@@ -11,6 +11,23 @@ steps.
 
 ---
 
+## 0. Get the code onto the default branch
+
+Vercel builds a project's **production** deployment from one branch, which
+defaults to the repository's default branch (`main`). Connecting Vercel before
+the milestone is merged produces a successful build of an empty site.
+
+Merge the milestone branch into `main` first — via a pull request on GitHub, or
+locally:
+
+```bash
+git checkout main
+git merge --ff-only claude/cardflare-project-init-tv2cxz
+git push origin main
+```
+
+Confirm `main` contains `src/` and `supabase/` on GitHub before continuing.
+
 ## 1. Create the Supabase project
 
 1. Sign in at <https://supabase.com> and create a new project.
@@ -185,6 +202,23 @@ correct. If you see data, stop and re-check step 2.
 [ ] Waitlist not readable via the public anon API
 [ ] Open Graph preview renders when shared
 ```
+
+## Operational gotchas worth knowing before launch
+
+**Supabase free-tier projects pause after a period of inactivity.** A paused
+project refuses connections, so waitlist submissions would fail with the
+generic error while the page still looks healthy. A pre-launch waitlist can
+easily sit idle long enough to trigger this. Check Supabase's current free-tier
+policy, and either keep the project active, move to a paid plan before
+promoting the site, or check the table after any quiet stretch.
+
+**Vercel's Hobby plan is for non-commercial use.** CardFlare is a commercial
+project, so review Vercel's current plan terms and budget for Pro if the
+project's use falls outside Hobby.
+
+**Nothing alerts you if signups stop working.** Until monitoring exists, submit
+a test signup yourself after any deployment and confirm the row lands in
+Supabase.
 
 ## Rollback
 
