@@ -4,8 +4,16 @@ import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
 import mark from "@public/brand/cardflare-mark.png";
 
+/**
+ * The mark is taller than it is wide, so it is sized by height and its width
+ * is derived from the file's own dimensions. Reading the aspect ratio from the
+ * static import means a future master with different proportions stays
+ * correctly shaped without touching this component.
+ */
+const ASPECT = mark.width / mark.height;
+
 interface LogoProps {
-  /** Rendered size of the mark in pixels. */
+  /** Rendered height of the mark in pixels. Width follows the artwork. */
   size?: number;
   /** Hides the wordmark, leaving the mark alone (used in tight spaces). */
   markOnly?: boolean;
@@ -29,7 +37,7 @@ export function Logo({
         src={mark}
         alt={markOnly ? `${SITE.name} logo` : ""}
         aria-hidden={markOnly ? undefined : true}
-        width={size}
+        width={Math.round(size * ASPECT)}
         height={size}
         priority={priority}
         className="shrink-0"

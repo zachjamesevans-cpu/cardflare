@@ -23,8 +23,23 @@ const COLOR = {
   textSecondary: "#b3becc",
 };
 
+/**
+ * Reads a PNG's dimensions from its IHDR chunk, which always sits at a fixed
+ * offset. Cheaper than a dependency for the one thing this file needs.
+ */
+function pngSize(buffer: Buffer) {
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
 export default async function OpengraphImage() {
-  const mark = await readFile(join(process.cwd(), "public/brand/cardflare-mark.png"));
+  const markPath = join(process.cwd(), "public/brand/cardflare-mark.png");
+  const mark = await readFile(markPath);
+
+  // The mark is taller than it is wide. Derive the width from the file so the
+  // card never stretches it, whatever proportions a future master has.
+  const { width: markWidth, height: markHeight } = pngSize(mark);
+  const MARK_HEIGHT = 76;
+  const markRenderWidth = Math.round(MARK_HEIGHT * (markWidth / markHeight));
 
   return new ImageResponse(
     <div
@@ -42,8 +57,8 @@ export default async function OpengraphImage() {
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <img
           src={`data:image/png;base64,${mark.toString("base64")}`}
-          width={72}
-          height={72}
+          width={markRenderWidth}
+          height={MARK_HEIGHT}
           alt=""
         />
         <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>

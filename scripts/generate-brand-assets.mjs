@@ -1,10 +1,11 @@
 /**
  * Regenerates optimized derivatives of the approved CardFlare logo.
  *
- * The approved master (public/brand/cardflare-logo.png) is never redrawn — it is
- * only losslessly re-encoded. The master ships as an opaque black square behind the
- * circular badge, so the web derivatives apply a circular alpha mask to drop the
- * black field. The badge artwork itself is untouched. See BRAND.md.
+ * The approved master (public/brand/cardflare-logo.png) is never redrawn or
+ * rewritten — it is only read. The master is a transparent PNG of the
+ * card-and-flare mark, drawn on a square canvas with uneven padding, so the
+ * derivatives trim to the artwork's own bounds and rebuild the padding
+ * deliberately for each context. See BRAND.md.
  *
  * Usage: npm run brand:assets
  */
@@ -15,72 +16,83 @@ import sharp from "sharp";
 const ROOT = resolve(import.meta.dirname, "..");
 const MASTER = resolve(ROOT, "public/brand/cardflare-logo.png");
 
-// Measured from the master: the badge circle's centre and radius in source pixels.
-// The radius is pulled in slightly so the anti-aliased edge (which blends toward
-// the black field) is clipped rather than left as a dark halo.
-const CIRCLE = { cx: 627, cy: 624, r: 615 };
+/**
+ * Backdrop for the square app icons.
+ *
+ * The mark's card face is dark, so a transparent icon risks vanishing into a
+ * dark browser tab strip or home screen. Sitting it on the brand background
+ * keeps it legible everywhere. Matches --color-canvas, nudged lighter so the
+ * icon reads as a distinct object rather than a hole in the page.
+ */
+const ICON_BACKDROP = "#12151b";
 
 async function write(path, buffer) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, buffer);
+  const { width, height } = await sharp(buffer).metadata();
   console.log(
-    `  ${path.replace(`${ROOT}/`, "")}  ${(buffer.length / 1024).toFixed(1)} KB`,
+    `  ${path.replace(`${ROOT}/`, "").padEnd(34)} ${`${width}x${height}`.padEnd(9)} ${(buffer.length / 1024).toFixed(1)} KB`,
   );
 }
 
-/**
- * Crops the master to the badge circle, scales it, and masks the surrounding
- * black field out. sharp always composites after resizing, so the mask is built
- * at the output size rather than the source size.
- */
-async function maskedBadge(size) {
-  const { cx, cy, r } = CIRCLE;
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`,
-  );
+const png = { compressionLevel: 9, effort: 10 };
 
-  return sharp(MASTER)
-    .extract({ left: cx - r, top: cy - r, width: r * 2, height: r * 2 })
-    .resize(size, size)
-    .composite([{ input: mask, blend: "dest-in" }])
-    .png({ compressionLevel: 9, effort: 10 })
+/** The master cropped to the artwork's own bounding box. */
+function trimmedMark() {
+  // threshold 1 trims on alpha, so only fully transparent padding is removed.
+  return sharp(MASTER).trim({ threshold: 1 });
+}
+
+/** Scales the trimmed mark to fit a square of `size`, leaving `margin` around it. */
+async function markInSquare(size, margin, background) {
+  const inner = size - margin * 2;
+  const art = await trimmedMark()
+    .resize({ width: inner, height: inner, fit: "inside" })
+    .toBuffer();
+
+  return sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: background ?? { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: art, gravity: "center" }])
+    .png(png)
     .toBuffer();
 }
 
 async function main() {
   console.log("Generating CardFlare brand assets…");
 
-  // The master is deliberately never rewritten: re-encoding it through sharp is
-  // not bit-lossless (colour-profile chunks are dropped), and it is an archival
-  // asset rather than something the page loads. Only the derivatives below are
-  // optimized, and those are what the site actually serves.
-
-  // Transparent circular mark used throughout the UI and as the favicon source.
-  for (const [path, size] of [
-    [resolve(ROOT, "public/brand/cardflare-mark.png"), 512],
-    [resolve(ROOT, "src/app/icon.png"), 256],
-  ]) {
-    await write(path, await maskedBadge(size));
-  }
-
-  // Apple touch icon: iOS squares and opaques the icon anyway, so bake the badge
-  // onto the brand background with padding instead of letting iOS crop it.
-  await write(
-    resolve(ROOT, "src/app/apple-icon.png"),
-    await sharp({
-      create: {
-        width: 180,
-        height: 180,
-        channels: 4,
-        background: "#12151b",
-      },
-    })
-      .composite([{ input: await maskedBadge(156) }])
-      .png({ compressionLevel: 9, effort: 10 })
-      .toBuffer(),
+  const { width, height } = await sharp(await trimmedMark().toBuffer()).metadata();
+  console.log(
+    `  master artwork ${width}x${height} (aspect ${(width / height).toFixed(3)})\n`,
   );
 
-  console.log("Done.");
+  // Primary mark: trimmed to the artwork, transparent. Used on the dark site
+  // and in the social card, where components control their own spacing.
+  await write(
+    resolve(ROOT, "public/brand/cardflare-mark.png"),
+    await trimmedMark().resize({ height: 512 }).png(png).toBuffer(),
+  );
+
+  // Favicon source. Square and backed, so it stays visible on any tab colour.
+  // Padding is kept tight — at 16px every pixel of artwork counts.
+  await write(
+    resolve(ROOT, "src/app/icon.png"),
+    await markInSquare(256, 12, ICON_BACKDROP),
+  );
+
+  // iOS home screen. iOS squares and opaques icons regardless, so the padding
+  // and background are baked in rather than left to the platform.
+  await write(
+    resolve(ROOT, "src/app/apple-icon.png"),
+    await markInSquare(180, 20, ICON_BACKDROP),
+  );
+
+  console.log("\nDone.");
 }
 
 await main();
