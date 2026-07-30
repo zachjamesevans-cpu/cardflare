@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/*
+ * CardFlare design tokens.
+ *
+ * This block is the single source of truth for the brand's colour, radius,
+ * shadow and motion scales. Changing the accent here changes it everywhere —
+ * never hardcode a literal brand colour in a component.
+ */
+@theme {
+  /* Surfaces — deep charcoal-navy, sampled around the logo's badge. */
+  --color-canvas: #0e1116;
+  --color-surface: #151a21;
+  --color-elevated: #1d242d;
+  --color-border: #2a323d;
+  --color-border-strong: #3a4553;
+
+  /* Accent — the faded neon lime from the approved CardFlare mark. */
+  --color-accent: #c6ee4f;
+  --color-accent-hover: #d3fa5f;
+  --color-accent-muted: #8ba635;
+  --color-accent-contrast: #0e1116;
+
+  /* Text */
+  --color-text-primary: #f2f5f7;
+  --color-text-secondary: #b3becc;
+  --color-text-muted: #8593a4;
+
+  /* Status */
+  --color-success: #6ee7a8;
+  --color-warning: #fbc85a;
+  --color-danger: #ff8f8f;
+
+  /* Radius */
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
+
+  /* Shadows and glow */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-panel: 0 24px 60px -24px rgb(0 0 0 / 0.85);
+  --shadow-glow: 0 0 32px -8px --alpha(var(--color-accent) / 45%);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 420ms;
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Type */
+  --font-sans: var(--font-brand-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-brand-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    /* Opt back into Next.js suppressing smooth scroll during route changes. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+  }
+
+  /*
+   * A single visible focus treatment for every interactive element. Uses
+   * :focus-visible so pointer users don't see rings on click.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+
+  /* Anchor targets clear the sticky header when jumped to. */
+  [id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  ::selection {
+    background-color: --alpha(var(--color-accent) / 30%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@utility glow-accent {
+  box-shadow: var(--shadow-glow);
+}
+
+/*
+ * Ambient background wash used behind the hero. Kept as a utility so the
+ * gradient stops live with the tokens instead of inside a component.
+ */
+@utility bg-flare-wash {
+  background-image:
+    radial-gradient(
+      60rem 32rem at 50% -12%,
+      --alpha(var(--color-accent) / 10%),
+      transparent 70%
+    ),
+    radial-gradient(
+      40rem 28rem at 85% 8%,
+      --alpha(var(--color-accent) / 5%),
+      transparent 70%
+    );
+}
