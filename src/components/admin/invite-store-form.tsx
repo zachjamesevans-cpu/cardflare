@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2, MailCheck, MailWarning } from "lucide-react";
+import { Loader2, MailCheck, MailWarning, MailX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
@@ -10,6 +10,7 @@ import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { inviteStoreAction } from "@/lib/stores/actions";
 import {
   INVITE_STORE_IDLE,
+  type InviteEmailOutcome,
   type InviteStoreFieldErrors,
   type InviteStoreState,
 } from "@/lib/stores/schema";
@@ -29,6 +30,54 @@ function errorFor(state: InviteStoreState, field: keyof InviteStoreFieldErrors) 
   return state.status === "error" ? state.fieldErrors[field] : undefined;
 }
 
+/**
+ * Reports what happened, distinguishing the two ways an email can not arrive.
+ *
+ * "Email is not set up yet" is a configuration task; "the provider rejected
+ * it" is a fault to investigate. Both leave the store perfectly usable, so
+ * neither is framed as a failure of the invitation itself.
+ */
+function InviteOutcome({
+  storeName,
+  email,
+}: {
+  storeName: string;
+  email: InviteEmailOutcome;
+}) {
+  const { Icon, tone, message } = {
+    sent: {
+      Icon: MailCheck,
+      tone: "text-accent",
+      message: "was invited, and the email is on its way.",
+    },
+    "not-configured": {
+      Icon: MailWarning,
+      tone: "text-warning",
+      message:
+        "was invited, but no email was sent because email is not configured yet. Tell them to sign in at cardflare.gg/login with this address — it works regardless.",
+    },
+    failed: {
+      Icon: MailX,
+      tone: "text-danger",
+      message:
+        "was invited, but the email provider rejected the message. Check the runtime logs. They can still sign in at cardflare.gg/login with this address.",
+    },
+  }[email];
+
+  return (
+    <p
+      role="status"
+      className="flex items-start gap-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-4 py-3 text-sm text-text-secondary"
+    >
+      <Icon className={`mt-0.5 size-4 shrink-0 ${tone}`} aria-hidden="true" />
+      <span>
+        <strong className="font-semibold text-text-primary">{storeName}</strong>{" "}
+        {message}
+      </span>
+    </p>
+  );
+}
+
 export function InviteStoreForm() {
   const [state, formAction] = useActionState(inviteStoreAction, INVITE_STORE_IDLE);
 
@@ -40,30 +89,7 @@ export function InviteStoreForm() {
   return (
     <div className="flex flex-col gap-4">
       {state.status === "success" && (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-4 py-3 text-sm text-text-secondary"
-        >
-          {state.emailSent ? (
-            <MailCheck
-              className="mt-0.5 size-4 shrink-0 text-accent"
-              aria-hidden="true"
-            />
-          ) : (
-            <MailWarning
-              className="mt-0.5 size-4 shrink-0 text-warning"
-              aria-hidden="true"
-            />
-          )}
-          <span>
-            <strong className="font-semibold text-text-primary">
-              {state.storeName}
-            </strong>{" "}
-            {state.emailSent
-              ? "was invited and the email is on its way."
-              : "was invited, but the email did not send. They can still sign in — pass the link on yourself."}
-          </span>
-        </p>
+        <InviteOutcome storeName={state.storeName} email={state.email} />
       )}
 
       <form
