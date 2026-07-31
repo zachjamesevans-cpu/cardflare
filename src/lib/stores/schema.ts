@@ -31,9 +31,18 @@ export type InviteStoreInput = z.infer<typeof inviteStoreSchema>;
 
 export type InviteStoreFieldErrors = Partial<Record<keyof InviteStoreInput, string>>;
 
+/**
+ * Why the invitation email did or did not go out.
+ *
+ * Kept distinct from a plain boolean because "email is not configured yet" and
+ * "the provider rejected it" need completely different responses from an
+ * admin, and flattening them into `false` hides which one happened.
+ */
+export type InviteEmailOutcome = "sent" | "not-configured" | "failed";
+
 export type InviteStoreState =
   | { status: "idle" }
-  | { status: "success"; storeName: string; emailSent: boolean }
+  | { status: "success"; storeName: string; email: InviteEmailOutcome }
   | {
       status: "error";
       message: string;

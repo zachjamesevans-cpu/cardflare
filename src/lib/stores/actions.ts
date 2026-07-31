@@ -82,6 +82,6 @@ export async function inviteStoreAction(
   return {
     status: "success",
     storeName: result.store.name,
-    emailSent: email.status === "sent",
+    email: email.status === "skipped" ? "not-configured" : email.status,
   };
 }
