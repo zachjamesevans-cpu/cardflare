@@ -13,9 +13,11 @@ and meet up to trade in person.
 
 ## Current status
 
-The public splash page and waitlist are built and tested. **The application
-itself — event rooms, authentication, card search, matching, trading — has not
-been built yet.**
+The public splash page and waitlist are **live at https://cardflare.gg**.
+
+**The application itself — event rooms, authentication, card search, matching,
+trading — has not been built yet.** The landing page says so, and must keep
+saying so until it is true.
 
 ## Documentation
 

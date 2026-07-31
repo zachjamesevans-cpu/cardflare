@@ -62,9 +62,10 @@ faster or more likely to happen.
 
 ## Current status
 
-**Milestone 1 (public splash page and waitlist) is complete.** The application
-itself — event rooms, authentication, card search, matching, trading — has not
-been built. See [ROADMAP.md](./ROADMAP.md) for the intended sequence.
+**Milestone 1 (public splash page and waitlist) is live at
+https://cardflare.gg.** The application itself — event rooms, authentication,
+card search, matching, trading — has not been built. See
+[ROADMAP.md](./ROADMAP.md) for the intended sequence.
 
 The landing page must not imply the product has launched. Copy says CardFlare
 "is currently being built and preparing for its first local-store pilots".

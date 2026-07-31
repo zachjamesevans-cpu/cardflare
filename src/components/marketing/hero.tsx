@@ -1,7 +1,7 @@
 import { EventRoomPreview } from "@/components/app-preview/event-room-preview";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
-import { WAITLIST_ANCHOR } from "@/lib/site";
+import { ANCHORS, WAITLIST_ANCHOR } from "@/lib/site";
 
 export function Hero() {
   return (
@@ -34,7 +34,7 @@ export function Hero() {
               Join the Waitlist
             </ButtonLink>
             <ButtonLink
-              href="#how-it-works"
+              href={ANCHORS.howItWorks}
               variant="secondary"
               size="lg"
               className="w-full sm:w-auto"

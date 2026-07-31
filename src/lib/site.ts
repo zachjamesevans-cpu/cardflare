@@ -24,10 +24,27 @@ export function siteUrl(): string {
   return "http://localhost:3000";
 }
 
+/**
+ * Links to sections of the landing page.
+ *
+ * These must stay root-relative (`/#id`) rather than bare fragments (`#id`).
+ * The header and footer render on the legal pages too, and a bare fragment
+ * there only rewrites the address bar: the target element does not exist on
+ * `/privacy`, so the browser has nothing to scroll to and the visitor is
+ * stranded. With the leading slash the browser navigates home first, then
+ * scrolls. On the landing page itself it still resolves to a same-page jump.
+ */
+export const ANCHORS = {
+  howItWorks: "/#how-it-works",
+  forPlayers: "/#for-players",
+  forStores: "/#for-stores",
+  waitlist: "/#waitlist",
+} as const;
+
 export const NAV_LINKS = [
-  { href: "#how-it-works", label: "How It Works" },
-  { href: "#for-players", label: "For Players" },
-  { href: "#for-stores", label: "For Stores" },
+  { href: ANCHORS.howItWorks, label: "How It Works" },
+  { href: ANCHORS.forPlayers, label: "For Players" },
+  { href: ANCHORS.forStores, label: "For Stores" },
 ] as const;
 
-export const WAITLIST_ANCHOR = "#waitlist";
+export const WAITLIST_ANCHOR = ANCHORS.waitlist;
