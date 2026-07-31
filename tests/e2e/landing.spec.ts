@@ -1,4 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * On small screens the nav lives behind a disclosure, so its links are not in
+ * the document until the menu is opened. On desktop it is always present.
+ */
+async function openNav(page: Page, isMobile: boolean | undefined) {
+  if (isMobile) {
+    await page.getByRole("button", { name: /open menu/i }).click();
+  }
+}
 
 test.describe("landing page", () => {
   test("loads with the core proposition and branding", async ({ page }) => {
@@ -100,4 +110,45 @@ test.describe("legal pages", () => {
     await page.getByRole("link", { name: "Privacy" }).click();
     await expect(page).toHaveURL(/\/privacy$/);
   });
+
+  /*
+   * Regression: these anchors were bare fragments (`#waitlist`), which do
+   * nothing on a page that has no such element. Clicking the header CTA on
+   * /privacy just rewrote the address bar and stranded the visitor.
+   */
+  for (const path of ["/privacy", "/terms"] as const) {
+    test(`header CTA on ${path} reaches the waitlist form`, async ({
+      page,
+      isMobile,
+    }) => {
+      await page.goto(path);
+      await openNav(page, isMobile);
+
+      await page
+        .getByRole("navigation", { name: "Main" })
+        .getByRole("link", { name: "Join the Waitlist" })
+        .click();
+
+      await expect(page).toHaveURL(/\/#waitlist$/);
+      await expect(page.getByLabel("Email address")).toBeInViewport();
+    });
+
+    test(`section links on ${path} reach the landing page`, async ({
+      page,
+      isMobile,
+    }) => {
+      await page.goto(path);
+      await openNav(page, isMobile);
+
+      await page
+        .getByRole("navigation", { name: "Main" })
+        .getByRole("link", { name: "How It Works" })
+        .click();
+
+      await expect(page).toHaveURL(/\/#how-it-works$/);
+      await expect(
+        page.getByRole("heading", { name: "Three steps to a trade" }),
+      ).toBeInViewport();
+    });
+  }
 });

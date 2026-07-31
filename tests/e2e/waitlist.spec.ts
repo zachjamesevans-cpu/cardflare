@@ -2,9 +2,23 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The form blocks submissions completed faster than a human could manage.
- * Tests fill instantly, so wait past that threshold before submitting.
+ * Tests fill instantly, so they have to wait past that threshold.
  */
 const MIN_FILL_MS = 2_000;
+
+/**
+ * Waits out the minimum-fill window, measured from the right moment.
+ *
+ * The timestamp the server checks is stamped on hydration, not on navigation.
+ * Starting the clock at `goto` therefore races: under parallel load hydration
+ * can lag far enough that the click still lands inside the window, and the
+ * submission is silently classified as a bot — the form reports success and
+ * nothing is stored. Wait for the field to be populated first.
+ */
+async function settleFillWindow(page: Page) {
+  await expect(page.locator('input[name="form_rendered_at"]')).not.toHaveValue("");
+  await page.waitForTimeout(MIN_FILL_MS);
+}
 
 async function fillValidForm(page: Page, email: string) {
   await page.goto("/#waitlist");
@@ -14,7 +28,7 @@ async function fillValidForm(page: Page, email: string) {
   await page.getByLabel(/which best describes you/i).selectOption("player");
   await page.getByRole("checkbox").check();
 
-  await page.waitForTimeout(MIN_FILL_MS);
+  await settleFillWindow(page);
 }
 
 test.describe("waitlist form", () => {
@@ -38,7 +52,7 @@ test.describe("waitlist form", () => {
 
   test("shows useful messages for an empty submission", async ({ page }) => {
     await page.goto("/#waitlist");
-    await page.waitForTimeout(MIN_FILL_MS);
+    await settleFillWindow(page);
 
     await page.getByRole("button", { name: /join the waitlist/i }).click();
 
@@ -56,7 +70,7 @@ test.describe("waitlist form", () => {
     await page.getByLabel("Email address").fill("not-an-email");
     await page.getByLabel(/which best describes you/i).selectOption("player");
     await page.getByRole("checkbox").check();
-    await page.waitForTimeout(MIN_FILL_MS);
+    await settleFillWindow(page);
 
     await page.getByRole("button", { name: /join the waitlist/i }).click();
 
@@ -75,7 +89,7 @@ test.describe("waitlist form", () => {
     await page.getByLabel("State or region").fill("TX");
     await page.getByLabel("Local game store").fill("Grand Line Games");
     await page.getByRole("checkbox").check();
-    await page.waitForTimeout(MIN_FILL_MS);
+    await settleFillWindow(page);
 
     await page.getByRole("button", { name: /join the waitlist/i }).click();
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
@@ -97,7 +111,7 @@ test.describe("waitlist form", () => {
     await page.getByLabel("Email address").fill("not-an-email");
     await page.getByLabel(/which best describes you/i).selectOption("player");
     await page.getByRole("checkbox").check();
-    await page.waitForTimeout(MIN_FILL_MS);
+    await settleFillWindow(page);
     await page.getByRole("button", { name: /join the waitlist/i }).click();
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
 
@@ -112,7 +126,7 @@ test.describe("waitlist form", () => {
 
   test("marks invalid fields for assistive technology", async ({ page }) => {
     await page.goto("/#waitlist");
-    await page.waitForTimeout(MIN_FILL_MS);
+    await settleFillWindow(page);
 
     await page.getByRole("button", { name: /join the waitlist/i }).click();
 
