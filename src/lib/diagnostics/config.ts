@@ -86,11 +86,25 @@ function fromAddressCheck(): ConfigCheck {
     };
   }
 
+  const displayName = angled ? raw.slice(0, raw.lastIndexOf("<")).trim() : "";
+
+  // A bare address is valid and sends fine, but mail clients fall back to the
+  // local part for the sender name — so "hello@cardflare.gg" arrives in the
+  // inbox as "hello", which is not a brand.
+  if (!displayName) {
+    return {
+      label,
+      variable,
+      status: "warn",
+      detail: `Sending as ${address} with no display name, so inboxes will show "${address.split("@")[0]}" as the sender. Use "CardFlare <${address}>" instead.`,
+    };
+  }
+
   return {
     label,
     variable,
     status: "ok",
-    detail: `Sending as ${address} — this domain must be verified with the provider.`,
+    detail: `Sending as ${displayName} <${address}> — this domain must be verified with the provider.`,
   };
 }
 
