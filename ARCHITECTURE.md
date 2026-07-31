@@ -134,10 +134,11 @@ Three properties are deliberate:
 - **`sendEmail` never throws**, and the scheduled callback catches anything
   regardless, since it runs detached from the request.
 
-Absent `RESEND_API_KEY` and `WAITLIST_FROM_EMAIL`, sending is skipped and the
-waitlist behaves exactly as before. The client talks to the REST API with
-`fetch` rather than the SDK — one endpoint, four fields, not worth a
-dependency.
+Absent `RESEND_API_KEY` and `CARDFLARE_FROM_EMAIL`, sending is skipped and the
+waitlist behaves exactly as before. The same pair governs store invites, which
+is why the variable is named for the product rather than for the waitlist. The
+client talks to the REST API with `fetch` rather than the SDK — one endpoint,
+four fields, not worth a dependency.
 
 ### Known limitation: rate limiter scope
 
