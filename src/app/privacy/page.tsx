@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "30 July 2026";
+const LAST_UPDATED = "31 July 2026";
 
 export default function PrivacyPage() {
   return (
@@ -32,7 +32,8 @@ export default function PrivacyPage() {
             game store, and your comment.
           </li>
           <li>
-            Whether you consented to receive updates, and the page the signup came from.
+            Whether you opted in to the wider updates, and the page the signup came
+            from.
           </li>
         </ul>
         <p>
@@ -54,9 +55,18 @@ export default function PrivacyPage() {
 
       <LegalSection heading="Email">
         <p>
-          We only email you if you ticked the consent box when you signed up. Every
-          email we send includes a way to unsubscribe, and unsubscribing does not remove
-          you from the waitlist itself &mdash; tell us if you want both.
+          Joining the waitlist is a request to hear when {SITE.name} launches, so we
+          email you a confirmation and, later, launch news. That is the list you asked
+          to be on.
+        </p>
+        <p>
+          The optional box at the bottom of the form is separate: tick it and we may
+          also send news, event announcements and trading tips. Leave it unticked and we
+          will not.
+        </p>
+        <p>
+          Every email we send includes a way to unsubscribe, and unsubscribing does not
+          remove you from the waitlist itself &mdash; tell us if you want both.
         </p>
       </LegalSection>
 

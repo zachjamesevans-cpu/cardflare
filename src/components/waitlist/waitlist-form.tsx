@@ -117,7 +117,6 @@ export function WaitlistForm() {
   }
 
   const generalError = state.status === "error" ? state.message : undefined;
-  const consentError = errorFor(state, "marketingConsent");
 
   return (
     <form
@@ -280,15 +279,19 @@ export function WaitlistForm() {
         </Field>
       </fieldset>
 
+      {/*
+       * Optional. Launch news is sent regardless — that is what joining the
+       * list asks for — so this covers the wider updates only, and carries no
+       * error state because there is no wrong answer.
+       */}
       <Checkbox
         id="marketingConsent"
         name="marketingConsent"
-        error={consentError}
-        errorId={fieldIds("marketingConsent").errorId}
         label={
           <>
-            Email me CardFlare product and launch updates. We will not sell your
-            information, and you can unsubscribe from any email.
+            Optional: also email me CardFlare news, event announcements and trading
+            tips. We will not sell your information, and you can unsubscribe from any
+            email.
           </>
         }
       />

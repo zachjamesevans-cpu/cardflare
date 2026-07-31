@@ -172,11 +172,22 @@ describe("submitWaitlist", () => {
     });
   });
 
-  it("rejects a submission that did not consent", async () => {
+  it("stores a submission that declined the optional updates", async () => {
     const result = await submit(formData({}, ["marketingConsent"]));
 
-    expect(result.status).toBe("error");
-    expect(insertWaitlistSignup).not.toHaveBeenCalled();
+    expect(result.status).toBe("success");
+    expect(insertWaitlistSignup).toHaveBeenCalledWith(
+      expect.objectContaining({ marketingConsent: false }),
+      null,
+    );
+  });
+
+  // Declining the wider updates must not cost them the confirmation, which is
+  // the transactional half and the reason they filled the form in.
+  it("still sends the confirmation when the box was left unticked", async () => {
+    await submit(formData({}, ["marketingConsent"]));
+
+    expect(sendEmail).toHaveBeenCalledOnce();
   });
 
   it("rejects a user type that is not on the allow-list", async () => {

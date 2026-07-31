@@ -56,9 +56,17 @@ export const waitlistSubmissionSchema = z.object({
   region: optionalText(80),
   storeName: optionalText(120),
   comment: optionalText(500),
-  marketingConsent: z.literal(true, {
-    message: "Please confirm you'd like to receive CardFlare updates.",
-  }),
+  /**
+   * Optional, and deliberately so.
+   *
+   * Joining a waitlist is a request to be told when the thing launches, so
+   * that email is the service being asked for rather than marketing consent
+   * to collect. Requiring a tick to permit the only message the list exists to
+   * send is a checkbox for its own sake, and consent conditioned on access is
+   * the kind that regulators treat as not freely given. The box now covers the
+   * wider updates, where a real yes or no means something.
+   */
+  marketingConsent: z.boolean(),
   referralCode: optionalText(64),
 });
 

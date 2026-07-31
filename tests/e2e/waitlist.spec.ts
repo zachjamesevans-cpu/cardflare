@@ -58,9 +58,33 @@ test.describe("waitlist form", () => {
 
     await expect(page.getByText("Please enter your first name.")).toBeVisible();
     await expect(page.getByText("Please enter your email address.")).toBeVisible();
-    await expect(
-      page.getByText(/confirm you'd like to receive CardFlare updates/i),
-    ).toBeVisible();
+
+    // The consent box is optional, so an empty form must not complain about it.
+    await expect(page.getByText(/CardFlare news, event announcements/i)).toBeVisible();
+    await expect(page.getByRole("checkbox")).not.toHaveAttribute("aria-invalid");
+  });
+
+  /*
+   * The box was once required, so leaving it unticked blocked the signup.
+   *
+   * Deliberately submitted with a bad email rather than a good one: validation
+   * reports every field at once, so an unticked box that produced no error
+   * alongside one that did proves consent is optional — without spending the
+   * shared rate-limit budget that a valid submission would.
+   */
+  test("does not complain about an unticked consent box", async ({ page }) => {
+    await page.goto("/#waitlist");
+
+    await page.getByLabel("First name").fill("Zach");
+    await page.getByLabel("Email address").fill("not-an-email");
+    await page.getByLabel(/which best describes you/i).selectOption("player");
+    await expect(page.getByRole("checkbox")).not.toBeChecked();
+
+    await settleFillWindow(page);
+    await page.getByRole("button", { name: /join the waitlist/i }).click();
+
+    await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
+    await expect(page.getByRole("checkbox")).not.toHaveAttribute("aria-invalid");
   });
 
   test("rejects a malformed email with an inline message", async ({ page }) => {
