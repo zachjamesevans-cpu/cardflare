@@ -33,8 +33,10 @@ src/components/
   ui/                  Design system primitives
   waitlist/            Waitlist form and success state
 src/lib/
-  email/               Provider client and the confirmation template
-  supabase/            Service-role client and schema types
+  auth/                Session, viewer roles, guards, sign-in actions
+  email/               Provider client and message templates
+  stores/              Store invitation schema, repository, actions
+  supabase/            Browser/server/service-role clients and schema types
   waitlist/            Schema, parsing, repository, server action
 supabase/migrations/   SQL migrations
 tests/unit/            Vitest
@@ -143,6 +145,68 @@ The limiter is in-memory, so under serverless fan-out it throttles per instance
 rather than globally. That is an accepted launch trade-off — it stops a naive
 flood at zero cost. Swap `checkRateLimit` for a shared store (Upstash, or a
 Postgres counter) if abuse appears.
+
+## Authentication and roles
+
+Identity comes from Supabase Auth, by emailed magic link. There are no
+passwords to store, reset, or leak.
+
+`getViewer()` resolves the caller to one of four shapes — `anonymous`,
+`admin`, `store`, `unaffiliated` — and every guard derives from it. It calls
+`getUser()` rather than `getSession()`: the latter reads the cookie without
+verifying it, so it can be forged, and this result gates the admin console.
+
+| Area     | Who reaches it                                                 |
+| -------- | -------------------------------------------------------------- |
+| `/admin` | Accounts listed in `admin_users`                               |
+| `/store` | Accounts with a row in `store_members`                         |
+| `/login` | Anyone, but a link is only sent to accounts that already exist |
+
+**Admins are an explicit allow-list with no self-service path.** Rows go into
+`admin_users` by hand, in SQL.
+
+**Guards live in the action, not only the page.** A Server Action is a public
+POST endpoint, so hiding a form hides nothing; `inviteStoreAction` re-checks
+the viewer itself. The admin layout and the admin page each guard separately
+too — a layout is not a security boundary, and a page added later should not
+inherit the appearance of protection without the substance.
+
+**Sign-in reveals nothing.** `shouldCreateUser` is off and the response is
+identical whether or not the address belongs to a store, so the form cannot be
+used to enumerate who is in the beta.
+
+**Redirects are constrained to this origin.** `safeNextPath` rejects absolute,
+protocol-relative and backslash-prefixed targets; without it `?next=` would be
+an open redirect wearing CardFlare's credibility.
+
+### Invitations
+
+Deliberately tokenless. Supabase Auth already proves control of an inbox, so a
+second homegrown secret would add cryptography to maintain without adding
+security. An invite is a row keyed by email; on first sign-in the server
+matches it against the address Supabase has verified, creates the membership,
+and marks the store active. Consumed with the service role, because
+`store_invites` is unreadable through the public API.
+
+Re-running is harmless — it is a no-op once accepted — so a failed membership
+insert simply retries on the next sign-in.
+
+### Row Level Security
+
+Policies key off `auth.uid()` through two `SECURITY DEFINER` helpers,
+`is_admin()` and `is_store_member()`. They exist because a policy on `stores`
+that queried `store_members` directly would trigger that table's own policies,
+which reference `stores` — infinite recursion. Both pin `search_path`, since a
+definer function resolving names through the caller's path is an escalation
+route.
+
+There are **no insert, update or delete policies anywhere**. Every write goes
+through the service role after an application-level authorisation check. A
+store can read its own row and nothing else; it cannot edit even that.
+
+Verified against a real PostgreSQL instance: a store owner sees only their own
+store, cannot read the admin list or invitations, cannot edit their store, and
+cannot promote themselves to admin.
 
 ## Design system
 
