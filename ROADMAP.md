@@ -5,7 +5,11 @@ begins. See [PRODUCT.md](./PRODUCT.md) for scope boundaries.
 
 ## ✅ Milestone 1 — Public splash page and waitlist
 
-**Status: complete, pending deployment by the project owner.**
+**Status: shipped and live at https://cardflare.gg.**
+
+Verified in production by the project owner: signups persist to Supabase,
+duplicates return the friendly response, and the waitlist is confirmed
+unreadable through the public API (the anon key returns a permission error).
 
 - Landing page: navigation, hero, how it works, for players, for stores,
   product preview, early access, waitlist, footer
@@ -54,16 +58,16 @@ Trade confirmation, quantity updates, trade history, event analytics.
 
 Tracked so they are not lost, none blocking launch.
 
-| Item                         | Notes                                                                                                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Confirmation email**       | Deliberately not built. Requires a verified sending domain; sending before DNS and sender configuration are valid damages deliverability. Add once `cardflare.gg` DNS is live. |
-| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                           |
-| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                |
-| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                          |
-| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                            |
-| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                     |
-| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                 |
-| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                 |
+| Item                         | Notes                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Confirmation email**       | **Now unblocked** — `cardflare.gg` DNS is live, so a sender domain can be verified. Was deliberately deferred because sending from an unverified domain damages deliverability. |
+| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                            |
+| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                 |
+| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                           |
+| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                             |
+| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                      |
+| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                  |
+| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                  |
 
 ## Dependency advisories
 
