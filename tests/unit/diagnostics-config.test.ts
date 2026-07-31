@@ -54,10 +54,26 @@ describe("configGroups", () => {
     expect(check("CARDFLARE_FROM_EMAIL").detail).toContain("hello@cardflare.gg");
   });
 
-  it("accepts a bare address as well as the display-name form", () => {
+  /*
+   * A bare address sends perfectly well, so this is a warning rather than a
+   * failure — but mail clients fall back to the local part, and the first
+   * emails CardFlare ever sent arrived from "hello" rather than "CardFlare".
+   */
+  it("warns when the address carries no display name", () => {
     process.env.CARDFLARE_FROM_EMAIL = "hello@cardflare.gg";
 
-    expect(check("CARDFLARE_FROM_EMAIL").status).toBe("ok");
+    const result = check("CARDFLARE_FROM_EMAIL");
+    expect(result.status).toBe("warn");
+    expect(result.detail).toContain('"hello"');
+    expect(result.detail).toContain("CardFlare <hello@cardflare.gg>");
+  });
+
+  it("reports the display name when one is set", () => {
+    process.env.CARDFLARE_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+
+    const result = check("CARDFLARE_FROM_EMAIL");
+    expect(result.status).toBe("ok");
+    expect(result.detail).toContain("CardFlare <hello@cardflare.gg>");
   });
 
   it("flags a malformed address rather than calling it configured", () => {
