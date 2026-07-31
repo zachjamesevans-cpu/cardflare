@@ -77,12 +77,25 @@ Required from Milestone 2 onward, since stores sign in with a magic link.
 
 In Supabase → **Authentication → URL Configuration**:
 
-- **Site URL**: `https://cardflare.gg`
-- **Redirect URLs**: add `https://cardflare.gg/auth/callback`, plus
-  `http://localhost:3000/auth/callback` for local work.
+- **Site URL**: `https://cardflare.gg`. Leaving this at the default
+  `http://localhost:3000` is the usual cause of a sign-in link that lands on a
+  dead localhost page.
+- **Redirect URLs**:
 
-A redirect URL that is not on this list is refused, and the magic link will
-appear to do nothing.
+  ```
+  https://cardflare.gg/auth/callback
+  https://cardflare.gg/auth/callback**
+  http://localhost:3000/auth/callback**
+  ```
+
+**The `**` entries are required, not belt-and-braces.** The app appends
+`?next=…` to the callback, and an exact-match entry does not cover a URL that
+carries a query string.
+
+A redirect that is not matched by this list is silently **discarded** — Supabase
+falls back to Site URL rather than reporting an error. The symptom is a link
+that goes to the wrong host and the wrong path, which reads like a broken
+email rather than a missing setting.
 
 > **Auth emails come from Supabase, not Resend.** By default they are sent from
 > Supabase's shared sender with their branding, and the free tier rate-limits
