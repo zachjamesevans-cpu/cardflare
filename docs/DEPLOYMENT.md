@@ -179,6 +179,64 @@ curl "https://<project-ref>.supabase.co/rest/v1/waitlist_signups" \
 You must **not** get signup rows back. An empty array or a permission error is
 correct. If you see data, stop and re-check step 2.
 
+## 11. Confirmation email (optional)
+
+New signups get a confirmation email once this is configured. Until then the
+waitlist works exactly as before and simply sends nothing — the feature is
+inert, not broken, when the variables are absent.
+
+**Do this only after `cardflare.gg` DNS is live.** Sending from an unverified
+domain gets messages filtered or refused, and a domain that starts out sending
+unauthenticated mail carries that reputation forward.
+
+### Verify the sending domain
+
+1. Create an account at <https://resend.com>.
+2. **Domains → Add Domain** → `cardflare.gg`.
+3. Resend shows a set of DNS records — typically DKIM, SPF and a DMARC
+   suggestion. Add each to GoDaddy exactly as shown, the same way you added
+   Vercel's records.
+4. Wait for Resend to report the domain as **Verified**.
+
+As with Vercel's records, copy them from Resend's dashboard. They are unique to
+your domain and are not written down here.
+
+> Adding these does not affect the Vercel records already in place. Mail records
+> and website records coexist; just don't edit or delete the existing ones.
+
+### Add the two variables
+
+**API Keys → Create API Key**, then in Vercel → Settings → Environment
+Variables:
+
+| Name                  | Value                            | Environments        |
+| --------------------- | -------------------------------- | ------------------- |
+| `RESEND_API_KEY`      | The key from Resend              | Production, Preview |
+| `WAITLIST_FROM_EMAIL` | `CardFlare <hello@cardflare.gg>` | Production, Preview |
+
+Both are required. One without the other counts as unconfigured and nothing
+sends. The address must be on the domain you just verified.
+
+Then **Deployments → ⋯ → Redeploy**, as with any environment variable change.
+
+### Check it
+
+Sign up with an address you can read. You should receive the confirmation
+within a minute or so.
+
+- [ ] Email arrives, and lands in the inbox rather than spam
+- [ ] The name shown is the one submitted
+- [ ] Signing up **again** with the same address sends **no** second email
+- [ ] Resend's dashboard shows the send under **Emails**
+
+That third check matters: the email fires only when a row is actually created.
+That is what stops the form being used to flood someone else's inbox by
+resubmitting their address.
+
+If nothing arrives, check Resend's **Emails** log first — it distinguishes
+"never sent" from "sent and bounced". A `403` or `422` in Vercel's runtime logs
+usually means the domain is not verified or the from address is off-domain.
+
 ---
 
 ## Deployment checklist
@@ -201,6 +259,7 @@ correct. If you see data, stop and re-check step 2.
 [ ] Duplicate submission handled gracefully
 [ ] Waitlist not readable via the public anon API
 [ ] Open Graph preview renders when shared
+[ ] (optional) Resend domain verified and confirmation email arriving
 ```
 
 ## Operational gotchas worth knowing before launch
