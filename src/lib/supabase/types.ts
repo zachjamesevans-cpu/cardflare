@@ -1,7 +1,7 @@
 /**
  * Hand-maintained mirror of the SQL in supabase/migrations.
  *
- * Regenerate with the Supabase CLI once the project exists:
+ * Regenerate with the Supabase CLI once convenient:
  *   npx supabase gen types typescript --project-id <id> > src/lib/supabase/types.ts
  *
  * These must be `type` aliases rather than `interface`s: supabase-js constrains
@@ -12,6 +12,8 @@
 import type { UserType } from "@/lib/waitlist/schema";
 
 export type WaitlistStatus = "active" | "unsubscribed" | "bounced";
+export type StoreStatus = "invited" | "active" | "paused";
+export type StoreRole = "owner" | "staff";
 
 export type WaitlistSignupRow = {
   id: string;
@@ -39,21 +41,89 @@ export type WaitlistSignupInsert = Omit<
   status?: WaitlistStatus;
 };
 
+export type StoreRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  contact_email: string;
+  city: string | null;
+  region: string | null;
+  status: StoreStatus;
+  is_pilot: boolean;
+};
+
+/** Columns with database defaults are optional on insert. */
+export type StoreInsert = Omit<
+  StoreRow,
+  "id" | "created_at" | "status" | "is_pilot"
+> & {
+  id?: string;
+  created_at?: string;
+  status?: StoreStatus;
+  is_pilot?: boolean;
+};
+
+export type StoreMemberRow = {
+  store_id: string;
+  user_id: string;
+  role: StoreRole;
+  created_at: string;
+};
+
+export type StoreMemberInsert = Omit<StoreMemberRow, "created_at" | "role"> & {
+  role?: StoreRole;
+  created_at?: string;
+};
+
+export type StoreInviteRow = {
+  id: string;
+  store_id: string;
+  email: string;
+  created_at: string;
+  invited_by: string | null;
+  accepted_at: string | null;
+  accepted_by: string | null;
+};
+
+export type StoreInviteInsert = Omit<
+  StoreInviteRow,
+  "id" | "created_at" | "accepted_at" | "accepted_by"
+> & {
+  id?: string;
+  created_at?: string;
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+};
+
+export type AdminUserRow = {
+  user_id: string;
+  created_at: string;
+  note: string | null;
+};
+
+type Table<Row, Insert> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Partial<Insert>;
+  Relationships: [];
+};
+
 export type Database = {
   public: {
     Tables: {
-      waitlist_signups: {
-        Row: WaitlistSignupRow;
-        Insert: WaitlistSignupInsert;
-        Update: Partial<WaitlistSignupInsert>;
-        Relationships: [];
-      };
+      waitlist_signups: Table<WaitlistSignupRow, WaitlistSignupInsert>;
+      stores: Table<StoreRow, StoreInsert>;
+      store_members: Table<StoreMemberRow, StoreMemberInsert>;
+      store_invites: Table<StoreInviteRow, StoreInviteInsert>;
+      admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: {
       waitlist_user_type: UserType;
       waitlist_status: WaitlistStatus;
+      store_status: StoreStatus;
+      store_role: StoreRole;
     };
     CompositeTypes: Record<string, never>;
   };

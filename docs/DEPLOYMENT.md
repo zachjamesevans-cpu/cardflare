@@ -73,9 +73,45 @@ select * from pg_policies where tablename = 'waitlist_signups';
 
 ## 3. Authentication URLs
 
-Milestone 1 uses no Supabase Auth, so **no configuration is required now**.
-When Milestone 2 adds authentication, set **Authentication → URL Configuration
-→ Site URL** to `https://cardflare.gg` and add preview URLs as redirect URLs.
+Required from Milestone 2 onward, since stores sign in with a magic link.
+
+In Supabase → **Authentication → URL Configuration**:
+
+- **Site URL**: `https://cardflare.gg`
+- **Redirect URLs**: add `https://cardflare.gg/auth/callback`, plus
+  `http://localhost:3000/auth/callback` for local work.
+
+A redirect URL that is not on this list is refused, and the magic link will
+appear to do nothing.
+
+> **Auth emails come from Supabase, not Resend.** By default they are sent from
+> Supabase's shared sender with their branding, and the free tier rate-limits
+> them sharply. To send from `cardflare.gg` instead, set Resend's SMTP details
+> under **Project Settings → Authentication → SMTP Settings**. Configuration
+> only — no code change.
+
+### Make yourself an admin
+
+Admins are an explicit allow-list; there is no self-service path into it, by
+design. Sign in once at `/login` so an account exists, then run this in the
+**SQL Editor**:
+
+```sql
+insert into public.admin_users (user_id, note)
+select id, 'founder'
+  from auth.users
+ where email = 'you@example.com'
+on conflict (user_id) do nothing;
+```
+
+Confirm it took effect:
+
+```sql
+select u.email from public.admin_users a join auth.users u on u.id = a.user_id;
+```
+
+`/admin` is now reachable for that account. Anyone else signing in lands on
+`/store`, and sees only their own store.
 
 ## 4. Connect the repository to Vercel
 

@@ -22,14 +22,30 @@ unreadable through the public API (the anon key returns a permission error).
 - Confirmation email for new signups (inert until a sending domain is verified —
   see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) step 11)
 
+## 🚧 Milestone 2 — Foundations (in progress)
+
+Shipped so far:
+
+- Supabase Auth magic-link sign-in for stores; no passwords anywhere
+- `admin_users`, `stores`, `store_members`, `store_invites` with RLS,
+  verified against a real PostgreSQL instance
+- Admin console at `/admin`: invite a store, see stores and pending invites
+- Tokenless invitations, consumed on first sign-in against the verified email
+- Branded store invitation email
+- `/store` placeholder confirming a store is set up
+
+Still to come in this milestone:
+
+- Guest player sessions (join by QR, display name only, no account)
+
+**Beta rollout decisions taken.** Invitations gate _stores_, not players: a
+player at the counter must be able to scan and join in seconds, so gating that
+behind an emailed invite would break the core loop exactly where it matters.
+Admins can create events directly, so the first pilot needs nothing from the
+store but a printed QR code, and store self-service can follow once a real
+event has been observed.
+
 ## ⏸ Awaiting approval
-
-Do not start these until Milestone 1 is approved.
-
-### Milestone 2 — Foundations
-
-Supabase application schema, player authentication, guest sessions, store
-accounts, Row Level Security.
 
 ### Milestone 3 — Events
 
