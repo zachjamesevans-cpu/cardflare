@@ -1,3 +1,4 @@
+import { text } from "@/lib/form-value";
 import {
   ECHOED_FIELDS,
   toFieldErrors,
@@ -31,11 +32,6 @@ export type ParsedWaitlistForm =
       values: WaitlistFormValues;
     }
   | { kind: "valid"; data: WaitlistSubmission };
-
-function text(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
-}
 
 /** Longest string echoed back to the form, so a huge paste cannot bloat the response. */
 const MAX_ECHOED_LENGTH = 512;

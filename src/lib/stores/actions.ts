@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
+import { text } from "@/lib/form-value";
 import { sendEmail } from "@/lib/email/client";
 import { storeInviteEmail } from "@/lib/email/store-invite";
 import { siteUrl } from "@/lib/site";
@@ -35,10 +36,10 @@ export async function inviteStoreAction(
   }
 
   const parsed = inviteStoreSchema.safeParse({
-    name: formData.get("name"),
-    contactEmail: formData.get("contactEmail"),
-    city: formData.get("city"),
-    region: formData.get("region"),
+    name: text(formData, "name"),
+    contactEmail: text(formData, "contactEmail"),
+    city: text(formData, "city"),
+    region: text(formData, "region"),
   });
 
   if (!parsed.success) {

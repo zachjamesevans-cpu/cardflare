@@ -80,6 +80,26 @@ test.describe("sign-in form", () => {
   });
 
   /*
+   * Regression: reaching /login directly means no `next` hidden field is
+   * rendered, so FormData.get("next") returned null. That failed the schema
+   * and surfaced "expected string, received null" to someone who had typed a
+   * perfectly good email address.
+   */
+  test("accepts a valid address when arriving without a next parameter", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await expect(page).not.toHaveURL(/next=/);
+
+    await page.getByLabel("Email address").fill("someone@example.com");
+    await page.getByRole("button", { name: /sign-in link/i }).click();
+
+    const alert = page.getByRole("main").getByRole("alert");
+    await expect(alert).not.toContainText(/expected string/i);
+    await expect(alert).not.toContainText(/received null/i);
+  });
+
+  /*
    * The response must not reveal whether an address is in the beta, or the
    * form becomes a way to enumerate participating stores.
    */
