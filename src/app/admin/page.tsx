@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Store as StoreIcon } from "lucide-react";
 
+import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -25,6 +26,20 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-12">
+      <section className="flex flex-col gap-5" aria-labelledby="config-heading">
+        <div className="flex flex-col gap-1.5">
+          <h2 id="config-heading" className="text-xl font-bold text-text-primary">
+            Configuration
+          </h2>
+          <p className="text-sm text-text-secondary">
+            What this deployment can see. Changing a variable requires a redeploy before
+            it shows up here.
+          </p>
+        </div>
+
+        <ConfigStatus />
+      </section>
+
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">
         <div className="flex flex-col gap-1.5">
           <h2 id="invite-heading" className="text-xl font-bold text-text-primary">

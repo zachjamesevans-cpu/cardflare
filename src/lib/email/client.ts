@@ -38,7 +38,20 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.CARDFLARE_FROM_EMAIL;
 
-  if (!apiKey || !from) return { status: "skipped", reason: "not-configured" };
+  if (!apiKey || !from) {
+    // Skipping is intentional, but skipping *silently* is not: a missing
+    // variable then looks identical to a provider that accepted the message
+    // and dropped it. Name what is absent, never what is present.
+    const missing = [
+      !apiKey && "RESEND_API_KEY",
+      !from && "CARDFLARE_FROM_EMAIL",
+    ].filter(Boolean);
+
+    console.warn(
+      `Email not sent: ${missing.join(" and ")} not set on this deployment.`,
+    );
+    return { status: "skipped", reason: "not-configured" };
+  }
 
   try {
     const response = await fetch(RESEND_ENDPOINT, {
