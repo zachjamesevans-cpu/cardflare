@@ -19,6 +19,8 @@ unreadable through the public API (the anon key returns a permission error).
 - Privacy and Terms drafts
 - SEO, Open Graph, Twitter, robots, sitemap, icons, structured data
 - Unit, integration and E2E tests
+- Confirmation email for new signups (inert until a sending domain is verified —
+  see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) step 11)
 
 ## ⏸ Awaiting approval
 
@@ -58,16 +60,15 @@ Trade confirmation, quantity updates, trade history, event analytics.
 
 Tracked so they are not lost, none blocking launch.
 
-| Item                         | Notes                                                                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Confirmation email**       | **Now unblocked** — `cardflare.gg` DNS is live, so a sender domain can be verified. Was deliberately deferred because sending from an unverified domain damages deliverability. |
-| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                            |
-| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                 |
-| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                           |
-| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                             |
-| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                      |
-| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                  |
-| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                  |
+| Item                         | Notes                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.            |
+| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag. |
+| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                           |
+| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.             |
+| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                      |
+| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                  |
+| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                  |
 
 ## Dependency advisories
 

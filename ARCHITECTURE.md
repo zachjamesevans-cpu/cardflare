@@ -33,6 +33,7 @@ src/components/
   ui/                  Design system primitives
   waitlist/            Waitlist form and success state
 src/lib/
+  email/               Provider client and the confirmation template
   supabase/            Service-role client and schema types
   waitlist/            Schema, parsing, repository, server action
 supabase/migrations/   SQL migrations
@@ -68,7 +69,8 @@ WaitlistForm (client)
        ├─ parseWaitlistFormData   honeypot → timing → Zod   (form-data.ts)
        ├─ checkRateLimit          per-IP fixed window       (rate-limit.ts)
        ├─ isSupabaseConfigured
-       └─ insertWaitlistSignup    service-role insert       (repository.ts)
+       ├─ insertWaitlistSignup    service-role insert       (repository.ts)
+       └─ after(sendEmail)        confirmation, off the critical path
 ```
 
 The layers are split so each is independently testable: `form-data.ts` is pure
@@ -112,6 +114,28 @@ through the action, the constraints still hold.
 `parseWaitlistFormData` already returns a `bot` outcome. A CAPTCHA becomes an
 additional check in that function plus a token field on the form; nothing else
 changes.
+
+### Confirmation email
+
+Sent through `after()` from `next/server`, so it runs once the response has
+been delivered — the provider is never on the critical path, and a slow or
+unreachable one cannot make the form feel broken.
+
+Three properties are deliberate:
+
+- **It fires only when a row was created**, never on a duplicate. That makes
+  the email unrepeatable: resubmitting an address that already exists sends
+  nothing, so the form cannot be used to flood a stranger's inbox.
+- **It is scheduled outside the `try` that wraps the insert.** Inside, a throw
+  from the email path would report a stored signup back to the visitor as a
+  failure.
+- **`sendEmail` never throws**, and the scheduled callback catches anything
+  regardless, since it runs detached from the request.
+
+Absent `RESEND_API_KEY` and `WAITLIST_FROM_EMAIL`, sending is skipped and the
+waitlist behaves exactly as before. The client talks to the REST API with
+`fetch` rather than the SDK — one endpoint, four fields, not worth a
+dependency.
 
 ### Known limitation: rate limiter scope
 

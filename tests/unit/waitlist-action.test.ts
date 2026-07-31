@@ -7,12 +7,23 @@ import { WAITLIST_IDLE } from "@/lib/waitlist/schema";
 
 const insertWaitlistSignup = vi.fn();
 const isSupabaseConfigured = vi.fn(() => true);
+const sendEmail = vi.fn();
 let requestHeaders: Record<string, string> = {};
 
 vi.mock("next/headers", () => ({
   headers: async () => ({
     get: (name: string) => requestHeaders[name.toLowerCase()] ?? null,
   }),
+}));
+
+/** Runs the scheduled work immediately so tests can observe it. */
+vi.mock("next/server", () => ({
+  after: (callback: () => unknown) => callback(),
+}));
+
+vi.mock("@/lib/email/client", () => ({
+  isEmailConfigured: () => true,
+  sendEmail: (...args: unknown[]) => sendEmail(...args),
 }));
 
 vi.mock("@/lib/waitlist/repository", () => ({
@@ -49,6 +60,7 @@ const submit = (data: FormData) => submitWaitlist(WAITLIST_IDLE, data);
 beforeEach(() => {
   resetRateLimits();
   insertWaitlistSignup.mockReset().mockResolvedValue({ outcome: "created" });
+  sendEmail.mockReset().mockResolvedValue({ status: "sent", id: "email_1" });
   isSupabaseConfigured.mockReset().mockReturnValue(true);
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -194,6 +206,77 @@ describe("submitWaitlist", () => {
     requestHeaders = { "x-forwarded-for": "203.0.113.11" };
 
     expect((await submit(formData())).status).toBe("success");
+  });
+
+  describe("confirmation email", () => {
+    it("sends one to a newly stored signup", async () => {
+      await submit(formData());
+
+      expect(sendEmail).toHaveBeenCalledOnce();
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "zach@example.com",
+          subject: expect.stringMatching(/waitlist/i),
+        }),
+      );
+    });
+
+    /*
+     * Emailing on duplicates would let anyone flood a stranger's inbox by
+     * resubmitting their address. Sending only on insert makes it unrepeatable.
+     */
+    it("sends nothing when the address is already on the list", async () => {
+      insertWaitlistSignup.mockResolvedValue({ outcome: "duplicate" });
+
+      await submit(formData());
+
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("cannot be used to repeatedly email one address", async () => {
+      insertWaitlistSignup
+        .mockResolvedValueOnce({ outcome: "created" })
+        .mockResolvedValue({ outcome: "duplicate" });
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await submit(formData());
+      }
+
+      expect(sendEmail).toHaveBeenCalledOnce();
+    });
+
+    it("sends nothing for a rejected submission", async () => {
+      await submit(formData({ email: "not-an-email" }));
+
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing for a honeypot submission", async () => {
+      await submit(formData({ [HONEYPOT_FIELD]: "spam" }));
+
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("still reports success when the email provider fails", async () => {
+      sendEmail.mockResolvedValue({ status: "failed", reason: "http-500" });
+
+      const result = await submit(formData());
+
+      expect(result).toEqual({ status: "success", alreadyRegistered: false });
+    });
+
+    /*
+     * The row is already stored by the time the email runs. A throw from that
+     * path must never turn a good signup into a visible failure.
+     */
+    it("still reports success when the email path throws outright", async () => {
+      sendEmail.mockRejectedValue(new Error("provider exploded"));
+
+      const result = await submit(formData());
+
+      expect(result).toEqual({ status: "success", alreadyRegistered: false });
+      expect(insertWaitlistSignup).toHaveBeenCalledOnce();
+    });
   });
 
   it("records the originating page as the signup source", async () => {

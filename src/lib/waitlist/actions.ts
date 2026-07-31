@@ -1,12 +1,20 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 
+import { sendEmail } from "@/lib/email/client";
+import { waitlistConfirmationEmail } from "@/lib/email/waitlist-confirmation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { siteUrl } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 import { insertWaitlistSignup } from "./repository";
 import { parseWaitlistFormData } from "./form-data";
-import { valuesFromSubmission, type WaitlistFormState } from "./schema";
+import {
+  valuesFromSubmission,
+  type WaitlistFormState,
+  type WaitlistSubmission,
+} from "./schema";
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -65,13 +73,10 @@ export async function submitWaitlist(
     };
   }
 
-  try {
-    const result = await insertWaitlistSignup(parsed.data, await requestSource());
+  let result;
 
-    return {
-      status: "success",
-      alreadyRegistered: result.outcome === "duplicate",
-    };
+  try {
+    result = await insertWaitlistSignup(parsed.data, await requestSource());
   } catch (error) {
     // Log server-side detail; never return it, since it can carry database
     // internals or the submitted address.
@@ -82,6 +87,60 @@ export async function submitWaitlist(
       fieldErrors: {},
       values: valuesFromSubmission(parsed.data),
     };
+  }
+
+  // Past this point the row is stored, so the signup has succeeded and nothing
+  // that follows may change that. The email is scheduled outside the try above
+  // deliberately: were it inside, a throw from the email path would report a
+  // perfectly good signup back to the visitor as a failure.
+  if (result.outcome === "created") {
+    queueConfirmationEmail(parsed.data);
+  }
+
+  return {
+    status: "success",
+    alreadyRegistered: result.outcome === "duplicate",
+  };
+}
+
+/**
+ * Sends the confirmation after the response has gone out.
+ *
+ * Two deliberate choices here:
+ *
+ * `after()` keeps the provider off the critical path — the visitor sees their
+ * confirmation immediately, and a slow or unreachable provider cannot make the
+ * form feel broken.
+ *
+ * It fires only when a row was actually created, never on a duplicate. Beyond
+ * being the sensible message, that makes the email un-repeatable: resubmitting
+ * an address that is already stored sends nothing, so the form cannot be used
+ * to flood someone else's inbox.
+ */
+function queueConfirmationEmail(submission: WaitlistSubmission): void {
+  try {
+    after(async () => {
+      try {
+        const result = await sendEmail(
+          waitlistConfirmationEmail(submission.firstName, submission.email, siteUrl()),
+        );
+
+        // The signup is already stored, so a failure here is worth knowing
+        // about but is not worth surfacing to anyone.
+        if (result.status === "failed") {
+          console.error(`Waitlist confirmation email failed: ${result.reason}`);
+        }
+      } catch (error) {
+        // `sendEmail` is written not to reject, but this callback runs detached
+        // from the request. An unhandled rejection out here would be an
+        // unexplained crash in the logs rather than a diagnosable line.
+        console.error("Unexpected failure sending the confirmation email", error);
+      }
+    });
+  } catch (error) {
+    // `after` needs a request context. Losing a confirmation email is a far
+    // smaller problem than losing the signup, so this stays contained.
+    console.error("Could not schedule the confirmation email", error);
   }
 }
 
