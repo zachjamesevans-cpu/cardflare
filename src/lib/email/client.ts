@@ -31,12 +31,12 @@ export type SendResult =
   | { status: "failed"; reason: string };
 
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.WAITLIST_FROM_EMAIL);
+  return Boolean(process.env.RESEND_API_KEY && process.env.CARDFLARE_FROM_EMAIL);
 }
 
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.WAITLIST_FROM_EMAIL;
+  const from = process.env.CARDFLARE_FROM_EMAIL;
 
   if (!apiKey || !from) return { status: "skipped", reason: "not-configured" };
 

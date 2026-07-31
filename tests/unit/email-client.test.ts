@@ -23,24 +23,24 @@ afterEach(() => {
 
 function configure() {
   process.env.RESEND_API_KEY = "re_test_key";
-  process.env.WAITLIST_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+  process.env.CARDFLARE_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
 }
 
 describe("isEmailConfigured", () => {
   it("is false when neither variable is set", () => {
     delete process.env.RESEND_API_KEY;
-    delete process.env.WAITLIST_FROM_EMAIL;
+    delete process.env.CARDFLARE_FROM_EMAIL;
 
     expect(isEmailConfigured()).toBe(false);
   });
 
   it("requires both variables, not just one", () => {
-    delete process.env.WAITLIST_FROM_EMAIL;
+    delete process.env.CARDFLARE_FROM_EMAIL;
     process.env.RESEND_API_KEY = "re_test_key";
     expect(isEmailConfigured()).toBe(false);
 
     delete process.env.RESEND_API_KEY;
-    process.env.WAITLIST_FROM_EMAIL = "hello@cardflare.gg";
+    process.env.CARDFLARE_FROM_EMAIL = "hello@cardflare.gg";
     expect(isEmailConfigured()).toBe(false);
   });
 
@@ -54,7 +54,7 @@ describe("isEmailConfigured", () => {
 describe("sendEmail", () => {
   it("skips without calling out when unconfigured", async () => {
     delete process.env.RESEND_API_KEY;
-    delete process.env.WAITLIST_FROM_EMAIL;
+    delete process.env.CARDFLARE_FROM_EMAIL;
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 

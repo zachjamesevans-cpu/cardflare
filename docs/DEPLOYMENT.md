@@ -228,11 +228,12 @@ curl "https://<project-ref>.supabase.co/rest/v1/waitlist_signups" \
 You must **not** get signup rows back. An empty array or a permission error is
 correct. If you see data, stop and re-check step 2.
 
-## 11. Confirmation email (optional)
+## 11. Outbound email (optional)
 
-New signups get a confirmation email once this is configured. Until then the
-waitlist works exactly as before and simply sends nothing — the feature is
-inert, not broken, when the variables are absent.
+Waitlist confirmations and store invites both send once this is configured.
+Until then they simply send nothing — the feature is inert, not broken, when
+the variables are absent. An invite still creates the store, and the admin
+console says plainly that no email went out.
 
 **Do this only after `cardflare.gg` DNS is live.** Sending from an unverified
 domain gets messages filtered or refused, and a domain that starts out sending
@@ -253,15 +254,39 @@ your domain and are not written down here.
 > Adding these does not affect the Vercel records already in place. Mail records
 > and website records coexist; just don't edit or delete the existing ones.
 
+#### If the domain already receives mail (Google Workspace, etc.)
+
+Sending through Resend and receiving through Workspace on the same domain is
+normal and supported, but three record types allow only **one** entry per name.
+Adding a second silently breaks the first.
+
+- **MX** — these route _incoming_ mail and belong to your mailbox provider.
+  Resend's records go on a subdomain (`send.cardflare.gg` or similar), which
+  does not collide with the apex. **If Resend ever asks for an MX record on the
+  apex, stop** — that would take over delivery and break the mailbox.
+- **SPF** (`TXT`, starting `v=spf1`) — only one per name is valid. If Resend's
+  SPF lands on its own subdomain there is nothing to reconcile. If it targets a
+  name that already has one, **merge the two into a single record** by adding
+  Resend's `include:` to the existing one. Never publish two.
+- **DMARC** (`TXT` at `_dmarc`) — one only. If your mailbox provider already
+  set one up, leave it; do not add a second.
+
+DKIM is the exception and needs no care: each provider publishes under its own
+selector (`google._domainkey`, `resend._domainkey`), so they coexist by design.
+
+If Resend's instructions appear to conflict with a record already in the zone,
+screenshot both and resolve it before changing anything. A broken MX record
+stops mail arriving, and the failure is silent from the sender's side.
+
 ### Add the two variables
 
 **API Keys → Create API Key**, then in Vercel → Settings → Environment
 Variables:
 
-| Name                  | Value                            | Environments        |
-| --------------------- | -------------------------------- | ------------------- |
-| `RESEND_API_KEY`      | The key from Resend              | Production, Preview |
-| `WAITLIST_FROM_EMAIL` | `CardFlare <hello@cardflare.gg>` | Production, Preview |
+| Name                   | Value                            | Environments        |
+| ---------------------- | -------------------------------- | ------------------- |
+| `RESEND_API_KEY`       | The key from Resend              | Production, Preview |
+| `CARDFLARE_FROM_EMAIL` | `CardFlare <hello@cardflare.gg>` | Production, Preview |
 
 Both are required. One without the other counts as unconfigured and nothing
 sends. The address must be on the domain you just verified.
