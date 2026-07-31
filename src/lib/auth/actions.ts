@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -13,6 +14,13 @@ import type { SignInState } from "./state";
 const SIGN_IN_MAX = 5;
 const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 
+/**
+ * Only the email is validated here.
+ *
+ * `next` is deliberately absent: `safeNextPath` is its validator, it already
+ * accepts null and undefined, and putting it in this schema made a missing
+ * hidden field fail the whole parse.
+ */
 const signInSchema = z.object({
   email: z
     .string()
@@ -21,7 +29,6 @@ const signInSchema = z.object({
     .max(254, "That email address is too long.")
     .pipe(z.email("Please enter a valid email address."))
     .transform((value) => value.toLowerCase()),
-  next: z.string().optional(),
 });
 
 /**
@@ -36,16 +43,16 @@ export async function requestSignInLink(
   _previous: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
-  const parsed = signInSchema.safeParse({
-    email: formData.get("email"),
-    next: formData.get("next"),
-  });
+  const parsed = signInSchema.safeParse({ email: text(formData, "email") });
 
   if (!parsed.success) {
+    // Take the email field's own message rather than whichever issue happens
+    // to be first, so an internal validation detail can never reach the user.
+    const emailIssue = parsed.error.issues.find((issue) => issue.path[0] === "email");
+
     return {
       status: "error",
-      message:
-        parsed.error.issues[0]?.message ?? "Please check the form and try again.",
+      message: emailIssue?.message ?? "Please enter a valid email address.",
     };
   }
 
@@ -62,7 +69,7 @@ export async function requestSignInLink(
     };
   }
 
-  const nextPath = safeNextPath(parsed.data.next);
+  const nextPath = safeNextPath(text(formData, "next"));
   const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase.auth.signInWithOtp({
