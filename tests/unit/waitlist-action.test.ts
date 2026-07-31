@@ -64,6 +64,38 @@ beforeEach(() => {
   isSupabaseConfigured.mockReset().mockReturnValue(true);
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "info").mockImplementation(() => {});
+});
+
+/*
+ * Both paths below return success and store nothing, which is correct for the
+ * visitor and indistinguishable from a broken deployment for whoever is
+ * debugging it. The logs are the only signal either happened, so they are
+ * asserted rather than left as incidental.
+ */
+describe("silently discarded submissions are logged", () => {
+  it("names the anti-spam rule that discarded a submission", async () => {
+    await submit(formData({ [RENDERED_AT_FIELD]: String(Date.now()) }));
+
+    expect(insertWaitlistSignup).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("too-fast"));
+  });
+
+  it("names the honeypot when that is what tripped", async () => {
+    await submit(formData({ [HONEYPOT_FIELD]: "https://spam.example" }));
+
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("honeypot"));
+  });
+
+  it("records that a duplicate sent no email", async () => {
+    insertWaitlistSignup.mockResolvedValue({ outcome: "duplicate" });
+
+    await submit(formData());
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(console.info).toHaveBeenCalledWith(expect.stringContaining("duplicate"));
+  });
 });
 
 describe("submitWaitlist", () => {
@@ -140,11 +172,22 @@ describe("submitWaitlist", () => {
     });
   });
 
-  it("rejects a submission that did not consent", async () => {
+  it("stores a submission that declined the optional updates", async () => {
     const result = await submit(formData({}, ["marketingConsent"]));
 
-    expect(result.status).toBe("error");
-    expect(insertWaitlistSignup).not.toHaveBeenCalled();
+    expect(result.status).toBe("success");
+    expect(insertWaitlistSignup).toHaveBeenCalledWith(
+      expect.objectContaining({ marketingConsent: false }),
+      null,
+    );
+  });
+
+  // Declining the wider updates must not cost them the confirmation, which is
+  // the transactional half and the reason they filled the form in.
+  it("still sends the confirmation when the box was left unticked", async () => {
+    await submit(formData({}, ["marketingConsent"]));
+
+    expect(sendEmail).toHaveBeenCalledOnce();
   });
 
   it("rejects a user type that is not on the allow-list", async () => {

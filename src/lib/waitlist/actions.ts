@@ -35,7 +35,12 @@ export async function submitWaitlist(
 
   // Silently accept bot submissions. Telling a scripted client it was detected
   // just teaches the next attempt what to avoid.
+  //
+  // Silent to the client, never silent to us: this path discards a submission
+  // while showing success, so without a log a false positive is invisible from
+  // both ends — no row, no email, no error, nothing to search for.
   if (parsed.kind === "bot") {
+    console.warn(`Waitlist submission discarded by anti-spam: ${parsed.reason}.`);
     return { status: "success", alreadyRegistered: false };
   }
 
@@ -95,6 +100,10 @@ export async function submitWaitlist(
   // perfectly good signup back to the visitor as a failure.
   if (result.outcome === "created") {
     queueConfirmationEmail(parsed.data);
+  } else {
+    // The other reason a signup produces no email. Logged so "nothing arrived"
+    // can be told apart from "nothing was attempted" without guesswork.
+    console.info("Waitlist submission was a duplicate; no email sent.");
   }
 
   return {

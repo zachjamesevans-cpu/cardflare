@@ -105,8 +105,20 @@ describe("waitlistSubmissionSchema", () => {
     expect(toFieldErrors(result.error!).userType).toBeDefined();
   });
 
-  it("requires marketing consent to be explicitly true", () => {
-    for (const marketingConsent of [false, undefined, "on", null]) {
+  it("accepts either answer to marketing consent", () => {
+    for (const marketingConsent of [true, false]) {
+      const result = waitlistSubmissionSchema.safeParse(
+        validInput({ marketingConsent }),
+      );
+      expect(result.success).toBe(true);
+      expect(result.data?.marketingConsent).toBe(marketingConsent);
+    }
+  });
+
+  // Still a boolean, not a checkbox string. `parseWaitlistFormData` coerces
+  // before it gets here, and the column is boolean.
+  it("rejects a consent value that is not a boolean", () => {
+    for (const marketingConsent of [undefined, "on", null]) {
       const result = waitlistSubmissionSchema.safeParse(
         validInput({ marketingConsent }),
       );
@@ -150,7 +162,7 @@ describe("toFieldErrors", () => {
       firstName: "",
       email: "nope",
       userType: "bogus",
-      marketingConsent: false,
+      marketingConsent: "not-a-boolean",
     });
 
     const errors = toFieldErrors(result.error!);

@@ -37,13 +37,22 @@ describe("parseWaitlistFormData", () => {
     });
   });
 
-  it("treats an absent consent checkbox as no consent", () => {
+  /*
+   * An unticked box is a valid answer, not a validation failure. It was once
+   * required, which meant the only email the waitlist exists to send needed
+   * permission the signup had already implied.
+   */
+  it("accepts an absent consent checkbox and records it as false", () => {
     const result = parseWaitlistFormData(formData({}, ["marketingConsent"]), NOW);
 
-    expect(result.kind).toBe("invalid");
-    expect(result).toMatchObject({
-      fieldErrors: { marketingConsent: expect.any(String) },
-    });
+    expect(result.kind).toBe("valid");
+    expect(result).toMatchObject({ data: { marketingConsent: false } });
+  });
+
+  it("records a ticked box as true", () => {
+    const result = parseWaitlistFormData(formData(), NOW);
+
+    expect(result).toMatchObject({ data: { marketingConsent: true } });
   });
 
   it("reports invalid fields rather than throwing", () => {
