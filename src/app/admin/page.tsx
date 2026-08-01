@@ -3,10 +3,12 @@ import { Store as StoreIcon } from "lucide-react";
 
 import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
+import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import { countCards } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
@@ -27,6 +29,15 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Server Actions invoked from this page inherit its time limit, and the
+ * catalog sync is the one that needs more than a default. 60 seconds is the
+ * ceiling every Vercel plan allows, so this cannot fail a deploy; a full
+ * catalog pull may still outlive it, which is why an abandoned run is
+ * recoverable and re-running is idempotent.
+ */
+export const maxDuration = 60;
+
 export default async function AdminPage() {
   await requireAdmin();
   const [stores, events, cardCount, lastRun] = await Promise.all([
@@ -39,6 +50,7 @@ export default async function AdminPage() {
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
   const window = defaultEventWindow();
+  const providerName = new OptcgApiProvider().displayName;
 
   return (
     <div className="flex flex-col gap-12">
@@ -65,6 +77,22 @@ export default async function AdminPage() {
               : null,
           }}
         />
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="sync-heading">
+        <div className="flex flex-col gap-1.5">
+          <h2 id="sync-heading" className="text-xl font-bold text-text-primary">
+            Card catalog
+          </h2>
+          <p className="text-sm text-text-secondary">
+            Imports One Piece cards from {providerName} so search has something to find.
+            Card data only — no prices, and no artwork is copied.
+          </p>
+        </div>
+
+        <Card>
+          <SyncCatalogForm providerName={providerName} />
+        </Card>
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">

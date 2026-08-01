@@ -69,6 +69,10 @@ misconfigured.
 | `npm run cards:sync:onepiece -- --sample`         | Import ~75–150 cards for testing                 |
 | `npm run cards:sync:onepiece -- --full --confirm` | Import the full catalog                          |
 
+Card imports can also be run from **Admin → Card catalog**, which uses the
+service-role key already configured on the deployed server rather than a local
+copy. See [docs/CARD_DATA.md](./docs/CARD_DATA.md#synchronisation).
+
 ## Environment variables
 
 See [`.env.example`](./.env.example). Only variables the app actually reads are

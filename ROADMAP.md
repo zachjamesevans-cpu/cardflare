@@ -65,8 +65,8 @@ onward.
 
 - `cards`, `card_printings`, `card_aliases` with RLS and no policies, verified
   against a real PostgreSQL instance
-- `CardProvider` interface plus a JSON provider and an idempotent importer
-  (`npm run cards:import`) — see [docs/CARD_DATA.md](./docs/CARD_DATA.md)
+- `CardProvider` interface plus a JSON provider and an idempotent importer —
+  see [docs/CARD_DATA.md](./docs/CARD_DATA.md)
 - Card identity separated from printing, so needing OP01-024 matches whoever
   holds it in any printing
 - Ranked search tolerant of misspellings, exposed at `/cards`
@@ -76,9 +76,11 @@ onward.
 
 **Rebuilt in the card-catalog milestone**: provider-neutral `CardDataProvider`,
 an OPTCG API adapter, exact/normalized name separation, three-valued printing
-classification, sync bookkeeping, and images behind a feature flag. The
-provider's response shape has **not** been inspected — the mapping is gated
-until it is. See [docs/CARD_DATA.md](./docs/CARD_DATA.md).
+classification, sync bookkeeping, and images behind a feature flag. The mapping
+was verified against a real `/api/allSetCards/` record on 2 August 2026; the
+starter-deck, promo and DON!! shapes have not been observed. A sync can be run
+from **Admin → Card catalog** or from the command line. See
+[docs/CARD_DATA.md](./docs/CARD_DATA.md).
 
 No card data ships in the repository, because wrong card data is worse than
 none.
