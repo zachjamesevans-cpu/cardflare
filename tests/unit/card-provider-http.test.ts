@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderHttp, ProviderHttpError } from "@/lib/cards/providers/http";
+import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import {
-  MappingUnverifiedError,
-  OptcgApiProvider,
-} from "@/lib/cards/providers/optcgapi/adapter";
-import { MAPPING_STATUS } from "@/lib/cards/providers/optcgapi/mapping";
+  MAPPING_STATUS,
+  MAPPING_VERIFIED_ON,
+} from "@/lib/cards/providers/optcgapi/mapping";
 
 /** Never sleeps, so backoff is exercised without the wall-clock cost. */
 const noSleep = () => Promise.resolve();
@@ -152,37 +152,21 @@ describe("ProviderHttp", () => {
 
 describe("the mapping gate", () => {
   /*
-   * The brief forbids importing before the response shape has been inspected.
-   * That is enforced here rather than left to discipline: every network path
-   * refuses while the mapping is unverified.
+   * The gate held while nothing had been observed, and was released on
+   * 2 August 2026 against a real /api/allSetCards/ record. Both halves matter:
+   * "verified" is only meaningful if it carries the date somebody checked.
    */
-  it("is currently unverified, so no import can run", () => {
-    expect(MAPPING_STATUS).toBe("unverified");
+  it("is verified, and records when", () => {
+    expect(MAPPING_STATUS).toBe("verified");
+    expect(MAPPING_VERIFIED_ON).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("refuses every fetch while unverified", async () => {
-    const provider = new OptcgApiProvider({
-      sleep: noSleep,
-      fetchImpl: fetchMock as unknown as typeof fetch,
-    });
-
-    await expect(provider.fetchCards()).rejects.toBeInstanceOf(MappingUnverifiedError);
-    await expect(provider.fetchSets()).rejects.toBeInstanceOf(MappingUnverifiedError);
-    await expect(provider.fetchCardByExternalId("x")).rejects.toBeInstanceOf(
-      MappingUnverifiedError,
-    );
-
-    // Nothing reached the network.
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  // Normalisation is pure, so it stays testable against fixtures either way.
-  it("still allows normalisation, which needs no network", () => {
+  it("keeps normalisation free of the network, so fixtures alone can test it", () => {
     const provider = new OptcgApiProvider();
 
-    expect(() =>
-      provider.normalizeCard({ card_set_id: "OP01-001", card_name: "Zoro" }),
-    ).not.toThrow();
+    expect(
+      provider.normalizeCard({ card_set_id: "OP01-001", card_name: "Zoro" }).ok,
+    ).toBe(true);
   });
 });
 
@@ -193,9 +177,7 @@ describe("the mapping gate", () => {
  * good data sitting there.
  */
 describe("a missing endpoint", () => {
-  const verified = MAPPING_STATUS === "verified";
-
-  it.runIf(verified)("does not abandon the rest of the catalog", async () => {
+  it("does not abandon the rest of the catalog", async () => {
     fetchMock = vi.fn(async (url: string) =>
       String(url).includes("allPromoCards")
         ? jsonResponse({ detail: "Not Found" }, 404)
@@ -213,11 +195,4 @@ describe("a missing endpoint", () => {
     expect(cards.length).toBeGreaterThan(0);
     expect(failures.some((f) => f.reason.includes("allPromoCards"))).toBe(true);
   });
-
-  it.skipIf(verified)(
-    "is covered once the mapping is verified — skipped while it is gated",
-    () => {
-      expect(MAPPING_STATUS).toBe("unverified");
-    },
-  );
 });

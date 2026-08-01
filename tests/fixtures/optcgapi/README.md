@@ -1,13 +1,14 @@
 # OPTCG API fixtures
 
-**These are hand-written stand-ins, not real provider responses.**
+`allSetCards.json` is a **real record**, observed from
+`https://optcgapi.com/api/allSetCards/` on 2 August 2026. It is one record, kept
+deliberately small; the endpoint returns thousands.
 
-`npm run cards:probe` overwrites them with genuine (redacted) records from the
-live API. Until that has been run, nothing here describes optcgapi.com's actual
-schema — it exercises the adapter's handling of shapes any provider might
-produce: strings where numbers belong, absent optional fields, a record that is
-not an object at all.
+`synthetic-cards.json` is hand-written and is **not** provider output. It
+exercises shapes the adapter must survive — numbers as strings, `"-"` for
+inapplicable, absent optional fields, an insecure image URL, a record that is
+not an object — which a single real record cannot cover.
 
-The tests that use them assert _behaviour under those shapes_, which is valid
-regardless of the real field names. They cannot and do not confirm the field
-mapping. That is what the probe is for, and why `MAPPING_STATUS` gates the sync.
+`npm run cards:probe` regenerates observed fixtures for every endpoint. Only
+`allSetCards` has been observed so far: the starter-deck, promo and DON!!
+shapes are still unverified.

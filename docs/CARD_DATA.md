@@ -3,12 +3,10 @@
 How One Piece card data reaches CardFlare, what is known about it, and what is
 not.
 
-> **Status: the provider's response shape has not been inspected.** The adapter
-> was written in an environment with no outbound network access, so the field
-> mapping is a hypothesis rather than an observation. `MAPPING_STATUS` in
-> `src/lib/cards/providers/optcgapi/mapping.ts` is `"unverified"` and every
-> network path refuses to run while it stays that way. See
-> [Verifying the mapping](#verifying-the-mapping).
+> **Status: verified against `/api/allSetCards/` on 2 August 2026.** One real
+> record was inspected and the mapping corrected against it. The starter-deck,
+> promo and DON!! endpoints have **not** been observed — their shapes are
+> assumed to match and may not. Run `npm run cards:probe` to confirm.
 
 ## Selected provider
 
@@ -65,15 +63,63 @@ is wrong. The correct path is still unknown.
 
 ## Observed response schema
 
-**Nothing observed yet.** No request has been made to the live API.
+`GET /api/allSetCards/` returns a **JSON array**. One record, observed
+2 August 2026 and saved as `tests/fixtures/optcgapi/allSetCards.json`:
 
-`npm run cards:probe` fills this section in. It writes redacted records to
-`tests/fixtures/optcgapi/` and prints, per endpoint, every field name with its
-type, how many records carry it, and a sample value. Fields present on only
-some records are called out — that is the inconsistency report the brief asks
-for.
+| Field             | Type       | Example                                                        | Mapped to                |
+| ----------------- | ---------- | -------------------------------------------------------------- | ------------------------ |
+| `card_set_id`     | string     | `"OP01-077"`                                                   | `canonical_card_number`  |
+| `card_name`       | string     | `"Perona"`                                                     | `exact_name`             |
+| `card_type`       | string     | `"Character"`                                                  | `card_type` (lowercased) |
+| `card_color`      | string     | `"Blue"`                                                       | `colors[]`               |
+| `card_cost`       | **string** | `"1"`                                                          | `cost`                   |
+| `card_power`      | **string** | `"2000"`                                                       | `power`                  |
+| `counter_amount`  | **number** | `1000`                                                         | `counter`                |
+| `life`            | null       | `null`                                                         | `life`                   |
+| `rarity`          | string     | `"UC"`                                                         | `rarity`                 |
+| `sub_types`       | string     | `"Thriller Bark Pirates"`                                      | `traits[]`               |
+| `attribute`       | string     | `"Special"`                                                    | `attribute`              |
+| `set_id`          | string     | `"OP-01"`                                                      | `set_code`               |
+| `set_name`        | string     | `"Romance Dawn"`                                               | `set_name`               |
+| `card_text`       | string     | `"[On Play] …"`                                                | `effect_text`            |
+| `date_scraped`    | string     | `"2026-07-31"`                                                 | `provider_updated_at`    |
+| `card_image_id`   | string     | `"OP01-077"`                                                   | `image_id` — see below   |
+| `card_image`      | string     | `"https://optcgapi.com/media/static/Card_Images/OP01-077.jpg"` | `image_url`              |
+| `inventory_price` | number     | `0.89`                                                         | **dropped**              |
+| `market_price`    | number     | `0.92`                                                         | **dropped**              |
 
-Paste the probe's output here once it has run.
+Five findings from that one record, each of which changed the code:
+
+1. **Bulk endpoints carry images.** `card_image` is present on the bulk set
+   endpoint, so no per-card image fan-out is needed. That removes the whole
+   contingency plan for image backfill.
+2. **The image host is `optcgapi.com`**, under `/media/static/Card_Images/`.
+   Already the allow-listed host in `next.config.ts`.
+3. **`card_image_id` repeats the card number.** Despite the name it is _not_ a
+   per-artwork identifier, and using it as the printing discriminator would give
+   two artworks one key. It is ignored when it equals the card number; the
+   fingerprint — which includes the image URL — takes over.
+4. **Numeric types are inconsistent.** `card_cost` and `card_power` are strings,
+   `counter_amount` is a number. Both are coerced.
+5. **There is no trigger field.** Trigger text, where a card has any, is inside
+   `card_text`. Nothing is mapped to `trigger_text` rather than guessing at a
+   split.
+
+`set_id` is `"OP-01"` while `card_set_id` is `"OP01-077"` — the set code is
+_not_ the card number's prefix. Set filtering matches `"OP-01"`, not `"OP01"`.
+
+**Pricing is dropped before storage.** `inventory_price` and `market_price` are
+stripped from `raw_metadata` as well as ignored: pricing is out of scope, and
+storing figures we never display would leave stale numbers waiting to be
+surfaced by accident.
+
+### Not yet observed
+
+`/api/allSTCards/`, `/api/allDonCards/`, `/api/allSets/` and `/api/allDecks/`
+opened successfully but their records have not been inspected.
+`/api/allPromoCards/` returns 404. Their field names are assumed to match the
+set endpoint, which is a guess — a record that does not match is skipped and
+recorded in `card_sync_failures` rather than imported wrong.
 
 ## Mapping decisions
 
