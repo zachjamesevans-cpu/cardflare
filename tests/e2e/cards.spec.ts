@@ -79,23 +79,41 @@ test.describe("card search", () => {
   });
 
   /*
-   * Card artwork is not licensed. Until it is, nothing on this page may render
-   * a remote image — a stray <img> is how that gets shipped by accident.
+   * Artwork is now rendered, so "no remote images" is no longer the rule. The
+   * rule that replaces it is narrower and permanent: every image must resolve
+   * to a host on the allow-list.
+   *
+   * Checked through the optimiser too. Next renders `/_next/image?url=...`,
+   * which is same-origin, so a naive "is it absolute" test would pass while
+   * the optimiser fetched from anywhere — exactly the open-proxy shape that
+   * `remotePatterns` exists to prevent.
+   *
+   * Vacuous without a live database, since search returns nothing to render.
+   * It earns its keep against a build where images point somewhere unexpected.
    */
-  test("renders no third-party images", async ({ page }) => {
+  test("renders images only from allow-listed hosts", async ({ page }) => {
+    const ALLOWED = ["optcgapi.com", "www.optcgapi.com"];
+
     await page.goto("/cards");
 
     await page.getByLabel("Card name or number").fill("luffy");
     await page.waitForTimeout(800);
 
-    const external = await page
-      .locator("img")
-      .evaluateAll((nodes) =>
-        nodes
-          .map((node) => (node as HTMLImageElement).getAttribute("src") ?? "")
-          .filter((src) => /^https?:\/\//.test(src)),
-      );
+    const hosts = await page.locator("img").evaluateAll((nodes) =>
+      nodes.flatMap((node) => {
+        const src = (node as HTMLImageElement).getAttribute("src") ?? "";
+        if (!src || src.startsWith("data:")) return [];
 
-    expect(external).toEqual([]);
+        const url = new URL(src, window.location.origin);
+
+        // Unwrap the optimiser: the host that matters is the one it fetches.
+        const proxied = url.pathname === "/_next/image" && url.searchParams.get("url");
+        const target = proxied ? new URL(proxied, window.location.origin) : url;
+
+        return target.origin === window.location.origin ? [] : [target.hostname];
+      }),
+    );
+
+    expect(hosts.filter((host) => !ALLOWED.includes(host))).toEqual([]);
   });
 });

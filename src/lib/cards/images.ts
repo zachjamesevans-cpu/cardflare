@@ -7,13 +7,13 @@
  *      Enforced at sync time — nothing else can put a value in `image_url`.
  *   2. This flag.
  *
- * Off by default. CardFlare does not own card artwork, and an install that has
- * not made a deliberate decision about it should not be requesting third-party
- * images. When off, no request is made at all — the placeholder is rendered
- * instead, not an <img> that fails.
+ * Unset means off, so an install that has not made a deliberate decision about
+ * third-party artwork does not request any. When off, no request is made at
+ * all — the placeholder is rendered instead, not an <img> that fails.
  *
  * `NEXT_PUBLIC_` because the decision is needed while rendering on the client.
- * It is a display switch, not a secret.
+ * It is a display switch, not a secret. Inlined at build time, so changing it
+ * requires a rebuild.
  */
 export function cardImagesEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES === "true";

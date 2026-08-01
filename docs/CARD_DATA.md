@@ -206,20 +206,39 @@ Unknown until the probe runs. What is already known:
 - **Provider timestamps.** `provider_updated_at` is mapped speculatively and may
   never be populated.
 
-## Known image limitations
+## Card images
 
-- Only URLs the provider actually returns are stored. URLs are never
-  constructed from a pattern, rewritten, resized, or downloaded.
-- Nothing is copied into the repository or into Supabase Storage.
+Artwork rendering was switched on deliberately, after the founder reviewed the
+provider's terms. It is not a default and can be turned off again by setting
+`NEXT_PUBLIC_ENABLE_CARD_IMAGES=false` and redeploying.
+
+**What the app does:**
+
+- Only URLs the provider actually returns are stored. A URL is never
+  constructed from a pattern or guessed from a card number.
+- No image file is committed to the repository or copied into Supabase Storage.
+  The database holds URLs, not bytes.
 - Rendering needs **both** gates open: the provider declared `suppliesImages`,
-  and `NEXT_PUBLIC_ENABLE_CARD_IMAGES=true`.
+  and `NEXT_PUBLIC_ENABLE_CARD_IMAGES=true`. Either one closed renders the
+  placeholder.
 - Hosts are allow-listed in `next.config.ts` and re-checked in
-  `src/lib/cards/images.ts` before render. A URL from anywhere else is ignored.
-- When images are off, no `<img>` is rendered at all — nothing is requested from
-  a third party.
-- A failed load falls back to the CardFlare placeholder with no layout shift.
+  `src/lib/cards/images.ts` before render. A URL from anywhere else is ignored
+  rather than rendered. The allow-list is by host, not by path, because only
+  the `/api/allSetCards/` image location has been observed.
+- Images are served through Next's image optimiser. The server fetches each
+  image once, resizes it to the size actually displayed, and caches it. That
+  means a visitor's browser does **not** pull a full-size JPEG from the
+  provider on every search — which matters both for store wifi and for not
+  hammering a free service.
+- A failed load falls back to the CardFlare placeholder with no layout shift,
+  because the placeholder is always mounted underneath.
 - The placeholder is a generic card silhouette in CardFlare's palette. It is
   deliberately not a mock One Piece card.
+- `/cards` carries a trademark and attribution note naming artwork as well as
+  data.
+
+**What it does not do:** claim any rights in the artwork. The images are
+Bandai's. The note on `/cards` says so.
 
 ## Verifying the mapping
 
