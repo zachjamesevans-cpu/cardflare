@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   compactCardNumber,
+  stableFingerprint,
+  type ProviderSource,
   normalizationFailure,
   normalizedCardSchema,
   type CardDataProvider,
@@ -29,7 +31,23 @@ export const OPTCGAPI_ENDPOINTS = {
   promoCards: "/api/allPromoCards/",
   donCards: "/api/allDonCards/",
   sets: "/api/allSets/",
+  decks: "/api/allDecks/",
 } as const;
+
+/**
+ * Endpoint groups that carry cards, and the source recorded against each.
+ *
+ * `sets` and `decks` are product listings rather than cards and are not synced
+ * here. Filtered and pricing-history endpoints are deliberately unused: the
+ * first duplicate what the bulk endpoints already return, and pricing is out
+ * of scope for this milestone.
+ */
+const CARD_GROUPS = [
+  ["setCards", "set"],
+  ["starterDeckCards", "starter-deck"],
+  ["promoCards", "promo"],
+  ["donCards", "don"],
+] as const;
 
 /** Sample mode caps per endpoint, chosen to land in the 75–150 band overall. */
 const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {
@@ -38,6 +56,7 @@ const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {
   promoCards: 20,
   donCards: 10,
   sets: 0,
+  decks: 0,
 };
 
 /**
@@ -121,7 +140,7 @@ export class OptcgApiProvider implements CardDataProvider {
    * response must not abandon the rest of the run. The record is carried on
    * the failure so it can be persisted and inspected later.
    */
-  normalizeCard(input: unknown): NormalizedCardResult {
+  normalizeCard(input: unknown, source: ProviderSource = "set"): NormalizedCardResult {
     if (typeof input !== "object" || input === null || Array.isArray(input)) {
       return {
         ok: false,
@@ -137,6 +156,41 @@ export class OptcgApiProvider implements CardDataProvider {
     const externalId = asString(pick(record, "externalId"));
     const cardNumber = asString(pick(record, "cardNumber"));
     const setCode = asString(pick(record, "setCode"));
+    const imageId = asString(pick(record, "imageId"));
+    const rarity = asString(pick(record, "rarity"));
+
+    /*
+     * The printing key.
+     *
+     * Card number alone would merge an alternate art into its base printing —
+     * the exact thing the brief forbids. Source distinguishes the same number
+     * appearing in a booster and a starter deck. The image id is the provider's
+     * own per-artwork identifier and is the strongest discriminator available;
+     * the fingerprint is a last resort when it is absent, built from the parts
+     * that do differ between printings so two arts still get two rows.
+     */
+    /*
+     * A discriminator only counts if it actually discriminates. `card_set_id`
+     * is a candidate for both the card number and the external id, so on some
+     * records `externalId` is simply the card number again — using it would
+     * give two artworks of one card the same key and silently merge them,
+     * which is the exact failure this composite key exists to prevent.
+     */
+    const distinctId = externalId && externalId !== cardNumber ? externalId : null;
+
+    const printingKey = [
+      source,
+      cardNumber ?? "unknown",
+      imageId ??
+        distinctId ??
+        stableFingerprint([
+          cardNumber,
+          asString(pick(record, "name")),
+          rarity,
+          setCode,
+          asString(pick(record, "imageUrl")),
+        ]),
+    ].join(":");
 
     const candidate = {
       canonicalCardNumber: cardNumber ?? "",
@@ -148,7 +202,7 @@ export class OptcgApiProvider implements CardDataProvider {
       power: asNumber(pick(record, "power")),
       counter: asNumber(pick(record, "counter")),
       life: asNumber(pick(record, "life")),
-      rarity: asString(pick(record, "rarity")),
+      rarity,
       effectText: asString(pick(record, "effectText")),
       triggerText: asString(pick(record, "triggerText")),
       providerExternalId: externalId,
@@ -156,7 +210,9 @@ export class OptcgApiProvider implements CardDataProvider {
       providerUpdatedAt: asString(pick(record, "updatedAt")),
       printings: [
         {
-          providerExternalId: externalId ?? cardNumber ?? "",
+          providerExternalId: printingKey,
+          imageId,
+          source,
           setCode,
           setName: asString(pick(record, "setName")),
           /*
@@ -211,9 +267,7 @@ export class OptcgApiProvider implements CardDataProvider {
     const cards: NormalizedCard[] = [];
     const failures: NormalizationFailure[] = [];
 
-    const groups = ["setCards", "starterDeckCards", "promoCards", "donCards"] as const;
-
-    for (const group of groups) {
+    for (const [group, source] of CARD_GROUPS) {
       const path = OPTCGAPI_ENDPOINTS[group];
       options.onProgress?.(`Fetching ${group} from ${path}`);
 
@@ -259,7 +313,7 @@ export class OptcgApiProvider implements CardDataProvider {
         : parsed.data;
 
       for (const record of records) {
-        const result = this.normalizeCard(record);
+        const result = this.normalizeCard(record, source);
         if (result.ok) cards.push(result.card);
         else failures.push(result.failure);
       }

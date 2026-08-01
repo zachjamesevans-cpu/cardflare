@@ -227,6 +227,8 @@ async function upsertPrintings(
         set_name: printing.setName,
         printing_label: printing.printingLabel,
         variant_type: printing.variantType,
+        image_id: printing.imageId,
+        provider_source: printing.source,
         is_alternate_art: printing.isAlternateArt,
         is_promo: printing.isPromo,
         is_parallel: printing.isParallel,

@@ -93,6 +93,30 @@ keys; the first present on a record wins. Every entry is currently a guess.
 | `image_url`                        | On the printing, nullable, `https` only.                                                                                                                                                     |
 | `raw_metadata`                     | The whole provider record, on both card and printing.                                                                                                                                        |
 
+### The printing key
+
+`card_printings.provider_external_id` is **composite**, not the provider's raw
+id:
+
+```
+<source>:<card number>:<image id | distinct record id | fingerprint>
+```
+
+Card number alone would merge an alternate art into its base printing. Source
+separates the same number appearing in a booster and a starter deck. The image
+id (`card_image_id`) is the provider's own per-artwork identifier and the
+strongest discriminator available.
+
+Two subtleties, both found by testing:
+
+- A record id that simply repeats the card number is **not** a discriminator.
+  `card_set_id` is a candidate for both fields, so it degenerated into the card
+  number on some records and gave two artworks one key. It is now ignored when
+  it equals the card number.
+- The fingerprint is a last resort, hashed over the parts that actually differ
+  between printings, so two arts still get two rows when the provider offers no
+  id at all.
+
 ### Card identity versus printing
 
 `cards` is the gameplay identity — one row per card number. `card_printings` is
@@ -124,6 +148,13 @@ Unknown until the probe runs. What is already known:
   One Piece card, or that any set is complete.
 - **Accuracy is unverified.** The ten-record spot check the brief asks for
   cannot be done before a sample import exists.
+- **Bulk endpoints may not carry images.** The provider's documentation
+  associates `card_image` / `card_image_id` with the individual-card endpoints.
+  If the probe confirms the bulk endpoints omit them, the sync imports full text
+  metadata from bulk and backfills images **only for the deterministic sample**,
+  rate-limited. It will not fan out one request per card across the whole
+  catalog — that is thousands of requests against a server one person pays for,
+  and it stops and reports instead.
 - **Language.** Printings default to `en`. Whether the provider offers other
   languages is unknown.
 - **Provider timestamps.** `provider_updated_at` is mapped speculatively and may

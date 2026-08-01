@@ -22,7 +22,8 @@ const fixture = JSON.parse(
 ) as unknown[];
 
 const provider = new OptcgApiProvider();
-const normalize = (input: unknown) => provider.normalizeCard(input);
+const normalize = (input: unknown, source?: "set" | "starter-deck" | "promo" | "don") =>
+  provider.normalizeCard(input, source);
 
 function cardAt(index: number) {
   const result = normalize(fixture[index]);
@@ -204,8 +205,8 @@ describe("mergeByCardNumber", () => {
     const luffy = merged.find((c) => c.canonicalCardNumber === "OP01-024")!;
 
     expect(luffy.printings.map((p) => p.providerExternalId).sort()).toEqual([
-      "optcg-1",
-      "optcg-4-altart",
+      "set:OP01-024:optcg-1",
+      "set:OP01-024:optcg-4-altart",
     ]);
   });
 
@@ -219,5 +220,91 @@ describe("mergeByCardNumber", () => {
 
   it("is stable when run twice", () => {
     expect(mergeByCardNumber(merged)).toHaveLength(merged.length);
+  });
+});
+
+describe("printing keys", () => {
+  /*
+   * The whole reason the key is composite. Two records share OP01-024 and
+   * differ only in artwork; keying on the card number would have merged them
+   * into one printing and lost an alternate art, which the brief forbids
+   * outright.
+   */
+  it("gives two artworks of one card number two different keys", () => {
+    const base = cardAt(0).printings[0]!.providerExternalId;
+    const alt = cardAt(3).printings[0]!.providerExternalId;
+
+    expect(base).not.toBe(alt);
+  });
+
+  it("includes the source, so a booster and a starter deck do not collide", () => {
+    const record = { card_set_id: "ST01-001", card_name: "Roronoa Zoro" };
+
+    const fromSet = normalize(record, "set");
+    const fromDeck = normalize(record, "starter-deck");
+
+    expect(fromSet.ok && fromDeck.ok).toBe(true);
+    if (!fromSet.ok || !fromDeck.ok) return;
+
+    expect(fromSet.card.printings[0]!.providerExternalId).toContain("set:");
+    expect(fromDeck.card.printings[0]!.providerExternalId).toContain("starter-deck:");
+    expect(fromSet.card.printings[0]!.providerExternalId).not.toBe(
+      fromDeck.card.printings[0]!.providerExternalId,
+    );
+  });
+
+  /*
+   * Stability is the point: an unstable key would create a fresh printing row
+   * on every sync instead of updating the existing one.
+   */
+  it("is stable across repeated normalisation of the same record", () => {
+    const once = normalize(fixture[0]);
+    const twice = normalize(fixture[0]);
+
+    expect(once.ok && twice.ok).toBe(true);
+    if (!once.ok || !twice.ok) return;
+
+    expect(once.card.printings[0]!.providerExternalId).toBe(
+      twice.card.printings[0]!.providerExternalId,
+    );
+  });
+
+  /*
+   * Regression: `card_set_id` is a candidate for both the card number and the
+   * external id, so the "discriminator" was sometimes just the card number
+   * again — and two printings collapsed to one key.
+   */
+  it("falls back to a fingerprint when the only id is the card number", () => {
+    const withoutIds = {
+      card_set_id: "OP99-001",
+      card_name: "No Identifiers",
+      rarity: "C",
+    };
+
+    const first = normalize(withoutIds);
+    const second = normalize({ ...withoutIds, rarity: "SR" });
+
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    // Different printings of the same number still separate.
+    expect(first.card.printings[0]!.providerExternalId).not.toBe(
+      second.card.printings[0]!.providerExternalId,
+    );
+  });
+
+  it("records the provider image id when one is supplied", () => {
+    const withImage = normalize({
+      card_set_id: "OP01-024",
+      card_name: "Monkey D. Luffy",
+      card_image_id: "img-991",
+      card_image: "https://optcgapi.com/images/OP01-024_alt.png",
+    });
+
+    expect(withImage.ok).toBe(true);
+    if (!withImage.ok) return;
+
+    expect(withImage.card.printings[0]!.imageId).toBe("img-991");
+    expect(withImage.card.printings[0]!.providerExternalId).toContain("img-991");
   });
 });
