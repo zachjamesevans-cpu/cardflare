@@ -15,20 +15,26 @@ and meet up to trade in person.
 
 The public splash page and waitlist are **live at https://cardflare.gg**.
 
-**The application itself — event rooms, authentication, card search, matching,
-trading — has not been built yet.** The landing page says so, and must keep
-saying so until it is true.
+Built since: store sign-in and the admin console, guest player sessions, Event
+Rooms with printable QR codes, and card search. **Posting Flares, matching and
+trades have not been built**, so the loop does not close yet — the landing page
+still says CardFlare is being built, and must keep saying so until it is true.
+
+Card artwork is deliberately absent and no card data ships in this repository.
+See [docs/CARD_DATA.md](./docs/CARD_DATA.md). Milestone detail is in
+[ROADMAP.md](./ROADMAP.md).
 
 ## Documentation
 
-| Document                                         | What it covers                                     |
-| ------------------------------------------------ | -------------------------------------------------- |
-| [PRODUCT.md](./PRODUCT.md)                       | What CardFlare is, what it is not, core vocabulary |
-| [ARCHITECTURE.md](./ARCHITECTURE.md)             | Stack, structure, security model, testing          |
-| [BRAND.md](./BRAND.md)                           | Logo rules, colour tokens, typography, voice       |
-| [ROADMAP.md](./ROADMAP.md)                       | Milestones and deferred work                       |
-| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)       | Supabase, Vercel, DNS, launch checklist            |
-| [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) | Exporting waitlist data safely                     |
+| Document                                         | What it covers                                       |
+| ------------------------------------------------ | ---------------------------------------------------- |
+| [PRODUCT.md](./PRODUCT.md)                       | What CardFlare is, what it is not, core vocabulary   |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)             | Stack, structure, security model, testing            |
+| [BRAND.md](./BRAND.md)                           | Logo rules, colour tokens, typography, voice         |
+| [ROADMAP.md](./ROADMAP.md)                       | Milestones and deferred work                         |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)       | Supabase, Vercel, DNS, launch checklist              |
+| [docs/CARD_DATA.md](./docs/CARD_DATA.md)         | Importing card data, and what is deliberately absent |
+| [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) | Exporting waitlist data safely                       |
 
 ## Getting started
 
@@ -46,17 +52,18 @@ misconfigured.
 
 ## Scripts
 
-| Command                | Does                                             |
-| ---------------------- | ------------------------------------------------ |
-| `npm run dev`          | Development server                               |
-| `npm run build`        | Production build                                 |
-| `npm run verify`       | Format check, lint, typecheck, unit tests, build |
-| `npm test`             | Unit and integration tests                       |
-| `npm run test:e2e`     | Playwright tests (builds and starts the app)     |
-| `npm run lint`         | ESLint                                           |
-| `npm run typecheck`    | `tsc --noEmit`                                   |
-| `npm run format`       | Prettier write                                   |
-| `npm run brand:assets` | Regenerate logo derivatives from the master      |
+| Command                | Does                                               |
+| ---------------------- | -------------------------------------------------- |
+| `npm run dev`          | Development server                                 |
+| `npm run build`        | Production build                                   |
+| `npm run verify`       | Format check, lint, typecheck, unit tests, build   |
+| `npm test`             | Unit and integration tests                         |
+| `npm run test:e2e`     | Playwright tests (builds and starts the app)       |
+| `npm run lint`         | ESLint                                             |
+| `npm run typecheck`    | `tsc --noEmit`                                     |
+| `npm run format`       | Prettier write                                     |
+| `npm run brand:assets` | Regenerate logo derivatives from the master        |
+| `npm run cards:import` | Import card data from JSON — see docs/CARD_DATA.md |
 
 ## Environment variables
 
@@ -73,7 +80,7 @@ public/brand/     Approved logo master and derivatives
 scripts/          Brand asset generation
 src/app/          Routes, metadata, icons, OG image
 src/components/   UI primitives, layout, marketing sections, app previews
-src/lib/          Supabase client, waitlist schema/action/repository
+src/lib/          Supabase clients, auth, waitlist, players, events, cards
 supabase/         SQL migrations
 tests/            Vitest unit tests and Playwright E2E tests
 ```

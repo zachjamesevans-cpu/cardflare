@@ -72,10 +72,6 @@ export async function createEvent(
   throw new Error(`Could not find an unused join code in ${CODE_ATTEMPTS} attempts.`);
 }
 
-export interface EventListing extends EventRow {
-  storeName: string;
-}
-
 /** Events for one store, newest first. Service role; the caller checks access. */
 export async function listEventsForStore(storeId: string): Promise<EventRow[]> {
   if (!canQuery("list the store's events")) return [];
@@ -94,13 +90,20 @@ export async function listEventsForStore(storeId: string): Promise<EventRow[]> {
   return data ?? [];
 }
 
-/** Every event, for the admin console. */
-export async function listAllEvents(): Promise<EventListing[]> {
+/**
+ * Every event, for the admin console.
+ *
+ * No `stores(name)` embed: the admin page already loads stores to render them,
+ * so joining here would duplicate that and lean on the `Relationships`
+ * metadata in the hand-written schema mirror, which is empty. Callers that
+ * need names map them by `store_id`.
+ */
+export async function listAllEvents(): Promise<EventRow[]> {
   if (!canQuery("list events")) return [];
 
   const { data, error } = await getSupabaseAdmin()
     .from("events")
-    .select("*, stores(name)")
+    .select()
     .order("starts_at", { ascending: false })
     .limit(100);
 
@@ -109,10 +112,7 @@ export async function listAllEvents(): Promise<EventListing[]> {
     return [];
   }
 
-  return (data ?? []).map((row) => {
-    const { stores, ...event } = row as EventRow & { stores: { name: string } | null };
-    return { ...event, storeName: stores?.name ?? "Unknown store" };
-  });
+  return data ?? [];
 }
 
 export async function findEventById(id: string): Promise<EventRow | null> {
