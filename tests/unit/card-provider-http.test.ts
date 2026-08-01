@@ -185,3 +185,39 @@ describe("the mapping gate", () => {
     ).not.toThrow();
   });
 });
+
+/*
+ * Found by pointing the endpoint list at the live API: /api/allPromoCards/
+ * returns 404 despite being documented. Before this, that took the whole sync
+ * down and imported nothing — while the other three endpoints had perfectly
+ * good data sitting there.
+ */
+describe("a missing endpoint", () => {
+  const verified = MAPPING_STATUS === "verified";
+
+  it.runIf(verified)("does not abandon the rest of the catalog", async () => {
+    fetchMock = vi.fn(async (url: string) =>
+      String(url).includes("allPromoCards")
+        ? jsonResponse({ detail: "Not Found" }, 404)
+        : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
+    );
+
+    const provider = new OptcgApiProvider({
+      sleep: noSleep,
+      spacingMs: 1,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    const { cards, failures } = await provider.fetchCards();
+
+    expect(cards.length).toBeGreaterThan(0);
+    expect(failures.some((f) => f.reason.includes("allPromoCards"))).toBe(true);
+  });
+
+  it.skipIf(verified)(
+    "is covered once the mapping is verified — skipped while it is gated",
+    () => {
+      expect(MAPPING_STATUS).toBe("unverified");
+    },
+  );
+});

@@ -11,7 +11,7 @@ import {
   type NormalizedCardResult,
   type ProviderSet,
 } from "@/lib/cards/domain";
-import { ProviderHttp, type HttpOptions } from "../http";
+import { ProviderHttp, ProviderHttpError, type HttpOptions } from "../http";
 import { MAPPING_STATUS, pick } from "./mapping";
 
 export const OPTCGAPI_KEY = "optcgapi";
@@ -217,7 +217,30 @@ export class OptcgApiProvider implements CardDataProvider {
       const path = OPTCGAPI_ENDPOINTS[group];
       options.onProgress?.(`Fetching ${group} from ${path}`);
 
-      const raw = await this.http.getJson(path);
+      /*
+       * One missing endpoint must not abandon the whole catalog.
+       *
+       * `/api/allPromoCards/` returns 404 in practice despite being listed in
+       * the documentation. Letting that propagate meant a single retired or
+       * renamed endpoint took the entire sync down and imported nothing, when
+       * the other three had perfectly good data. The gap is recorded as a
+       * failure and the run continues.
+       */
+      let raw: unknown;
+      try {
+        raw = await this.http.getJson(path);
+      } catch (error) {
+        if (!(error instanceof ProviderHttpError)) throw error;
+
+        failures.push({
+          providerExternalId: null,
+          reason: `${path} is unavailable (${error.status ?? "network"}). Skipped.`,
+          raw: null,
+        });
+        options.onProgress?.(`  ${path} unavailable — skipped`);
+        continue;
+      }
+
       const parsed = rawListSchema.safeParse(raw);
 
       if (!parsed.success) {

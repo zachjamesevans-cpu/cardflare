@@ -100,6 +100,11 @@ provider classifies printings explicitly, map those fields then — not before.
 
 Unknown until the probe runs. What is already known:
 
+- **`/api/allPromoCards/` returns 404**, confirmed by opening it in a browser on
+  2 Aug 2026. Promo coverage is therefore absent unless promos appear inside
+  another endpoint. A missing endpoint no longer fails the sync: it is recorded
+  in `card_sync_failures` and the remaining endpoints still import.
+
 - **Coverage is unverified.** No claim is made that this provider carries every
   One Piece card, or that any set is complete.
 - **Accuracy is unverified.** The ten-record spot check the brief asks for
