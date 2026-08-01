@@ -95,6 +95,51 @@ export type StoreInviteInsert = Omit<
   accepted_by?: string | null;
 };
 
+export type CardCategory = "leader" | "character" | "event" | "stage" | "don";
+
+export type CardRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  game: Game;
+  code: string;
+  name: string;
+  category: CardCategory;
+  colors: string[];
+  types: string[];
+  cost: number | null;
+  power: number | null;
+  counter: number | null;
+  life: number | null;
+  attribute: string | null;
+};
+
+export type CardInsert = Omit<CardRow, "id" | "created_at" | "game"> & {
+  id?: string;
+  created_at?: string;
+  game?: Game;
+};
+
+export type CardPrintingRow = {
+  id: string;
+  card_id: string;
+  set_code: string;
+  rarity: string | null;
+  variant: string | null;
+  /** Null unless a provider is licensed to supply artwork. */
+  image_url: string | null;
+};
+
+export type CardPrintingInsert = Omit<CardPrintingRow, "id"> & { id?: string };
+
+export type CardAliasRow = { id: string; card_id: string; alias: string };
+export type CardAliasInsert = Omit<CardAliasRow, "id"> & { id?: string };
+
+/** One row of `search_cards`: a card plus its relevance score. */
+export type CardSearchRow = Omit<CardRow, "created_at" | "updated_at" | "game"> & {
+  score: number;
+};
+
 export type EventStatus = "draft" | "open" | "closed";
 export type Game = "one_piece";
 
@@ -160,9 +205,17 @@ export type Database = {
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
       events: Table<EventRow, EventInsert>;
+      cards: Table<CardRow, CardInsert>;
+      card_printings: Table<CardPrintingRow, CardPrintingInsert>;
+      card_aliases: Table<CardAliasRow, CardAliasInsert>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      search_cards: {
+        Args: { search_query: string; result_limit?: number };
+        Returns: CardSearchRow[];
+      };
+    };
     Enums: {
       waitlist_user_type: UserType;
       waitlist_status: WaitlistStatus;
@@ -170,6 +223,7 @@ export type Database = {
       store_role: StoreRole;
       event_status: EventStatus;
       game: Game;
+      card_category: CardCategory;
     };
     CompositeTypes: Record<string, never>;
   };

@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "brand:assets": "node scripts/generate-brand-assets.mjs",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "cards:import": "tsx --env-file-if-exists=.env.local scripts/import-cards.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

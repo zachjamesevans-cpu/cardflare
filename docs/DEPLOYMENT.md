@@ -81,6 +81,7 @@ the SQL Editor, or `npx supabase db push`.
 | `20260731090000_create_beta_foundations.sql` | Admins, stores, store members, store invitations |
 | `20260801120000_create_player_sessions.sql`  | Guest player sessions                            |
 | `20260801150000_create_events.sql`           | Event Rooms, join codes, event lifecycle         |
+| `20260801180000_create_cards.sql`            | Cards, printings, aliases, ranked search         |
 
 A migration that has not been run shows up as `relation "public.<table>" does
 not exist` the first time the app touches it.

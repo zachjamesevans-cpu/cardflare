@@ -61,16 +61,27 @@ event has been observed.
 Players can reach a room and see it; posting Flares and matching is Milestone 4
 onward.
 
+## ✅ Milestone 5 — Cards
+
+- `cards`, `card_printings`, `card_aliases` with RLS and no policies, verified
+  against a real PostgreSQL instance
+- `CardProvider` interface plus a JSON provider and an idempotent importer
+  (`npm run cards:import`) — see [docs/CARD_DATA.md](./docs/CARD_DATA.md)
+- Card identity separated from printing, so needing OP01-024 matches whoever
+  holds it in any printing
+- Ranked search tolerant of misspellings, exposed at `/cards`
+- **No effect text and no artwork**, both deliberate. `image_url` exists and
+  stays null until a provider is licensed to fill it; `capabilities.images`
+  is the single gate
+
+No card data ships in the repository. The importer is the mechanism and the
+data is loaded separately, because wrong card data is worse than none.
+
 ## ⏸ Awaiting approval
 
 ### Milestone 4 — Joining
 
 Player joins event, guest profile, avatar, event lobby, presence.
-
-### Milestone 5 — Cards
-
-Card provider abstraction, One Piece card data, card identity versus card
-printing, search and aliases.
 
 ### Milestone 6 — Lists
 
@@ -88,18 +99,20 @@ Trade confirmation, quantity updates, trade history, event analytics.
 
 Tracked so they are not lost, none blocking launch.
 
-| Item                         | Notes                                                                                                                                                                                       |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                                        |
-| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                             |
-| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                                       |
-| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                                         |
-| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                                  |
-| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                              |
-| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                              |
-| **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from. |
-| **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.   |
-| **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                 |
+| Item                         | Notes                                                                                                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                                                      |
+| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                                           |
+| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                                                     |
+| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                                                       |
+| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                                                |
+| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                                            |
+| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                                            |
+| **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from.               |
+| **Card artwork**             | Not licensed, so `image_url` stays null and nothing renders a remote image. Revisit only with explicit permission — hot-linking is neither legally settled nor operationally safe. See docs/CARD_DATA.md. |
+| **Card data coverage**       | The importer exists; the full One Piece pool has not been loaded. Needs a source whose terms permit it.                                                                                                   |
+| **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.                 |
+| **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                               |
 
 ## Dependency advisories
 

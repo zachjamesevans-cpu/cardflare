@@ -39,6 +39,7 @@ src/components/
 src/lib/
   auth/                Session, viewer roles, guards, sign-in actions
   email/               Provider client and message templates
+  cards/               Card provider interface, importer, search
   events/              Event Rooms: schema, repository, actions, join codes, QR
   players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
@@ -61,6 +62,7 @@ only Client Components are:
 | `JoinForm`           | `useActionState`, inline errors                |
 | `JoinCodeForm`       | `useActionState`, inline errors                |
 | `CreateEventForm`    | `useActionState`, inline errors                |
+| `CardSearch`         | `useActionState`, inline results               |
 | `PrintButton`        | Calls `window.print()`                         |
 | `PlayerIdentityCard` | Rename disclosure state                        |
 | `AnalyticsTracker`   | Page view and delegated click tracking         |
@@ -357,3 +359,52 @@ service-role key is absent, which once turned an outage into a 500 on a page a
 player reached from a counter. A well-formed code that cannot be checked now
 says so, and never reports itself as invalid — telling someone their store's
 printed code is wrong is worse than admitting the outage.
+
+## Cards
+
+```
+CardSearch (client)
+  └─ searchCardsAction         Server Action — src/lib/cards/actions.ts
+       ├─ cardQuerySchema         collapse, bound to 2–60 characters
+       ├─ checkRateLimit          60 per IP per 5 minutes
+       └─ searchCards             search_cards() RPC, then printings in one query
+```
+
+### Provider abstraction
+
+`CardProvider` has a name, a `capabilities` object and `fetchCards()`. Whatever
+the eventual source, it normalises into `ProvidedCard` and nothing downstream
+learns where the data came from. `JsonCardProvider` is the reference
+implementation, and the importer is a script rather than a Server Action —
+loading thousands of cards is a deploy-time operation done by someone holding
+the service-role key, so there is no endpoint to protect.
+
+Validation is all-or-nothing and reports every bad record at once. Wrong card
+data is worse than missing card data when someone is hunting a trade, so a
+failed record is never partially salvaged.
+
+### Artwork
+
+`capabilities.images` is the only gate, checked once in the importer. A
+provider that has not declared it cannot populate `image_url` by accident, and
+the column has an `https`-only check on top. Nothing is licensed today, so it
+is null everywhere and an E2E test asserts the search page renders no remote
+images at all. Reasoning in [docs/CARD_DATA.md](./docs/CARD_DATA.md).
+
+### Identity versus printing
+
+`cards` is what a player means by "OP01-024"; `card_printings` is a physical
+object. Matching keys off the card, because someone hunting one is nearly
+always happy with any printing. Reversing that would mean the player holding
+the alternate art never matches the player who needs the card.
+
+### Search
+
+`search_cards()` is a SQL function because the ranking is the feature: trigram
+`similarity()` cannot be expressed through PostgREST, and without it a
+misspelling returns nothing. `SECURITY INVOKER` and called with the service
+role — a definer function would re-open what the table revokes closed.
+
+It scans every card to score it, which is well under a millisecond at a few
+thousand cards. If the pool ever outgrows that, the fix is a trigram prefilter,
+not a rewrite.
