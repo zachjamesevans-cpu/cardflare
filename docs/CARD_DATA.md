@@ -21,7 +21,11 @@ not.
 | Supplies image URLs | Documented as yes; **not confirmed**                |
 | Terms reviewed      | **No.** See [Copyright](#copyright-and-attribution) |
 
-The upstream operator asks developers not to make excessive requests. CardFlare
+**The API is one person's VPS, paid for monthly out of pocket.** The
+documentation asks, in the author's own words, not to make "an insane amount of
+API calls each day" and not to "hurt my wallet too much". That is not
+boilerplate rate-limiting language and CardFlare treats it as a hard
+constraint, not a suggestion. CardFlare
 honours that in three ways: bulk endpoints only, one request at a time with a
 pause between them, and the provider is never queried at runtime — search reads
 the local Supabase catalog.
@@ -46,7 +50,18 @@ Per-record endpoints, used only by `fetchCardByExternalId`:
 
 `/api/sets/{set_id}/`, `/api/decks/{st_id}/` and `/api/decks/card/{card_id}/`
 are documented but unused: walking sets one at a time would be thousands of
-requests for data the bulk endpoints already return.
+requests for data the bulk endpoints already return, against a server somebody
+pays for personally.
+
+**`{card_id}` is the printed card number.** The documentation's own worked
+example is `https://optcgapi.com/api/sets/card/OP01-001/`. So the provider's
+notion of a card identifier is the card number itself, not an opaque row id —
+which is why `card_id` is a candidate for `canonical_card_number` and why
+`fetchCardByExternalId` is passed a card number in practice.
+
+The documentation lists four endpoint groups: **Sets, Starter Decks, Promos,
+Don!!**. Promos therefore exist as a group; only the `/api/allPromoCards/` path
+is wrong. The correct path is still unknown.
 
 ## Observed response schema
 
@@ -78,6 +93,30 @@ keys; the first present on a record wins. Every entry is currently a guess.
 | `image_url`                        | On the printing, nullable, `https` only.                                                                                                                                                     |
 | `raw_metadata`                     | The whole provider record, on both card and printing.                                                                                                                                        |
 
+### The printing key
+
+`card_printings.provider_external_id` is **composite**, not the provider's raw
+id:
+
+```
+<source>:<card number>:<image id | distinct record id | fingerprint>
+```
+
+Card number alone would merge an alternate art into its base printing. Source
+separates the same number appearing in a booster and a starter deck. The image
+id (`card_image_id`) is the provider's own per-artwork identifier and the
+strongest discriminator available.
+
+Two subtleties, both found by testing:
+
+- A record id that simply repeats the card number is **not** a discriminator.
+  `card_set_id` is a candidate for both fields, so it degenerated into the card
+  number on some records and gave two artworks one key. It is now ignored when
+  it equals the card number.
+- The fingerprint is a last resort, hashed over the parts that actually differ
+  between printings, so two arts still get two rows when the provider offers no
+  id at all.
+
 ### Card identity versus printing
 
 `cards` is the gameplay identity — one row per card number. `card_printings` is
@@ -100,10 +139,22 @@ provider classifies printings explicitly, map those fields then — not before.
 
 Unknown until the probe runs. What is already known:
 
+- **`/api/allPromoCards/` returns 404**, confirmed by opening it in a browser on
+  2 Aug 2026. Promo coverage is therefore absent unless promos appear inside
+  another endpoint. A missing endpoint no longer fails the sync: it is recorded
+  in `card_sync_failures` and the remaining endpoints still import.
+
 - **Coverage is unverified.** No claim is made that this provider carries every
   One Piece card, or that any set is complete.
 - **Accuracy is unverified.** The ten-record spot check the brief asks for
   cannot be done before a sample import exists.
+- **Bulk endpoints may not carry images.** The provider's documentation
+  associates `card_image` / `card_image_id` with the individual-card endpoints.
+  If the probe confirms the bulk endpoints omit them, the sync imports full text
+  metadata from bulk and backfills images **only for the deterministic sample**,
+  rate-limited. It will not fan out one request per card across the whole
+  catalog — that is thousands of requests against a server one person pays for,
+  and it stops and reports instead.
 - **Language.** Printings default to `en`. Whether the provider offers other
   languages is unknown.
 - **Provider timestamps.** `provider_updated_at` is mapped speculatively and may
@@ -220,11 +271,24 @@ rights holders, and does not claim ownership of any card artwork or card data.
 
 Rendered by `DataAttribution` wherever card data appears.
 
+What the provider's documentation does and does not say, as of 2 Aug 2026:
+
+- **Says:** the API needs no authentication and is "open for anyone to use",
+  read-only, with a request not to make excessive calls. That covers _reading
+  and storing the metadata_, which is what the sync does.
+- **Says:** "One Piece and the One Piece Trading Card Game data are trademarks
+  of Eiichiro Oda, Bandai, Shonen Jump, and Viz Media" — the provider makes no
+  ownership claim of its own.
+- **Does not say anything about images.** There is no grant, and no
+  prohibition, covering redistributing or displaying card artwork served from
+  their host. Absence of a prohibition is not permission.
+
+`NEXT_PUBLIC_ENABLE_CARD_IMAGES` therefore stays **off**. Turning it on is a
+decision that needs something firmer than silence — a direct answer from the
+provider, or a rights holder's own terms.
+
 Outstanding, and needing a human decision:
 
-- **The provider's terms have not been read.** Nobody has confirmed that
-  storing this data, or displaying its images, is permitted. Do that before the
-  full sync and before enabling images.
 - **Bandai's site is never scraped.** Only the provider's documented API is
   called.
 - **No artwork is copied.** Hot-linking a provider's images with their

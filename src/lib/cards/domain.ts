@@ -44,6 +44,26 @@ export function compactCardNumber(cardNumber: string): string {
   return cardNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+/**
+ * Deterministic fingerprint over a record's identifying parts.
+ *
+ * Used only as a last resort for a printing key, when the provider supplies no
+ * image id and no stable record id. FNV-1a: not security-relevant, but it must
+ * be stable across processes and deploys or every sync would create a new
+ * printing row for the same card.
+ */
+export function stableFingerprint(parts: (string | null | undefined)[]): string {
+  const input = parts.map((part) => part ?? "").join("\u0000");
+  let hash = 0x811c9dc5;
+
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Domain types                                                               */
 /* -------------------------------------------------------------------------- */
@@ -67,7 +87,22 @@ const optionalText = (max: number) =>
  * uncertain.
  */
 export const normalizedPrintingSchema = z.object({
+  /**
+   * The printing key. Composite, not the raw provider id.
+   *
+   * The same card number can appear as several printings — base art, alternate
+   * art, a promo — and keying on the number alone would merge them, which the
+   * brief explicitly forbids. Built from source + card number + image id, with
+   * a deterministic fingerprint only when the provider gives neither an image
+   * id nor a stable record id.
+   */
   providerExternalId: trimmed(200),
+  /** The provider's own image identifier, when it has one. */
+  imageId: optionalText(120),
+  source: z
+    .enum(["set", "starter-deck", "promo", "don"])
+    .nullish()
+    .transform((value) => value ?? null),
   setCode: z
     .string()
     .trim()
@@ -151,6 +186,9 @@ export interface ProviderSet {
 /* Provider contract                                                          */
 /* -------------------------------------------------------------------------- */
 
+/** Which documented endpoint group a record came from. */
+export type ProviderSource = "set" | "starter-deck" | "promo" | "don";
+
 export interface CardFetchOptions {
   /** Sample mode: cap how much is pulled, for interface and schema testing. */
   sample?: boolean;
@@ -197,7 +235,12 @@ export interface CardDataProvider {
   fetchSets(): Promise<ProviderSet[]>;
 
   /** Exposed separately so normalisation is testable against fixtures alone. */
-  normalizeCard(input: unknown): NormalizedCardResult;
+  /**
+   * `source` is which endpoint group the record came from. It participates in
+   * the printing key, because the same card number legitimately appears in a
+   * booster set and a starter deck as different products.
+   */
+  normalizeCard(input: unknown, source?: ProviderSource): NormalizedCardResult;
 }
 
 /** Turns a Zod failure into a `NormalizationFailure` without losing the record. */

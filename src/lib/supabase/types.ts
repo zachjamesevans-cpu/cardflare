@@ -138,6 +138,10 @@ export type CardPrintingRow = {
   set_name: string | null;
   printing_label: string | null;
   variant_type: string | null;
+  /** The provider's own image identifier, when it has one. */
+  image_id: string | null;
+  /** Which endpoint group produced the record: set, starter-deck, promo, don. */
+  provider_source: string | null;
   /** Three-valued: null means the provider did not classify the printing. */
   is_alternate_art: boolean | null;
   is_promo: boolean | null;

@@ -61,12 +61,22 @@ export const CANDIDATE_FIELDS = {
   counter: ["counter_amount", "counter", "card_counter"],
   life: ["life", "card_life"],
   rarity: ["rarity", "card_rarity"],
-  traits: ["sub_types", "subtypes", "traits", "card_traits", "attribute"],
+  traits: ["sub_types", "subtypes", "traits", "card_traits"],
+  attribute: ["attribute", "card_attribute"],
   effectText: ["card_text", "effect", "card_effect", "text"],
   triggerText: ["trigger", "card_trigger", "trigger_text"],
   setCode: ["set_id", "set_code", "setId"],
+  rarityLabel: ["rarity", "card_rarity"],
   setName: ["set_name", "set", "setName"],
-  imageUrl: ["image_url", "imageUrl", "card_image", "image"],
+  /*
+   * `card_image` and `card_image_id` are named in the provider's own
+   * documentation and are the strongest candidates. Both are documented as
+   * possibly absent, and the documentation suggests they may appear on the
+   * individual-card endpoints rather than the bulk ones — which the probe
+   * settles and the sync's sample-only image backfill accommodates.
+   */
+  imageUrl: ["card_image", "image_url", "imageUrl", "image"],
+  imageId: ["card_image_id", "image_id", "imageId"],
   externalId: ["id", "card_set_id", "uuid"],
   updatedAt: ["updated_at", "last_updated", "modified"],
 } as const satisfies Record<string, readonly string[]>;
