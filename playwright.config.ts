@@ -33,5 +33,12 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    /*
+     * NEXT_PUBLIC_ values are inlined at build time, so the flag has to be set
+     * for the build rather than the server. Matches production, which means
+     * the allow-listed-hosts test exercises the real render path wherever a
+     * database is available.
+     */
+    env: { ...process.env, NEXT_PUBLIC_ENABLE_CARD_IMAGES: "true" },
   },
 });

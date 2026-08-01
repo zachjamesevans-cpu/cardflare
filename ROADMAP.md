@@ -79,7 +79,9 @@ an OPTCG API adapter, exact/normalized name separation, three-valued printing
 classification, sync bookkeeping, and images behind a feature flag. The mapping
 was verified against a real `/api/allSetCards/` record on 2 August 2026; the
 starter-deck, promo and DON!! shapes have not been observed. A sync can be run
-from **Admin → Card catalog** or from the command line. See
+from **Admin → Card catalog** or from the command line. Artwork now renders:
+the founder reviewed the provider's terms on 2 August 2026 and enabled
+`NEXT_PUBLIC_ENABLE_CARD_IMAGES`, superseding the "no artwork" line above. See
 [docs/CARD_DATA.md](./docs/CARD_DATA.md).
 
 No card data ships in the repository, because wrong card data is worse than
@@ -131,7 +133,7 @@ Tracked so they are not lost, none blocking launch.
 | **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                              |
 | **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                              |
 | **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from. |
-| **Provider terms review**    | Nobody has read optcgapi.com's terms. Required before a full sync and before enabling images.                                                                                               |
+| **Provider terms review**    | Reviewed by the founder on 2 August 2026; images enabled on that basis. Re-check if the provider changes terms or if artwork is used anywhere beyond thumbnails on `/cards`.                |
 | **Card data coverage**       | The importer exists; the full One Piece pool has not been loaded. Needs a source whose terms permit it.                                                                                     |
 | **Realtime presence**        | Presence is a polled `last_seen_at` window, so the lobby updates on load rather than live. Supabase Realtime belongs with match notifications, where latency actually matters.              |
 | **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.   |
