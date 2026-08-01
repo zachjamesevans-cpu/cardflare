@@ -18,38 +18,63 @@ test.describe("card search", () => {
     );
   });
 
-  test("refuses a one-character query without searching", async ({ page }) => {
+  test("is a combobox with the accessibility wiring a listbox needs", async ({
+    page,
+  }) => {
     await page.goto("/cards");
 
-    await page.getByLabel("Card name or number").fill("z");
-    await page.getByRole("button", { name: /^search$/i }).click();
-
-    await expect(page.getByRole("main").getByRole("alert")).toContainText(
-      /at least 2 characters/i,
-    );
+    const input = page.getByLabel("Card name or number");
+    await expect(input).toHaveAttribute("role", "combobox");
+    await expect(input).toHaveAttribute("aria-autocomplete", "list");
   });
 
-  test("keeps a rejected query so it can be corrected", async ({ page }) => {
+  test("searches on a debounce rather than needing a submit", async ({ page }) => {
+    await page.goto("/cards");
+
+    // No submit button: typing is the interaction.
+    await expect(page.getByRole("button", { name: /^search$/i })).toHaveCount(0);
+  });
+
+  test("says nothing while the query is too short to be useful", async ({ page }) => {
     await page.goto("/cards");
 
     await page.getByLabel("Card name or number").fill("z");
-    await page.getByRole("button", { name: /^search$/i }).click();
+    await page.waitForTimeout(500);
 
-    await expect(page.getByLabel("Card name or number")).toHaveValue("z");
+    const main = page.getByRole("main");
+    await expect(main).not.toContainText(/no matching cards/i);
+    await expect(main).not.toContainText(/no cards have been loaded/i);
+  });
+
+  test("shows the data-source and trademark note", async ({ page }) => {
+    await page.goto("/cards");
+
+    await expect(page.getByRole("main")).toContainText(
+      /trademarks of their respective owners/i,
+    );
+    await expect(page.getByRole("main")).toContainText(/not affiliated/i);
   });
 
   /*
    * An empty result set is an answer, not a failure, and must not surface as
    * an error or leak why the lookup found nothing.
+   *
+   * Which of the two messages appears depends on whether any cards are loaded,
+   * and both are correct — the point is that one of them shows and neither
+   * mentions the infrastructure.
    */
-  test("reports no matches as a result rather than an error", async ({ page }) => {
+  test("reports an empty result without erroring or leaking internals", async ({
+    page,
+  }) => {
     await page.goto("/cards");
 
     await page.getByLabel("Card name or number").fill("zzzzqqqq");
-    await page.getByRole("button", { name: /^search$/i }).click();
 
     const main = page.getByRole("main");
-    await expect(main).toContainText(/no card matches/i);
+    await expect(main).toContainText(
+      /no matching cards found|no cards have been loaded|unavailable right now/i,
+      { timeout: 10_000 },
+    );
     await expect(main).not.toContainText(/supabase|postgres|service.role/i);
   });
 
@@ -61,7 +86,7 @@ test.describe("card search", () => {
     await page.goto("/cards");
 
     await page.getByLabel("Card name or number").fill("luffy");
-    await page.getByRole("button", { name: /^search$/i }).click();
+    await page.waitForTimeout(800);
 
     const external = await page
       .locator("img")

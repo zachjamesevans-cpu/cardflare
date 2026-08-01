@@ -36,6 +36,18 @@ export interface ConfigGroup {
   checks: ConfigCheck[];
 }
 
+/**
+ * Data the panel can only learn by asking the database.
+ *
+ * Passed in rather than fetched here so this module stays a pure reading of
+ * the environment and remains directly testable.
+ */
+export interface ConfigFacts {
+  cardCount: number;
+  /** Null when no sync has ever run. */
+  lastSync?: { status: string; mode: string; finishedAt: string | null } | null;
+}
+
 function present(variable: string): boolean {
   return Boolean(process.env[variable]?.trim());
 }
@@ -108,7 +120,79 @@ function fromAddressCheck(): ConfigCheck {
   };
 }
 
-export function configGroups(): ConfigGroup[] {
+/**
+ * Reports whether any cards exist.
+ *
+ * Not an environment variable, but the same class of problem: with an empty
+ * pool every search correctly returns nothing, which reads as broken search
+ * rather than as an import nobody has run.
+ */
+function cardPoolCheck(cardCount: number): ConfigCheck {
+  const label = "Card pool";
+  const variable = "cards";
+
+  if (cardCount === 0) {
+    return {
+      label,
+      variable,
+      status: "warn",
+      detail:
+        "No cards imported. Search works but matches nothing. See docs/CARD_DATA.md.",
+    };
+  }
+
+  return {
+    label,
+    variable,
+    status: "ok",
+    detail: `${cardCount.toLocaleString()} cards loaded.`,
+  };
+}
+
+/**
+ * The image feature flag.
+ *
+ * Reported because "why are there no pictures" has two completely different
+ * answers — the flag is off, or the provider supplied no URL — and only the
+ * first is a setting.
+ */
+function cardImagesCheck(): ConfigCheck {
+  const variable = "NEXT_PUBLIC_ENABLE_CARD_IMAGES";
+  const on = process.env[variable] === "true";
+
+  return {
+    label: "Card images",
+    variable,
+    // Off is a valid, deliberate state, so this is never a failure.
+    status: "ok",
+    detail: on
+      ? "On. Provider-supplied artwork is rendered where a URL exists."
+      : "Off. The CardFlare placeholder is shown and no third-party image is requested.",
+  };
+}
+
+function lastSyncCheck(facts: ConfigFacts): ConfigCheck {
+  const label = "Last sync";
+  const variable = "card_sync_runs";
+  const run = facts.lastSync;
+
+  if (!run) {
+    return { label, variable, status: "warn", detail: "Never run." };
+  }
+
+  const when = run.finishedAt
+    ? new Date(run.finishedAt).toISOString().replace("T", " ").slice(0, 16)
+    : "unfinished";
+
+  return {
+    label,
+    variable,
+    status: run.status === "succeeded" ? "ok" : "warn",
+    detail: `${run.mode} sync ${run.status} (${when} UTC)`,
+  };
+}
+
+export function configGroups(facts: ConfigFacts): ConfigGroup[] {
   return [
     {
       title: "Database",
@@ -124,6 +208,11 @@ export function configGroups(): ConfigGroup[] {
       whenIncomplete:
         "Confirmations and invites send nothing. Signups and invites still succeed.",
       checks: [secretCheck("API key", "RESEND_API_KEY"), fromAddressCheck()],
+    },
+    {
+      title: "Cards",
+      whenIncomplete: "Card search returns nothing until a card list is imported.",
+      checks: [cardPoolCheck(facts.cardCount), lastSyncCheck(facts), cardImagesCheck()],
     },
   ];
 }

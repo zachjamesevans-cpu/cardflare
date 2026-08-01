@@ -9,9 +9,13 @@ const VARS = [
   "RESEND_API_KEY",
   "CARDFLARE_FROM_EMAIL",
   "WAITLIST_FROM_EMAIL",
+  "NEXT_PUBLIC_ENABLE_CARD_IMAGES",
 ];
 
 const original: Record<string, string | undefined> = {};
+
+/** Database facts the panel is handed rather than reading itself. */
+const FACTS = { cardCount: 1234, lastSync: null };
 
 beforeEach(() => {
   for (const name of VARS) {
@@ -28,7 +32,7 @@ afterEach(() => {
 });
 
 function emailGroup() {
-  const group = configGroups().find((candidate) => candidate.title === "Email");
+  const group = configGroups(FACTS).find((candidate) => candidate.title === "Email");
   if (!group) throw new Error("Email group missing");
   return group;
 }
@@ -38,6 +42,63 @@ function check(variable: string) {
   if (!found) throw new Error(`${variable} check missing`);
   return found;
 }
+
+function cardGroup(count: number) {
+  const group = configGroups({ cardCount: count, lastSync: null }).find(
+    (candidate) => candidate.title === "Cards",
+  );
+  if (!group) throw new Error("Cards group missing");
+  return group;
+}
+
+/*
+ * With an empty pool every search correctly matches nothing, which reads as
+ * broken search rather than as an import nobody has run. The panel is where
+ * that stops being invisible.
+ */
+describe("card pool", () => {
+  it("warns when no cards are loaded", () => {
+    const check = cardGroup(0).checks[0]!;
+
+    expect(check.status).toBe("warn");
+    expect(check.detail).toMatch(/no cards imported/i);
+    expect(check.detail).toContain("CARD_DATA.md");
+  });
+
+  it("reports the count once cards exist", () => {
+    const check = cardGroup(2451).checks[0]!;
+
+    expect(check.status).toBe("ok");
+    expect(check.detail).toContain("2,451");
+  });
+
+  /*
+   * "Why are there no pictures" has two answers — the flag is off, or the
+   * provider supplied no URL — and only the first is a setting. Off is a
+   * deliberate state, so it is never reported as a fault.
+   */
+  it("reports the image flag as informational, never as a fault", () => {
+    delete process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES;
+    const off = cardGroup(10).checks.find((c) => c.variable.includes("CARD_IMAGES"))!;
+
+    expect(off.status).toBe("ok");
+    expect(off.detail).toMatch(/off/i);
+    expect(off.detail).toMatch(/placeholder/i);
+
+    process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES = "true";
+    const on = cardGroup(10).checks.find((c) => c.variable.includes("CARD_IMAGES"))!;
+
+    expect(on.status).toBe("ok");
+    expect(on.detail).toMatch(/on\./i);
+  });
+
+  it("warns when no sync has ever run", () => {
+    const check = cardGroup(0).checks.find((c) => c.label === "Last sync")!;
+
+    expect(check.status).toBe("warn");
+    expect(check.detail).toMatch(/never/i);
+  });
+});
 
 describe("configGroups", () => {
   it("reports missing variables as missing", () => {
@@ -101,7 +162,7 @@ describe("configGroups", () => {
     process.env.RESEND_API_KEY = "re_super_secret_value";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_do_not_leak";
 
-    const serialised = JSON.stringify(configGroups());
+    const serialised = JSON.stringify(configGroups(FACTS));
     expect(serialised).not.toContain("re_super_secret_value");
     expect(serialised).not.toContain("sb_secret_do_not_leak");
   });

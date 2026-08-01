@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetRateLimits } from "@/lib/rate-limit";
+import { highlightParts, printingLabel } from "@/lib/cards/schema";
 
 const searchCards = vi.fn();
+const countCards = vi.fn();
 let requestHeaders: Record<string, string> = {};
 
 vi.mock("next/headers", () => ({
@@ -14,94 +16,185 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/cards/search", () => ({
   SEARCH_LIMIT: 20,
   searchCards: (...args: unknown[]) => searchCards(...args),
+  countCards: () => countCards(),
 }));
 
 const { searchCardsAction } = await import("@/lib/cards/actions");
-const { CARD_SEARCH_IDLE, MIN_QUERY_LENGTH } = await import("@/lib/cards/schema");
 
-function formData(query?: string) {
-  const data = new FormData();
-  if (query !== undefined) data.set("query", query);
-  return data;
-}
-
-const search = (data: FormData) => searchCardsAction(CARD_SEARCH_IDLE, data);
+const hit = {
+  id: "1",
+  exactName: "Monkey D. Luffy",
+  canonicalCardNumber: "OP01-024",
+};
 
 beforeEach(() => {
   resetRateLimits();
   searchCards.mockReset().mockResolvedValue([]);
+  countCards.mockReset().mockResolvedValue(2451);
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 describe("searchCardsAction", () => {
-  it("returns results for a valid query", async () => {
-    searchCards.mockResolvedValue([{ id: "1", code: "OP01-024", name: "Luffy" }]);
+  it("searches by exact name", async () => {
+    searchCards.mockResolvedValue([hit]);
 
-    const result = await search(formData("luffy"));
+    const result = await searchCardsAction("Monkey D. Luffy");
 
-    expect(result).toMatchObject({ status: "results", query: "luffy" });
-    expect(result.status === "results" && result.results).toHaveLength(1);
+    expect(result).toMatchObject({ status: "ok", poolEmpty: false });
+    expect(searchCards).toHaveBeenCalledWith("Monkey D. Luffy", expect.anything());
+  });
+
+  it("searches by partial name", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    expect((await searchCardsAction("luffy")).status).toBe("ok");
+    expect(searchCards).toHaveBeenCalledWith("luffy", expect.anything());
+  });
+
+  it("searches by card number, with or without the dash", async () => {
+    await searchCardsAction("OP01-024");
+    await searchCardsAction("op01024");
+
+    expect(searchCards).toHaveBeenNthCalledWith(1, "OP01-024", expect.anything());
+    expect(searchCards).toHaveBeenNthCalledWith(2, "op01024", expect.anything());
   });
 
   it("collapses whitespace before searching", async () => {
-    await search(formData("  monkey   d   luffy  "));
+    await searchCardsAction("  monkey   d   luffy  ");
 
-    expect(searchCards).toHaveBeenCalledWith("monkey d luffy");
+    expect(searchCards).toHaveBeenCalledWith("monkey d luffy", expect.anything());
+  });
+
+  it("passes filters through as nulls when absent", async () => {
+    await searchCardsAction("luffy");
+
+    expect(searchCards).toHaveBeenCalledWith("luffy", {
+      setCode: null,
+      cardType: null,
+      color: null,
+    });
+  });
+
+  it("passes supplied filters through", async () => {
+    await searchCardsAction("luffy", { setCode: "OP01", color: "red" });
+
+    expect(searchCards).toHaveBeenCalledWith("luffy", {
+      setCode: "OP01",
+      cardType: null,
+      color: "red",
+    });
   });
 
   /*
    * No match is an answer, not a failure. Reporting it as an error would make
    * a correct "that card does not exist" look like the app is broken.
    */
-  it("treats no matches as a result, not an error", async () => {
-    searchCards.mockResolvedValue([]);
-
-    const result = await search(formData("zzzzqqqq"));
-
-    expect(result.status).toBe("results");
+  it("treats no matches as a result", async () => {
+    expect(await searchCardsAction("zzzzqqqq")).toMatchObject({
+      status: "ok",
+      poolEmpty: false,
+    });
   });
 
-  it("refuses a query shorter than the minimum without querying", async () => {
-    const result = await search(formData("z"));
+  /*
+   * "Nothing matched" and "nothing is loaded" are the same screen to a player
+   * and completely different problems. Only the second is a setup task.
+   */
+  it("distinguishes an empty catalog from a query that matched nothing", async () => {
+    countCards.mockResolvedValue(0);
 
-    expect(result.status).toBe("error");
-    expect(result.status === "error" && result.message).toContain(
-      String(MIN_QUERY_LENGTH),
-    );
-    expect(searchCards).not.toHaveBeenCalled();
+    expect(await searchCardsAction("luffy")).toMatchObject({ poolEmpty: true });
   });
 
-  it("refuses an empty or absent query without querying", async () => {
-    expect((await search(formData(""))).status).toBe("error");
-    expect((await search(formData("   "))).status).toBe("error");
-    expect((await search(formData())).status).toBe("error");
+  it("does not count the catalog when the search found something", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    await searchCardsAction("luffy");
+
+    expect(countCards).not.toHaveBeenCalled();
+  });
+
+  it("refuses a query below the minimum without querying", async () => {
+    expect((await searchCardsAction("z")).status).toBe("invalid");
+    expect((await searchCardsAction("  ")).status).toBe("invalid");
     expect(searchCards).not.toHaveBeenCalled();
   });
 
   it("refuses an over-long query", async () => {
-    const result = await search(formData("x".repeat(200)));
-
-    expect(result.status).toBe("error");
+    expect((await searchCardsAction("x".repeat(200))).status).toBe("invalid");
     expect(searchCards).not.toHaveBeenCalled();
   });
 
-  it("keeps what was typed so it can be corrected", async () => {
-    const result = await search(formData("z"));
+  it("never leaks database internals when the search throws", async () => {
+    searchCards.mockRejectedValue(new Error('relation "cards" does not exist'));
 
-    expect(result.status === "error" && result.query).toBe("z");
+    const result = await searchCardsAction("luffy");
+
+    expect(result.status).toBe("error");
+    expect(result.status === "error" && result.message).not.toMatch(/relation|cards/i);
   });
 
   it("throttles a flood from one address", async () => {
-    requestHeaders = { "x-forwarded-for": "203.0.113.9" };
+    requestHeaders = { "x-forwarded-for": "203.0.113.20" };
 
-    for (let i = 0; i < 60; i += 1) {
-      await search(formData(`query ${i}`));
+    for (let i = 0; i < 120; i += 1) await searchCardsAction(`query ${i}`);
+    expect(searchCards).toHaveBeenCalledTimes(120);
+
+    expect((await searchCardsAction("one too many")).status).toBe("error");
+    expect(searchCards).toHaveBeenCalledTimes(120);
+  });
+});
+
+describe("printingLabel", () => {
+  const base = {
+    setCode: "OP01",
+    setName: "Romance Dawn",
+    printingLabel: "OP01",
+    variantType: null,
+    imageUrl: null,
+  };
+
+  it("uses the provider's label", () => {
+    expect(printingLabel(base)).toBe("OP01");
+  });
+
+  it("appends a variant only when the provider gave one", () => {
+    expect(printingLabel({ ...base, variantType: "Alternate Art" })).toBe(
+      "OP01 · Alternate Art",
+    );
+  });
+
+  // Nothing to say beats an empty chip.
+  it("returns null when there is nothing meaningful to show", () => {
+    expect(printingLabel({ ...base, setCode: null, printingLabel: null })).toBeNull();
+  });
+});
+
+describe("highlightParts", () => {
+  it("splits around a case-insensitive match", () => {
+    expect(highlightParts("Monkey D. Luffy", "luffy")).toEqual([
+      { text: "Monkey D. ", match: false },
+      { text: "Luffy", match: true },
+    ]);
+  });
+
+  it("returns the whole string when the term is empty", () => {
+    expect(highlightParts("Luffy", "")).toEqual([{ text: "Luffy", match: false }]);
+  });
+
+  /*
+   * The term is user input. Treating it as a pattern would let a stray
+   * bracket throw while someone is typing.
+   */
+  it("treats regex metacharacters as literal text", () => {
+    for (const term of ["(", "[a-z]", "*", "\\"]) {
+      expect(() => highlightParts("Monkey D. Luffy", term)).not.toThrow();
     }
-    expect(searchCards).toHaveBeenCalledTimes(60);
 
-    const blocked = await search(formData("one too many"));
-    expect(blocked.status).toBe("error");
-    expect(searchCards).toHaveBeenCalledTimes(60);
+    expect(highlightParts("Monkey D. Luffy", ".")).toContainEqual({
+      text: ".",
+      match: true,
+    });
   });
 });
