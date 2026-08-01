@@ -21,7 +21,11 @@ not.
 | Supplies image URLs | Documented as yes; **not confirmed**                |
 | Terms reviewed      | **No.** See [Copyright](#copyright-and-attribution) |
 
-The upstream operator asks developers not to make excessive requests. CardFlare
+**The API is one person's VPS, paid for monthly out of pocket.** The
+documentation asks, in the author's own words, not to make "an insane amount of
+API calls each day" and not to "hurt my wallet too much". That is not
+boilerplate rate-limiting language and CardFlare treats it as a hard
+constraint, not a suggestion. CardFlare
 honours that in three ways: bulk endpoints only, one request at a time with a
 pause between them, and the provider is never queried at runtime — search reads
 the local Supabase catalog.
@@ -46,7 +50,18 @@ Per-record endpoints, used only by `fetchCardByExternalId`:
 
 `/api/sets/{set_id}/`, `/api/decks/{st_id}/` and `/api/decks/card/{card_id}/`
 are documented but unused: walking sets one at a time would be thousands of
-requests for data the bulk endpoints already return.
+requests for data the bulk endpoints already return, against a server somebody
+pays for personally.
+
+**`{card_id}` is the printed card number.** The documentation's own worked
+example is `https://optcgapi.com/api/sets/card/OP01-001/`. So the provider's
+notion of a card identifier is the card number itself, not an opaque row id —
+which is why `card_id` is a candidate for `canonical_card_number` and why
+`fetchCardByExternalId` is passed a card number in practice.
+
+The documentation lists four endpoint groups: **Sets, Starter Decks, Promos,
+Don!!**. Promos therefore exist as a group; only the `/api/allPromoCards/` path
+is wrong. The correct path is still unknown.
 
 ## Observed response schema
 
@@ -225,11 +240,24 @@ rights holders, and does not claim ownership of any card artwork or card data.
 
 Rendered by `DataAttribution` wherever card data appears.
 
+What the provider's documentation does and does not say, as of 2 Aug 2026:
+
+- **Says:** the API needs no authentication and is "open for anyone to use",
+  read-only, with a request not to make excessive calls. That covers _reading
+  and storing the metadata_, which is what the sync does.
+- **Says:** "One Piece and the One Piece Trading Card Game data are trademarks
+  of Eiichiro Oda, Bandai, Shonen Jump, and Viz Media" — the provider makes no
+  ownership claim of its own.
+- **Does not say anything about images.** There is no grant, and no
+  prohibition, covering redistributing or displaying card artwork served from
+  their host. Absence of a prohibition is not permission.
+
+`NEXT_PUBLIC_ENABLE_CARD_IMAGES` therefore stays **off**. Turning it on is a
+decision that needs something firmer than silence — a direct answer from the
+provider, or a rights holder's own terms.
+
 Outstanding, and needing a human decision:
 
-- **The provider's terms have not been read.** Nobody has confirmed that
-  storing this data, or displaying its images, is permitted. Do that before the
-  full sync and before enabling images.
 - **Bandai's site is never scraped.** Only the provider's documented API is
   called.
 - **No artwork is copied.** Hot-linking a provider's images with their
