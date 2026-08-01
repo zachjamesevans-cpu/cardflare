@@ -27,12 +27,27 @@ function isPresent(lastSeenAt: string, now: number): boolean {
   return now - new Date(lastSeenAt).getTime() <= PRESENCE_WINDOW_MS;
 }
 
+/** Postgres unique violation: this player is already in this room. */
+const UNIQUE_VIOLATION = "23505";
+
 /**
- * Adds a player to a room, or refreshes them if they are already in it.
+ * Puts a player in a room.
  *
- * Upsert on `(event_id, player_session_id)`: re-scanning the printed code is
- * the most likely thing a player does, and it must rejoin rather than
- * duplicate or fail. Returns false only when the write genuinely failed.
+ * Sends **no timestamps at all**. Both columns default to the database's
+ * `now()`, so they come from one clock and `last_seen_at >= joined_at` holds
+ * by construction.
+ *
+ * This is a regression fix, and the failure was total: the first version sent
+ * `last_seen_at` from the application clock while `joined_at` took the column
+ * default. The default is evaluated when the insert reaches Postgres, which is
+ * a network hop later, so `last_seen_at` was reliably a hundred milliseconds
+ * *earlier* than `joined_at` and every single join violated the check
+ * constraint. Never mix a client timestamp with a server default in one row.
+ *
+ * Re-scanning the printed code is the most likely thing a player does, so a
+ * unique violation means "already here" and is a success. Presence is not
+ * refreshed here — `touchParticipation` owns that, and it runs on the very
+ * next render.
  */
 export async function joinEvent(
   eventId: string,
@@ -43,21 +58,15 @@ export async function joinEvent(
     return false;
   }
 
-  const now = new Date().toISOString();
-
   const { error } = await getSupabaseAdmin()
     .from("event_participants")
-    .upsert(
-      { event_id: eventId, player_session_id: playerSessionId, last_seen_at: now },
-      { onConflict: "event_id,player_session_id" },
-    );
+    .insert({ event_id: eventId, player_session_id: playerSessionId });
 
-  if (error) {
-    console.error("Could not join the event", error);
-    return false;
-  }
+  if (!error) return true;
+  if (error.code === UNIQUE_VIOLATION) return true;
 
-  return true;
+  console.error("Could not join the event", error);
+  return false;
 }
 
 export async function leaveEvent(
@@ -79,12 +88,12 @@ export async function leaveEvent(
 export async function findParticipation(
   eventId: string,
   playerSessionId: string,
-): Promise<{ joinedAt: string } | null> {
+): Promise<{ joinedAt: string; lastSeenAt: string } | null> {
   if (!isSupabaseConfigured()) return null;
 
   const { data, error } = await getSupabaseAdmin()
     .from("event_participants")
-    .select("joined_at")
+    .select("joined_at, last_seen_at")
     .eq("event_id", eventId)
     .eq("player_session_id", playerSessionId)
     .maybeSingle();
@@ -94,15 +103,23 @@ export async function findParticipation(
     return null;
   }
 
-  return data ? { joinedAt: data.joined_at } : null;
+  return data ? { joinedAt: data.joined_at, lastSeenAt: data.last_seen_at } : null;
 }
 
 /**
  * Marks a player as still here.
  *
- * Rate-limited by `TOUCH_AFTER_MS` so a player refreshing the room costs one
- * write a minute rather than one per render. Failure is swallowed: a stale
- * presence timestamp is not worth failing a page over.
+ * Rate-limited by `TOUCH_AFTER_MS`, so a player sitting in the room costs one
+ * write a minute rather than one per render. That comparison must be against
+ * `last_seen_at` and not `joined_at` — against `joined_at` the gap only ever
+ * grows, so an hour into an event every single render would write.
+ *
+ * The minimum gap is also what keeps this safe next to the check constraint:
+ * a minute of real elapsed time dwarfs any clock difference between the app
+ * and the database, so the new `last_seen_at` cannot land before `joined_at`.
+ *
+ * Failure is swallowed. A stale presence timestamp is not worth failing a page
+ * render over.
  */
 export async function touchParticipation(
   eventId: string,

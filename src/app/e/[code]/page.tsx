@@ -88,9 +88,10 @@ export default async function JoinByCodePage({
   const session = await getPlayerSession();
   const participation = session ? await findParticipation(event.id, session.id) : null;
 
-  // Being here is the heartbeat. Rate-limited inside, so a reload is not a write.
+  // Being here is the heartbeat. Rate-limited inside against `lastSeenAt`, so
+  // a reload is not a write.
   if (session && participation) {
-    await touchParticipation(event.id, session.id, participation.joinedAt);
+    await touchParticipation(event.id, session.id, participation.lastSeenAt);
   }
 
   const participants = participation ? await listParticipants(event.id) : [];
