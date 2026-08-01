@@ -1,0 +1,285 @@
+import { z } from "zod";
+
+import {
+  compactCardNumber,
+  normalizationFailure,
+  normalizedCardSchema,
+  type CardDataProvider,
+  type CardFetchOptions,
+  type NormalizationFailure,
+  type NormalizedCard,
+  type NormalizedCardResult,
+  type ProviderSet,
+} from "@/lib/cards/domain";
+import { ProviderHttp, type HttpOptions } from "../http";
+import { MAPPING_STATUS, pick } from "./mapping";
+
+export const OPTCGAPI_KEY = "optcgapi";
+export const OPTCGAPI_BASE_URL = "https://optcgapi.com";
+
+/**
+ * The documented endpoint groups.
+ *
+ * Bulk endpoints only. Walking sets and requesting cards one at a time would
+ * be thousands of requests against a free service to obtain the same data.
+ */
+export const OPTCGAPI_ENDPOINTS = {
+  setCards: "/api/allSetCards/",
+  starterDeckCards: "/api/allSTCards/",
+  promoCards: "/api/allPromoCards/",
+  donCards: "/api/allDonCards/",
+  sets: "/api/allSets/",
+} as const;
+
+/** Sample mode caps per endpoint, chosen to land in the 75–150 band overall. */
+const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {
+  setCards: 60,
+  starterDeckCards: 30,
+  promoCards: 20,
+  donCards: 10,
+  sets: 0,
+};
+
+/**
+ * The only structural assumption made about the provider.
+ *
+ * Every documented endpoint returns a list of records. Field *names* are
+ * deliberately not asserted here — that is what the probe establishes and what
+ * `MAPPING_STATUS` gates. A record that is not an object is rejected outright.
+ */
+const rawListSchema = z.array(z.record(z.string(), z.unknown()));
+
+export class MappingUnverifiedError extends Error {
+  constructor() {
+    super(
+      "The optcgapi field mapping has not been verified against live responses. " +
+        "Run `npm run cards:probe`, correct src/lib/cards/providers/optcgapi/mapping.ts, " +
+        'then set MAPPING_STATUS to "verified".',
+    );
+    this.name = "MappingUnverifiedError";
+  }
+}
+
+function asString(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number") return String(value);
+  return null;
+}
+
+/**
+ * Reads a number that may arrive as a string, and may be "-" or "" for
+ * "not applicable" — a Leader has no cost, an Event has no power.
+ */
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  const cleaned = value.replace(/[^\d-]/g, "");
+  if (!cleaned || cleaned === "-") return null;
+
+  const parsed = Number.parseInt(cleaned, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** Splits a list that may arrive as an array or a delimited string. */
+function asList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+  if (typeof value !== "string") return [];
+
+  return value
+    .split(/[/,;|]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Adapter for optcgapi.com.
+ *
+ * `suppliesImages` is true because the API is documented as returning image
+ * URLs — but only URLs it actually returns are ever stored, they are never
+ * constructed from a pattern, and display is separately gated by
+ * NEXT_PUBLIC_ENABLE_CARD_IMAGES. Both gates must be open for artwork to
+ * appear.
+ */
+export class OptcgApiProvider implements CardDataProvider {
+  readonly providerKey = OPTCGAPI_KEY;
+  readonly displayName = "OPTCG API (optcgapi.com)";
+  readonly suppliesImages = true;
+
+  private readonly http: ProviderHttp;
+
+  constructor(options: HttpOptions = {}) {
+    this.http = new ProviderHttp(OPTCGAPI_BASE_URL, options);
+  }
+
+  /**
+   * Turns one provider record into a CardFlare card.
+   *
+   * Failures are returned, never thrown: one malformed record in a bulk
+   * response must not abandon the rest of the run. The record is carried on
+   * the failure so it can be persisted and inspected later.
+   */
+  normalizeCard(input: unknown): NormalizedCardResult {
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      return {
+        ok: false,
+        failure: {
+          providerExternalId: null,
+          reason: "Record is not an object",
+          raw: input,
+        },
+      };
+    }
+
+    const record = input as Record<string, unknown>;
+    const externalId = asString(pick(record, "externalId"));
+    const cardNumber = asString(pick(record, "cardNumber"));
+    const setCode = asString(pick(record, "setCode"));
+
+    const candidate = {
+      canonicalCardNumber: cardNumber ?? "",
+      exactName: asString(pick(record, "name")) ?? "",
+      cardType: asString(pick(record, "cardType")),
+      colors: asList(pick(record, "color")).map((c) => c.toLowerCase()),
+      traits: asList(pick(record, "traits")),
+      cost: asNumber(pick(record, "cost")),
+      power: asNumber(pick(record, "power")),
+      counter: asNumber(pick(record, "counter")),
+      life: asNumber(pick(record, "life")),
+      rarity: asString(pick(record, "rarity")),
+      effectText: asString(pick(record, "effectText")),
+      triggerText: asString(pick(record, "triggerText")),
+      providerExternalId: externalId,
+      rawMetadata: record,
+      providerUpdatedAt: asString(pick(record, "updatedAt")),
+      printings: [
+        {
+          providerExternalId: externalId ?? cardNumber ?? "",
+          setCode,
+          setName: asString(pick(record, "setName")),
+          /*
+           * The provider's own words, never a classification of our own.
+           * `variant_type` stays null when it says nothing, and the four
+           * boolean flags stay null throughout — this adapter does not infer
+           * "alternate art" from a name suffix or a rarity code, because the
+           * brief forbids guessing variant classifications and a wrong guess
+           * would split one card into two or merge two into one.
+           */
+          printingLabel: setCode,
+          variantType: null,
+          isAlternateArt: null,
+          isPromo: null,
+          isParallel: null,
+          isReprint: null,
+          language: "en",
+          imageUrl: asString(pick(record, "imageUrl")),
+          rawMetadata: record,
+          providerUpdatedAt: asString(pick(record, "updatedAt")),
+        },
+      ],
+    };
+
+    const parsed = normalizedCardSchema.safeParse(candidate);
+
+    if (!parsed.success) {
+      return normalizationFailure(record, externalId, parsed.error);
+    }
+
+    // The database requires this and it is derived, never provider-supplied.
+    if (!compactCardNumber(parsed.data.canonicalCardNumber)) {
+      return {
+        ok: false,
+        failure: {
+          providerExternalId: externalId,
+          reason: "Card number contains no letters or digits",
+          raw: record,
+        },
+      };
+    }
+
+    return { ok: true, card: parsed.data };
+  }
+
+  async fetchCards(options: CardFetchOptions = {}): Promise<{
+    cards: NormalizedCard[];
+    failures: NormalizationFailure[];
+  }> {
+    if (MAPPING_STATUS !== "verified") throw new MappingUnverifiedError();
+
+    const cards: NormalizedCard[] = [];
+    const failures: NormalizationFailure[] = [];
+
+    const groups = ["setCards", "starterDeckCards", "promoCards", "donCards"] as const;
+
+    for (const group of groups) {
+      const path = OPTCGAPI_ENDPOINTS[group];
+      options.onProgress?.(`Fetching ${group} from ${path}`);
+
+      const raw = await this.http.getJson(path);
+      const parsed = rawListSchema.safeParse(raw);
+
+      if (!parsed.success) {
+        failures.push({
+          providerExternalId: null,
+          reason: `${path} did not return a list of objects`,
+          raw,
+        });
+        continue;
+      }
+
+      // Sample mode takes a deterministic prefix, not a random selection, so
+      // two sample runs produce the same catalog and a bug is reproducible.
+      const records = options.sample
+        ? parsed.data.slice(0, SAMPLE_CAPS[group])
+        : parsed.data;
+
+      for (const record of records) {
+        const result = this.normalizeCard(record);
+        if (result.ok) cards.push(result.card);
+        else failures.push(result.failure);
+      }
+
+      options.onProgress?.(
+        `  ${records.length} record(s) from ${group}, ${failures.length} failure(s) so far`,
+      );
+    }
+
+    return { cards, failures };
+  }
+
+  async fetchCardByExternalId(id: string): Promise<NormalizedCard | null> {
+    if (MAPPING_STATUS !== "verified") throw new MappingUnverifiedError();
+
+    // Path segment, so it must not be able to escape into another route.
+    const raw = await this.http.getJson(`/api/sets/card/${encodeURIComponent(id)}/`);
+
+    const record = Array.isArray(raw) ? raw[0] : raw;
+    if (!record) return null;
+
+    const result = this.normalizeCard(record);
+    return result.ok ? result.card : null;
+  }
+
+  async fetchSets(): Promise<ProviderSet[]> {
+    if (MAPPING_STATUS !== "verified") throw new MappingUnverifiedError();
+
+    const raw = await this.http.getJson(OPTCGAPI_ENDPOINTS.sets);
+    const parsed = rawListSchema.safeParse(raw);
+    if (!parsed.success) return [];
+
+    return parsed.data.flatMap((record) => {
+      const code = asString(pick(record, "setCode"));
+      if (!code) return [];
+
+      return [
+        {
+          code: code.toUpperCase(),
+          name: asString(pick(record, "setName")),
+          providerExternalId: asString(pick(record, "externalId")) ?? code,
+        },
+      ];
+    });
+  }
+}

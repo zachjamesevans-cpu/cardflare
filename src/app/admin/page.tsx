@@ -8,6 +8,7 @@ import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { countCards } from "@/lib/cards/search";
+import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
@@ -28,10 +29,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events, cardCount] = await Promise.all([
+  const [stores, events, cardCount, lastRun] = await Promise.all([
     listStores(),
     listAllEvents(),
     countCards(),
+    latestSyncRun(),
   ]);
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
@@ -51,7 +53,18 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        <ConfigStatus facts={{ cardCount }} />
+        <ConfigStatus
+          facts={{
+            cardCount,
+            lastSync: lastRun
+              ? {
+                  status: lastRun.status,
+                  mode: lastRun.mode,
+                  finishedAt: lastRun.finished_at,
+                }
+              : null,
+          }}
+        />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">

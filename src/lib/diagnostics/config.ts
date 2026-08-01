@@ -44,6 +44,8 @@ export interface ConfigGroup {
  */
 export interface ConfigFacts {
   cardCount: number;
+  /** Null when no sync has ever run. */
+  lastSync?: { status: string; mode: string; finishedAt: string | null } | null;
 }
 
 function present(variable: string): boolean {
@@ -147,6 +149,49 @@ function cardPoolCheck(cardCount: number): ConfigCheck {
   };
 }
 
+/**
+ * The image feature flag.
+ *
+ * Reported because "why are there no pictures" has two completely different
+ * answers — the flag is off, or the provider supplied no URL — and only the
+ * first is a setting.
+ */
+function cardImagesCheck(): ConfigCheck {
+  const variable = "NEXT_PUBLIC_ENABLE_CARD_IMAGES";
+  const on = process.env[variable] === "true";
+
+  return {
+    label: "Card images",
+    variable,
+    // Off is a valid, deliberate state, so this is never a failure.
+    status: "ok",
+    detail: on
+      ? "On. Provider-supplied artwork is rendered where a URL exists."
+      : "Off. The CardFlare placeholder is shown and no third-party image is requested.",
+  };
+}
+
+function lastSyncCheck(facts: ConfigFacts): ConfigCheck {
+  const label = "Last sync";
+  const variable = "card_sync_runs";
+  const run = facts.lastSync;
+
+  if (!run) {
+    return { label, variable, status: "warn", detail: "Never run." };
+  }
+
+  const when = run.finishedAt
+    ? new Date(run.finishedAt).toISOString().replace("T", " ").slice(0, 16)
+    : "unfinished";
+
+  return {
+    label,
+    variable,
+    status: run.status === "succeeded" ? "ok" : "warn",
+    detail: `${run.mode} sync ${run.status} (${when} UTC)`,
+  };
+}
+
 export function configGroups(facts: ConfigFacts): ConfigGroup[] {
   return [
     {
@@ -167,7 +212,7 @@ export function configGroups(facts: ConfigFacts): ConfigGroup[] {
     {
       title: "Cards",
       whenIncomplete: "Card search returns nothing until a card list is imported.",
-      checks: [cardPoolCheck(facts.cardCount)],
+      checks: [cardPoolCheck(facts.cardCount), lastSyncCheck(facts), cardImagesCheck()],
     },
   ];
 }

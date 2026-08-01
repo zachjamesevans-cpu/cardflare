@@ -21,8 +21,9 @@ store can run an event and watch players arrive. **Posting Flares, matching and
 trades have not been built**, so the loop does not close yet — the landing page
 still says CardFlare is being built, and must keep saying so until it is true.
 
-Card artwork is deliberately absent and no card data ships in this repository.
-See [docs/CARD_DATA.md](./docs/CARD_DATA.md). Milestone detail is in
+No card data ships in this repository; it is synchronised from a provider.
+Card images are behind `NEXT_PUBLIC_ENABLE_CARD_IMAGES`, off by default. See
+[docs/CARD_DATA.md](./docs/CARD_DATA.md). Milestone detail is in
 [ROADMAP.md](./ROADMAP.md).
 
 ## Documentation
@@ -53,18 +54,20 @@ misconfigured.
 
 ## Scripts
 
-| Command                | Does                                               |
-| ---------------------- | -------------------------------------------------- |
-| `npm run dev`          | Development server                                 |
-| `npm run build`        | Production build                                   |
-| `npm run verify`       | Format check, lint, typecheck, unit tests, build   |
-| `npm test`             | Unit and integration tests                         |
-| `npm run test:e2e`     | Playwright tests (builds and starts the app)       |
-| `npm run lint`         | ESLint                                             |
-| `npm run typecheck`    | `tsc --noEmit`                                     |
-| `npm run format`       | Prettier write                                     |
-| `npm run brand:assets` | Regenerate logo derivatives from the master        |
-| `npm run cards:import` | Import card data from JSON — see docs/CARD_DATA.md |
+| Command                                           | Does                                             |
+| ------------------------------------------------- | ------------------------------------------------ |
+| `npm run dev`                                     | Development server                               |
+| `npm run build`                                   | Production build                                 |
+| `npm run verify`                                  | Format check, lint, typecheck, unit tests, build |
+| `npm test`                                        | Unit and integration tests                       |
+| `npm run test:e2e`                                | Playwright tests (builds and starts the app)     |
+| `npm run lint`                                    | ESLint                                           |
+| `npm run typecheck`                               | `tsc --noEmit`                                   |
+| `npm run format`                                  | Prettier write                                   |
+| `npm run brand:assets`                            | Regenerate logo derivatives from the master      |
+| `npm run cards:probe`                             | Inspect the card provider's live response shape  |
+| `npm run cards:sync:onepiece -- --sample`         | Import ~75–150 cards for testing                 |
+| `npm run cards:sync:onepiece -- --full --confirm` | Import the full catalog                          |
 
 ## Environment variables
 
@@ -100,6 +103,7 @@ tests/            Vitest unit tests and Playwright E2E tests
 The Privacy Policy and Terms of Service are clearly-labelled **drafts**. Legal
 review is recommended before broad commercial launch.
 
-One Piece Card Game and all other trading card game names, logos and card images
-are trademarks of their respective owners. CardFlare is not affiliated with,
-endorsed by, or sponsored by any trading card game publisher.
+Card data is supplied by third-party data providers. ONE PIECE and the ONE
+PIECE CARD GAME are trademarks of their respective owners. CardFlare is not
+affiliated with or endorsed by Bandai, Shueisha, Toei Animation, or other rights
+holders, and does not claim ownership of any card artwork or card data.

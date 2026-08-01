@@ -1,0 +1,55 @@
+[
+  {
+    "card_set_id": "OP01-024",
+    "card_name": "Monkey D. Luffy",
+    "card_type": "Character",
+    "card_color": "Red",
+    "card_cost": "5",
+    "card_power": "6000",
+    "counter_amount": "1000",
+    "rarity": "SR",
+    "sub_types": "Supernovas/Straw Hat Crew",
+    "card_text": "[On Play] Give up to 1 rested DON!! card to your Leader.",
+    "trigger": "[Trigger] Play this card.",
+    "set_id": "OP01",
+    "set_name": "Romance Dawn",
+    "image_url": "https://optcgapi.com/images/cards/OP01-024.png",
+    "id": "optcg-1"
+  },
+  {
+    "card_set_id": "op01-001",
+    "card_name": "Roronoa Zoro",
+    "card_type": "Leader",
+    "card_color": "Red/Green",
+    "card_cost": "-",
+    "card_power": "5000",
+    "life": "5",
+    "rarity": "L",
+    "set_id": "op01",
+    "id": "optcg-2"
+  },
+  {
+    "card_set_id": "ST01-012",
+    "card_name": "Diable Jambe",
+    "card_type": "Event",
+    "card_color": "Red",
+    "card_cost": "1",
+    "set_id": "ST01",
+    "image_url": "http://insecure.example/nope.png",
+    "id": "optcg-3"
+  },
+  {
+    "card_set_id": "OP01-024",
+    "card_name": "Monkey D. Luffy",
+    "card_type": "Character",
+    "card_color": "Red",
+    "rarity": "SEC",
+    "set_id": "OP01",
+    "id": "optcg-4-altart"
+  },
+  {
+    "card_name": "Nameless, no number",
+    "card_type": "Character",
+    "id": "optcg-5-broken"
+  }
+]

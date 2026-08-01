@@ -9,12 +9,13 @@ const VARS = [
   "RESEND_API_KEY",
   "CARDFLARE_FROM_EMAIL",
   "WAITLIST_FROM_EMAIL",
+  "NEXT_PUBLIC_ENABLE_CARD_IMAGES",
 ];
 
 const original: Record<string, string | undefined> = {};
 
 /** Database facts the panel is handed rather than reading itself. */
-const FACTS = { cardCount: 1234 };
+const FACTS = { cardCount: 1234, lastSync: null };
 
 beforeEach(() => {
   for (const name of VARS) {
@@ -43,7 +44,7 @@ function check(variable: string) {
 }
 
 function cardGroup(count: number) {
-  const group = configGroups({ cardCount: count }).find(
+  const group = configGroups({ cardCount: count, lastSync: null }).find(
     (candidate) => candidate.title === "Cards",
   );
   if (!group) throw new Error("Cards group missing");
@@ -69,6 +70,33 @@ describe("card pool", () => {
 
     expect(check.status).toBe("ok");
     expect(check.detail).toContain("2,451");
+  });
+
+  /*
+   * "Why are there no pictures" has two answers — the flag is off, or the
+   * provider supplied no URL — and only the first is a setting. Off is a
+   * deliberate state, so it is never reported as a fault.
+   */
+  it("reports the image flag as informational, never as a fault", () => {
+    delete process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES;
+    const off = cardGroup(10).checks.find((c) => c.variable.includes("CARD_IMAGES"))!;
+
+    expect(off.status).toBe("ok");
+    expect(off.detail).toMatch(/off/i);
+    expect(off.detail).toMatch(/placeholder/i);
+
+    process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES = "true";
+    const on = cardGroup(10).checks.find((c) => c.variable.includes("CARD_IMAGES"))!;
+
+    expect(on.status).toBe("ok");
+    expect(on.detail).toMatch(/on\./i);
+  });
+
+  it("warns when no sync has ever run", () => {
+    const check = cardGroup(0).checks.find((c) => c.label === "Last sync")!;
+
+    expect(check.status).toBe("warn");
+    expect(check.detail).toMatch(/never/i);
   });
 });
 

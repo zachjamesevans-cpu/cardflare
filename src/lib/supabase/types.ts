@@ -95,23 +95,30 @@ export type StoreInviteInsert = Omit<
   accepted_by?: string | null;
 };
 
-export type CardCategory = "leader" | "character" | "event" | "stage" | "don";
-
 export type CardRow = {
   id: string;
   created_at: string;
   updated_at: string;
   game: Game;
-  code: string;
-  name: string;
-  category: CardCategory;
+  canonical_card_number: string;
+  compact_card_number: string;
+  /** The provider's display name, verbatim. Never rewritten. */
+  exact_name: string;
+  normalized_name: string;
+  card_type: string | null;
   colors: string[];
-  types: string[];
+  traits: string[];
   cost: number | null;
   power: number | null;
   counter: number | null;
   life: number | null;
-  attribute: string | null;
+  rarity: string | null;
+  effect_text: string | null;
+  trigger_text: string | null;
+  provider_key: string;
+  provider_external_id: string | null;
+  raw_metadata: unknown;
+  provider_updated_at: string | null;
 };
 
 export type CardInsert = Omit<CardRow, "id" | "created_at" | "game"> & {
@@ -122,23 +129,105 @@ export type CardInsert = Omit<CardRow, "id" | "created_at" | "game"> & {
 
 export type CardPrintingRow = {
   id: string;
+  created_at: string;
+  updated_at: string;
   card_id: string;
-  set_code: string;
-  rarity: string | null;
-  variant: string | null;
-  /** Null unless a provider is licensed to supply artwork. */
+  provider_key: string;
+  provider_external_id: string;
+  set_code: string | null;
+  set_name: string | null;
+  printing_label: string | null;
+  variant_type: string | null;
+  /** Three-valued: null means the provider did not classify the printing. */
+  is_alternate_art: boolean | null;
+  is_promo: boolean | null;
+  is_parallel: boolean | null;
+  is_reprint: boolean | null;
+  language: string;
+  /** Provider-supplied only. Never inferred, never rewritten. */
   image_url: string | null;
+  raw_metadata: unknown;
+  provider_updated_at: string | null;
 };
 
-export type CardPrintingInsert = Omit<CardPrintingRow, "id"> & { id?: string };
+export type CardPrintingInsert = Omit<
+  CardPrintingRow,
+  "id" | "created_at" | "language"
+> & { id?: string; created_at?: string; language?: string };
 
-export type CardAliasRow = { id: string; card_id: string; alias: string };
-export type CardAliasInsert = Omit<CardAliasRow, "id"> & { id?: string };
+export type CardAliasRow = {
+  id: string;
+  card_id: string;
+  alias: string;
+  source: string;
+};
+export type CardAliasInsert = Omit<CardAliasRow, "id" | "source"> & {
+  id?: string;
+  source?: string;
+};
+
+export type SyncStatus = "running" | "succeeded" | "failed";
+export type SyncMode = "sample" | "full";
+
+export type CardSyncRunRow = {
+  id: string;
+  provider_key: string;
+  mode: SyncMode;
+  status: SyncStatus;
+  started_at: string;
+  finished_at: string | null;
+  records_seen: number;
+  cards_upserted: number;
+  printings_upserted: number;
+  records_failed: number;
+  notes: string | null;
+};
+
+export type CardSyncRunInsert = Omit<
+  CardSyncRunRow,
+  | "id"
+  | "status"
+  | "started_at"
+  | "finished_at"
+  | "records_seen"
+  | "cards_upserted"
+  | "printings_upserted"
+  | "records_failed"
+  | "notes"
+> &
+  Partial<CardSyncRunRow>;
+
+export type CardSyncFailureRow = {
+  id: string;
+  run_id: string;
+  provider_external_id: string | null;
+  reason: string;
+  raw_record: unknown;
+  created_at: string;
+};
+
+export type CardSyncFailureInsert = Omit<CardSyncFailureRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
 
 /** One row of `search_cards`: a card plus its relevance score. */
-export type CardSearchRow = Omit<CardRow, "created_at" | "updated_at" | "game"> & {
-  score: number;
-};
+export type CardSearchRow = Pick<
+  CardRow,
+  | "id"
+  | "canonical_card_number"
+  | "exact_name"
+  | "card_type"
+  | "colors"
+  | "traits"
+  | "cost"
+  | "power"
+  | "counter"
+  | "life"
+  | "rarity"
+  | "effect_text"
+  | "trigger_text"
+> & { score: number };
 
 export type EventStatus = "draft" | "open" | "closed";
 export type Game = "one_piece";
@@ -226,11 +315,19 @@ export type Database = {
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;
       card_aliases: Table<CardAliasRow, CardAliasInsert>;
+      card_sync_runs: Table<CardSyncRunRow, CardSyncRunInsert>;
+      card_sync_failures: Table<CardSyncFailureRow, CardSyncFailureInsert>;
     };
     Views: Record<string, never>;
     Functions: {
       search_cards: {
-        Args: { search_query: string; result_limit?: number };
+        Args: {
+          search_query: string;
+          result_limit?: number;
+          filter_set_code?: string | null;
+          filter_card_type?: string | null;
+          filter_color?: string | null;
+        };
         Returns: CardSearchRow[];
       };
     };
@@ -241,7 +338,8 @@ export type Database = {
       store_role: StoreRole;
       event_status: EventStatus;
       game: Game;
-      card_category: CardCategory;
+      sync_status: SyncStatus;
+      sync_mode: SyncMode;
     };
     CompositeTypes: Record<string, never>;
   };
