@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { TextInput } from "@/components/ui/controls";
+import { Select, TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { createEventAction } from "@/lib/events/actions";
 import {
@@ -30,12 +30,29 @@ function errorFor(state: CreateEventState, field: keyof CreateEventFieldErrors) 
   return state.status === "error" ? state.fieldErrors[field] : undefined;
 }
 
+export interface StoreOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Creates an event for one store.
+ *
+ * A store member has exactly one store, so it is a hidden field. An admin may
+ * create for any of them, so they get a picker — the server re-checks the
+ * choice against the caller's membership either way, so the difference here is
+ * only what is worth showing.
+ */
 export function CreateEventForm({
   storeId,
+  stores,
   defaultStartsAt,
   defaultEndsAt,
 }: {
-  storeId: string;
+  /** Fixed store, for a store member. */
+  storeId?: string;
+  /** Choosable stores, for an admin. Exactly one of these two is given. */
+  stores?: StoreOption[];
   /** Pre-filled with a sensible next slot, computed on the server. */
   defaultStartsAt: string;
   defaultEndsAt: string;
@@ -54,7 +71,7 @@ export function CreateEventForm({
       noValidate
       className="flex flex-col gap-5"
     >
-      <input type="hidden" name="storeId" value={storeId} />
+      {storeId && <input type="hidden" name="storeId" value={storeId} />}
 
       <p
         role="alert"
@@ -66,6 +83,32 @@ export function CreateEventForm({
       >
         {state.status === "error" ? state.message : ""}
       </p>
+
+      {stores && (
+        <Field name="storeId" label="Store" error={errorFor(state, "storeId")}>
+          <Select
+            {...fieldIds("storeId")}
+            name="storeId"
+            required
+            defaultValue={stores.length === 1 ? stores[0].id : ""}
+            aria-invalid={errorFor(state, "storeId") ? true : undefined}
+            aria-describedby={describedBy(
+              "storeId",
+              !!errorFor(state, "storeId"),
+              false,
+            )}
+          >
+            <option value="" disabled>
+              Choose a store…
+            </option>
+            {stores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
 
       <Field
         name="name"
