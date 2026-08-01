@@ -113,6 +113,8 @@ export type CardRow = {
   counter: number | null;
   life: number | null;
   rarity: string | null;
+  /** One Piece attribute — Slash, Strike, Special, Wisdom, Ranged. */
+  attribute: string | null;
   effect_text: string | null;
   trigger_text: string | null;
   provider_key: string;
@@ -229,6 +231,7 @@ export type CardSearchRow = Pick<
   | "counter"
   | "life"
   | "rarity"
+  | "attribute"
   | "effect_text"
   | "trigger_text"
 > & { score: number };

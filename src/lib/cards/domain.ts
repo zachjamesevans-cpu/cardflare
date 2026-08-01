@@ -165,6 +165,8 @@ export const normalizedCardSchema = z.object({
   counter: z.number().int().min(0).max(99999).nullish().default(null),
   life: z.number().int().min(0).max(99).nullish().default(null),
   rarity: optionalText(40),
+  /** One Piece attribute — Slash, Strike, Special, Wisdom, Ranged. */
+  attribute: optionalText(40),
   effectText: optionalText(4000),
   triggerText: optionalText(2000),
   providerExternalId: optionalText(200),

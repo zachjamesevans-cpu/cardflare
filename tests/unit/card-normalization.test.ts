@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { readFileSync as read } from "node:fs";
+
 import { compactCardNumber, normalizeName } from "@/lib/cards/domain";
 import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import { mergeByCardNumber } from "@/lib/cards/sync";
@@ -306,5 +308,99 @@ describe("printing keys", () => {
 
     expect(withImage.card.printings[0]!.imageId).toBe("img-991");
     expect(withImage.card.printings[0]!.providerExternalId).toContain("img-991");
+  });
+});
+
+/**
+ * The real record, observed from /api/allSetCards/ on 2 August 2026.
+ *
+ * One record from one endpoint — the starter-deck, promo and DON!! shapes are
+ * still unobserved. These assertions are what "verified" currently rests on.
+ */
+describe("the observed provider record", () => {
+  const [observed] = JSON.parse(
+    read(resolve(import.meta.dirname, "../fixtures/optcgapi/allSetCards.json"), "utf8"),
+  ) as unknown[];
+
+  const result = normalize(observed);
+  const card = result.ok ? result.card : null;
+
+  it("normalises without failure", () => {
+    expect(result.ok).toBe(true);
+  });
+
+  it("maps every field the record carries", () => {
+    expect(card).toMatchObject({
+      canonicalCardNumber: "OP01-077",
+      exactName: "Perona",
+      cardType: "character",
+      colors: ["blue"],
+      traits: ["Thriller Bark Pirates"],
+      cost: 1,
+      power: 2000,
+      counter: 1000,
+      life: null,
+      rarity: "UC",
+      attribute: "Special",
+    });
+  });
+
+  it("keeps the effect text and finds no trigger to split out", () => {
+    expect(card?.effectText).toContain("[On Play]");
+    expect(card?.triggerText).toBeNull();
+  });
+
+  // card_cost and card_power arrive as strings, counter_amount as a number.
+  it("coerces the provider's inconsistent numeric types", () => {
+    expect(typeof card?.cost).toBe("number");
+    expect(typeof card?.power).toBe("number");
+    expect(typeof card?.counter).toBe("number");
+  });
+
+  it("takes the bulk endpoint's image URL", () => {
+    expect(card?.printings[0]!.imageUrl).toBe(
+      "https://optcgapi.com/media/static/Card_Images/OP01-077.jpg",
+    );
+  });
+
+  /*
+   * card_image_id is "OP01-077" — the card number. Using it as the artwork
+   * discriminator would give two arts of this card one key.
+   */
+  it("does not use an image id that merely repeats the card number", () => {
+    const key = card?.printings[0]!.providerExternalId ?? "";
+
+    expect(key.startsWith("set:OP01-077:")).toBe(true);
+    expect(key).not.toBe("set:OP01-077:OP01-077");
+  });
+
+  it("separates two artworks that differ only by image URL", () => {
+    const alt = normalize({
+      ...(observed as Record<string, unknown>),
+      card_image: "https://optcgapi.com/media/static/Card_Images/OP01-077_p1.jpg",
+    });
+
+    expect(alt.ok).toBe(true);
+    if (!alt.ok || !card) return;
+
+    expect(alt.card.printings[0]!.providerExternalId).not.toBe(
+      card.printings[0]!.providerExternalId,
+    );
+  });
+
+  it("records date_scraped as the provider timestamp", () => {
+    expect(card?.providerUpdatedAt).toBe("2026-07-31");
+  });
+
+  /*
+   * Pricing is out of scope for this milestone. Keeping it in raw_metadata
+   * would leave stale figures in the database waiting to be surfaced.
+   */
+  it("strips pricing before storing the raw record", () => {
+    const raw = JSON.stringify(card?.rawMetadata ?? {});
+
+    expect(raw).not.toContain("inventory_price");
+    expect(raw).not.toContain("market_price");
+    expect(raw).toContain("card_set_id");
   });
 });

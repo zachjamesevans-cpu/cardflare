@@ -193,6 +193,7 @@ function toCardRow(card: NormalizedCard, provider: CardDataProvider) {
     counter: card.counter,
     life: card.life,
     rarity: card.rarity,
+    attribute: card.attribute,
     effect_text: card.effectText,
     trigger_text: card.triggerText,
     provider_key: provider.providerKey,

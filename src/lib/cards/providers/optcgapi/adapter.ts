@@ -68,6 +68,14 @@ const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {
  */
 const rawListSchema = z.array(z.record(z.string(), z.unknown()));
 
+/** Dropped before storage: pricing is out of scope for this milestone. */
+const PRICE_FIELDS = new Set([
+  "inventory_price",
+  "market_price",
+  "inventory_price_history",
+  "market_price_history",
+]);
+
 export class MappingUnverifiedError extends Error {
   constructor() {
     super(
@@ -153,6 +161,16 @@ export class OptcgApiProvider implements CardDataProvider {
     }
 
     const record = input as Record<string, unknown>;
+
+    /*
+     * The provider returns `inventory_price` and `market_price`. Pricing is out
+     * of scope for this milestone, so it is stripped before the record is kept
+     * as raw_metadata — storing prices we never display would leave stale
+     * figures in the database waiting to be surfaced by accident.
+     */
+    const stored = Object.fromEntries(
+      Object.entries(record).filter(([key]) => !PRICE_FIELDS.has(key)),
+    );
     const externalId = asString(pick(record, "externalId"));
     const cardNumber = asString(pick(record, "cardNumber"));
     const setCode = asString(pick(record, "setCode"));
@@ -160,29 +178,28 @@ export class OptcgApiProvider implements CardDataProvider {
     const rarity = asString(pick(record, "rarity"));
 
     /*
-     * The printing key.
+     * The printing key: source + card number + the best discriminator we have.
      *
      * Card number alone would merge an alternate art into its base printing —
-     * the exact thing the brief forbids. Source distinguishes the same number
-     * appearing in a booster and a starter deck. The image id is the provider's
-     * own per-artwork identifier and is the strongest discriminator available;
-     * the fingerprint is a last resort when it is absent, built from the parts
-     * that do differ between printings so two arts still get two rows.
+     * the exact thing the brief forbids. Source keeps the same number appearing
+     * in a booster and in a starter deck as two products.
+     *
+     * A discriminator only counts if it actually discriminates. On the observed
+     * record `card_image_id` is "OP01-077" — identical to the card number,
+     * despite the name — and `card_set_id` is a candidate for both the number
+     * and the record id. Either one, used blindly, would give two artworks the
+     * same key. Both are ignored when they merely repeat the number, leaving
+     * the fingerprint, which includes the image URL: the one value that must
+     * differ between two arts of the same card.
      */
-    /*
-     * A discriminator only counts if it actually discriminates. `card_set_id`
-     * is a candidate for both the card number and the external id, so on some
-     * records `externalId` is simply the card number again — using it would
-     * give two artworks of one card the same key and silently merge them,
-     * which is the exact failure this composite key exists to prevent.
-     */
-    const distinctId = externalId && externalId !== cardNumber ? externalId : null;
+    const discriminating = (value: string | null) =>
+      value && value !== cardNumber ? value : null;
 
     const printingKey = [
       source,
       cardNumber ?? "unknown",
-      imageId ??
-        distinctId ??
+      discriminating(imageId) ??
+        discriminating(externalId) ??
         stableFingerprint([
           cardNumber,
           asString(pick(record, "name")),
@@ -203,10 +220,11 @@ export class OptcgApiProvider implements CardDataProvider {
       counter: asNumber(pick(record, "counter")),
       life: asNumber(pick(record, "life")),
       rarity,
+      attribute: asString(pick(record, "attribute")),
       effectText: asString(pick(record, "effectText")),
       triggerText: asString(pick(record, "triggerText")),
       providerExternalId: externalId,
-      rawMetadata: record,
+      rawMetadata: stored,
       providerUpdatedAt: asString(pick(record, "updatedAt")),
       printings: [
         {
@@ -231,7 +249,7 @@ export class OptcgApiProvider implements CardDataProvider {
           isReprint: null,
           language: "en",
           imageUrl: asString(pick(record, "imageUrl")),
-          rawMetadata: record,
+          rawMetadata: stored,
           providerUpdatedAt: asString(pick(record, "updatedAt")),
         },
       ],

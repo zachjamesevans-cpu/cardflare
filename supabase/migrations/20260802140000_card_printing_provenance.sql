@@ -22,3 +22,12 @@ create index if not exists card_printings_source_idx
 
 create index if not exists card_printings_image_id_idx
   on public.card_printings (image_id);
+
+-- Observed on the live provider record: an `attribute` field (Slash, Strike,
+-- Special, Wisdom, Ranged). It identifies a card in play and belongs on the
+-- gameplay identity rather than the printing.
+alter table public.cards
+  add column if not exists attribute text;
+
+comment on column public.cards.attribute is
+  'One Piece attribute, e.g. Slash or Special. Observed on the provider''s set endpoint.';

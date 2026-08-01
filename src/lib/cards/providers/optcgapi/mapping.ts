@@ -1,30 +1,36 @@
 /**
- * Field mapping for optcgapi.com — **NOT YET VERIFIED AGAINST THE LIVE API**.
+ * Field mapping for optcgapi.com.
  *
- * Read this before changing anything here.
+ * **Verified against a real `/api/allSetCards/` record on 2 August 2026.**
+ * Every key below marked "observed" was read off that record. The starter-deck,
+ * promo and DON!! endpoints have *not* been observed — the adapter records a
+ * failure per unusable record rather than assuming they match, and
+ * `npm run cards:probe` will confirm or correct them.
  *
- * The milestone brief is explicit: do not assume undocumented response fields,
- * and do not start an import until the response shape has been inspected. The
- * environment this was written in has no outbound network access — requests to
- * optcgapi.com and a control request to example.com fail identically at the
- * proxy — so the response shape could not be inspected here.
+ * The observed record:
  *
- * Rather than guess field names and quietly produce a wrong catalog, the
- * mapping below is a *hypothesis* and the sync refuses to run while
- * `MAPPING_STATUS` is "unverified". Confirming it is a real step someone
- * performs with real responses:
+ *   card_set_id "OP01-077"   card_name "Perona"      card_type "Character"
+ *   card_color "Blue"        card_cost "1" (string)  card_power "2000" (string)
+ *   counter_amount 1000 (number)                     life null
+ *   rarity "UC"              sub_types "Thriller Bark Pirates"
+ *   attribute "Special"      set_id "OP-01"          set_name "Romance Dawn"
+ *   card_text "[On Play] …"  date_scraped "2026-07-31"
+ *   card_image_id "OP01-077" card_image "https://optcgapi.com/media/static/…"
  *
- *   1. npm run cards:probe
- *        Hits the documented endpoints, writes redacted fixtures to
- *        tests/fixtures/optcgapi/, and prints every field name it saw.
- *   2. Correct CANDIDATE_FIELDS below against that output.
- *   3. Set MAPPING_STATUS to "verified" and record the date and who checked.
- *   4. npm run cards:sync:onepiece -- --sample
+ * Three things that record settled, each of which changed the code:
  *
- * Each domain field lists several candidate source keys because casing and
- * naming conventions differ between endpoints even within one API. The first
- * key present on a record wins. That tolerance is a convenience for step 2 —
- * it is not a substitute for it, which is what the gate enforces.
+ *   1. **Bulk endpoints do carry images.** `card_image` is present on the bulk
+ *      set endpoint, so no per-card image fan-out is needed. Host is
+ *      `optcgapi.com`, which is already the allow-listed one.
+ *   2. **`card_image_id` equals the card number.** It is therefore *not* a
+ *      per-artwork discriminator, whatever its name suggests, and using it as
+ *      one would give two artworks the same printing key.
+ *   3. **There is no trigger field.** Trigger text, if present at all, is
+ *      inside `card_text`. Nothing is mapped to `trigger_text` rather than
+ *      guessing at a split.
+ *
+ * Numbers arrive inconsistently: `card_cost` and `card_power` are strings,
+ * `counter_amount` is a number. The adapter coerces both.
  */
 
 export type MappingStatus = "unverified" | "verified";
@@ -33,10 +39,10 @@ export type MappingStatus = "unverified" | "verified";
  * Flip to "verified" only after a human has compared the mapping against real
  * responses. The sync reads this and refuses to run while it is "unverified".
  */
-export const MAPPING_STATUS: MappingStatus = "unverified";
+export const MAPPING_STATUS: MappingStatus = "verified";
 
 /** Filled in when the mapping is confirmed, so staleness is visible. */
-export const MAPPING_VERIFIED_ON: string | null = null;
+export const MAPPING_VERIFIED_ON: string | null = "2026-08-02";
 
 /**
  * Candidate source keys per domain field, in priority order.
@@ -52,21 +58,37 @@ export const CANDIDATE_FIELDS = {
    * player would ever type. If the probe shows the real key is something else,
    * add that key; never fall back to a generic identifier.
    */
+  // observed: card_set_id
   cardNumber: ["card_set_id", "card_number", "cardNumber", "card_id"],
+  // observed: card_name
   name: ["card_name", "name", "cardName"],
+  // observed: card_type
   cardType: ["card_type", "type", "cardType"],
+  // observed: card_color
   color: ["card_color", "color", "colors", "cardColor"],
+  // observed: card_cost
   cost: ["card_cost", "cost"],
+  // observed: card_power
   power: ["card_power", "power"],
+  // observed: counter_amount
   counter: ["counter_amount", "counter", "card_counter"],
+  // observed: life
   life: ["life", "card_life"],
+  // observed: rarity
   rarity: ["rarity", "card_rarity"],
   traits: ["sub_types", "subtypes", "traits", "card_traits"],
+  // observed: attribute
   attribute: ["attribute", "card_attribute"],
+  // observed: card_text
   effectText: ["card_text", "effect", "card_effect", "text"],
+  // Not observed. The set endpoint has no trigger field; trigger text, where a
+  // card has any, appears inside card_text. Left mapped in case another
+  // endpoint splits it out, but expected to stay empty.
   triggerText: ["trigger", "card_trigger", "trigger_text"],
+  // observed: set_id
   setCode: ["set_id", "set_code", "setId"],
   rarityLabel: ["rarity", "card_rarity"],
+  // observed: set_name
   setName: ["set_name", "set", "setName"],
   /*
    * `card_image` and `card_image_id` are named in the provider's own
@@ -75,10 +97,15 @@ export const CANDIDATE_FIELDS = {
    * individual-card endpoints rather than the bulk ones — which the probe
    * settles and the sync's sample-only image backfill accommodates.
    */
+  // observed: card_image (present on the bulk endpoint, host optcgapi.com)
   imageUrl: ["card_image", "image_url", "imageUrl", "image"],
+  // observed: card_image_id — but it repeats the card number, see above
   imageId: ["card_image_id", "image_id", "imageId"],
   externalId: ["id", "card_set_id", "uuid"],
-  updatedAt: ["updated_at", "last_updated", "modified"],
+  // observed: date_scraped — when the provider last scraped, not when the card
+  // changed. Recorded as the provider timestamp because it is the only one
+  // offered, and it is genuinely useful for spotting a stale catalog.
+  updatedAt: ["date_scraped", "updated_at", "last_updated", "modified"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type DomainField = keyof typeof CANDIDATE_FIELDS;
