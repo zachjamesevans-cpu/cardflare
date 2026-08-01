@@ -302,6 +302,61 @@ async function finishRun(
   if (error) console.error("Could not finalise the sync run", error);
 }
 
+/**
+ * How long a run may sit in `running` before it is treated as abandoned.
+ *
+ * `finishRun` writes the terminal status, so a process that is killed —
+ * a serverless invocation hitting its time limit, a laptop closing mid-command —
+ * leaves the row `running` forever. Without a ceiling that one row would block
+ * every future run. Generously longer than any run should take.
+ */
+export const STALE_RUN_MS = 20 * 60 * 1000;
+
+/**
+ * The run currently in progress, if there genuinely is one.
+ *
+ * Two syncs at once would double the load on a free provider and race each
+ * other's upserts, so callers use this to refuse rather than queue. A run past
+ * `STALE_RUN_MS` is marked failed here rather than reported as live: leaving it
+ * would both block new runs and make the admin panel claim a sync is happening
+ * when nothing is running.
+ */
+export async function activeSyncRun(
+  now: number = Date.now(),
+): Promise<{ id: string; mode: string; startedAt: string } | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("card_sync_runs")
+    .select("id, mode, started_at")
+    .eq("status", "running")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not check for a running sync", error);
+    // Fail closed: an unreadable table is not evidence that nothing is running.
+    throw new Error("Could not check whether a sync is already running");
+  }
+
+  if (!data) return null;
+
+  if (now - new Date(data.started_at).getTime() > STALE_RUN_MS) {
+    await getSupabaseAdmin()
+      .from("card_sync_runs")
+      .update({
+        status: "failed",
+        finished_at: new Date(now).toISOString(),
+        notes: "Abandoned — the process stopped before the run finished.",
+      })
+      .eq("id", data.id)
+      .eq("status", "running");
+
+    return null;
+  }
+
+  return { id: data.id, mode: data.mode, startedAt: data.started_at };
+}
+
 /** The most recent finished run, for the admin panel. */
 export async function latestSyncRun() {
   const { data, error } = await getSupabaseAdmin()

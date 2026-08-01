@@ -240,6 +240,33 @@ Until step 3, `fetchCards`, `fetchSets` and `fetchCardByExternalId` all throw
 
 ## Synchronisation
 
+Two ways to run the same `syncCards` call. Neither is reachable by a public
+user.
+
+### From the admin console
+
+**Admin → Card catalog** offers a sample or a full sync. This is the ordinary
+way to import cards: it runs on the deployed server, so it uses the
+service-role key that is already configured there and needs no checkout, no
+Node installation, and no copy of the key on anyone's laptop.
+
+- Gated by the same admin check as store invites, applied inside the Server
+  Action rather than in the page — the action is a public POST endpoint, so
+  hiding the button would gate nothing.
+- The provider is fixed in the action. No part of the request selects a URL, a
+  host or an endpoint.
+- A full sync additionally requires the confirmation checkbox, re-checked on
+  the server. It is the browser equivalent of `--confirm`.
+- Limited to four runs per admin per fifteen minutes, and refused outright
+  while another run is in progress.
+- The admin page sets `maxDuration = 60`, the ceiling every Vercel plan
+  permits. A full catalog pull can exceed that. If it does, the request is cut
+  off, the run is marked `failed` after twenty minutes by the next
+  `activeSyncRun` check, and re-running is safe — see **Resumable** below. Use
+  the command line for the full catalog if it will not fit in sixty seconds.
+
+### From the command line
+
 ```bash
 # ~75-150 deterministic records, for interface and database testing
 npm run cards:sync:onepiece -- --sample
@@ -249,8 +276,8 @@ npm run cards:sync:onepiece -- --full --confirm
 ```
 
 Needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; reads
-`.env.local`. Server-side only — there is no endpoint, so no public user can
-trigger a sync.
+`.env.local`. The reference implementation, and the only option with no time
+limit.
 
 > The sample is a deterministic prefix of each endpoint. It is **not** a
 > popularity or metagame selection and should not be read as one.
@@ -266,7 +293,11 @@ Behaviour:
 - **Failures are kept.** A record that fails validation is skipped, never
   coerced, and written to `card_sync_failures` with its payload.
 - **Runs are logged** to `card_sync_runs`, surfaced in `/admin`.
-- Full mode requires `--confirm` and prints what it will do first.
+- **One at a time.** A run left in `running` for more than twenty minutes is
+  treated as abandoned and marked failed, so a killed process cannot wedge the
+  console.
+- Full mode requires `--confirm` (or the checkbox) and says what it will do
+  first.
 
 ## Update strategy
 
