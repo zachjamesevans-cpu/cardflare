@@ -19,6 +19,10 @@
 mirror are sufficient), React Hook Form (a Server Action with `useActionState`
 covers a single form with less client JavaScript), any animation library.
 
+`qrcode` is the one dependency added for a thing that could in principle be
+hand-written. Reed–Solomon encoding and QR version selection are not worth
+reimplementing, and a subtly wrong QR fails on paper rather than in a test.
+
 ## Directory layout
 
 ```
@@ -35,6 +39,7 @@ src/components/
 src/lib/
   auth/                Session, viewer roles, guards, sign-in actions
   email/               Provider client and message templates
+  events/              Event Rooms: schema, repository, actions, join codes, QR
   players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
@@ -54,6 +59,9 @@ only Client Components are:
 | `MobileNav`          | Disclosure state, Escape handling              |
 | `WaitlistForm`       | `useActionState`, inline errors, success state |
 | `JoinForm`           | `useActionState`, inline errors                |
+| `JoinCodeForm`       | `useActionState`, inline errors                |
+| `CreateEventForm`    | `useActionState`, inline errors                |
+| `PrintButton`        | Calls `window.print()`                         |
 | `PlayerIdentityCard` | Rename disclosure state                        |
 | `AnalyticsTracker`   | Page view and delegated click tracking         |
 
@@ -295,3 +303,57 @@ failing, so the suite stays meaningful without credentials.
   and must be regenerated once the project exists. It must stay a `type` alias,
   not an `interface` — only type aliases get the implicit index signature that
   supabase-js requires, and an interface silently degrades every query to `never`.
+
+## Event Rooms
+
+```
+CreateEventForm (client)
+  └─ createEventAction         Server Action — src/lib/events/actions.ts
+       ├─ createEventSchema       name, window, 24-hour sanity bound
+       ├─ authorizeStore          membership from the session, never the form
+       ├─ createEvent             service-role insert, retries on code collision
+       └─ redirect                to the event's printable page
+```
+
+### Authorisation
+
+The store id arrives in a hidden field, so it is attacker-controlled.
+`authorizeStore` compares it against the membership `getViewer` resolved from
+the session cookie; a store submitting another store's id is refused. Status
+changes load the event first and take the store from the row, so posting
+another store's event id cannot close their room. Both refusals return the same
+message a missing store would, so neither can be used to discover which ids are
+real.
+
+RLS backs this up: a store can read its own events and nothing else, and there
+are no insert, update or delete policies at all. Verified against a real
+PostgreSQL instance — store A cannot read, create, edit or delete anything
+belonging to store B, and `anon` is refused outright.
+
+The `select` grant to `authenticated` is written into the migration rather than
+inherited from Supabase's default privileges. A policy narrows a grant; it never
+creates one, so a migration that assumes the default silently produces
+"permission denied" on a database configured differently.
+
+### Join codes
+
+Crockford's base32 — digits, minus the letters that collide with them (I, L, O,
+U). Keeping the digit and dropping the letter is what makes correction
+possible: a player who reads a printed `1` as `I` still lands in the right room.
+Generated with `randomInt`, since a guessable code is a way into an event.
+
+`normalizeJoinCode` is pure and shared by the URL route and the typed-code
+form, so `/e/k3m-9pz` and a hand-typed `K3M 9PZ` resolve identically.
+
+### Public lookup
+
+`/e/[code]` is reached by scanning printed paper, so it is the one page with no
+session behind it. It resolves the code with the service role and selects an
+explicit column list rather than `*`, so a later migration cannot quietly widen
+what a stranger holding a code can see.
+
+Every read degrades rather than throwing: `getSupabaseAdmin` raises when the
+service-role key is absent, which once turned an outage into a 500 on a page a
+player reached from a counter. A well-formed code that cannot be checked now
+says so, and never reports itself as invalid — telling someone their store's
+printed code is wrong is worse than admitting the outage.

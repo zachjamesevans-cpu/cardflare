@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { CalendarClock } from "lucide-react";
 
+import { CreateEventForm } from "@/components/events/create-event-form";
+import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
+import { defaultEventWindow } from "@/lib/events/format";
+import { listEventsForStore } from "@/lib/events/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -45,28 +48,49 @@ export default async function StorePage() {
     .order("name");
 
   const store = stores?.[0];
+  const events = store ? await listEventsForStore(store.id) : [];
+  const window = defaultEventWindow();
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
       title={store?.name ?? "Your store"}
-      description="Your CardFlare beta home."
+      description="Create an event, print its QR code, and players scan in."
     >
-      <Card className="flex flex-col items-start gap-3">
-        <span className="flex size-10 items-center justify-center rounded-[var(--radius-control)] border border-accent/30 bg-accent/10">
-          <CalendarClock className="size-5 text-accent" aria-hidden="true" />
-        </span>
-        <h2 className="text-lg font-semibold text-text-primary">
-          Event Rooms are coming next
+      <section className="flex flex-col gap-5" aria-labelledby="new-event-heading">
+        <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
+          New event
         </h2>
-        <p className="max-w-xl text-text-secondary">
-          You&rsquo;re set up and signed in. The next release adds Event Rooms:
-          you&rsquo;ll create a room for an event, print its QR code, and players will
-          join by scanning it. Until then we&rsquo;ll set your first event up with you
-          directly.
-        </p>
-      </Card>
+
+        <Card>
+          {store ? (
+            <CreateEventForm
+              storeId={store.id}
+              defaultStartsAt={window.startsAt}
+              defaultEndsAt={window.endsAt}
+            />
+          ) : (
+            <p className="text-text-secondary">
+              We could not load your store. Try reloading, and get in touch if it
+              persists.
+            </p>
+          )}
+        </Card>
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="events-heading">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="events-heading" className="text-xl font-bold text-text-primary">
+            Events
+          </h2>
+          <span className="text-sm text-text-muted tabular-nums">
+            {events.length} total
+          </span>
+        </div>
+
+        <EventList events={events} />
+      </section>
     </AppShell>
   );
 }

@@ -3,8 +3,10 @@ import { Store as StoreIcon } from "lucide-react";
 
 import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
+import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { listAllEvents } from "@/lib/events/repository";
 import { listStores } from "@/lib/stores/repository";
 import type { StoreListing } from "@/lib/stores/repository";
 
@@ -22,7 +24,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   await requireAdmin();
-  const stores = await listStores();
+  const [stores, events] = await Promise.all([listStores(), listAllEvents()]);
+
+  const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
 
   return (
     <div className="flex flex-col gap-12">
@@ -53,6 +57,19 @@ export default async function AdminPage() {
         <Card>
           <InviteStoreForm />
         </Card>
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="events-heading">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="events-heading" className="text-xl font-bold text-text-primary">
+            Events
+          </h2>
+          <span className="text-sm text-text-muted tabular-nums">
+            {events.length} total
+          </span>
+        </div>
+
+        <EventList events={events} showStore storeNames={storeNames} />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="stores-heading">
