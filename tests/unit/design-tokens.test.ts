@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { AVATAR_HUE_COUNT } from "@/lib/players/avatar";
+
 /**
  * Guards the palette against regressions.
  *
@@ -95,6 +97,25 @@ describe("design tokens", () => {
       );
     },
   );
+
+  /*
+   * Avatar hues are picked from a session id, so no one reviews the pairing
+   * before a player sees it. Every one has to be legible on every surface or
+   * some players get an unreadable name and nobody finds out.
+   */
+  describe.each(["canvas", "surface", "elevated"])("avatar hues on %s", (surface) => {
+    it.each([1, 2, 3, 4, 5, 6])("avatar-%i meets WCAG AA", (index) => {
+      expect(
+        contrastRatio(token(`avatar-${index}`), token(surface)),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  it("has as many avatar hues as the code assigns from", () => {
+    const defined = css.match(/--color-avatar-\d+:/g) ?? [];
+
+    expect(defined).toHaveLength(AVATAR_HUE_COUNT);
+  });
 
   it("keeps the focus ring distinguishable from the page", () => {
     expect(contrastRatio(token("accent"), token("canvas"))).toBeGreaterThanOrEqual(3);

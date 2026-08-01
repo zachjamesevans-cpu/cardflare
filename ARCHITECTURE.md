@@ -63,6 +63,7 @@ only Client Components are:
 | `JoinCodeForm`       | `useActionState`, inline errors                |
 | `CreateEventForm`    | `useActionState`, inline errors                |
 | `CardSearch`         | `useActionState`, inline results               |
+| `JoinEventForm`      | `useActionState`, inline errors                |
 | `PrintButton`        | Calls `window.print()`                         |
 | `PlayerIdentityCard` | Rename disclosure state                        |
 | `AnalyticsTracker`   | Page view and delegated click tracking         |
@@ -408,3 +409,56 @@ role — a definer function would re-open what the table revokes closed.
 It scans every card to score it, which is well under a millisecond at a few
 thousand cards. If the pool ever outgrows that, the fix is a trigram prefilter,
 not a rewrite.
+
+## Joining an Event Room
+
+```
+JoinEventForm (client)
+  └─ joinEventAction           Server Action — src/lib/events/join-event-actions.ts
+       ├─ isValidJoinCode         shape-checked before any query
+       ├─ checkRateLimit          20 per IP per 10 minutes
+       ├─ findEventByJoinCode     and re-check status === "open"
+       ├─ createPlayerSession     only when the browser has no identity yet
+       ├─ joinEvent               upsert on (event_id, player_session_id)
+       └─ setPlayerCookie         only for a newly created identity
+```
+
+Scanning to being in the room is one submission. Splitting identity from
+joining would put a second screen between the QR code and the room, which is
+the one place the core loop cannot afford friction.
+
+The event comes from the code in the request; the **player always comes from
+the cookie**. A session id in the form would let anyone drop someone else into
+a room, and a test asserts a submitted one is ignored.
+
+Status is re-checked at the moment of joining rather than trusted from when the
+page rendered — a store can close the room in between.
+
+The identity is written before the room membership, so a failed join rolls the
+new session back. An orphaned session plus a cookie pointing at it is worse
+than nothing: the player would look signed in and be in no room.
+
+### Presence
+
+`last_seen_at`, refreshed when a player loads the room and at most once a
+minute, with "here now" being a 15-minute window on it. Deliberately not
+websockets — a store wants to know who is around, not who moved their thumb,
+and a polled timestamp survives a phone locking in someone's pocket. Realtime
+belongs with match notifications, where the latency is the feature.
+
+### Avatars
+
+Initials over one of six hues, both derived from the session id. Generated,
+never uploaded: an upload means storage, moderation, and a way to put an
+arbitrary image in front of strangers in a room — all to distinguish six people
+at a counter, which initials and a colour already do. It also keeps the "no
+images we do not own" position intact.
+
+The hues are tokens in `globals.css`, and `design-tokens.test.ts` asserts each
+one clears WCAG AA on every surface and that there are exactly as many as the
+code assigns from. Nobody reviews the pairing before a player sees it, so an
+unreadable combination would otherwise ship silently.
+
+Display names are read from `player_sessions` at query time rather than copied
+onto the participant row, so fixing a typo renames the player in every room
+they are in.

@@ -31,6 +31,21 @@
   --color-warning: #fbc85a;
   --color-danger: #ff8f8f;
 
+  /*
+   * Player avatars — six hues assigned deterministically from a session id.
+   *
+   * Only ever used as foreground text over a tint of themselves, the same way
+   * Badge works, so each one has to clear AA against every surface.
+   * tests/unit/design-tokens.test.ts enforces that. Deliberately not the
+   * accent: an avatar must never be mistaken for a CardFlare control.
+   */
+  --color-avatar-1: #8fd3ff;
+  --color-avatar-2: #a8e6a1;
+  --color-avatar-3: #ffc98f;
+  --color-avatar-4: #d9b3ff;
+  --color-avatar-5: #ffadad;
+  --color-avatar-6: #7fe3d4;
+
   /* Radius */
   --radius-control: 0.625rem;
   --radius-card: 1rem;

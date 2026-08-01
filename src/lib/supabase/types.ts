@@ -163,6 +163,23 @@ export type EventInsert = Omit<EventRow, "id" | "created_at" | "status" | "game"
   game?: Game;
 };
 
+export type EventParticipantRow = {
+  id: string;
+  event_id: string;
+  player_session_id: string;
+  joined_at: string;
+  last_seen_at: string;
+};
+
+export type EventParticipantInsert = Omit<
+  EventParticipantRow,
+  "id" | "joined_at" | "last_seen_at"
+> & {
+  id?: string;
+  joined_at?: string;
+  last_seen_at?: string;
+};
+
 export type PlayerSessionRow = {
   id: string;
   created_at: string;
@@ -205,6 +222,7 @@ export type Database = {
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
       events: Table<EventRow, EventInsert>;
+      event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;
       card_aliases: Table<CardAliasRow, CardAliasInsert>;

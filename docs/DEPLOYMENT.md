@@ -76,12 +76,13 @@ select * from pg_policies where tablename = 'waitlist_signups';
 Each milestone adds one. Run them in filename order, the same way — paste into
 the SQL Editor, or `npx supabase db push`.
 
-| File                                         | Adds                                             |
-| -------------------------------------------- | ------------------------------------------------ |
-| `20260731090000_create_beta_foundations.sql` | Admins, stores, store members, store invitations |
-| `20260801120000_create_player_sessions.sql`  | Guest player sessions                            |
-| `20260801150000_create_events.sql`           | Event Rooms, join codes, event lifecycle         |
-| `20260801180000_create_cards.sql`            | Cards, printings, aliases, ranked search         |
+| File                                           | Adds                                             |
+| ---------------------------------------------- | ------------------------------------------------ |
+| `20260731090000_create_beta_foundations.sql`   | Admins, stores, store members, store invitations |
+| `20260801120000_create_player_sessions.sql`    | Guest player sessions                            |
+| `20260801150000_create_events.sql`             | Event Rooms, join codes, event lifecycle         |
+| `20260801180000_create_cards.sql`              | Cards, printings, aliases, ranked search         |
+| `20260801210000_create_event_participants.sql` | Players in an Event Room, presence               |
 
 A migration that has not been run shows up as `relation "public.<table>" does
 not exist` the first time the app touches it.

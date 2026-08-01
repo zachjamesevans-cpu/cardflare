@@ -77,11 +77,25 @@ onward.
 No card data ships in the repository. The importer is the mechanism and the
 data is loaded separately, because wrong card data is worse than none.
 
-## ⏸ Awaiting approval
+## ✅ Milestone 4 — Joining
 
-### Milestone 4 — Joining
+- `event_participants` joins a guest session to an event, verified against a
+  real PostgreSQL instance: rejoining is idempotent, deleting a session or an
+  event clears the room, and a rename follows the player everywhere
+- Scanning to being in the room is **one submission** — a new player types a
+  name and is in; a returning player taps once
+- Event lobby: who is here, present players first
+- Presence via `last_seen_at` and a 15-minute window, refreshed at most once a
+  minute. Not websockets: a store wants to know who is around, not who moved
+  their thumb, and a polled timestamp survives a phone locking in a pocket
+- Generated avatars — initials over one of six hues derived from the session
+  id. Never uploaded, so there is no storage, no moderation surface, and
+  nothing to license
+- Stores and admins see live attendance on every event
 
-Player joins event, guest profile, avatar, event lobby, presence.
+**The core loop's first two steps now work end to end**: a store creates an
+event, prints the sheet, and players scan into the room. Posting Flares is
+Milestone 6.
 
 ### Milestone 6 — Lists
 
@@ -111,6 +125,7 @@ Tracked so they are not lost, none blocking launch.
 | **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from.               |
 | **Card artwork**             | Not licensed, so `image_url` stays null and nothing renders a remote image. Revisit only with explicit permission — hot-linking is neither legally settled nor operationally safe. See docs/CARD_DATA.md. |
 | **Card data coverage**       | The importer exists; the full One Piece pool has not been loaded. Needs a source whose terms permit it.                                                                                                   |
+| **Realtime presence**        | Presence is a polled `last_seen_at` window, so the lobby updates on load rather than live. Supabase Realtime belongs with match notifications, where latency actually matters.                            |
 | **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.                 |
 | **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                               |
 

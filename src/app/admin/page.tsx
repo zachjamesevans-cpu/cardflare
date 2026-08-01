@@ -6,6 +6,7 @@ import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
 import { listStores } from "@/lib/stores/repository";
 import type { StoreListing } from "@/lib/stores/repository";
@@ -27,6 +28,7 @@ export default async function AdminPage() {
   const [stores, events] = await Promise.all([listStores(), listAllEvents()]);
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
+  const attendance = await countParticipants(events.map((event) => event.id));
 
   return (
     <div className="flex flex-col gap-12">
@@ -69,7 +71,12 @@ export default async function AdminPage() {
           </span>
         </div>
 
-        <EventList events={events} showStore storeNames={storeNames} />
+        <EventList
+          events={events}
+          showStore
+          storeNames={storeNames}
+          attendance={attendance}
+        />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="stores-heading">
