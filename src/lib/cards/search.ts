@@ -123,6 +123,38 @@ async function printingsFor(cardIds: string[]): Promise<Map<string, CardPrinting
 }
 
 /**
+ * How many printings exist, and how many carry a provider image URL.
+ *
+ * "Why are there no pictures" has three unrelated answers — the display flag
+ * is off, the provider returned no URL, or the URL is on a host that is not
+ * allow-listed — and from the outside they look identical. This separates the
+ * first two, which is the difference between changing a setting and changing
+ * the provider.
+ */
+export async function countPrintingImages(): Promise<{
+  total: number;
+  withImage: number;
+}> {
+  if (!isSupabaseConfigured()) return { total: 0, withImage: 0 };
+
+  const admin = getSupabaseAdmin();
+  const base = () =>
+    admin.from("card_printings").select("id", { count: "exact", head: true });
+
+  const [all, withUrl] = await Promise.all([
+    base(),
+    base().not("image_url", "is", null),
+  ]);
+
+  if (all.error || withUrl.error) {
+    console.error("Could not count printing images", all.error ?? withUrl.error);
+    return { total: 0, withImage: 0 };
+  }
+
+  return { total: all.count ?? 0, withImage: withUrl.count ?? 0 };
+}
+
+/**
  * How many cards are loaded.
  *
  * Exists so an empty pool can be told from a query that matched nothing.

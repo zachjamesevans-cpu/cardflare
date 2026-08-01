@@ -43,13 +43,21 @@ function check(variable: string) {
   return found;
 }
 
-function cardGroup(count: number) {
-  const group = configGroups({ cardCount: count, lastSync: null }).find(
+function cardGroup(
+  count: number,
+  printingImages?: { total: number; withImage: number },
+) {
+  const group = configGroups({ cardCount: count, lastSync: null, printingImages }).find(
     (candidate) => candidate.title === "Cards",
   );
   if (!group) throw new Error("Cards group missing");
   return group;
 }
+
+const imageCheck = (
+  count: number,
+  printingImages?: { total: number; withImage: number },
+) => cardGroup(count, printingImages).checks.find((c) => c.label === "Card images")!;
 
 /*
  * With an empty pool every search correctly matches nothing, which reads as
@@ -90,6 +98,39 @@ describe("card pool", () => {
 
     expect(on.status).toBe("ok");
     expect(on.detail).toMatch(/on\./i);
+  });
+
+  /*
+   * The flag being off and the provider having supplied no URL look identical
+   * from a browser, and only the first is a setting. Reported together so the
+   * panel answers "why are there no pictures" outright.
+   */
+  it("says how many printings actually carry an image URL", () => {
+    const check = imageCheck(10, { total: 120, withImage: 118 });
+
+    expect(check.detail).toMatch(/off/i);
+    expect(check.detail).toContain("118 of 120");
+  });
+
+  it("says plainly when turning the flag on would change nothing", () => {
+    const check = imageCheck(10, { total: 120, withImage: 0 });
+
+    expect(check.detail).toMatch(/no image URL/i);
+    expect(check.detail).toMatch(/would change nothing/i);
+  });
+
+  it("reports the supply whether the flag is on or off", () => {
+    process.env.NEXT_PUBLIC_ENABLE_CARD_IMAGES = "true";
+    const check = imageCheck(10, { total: 120, withImage: 118 });
+
+    expect(check.detail).toMatch(/on\./i);
+    expect(check.detail).toContain("118 of 120");
+  });
+
+  /* Before any import the counts are noise, not information. */
+  it("says nothing about supply when nothing has been imported", () => {
+    expect(imageCheck(0, { total: 0, withImage: 0 }).detail).not.toMatch(/printings/i);
+    expect(imageCheck(0).detail).not.toMatch(/printings/i);
   });
 
   it("warns when no sync has ever run", () => {

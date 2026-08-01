@@ -9,7 +9,7 @@ import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
-import { countCards } from "@/lib/cards/search";
+import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
@@ -40,11 +40,12 @@ export const maxDuration = 60;
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events, cardCount, lastRun] = await Promise.all([
+  const [stores, events, cardCount, lastRun, printingImages] = await Promise.all([
     listStores(),
     listAllEvents(),
     countCards(),
     latestSyncRun(),
+    countPrintingImages(),
   ]);
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
@@ -68,6 +69,7 @@ export default async function AdminPage() {
         <ConfigStatus
           facts={{
             cardCount,
+            printingImages,
             lastSync: lastRun
               ? {
                   status: lastRun.status,
