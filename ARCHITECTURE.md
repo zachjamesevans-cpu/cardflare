@@ -35,6 +35,7 @@ src/components/
 src/lib/
   auth/                Session, viewer roles, guards, sign-in actions
   email/               Provider client and message templates
+  players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
   waitlist/            Schema, parsing, repository, server action
@@ -48,11 +49,13 @@ tests/e2e/             Playwright
 Everything is a Server Component unless interactivity forces otherwise. The
 only Client Components are:
 
-| Component          | Why it must be client-side                     |
-| ------------------ | ---------------------------------------------- |
-| `MobileNav`        | Disclosure state, Escape handling              |
-| `WaitlistForm`     | `useActionState`, inline errors, success state |
-| `AnalyticsTracker` | Page view and delegated click tracking         |
+| Component            | Why it must be client-side                     |
+| -------------------- | ---------------------------------------------- |
+| `MobileNav`          | Disclosure state, Escape handling              |
+| `WaitlistForm`       | `useActionState`, inline errors, success state |
+| `JoinForm`           | `useActionState`, inline errors                |
+| `PlayerIdentityCard` | Rename disclosure state                        |
+| `AnalyticsTracker`   | Page view and delegated click tracking         |
 
 All routes prerender as static content. The waitlist submits through a Server
 Action, so no API route is needed and no Supabase credentials reach the browser.
@@ -91,16 +94,17 @@ validation.
 A Server Action is a public POST endpoint. Every submission is re-validated
 server-side regardless of what the client did.
 
-| Control               | Implementation                                                                                     |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| No client DB access   | Writes go only through the Server Action using the service-role key                                |
-| Service key isolation | `src/lib/supabase/admin.ts` imports `server-only` — leaking it fails the build                     |
-| Row Level Security    | Enabled on `waitlist_signups` with **no policies**; privileges revoked from `anon`/`authenticated` |
-| Input validation      | Zod on the server; the database repeats the checks as constraints                                  |
-| Mass assignment       | Fields are read by name; `status`, `id` and `created_at` are never client-settable                 |
-| Rate limiting         | 5 submissions per IP per 10 minutes                                                                |
-| Bot filtering         | Hidden honeypot field plus a minimum fill time                                                     |
-| Error disclosure      | Database errors are logged server-side; users get a fixed generic message                          |
+| Control               | Implementation                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| No client DB access   | Writes go only through the Server Action using the service-role key                                                      |
+| Service key isolation | `src/lib/supabase/admin.ts` imports `server-only` — leaking it fails the build                                           |
+| Row Level Security    | Enabled on `waitlist_signups` and `player_sessions` with **no policies**; privileges revoked from `anon`/`authenticated` |
+| Bearer credentials    | The guest session token is stored only as a SHA-256; the cookie is `httpOnly`                                            |
+| Input validation      | Zod on the server; the database repeats the checks as constraints                                                        |
+| Mass assignment       | Fields are read by name; `status`, `id` and `created_at` are never client-settable                                       |
+| Rate limiting         | 5 submissions per IP per 10 minutes                                                                                      |
+| Bot filtering         | Hidden honeypot field plus a minimum fill time                                                                           |
+| Error disclosure      | Database errors are logged server-side; users get a fixed generic message                                                |
 
 Because RLS is on with zero policies, the table is invisible to the public
 PostgREST API even if the anon key is published — which it is, by design.
@@ -208,6 +212,42 @@ store can read its own row and nothing else; it cannot edit even that.
 Verified against a real PostgreSQL instance: a store owner sees only their own
 store, cannot read the admin list or invitations, cannot edit their store, and
 cannot promote themselves to admin.
+
+## Guest player sessions
+
+A player at a counter has to be in the room in seconds, so players get an
+identity with no account: a display name and a cookie.
+
+```
+JoinForm (client)
+  └─ joinAsPlayer              Server Action — src/lib/players/actions.ts
+       ├─ displayNameSchema       collapse → bound → reject unsafe characters
+       ├─ checkRateLimit          20 per IP per 10 minutes
+       ├─ createPlayerSession     service-role insert of the token's hash
+       └─ setPlayerCookie         httpOnly, secure, sameSite=lax, 30 days
+```
+
+The cookie holds a 32-byte CSPRNG token; `player_sessions` stores only its
+SHA-256. Possession of the token _is_ the authorisation — there is no
+`auth.uid()` to key a policy off — so RLS is on with **zero policies** and
+every access goes through the service role, exactly like the waitlist. Read
+access to the table therefore cannot resume anyone's session.
+
+Rename and leave resolve the session from the cookie, never from an id in the
+request, so neither can be pointed at another player's row.
+
+The limit is 20 joins per address per 10 minutes rather than the waitlist's 5:
+a whole store shares one network, and a queue of players scanning the same code
+must not lock each other out.
+
+Sessions expire after 30 days and are renewed at most once a day on use, so an
+active player is never signed out mid-event while a borrowed phone does not
+keep someone else's name indefinitely.
+
+Display names are bounded, whitespace-collapsed, and stripped of control, bidi
+and zero-width characters — a bidi override would let a name render as
+something other than what is stored. That is not moderation, and none is
+claimed; see ROADMAP.md.
 
 ## Design system
 

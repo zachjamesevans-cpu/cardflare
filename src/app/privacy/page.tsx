@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "31 July 2026";
+const LAST_UPDATED = "1 August 2026";
 
 export default function PrivacyPage() {
   return (
@@ -67,6 +67,31 @@ export default function PrivacyPage() {
         <p>
           Every email we send includes a way to unsubscribe, and unsubscribing does not
           remove you from the waitlist itself &mdash; tell us if you want both.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="Playing as a guest">
+        <p>
+          You can join {SITE.name} as a player without an account. We ask for a display
+          name and nothing else &mdash; no email address, no password, no phone number.
+        </p>
+        <p>
+          We store that display name, the times the session was created and last used,
+          and a random value that identifies your device. That value is held only as a
+          one-way hash, so the copy in our database cannot be used to sign in as you.
+        </p>
+        <p>
+          The session expires after 30 days of not being used. &ldquo;Leave and forget
+          this device&rdquo; on the player page deletes it immediately.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="Cookies">
+        <p>
+          {SITE.name} sets one cookie for players, which keeps you signed in to your
+          guest session. It is strictly necessary for that feature and is not used for
+          advertising or cross-site tracking. Stores signing in also get a session
+          cookie from our authentication provider.
         </p>
       </LegalSection>
 

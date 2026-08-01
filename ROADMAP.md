@@ -22,9 +22,7 @@ unreadable through the public API (the anon key returns a permission error).
 - Confirmation email for new signups (inert until a sending domain is verified —
   see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) step 11)
 
-## 🚧 Milestone 2 — Foundations (in progress)
-
-Shipped so far:
+## ✅ Milestone 2 — Foundations
 
 - Supabase Auth magic-link sign-in for stores; no passwords anywhere
 - `admin_users`, `stores`, `store_members`, `store_invites` with RLS,
@@ -33,10 +31,13 @@ Shipped so far:
 - Tokenless invitations, consumed on first sign-in against the verified email
 - Branded store invitation email
 - `/store` placeholder confirming a store is set up
+- Guest player sessions at `/play`: a display name and an httpOnly cookie, no
+  account. The cookie carries a random token; the database stores only its
+  SHA-256, so read access to the table cannot resume a session. Sessions expire
+  after 30 days and renew on use.
 
-Still to come in this milestone:
-
-- Guest player sessions (join by QR, display name only, no account)
+Attaching a guest session to a specific event is Milestone 3 work, since events
+do not exist yet.
 
 **Beta rollout decisions taken.** Invitations gate _stores_, not players: a
 player at the counter must be able to scan and join in seconds, so gating that
@@ -76,15 +77,17 @@ Trade confirmation, quantity updates, trade history, event analytics.
 
 Tracked so they are not lost, none blocking launch.
 
-| Item                         | Notes                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.            |
-| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag. |
-| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                           |
-| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.             |
-| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                      |
-| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                  |
-| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                  |
+| Item                         | Notes                                                                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Google Sheets sync**       | Supabase stays the source of truth. See [docs/GOOGLE_SHEETS.md](./docs/GOOGLE_SHEETS.md) — CSV export covers launch.                                                                        |
+| **Analytics provider**       | `src/lib/analytics.ts` is a working no-op facade. Connecting a privacy-conscious provider is a config change plus a script tag.                                                             |
+| **CAPTCHA**                  | Only if abuse appears. `parseWaitlistFormData` already has a `bot` outcome to extend.                                                                                                       |
+| **Shared rate limiter**      | Current limiter is per-instance. Move to Upstash or a Postgres counter if the in-memory window proves insufficient.                                                                         |
+| **Legal review**             | Privacy and Terms are clearly-labelled drafts. Recommended before broad commercial launch.                                                                                                  |
+| **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                              |
+| **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                              |
+| **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from. |
+| **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                 |
 
 ## Dependency advisories
 

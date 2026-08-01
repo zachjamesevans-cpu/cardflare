@@ -95,6 +95,25 @@ export type StoreInviteInsert = Omit<
   accepted_by?: string | null;
 };
 
+export type PlayerSessionRow = {
+  id: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  display_name: string;
+  /** SHA-256 of the cookie token. The token itself is never stored. */
+  token_hash: string;
+};
+
+export type PlayerSessionInsert = Omit<
+  PlayerSessionRow,
+  "id" | "created_at" | "last_seen_at"
+> & {
+  id?: string;
+  created_at?: string;
+  last_seen_at?: string;
+};
+
 export type AdminUserRow = {
   user_id: string;
   created_at: string;
@@ -116,6 +135,7 @@ export type Database = {
       store_members: Table<StoreMemberRow, StoreMemberInsert>;
       store_invites: Table<StoreInviteRow, StoreInviteInsert>;
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
+      player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

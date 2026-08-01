@@ -71,6 +71,27 @@ select rowsecurity from pg_tables where tablename = 'waitlist_signups';
 select * from pg_policies where tablename = 'waitlist_signups';
 ```
 
+### Later migrations
+
+Each milestone adds one. Run them in filename order, the same way — paste into
+the SQL Editor, or `npx supabase db push`.
+
+| File                                         | Adds                                             |
+| -------------------------------------------- | ------------------------------------------------ |
+| `20260731090000_create_beta_foundations.sql` | Admins, stores, store members, store invitations |
+| `20260801120000_create_player_sessions.sql`  | Guest player sessions                            |
+
+A migration that has not been run shows up as `relation "public.<table>" does
+not exist` the first time the app touches it.
+
+**Verify the player sessions table**, since it holds a credential:
+
+```sql
+-- Expect: rowsecurity = true, and zero policies.
+select rowsecurity from pg_tables where tablename = 'player_sessions';
+select count(*) from pg_policies where tablename = 'player_sessions';
+```
+
 ## 3. Authentication URLs
 
 Required from Milestone 2 onward, since stores sign in with a magic link.
