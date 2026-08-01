@@ -36,6 +36,16 @@ export interface ConfigGroup {
   checks: ConfigCheck[];
 }
 
+/**
+ * Data the panel can only learn by asking the database.
+ *
+ * Passed in rather than fetched here so this module stays a pure reading of
+ * the environment and remains directly testable.
+ */
+export interface ConfigFacts {
+  cardCount: number;
+}
+
 function present(variable: string): boolean {
   return Boolean(process.env[variable]?.trim());
 }
@@ -108,7 +118,36 @@ function fromAddressCheck(): ConfigCheck {
   };
 }
 
-export function configGroups(): ConfigGroup[] {
+/**
+ * Reports whether any cards exist.
+ *
+ * Not an environment variable, but the same class of problem: with an empty
+ * pool every search correctly returns nothing, which reads as broken search
+ * rather than as an import nobody has run.
+ */
+function cardPoolCheck(cardCount: number): ConfigCheck {
+  const label = "Card pool";
+  const variable = "cards";
+
+  if (cardCount === 0) {
+    return {
+      label,
+      variable,
+      status: "warn",
+      detail:
+        "No cards imported. Search works but matches nothing. See docs/CARD_DATA.md.",
+    };
+  }
+
+  return {
+    label,
+    variable,
+    status: "ok",
+    detail: `${cardCount.toLocaleString()} cards loaded.`,
+  };
+}
+
+export function configGroups(facts: ConfigFacts): ConfigGroup[] {
   return [
     {
       title: "Database",
@@ -124,6 +163,11 @@ export function configGroups(): ConfigGroup[] {
       whenIncomplete:
         "Confirmations and invites send nothing. Signups and invites still succeed.",
       checks: [secretCheck("API key", "RESEND_API_KEY"), fromAddressCheck()],
+    },
+    {
+      title: "Cards",
+      whenIncomplete: "Card search returns nothing until a card list is imported.",
+      checks: [cardPoolCheck(facts.cardCount)],
     },
   ];
 }

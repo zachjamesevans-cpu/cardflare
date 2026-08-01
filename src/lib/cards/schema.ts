@@ -47,7 +47,20 @@ export interface CardResult {
 export type CardSearchState =
   | { status: "idle" }
   | { status: "error"; message: string; query: string }
-  | { status: "results"; query: string; results: CardResult[] };
+  | {
+      status: "results";
+      query: string;
+      results: CardResult[];
+      /**
+       * True when no cards have been imported at all.
+       *
+       * "Nothing matched" and "nothing is loaded" look identical to a player
+       * and are completely different problems — a typo versus a setup step
+       * nobody has run. Carrying the distinction is what lets the page say
+       * which one it is.
+       */
+      poolEmpty: boolean;
+    };
 
 export const CARD_SEARCH_IDLE: CardSearchState = { status: "idle" };
 

@@ -104,6 +104,22 @@ function CardHit({ card }: { card: CardResult }) {
 function Results({ state }: { state: CardSearchState }) {
   if (state.status !== "results") return null;
 
+  /*
+   * An empty card pool is a setup step nobody has run, not a failed search.
+   * Saying "no card matches that" would send a player looking for their typo.
+   */
+  if (state.poolEmpty) {
+    return (
+      <Card className="flex flex-col items-center gap-2 py-10 text-center">
+        <p className="text-text-secondary">No cards have been loaded yet.</p>
+        <p className="max-w-sm text-sm text-text-muted">
+          Card search will work as soon as the One Piece card list is imported. Nothing
+          is wrong with what you typed.
+        </p>
+      </Card>
+    );
+  }
+
   if (state.results.length === 0) {
     return (
       <Card className="flex flex-col items-center gap-2 py-10 text-center">

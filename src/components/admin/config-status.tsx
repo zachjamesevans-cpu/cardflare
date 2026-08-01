@@ -6,6 +6,7 @@ import {
   groupStatus,
   type CheckStatus,
   type ConfigCheck,
+  type ConfigFacts,
 } from "@/lib/diagnostics/config";
 
 const ICONS: Record<CheckStatus, { Icon: typeof CircleCheck; tone: string }> = {
@@ -46,11 +47,11 @@ function CheckRow({ check }: { check: ConfigCheck }) {
  * variable is set and something else is wrong", which are otherwise
  * indistinguishable from the outside.
  */
-export function ConfigStatus() {
-  const groups = configGroups();
+export function ConfigStatus({ facts }: { facts: ConfigFacts }) {
+  const groups = configGroups(facts);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {groups.map((group) => {
         const status = groupStatus(group);
 

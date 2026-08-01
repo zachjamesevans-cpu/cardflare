@@ -13,6 +13,9 @@ const VARS = [
 
 const original: Record<string, string | undefined> = {};
 
+/** Database facts the panel is handed rather than reading itself. */
+const FACTS = { cardCount: 1234 };
+
 beforeEach(() => {
   for (const name of VARS) {
     original[name] = process.env[name];
@@ -28,7 +31,7 @@ afterEach(() => {
 });
 
 function emailGroup() {
-  const group = configGroups().find((candidate) => candidate.title === "Email");
+  const group = configGroups(FACTS).find((candidate) => candidate.title === "Email");
   if (!group) throw new Error("Email group missing");
   return group;
 }
@@ -38,6 +41,36 @@ function check(variable: string) {
   if (!found) throw new Error(`${variable} check missing`);
   return found;
 }
+
+function cardGroup(count: number) {
+  const group = configGroups({ cardCount: count }).find(
+    (candidate) => candidate.title === "Cards",
+  );
+  if (!group) throw new Error("Cards group missing");
+  return group;
+}
+
+/*
+ * With an empty pool every search correctly matches nothing, which reads as
+ * broken search rather than as an import nobody has run. The panel is where
+ * that stops being invisible.
+ */
+describe("card pool", () => {
+  it("warns when no cards are loaded", () => {
+    const check = cardGroup(0).checks[0]!;
+
+    expect(check.status).toBe("warn");
+    expect(check.detail).toMatch(/no cards imported/i);
+    expect(check.detail).toContain("CARD_DATA.md");
+  });
+
+  it("reports the count once cards exist", () => {
+    const check = cardGroup(2451).checks[0]!;
+
+    expect(check.status).toBe("ok");
+    expect(check.detail).toContain("2,451");
+  });
+});
 
 describe("configGroups", () => {
   it("reports missing variables as missing", () => {
@@ -101,7 +134,7 @@ describe("configGroups", () => {
     process.env.RESEND_API_KEY = "re_super_secret_value";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_do_not_leak";
 
-    const serialised = JSON.stringify(configGroups());
+    const serialised = JSON.stringify(configGroups(FACTS));
     expect(serialised).not.toContain("re_super_secret_value");
     expect(serialised).not.toContain("sb_secret_do_not_leak");
   });

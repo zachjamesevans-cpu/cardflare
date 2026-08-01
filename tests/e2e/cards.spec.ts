@@ -41,15 +41,21 @@ test.describe("card search", () => {
   /*
    * An empty result set is an answer, not a failure, and must not surface as
    * an error or leak why the lookup found nothing.
+   *
+   * Which of the two messages appears depends on whether any cards are loaded,
+   * and both are correct — the point is that one of them shows and neither
+   * mentions the infrastructure.
    */
-  test("reports no matches as a result rather than an error", async ({ page }) => {
+  test("reports an empty result without erroring or leaking internals", async ({
+    page,
+  }) => {
     await page.goto("/cards");
 
     await page.getByLabel("Card name or number").fill("zzzzqqqq");
     await page.getByRole("button", { name: /^search$/i }).click();
 
     const main = page.getByRole("main");
-    await expect(main).toContainText(/no card matches/i);
+    await expect(main).toContainText(/no card matches|no cards have been loaded/i);
     await expect(main).not.toContainText(/supabase|postgres|service.role/i);
   });
 

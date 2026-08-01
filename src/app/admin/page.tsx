@@ -7,6 +7,7 @@ import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { countCards } from "@/lib/cards/search";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
@@ -27,7 +28,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events] = await Promise.all([listStores(), listAllEvents()]);
+  const [stores, events, cardCount] = await Promise.all([
+    listStores(),
+    listAllEvents(),
+    countCards(),
+  ]);
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
@@ -46,7 +51,7 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        <ConfigStatus />
+        <ConfigStatus facts={{ cardCount }} />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">

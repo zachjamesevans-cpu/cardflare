@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetRateLimits } from "@/lib/rate-limit";
 
 const searchCards = vi.fn();
+const countCards = vi.fn();
 let requestHeaders: Record<string, string> = {};
 
 vi.mock("next/headers", () => ({
@@ -14,6 +15,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/cards/search", () => ({
   SEARCH_LIMIT: 20,
   searchCards: (...args: unknown[]) => searchCards(...args),
+  countCards: () => countCards(),
 }));
 
 const { searchCardsAction } = await import("@/lib/cards/actions");
@@ -30,6 +32,7 @@ const search = (data: FormData) => searchCardsAction(CARD_SEARCH_IDLE, data);
 beforeEach(() => {
   resetRateLimits();
   searchCards.mockReset().mockResolvedValue([]);
+  countCards.mockReset().mockResolvedValue(2451);
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -59,7 +62,29 @@ describe("searchCardsAction", () => {
 
     const result = await search(formData("zzzzqqqq"));
 
-    expect(result.status).toBe("results");
+    expect(result).toMatchObject({ status: "results", poolEmpty: false });
+  });
+
+  /*
+   * "Nothing matched" and "nothing is loaded" are the same screen to a player
+   * and completely different problems. Only the second is a setup task.
+   */
+  it("distinguishes an empty card pool from a query that matched nothing", async () => {
+    searchCards.mockResolvedValue([]);
+    countCards.mockResolvedValue(0);
+
+    const result = await search(formData("luffy"));
+
+    expect(result).toMatchObject({ status: "results", poolEmpty: true });
+  });
+
+  it("does not count the pool when the search found something", async () => {
+    searchCards.mockResolvedValue([{ id: "1", code: "OP01-024", name: "Luffy" }]);
+
+    const result = await search(formData("luffy"));
+
+    expect(countCards).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ poolEmpty: false });
   });
 
   it("refuses a query shorter than the minimum without querying", async () => {

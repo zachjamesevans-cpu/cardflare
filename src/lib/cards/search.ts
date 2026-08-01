@@ -90,3 +90,27 @@ async function printingsFor(cardIds: string[]): Promise<Map<string, CardPrinting
 
   return grouped;
 }
+
+/**
+ * How many cards are loaded.
+ *
+ * Exists so an empty pool can be told from a query that matched nothing. Those
+ * are the same screen to a player and completely different problems: one is a
+ * typo, the other is that nobody has run an import yet. Reporting the second
+ * as the first is how a setup task stays invisible — the same mistake the
+ * email configuration made.
+ */
+export async function countCards(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+
+  const { count, error } = await getSupabaseAdmin()
+    .from("cards")
+    .select("id", { count: "exact", head: true });
+
+  if (error) {
+    console.error("Could not count cards", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}

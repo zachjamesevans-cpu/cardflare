@@ -4,7 +4,7 @@ import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { cardQuerySchema, type CardSearchState } from "./schema";
-import { searchCards } from "./search";
+import { countCards, searchCards } from "./search";
 
 /**
  * Search is unauthenticated and hits the database on every submission.
@@ -47,7 +47,10 @@ export async function searchCardsAction(
 
   const results = await searchCards(parsed.data);
 
+  // Only asked when nothing matched, so the common path stays one query.
+  const poolEmpty = results.length === 0 ? (await countCards()) === 0 : false;
+
   // An empty result set is a result, not an error: "no card matches that" is
   // the honest answer and the form says so rather than looking broken.
-  return { status: "results", query: parsed.data, results };
+  return { status: "results", query: parsed.data, results, poolEmpty };
 }
