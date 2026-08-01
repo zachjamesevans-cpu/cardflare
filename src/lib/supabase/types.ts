@@ -95,6 +95,29 @@ export type StoreInviteInsert = Omit<
   accepted_by?: string | null;
 };
 
+export type EventStatus = "draft" | "open" | "closed";
+export type Game = "one_piece";
+
+export type EventRow = {
+  id: string;
+  created_at: string;
+  store_id: string;
+  created_by: string | null;
+  name: string;
+  game: Game;
+  starts_at: string;
+  ends_at: string;
+  status: EventStatus;
+  join_code: string;
+};
+
+export type EventInsert = Omit<EventRow, "id" | "created_at" | "status" | "game"> & {
+  id?: string;
+  created_at?: string;
+  status?: EventStatus;
+  game?: Game;
+};
+
 export type PlayerSessionRow = {
   id: string;
   created_at: string;
@@ -136,6 +159,7 @@ export type Database = {
       store_invites: Table<StoreInviteRow, StoreInviteInsert>;
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
+      events: Table<EventRow, EventInsert>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -144,6 +168,8 @@ export type Database = {
       waitlist_status: WaitlistStatus;
       store_status: StoreStatus;
       store_role: StoreRole;
+      event_status: EventStatus;
+      game: Game;
     };
     CompositeTypes: Record<string, never>;
   };

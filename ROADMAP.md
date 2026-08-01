@@ -46,11 +46,22 @@ Admins can create events directly, so the first pilot needs nothing from the
 store but a printed QR code, and store self-service can follow once a real
 event has been observed.
 
+## ✅ Milestone 3 — Events
+
+- `events` table with RLS: a store reads its own events, admins read all, and
+  there are no write policies — verified against a real PostgreSQL instance
+- Store dashboard at `/store`: create an event, see every event and its code
+- Event page at `/store/events/[id]`: printable QR poster, join code, and the
+  draft → open → closed lifecycle
+- Printed join codes in Crockford's base32, so a misread `I` or `O` still
+  resolves to the right room
+- `/e/[code]` — where the QR points — and `/join` for players who cannot scan
+- Admin console lists every store's events and can create for any store
+
+Players can reach a room and see it; posting Flares and matching is Milestone 4
+onward.
+
 ## ⏸ Awaiting approval
-
-### Milestone 3 — Events
-
-Store dashboard, event creation, QR codes, room codes, event lifecycle.
 
 ### Milestone 4 — Joining
 
@@ -87,6 +98,7 @@ Tracked so they are not lost, none blocking launch.
 | **Generated Supabase types** | `src/lib/supabase/types.ts` is hand-written; regenerate from the real project.                                                                                                              |
 | **Real social links**        | Footer intentionally has no social placeholders. Add only when accounts exist.                                                                                                              |
 | **Display name moderation**  | Names are bounded and stripped of control, bidi and zero-width characters. That is not moderation. A reporting path belongs with Event Rooms, where there is a room to remove someone from. |
+| **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.   |
 | **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                 |
 
 ## Dependency advisories
