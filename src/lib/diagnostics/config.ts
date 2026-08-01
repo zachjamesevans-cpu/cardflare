@@ -46,6 +46,8 @@ export interface ConfigFacts {
   cardCount: number;
   /** Null when no sync has ever run. */
   lastSync?: { status: string; mode: string; finishedAt: string | null } | null;
+  /** How many printings exist, and how many carry a provider image URL. */
+  printingImages?: { total: number; withImage: number };
 }
 
 function present(variable: string): boolean {
@@ -150,24 +152,36 @@ function cardPoolCheck(cardCount: number): ConfigCheck {
 }
 
 /**
- * The image feature flag.
+ * The image feature flag, and whether there is anything for it to show.
  *
  * Reported because "why are there no pictures" has two completely different
  * answers — the flag is off, or the provider supplied no URL — and only the
- * first is a setting.
+ * first is a setting. Saying which one it is turns a guess into a fact, so
+ * both are stated whichever way the flag is set.
  */
-function cardImagesCheck(): ConfigCheck {
+function cardImagesCheck(facts: ConfigFacts): ConfigCheck {
   const variable = "NEXT_PUBLIC_ENABLE_CARD_IMAGES";
   const on = process.env[variable] === "true";
+  const images = facts.printingImages;
+
+  // Only meaningful once something has been imported.
+  const supply =
+    !images || images.total === 0
+      ? ""
+      : images.withImage === 0
+        ? ` The provider supplied no image URL for any of the ${images.total.toLocaleString()} printings, so turning this on would change nothing.`
+        : ` ${images.withImage.toLocaleString()} of ${images.total.toLocaleString()} printings carry a provider image URL.`;
 
   return {
     label: "Card images",
     variable,
     // Off is a valid, deliberate state, so this is never a failure.
     status: "ok",
-    detail: on
-      ? "On. Provider-supplied artwork is rendered where a URL exists."
-      : "Off. The CardFlare placeholder is shown and no third-party image is requested.",
+    detail:
+      (on
+        ? "On. Provider-supplied artwork is rendered where a URL exists."
+        : "Off. The CardFlare placeholder is shown and no third-party image is requested.") +
+      supply,
   };
 }
 
@@ -212,7 +226,11 @@ export function configGroups(facts: ConfigFacts): ConfigGroup[] {
     {
       title: "Cards",
       whenIncomplete: "Card search returns nothing until a card list is imported.",
-      checks: [cardPoolCheck(facts.cardCount), lastSyncCheck(facts), cardImagesCheck()],
+      checks: [
+        cardPoolCheck(facts.cardCount),
+        lastSyncCheck(facts),
+        cardImagesCheck(facts),
+      ],
     },
   ];
 }
