@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { defaultEventWindow } from "@/lib/events/format";
+import { countParticipants } from "@/lib/events/participants";
 import { listEventsForStore } from "@/lib/events/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -49,6 +50,7 @@ export default async function StorePage() {
 
   const store = stores?.[0];
   const events = store ? await listEventsForStore(store.id) : [];
+  const attendance = await countParticipants(events.map((event) => event.id));
   const window = defaultEventWindow();
 
   return (
@@ -89,7 +91,7 @@ export default async function StorePage() {
           </span>
         </div>
 
-        <EventList events={events} />
+        <EventList events={events} attendance={attendance} />
       </section>
     </AppShell>
   );

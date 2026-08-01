@@ -16,7 +16,8 @@ and meet up to trade in person.
 The public splash page and waitlist are **live at https://cardflare.gg**.
 
 Built since: store sign-in and the admin console, guest player sessions, Event
-Rooms with printable QR codes, and card search. **Posting Flares, matching and
+Rooms with printable QR codes, joining a room by scanning, and card search. A
+store can run an event and watch players arrive. **Posting Flares, matching and
 trades have not been built**, so the loop does not close yet — the landing page
 still says CardFlare is being built, and must keep saying so until it is true.
 

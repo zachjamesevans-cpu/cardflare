@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Users } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
@@ -9,9 +9,11 @@ import type { EventRow } from "@/lib/supabase/types";
 export function EventRowCard({
   event,
   storeName,
+  attendance,
 }: {
   event: EventRow;
   storeName?: string;
+  attendance?: { total: number; present: number };
 }) {
   return (
     <Card as="li" className="flex flex-wrap items-center justify-between gap-4">
@@ -29,6 +31,18 @@ export function EventRowCard({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {attendance && attendance.total > 0 && (
+          <span
+            className="flex items-center gap-1.5 text-sm text-text-muted tabular-nums"
+            title={`${attendance.present} here now of ${attendance.total} joined`}
+          >
+            <Users className="size-4" aria-hidden="true" />
+            {attendance.present}
+            <span className="sr-only">
+              players here now, {attendance.total} joined in total
+            </span>
+          </span>
+        )}
         <code className="rounded-[var(--radius-control)] border border-border bg-elevated px-2.5 py-1 text-sm font-semibold tracking-[0.15em] text-text-primary">
           {event.join_code}
         </code>
@@ -44,10 +58,12 @@ export function EventList({
   events,
   showStore = false,
   storeNames,
+  attendance,
 }: {
   events: EventRow[];
   showStore?: boolean;
   storeNames?: Record<string, string>;
+  attendance?: Map<string, { total: number; present: number }>;
 }) {
   if (events.length === 0) {
     return (
@@ -65,6 +81,7 @@ export function EventList({
           key={event.id}
           event={event}
           storeName={showStore ? storeNames?.[event.store_id] : undefined}
+          attendance={attendance?.get(event.id)}
         />
       ))}
     </ul>

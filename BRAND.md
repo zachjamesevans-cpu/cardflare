@@ -74,6 +74,28 @@ Sampled from the approved logo. Defined once in the `@theme` block of
 Every text-on-surface pairing meets WCAG AA (≥ 4.5:1) and is enforced by
 `tests/unit/design-tokens.test.ts`.
 
+### Player avatar hues
+
+| Token              | Value     |
+| ------------------ | --------- |
+| `--color-avatar-1` | `#8fd3ff` |
+| `--color-avatar-2` | `#a8e6a1` |
+| `--color-avatar-3` | `#ffc98f` |
+| `--color-avatar-4` | `#d9b3ff` |
+| `--color-avatar-5` | `#ffadad` |
+| `--color-avatar-6` | `#7fe3d4` |
+
+Assigned to a player by hashing their session id, so nobody reviews the pairing
+before it appears next to their name. Each one therefore has to clear AA on
+canvas, surface **and** elevated, and the design-token test checks all
+eighteen combinations plus that the token count matches `AVATAR_HUE_COUNT`.
+
+Used only as foreground text over a tint of themselves, the same way `Badge`
+works. **Deliberately not the accent**: an avatar must never be mistaken for a
+CardFlare control. Adding or removing a hue means updating the tokens, the
+constant, and `HUE_CLASS` in `player-avatar.tsx` together — Tailwind cannot see
+a class name assembled at runtime.
+
 **Note on the accent vs the mark.** The palette was sampled from the original
 logo, whose brightest lime was `#d3fa5f`. The current master runs slightly
 brighter and warmer at `#e0ff6c`. The two sit together without clashing, so the
