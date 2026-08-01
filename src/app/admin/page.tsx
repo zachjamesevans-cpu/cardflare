@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Store as StoreIcon } from "lucide-react";
 
+import { CatalogHealth } from "@/components/admin/catalog-health";
 import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
@@ -8,6 +9,7 @@ import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { catalogBySet, failuresForRun } from "@/lib/cards/health";
 import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
@@ -53,6 +55,12 @@ export default async function AdminPage() {
   const window = defaultEventWindow();
   const providerName = new OptcgApiProvider().displayName;
 
+  // Depends on which run was last, so it cannot join the batch above.
+  const [setCoverage, failures] = await Promise.all([
+    catalogBySet(),
+    lastRun ? failuresForRun(lastRun.id) : { groups: [], total: 0, truncated: false },
+  ]);
+
   return (
     <div className="flex flex-col gap-12">
       <section className="flex flex-col gap-5" aria-labelledby="config-heading">
@@ -95,6 +103,13 @@ export default async function AdminPage() {
         <Card>
           <SyncCatalogForm providerName={providerName} />
         </Card>
+
+        <CatalogHealth
+          sets={setCoverage.sets}
+          setsTruncated={setCoverage.truncated}
+          failures={failures}
+          recordsSeen={lastRun?.records_seen ?? 0}
+        />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">
