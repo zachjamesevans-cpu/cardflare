@@ -361,7 +361,9 @@ export async function activeSyncRun(
 export async function latestSyncRun() {
   const { data, error } = await getSupabaseAdmin()
     .from("card_sync_runs")
-    .select("mode, status, started_at, finished_at, cards_upserted, records_failed")
+    .select(
+      "id, mode, status, started_at, finished_at, cards_upserted, printings_upserted, records_seen, records_failed, notes",
+    )
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
