@@ -3,9 +3,11 @@ import { Store as StoreIcon } from "lucide-react";
 
 import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
+import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
 import { listStores } from "@/lib/stores/repository";
@@ -29,6 +31,7 @@ export default async function AdminPage() {
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
+  const window = defaultEventWindow();
 
   return (
     <div className="flex flex-col gap-12">
@@ -58,6 +61,32 @@ export default async function AdminPage() {
 
         <Card>
           <InviteStoreForm />
+        </Card>
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="new-event-heading">
+        <div className="flex flex-col gap-1.5">
+          <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
+            New event
+          </h2>
+          <p className="text-sm text-text-secondary">
+            Create an event for any store. The first pilot needs nothing from them but
+            the printed sheet.
+          </p>
+        </div>
+
+        <Card>
+          {stores.length === 0 ? (
+            <p className="text-text-secondary">
+              Invite a store first — an event has to belong to one.
+            </p>
+          ) : (
+            <CreateEventForm
+              stores={stores.map((store) => ({ id: store.id, name: store.name }))}
+              defaultStartsAt={window.startsAt}
+              defaultEndsAt={window.endsAt}
+            />
+          )}
         </Card>
       </section>
 

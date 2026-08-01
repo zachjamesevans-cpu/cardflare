@@ -147,6 +147,21 @@ describe("createEventAction", () => {
     );
   });
 
+  /*
+   * The admin form's store picker starts on an empty option, so this is what
+   * submitting it untouched looks like. It has to land on the field rather
+   * than as a bare "something went wrong".
+   */
+  it("reports an unchosen store on the store field", async () => {
+    const result = await create(formData({ storeId: "" }));
+
+    expect(result).toMatchObject({
+      status: "error",
+      fieldErrors: { storeId: expect.any(String) },
+    });
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+
   it("reports field errors without touching the database", async () => {
     const result = await create(formData({ name: "" }));
 
