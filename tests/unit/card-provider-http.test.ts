@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderHttp, ProviderHttpError } from "@/lib/cards/providers/http";
-import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
+import {
+  OptcgApiProvider,
+  OPTCGAPI_ENDPOINTS,
+} from "@/lib/cards/providers/optcgapi/adapter";
 import {
   MAPPING_STATUS,
   MAPPING_VERIFIED_ON,
@@ -171,15 +174,22 @@ describe("the mapping gate", () => {
 });
 
 /*
- * Found by pointing the endpoint list at the live API: /api/allPromoCards/
- * returns 404 despite being documented. Before this, that took the whole sync
- * down and imported nothing — while the other three endpoints had perfectly
- * good data sitting there.
+ * Found by pointing the endpoint list at the live API: a documented endpoint
+ * 404d. Before this, that took the whole sync down and imported nothing —
+ * while the other endpoints had perfectly good data sitting there.
+ *
+ * The endpoint that originally 404d was `/api/allPromoCards/`, a path inferred
+ * from the naming of its neighbours; the real one is `/api/allPromos/`. This
+ * test no longer names it, because the guarantee is about any endpoint being
+ * unreachable, and pinning it to a path meant the test quietly stopped
+ * exercising anything the moment the path was corrected.
  */
 describe("a missing endpoint", () => {
   it("does not abandon the rest of the catalog", async () => {
+    const missing = OPTCGAPI_ENDPOINTS.donCards;
+
     fetchMock = vi.fn(async (url: string) =>
-      String(url).includes("allPromoCards")
+      String(url).includes(missing)
         ? jsonResponse({ detail: "Not Found" }, 404)
         : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
     );
@@ -193,6 +203,27 @@ describe("a missing endpoint", () => {
     const { cards, failures } = await provider.fetchCards();
 
     expect(cards.length).toBeGreaterThan(0);
-    expect(failures.some((f) => f.reason.includes("allPromoCards"))).toBe(true);
+    expect(failures.some((f) => f.reason.includes(missing))).toBe(true);
+  });
+
+  /* Every other group still has to reach the caller, not just one of them. */
+  it("still imports the endpoints that answered", async () => {
+    fetchMock = vi.fn(async (url: string) =>
+      String(url).includes(OPTCGAPI_ENDPOINTS.donCards)
+        ? jsonResponse({ detail: "Not Found" }, 404)
+        : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
+    );
+
+    const { cards } = await new OptcgApiProvider({
+      sleep: noSleep,
+      spacingMs: 1,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    }).fetchCards();
+
+    // set, starter deck and promo answered; DON!! did not.
+    expect(cards).toHaveLength(3);
+    expect(new Set(cards.map((card) => card.printings[0]!.source))).toEqual(
+      new Set(["set", "starter-deck", "promo"]),
+    );
   });
 });

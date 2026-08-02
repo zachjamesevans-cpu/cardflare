@@ -23,6 +23,8 @@ export interface CardPrinting {
   printingLabel: string | null;
   /** The provider's own wording. Null when it did not classify the printing. */
   variantType: string | null;
+  /** True only where the provider served it as a promo. Null means unknown. */
+  isPromo: boolean | null;
   /** Provider-supplied only, and rendered only when the image flag is on. */
   imageUrl: string | null;
 }
@@ -75,6 +77,13 @@ export function printingLabel(printing: CardPrinting): string | null {
   const parts = [
     printing.printingLabel ?? printing.setCode,
     printing.variantType,
+    /*
+     * A promo reprint carries the same card number and the same set id as the
+     * booster printing, so without this both read as "OP09" and a player
+     * cannot tell which one is in front of them — which is the whole question
+     * when two people are trying to trade the right copy.
+     */
+    printing.isPromo ? "Promo" : null,
   ].filter(Boolean);
 
   return parts.length > 0 ? parts.join(" · ") : null;

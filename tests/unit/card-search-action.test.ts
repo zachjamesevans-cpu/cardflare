@@ -152,6 +152,7 @@ describe("printingLabel", () => {
     setName: "Romance Dawn",
     printingLabel: "OP01",
     variantType: null,
+    isPromo: null,
     imageUrl: null,
   };
 

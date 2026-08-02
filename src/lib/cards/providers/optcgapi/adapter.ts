@@ -28,7 +28,12 @@ export const OPTCGAPI_BASE_URL = "https://optcgapi.com";
 export const OPTCGAPI_ENDPOINTS = {
   setCards: "/api/allSetCards/",
   starterDeckCards: "/api/allSTCards/",
-  promoCards: "/api/allPromoCards/",
+  /*
+   * `allPromos`, not `allPromoCards`. The latter was inferred from the naming
+   * of its neighbours and 404s. Confirmed against the provider's own
+   * documentation on 2 August 2026.
+   */
+  promoCards: "/api/allPromos/",
   donCards: "/api/allDonCards/",
   sets: "/api/allSets/",
   decks: "/api/allDecks/",
@@ -244,7 +249,18 @@ export class OptcgApiProvider implements CardDataProvider {
           printingLabel: setCode,
           variantType: null,
           isAlternateArt: null,
-          isPromo: null,
+          /*
+           * The one classification the provider actually states.
+           *
+           * This is not inference from a name suffix or a rarity code — the
+           * record came from the promos endpoint, so the provider has said it
+           * is a promo. Everything else stays null.
+           *
+           * `null` rather than `false` elsewhere: a set card is not thereby
+           * known not to be a promo, only unclassified. Collapsing those two
+           * would record a guess as a fact.
+           */
+          isPromo: source === "promo" ? true : null,
           isParallel: null,
           isReprint: null,
           language: "en",
