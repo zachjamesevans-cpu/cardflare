@@ -123,6 +123,14 @@ export const normalizedPrintingSchema = z.object({
    * merging by card number can only keep one of them.
    */
   rarity: optionalText(40),
+  /**
+   * The provider's name for this printing, verbatim.
+   *
+   * Two printings can share a set code *and* a rarity — EB01-001 has three,
+   * two of them "EB-01 · L" — and then the name is the only thing that tells
+   * them apart: "Kouzuki Oden" against "Kouzuki Oden (SPR)".
+   */
+  name: optionalText(200),
   isAlternateArt: z.boolean().nullish().default(null),
   isPromo: z.boolean().nullish().default(null),
   isParallel: z.boolean().nullish().default(null),

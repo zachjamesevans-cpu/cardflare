@@ -241,8 +241,32 @@ ever rendered, so the alternate art was invisible in search.
   choosing a specific printing belongs with Flares, where there is something to
   choose it for.
 
-> Printings imported before this change have a null printing rarity, which is
-> honest — nobody had recorded it. Re-run a full sync to fill it in.
+- **`card_printings.printing_name`** holds each printing's own name. Rarity is
+  not always enough: EB01-001 has two printings that are both `EB-01 · L`, and
+  the only thing separating them is that one is named `Kouzuki Oden (SPR)`. The
+  chip appends the mark, so they read `EB-01 · L` and `EB-01 · L · SPR`.
+- **The card takes the shortest name among its printings.** It previously took
+  whichever record merged first, so EB01-001 displayed as "Kouzuki Oden (SPR)"
+  — a variant's name standing in for the card's. The provider marks a variant
+  by appending to the base name and never by removing from it, so the shortest
+  is the base. This chooses between names the provider gave; it does not write
+  one, and every name is still stored verbatim on its own printing.
+
+> Printings imported before these changes have a null printing rarity and name,
+> which is honest — nobody had recorded them. Re-run a full sync to fill in.
+
+## Two fields this provider never populates
+
+Both found by reading a real spot check rather than the documentation.
+
+- **`trigger_text` is always null.** The provider returns a single `card_text`
+  with `[Trigger]` inline, so trigger effects are inside `effect_text`. Search
+  still matches on them because the text is present. Splitting them out would
+  mean parsing on the `[Trigger]` marker; it is a literal, well-defined string,
+  but it has not been done and the column stays honestly empty until it is.
+- **`counter_amount` is `0` rather than absent** on cards that have no counter,
+  including Stages and Events that cannot have one. Stored as given; the UI
+  omits a counter of zero, because a counter of zero is not a counter.
 
 ## Mapping decisions
 

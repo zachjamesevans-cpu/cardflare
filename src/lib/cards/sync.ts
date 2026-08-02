@@ -74,6 +74,24 @@ export function mergeByCardNumber(cards: NormalizedCard[]): NormalizedCard[] {
     if (existing.colors.length === 0) existing.colors = card.colors;
     if (existing.traits.length === 0) existing.traits = card.traits;
 
+    /*
+     * The card takes the shortest of the names its printings carry.
+     *
+     * Found by the spot check: EB01-001 was displaying as "Kouzuki Oden (SPR)"
+     * — a variant's name standing in for the card's — purely because that
+     * record happened to merge first. Whichever record arrives first is not a
+     * basis for naming a card.
+     *
+     * The provider marks a variant by appending to the base name and never by
+     * removing from it: "Kouzuki Oden (SPR)", "Gum-Gum Lightning (Premium Card
+     * Collection -Best Selection Vol. 4-)". So the shortest is the base. This
+     * is a rule for choosing between names the provider gave us, not for
+     * writing one — every name is still stored verbatim on its own printing.
+     */
+    if (card.exactName.length < existing.exactName.length) {
+      existing.exactName = card.exactName;
+    }
+
     // Printings are keyed by provider id, so re-seeing one is not a duplicate.
     for (const printing of card.printings) {
       const seen = existing.printings.some(
@@ -229,6 +247,7 @@ async function upsertPrintings(
         printing_label: printing.printingLabel,
         variant_type: printing.variantType,
         rarity: printing.rarity,
+        printing_name: printing.name,
         image_id: printing.imageId,
         provider_source: printing.source,
         is_alternate_art: printing.isAlternateArt,

@@ -103,6 +103,7 @@ describe("how a promo reads to a player", () => {
     printingLabel: "OP09",
     variantType: null,
     rarity: null,
+    printingName: null,
     imageUrl: null,
   };
 
