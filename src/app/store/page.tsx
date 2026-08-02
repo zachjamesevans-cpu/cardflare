@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { CounterCode } from "@/components/events/counter-code";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
@@ -8,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
+import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -45,25 +47,56 @@ export default async function StorePage() {
   const supabase = await createSupabaseServerClient();
   const { data: stores } = await supabase
     .from("stores")
-    .select("id, name, city, region, status")
+    .select("id, name, city, region, status, join_code, walk_in_enabled")
     .order("name");
 
   const store = stores?.[0];
   const events = store ? await listEventsForStore(store.id) : [];
   const attendance = await countParticipants(events.map((event) => event.id));
   const window = defaultEventWindow();
+  const counterQr = store ? await joinQrSvg(store.join_code) : null;
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
       title={store?.name ?? "Your store"}
-      description="Create an event, print its QR code, and players scan in."
+      description="One printed code on your counter, plus a room for every event you run."
     >
+      {store && counterQr && (
+        <section className="flex flex-col gap-5" aria-labelledby="counter-code-heading">
+          <h2 id="counter-code-heading" className="text-xl font-bold text-text-primary">
+            Your counter code
+          </h2>
+
+          <CounterCode
+            storeId={store.id}
+            storeName={store.name}
+            joinCode={store.join_code}
+            url={joinUrl(store.join_code)}
+            qrSvg={counterQr}
+            walkInEnabled={store.walk_in_enabled}
+          />
+        </section>
+      )}
+
       <section className="flex flex-col gap-5" aria-labelledby="new-event-heading">
-        <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
-          New event
-        </h2>
+        <div className="flex flex-col gap-1">
+          <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
+            New event
+          </h2>
+          {/*
+           * Said out loud, because the counter code above makes it a fair
+           * question. An event is worth creating when it has a name and a
+           * window worth printing — a tournament, a prerelease — not for an
+           * ordinary afternoon, which the counter code already covers.
+           */}
+          <p className="text-sm text-text-secondary">
+            For a tournament or a prerelease: its own name, its own window, and its own
+            sheet. Your counter code sends players here automatically while it is
+            running.
+          </p>
+        </div>
 
         <Card>
           {store ? (

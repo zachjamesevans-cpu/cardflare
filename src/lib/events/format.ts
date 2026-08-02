@@ -17,8 +17,21 @@ const FORMAT: Intl.DateTimeFormatOptions = {
   timeZone: "UTC",
 };
 
-export function formatEventWindow(startsAt: string, endsAt: string): string {
+/**
+ * A room's window.
+ *
+ * `endsAt` is null while a walk-in room is still running — it has no planned
+ * finish, and one is stamped only when it closes. "Open since" is the honest
+ * rendering of that, rather than inventing a finishing time to keep the
+ * formatting simple.
+ */
+export function formatEventWindow(startsAt: string, endsAt: string | null): string {
   const start = new Date(startsAt);
+
+  if (!endsAt) {
+    return `Open since ${new Intl.DateTimeFormat("en-US", FORMAT).format(start)} UTC`;
+  }
+
   const end = new Date(endsAt);
 
   const startLabel = new Intl.DateTimeFormat("en-US", FORMAT).format(start);

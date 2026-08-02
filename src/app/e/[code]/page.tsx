@@ -9,6 +9,7 @@ import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
+import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
@@ -18,7 +19,7 @@ import {
   listParticipants,
   touchParticipation,
 } from "@/lib/events/participants";
-import { findEventByJoinCode } from "@/lib/events/repository";
+import { resolveCode } from "@/lib/events/rooms";
 import { getPlayerSession } from "@/lib/players/session";
 import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
@@ -107,8 +108,39 @@ export default async function JoinByCodePage({
    */
   if (!isSupabaseConfigured()) return <Unavailable />;
 
-  const event = await findEventByJoinCode(normalized);
-  if (!event) notFound();
+  const resolved = await resolveCode(normalized);
+  if (resolved.outcome === "not-found") notFound();
+
+  /* Walk-in trading is off and no event is running. */
+  if (resolved.outcome === "quiet") {
+    return (
+      <Shell>
+        <StoreQuiet storeName={resolved.store.name} />
+      </Shell>
+    );
+  }
+
+  /*
+   * Nothing open yet, but walk-in trading is allowed. Looking at this page
+   * does not open the room — submitting the form does, so an empty session
+   * never lands in the store's history because somebody glanced at the counter
+   * on their way past.
+   */
+  if (resolved.outcome === "lobby") {
+    const waiting = await getPlayerSession();
+
+    return (
+      <Shell>
+        <StoreLobby
+          storeName={resolved.store.name}
+          code={normalized}
+          knownAs={waiting?.display_name}
+        />
+      </Shell>
+    );
+  }
+
+  const event = resolved.room;
 
   const session = await getPlayerSession();
   const participation = session ? await findParticipation(event.id, session.id) : null;
@@ -165,7 +197,16 @@ export default async function JoinByCodePage({
           <div className="flex items-center gap-2">
             <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
             <dt className="sr-only">When</dt>
-            <dd>{formatEventWindow(event.startsAt, event.endsAt)}</dd>
+            {/*
+             * A walk-in room has no schedule to report, and a player standing
+             * in the store does not need one. A scheduled event does — knowing
+             * when it finishes is how somebody decides whether to wait around.
+             */}
+            <dd>
+              {event.kind === "walk_in"
+                ? "Trading now"
+                : formatEventWindow(event.startsAt, event.endsAt)}
+            </dd>
           </div>
           {location && (
             <div className="flex items-center gap-2">

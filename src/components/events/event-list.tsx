@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, Users } from "lucide-react";
+import { CalendarDays, DoorOpen, Users } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
@@ -43,9 +43,20 @@ export function EventRowCard({
             </span>
           </span>
         )}
-        <code className="rounded-[var(--radius-control)] border border-border bg-elevated px-2.5 py-1 text-sm font-semibold tracking-[0.15em] text-text-primary">
-          {event.join_code}
-        </code>
+        {/*
+         * A walk-in room has no code of its own — it is reached through the
+         * store's counter code — so it is labelled by what it is instead.
+         */}
+        {event.join_code ? (
+          <code className="rounded-[var(--radius-control)] border border-border bg-elevated px-2.5 py-1 text-sm font-semibold tracking-[0.15em] text-text-primary">
+            {event.join_code}
+          </code>
+        ) : (
+          <span className="flex items-center gap-1.5 text-sm text-text-muted">
+            <DoorOpen className="size-4" aria-hidden="true" />
+            Walk-in
+          </span>
+        )}
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
           {STATUS_LABELS[event.status]}
         </Badge>

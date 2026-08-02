@@ -50,13 +50,17 @@ export type StoreRow = {
   region: string | null;
   status: StoreStatus;
   is_pilot: boolean;
+  /** The permanent code on the counter. Seven characters, never rotated. */
+  join_code: string;
+  walk_in_enabled: boolean;
 };
 
 /** Columns with database defaults are optional on insert. */
 export type StoreInsert = Omit<
   StoreRow,
-  "id" | "created_at" | "status" | "is_pilot"
+  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled"
 > & {
+  walk_in_enabled?: boolean;
   id?: string;
   created_at?: string;
   status?: StoreStatus;
@@ -243,6 +247,13 @@ export type CardSearchRow = Pick<
 export type EventStatus = "draft" | "open" | "closed";
 export type Game = "one_piece";
 
+/**
+ * `walk_in` rooms are opened by the application when somebody scans a store's
+ * permanent code, so they have no planned end and no code of their own — both
+ * columns are null for them, and the database enforces that.
+ */
+export type EventKind = "scheduled" | "walk_in";
+
 export type EventRow = {
   id: string;
   created_at: string;
@@ -250,17 +261,22 @@ export type EventRow = {
   created_by: string | null;
   name: string;
   game: Game;
+  kind: EventKind;
   starts_at: string;
-  ends_at: string;
+  ends_at: string | null;
   status: EventStatus;
-  join_code: string;
+  join_code: string | null;
 };
 
-export type EventInsert = Omit<EventRow, "id" | "created_at" | "status" | "game"> & {
+export type EventInsert = Omit<
+  EventRow,
+  "id" | "created_at" | "status" | "game" | "kind"
+> & {
   id?: string;
   created_at?: string;
   status?: EventStatus;
   game?: Game;
+  kind?: EventKind;
 };
 
 export type EventParticipantRow = {

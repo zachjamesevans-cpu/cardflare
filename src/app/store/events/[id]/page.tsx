@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { EventStatusControls } from "@/components/events/event-status-controls";
 import { JoinPoster } from "@/components/events/join-poster";
+import { WalkInSession } from "@/components/events/walk-in-session";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge, Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
@@ -44,7 +45,12 @@ export default async function EventPage({
 
   if (!canView) notFound();
 
-  const [svg] = await Promise.all([joinQrSvg(event.join_code)]);
+  /*
+   * A walk-in room has no code and no sheet: it is reached through the store's
+   * permanent counter code, and printing a second code for it would put a way
+   * in on the wall that stops working the next time the room reopens.
+   */
+  const svg = event.join_code ? await joinQrSvg(event.join_code) : null;
 
   return (
     <AppShell
@@ -67,25 +73,31 @@ export default async function EventPage({
 
       <section className="flex flex-col gap-5" aria-labelledby="status-heading">
         <h2 id="status-heading" className="text-xl font-bold text-text-primary">
-          Event status
+          {event.kind === "walk_in" ? "Session" : "Event status"}
         </h2>
         <Card>
-          <EventStatusControls eventId={event.id} status={event.status} />
+          {event.kind === "walk_in" ? (
+            <WalkInSession eventId={event.id} status={event.status} />
+          ) : (
+            <EventStatusControls eventId={event.id} status={event.status} />
+          )}
         </Card>
       </section>
 
-      <section className="flex flex-col gap-5" aria-labelledby="qr-heading">
-        <h2 id="qr-heading" className="text-xl font-bold text-text-primary">
-          Join code
-        </h2>
-        <JoinPoster
-          eventName={event.name}
-          eventWindow={formatEventWindow(event.starts_at, event.ends_at)}
-          joinCode={event.join_code}
-          url={joinUrl(event.join_code)}
-          qrSvg={svg}
-        />
-      </section>
+      {event.join_code && svg && (
+        <section className="flex flex-col gap-5" aria-labelledby="qr-heading">
+          <h2 id="qr-heading" className="text-xl font-bold text-text-primary">
+            Join code
+          </h2>
+          <JoinPoster
+            eventName={event.name}
+            eventWindow={formatEventWindow(event.starts_at, event.ends_at)}
+            joinCode={event.join_code}
+            url={joinUrl(event.join_code)}
+            qrSvg={svg}
+          />
+        </section>
+      )}
     </AppShell>
   );
 }

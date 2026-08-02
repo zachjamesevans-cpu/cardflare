@@ -28,11 +28,11 @@ const MARK_ASPECT = mark.width / mark.height;
 /**
  * What a player can actually do, in order.
  *
- * Deliberately stops at being in the room. Posting the cards you need is
- * Milestone 6 and does not exist yet — printing it on a sheet a store tapes to
- * its counter would be promising a feature nobody can use.
+ * The third step used to stop at "you're in the room", because posting cards
+ * did not exist yet and a sheet taped to a counter must not promise a feature
+ * nobody can use. It exists now, and it is the reason to scan at all.
  */
-const STEPS = ["Scan the code", "Enter your name", "You're in the room"];
+const STEPS = ["Scan the code", "Enter your name", "Post the cards you need"];
 
 function BrandLockup() {
   return (
@@ -60,6 +60,7 @@ function BrandLockup() {
 export function JoinPoster({
   eventName,
   eventWindow,
+  eyebrow = "Trading here today",
   joinCode,
   url,
   qrSvg,
@@ -67,6 +68,14 @@ export function JoinPoster({
   eventName: string;
   /** Human-readable date and time. Useful on a sheet that outlives the day. */
   eventWindow?: string | null;
+  /**
+   * The line above the name.
+   *
+   * A store's counter sheet is laminated and left up for a year, so it says
+   * something evergreen; an event sheet is printed for one night and can say
+   * "today" honestly.
+   */
+  eyebrow?: string;
   joinCode: string;
   url: string;
   qrSvg: string;
@@ -82,7 +91,7 @@ export function JoinPoster({
 
           <div className="flex flex-col gap-2">
             <p className="text-xs font-semibold tracking-[0.22em] text-neutral-500 uppercase">
-              Trading here today
+              {eyebrow}
             </p>
             <h3 className="text-3xl font-bold text-balance">{eventName}</h3>
             {eventWindow && (

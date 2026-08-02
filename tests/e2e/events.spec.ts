@@ -125,4 +125,38 @@ test.describe("joining by typed code", () => {
     const body = (await response?.text()) ?? "";
     expect(body).not.toMatch(/supabase|service.role|SUPABASE_/i);
   });
+
+  /*
+   * A store's counter code is seven characters and an event's is six. Both
+   * arrive through this URL, and both have to be accepted by shape before any
+   * query — otherwise a store's laminated code would 404 during an outage,
+   * sending somebody to the counter to complain about a sheet that is fine.
+   */
+  test("a seven-character store code is a real page, not a 404", async ({ page }) => {
+    const response = await page.goto("/e/K3M9PZQ");
+    const status = response?.status() ?? 0;
+
+    expect(status).toBeLessThan(500);
+    expect(status).not.toBe(404);
+  });
+
+  test("eight characters is still nonsense", async ({ page }) => {
+    const response = await page.goto("/e/K3M9PZQ8");
+
+    expect(response?.status()).toBe(404);
+  });
+
+  test("the typed-code box accepts a store code", async ({ page }) => {
+    await page.goto("/join");
+    await page.getByLabel("Event code").fill("K3M9PZQ");
+    await page.getByRole("button", { name: /find event/i }).click();
+
+    /*
+     * Without a database this cannot resolve, but it must not be turned away
+     * for being the wrong shape — the message for a seven-character code has
+     * to be the same one a six-character code gets.
+     */
+    const body = page.locator("body");
+    await expect(body).not.toContainText(/doesn't look right/i);
+  });
 });

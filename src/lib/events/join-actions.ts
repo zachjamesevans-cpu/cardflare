@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 import { isValidJoinCode, normalizeJoinCode } from "./join-code";
-import { findEventByJoinCode } from "./repository";
+import { resolveCode } from "./rooms";
 import type { JoinCodeState } from "./join-state";
 
 /**
@@ -67,8 +67,14 @@ export async function lookUpJoinCode(
     };
   }
 
-  const event = await findEventByJoinCode(code);
-  if (!event) {
+  /*
+   * A store code that resolves to a quiet store is still a real code, so it
+   * goes through to `/e/CODE` and lets that page explain what is happening.
+   * Answering "we couldn't find it" here would tell somebody holding a
+   * perfectly good counter code that they had mistyped it.
+   */
+  const resolved = await resolveCode(code);
+  if (resolved.outcome === "not-found") {
     return { status: "error", message: NOT_FOUND, code: submitted };
   }
 

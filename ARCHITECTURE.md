@@ -40,7 +40,8 @@ src/lib/
   auth/                Session, viewer roles, guards, sign-in actions
   email/               Provider client and message templates
   cards/               Card provider interface, importer, search
-  events/              Event Rooms: schema, repository, actions, join codes, QR
+  events/              Event Rooms: schema, repository, actions, join codes, QR,
+                       and rooms.ts — what a scanned code resolves to
   players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
@@ -347,6 +348,71 @@ Generated with `randomInt`, since a guessable code is a way into an event.
 
 `normalizeJoinCode` is pure and shared by the URL route and the typed-code
 form, so `/e/k3m-9pz` and a hand-typed `K3M 9PZ` resolve identically.
+
+**Two code spaces, separated by length.** Six characters is one event; seven is
+a store's permanent Counter Code. Both arrive through `/e/CODE` and the same
+box on `/join`, and a player never has to know which they hold — but the
+application must never confuse them. Different lengths make that impossible
+rather than unlikely: one shared length plus two unique indexes would leave a
+birthday collision _between_ the tables, and its failure would be silent, a
+laminated counter code quietly resolving to a stranger's event. `classifyCode`
+is the single place that decides, so nothing else measures lengths.
+
+The store gets the longer code because it is the one that never rotates. An
+event code is printed for one night; a counter code is on a wall for a year.
+
+## Store rooms
+
+A store prints one sheet and leaves it up. `src/lib/events/rooms.ts` decides
+what that one code means on any given evening.
+
+```
+resolveCode(code)                  read path — never opens a room
+  ├─ classifyCode                     six characters → events, seven → stores
+  ├─ findRunningScheduledEvent        an open event, now or within two hours
+  ├─ findOpenWalkInRoom               otherwise the store's walk-in room
+  ├─ latestActivityAt → isIdle        quiet for six hours? close it
+  └─ outcome: room | lobby | quiet
+
+enterRoomByCode(code)              write path — used only by the join action
+  └─ everything above, then openWalkInRoom if the outcome would be `lobby`
+```
+
+**A running event always wins.** If a store has a tournament open, the counter
+code puts everybody in the tournament rather than opening a rival room beside
+it. Splitting the room is the one failure this cannot have: the product is
+"find the person in this room who has your card", and two half-rooms answer
+that wrongly while looking like they worked. The two-hour doors-open lead
+exists for the same reason — without it the early arrivals would land in the
+walk-in room and everybody after the start time in the event, the same split
+caused by the clock instead of by a race.
+
+**Reading never writes a room into existence.** Somebody glancing at the
+counter code on the way past would otherwise leave an empty session in the
+store's history whose start time is a lie. Closing a stale room on the read
+path _is_ a write, and belongs there: it is cleanup that must happen before
+anyone can be told what is running, and the `status = 'open'` guard makes it
+idempotent.
+
+**One open walk-in room per store, enforced by a partial unique index** rather
+than by the application. Two players scanning at the same moment both find no
+room and both try to open one; the loser takes a `23505` and adopts the
+winner's room, so from the players' side both taps land in the same place.
+
+**Six hours of quiet ends a room.** Long enough that somebody who posts a Flare
+at eleven and somebody who arrives at four see each other's cards — that
+continuity across a slow day is the point for a store. Short enough that an
+overnight gap always starts a fresh room, so nobody walks in to a board of
+yesterday's requests. The finish is stamped at the last activity, not at the
+moment the staleness was noticed: a room found stale on Sunday stopped being
+used on Friday, and stamping Sunday would tell the store it ran for two days.
+
+A walk-in room has a null `ends_at` while it runs and a null `join_code`
+forever, both enforced by check constraints. No code of its own, because a
+per-session code would be a second way in that is printed nowhere and changes
+every time the room reopens — and because a null keeps `findEventByJoinCode`
+from ever resolving one, so a walk-in room can only be reached through the
+resolver that knows whether it is still live.
 
 ### Public lookup
 

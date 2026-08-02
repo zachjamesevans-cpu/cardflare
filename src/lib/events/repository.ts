@@ -1,11 +1,18 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import type { EventRow } from "@/lib/supabase/types";
+import type { EventRow, StoreRow } from "@/lib/supabase/types";
 import { generateJoinCode } from "./join-code";
-import type { CreateEventInput, EventStatus, PublicEvent } from "./schema";
+import type {
+  CreateEventInput,
+  EventKind,
+  EventStatus,
+  PublicEvent,
+  PublicStore,
+} from "./schema";
+import { WALK_IN_ROOM_NAME } from "./schema";
 
-const UNIQUE_VIOLATION = "23505";
+export const UNIQUE_VIOLATION = "23505";
 
 /**
  * How many times to retry a join-code collision before giving up.
@@ -133,18 +140,53 @@ export async function findEventById(id: string): Promise<EventRow | null> {
 }
 
 /**
- * Resolves a join code for the public join page.
+ * The columns a player may see about a room.
  *
- * Selects an explicit column list rather than `*`: this result is rendered to
- * anyone holding the code, and `select()` would quietly start returning any
+ * An explicit list rather than `*`, because this result is rendered to anyone
+ * holding the code and `select()` would quietly start returning whatever
  * column a later migration adds.
+ */
+const PUBLIC_ROOM_COLUMNS =
+  "id, name, kind, status, starts_at, ends_at, stores(name, city, region)";
+
+type PublicRoomRow = {
+  id: string;
+  name: string;
+  kind: EventKind;
+  status: EventStatus;
+  starts_at: string;
+  ends_at: string | null;
+  stores: { name: string; city: string | null; region: string | null } | null;
+};
+
+function toPublicEvent(row: PublicRoomRow): PublicEvent {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    status: row.status,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    storeName: row.stores?.name ?? "A CardFlare store",
+    storeCity: row.stores?.city ?? null,
+    storeRegion: row.stores?.region ?? null,
+  };
+}
+
+/**
+ * Resolves an event's own join code.
+ *
+ * Only ever matches a scheduled event: a walk-in room's `join_code` is null,
+ * which the database enforces. A walk-in room must be reached through
+ * `src/lib/events/rooms.ts`, the only thing that knows whether it is still the
+ * store's live room or a stale one that should have been closed hours ago.
  */
 export async function findEventByJoinCode(code: string): Promise<PublicEvent | null> {
   if (!canQuery("resolve the join code")) return null;
 
   const { data, error } = await getSupabaseAdmin()
     .from("events")
-    .select("id, name, status, starts_at, ends_at, stores(name, city, region)")
+    .select(PUBLIC_ROOM_COLUMNS)
     .eq("join_code", code)
     .maybeSingle();
 
@@ -154,25 +196,217 @@ export async function findEventByJoinCode(code: string): Promise<PublicEvent | n
   }
   if (!data) return null;
 
-  const row = data as unknown as {
-    id: string;
-    name: string;
-    status: EventStatus;
-    starts_at: string;
-    ends_at: string;
-    stores: { name: string; city: string | null; region: string | null } | null;
-  };
+  return toPublicEvent(data as unknown as PublicRoomRow);
+}
+
+/** Resolves a store's permanent counter code. */
+export async function findStoreByJoinCode(code: string): Promise<PublicStore | null> {
+  if (!canQuery("resolve the store code")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("stores")
+    .select("id, name, city, region, walk_in_enabled")
+    .eq("join_code", code)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not resolve the store code", error);
+    return null;
+  }
+  if (!data) return null;
 
   return {
-    id: row.id,
-    name: row.name,
-    status: row.status,
-    startsAt: row.starts_at,
-    endsAt: row.ends_at,
-    storeName: row.stores?.name ?? "A CardFlare store",
-    storeCity: row.stores?.city ?? null,
-    storeRegion: row.stores?.region ?? null,
+    id: data.id,
+    name: data.name,
+    city: data.city,
+    region: data.region,
+    walkInEnabled: data.walk_in_enabled,
   };
+}
+
+/**
+ * The store's scheduled event that a person walking in right now belongs in.
+ *
+ * `endsBefore` excludes an event whose window has passed but which nobody
+ * remembered to close, and `startsBefore` excludes one that is open but not
+ * for days yet. Ordered by start time so that when a store has both tonight's
+ * event and next week's sitting open, tonight's wins.
+ */
+export async function findRunningScheduledEvent(
+  storeId: string,
+  startsBefore: string,
+  endsAfter: string,
+): Promise<PublicEvent | null> {
+  if (!canQuery("look for a running event")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select(PUBLIC_ROOM_COLUMNS)
+    .eq("store_id", storeId)
+    .eq("kind", "scheduled")
+    .eq("status", "open")
+    .lte("starts_at", startsBefore)
+    .gt("ends_at", endsAfter)
+    .order("starts_at", { ascending: true })
+    .limit(1);
+
+  if (error) {
+    console.error("Could not look for a running event", error);
+    return null;
+  }
+
+  const row = (data ?? [])[0] as unknown as PublicRoomRow | undefined;
+  return row ? toPublicEvent(row) : null;
+}
+
+/**
+ * The store's open walk-in room, if it has one.
+ *
+ * `maybeSingle` is safe because a partial unique index permits only one open
+ * walk-in room per store.
+ */
+export async function findOpenWalkInRoom(storeId: string): Promise<PublicEvent | null> {
+  if (!canQuery("look for the walk-in room")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select(PUBLIC_ROOM_COLUMNS)
+    .eq("store_id", storeId)
+    .eq("kind", "walk_in")
+    .eq("status", "open")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not look for the walk-in room", error);
+    return null;
+  }
+
+  return data ? toPublicEvent(data as unknown as PublicRoomRow) : null;
+}
+
+/**
+ * When somebody was last seen in a room, or null if nobody ever arrived.
+ *
+ * Served by `event_participants_event_seen_idx`, so this is an index read of
+ * one row rather than an aggregate over the room's history.
+ */
+export async function latestActivityAt(eventId: string): Promise<string | null> {
+  if (!canQuery("check when the room was last used")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("event_participants")
+    .select("last_seen_at")
+    .eq("event_id", eventId)
+    .order("last_seen_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error("Could not check when the room was last used", error);
+    return null;
+  }
+
+  return (data ?? [])[0]?.last_seen_at ?? null;
+}
+
+/**
+ * Ends a walk-in room, stamping the finish time it never had.
+ *
+ * Guarded on `status = 'open'` so two requests deciding at the same moment
+ * that the room has gone quiet cannot both claim to have closed it, and so the
+ * partial unique index is free the instant this returns.
+ *
+ * Returns whether this caller was the one that closed it.
+ */
+export async function closeWalkInRoom(
+  eventId: string,
+  endedAt: string,
+): Promise<boolean> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .update({ status: "closed", ends_at: endedAt })
+    .eq("id", eventId)
+    .eq("status", "open")
+    .select("id");
+
+  if (error) {
+    console.error("Could not close the walk-in room", error);
+    return false;
+  }
+
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Starts a store's walk-in room.
+ *
+ * No join code and no end time — see the migration. A unique violation means
+ * somebody else opened one in the moment between the check and this insert,
+ * which the caller handles by adopting theirs.
+ */
+export async function openWalkInRoom(
+  storeId: string,
+  startedAt: string,
+): Promise<{ outcome: "opened"; room: PublicEvent } | { outcome: "raced" }> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .insert({
+      store_id: storeId,
+      kind: "walk_in",
+      name: WALK_IN_ROOM_NAME,
+      starts_at: startedAt,
+      ends_at: null,
+      join_code: null,
+      status: "open",
+      // Nobody did. The application opened it because somebody scanned.
+      created_by: null,
+    })
+    .select(PUBLIC_ROOM_COLUMNS)
+    .maybeSingle();
+
+  if (error?.code === UNIQUE_VIOLATION) return { outcome: "raced" };
+
+  if (error || !data) {
+    throw new Error(`Could not open the walk-in room: ${error?.message}`, {
+      cause: error,
+    });
+  }
+
+  return { outcome: "opened", room: toPublicEvent(data as unknown as PublicRoomRow) };
+}
+
+/** Turns walk-in trading on or off for a store. */
+export async function setWalkInEnabled(
+  storeId: string,
+  enabled: boolean,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("stores")
+    .update({ walk_in_enabled: enabled })
+    .eq("id", storeId);
+
+  if (error) {
+    throw new Error(`Could not change walk-in trading: ${error.message}`, {
+      cause: error,
+    });
+  }
+}
+
+/** The store a signed-in member is looking at, read with the service role. */
+export async function findStoreById(storeId: string): Promise<StoreRow | null> {
+  if (!canQuery("load the store")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("stores")
+    .select()
+    .eq("id", storeId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not load the store", error);
+    return null;
+  }
+
+  return data ?? null;
 }
 
 export async function setEventStatus(id: string, status: EventStatus): Promise<void> {

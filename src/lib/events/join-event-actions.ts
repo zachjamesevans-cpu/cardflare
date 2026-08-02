@@ -21,7 +21,7 @@ import { clientKey } from "@/lib/request-context";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 import { isValidJoinCode, normalizeJoinCode } from "./join-code";
 import { joinEvent, leaveEvent } from "./participants";
-import { findEventByJoinCode } from "./repository";
+import { enterRoomByCode, resolveCode } from "./rooms";
 
 const JOIN_MAX = 20;
 const JOIN_WINDOW_MS = 10 * 60 * 1000;
@@ -75,8 +75,16 @@ export async function joinEventAction(
     return invalid(GENERIC_ERROR, submitted);
   }
 
-  const event = await findEventByJoinCode(code);
-  if (!event) return invalid("That event could not be found.", submitted);
+  /*
+   * The only place a walk-in room is ever opened.
+   *
+   * A store's permanent code resolves to whatever is running — a scheduled
+   * event if there is one, so that tonight's tournament does not end up with
+   * half its players in a separate room. If nothing is running and the store
+   * allows walk-in trading, this tap is what starts it.
+   */
+  const event = await enterRoomByCode(code);
+  if (!event) return invalid("That room could not be found.", submitted);
 
   // Checked at the moment of joining, not when the page rendered: a store can
   // close the room between a player loading it and tapping the button.
@@ -163,8 +171,9 @@ export async function leaveEventAction(formData: FormData): Promise<void> {
   const session = await getPlayerSession();
   if (!session) redirect(`/e/${code}`);
 
-  const event = await findEventByJoinCode(code);
-  if (event) await leaveEvent(event.id, session.id);
+  // Resolved rather than entered: leaving a room must never open one.
+  const resolved = await resolveCode(code);
+  if (resolved.outcome === "room") await leaveEvent(resolved.room.id, session.id);
 
   revalidatePath(`/e/${code}`);
   redirect(`/e/${code}`);

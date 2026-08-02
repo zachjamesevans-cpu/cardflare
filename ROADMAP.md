@@ -142,6 +142,35 @@ Milestone 6.
 player scans in, posts what they need, and everyone in the room can see it.
 Automating the cross-reference and notifying both sides is Milestone 7.
 
+## ✅ Milestone 6.5 — Store rooms
+
+Asked for by a pilot store: printing a fresh sheet for every Friday is work,
+and the sheet is useless on the six other days.
+
+- **A permanent Counter Code per store**, minted with the account. Printed
+  once, laminated, left on the counter
+- **Two code spaces separated by length** — seven characters for a store, six
+  for an event. Two unique indexes would still allow a birthday collision
+  between the tables, and the failure would be silent: a laminated code
+  quietly resolving to a stranger's event
+- **One code, whichever room is live.** A running scheduled event always wins,
+  including two hours before doors, so tournament night never ends up with
+  half its players in a separate room. That split is the one failure this
+  cannot have, and it is pinned by tests
+- **Walk-in rooms open on a join, not on a page view**, so glancing at the
+  counter code never leaves an empty session in a store's history
+- **A quiet room closes itself** after six hours — longer than a slow
+  afternoon, shorter than a night, so a room spans a day of trading and never
+  spans two. A closed room's Flares stay with it; the next scan starts fresh
+- One open walk-in room per store, enforced by a partial unique index rather
+  than by the application. Two simultaneous scans cannot split the room; the
+  loser adopts the winner's
+- A switch in the store dashboard for stores that only want rooms during their
+  own events. Turning it off ends the current room rather than leaving one
+  running behind a control that says "off"
+- Verified against a real PostgreSQL instance: the backfill, every new
+  constraint, the race guard, and the close-then-reopen cycle
+
 ### Milestone 7 — Matching
 
 Matching engine, realtime match notifications, structured meetup responses.

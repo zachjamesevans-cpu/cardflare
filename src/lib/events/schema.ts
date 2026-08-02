@@ -61,6 +61,7 @@ export const joinCodeSchema = z
   .pipe(z.string().regex(JOIN_CODE_PATTERN, "That code doesn't look right."));
 
 export type EventStatus = "draft" | "open" | "closed";
+export type EventKind = "scheduled" | "walk_in";
 
 /** Statuses an event may be moved to, and what each one means. */
 export const STATUS_LABELS: Record<EventStatus, string> = {
@@ -68,6 +69,15 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
   open: "Open",
   closed: "Closed",
 };
+
+/**
+ * What a walk-in room is called wherever a name is required.
+ *
+ * A store never types this — the application opens these rooms — but the
+ * column is not-null and a player sees the value at the top of the room, so it
+ * has to read like something a person would say.
+ */
+export const WALK_IN_ROOM_NAME = "Walk-in trading";
 
 export type CreateEventFieldErrors = Partial<
   Record<"storeId" | "name" | "startsAt" | "endsAt", string>
@@ -90,14 +100,42 @@ export type CreateEventState =
 
 export const CREATE_EVENT_IDLE: CreateEventState = { status: "idle" };
 
-/** What a player is allowed to see about an event before joining it. */
+/** What a player is allowed to see about a room before joining it. */
 export interface PublicEvent {
   id: string;
   name: string;
+  kind: EventKind;
   status: EventStatus;
   startsAt: string;
-  endsAt: string;
+  /** Null while a walk-in room is still running. */
+  endsAt: string | null;
   storeName: string;
   storeCity: string | null;
   storeRegion: string | null;
 }
+
+/** The little a player sees about a store when no room of its is running. */
+export interface PublicStore {
+  id: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  walkInEnabled: boolean;
+}
+
+/**
+ * What a scanned code turned out to mean.
+ *
+ * A store's permanent code has three honest answers, and conflating any two of
+ * them would put a wrong screen in front of somebody standing at a counter
+ * holding a code that is perfectly correct:
+ *
+ *   `room`   something is running — an event, or the walk-in room
+ *   `lobby`  nothing is running yet, but joining will start the walk-in room
+ *   `quiet`  the store has walk-in trading switched off, so joining will not
+ */
+export type CodeResolution =
+  | { outcome: "not-found" }
+  | { outcome: "room"; room: PublicEvent }
+  | { outcome: "lobby"; store: PublicStore }
+  | { outcome: "quiet"; store: PublicStore };
