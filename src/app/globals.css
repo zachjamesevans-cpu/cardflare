@@ -136,3 +136,70 @@
       transparent 70%
     );
 }
+
+/*
+ * Printing a join poster.
+ *
+ * The page around the poster is a console — header, sign-out, status controls,
+ * navigation — and none of it belongs on a sheet taped to a counter.
+ *
+ * Hiding it with `visibility` was the obvious first move and was wrong: hidden
+ * elements keep their space, so the document stayed as tall as the console and
+ * printed a second, blank page. `display: none` collapses it properly, and
+ * `:has()` picks out exactly the right set — every element that is neither the
+ * sheet, nor inside it, nor an ancestor carrying it.
+ *
+ * The whole thing is guarded on the sheet existing, so every other page in the
+ * app prints normally.
+ */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /*
+   * The app shell pins html to `h-full` and body to `min-h-full` so a short
+   * page still fills the window. On paper that makes the document exactly one
+   * viewport tall, which is taller than the printable area once @page margins
+   * are taken off — so a one-page poster spilled onto a blank second page.
+   */
+  html:has([data-print-sheet]),
+  body:has([data-print-sheet]) {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff;
+  }
+
+  body:has([data-print-sheet])
+    *:not(:has([data-print-sheet])):not([data-print-sheet]):not([data-print-sheet] *) {
+    display: none !important;
+  }
+
+  /*
+   * The ancestors are kept only to carry the sheet. Their own padding, borders
+   * and max-widths would otherwise indent it and push it down the page.
+   */
+  body:has([data-print-sheet]) *:has([data-print-sheet]) {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    max-width: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+/*
+ * Forces a background to survive printing.
+ *
+ * Browsers drop background colours by default to save ink. The mark's card
+ * face is dark and roughly two fifths of the artwork is near-white, so on bare
+ * paper that portion disappears. Sitting it on the brand backdrop is the same
+ * thing BRAND.md does for the favicons, and this is what makes the backdrop
+ * actually reach the page.
+ */
+@utility print-exact {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
