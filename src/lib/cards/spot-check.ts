@@ -70,8 +70,14 @@ export function chooseSpread(rows: ScanRow[]): { row: ScanRow; because: string }
     rows.find((row) => row.counter !== null && row.counter > 0),
     "has a counter",
   );
+  /*
+   * Triggers are matched in the effect text, not in trigger_text. This
+   * provider never populates that column — it returns one `card_text` with
+   * "[Trigger]" inline — so the original criterion could never match and no
+   * trigger card was ever sampled.
+   */
   take(
-    rows.find((row) => row.trigger_text),
+    rows.find((row) => row.trigger_text || row.effect_text?.includes("[Trigger]")),
     "has a trigger",
   );
   take(
@@ -115,7 +121,7 @@ function describe(row: ScanRow, because: string, printings: CardPrinting[]): str
     field("trigger", row.trigger_text?.replace(/\s+/g, " ").slice(0, 160) ?? null),
     field(
       "printings",
-      printings.map((p) => printingLabel(p) ?? "—").join(" / ") || null,
+      printings.map((p) => printingLabel(p, row.exact_name) ?? "—").join(" / ") || null,
     ),
     field("images", printings.filter((p) => p.imageUrl).length),
   ].join("\n");
@@ -164,7 +170,13 @@ export async function spotCheck(): Promise<SpotCheck> {
       "id, canonical_card_number, exact_name, card_type, colors, traits, cost, power, counter, life, rarity, attribute, effect_text, trigger_text",
       { count: "exact" },
     )
-    .order("canonical_card_number")
+    /*
+     * Ordered by id, not by card number. Ordering by number and taking the
+     * first thousand meant the whole sample came from EB01 — every card in the
+     * first spot check was EB01-0xx, which checks one set and calls it a
+     * catalog. Ids are uuids, so this spans everything imported.
+     */
+    .order("id")
     .range(0, SCAN - 1);
 
   if (error) {
@@ -206,7 +218,7 @@ async function printingsForCards(
   const { data, error } = await getSupabaseAdmin()
     .from("card_printings")
     .select(
-      "card_id, set_code, set_name, printing_label, variant_type, rarity, is_promo, image_url",
+      "card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url",
     )
     .in("card_id", cardIds)
     .order("set_code");
@@ -224,6 +236,7 @@ async function printingsForCards(
       printingLabel: row.printing_label,
       variantType: row.variant_type,
       rarity: row.rarity,
+      printingName: row.printing_name,
       isPromo: row.is_promo,
       imageUrl: row.image_url,
     });

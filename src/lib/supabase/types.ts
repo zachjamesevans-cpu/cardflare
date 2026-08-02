@@ -142,6 +142,8 @@ export type CardPrintingRow = {
   variant_type: string | null;
   /** Rarity of this printing. A base art and an alternate art differ here. */
   rarity: string | null;
+  /** The provider's name for this printing, e.g. "Kouzuki Oden (SPR)". */
+  printing_name: string | null;
   /** The provider's own image identifier, when it has one. */
   image_id: string | null;
   /** Which endpoint group produced the record: set, starter-deck, promo, don. */

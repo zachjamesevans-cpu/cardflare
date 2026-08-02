@@ -94,6 +94,7 @@ describe("telling two printings apart in the UI", () => {
     printingLabel: "OP12",
     variantType: null,
     rarity: null,
+    printingName: null,
     isPromo: null,
     imageUrl: null,
     ...over,

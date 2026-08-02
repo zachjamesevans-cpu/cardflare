@@ -138,3 +138,34 @@ describe("formatReport", () => {
     expect(formatReport([], new Map(), 0)).toMatch(/no cards imported/i);
   });
 });
+
+/*
+ * Both of these were found by reading the first real spot check, not by
+ * reasoning about the code.
+ */
+describe("what the first real spot check exposed in the spot check itself", () => {
+  it("looks for a trigger in the effect text, since trigger_text is never set", () => {
+    // This provider returns one `card_text` with "[Trigger]" inline and leaves
+    // the dedicated field empty, so the original criterion matched nothing and
+    // no trigger card was ever sampled.
+    const spread = chooseSpread([
+      card({ card_type: "character" }),
+      card({
+        card_type: "character",
+        trigger_text: null,
+        effect_text: "[On Play] Draw 1. [Trigger] Play this card.",
+      }),
+    ]);
+
+    expect(spread.map((entry) => entry.because)).toContain("has a trigger");
+  });
+
+  it("still honours a real trigger column if a provider ever populates one", () => {
+    const spread = chooseSpread([
+      card({ card_type: "character" }),
+      card({ card_type: "character", trigger_text: "Draw 1 card." }),
+    ]);
+
+    expect(spread.map((entry) => entry.because)).toContain("has a trigger");
+  });
+});

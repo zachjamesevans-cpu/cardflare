@@ -46,7 +46,7 @@ function Stats({ card }: { card: CardResult }) {
     card.cost !== null && { label: "Cost", value: card.cost },
     card.life !== null && { label: "Life", value: card.life },
     card.power !== null && { label: "Power", value: card.power },
-    card.counter !== null && { label: "Counter", value: card.counter },
+    card.counter ? { label: "Counter", value: card.counter } : false,
   ].filter(Boolean) as { label: string; value: number }[];
 
   if (stats.length === 0) return null;
@@ -99,7 +99,7 @@ function PrintingStrip({
             className="w-8"
           />
           <span className="text-xs text-text-secondary">
-            {printingLabel(printing) ?? (
+            {printingLabel(printing, card.exactName) ?? (
               <Highlighted text={card.canonicalCardNumber} term={term} />
             )}
           </span>
@@ -125,7 +125,7 @@ function Row({
   id: string;
 }) {
   const printing = card.printings[0];
-  const label = printing ? printingLabel(printing) : null;
+  const label = printing ? printingLabel(printing, card.exactName) : null;
   // With several printings the strip below carries the detail, so repeating
   // the first one's label and the card's rarity up here only adds noise.
   const manyPrintings = card.printings.length > 1;

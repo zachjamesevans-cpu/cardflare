@@ -153,6 +153,7 @@ describe("printingLabel", () => {
     printingLabel: "OP01",
     variantType: null,
     rarity: null,
+    printingName: null,
     isPromo: null,
     imageUrl: null,
   };
