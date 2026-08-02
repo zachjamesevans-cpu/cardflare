@@ -114,6 +114,15 @@ export const normalizedPrintingSchema = z.object({
   printingLabel: optionalText(200),
   /** The provider's own wording for the variant, when it has one. */
   variantType: optionalText(80),
+  /**
+   * Rarity of this printing.
+   *
+   * Also on the card, deliberately. The card-level value is what search ranks
+   * on and is the rarity most people mean; this one exists because a base art
+   * and an alternate art share a card number and do not share a rarity, and
+   * merging by card number can only keep one of them.
+   */
+  rarity: optionalText(40),
   isAlternateArt: z.boolean().nullish().default(null),
   isPromo: z.boolean().nullish().default(null),
   isParallel: z.boolean().nullish().default(null),

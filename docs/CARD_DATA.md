@@ -219,6 +219,31 @@ one to lose.
 > impossible values, not implausible ones. That is what the ten-card accuracy
 > check is for, and why it is not optional.
 
+## Alternate arts
+
+A card number is one gameplay identity. It can be several physical cards:
+OP12-034 Perona exists as a base art and an alternate art, both returned by
+`/api/allSetCards/` with the same `card_set_id`.
+
+They were always stored correctly as two printings — the printing key
+fingerprints over rarity and image URL, which differ — but only the first was
+ever rendered, so the alternate art was invisible in search.
+
+- **`card_printings.rarity`** holds each printing's own rarity. It is also on
+  `cards`, deliberately: the card-level value is what search ranks on and is
+  the rarity most people mean, but `mergeByCardNumber` keeps the first record's
+  value, so it can only ever hold one of them.
+- **The search result shows every printing** when there is more than one, each
+  with its own thumbnail and label. One printing renders exactly as before.
+- **The label carries the rarity** — `OP12 · C` against `OP12 · SR`. Without it
+  both printings render as `OP12` and the strip shows the same chip twice.
+- The strip is **not interactive**. The result row is already a button, and
+  choosing a specific printing belongs with Flares, where there is something to
+  choose it for.
+
+> Printings imported before this change have a null printing rarity, which is
+> honest — nobody had recorded it. Re-run a full sync to fill it in.
+
 ## Mapping decisions
 
 `CANDIDATE_FIELDS` maps each CardFlare field to a list of candidate source

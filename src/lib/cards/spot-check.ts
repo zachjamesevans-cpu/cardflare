@@ -206,7 +206,7 @@ async function printingsForCards(
   const { data, error } = await getSupabaseAdmin()
     .from("card_printings")
     .select(
-      "card_id, set_code, set_name, printing_label, variant_type, is_promo, image_url",
+      "card_id, set_code, set_name, printing_label, variant_type, rarity, is_promo, image_url",
     )
     .in("card_id", cardIds)
     .order("set_code");
@@ -223,6 +223,7 @@ async function printingsForCards(
       setName: row.set_name,
       printingLabel: row.printing_label,
       variantType: row.variant_type,
+      rarity: row.rarity,
       isPromo: row.is_promo,
       imageUrl: row.image_url,
     });

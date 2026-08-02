@@ -102,6 +102,7 @@ describe("how a promo reads to a player", () => {
     setName: "One Piece Promotion Cards",
     printingLabel: "OP09",
     variantType: null,
+    rarity: null,
     imageUrl: null,
   };
 

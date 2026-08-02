@@ -23,6 +23,8 @@ export interface CardPrinting {
   printingLabel: string | null;
   /** The provider's own wording. Null when it did not classify the printing. */
   variantType: string | null;
+  /** Rarity of this printing, which a base and an alternate art do not share. */
+  rarity: string | null;
   /** True only where the provider served it as a promo. Null means unknown. */
   isPromo: boolean | null;
   /** Provider-supplied only, and rendered only when the image flag is on. */
@@ -76,6 +78,12 @@ export const CARD_SEARCH_IDLE: CardSearchState = { status: "idle" };
 export function printingLabel(printing: CardPrinting): string | null {
   const parts = [
     printing.printingLabel ?? printing.setCode,
+    /*
+     * Rarity is what actually separates a base art from an alternate art.
+     * Both carry the same card number and the same set code, so without it two
+     * printings of OP12-034 render as the same string twice.
+     */
+    printing.rarity,
     printing.variantType,
     /*
      * A promo reprint carries the same card number and the same set id as the

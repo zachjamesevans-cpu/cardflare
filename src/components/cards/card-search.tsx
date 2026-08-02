@@ -63,6 +63,52 @@ function Stats({ card }: { card: CardResult }) {
   );
 }
 
+/**
+ * Every printing of a card, side by side.
+ *
+ * A card number is one gameplay identity but can be several physical cards —
+ * OP12-034 Perona exists as a base art and an alternate art, and which one
+ * someone is hunting is the entire point of a trade. Showing only the first
+ * printing hid the other completely.
+ *
+ * Not interactive: the whole row is already a button, and a button inside a
+ * button is invalid. Choosing a specific printing belongs with Flares, where
+ * there is something to choose it *for*.
+ */
+function PrintingStrip({
+  card,
+  imagesEnabled,
+  term,
+}: {
+  card: CardResult;
+  imagesEnabled: boolean;
+  term: string;
+}) {
+  return (
+    <ul className="mt-1 flex flex-wrap gap-2" aria-label="Printings">
+      {card.printings.map((printing, index) => (
+        <li
+          key={`${printing.setCode}-${printing.rarity}-${index}`}
+          className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated py-1 pr-2.5 pl-1"
+        >
+          <CardThumbnail
+            imageUrl={printing.imageUrl}
+            exactName={card.exactName}
+            cardNumber={card.canonicalCardNumber}
+            enabled={imagesEnabled}
+            className="w-8"
+          />
+          <span className="text-xs text-text-secondary">
+            {printingLabel(printing) ?? (
+              <Highlighted text={card.canonicalCardNumber} term={term} />
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Row({
   card,
   term,
@@ -80,6 +126,9 @@ function Row({
 }) {
   const printing = card.printings[0];
   const label = printing ? printingLabel(printing) : null;
+  // With several printings the strip below carries the detail, so repeating
+  // the first one's label and the card's rarity up here only adds noise.
+  const manyPrintings = card.printings.length > 1;
 
   return (
     <li
@@ -113,11 +162,21 @@ function Row({
             <span>
               <Highlighted text={card.canonicalCardNumber} term={term} />
             </span>
-            {label && <span className="font-sans">{label}</span>}
-            {card.rarity && <span className="font-sans">{card.rarity}</span>}
+            {manyPrintings ? (
+              <span className="font-sans">{card.printings.length} versions</span>
+            ) : (
+              <>
+                {label && <span className="font-sans">{label}</span>}
+                {card.rarity && <span className="font-sans">{card.rarity}</span>}
+              </>
+            )}
           </p>
 
           <Stats card={card} />
+
+          {manyPrintings && (
+            <PrintingStrip card={card} imagesEnabled={imagesEnabled} term={term} />
+          )}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1">

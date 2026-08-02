@@ -302,6 +302,7 @@ export class OptcgApiProvider implements CardDataProvider {
            */
           printingLabel: setCode,
           variantType: null,
+          rarity,
           isAlternateArt: null,
           /*
            * The one classification the provider actually states.
