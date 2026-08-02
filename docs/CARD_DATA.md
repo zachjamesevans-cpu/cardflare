@@ -73,7 +73,7 @@ inferred from the naming of its neighbours, and 404s.
 | `card_set_id`     | string     | `"OP01-077"`                                                   | `canonical_card_number`  |
 | `card_name`       | string     | `"Perona"`                                                     | `exact_name`             |
 | `card_type`       | string     | `"Character"`                                                  | `card_type` (lowercased) |
-| `card_color`      | string     | `"Blue"`                                                       | `colors[]`               |
+| `card_color`      | string     | `"Blue"`, `"Blue Green Purple Red Black Yellow"`               | `colors[]`               |
 | `card_cost`       | **string** | `"1"`                                                          | `cost`                   |
 | `card_power`      | **string** | `"2000"`                                                       | `power`                  |
 | `counter_amount`  | **number** | `1000`                                                         | `counter`                |
@@ -166,6 +166,27 @@ DON!! will not find it in CardFlare.
 That is a schema change, so it is a decision to take deliberately rather than a
 side effect of a sync.
 
+## Colours and traits are separated differently
+
+`card_color` on a rainbow Leader is `"Blue Green Purple Red Black Yellow"` —
+one space-separated string, 34 characters, past the 24-character limit on a
+colour. Five such records were rejected by the 2 Aug 2026 full sync. Colours
+are therefore split on whitespace as well as punctuation.
+
+The limit was **not** raised to accommodate it. A single 34-character token is
+not a colour, and is still rejected — otherwise the next unexpected shape gets
+waved through instead of recorded.
+
+`sub_types` is space-separated too, and is deliberately **not** treated the
+same way. Trait names contain spaces: `"Straw Hat Crew The Four Emperors"` is
+two traits, and splitting on whitespace would produce six meaningless
+fragments. There is no separator in the data to tell them apart.
+
+> **Known limitation.** A card with more than one trait stores them as a single
+> combined string. Trait search still matches, because the text is present;
+> filtering by an exact trait does not. Fixing this needs a list of valid
+> One Piece traits to match against, which is a data source we do not have.
+
 ## Mapping decisions
 
 `CANDIDATE_FIELDS` maps each CardFlare field to a list of candidate source
@@ -178,7 +199,8 @@ keys; the first present on a record wins. Every entry is currently a guess.
 | `normalized_name`                  | Lowercased, punctuation stripped, whitespace collapsed. NFKC, not NFKD: decomposing splits a Japanese dakuten and the punctuation strip then eats the mark, turning ゾ into ソ.              |
 | `compact_card_number`              | Letters and digits only, so `op01024` finds `OP01-024`.                                                                                                                                      |
 | `card_type`                        | Lowercased so filtering is predictable.                                                                                                                                                      |
-| `colors`, `traits`                 | Arrays. Split on `/ , ; \|`. Multicolour cards are real.                                                                                                                                     |
+| `colors`                           | Split on `/ , ; \|` **and whitespace**. A multicolour Leader arrives as one space-separated string; see below.                                                                               |
+| `traits`                           | Split on `/ , ; \|` only. Trait names contain spaces, so whitespace cannot be a separator; see the limitation below.                                                                         |
 | `cost`, `power`, `counter`, `life` | Parsed from strings. `"-"` and `""` become null, not zero — a Leader has no cost.                                                                                                            |
 | `effect_text`, `trigger_text`      | Stored verbatim, nullable.                                                                                                                                                                   |
 | `image_url`                        | On the printing, nullable, `https` only.                                                                                                                                                     |
