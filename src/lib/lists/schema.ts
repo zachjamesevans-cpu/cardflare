@@ -1,26 +1,30 @@
 import { z } from "zod";
 
 import { UNSAFE_CHARACTERS } from "@/lib/players/schema";
-import type { EventCardKind } from "@/lib/supabase/types";
 
 /**
- * Flares and Have List entries, and the rules around them.
+ * Flares and the trade binder, and the rules around them.
  *
  * Free of server-only imports so the validation can be tested without a
  * database — the same reason `src/lib/waitlist/form-data.ts` is.
  *
- * Product language, per PRODUCT.md: a **Flare** is a live request for a card;
- * a **Have** is a card a player has with them. `kind` is the only difference
- * between them in storage.
+ * Product language, per PRODUCT.md: a **Flare** is a live request for a card
+ * in one room. The **Have List** is the player's trade binder, which follows
+ * them between rooms.
  */
 
+/** Which list an entry belongs to. */
+export type ListKind = "flare" | "have";
+
 /**
- * Caps per player, per event.
+ * Caps.
  *
- * The Flare board is public and shared, so one person listing a thousand cards
- * ruins the room for everyone in it. Haves are private and are closer to an
- * inventory, so the ceiling is higher — someone emptying a binder into it is
- * using the feature, not abusing it.
+ * Flares are capped per player per event: the board is public and shared, so
+ * one person listing hundreds of cards ruins the room for everyone in it.
+ *
+ * The binder is capped per player outright, because it is no longer scoped to
+ * an event. Higher, because it is private and closer to an inventory —
+ * somebody emptying a binder into it is using the feature, not abusing it.
  */
 export const MAX_FLARES = 30;
 export const MAX_HAVES = 200;
@@ -28,7 +32,7 @@ export const MAX_HAVES = 200;
 export const MAX_QUANTITY = 99;
 export const MAX_NOTE = 140;
 
-export function capFor(kind: EventCardKind): number {
+export function capFor(kind: ListKind): number {
   return kind === "flare" ? MAX_FLARES : MAX_HAVES;
 }
 
@@ -79,19 +83,45 @@ export const kindSchema = z.enum(["flare", "have"]);
 /** What the form shows after a submission. */
 export type ListState =
   | { status: "idle" }
-  | { status: "added"; kind: EventCardKind; cardName: string }
+  | { status: "added"; kind: ListKind; cardName: string }
   | { status: "error"; message: string };
 
 export const LIST_IDLE: ListState = { status: "idle" };
 
-/** Nouns, so copy and messages never drift from PRODUCT.md's vocabulary. */
-export const KIND_LABELS: Record<EventCardKind, { one: string; many: string }> = {
-  flare: { one: "Flare", many: "Flares" },
-  have: { one: "card you have", many: "cards you have" },
-};
-
-export function atCapMessage(kind: EventCardKind): string {
+export function atCapMessage(kind: ListKind): string {
   return kind === "flare"
     ? `You can have ${MAX_FLARES} Flares open at once. Cancel one to post another.`
-    : `Your Have list is capped at ${MAX_HAVES} cards for one event.`;
+    : `Your Have list is capped at ${MAX_HAVES} cards.`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Freshness                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Whether a binder needs confirming before it can be trusted in this room.
+ *
+ * The rule is "have you confirmed since this event started", not "is it older
+ * than N hours". An event is the natural unit: you arrive, you say what you
+ * are still carrying, and you are not asked again for the rest of the night
+ * however many times you reload the page.
+ *
+ * Without this a portable binder quietly rots. Being told "Zach has this",
+ * walking over, and finding he traded it last week costs more trust than never
+ * being matched at all — one bad match does more damage than ten missed ones.
+ */
+export function needsConfirming(
+  confirmedAt: (string | Date)[],
+  eventStartedAt: string | Date,
+): boolean {
+  if (confirmedAt.length === 0) return false;
+
+  const start = new Date(eventStartedAt).getTime();
+  if (Number.isNaN(start)) return false;
+
+  return confirmedAt.some((at) => {
+    const when = new Date(at).getTime();
+    // An unreadable timestamp is not evidence of freshness.
+    return Number.isNaN(when) || when < start;
+  });
 }

@@ -8,11 +8,17 @@ import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
-import { addEntry, cancelEntry } from "./repository";
+import {
+  addFlare,
+  addToBinder,
+  cancelFlare,
+  confirmBinder,
+  removeFromBinder,
+} from "./repository";
 import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./schema";
 
 /**
- * Posting a Flare, and listing a card you have.
+ * Posting a Flare, and keeping the binder.
  *
  * Every one of these is a public POST endpoint, so each re-establishes the
  * whole chain itself: a valid player session, an event that exists, and that
@@ -23,18 +29,27 @@ import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./sche
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
 /**
- * Generous, because a player emptying a binder into their Have List is using
- * the feature exactly as intended, and a whole store shares one network — the
- * same reasoning as card search and joining a room.
+ * Generous, because a player emptying a binder into the app is using the
+ * feature exactly as intended, and a whole store shares one network — the same
+ * reasoning as card search and joining a room.
  */
 const WRITE_MAX = 120;
 const WRITE_WINDOW_MS = 5 * 60 * 1000;
 
+async function overRate(): Promise<boolean> {
+  const rate = checkRateLimit(
+    `list-write:${await clientKey()}`,
+    WRITE_MAX,
+    WRITE_WINDOW_MS,
+  );
+  return !rate.allowed;
+}
+
 /**
  * Establishes that the caller is a player in this room.
  *
- * Returns the event and session together so no caller can accidentally act on
- * one without having checked the other.
+ * Returns the event and session together so no caller can act on one without
+ * having checked the other.
  */
 async function requirePlayerInRoom(
   code: string,
@@ -60,19 +75,18 @@ export async function addToListAction(
 
   const code = text(formData, "code");
 
-  const rate = checkRateLimit(
-    `list-write:${await clientKey()}`,
-    WRITE_MAX,
-    WRITE_WINDOW_MS,
-  );
-
-  if (!rate.allowed) {
+  if (await overRate()) {
     return {
       status: "error",
       message: "Too many changes from this network. Please wait a moment.",
     };
   }
 
+  /*
+   * A binder is not scoped to a room, but adding to it still requires being in
+   * one. There is no other surface for it, and it keeps a stolen session from
+   * being usable without also being somewhere.
+   */
   const room = await requirePlayerInRoom(code);
   if (!room) {
     return {
@@ -95,12 +109,10 @@ export async function addToListAction(
     };
   }
 
-  const result = await addEntry(
-    room.eventId,
-    room.playerSessionId,
-    kind.data,
-    parsed.data,
-  );
+  const result =
+    kind.data === "flare"
+      ? await addFlare(room.eventId, room.playerSessionId, parsed.data)
+      : await addToBinder(room.playerSessionId, parsed.data);
 
   if (!result.ok) {
     return {
@@ -120,25 +132,46 @@ export async function addToListAction(
   };
 }
 
-export async function cancelListEntryAction(formData: FormData): Promise<void> {
+export async function removeListEntryAction(formData: FormData): Promise<void> {
   const code = text(formData, "code");
   const entryId = text(formData, "entryId");
+  const kind = kindSchema.safeParse(text(formData, "kind"));
 
-  const rate = checkRateLimit(
-    `list-write:${await clientKey()}`,
-    WRITE_MAX,
-    WRITE_WINDOW_MS,
-  );
-  if (!rate.allowed) return;
+  if (!kind.success || (await overRate())) return;
 
   const room = await requirePlayerInRoom(code);
   if (!room) return;
 
   /*
-   * Scoped to this player's own session inside the repository, so knowing an
-   * id is not authority to remove someone else's Flare from a public board.
+   * Both are scoped to this player's own session inside the repository, so
+   * knowing an id is not authority to pull someone else's Flare off a public
+   * board or to empty their binder.
    */
-  await cancelEntry(entryId, room.playerSessionId);
+  if (kind.data === "flare") {
+    await cancelFlare(entryId, room.playerSessionId);
+  } else {
+    await removeFromBinder(entryId, room.playerSessionId);
+  }
+
+  revalidatePath(`/e/${code}`);
+}
+
+/**
+ * "Still carrying these?" — yes.
+ *
+ * The one tap that makes a portable binder safe to match against. Without it a
+ * list that follows a player between events quietly rots, and a wrong match
+ * costs more trust than a missing one.
+ */
+export async function confirmBinderAction(formData: FormData): Promise<void> {
+  const code = text(formData, "code");
+
+  if (await overRate()) return;
+
+  const room = await requirePlayerInRoom(code);
+  if (!room) return;
+
+  await confirmBinder(room.playerSessionId);
 
   revalidatePath(`/e/${code}`);
 }

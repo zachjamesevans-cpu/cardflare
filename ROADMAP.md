@@ -112,8 +112,9 @@ Milestone 6.
 
 ## ✅ Milestone 6 — Lists
 
-- `event_cards` holds Flares and Have List entries in one table, told apart by
-  `kind`, verified against a real PostgreSQL instance
+- `flares` holds a room's live requests; `player_cards` is the player's trade
+  binder and follows them between events and stores. Both verified against a
+  real PostgreSQL instance
 - **`printing_id` is nullable and null means "any printing"** — which is what
   most requests mean. A player who wants the alternate art specifically can say
   so, and Milestone 7 can honour the difference instead of guessing
@@ -121,6 +122,13 @@ Milestone 6.
   broadcasts "this person is carrying a $200 alt art" to a room of strangers.
   When matching lands, the holder chooses to respond; they are never
   involuntarily advertised
+- **The binder follows the player, not the event.** Scoping it per event meant
+  retyping a binder at every locals — including the same store's next Friday —
+  which would leave matching with nothing to match. It rides the 30-day player
+  session, so no sign-in was added
+- **One tap confirms it on arrival.** A portable list rots: being told "Zach has
+  this", walking over, and finding he traded it last week costs more trust than
+  never matching at all. Asked once per event, never again that night
 - A private, read-time cross-reference marks the Flares on the board that the
   viewer can answer, so the Have List is useful before matching exists
 - Adding the same card twice is a quantity change, not a second entry

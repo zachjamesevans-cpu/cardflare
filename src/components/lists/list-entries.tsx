@@ -4,8 +4,9 @@ import { CardThumbnail } from "@/components/cards/card-thumbnail";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cancelListEntryAction } from "@/lib/lists/actions";
+import { removeListEntryAction } from "@/lib/lists/actions";
 import type { ListEntry } from "@/lib/lists/repository";
+import type { ListKind } from "@/lib/lists/schema";
 
 /**
  * Flare boards and Have lists.
@@ -18,6 +19,7 @@ import type { ListEntry } from "@/lib/lists/repository";
 function Entry({
   entry,
   code,
+  kind,
   imagesEnabled,
   showWho,
   youHaveIt,
@@ -25,6 +27,7 @@ function Entry({
 }: {
   entry: ListEntry;
   code: string;
+  kind: ListKind;
   imagesEnabled: boolean;
   /** Flares are public and name their owner. Have lists are private. */
   showWho: boolean;
@@ -87,8 +90,9 @@ function Entry({
         )}
 
         {cancellable && (
-          <form action={cancelListEntryAction}>
+          <form action={removeListEntryAction}>
             <input type="hidden" name="code" value={code} />
+            <input type="hidden" name="kind" value={kind} />
             <input type="hidden" name="entryId" value={entry.id} />
             <Button type="submit" variant="ghost" size="sm">
               Remove
@@ -144,6 +148,7 @@ export function FlareBoard({
           key={entry.id}
           entry={entry}
           code={code}
+          kind="flare"
           imagesEnabled={imagesEnabled}
           showWho
           youHaveIt={heldCardIds.has(entry.cardId) && entry.playerSessionId !== youId}
@@ -167,8 +172,8 @@ export function HaveList({
   if (entries.length === 0) {
     return (
       <Empty icon={Hand}>
-        Add what you brought with you. Only you can see this list — it is used to flag
-        when someone here is looking for a card you have.
+        Add what you brought with you. Only you can see this list, it follows you to
+        every event, and it flags Flares here that you can answer.
       </Empty>
     );
   }
@@ -180,6 +185,7 @@ export function HaveList({
           key={entry.id}
           entry={entry}
           code={code}
+          kind="have"
           imagesEnabled={imagesEnabled}
           showWho={false}
           cancellable

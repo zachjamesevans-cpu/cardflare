@@ -6,6 +6,7 @@ import { CalendarClock, MapPin } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { ConfirmBinder } from "@/components/lists/confirm-binder";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -21,7 +22,8 @@ import { findEventByJoinCode } from "@/lib/events/repository";
 import { getPlayerSession } from "@/lib/players/session";
 import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
-import { listOwnEntries, listRoomFlares, ownHeldCardIds } from "@/lib/lists/repository";
+import { listBinder, listRoomFlares } from "@/lib/lists/repository";
+import { needsConfirming } from "@/lib/lists/schema";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -123,14 +125,28 @@ export default async function JoinByCodePage({
    * Only read once the player is actually in the room. A visitor looking at a
    * join form has no business causing a read of anybody's lists.
    */
-  const [participants, flares, haves, held] = inRoom
+  const [participants, flares, binder] = inRoom
     ? await Promise.all([
         listParticipants(event.id),
         listRoomFlares(event.id),
-        listOwnEntries(event.id, session!.id, "have"),
-        ownHeldCardIds(event.id, session!.id),
+        listBinder(session!.id),
       ])
-    : [[], [], [], new Set<string>()];
+    : [[], [], []];
+
+  /*
+   * Derived from the binder that was just read rather than queried again — the
+   * cross-reference is the same set of cards.
+   */
+  const held = new Set(binder.map((entry) => entry.cardId));
+
+  /*
+   * The binder follows the player between events, so before it is trusted in
+   * this room the player is asked once whether it is still accurate.
+   */
+  const staleBinder = needsConfirming(
+    binder.map((entry) => entry.confirmedAt ?? ""),
+    event.startsAt,
+  );
 
   const images = cardImagesEnabled();
   const location = [event.storeCity, event.storeRegion].filter(Boolean).join(", ");
@@ -217,13 +233,16 @@ export default async function JoinByCodePage({
                 What you brought
               </h2>
               <p className="text-sm text-text-secondary">
-                Private to you. Used to flag Flares above that you can answer.
+                Private to you, and it follows you to every event. Used to flag Flares
+                above that you can answer.
               </p>
             </div>
 
+            {staleBinder && <ConfirmBinder code={normalized} count={binder.length} />}
+
             <AddToListForm code={normalized} kind="have" imagesEnabled={images} />
 
-            <HaveList entries={haves} code={normalized} imagesEnabled={images} />
+            <HaveList entries={binder} code={normalized} imagesEnabled={images} />
           </section>
         </>
       ) : (

@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
-import { LIST_IDLE, MAX_NOTE, type ListState } from "@/lib/lists/schema";
+import { LIST_IDLE, MAX_NOTE, type ListKind, type ListState } from "@/lib/lists/schema";
 import { printingLabel, type CardResult } from "@/lib/cards/schema";
-import type { EventCardKind } from "@/lib/supabase/types";
 
 /**
  * Adding a card to a Flare list or a Have list.
@@ -23,7 +22,7 @@ import type { EventCardKind } from "@/lib/supabase/types";
  * This is what `CardSearch`'s `onSelect` was built for in Milestone 5.
  */
 
-const COPY: Record<EventCardKind, { title: string; hint: string; submit: string }> = {
+const COPY: Record<ListKind, { title: string; hint: string; submit: string }> = {
   flare: {
     title: "Post a Flare",
     hint: "Everyone in this room can see what you are looking for.",
@@ -81,7 +80,7 @@ export function AddToListForm({
   imagesEnabled,
 }: {
   code: string;
-  kind: EventCardKind;
+  kind: ListKind;
   imagesEnabled: boolean;
 }) {
   const [state, formAction] = useActionState(addToListAction, LIST_IDLE);
