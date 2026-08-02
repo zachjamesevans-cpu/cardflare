@@ -3,8 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getPlayerSession = vi.fn();
 const findEventByJoinCode = vi.fn();
 const findParticipation = vi.fn();
-const addEntry = vi.fn();
-const cancelEntry = vi.fn();
+const addFlare = vi.fn();
+const addToBinder = vi.fn();
+const cancelFlare = vi.fn();
+const removeFromBinder = vi.fn();
+const confirmBinder = vi.fn();
 
 const CARD = "11111111-1111-1111-1111-111111111111";
 const SESSION = { id: "33333333-3333-3333-3333-333333333333", display_name: "Zach" };
@@ -28,11 +31,15 @@ vi.mock("@/lib/events/participants", () => ({
   findParticipation: (...a: unknown[]) => findParticipation(...a),
 }));
 vi.mock("@/lib/lists/repository", () => ({
-  addEntry: (...a: unknown[]) => addEntry(...a),
-  cancelEntry: (...a: unknown[]) => cancelEntry(...a),
+  addFlare: (...a: unknown[]) => addFlare(...a),
+  addToBinder: (...a: unknown[]) => addToBinder(...a),
+  cancelFlare: (...a: unknown[]) => cancelFlare(...a),
+  removeFromBinder: (...a: unknown[]) => removeFromBinder(...a),
+  confirmBinder: (...a: unknown[]) => confirmBinder(...a),
 }));
 
-const { addToListAction, cancelListEntryAction } = await import("@/lib/lists/actions");
+const { addToListAction, removeListEntryAction, confirmBinderAction } =
+  await import("@/lib/lists/actions");
 const { LIST_IDLE } = await import("@/lib/lists/schema");
 const { resetRateLimits } = await import("@/lib/rate-limit");
 
@@ -53,8 +60,11 @@ beforeEach(() => {
   getPlayerSession.mockReset().mockResolvedValue(SESSION);
   findEventByJoinCode.mockReset().mockResolvedValue(EVENT);
   findParticipation.mockReset().mockResolvedValue({ joinedAt: "", lastSeenAt: "" });
-  addEntry.mockReset().mockResolvedValue({ ok: true });
-  cancelEntry.mockReset().mockResolvedValue(true);
+  addFlare.mockReset().mockResolvedValue({ ok: true });
+  addToBinder.mockReset().mockResolvedValue({ ok: true });
+  cancelFlare.mockReset().mockResolvedValue(true);
+  removeFromBinder.mockReset().mockResolvedValue(true);
+  confirmBinder.mockReset().mockResolvedValue(true);
 });
 
 /*
@@ -66,14 +76,14 @@ describe("posting to a list requires being in the room", () => {
     getPlayerSession.mockResolvedValue(null);
 
     expect((await add()).status).toBe("error");
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   it("refuses a code that resolves to no event", async () => {
     findEventByJoinCode.mockResolvedValue(null);
 
     expect((await add()).status).toBe("error");
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   /* The one that matters: a real session, a real room, but not a member. */
@@ -81,18 +91,13 @@ describe("posting to a list requires being in the room", () => {
     findParticipation.mockResolvedValue(null);
 
     expect((await add()).status).toBe("error");
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   it("writes against the session's own id, never one from the form", async () => {
     await add({ playerSessionId: "99999999-9999-9999-9999-999999999999" });
 
-    expect(addEntry).toHaveBeenCalledWith(
-      EVENT.id,
-      SESSION.id,
-      "flare",
-      expect.anything(),
-    );
+    expect(addFlare).toHaveBeenCalledWith(EVENT.id, SESSION.id, expect.anything());
   });
 });
 
@@ -101,32 +106,37 @@ describe("addToListAction", () => {
     const state = await add();
 
     expect(state.status).toBe("added");
-    expect(addEntry.mock.calls[0]![3]).toMatchObject({
+    expect(addFlare.mock.calls[0]![2]).toMatchObject({
       cardId: CARD,
       printingId: null,
       quantity: 1,
     });
   });
 
-  it("adds to the Have list when asked to", async () => {
+  /*
+   * The binder is not scoped to a room, so it must not be written against one.
+   * Passing an event id here is what would silently make it per-event again.
+   */
+  it("adds to the binder without an event, so it follows the player", async () => {
     await add({ kind: "have" });
 
-    expect(addEntry.mock.calls[0]![2]).toBe("have");
+    expect(addToBinder).toHaveBeenCalledWith(SESSION.id, expect.anything());
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   it("refuses a kind it does not recognise", async () => {
     expect((await add({ kind: "need" })).status).toBe("error");
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   it("refuses a card id that is not one", async () => {
     expect((await add({ cardId: "OP01-024" })).status).toBe("error");
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addFlare).not.toHaveBeenCalled();
   });
 
   /* The cap has to be explained, or a silent failure looks like a bug. */
   it("says which cap was hit", async () => {
-    addEntry.mockResolvedValue({ ok: false, reason: "at-cap" });
+    addFlare.mockResolvedValue({ ok: false, reason: "at-cap" });
 
     const state = await add();
 
@@ -135,7 +145,7 @@ describe("addToListAction", () => {
   });
 
   it("does not leak internals when the write fails", async () => {
-    addEntry.mockResolvedValue({ ok: false, reason: "unavailable" });
+    addFlare.mockResolvedValue({ ok: false, reason: "unavailable" });
 
     const state = await add();
 
@@ -152,7 +162,7 @@ describe("addToListAction", () => {
     const state = await add({ cardName: "Totally Different Card" });
 
     expect(state.status === "added" && state.cardName).toBe("Totally Different Card");
-    expect(addEntry.mock.calls[0]![3]).toMatchObject({ cardId: CARD });
+    expect(addFlare.mock.calls[0]![2]).toMatchObject({ cardId: CARD });
   });
 
   it("stops a flood from one network", async () => {
@@ -162,23 +172,53 @@ describe("addToListAction", () => {
   });
 });
 
-describe("cancelListEntryAction", () => {
-  it("cancels against the caller's own session", async () => {
-    await cancelListEntryAction(formData({ code: "K3M9PZ", entryId: "entry-1" }));
+describe("removeListEntryAction", () => {
+  const remove = (kind: string) =>
+    removeListEntryAction(formData({ code: "K3M9PZ", kind, entryId: "entry-1" }));
 
-    expect(cancelEntry).toHaveBeenCalledWith("entry-1", SESSION.id);
+  it("cancels a Flare against the caller's own session", async () => {
+    await remove("flare");
+
+    expect(cancelFlare).toHaveBeenCalledWith("entry-1", SESSION.id);
+    expect(removeFromBinder).not.toHaveBeenCalled();
+  });
+
+  it("removes a binder card against the caller's own session", async () => {
+    await remove("have");
+
+    expect(removeFromBinder).toHaveBeenCalledWith("entry-1", SESSION.id);
+    expect(cancelFlare).not.toHaveBeenCalled();
   });
 
   /*
    * Knowing an id must not be authority to pull someone else's Flare off a
-   * public board. The scoping lives in the repository; this is the guard that
-   * it is always given the caller's own session to scope by.
+   * public board, or to empty their binder. The scoping lives in the
+   * repository; this is the guard that it is always given the caller's own
+   * session to scope by.
    */
   it("does nothing for someone who is not in the room", async () => {
     findParticipation.mockResolvedValue(null);
 
-    await cancelListEntryAction(formData({ code: "K3M9PZ", entryId: "entry-1" }));
+    await remove("flare");
+    await remove("have");
 
-    expect(cancelEntry).not.toHaveBeenCalled();
+    expect(cancelFlare).not.toHaveBeenCalled();
+    expect(removeFromBinder).not.toHaveBeenCalled();
+  });
+});
+
+describe("confirmBinderAction", () => {
+  it("refreshes the caller's own binder", async () => {
+    await confirmBinderAction(formData({ code: "K3M9PZ" }));
+
+    expect(confirmBinder).toHaveBeenCalledWith(SESSION.id);
+  });
+
+  it("does nothing for someone who is not in the room", async () => {
+    findParticipation.mockResolvedValue(null);
+
+    await confirmBinderAction(formData({ code: "K3M9PZ" }));
+
+    expect(confirmBinder).not.toHaveBeenCalled();
   });
 });

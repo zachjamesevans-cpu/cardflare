@@ -2,27 +2,23 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { printingLabel, type CardPrinting } from "@/lib/cards/schema";
-import type { EventCardKind } from "@/lib/supabase/types";
-import { capFor, type AddEntryInput } from "./schema";
+import { capFor, type AddEntryInput, type ListKind } from "./schema";
 
 /**
- * Reads and writes for Flares and Have Lists.
+ * Reads and writes for Flares and the trade binder.
  *
  * Everything goes through the service role after the caller has proved
  * possession of a player session, exactly as `event_participants` does. A
  * guest has no `auth.uid()`, so there is nothing for an RLS policy to key off,
- * and a policy that let the anon key read this table would publish every
- * player's Have List — a list of valuable things a named person is carrying in
- * a room full of strangers.
+ * and a policy that let the anon key read `player_cards` would publish an
+ * inventory of valuable objects tied to a named person across venues.
  */
 
 /** One entry, as the room renders it. */
 export interface ListEntry {
   id: string;
-  kind: EventCardKind;
   quantity: number;
   note: string | null;
-  createdAt: string;
   cardId: string;
   cardNumber: string;
   cardName: string;
@@ -33,32 +29,36 @@ export interface ListEntry {
   /** Who posted it. Only ever populated for Flares, which are public. */
   playerSessionId: string;
   displayName: string | null;
+  /** Binder entries only: when the owner last said they still had it. */
+  confirmedAt: string | null;
 }
 
 const UNIQUE_VIOLATION = "23505";
 
 /*
- * Selected explicitly rather than with `*` so a new column cannot silently
- * start reaching the browser — a Have List is the sensitive one here.
+ * Columns are listed explicitly rather than with `*` so a new one cannot
+ * silently start reaching the browser.
  *
  * No PostgREST embeds. `src/lib/supabase/types.ts` is hand-maintained and
- * declares `Relationships: []`, so an embed resolves to `never` and silently
- * unravels the typing of the whole query. The same thing broke `listAllEvents`.
- * Cards and printings are fetched by id and joined below.
+ * declares `Relationships: []`, so an embed resolves to `never` and unravels
+ * the typing of the whole query. The same thing broke `listAllEvents`. Cards
+ * and printings are fetched by id and joined below.
  */
-const ENTRY_COLUMNS =
-  "id, kind, quantity, note, created_at, card_id, printing_id, player_session_id";
+const FLARE_COLUMNS =
+  "id, quantity, note, created_at, card_id, printing_id, player_session_id";
+const BINDER_COLUMNS =
+  "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
 
-type EntryRow = {
+interface EntryRow {
   id: string;
-  kind: EventCardKind;
   quantity: number;
   note: string | null;
   created_at: string;
   card_id: string;
   printing_id: string | null;
   player_session_id: string;
-};
+  confirmed_at?: string;
+}
 
 interface Lookups {
   cards: Map<string, { number: string; name: string }>;
@@ -97,9 +97,9 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
           .in("id", printingIds)
       : Promise.resolve({ data: [], error: null }),
     /*
-     * Only for the public board. A Have List belongs to one player who already
-     * knows their own name, and `player_sessions` holds a token hash that has
-     * no business being read for a private list.
+     * Only for the public Flare board. A binder belongs to one player who
+     * already knows their own name, and `player_sessions` holds a token hash
+     * that has no business being read for a private list.
      */
     withNames
       ? admin.from("player_sessions").select("id, display_name").in("id", sessionIds)
@@ -144,10 +144,8 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
 
   return {
     id: row.id,
-    kind: row.kind,
     quantity: row.quantity,
     note: row.note,
-    createdAt: row.created_at,
     cardId: row.card_id,
     cardNumber: card?.number ?? "",
     cardName,
@@ -156,66 +154,80 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     imageUrl: printing?.imageUrl ?? null,
     playerSessionId: row.player_session_id,
     displayName: lookups.names.get(row.player_session_id) ?? null,
+    confirmedAt: row.confirmed_at ?? null,
   };
 }
 
-/**
- * Adds a card to a player's Flares or Have List.
- *
- * Adding the same card twice is a quantity change, not a second entry — the
- * unique index says so and this upserts against it. A cancelled entry that is
- * re-added comes back open, because that is plainly what re-adding it means.
- */
-export async function addEntry(
-  eventId: string,
-  playerSessionId: string,
-  kind: EventCardKind,
-  input: AddEntryInput,
-): Promise<{ ok: true } | { ok: false; reason: "at-cap" | "unavailable" }> {
-  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+type AddResult = { ok: true } | { ok: false; reason: "at-cap" | "unavailable" };
 
+/** Counts a player's open entries so a cap can be reported, not just enforced. */
+async function overCap(
+  kind: ListKind,
+  playerSessionId: string,
+  eventId: string | null,
+): Promise<boolean | "unknown"> {
   const admin = getSupabaseAdmin();
 
-  /*
-   * Counted before writing rather than enforced by a constraint. A row-count
-   * ceiling in SQL needs a trigger, and a trigger cannot return the friendly
-   * message this needs. The race — two submissions crossing the cap at once —
-   * costs one extra row, which is not worth a lock.
-   */
-  const { count, error: countError } = await admin
-    .from("event_cards")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId)
-    .eq("player_session_id", playerSessionId)
-    .eq("kind", kind)
-    .eq("status", "open");
+  const query =
+    kind === "flare"
+      ? admin
+          .from("flares")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId!)
+          .eq("player_session_id", playerSessionId)
+          .eq("status", "open")
+      : admin
+          .from("player_cards")
+          .select("id", { count: "exact", head: true })
+          .eq("player_session_id", playerSessionId);
 
-  if (countError) {
-    console.error("Could not count list entries", countError);
-    return { ok: false, reason: "unavailable" };
-  }
-
-  if ((count ?? 0) >= capFor(kind)) return { ok: false, reason: "at-cap" };
-
-  const { error } = await admin.from("event_cards").upsert(
-    {
-      event_id: eventId,
-      player_session_id: playerSessionId,
-      kind,
-      card_id: input.cardId,
-      printing_id: input.printingId,
-      quantity: input.quantity,
-      note: input.note,
-      status: "open" as const,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "event_id,player_session_id,kind,card_id,printing_id" },
-  );
+  const { count, error } = await query;
 
   if (error) {
-    // Two identical submissions racing is not a failure worth reporting.
+    console.error("Could not count list entries", error);
+    return "unknown";
+  }
+
+  return (count ?? 0) >= capFor(kind);
+}
+
+/**
+ * Posts a Flare.
+ *
+ * Adding the same card twice is a quantity change, not a second Flare — the
+ * unique index says so and this upserts against it. A cancelled Flare that is
+ * re-posted comes back open, because that is plainly what re-posting means.
+ */
+export async function addFlare(
+  eventId: string,
+  playerSessionId: string,
+  input: AddEntryInput,
+): Promise<AddResult> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  const capped = await overCap("flare", playerSessionId, eventId);
+  if (capped === "unknown") return { ok: false, reason: "unavailable" };
+  if (capped) return { ok: false, reason: "at-cap" };
+
+  const { error } = await getSupabaseAdmin()
+    .from("flares")
+    .upsert(
+      {
+        event_id: eventId,
+        player_session_id: playerSessionId,
+        card_id: input.cardId,
+        printing_id: input.printingId,
+        quantity: input.quantity,
+        note: input.note,
+        status: "open" as const,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "event_id,player_session_id,card_id,printing_id" },
+    );
+
+  if (error) {
     if (error.code === UNIQUE_VIOLATION) return { ok: true };
-    console.error("Could not add a list entry", error);
+    console.error("Could not post a Flare", error);
     return { ok: false, reason: "unavailable" };
   }
 
@@ -223,51 +235,134 @@ export async function addEntry(
 }
 
 /**
- * Cancels an entry.
+ * Adds a card to the player's binder.
  *
- * Scoped to the owning session, so the id alone is not authority to remove
+ * No event: the binder follows the player. Adding a card is itself a
+ * confirmation that they have it, so `confirmed_at` is set now.
+ */
+export async function addToBinder(
+  playerSessionId: string,
+  input: AddEntryInput,
+): Promise<AddResult> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  const capped = await overCap("have", playerSessionId, null);
+  if (capped === "unknown") return { ok: false, reason: "unavailable" };
+  if (capped) return { ok: false, reason: "at-cap" };
+
+  const now = new Date().toISOString();
+
+  const { error } = await getSupabaseAdmin().from("player_cards").upsert(
+    {
+      player_session_id: playerSessionId,
+      card_id: input.cardId,
+      printing_id: input.printingId,
+      quantity: input.quantity,
+      note: input.note,
+      updated_at: now,
+      confirmed_at: now,
+    },
+    { onConflict: "player_session_id,card_id,printing_id" },
+  );
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return { ok: true };
+    console.error("Could not add to the binder", error);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Cancels a Flare.
+ *
+ * Scoped to the owning session, so knowing an id is not authority to remove
  * someone else's Flare from a public board. Kept rather than deleted: a
  * cancelled Flare is history a store may want, and Milestone 8 will need it.
  */
-export async function cancelEntry(
-  entryId: string,
+export async function cancelFlare(
+  flareId: string,
   playerSessionId: string,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
 
   const { error } = await getSupabaseAdmin()
-    .from("event_cards")
+    .from("flares")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
-    .eq("id", entryId)
+    .eq("id", flareId)
     .eq("player_session_id", playerSessionId);
 
   if (error) {
-    console.error("Could not cancel a list entry", error);
+    console.error("Could not cancel a Flare", error);
     return false;
   }
 
   return true;
 }
 
-/** One player's own open entries of a kind. */
-export async function listOwnEntries(
-  eventId: string,
+/**
+ * Removes a card from the binder.
+ *
+ * Deleted rather than marked cancelled. A binder is a statement about what is
+ * in a bag right now; a card that is not there has no history worth keeping,
+ * and a soft-deleted row would have to be excluded from every future match.
+ */
+export async function removeFromBinder(
+  entryId: string,
   playerSessionId: string,
-  kind: EventCardKind,
-): Promise<ListEntry[]> {
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_cards")
+    .delete()
+    .eq("id", entryId)
+    .eq("player_session_id", playerSessionId);
+
+  if (error) {
+    console.error("Could not remove a card from the binder", error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Says the whole binder is still accurate.
+ *
+ * One tap on arriving at an event. Turns "he has it" into "he said he had it
+ * an hour ago", which is the difference between a portable binder being useful
+ * and being a source of wasted walks across a room.
+ */
+export async function confirmBinder(playerSessionId: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_cards")
+    .update({ confirmed_at: new Date().toISOString() })
+    .eq("player_session_id", playerSessionId);
+
+  if (error) {
+    console.error("Could not confirm the binder", error);
+    return false;
+  }
+
+  return true;
+}
+
+/** The player's binder. Follows them between events and stores. */
+export async function listBinder(playerSessionId: string): Promise<ListEntry[]> {
   if (!isSupabaseConfigured()) return [];
 
   const { data, error } = await getSupabaseAdmin()
-    .from("event_cards")
-    .select(ENTRY_COLUMNS)
-    .eq("event_id", eventId)
+    .from("player_cards")
+    .select(BINDER_COLUMNS)
     .eq("player_session_id", playerSessionId)
-    .eq("kind", kind)
-    .eq("status", "open")
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Could not read a player's list", error);
+    console.error("Could not read the binder", error);
     return [];
   }
 
@@ -281,18 +376,15 @@ export async function listOwnEntries(
  * Every open Flare in the room, with the name of whoever posted it.
  *
  * Public on purpose — this is the board a player reads to find someone to
- * trade with. Have Lists are never returned here.
+ * trade with. Binders are never returned here.
  */
 export async function listRoomFlares(eventId: string): Promise<ListEntry[]> {
   if (!isSupabaseConfigured()) return [];
 
-  const admin = getSupabaseAdmin();
-
-  const { data, error } = await admin
-    .from("event_cards")
-    .select(ENTRY_COLUMNS)
+  const { data, error } = await getSupabaseAdmin()
+    .from("flares")
+    .select(FLARE_COLUMNS)
     .eq("event_id", eventId)
-    .eq("kind", "flare")
     .eq("status", "open")
     .order("created_at", { ascending: false });
 
@@ -308,25 +400,18 @@ export async function listRoomFlares(eventId: string): Promise<ListEntry[]> {
 }
 
 /**
- * Which cards the viewer has, of those being asked for in the room.
+ * Which cards the viewer has in their binder.
  *
- * The whole point of the Have List before matching exists: a private, read-time
- * cross-reference so a player can see "someone here needs this and it is in
- * your binder" without their inventory being broadcast to the room.
+ * A private, read-time cross-reference so a player can see "someone here needs
+ * this and it is in your binder" without their inventory being broadcast.
  */
-export async function ownHeldCardIds(
-  eventId: string,
-  playerSessionId: string,
-): Promise<Set<string>> {
+export async function ownHeldCardIds(playerSessionId: string): Promise<Set<string>> {
   if (!isSupabaseConfigured()) return new Set();
 
   const { data, error } = await getSupabaseAdmin()
-    .from("event_cards")
+    .from("player_cards")
     .select("card_id")
-    .eq("event_id", eventId)
-    .eq("player_session_id", playerSessionId)
-    .eq("kind", "have")
-    .eq("status", "open");
+    .eq("player_session_id", playerSessionId);
 
   if (error) {
     console.error("Could not read the viewer's held cards", error);

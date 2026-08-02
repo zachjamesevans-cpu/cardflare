@@ -280,17 +280,16 @@ export type EventParticipantInsert = Omit<
   last_seen_at?: string;
 };
 
-export type EventCardKind = "flare" | "have";
-export type EventCardStatus = "open" | "cancelled";
+export type FlareStatus = "open" | "cancelled";
 
-export type EventCardRow = {
+/** A live request for a card, in one Event Room. Public to that room. */
+export type FlareRow = {
   id: string;
   created_at: string;
   updated_at: string;
   event_id: string;
   player_session_id: string;
-  kind: EventCardKind;
-  status: EventCardStatus;
+  status: FlareStatus;
   card_id: string;
   /** Null means any printing will do. */
   printing_id: string | null;
@@ -298,15 +297,45 @@ export type EventCardRow = {
   note: string | null;
 };
 
-export type EventCardInsert = Omit<
-  EventCardRow,
+export type FlareInsert = Omit<
+  FlareRow,
   "id" | "created_at" | "updated_at" | "status" | "quantity"
 > & {
   id?: string;
   created_at?: string;
   updated_at?: string;
-  status?: EventCardStatus;
+  status?: FlareStatus;
   quantity?: number;
+};
+
+/**
+ * A player's trade binder. Follows the player, not the event.
+ *
+ * No `event_id` and no `status`: it is not scoped to a room, and a card is
+ * either in the binder or removed from it.
+ */
+export type PlayerCardRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  player_session_id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  note: string | null;
+  /** When the player last confirmed they still have this. */
+  confirmed_at: string;
+};
+
+export type PlayerCardInsert = Omit<
+  PlayerCardRow,
+  "id" | "created_at" | "updated_at" | "quantity" | "confirmed_at"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  quantity?: number;
+  confirmed_at?: string;
 };
 
 export type PlayerSessionRow = {
@@ -352,7 +381,8 @@ export type Database = {
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
       events: Table<EventRow, EventInsert>;
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
-      event_cards: Table<EventCardRow, EventCardInsert>;
+      flares: Table<FlareRow, FlareInsert>;
+      player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;
       card_aliases: Table<CardAliasRow, CardAliasInsert>;
@@ -378,8 +408,7 @@ export type Database = {
       store_status: StoreStatus;
       store_role: StoreRole;
       event_status: EventStatus;
-      event_card_kind: EventCardKind;
-      event_card_status: EventCardStatus;
+      flare_status: FlareStatus;
       game: Game;
       sync_status: SyncStatus;
       sync_mode: SyncMode;
