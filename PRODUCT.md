@@ -63,9 +63,10 @@ faster or more likely to happen.
 ## Current status
 
 **Milestone 1 (public splash page and waitlist) is live at
-https://cardflare.gg.** The application itself — event rooms, authentication,
-card search, matching, trading — has not been built. See
-[ROADMAP.md](./ROADMAP.md) for the intended sequence.
+https://cardflare.gg.** Event rooms, authentication, card search and Flares are
+built; matching and trading are not. Steps 1 to 4 of the core loop work, with
+step 4 done by a player reading the room's Flare board rather than by the
+application. See [ROADMAP.md](./ROADMAP.md) for the sequence.
 
 The landing page must not imply the product has launched. Copy says CardFlare
 "is currently being built and preparing for its first local-store pilots".

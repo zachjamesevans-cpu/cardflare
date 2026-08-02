@@ -218,7 +218,7 @@ async function printingsForCards(
   const { data, error } = await getSupabaseAdmin()
     .from("card_printings")
     .select(
-      "card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url",
+      "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url",
     )
     .in("card_id", cardIds)
     .order("set_code");
@@ -231,6 +231,7 @@ async function printingsForCards(
   for (const row of data ?? []) {
     const list = grouped.get(row.card_id) ?? [];
     list.push({
+      id: row.id,
       setCode: row.set_code,
       setName: row.set_name,
       printingLabel: row.printing_label,

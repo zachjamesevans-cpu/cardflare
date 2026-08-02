@@ -80,6 +80,7 @@ describe("a card whose printings are named differently", () => {
 
 describe("printingVariantMark", () => {
   const printing = (printingName: string | null): CardPrinting => ({
+    id: "11111111-1111-1111-1111-111111111111",
     setCode: "EB-01",
     setName: "Memorial Collection",
     printingLabel: "EB-01",
@@ -125,6 +126,7 @@ describe("printingVariantMark", () => {
 
 describe("the chips a player actually reads", () => {
   const base: CardPrinting = {
+    id: "11111111-1111-1111-1111-111111111111",
     setCode: "EB-01",
     setName: "Memorial Collection",
     printingLabel: "EB-01",

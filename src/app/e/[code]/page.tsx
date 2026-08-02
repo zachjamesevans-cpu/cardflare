@@ -5,6 +5,8 @@ import { CalendarClock, MapPin } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
+import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
@@ -18,6 +20,9 @@ import {
 import { findEventByJoinCode } from "@/lib/events/repository";
 import { getPlayerSession } from "@/lib/players/session";
 import { SITE } from "@/lib/site";
+import { cardImagesEnabled } from "@/lib/cards/images";
+import { listOwnEntries, listRoomFlares, ownHeldCardIds } from "@/lib/lists/repository";
+import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -28,16 +33,34 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-function Shell({ children }: { children: React.ReactNode }) {
+/**
+ * `wide` is for a player who is actually in the room. Everything else here —
+ * a join form, an error, a closed event — is a single card that should stay
+ * narrow and centred; a room with Flare boards in it needs the space.
+ */
+function Shell({
+  children,
+  wide = false,
+}: {
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
   return (
     <main
       id="main"
-      className="flex min-h-dvh flex-col items-center justify-center gap-8 px-5 py-16"
+      className={cn(
+        "flex min-h-dvh flex-col items-center gap-8 px-5 py-16",
+        wide ? "justify-start" : "justify-center",
+      )}
     >
       <Link href="/" aria-label={`${SITE.name} home`}>
         <Logo size={40} priority />
       </Link>
-      <div className="flex w-full max-w-md flex-col gap-5">{children}</div>
+      <div
+        className={cn("flex w-full flex-col gap-5", wide ? "max-w-2xl" : "max-w-md")}
+      >
+        {children}
+      </div>
     </main>
   );
 }
@@ -94,11 +117,26 @@ export default async function JoinByCodePage({
     await touchParticipation(event.id, session.id, participation.lastSeenAt);
   }
 
-  const participants = participation ? await listParticipants(event.id) : [];
+  const inRoom = Boolean(participation && session);
+
+  /*
+   * Only read once the player is actually in the room. A visitor looking at a
+   * join form has no business causing a read of anybody's lists.
+   */
+  const [participants, flares, haves, held] = inRoom
+    ? await Promise.all([
+        listParticipants(event.id),
+        listRoomFlares(event.id),
+        listOwnEntries(event.id, session!.id, "have"),
+        ownHeldCardIds(event.id, session!.id),
+      ])
+    : [[], [], [], new Set<string>()];
+
+  const images = cardImagesEnabled();
   const location = [event.storeCity, event.storeRegion].filter(Boolean).join(", ");
 
   return (
-    <Shell>
+    <Shell wide={inRoom}>
       <Card className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium text-accent">{event.storeName}</p>
@@ -134,7 +172,7 @@ export default async function JoinByCodePage({
               : "Thanks for coming. Ask the store about their next event."}
           </p>
         </Card>
-      ) : participation && session ? (
+      ) : inRoom && session ? (
         <>
           <Card className="flex items-center gap-3">
             <PlayerAvatar displayName={session.display_name} seed={session.id} />
@@ -152,19 +190,41 @@ export default async function JoinByCodePage({
             youId={session.id}
           />
 
-          <Card className="flex flex-col gap-2">
-            <h2 className="font-semibold text-text-primary">What&rsquo;s next</h2>
-            <p className="text-text-secondary">
-              Posting the cards you need as Flares, and matching with people in this
-              room who have them, arrives in the next release.
-            </p>
-            <Link
-              href="/cards"
-              className="text-sm text-accent underline underline-offset-4"
-            >
-              Search cards in the meantime
-            </Link>
-          </Card>
+          <section className="flex flex-col gap-4" aria-labelledby="flares-heading">
+            <div className="flex flex-col gap-1">
+              <h2 id="flares-heading" className="text-lg font-bold text-text-primary">
+                Wanted in this room
+              </h2>
+              <p className="text-sm text-text-secondary">
+                Every Flare posted here. If you have one of these, go and find them.
+              </p>
+            </div>
+
+            <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
+
+            <FlareBoard
+              entries={flares}
+              code={normalized}
+              imagesEnabled={images}
+              youId={session.id}
+              heldCardIds={held}
+            />
+          </section>
+
+          <section className="flex flex-col gap-4" aria-labelledby="haves-heading">
+            <div className="flex flex-col gap-1">
+              <h2 id="haves-heading" className="text-lg font-bold text-text-primary">
+                What you brought
+              </h2>
+              <p className="text-sm text-text-secondary">
+                Private to you. Used to flag Flares above that you can answer.
+              </p>
+            </div>
+
+            <AddToListForm code={normalized} kind="have" imagesEnabled={images} />
+
+            <HaveList entries={haves} code={normalized} imagesEnabled={images} />
+          </section>
         </>
       ) : (
         <Card>
