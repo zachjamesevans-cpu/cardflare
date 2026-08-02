@@ -46,13 +46,45 @@ export const OPTCGAPI_ENDPOINTS = {
  * here. Filtered and pricing-history endpoints are deliberately unused: the
  * first duplicate what the bulk endpoints already return, and pricing is out
  * of scope for this milestone.
+ *
+ * `donCards` is deliberately absent — see DON_EXCLUSION below.
  */
 const CARD_GROUPS = [
   ["setCards", "set"],
   ["starterDeckCards", "starter-deck"],
   ["promoCards", "promo"],
-  ["donCards", "don"],
 ] as const;
+
+/**
+ * Why DON!! cards are not imported.
+ *
+ * A record from `/api/allDonCards/`, observed 2 August 2026:
+ *
+ *   { "don_id": null, "rarity": "DON!!", "card_name": "DON!! Card (Egghead)",
+ *     "card_type": "DON!!", "card_image_id": "don_1",
+ *     "optcg_don_name": "DON!! Card (Egghead) - The Azure Sea's Seven (OP14)" }
+ *
+ * There is no `card_set_id`, and no other field carries a card number —
+ * because DON!! cards do not have one. That is not a mapping error to correct.
+ * They were being rejected 187 at a time for a missing card number, which was
+ * the right call made for the wrong-looking reason.
+ *
+ * Importing them anyway would mean putting something in
+ * `canonical_card_number`, which is NOT NULL and half of a card's identity.
+ * The only candidates are `card_image_id` ("don_1") or a string parsed out of
+ * `optcg_don_name` — one would render "DON_1" beside the name as if Bandai
+ * printed it there, the other is guesswork. Neither is a card number, and the
+ * brief is explicit that identifiers are not invented.
+ *
+ * Supporting them properly means letting a card have no number and keying it
+ * on the provider's identifier instead. That is a schema change, so it is a
+ * decision to take deliberately rather than a side effect of a sync. Until
+ * then the endpoint is not called and this is stated in the admin console
+ * rather than surfacing as 187 mystery failures every run.
+ */
+export const DON_EXCLUSION =
+  "DON!! cards are not imported: the provider's records carry no card number, " +
+  "and CardFlare does not invent one.";
 
 /** Sample mode caps per endpoint, chosen to land in the 75–150 band overall. */
 const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {

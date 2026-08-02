@@ -78,8 +78,11 @@ onward.
 an OPTCG API adapter, exact/normalized name separation, three-valued printing
 classification, sync bookkeeping, and images behind a feature flag. The mapping
 was verified against a real `/api/allSetCards/` record on 2 August 2026; the
-starter-deck, promo and DON!! shapes have not been observed. A sync can be run
-from **Admin → Card catalog** or from the command line. Artwork now renders:
+the promo endpoint's path was corrected from a guessed one and its shape
+verified. DON!! cards are deliberately excluded: the provider's records carry
+no card number and CardFlare does not invent one — supporting them needs a
+schema change, costed in docs/CARD_DATA.md. A sync can be run from
+**Admin → Card catalog** or from the command line. Artwork now renders:
 the founder reviewed the provider's terms on 2 August 2026 and enabled
 `NEXT_PUBLIC_ENABLE_CARD_IMAGES`, superseding the "no artwork" line above. See
 [docs/CARD_DATA.md](./docs/CARD_DATA.md).

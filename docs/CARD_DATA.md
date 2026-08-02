@@ -3,10 +3,12 @@
 How One Piece card data reaches CardFlare, what is known about it, and what is
 not.
 
-> **Status: verified against `/api/allSetCards/` on 2 August 2026.** One real
-> record was inspected and the mapping corrected against it. The starter-deck,
-> promo and DON!! endpoints have **not** been observed — their shapes are
-> assumed to match and may not. Run `npm run cards:probe` to confirm.
+> **Status: verified against `/api/allSetCards/` and `/api/allPromos/` on
+> 2 August 2026**, and against a real `/api/allDonCards/` record — which is why
+> DON!! cards are now deliberately excluded rather than failing every run. The
+> starter-deck endpoint has **not** been observed; its shape is assumed to match
+> the set endpoint and imports cleanly at scale, which is evidence but not
+> proof. Run `npm run cards:probe` to confirm.
 
 ## Selected provider
 
@@ -32,13 +34,13 @@ the local Supabase catalog.
 
 Bulk endpoints, used by the sync:
 
-| Endpoint            | Purpose            |
-| ------------------- | ------------------ |
-| `/api/allSetCards/` | Booster set cards  |
-| `/api/allSTCards/`  | Starter deck cards |
-| `/api/allPromos/`   | Promo cards        |
-| `/api/allDonCards/` | DON!! cards        |
-| `/api/allSets/`     | Set list           |
+| Endpoint            | Purpose                             |
+| ------------------- | ----------------------------------- |
+| `/api/allSetCards/` | Booster set cards                   |
+| `/api/allSTCards/`  | Starter deck cards                  |
+| `/api/allPromos/`   | Promo cards                         |
+| `/api/allDonCards/` | DON!! cards — not synced, see below |
+| `/api/allSets/`     | Set list                            |
 
 Per-record endpoints, used only by `fetchCardByExternalId`:
 
@@ -115,14 +117,54 @@ surfaced by accident.
 
 ### Not yet observed
 
-`/api/allDonCards/`, `/api/allSets/` and `/api/allDecks/` opened successfully
-but their records have not been inspected. Their field names are assumed to
-match the set endpoint, which is a guess — a record that does not match is
-skipped and recorded in `card_sync_failures` rather than imported wrong.
+`/api/allSets/` and `/api/allDecks/` opened successfully but their records have
+not been inspected. They are product listings rather than cards and are not
+synced.
 
-A full sync on 2 Aug 2026 rejected 187 records for a missing card number,
-which is where that guess is most likely to be failing. The offending payloads
-are visible under **Admin → Card catalog → Rejected**.
+`/api/allDonCards/` **has** been inspected, and is no longer called — see
+**DON!! cards** below.
+
+## DON!! cards are not imported
+
+An observed record from `/api/allDonCards/`, 2 Aug 2026:
+
+```json
+{
+  "don_id": null,
+  "rarity": "DON!!",
+  "card_name": "DON!! Card (Egghead)",
+  "card_text": "Your Turn +1000",
+  "card_type": "DON!!",
+  "card_image_id": "don_1",
+  "optcg_don_name": "DON!! Card (Egghead) - The Azure Sea's Seven (OP14)"
+}
+```
+
+There is no `card_set_id` and no other field carrying a card number, because
+DON!! cards do not have one. This is not a mapping error. Every full sync was
+rejecting 187 of these for a missing card number — the right outcome, reached
+for a reason that read like a bug.
+
+`canonical_card_number` is NOT NULL and is half of a card's identity. Importing
+these means putting something in it, and the only candidates are
+`card_image_id` (`"don_1"`) or a string parsed out of `optcg_don_name`. The
+first would render as `DON_1` beside the card name as though Bandai printed it
+there; the second is guesswork. Neither is a card number.
+
+**Cost of the exclusion.** Alternate-art DON!! cards are collected and traded,
+so this is a real gap, not a technicality. A player looking for the Egghead
+DON!! will not find it in CardFlare.
+
+**What supporting them properly requires**, whenever it is wanted:
+
+1. Make `canonical_card_number` and `compact_card_number` nullable.
+2. Add a unique key on `(game, provider_key, provider_external_id)` so a card
+   with no number still has exactly one identity.
+3. Teach `search_cards` to rank a numberless card on name alone.
+4. Teach the UI to omit the card-number chip rather than render an empty one.
+
+That is a schema change, so it is a decision to take deliberately rather than a
+side effect of a sync.
 
 ## Mapping decisions
 

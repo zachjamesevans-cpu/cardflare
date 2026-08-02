@@ -186,7 +186,7 @@ describe("the mapping gate", () => {
  */
 describe("a missing endpoint", () => {
   it("does not abandon the rest of the catalog", async () => {
-    const missing = OPTCGAPI_ENDPOINTS.donCards;
+    const missing = OPTCGAPI_ENDPOINTS.promoCards;
 
     fetchMock = vi.fn(async (url: string) =>
       String(url).includes(missing)
@@ -209,7 +209,7 @@ describe("a missing endpoint", () => {
   /* Every other group still has to reach the caller, not just one of them. */
   it("still imports the endpoints that answered", async () => {
     fetchMock = vi.fn(async (url: string) =>
-      String(url).includes(OPTCGAPI_ENDPOINTS.donCards)
+      String(url).includes(OPTCGAPI_ENDPOINTS.promoCards)
         ? jsonResponse({ detail: "Not Found" }, 404)
         : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
     );
@@ -220,10 +220,10 @@ describe("a missing endpoint", () => {
       fetchImpl: fetchMock as unknown as typeof fetch,
     }).fetchCards();
 
-    // set, starter deck and promo answered; DON!! did not.
-    expect(cards).toHaveLength(3);
+    // set and starter deck answered; promos did not.
+    expect(cards).toHaveLength(2);
     expect(new Set(cards.map((card) => card.printings[0]!.source))).toEqual(
-      new Set(["set", "starter-deck", "promo"]),
+      new Set(["set", "starter-deck"]),
     );
   });
 });
