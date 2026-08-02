@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { createPlayerSession, deletePlayerSession } from "@/lib/players/repository";
+import {
+  createPlayerSession,
+  deletePlayerSession,
+  renamePlayerSession,
+} from "@/lib/players/repository";
 import { joinAsPlayerSchema, type JoinPlayerState } from "@/lib/players/schema";
 import {
   createSessionToken,
@@ -83,7 +87,39 @@ export async function joinEventAction(
   let session = await getPlayerSession();
   let freshToken: string | null = null;
 
-  if (!session) {
+  if (session) {
+    /*
+     * A returning player can edit the name the form filled in for them.
+     *
+     * Renamed in place, never replaced: `player_cards`, `flares` and room
+     * membership all hang off the session id, so creating a new session to
+     * carry a new name would silently abandon the player's binder. Editing a
+     * name must not cost anybody their cards.
+     */
+    const wants = submitted.trim();
+
+    if (wants && wants !== session.display_name) {
+      const parsed = joinAsPlayerSchema.safeParse({ displayName: wants });
+
+      if (!parsed.success) {
+        const issue = parsed.error.issues.find((i) => i.path[0] === "displayName");
+        return invalid(issue?.message ?? "Please choose a display name.", submitted);
+      }
+
+      try {
+        await renamePlayerSession(session.id, parsed.data.displayName);
+        session = { ...session, display_name: parsed.data.displayName };
+      } catch (error) {
+        console.error("Could not rename the player session", error);
+        return invalid(GENERIC_ERROR, submitted);
+      }
+    }
+    /*
+     * An empty field keeps the existing name rather than blocking the join.
+     * The input is pre-filled, so blank means the field never arrived — and an
+     * empty name was never going to be stored anyway.
+     */
+  } else {
     const parsed = joinAsPlayerSchema.safeParse({ displayName: submitted });
 
     if (!parsed.success) {

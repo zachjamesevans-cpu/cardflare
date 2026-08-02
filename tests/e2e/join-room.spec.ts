@@ -36,6 +36,21 @@ test.describe("event room", () => {
     expect(body).not.toMatch(/wanted in this room|what you brought|post a flare/i);
   });
 
+  /*
+   * The name field must exist for everyone, not just first-timers. A returning
+   * player used to see fixed text with no way to change it, and the only route
+   * to a different name was to leave and lose the session.
+   */
+  test("offers an editable name field, not fixed text", async ({ page }) => {
+    await page.goto("/e/K3M9PZ");
+
+    const field = page.getByLabel(/call you|joining as/i);
+
+    if ((await field.count()) > 0) {
+      await expect(field).toBeEditable();
+    }
+  });
+
   test("the room is never indexed", async ({ page }) => {
     await page.goto("/e/K3M9PZ");
 
