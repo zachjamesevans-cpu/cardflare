@@ -125,3 +125,55 @@ export function needsConfirming(
     return Number.isNaN(when) || when < start;
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Grouping the board                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** One player and everything they are looking for. */
+export interface PlayerGroup<T> {
+  playerSessionId: string;
+  displayName: string | null;
+  entries: T[];
+}
+
+/**
+ * Collects a room's Flares under the player who posted them.
+ *
+ * Someone hunting four cards was four separate rows with their name repeated
+ * on each, so a busy board read as a wall of names rather than as a handful of
+ * people. Grouping matches what a player is actually deciding: not "who wants
+ * this card" but "who should I go and talk to".
+ *
+ * Order comes from the order in, which is newest first, so a group appears
+ * where its most recent Flare would have — a player who just posted rises to
+ * the top rather than being buried by whoever joined earliest. Cards inside a
+ * group keep that order too.
+ *
+ * Generic over the minimum shape it needs so it stays free of the server-only
+ * module that defines the full entry.
+ */
+export function groupByPlayer<
+  T extends { playerSessionId: string; displayName: string | null },
+>(entries: T[]): PlayerGroup<T>[] {
+  const groups = new Map<string, PlayerGroup<T>>();
+
+  for (const entry of entries) {
+    const existing = groups.get(entry.playerSessionId);
+
+    if (existing) {
+      existing.entries.push(entry);
+      continue;
+    }
+
+    groups.set(entry.playerSessionId, {
+      playerSessionId: entry.playerSessionId,
+      // Taken from the first entry seen. A name lives on the session, so every
+      // entry from one player carries the same one.
+      displayName: entry.displayName,
+      entries: [entry],
+    });
+  }
+
+  return [...groups.values()];
+}
