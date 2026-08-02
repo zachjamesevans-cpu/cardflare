@@ -129,17 +129,24 @@ email rather than a missing setting.
 
 ### Password sign-in
 
-Operators sign in with an email address and a password. Two settings in
-Supabase → **Authentication → Sign In / Providers → Email** need checking,
-because the defaults are weaker than what the app asks for:
+Operators sign in with an email address and a password. Two settings need
+checking, because the defaults are weaker than what the app asks for. Both live
+in the **Email** provider panel:
+
+**Authentication → Sign In / Providers → Email**, or go straight there with
+`https://supabase.com/dashboard/project/_/auth/providers?provider=Email` —
+the `_` resolves to your most recently opened project, which saves hunting for
+the project ref on a phone.
 
 - **Minimum password length: set it to 10.** Supabase's default is 6. CardFlare
   refuses anything shorter in `src/lib/auth/schema.ts`, but that only governs
   CardFlare's own forms — the Supabase setting is the one that holds if a
   password is ever set any other way.
-- **Leaked password protection: on.** Checks new passwords against Have I Been
-  Pwned by hash prefix, so the password itself never leaves Supabase. The app
-  surfaces the rejection when it comes back.
+- **Leaked password protection: on — Pro plan and above.** Checks new passwords
+  against Have I Been Pwned by hash prefix, so the password itself never leaves
+  Supabase. On the Free plan the toggle is there but gated behind an upgrade
+  prompt. Not a blocker: the length floor and the rate limits do not depend on
+  it, and the app surfaces the rejection if and when it is switched on.
 
 Nothing else is required: an invited store's account already exists with no
 password, and Supabase will send it a recovery link happily, so
