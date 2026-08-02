@@ -18,13 +18,24 @@ test.describe("protected areas", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  /*
+   * Nested admin routes inherit the layout's guard, but a layout is not a
+   * security boundary on its own — each page calls requireAdmin as well. This
+   * is the test that would catch a new one added without it.
+   */
+  test("/admin/spot-check sends a signed-out visitor to sign in", async ({ page }) => {
+    await page.goto("/admin/spot-check");
+
+    await expect(page).toHaveURL(/\/login/);
+  });
+
   test("neither leaks anything before redirecting", async ({ page }) => {
-    for (const path of ["/admin", "/store"]) {
+    for (const path of ["/admin", "/admin/spot-check", "/store"]) {
       const response = await page.goto(path);
       const body = (await response?.text()) ?? "";
 
       // The redirect must happen before any privileged content renders.
-      expect(body).not.toMatch(/Invite a store|CardFlare admin/i);
+      expect(body).not.toMatch(/Invite a store|CardFlare admin|Spot check/i);
     }
   });
 
