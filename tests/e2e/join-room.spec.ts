@@ -22,6 +22,20 @@ test.describe("event room", () => {
     expect(body).not.toMatch(/supabase|service.role|SUPABASE_/i);
   });
 
+  /*
+   * The Flare board and the Have list only exist for someone who has joined.
+   * A stranger loading the URL gets the join form and nothing else — and a
+   * Have list in particular is an inventory of valuable things a named person
+   * is carrying, so it must never render for a visitor.
+   */
+  test("shows no lists to someone who has not joined", async ({ page }) => {
+    await page.goto("/e/K3M9PZ");
+
+    const body = await page.locator("body").innerText();
+
+    expect(body).not.toMatch(/wanted in this room|what you brought|post a flare/i);
+  });
+
   test("the room is never indexed", async ({ page }) => {
     await page.goto("/e/K3M9PZ");
 

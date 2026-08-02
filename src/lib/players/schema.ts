@@ -22,7 +22,7 @@ export const DISPLAY_NAME_MAX = 24;
  * Deliberately not all of `\p{Cf}` — that category contains the zero-width
  * joiner, and excluding it would reject any emoji built from a sequence.
  */
-const UNSAFE_CHARACTERS = new RegExp(
+export const UNSAFE_CHARACTERS = new RegExp(
   [
     "[",
     "\\p{Cc}", // control characters

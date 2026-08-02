@@ -89,6 +89,7 @@ describe("an alternate art", () => {
 
 describe("telling two printings apart in the UI", () => {
   const printing = (over: Partial<CardPrinting> = {}): CardPrinting => ({
+    id: "11111111-1111-1111-1111-111111111111",
     setCode: "OP12",
     setName: "Legacy of the Master",
     printingLabel: "OP12",

@@ -148,6 +148,7 @@ describe("searchCardsAction", () => {
 
 describe("printingLabel", () => {
   const base = {
+    id: "11111111-1111-1111-1111-111111111111",
     setCode: "OP01",
     setName: "Romance Dawn",
     printingLabel: "OP01",

@@ -280,6 +280,35 @@ export type EventParticipantInsert = Omit<
   last_seen_at?: string;
 };
 
+export type EventCardKind = "flare" | "have";
+export type EventCardStatus = "open" | "cancelled";
+
+export type EventCardRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  event_id: string;
+  player_session_id: string;
+  kind: EventCardKind;
+  status: EventCardStatus;
+  card_id: string;
+  /** Null means any printing will do. */
+  printing_id: string | null;
+  quantity: number;
+  note: string | null;
+};
+
+export type EventCardInsert = Omit<
+  EventCardRow,
+  "id" | "created_at" | "updated_at" | "status" | "quantity"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  status?: EventCardStatus;
+  quantity?: number;
+};
+
 export type PlayerSessionRow = {
   id: string;
   created_at: string;
@@ -323,6 +352,7 @@ export type Database = {
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
       events: Table<EventRow, EventInsert>;
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
+      event_cards: Table<EventCardRow, EventCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;
       card_aliases: Table<CardAliasRow, CardAliasInsert>;
@@ -348,6 +378,8 @@ export type Database = {
       store_status: StoreStatus;
       store_role: StoreRole;
       event_status: EventStatus;
+      event_card_kind: EventCardKind;
+      event_card_status: EventCardStatus;
       game: Game;
       sync_status: SyncStatus;
       sync_mode: SyncMode;

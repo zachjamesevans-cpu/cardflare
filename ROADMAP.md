@@ -110,9 +110,29 @@ none.
 event, prints the sheet, and players scan into the room. Posting Flares is
 Milestone 6.
 
-### Milestone 6 — Lists
+## ✅ Milestone 6 — Lists
 
-Flares, Have Lists, quantities, preferences.
+- `event_cards` holds Flares and Have List entries in one table, told apart by
+  `kind`, verified against a real PostgreSQL instance
+- **`printing_id` is nullable and null means "any printing"** — which is what
+  most requests mean. A player who wants the alternate art specifically can say
+  so, and Milestone 7 can honour the difference instead of guessing
+- **Flares are public in the room, Have Lists are private.** A public Have List
+  broadcasts "this person is carrying a $200 alt art" to a room of strangers.
+  When matching lands, the holder chooses to respond; they are never
+  involuntarily advertised
+- A private, read-time cross-reference marks the Flares on the board that the
+  viewer can answer, so the Have List is useful before matching exists
+- Adding the same card twice is a quantity change, not a second entry
+- Caps of 30 Flares and 200 Haves per player per event, because the board is
+  shared and one person can ruin it
+- Notes are short free text, deliberately not a structured preference model —
+  nobody has specified one, and a taxonomy would bake in guesses about how
+  people trade
+
+**The core loop now runs manually end to end**: a store creates an event, a
+player scans in, posts what they need, and everyone in the room can see it.
+Automating the cross-reference and notifying both sides is Milestone 7.
 
 ### Milestone 7 — Matching
 

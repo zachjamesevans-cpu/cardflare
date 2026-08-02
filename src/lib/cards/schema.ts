@@ -18,6 +18,8 @@ export const cardQuerySchema = z
   );
 
 export interface CardPrinting {
+  /** Needed to name a specific printing on a Flare. */
+  id: string;
   setCode: string | null;
   setName: string | null;
   printingLabel: string | null;

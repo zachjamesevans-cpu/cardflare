@@ -98,6 +98,7 @@ describe("a promo record", () => {
 
 describe("how a promo reads to a player", () => {
   const base = {
+    id: "11111111-1111-1111-1111-111111111111",
     setCode: "OP09",
     setName: "One Piece Promotion Cards",
     printingLabel: "OP09",
