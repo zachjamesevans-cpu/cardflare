@@ -94,9 +94,22 @@ test.describe("sign-in form", () => {
     await page.getByLabel("Email address").fill("someone@example.com");
     await page.getByRole("button", { name: /sign-in link/i }).click();
 
-    const alert = page.getByRole("main").getByRole("alert");
-    await expect(alert).not.toContainText(/expected string/i);
-    await expect(alert).not.toContainText(/received null/i);
+    /*
+     * Asserted against the whole page, not the alert element.
+     *
+     * Without Supabase configured this action throws before it can return
+     * state, and the error boundary takes the alert with it — so scoping to
+     * `[role=alert]` made the assertion wait for an element that would never
+     * appear, and time out under load. Flaked twice in full runs while passing
+     * in isolation.
+     *
+     * The regression is a Zod message reaching the user, and the page is where
+     * a user would see it. That holds whether the action returned state or
+     * fell over.
+     */
+    const body = page.locator("body");
+    await expect(body).not.toContainText(/expected string/i);
+    await expect(body).not.toContainText(/received null/i);
   });
 
   /*

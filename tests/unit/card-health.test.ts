@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupFailures, summariseSets } from "@/lib/cards/health";
+import { groupFailures, previewRecord, summariseSets } from "@/lib/cards/health";
 
 describe("summariseSets", () => {
   /*
@@ -59,8 +59,8 @@ describe("groupFailures", () => {
     ]);
 
     expect(groups).toEqual([
-      { reason: "exactName: Required", count: 3 },
-      { reason: "canonicalCardNumber: Too small", count: 2 },
+      { reason: "exactName: Required", count: 3, example: null },
+      { reason: "canonicalCardNumber: Too small", count: 2, example: null },
     ]);
   });
 
@@ -85,5 +85,37 @@ describe("groupFailures", () => {
 
   it("returns nothing for a clean run", () => {
     expect(groupFailures([])).toEqual([]);
+  });
+});
+
+describe("previewRecord", () => {
+  it("pretty-prints so field names are readable", () => {
+    const text = previewRecord({ card_set_id: null, card_name: "DON!!" });
+
+    expect(text).toContain('"card_set_id": null');
+    expect(text).toContain('"card_name": "DON!!"');
+  });
+
+  it("bounds the output and says it did", () => {
+    const text = previewRecord({ note: "x".repeat(500) }, 100);
+
+    expect(text!.length).toBeLessThan(150);
+    expect(text).toContain("truncated");
+  });
+
+  it("has nothing to show for a record that was never stored", () => {
+    expect(previewRecord(null)).toBeNull();
+    expect(previewRecord(undefined)).toBeNull();
+  });
+
+  /* A summary panel must never be the thing that takes /admin down. */
+  it("returns null rather than throwing on a value it cannot serialise", () => {
+    const hostile = {
+      get boom() {
+        throw new Error("nope");
+      },
+    };
+
+    expect(previewRecord(hostile)).toBeNull();
   });
 });

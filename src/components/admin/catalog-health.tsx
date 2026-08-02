@@ -112,15 +112,37 @@ function FailureBlock({
             </span>
           </p>
 
-          <ul className="flex flex-col gap-2.5">
+          <ul className="flex flex-col gap-4">
             {groups.map((group) => (
-              <li key={group.reason} className="flex items-start justify-between gap-4">
-                <span className="min-w-0 text-sm break-words text-text-secondary">
-                  {group.reason}
-                </span>
-                <span className="shrink-0 text-sm text-text-muted tabular-nums">
-                  ×{group.count.toLocaleString()}
-                </span>
+              <li key={group.reason} className="flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="min-w-0 text-sm break-words text-text-secondary">
+                    {group.reason}
+                  </span>
+                  <span className="shrink-0 text-sm text-text-muted tabular-nums">
+                    ×{group.count.toLocaleString()}
+                  </span>
+                </div>
+
+                {/*
+                 * One rejected record, verbatim. The reason says a field was
+                 * missing; only the payload says what the provider sent
+                 * instead, which is the difference between "fix the mapping"
+                 * and "these records have no card number at all".
+                 *
+                 * Collapsed by default — eight of these open would bury the
+                 * rest of the console.
+                 */}
+                {group.example && (
+                  <details className="group/example">
+                    <summary className="cursor-pointer text-xs text-text-muted hover:text-text-secondary">
+                      Show one rejected record
+                    </summary>
+                    <pre className="mt-2 max-h-64 overflow-auto rounded-[var(--radius-control)] border border-border bg-canvas p-3 font-mono text-xs leading-relaxed text-text-secondary">
+                      {group.example}
+                    </pre>
+                  </details>
+                )}
               </li>
             ))}
           </ul>
