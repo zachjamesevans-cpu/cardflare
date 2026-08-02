@@ -171,6 +171,35 @@ and the sheet is useless on the six other days.
 - Verified against a real PostgreSQL instance: the backfill, every new
   constraint, the race guard, and the close-then-reopen cycle
 
+## ✅ Milestone 6.6 — Operator sign-in
+
+Asked for by the founder: `/admin` bounced him to the marketing site from his
+phone, and needing a fresh emailed link every time is friction in the wrong
+place for the people who run events.
+
+- **Sessions now survive.** There was no middleware, so a rotating refresh
+  token was spent during page renders and its replacement discarded — a Server
+  Component cannot write cookies. Operators were signed out about an hour after
+  signing in, and a signed-in admin could read as a stranger and get bounced
+  off `/admin`. Both were one missing file
+- **Email and password sign-in**, with the emailed link kept as the recovery
+  path — an invited account has no password, so the link is how the first one
+  gets set. `/login/reset` is both "forgot mine" and "set my first"
+- **An account area** at `/account` for changing a password and signing out
+- **Google and Apple wired end to end**, rendered only where `AUTH_PROVIDERS`
+  says a provider is actually configured. Nothing dead ships; turning one on
+  later is credentials plus one variable
+- **No new way to get an account.** Password sign-in, reset and the magic link
+  all refuse to create one — an admin inviting a store is still the only path
+- Ten-character minimum, seventy-two-character maximum, rate limited per IP
+  _and_ per address, and one failure message for every kind of failure so the
+  form cannot be used to enumerate pilot stores
+
+**Deliberately not built:** usernames (Supabase Auth is email-based; a real
+handle needs a profiles table, uniqueness and case-folding rules, and a
+username→email lookup), public self-service signup, and MFA. The first two were
+declined by the founder; MFA belongs with a larger admin-hardening pass.
+
 ### Milestone 7 — Matching
 
 Matching engine, realtime match notifications, structured meetup responses.

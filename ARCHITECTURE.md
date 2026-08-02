@@ -60,6 +60,9 @@ only Client Components are:
 | -------------------- | ---------------------------------------------- |
 | `MobileNav`          | Disclosure state, Escape handling              |
 | `WaitlistForm`       | `useActionState`, inline errors, success state |
+| `PasswordSignInForm` | `useActionState`, inline errors                |
+| `ResetRequestForm`   | `useActionState`, inline errors, success state |
+| `NewPasswordForm`    | `useActionState`, inline errors, success state |
 | `JoinForm`           | `useActionState`, inline errors                |
 | `JoinCodeForm`       | `useActionState`, inline errors                |
 | `CreateEventForm`    | `useActionState`, inline errors                |
@@ -165,19 +168,92 @@ Postgres counter) if abuse appears.
 
 ## Authentication and roles
 
-Identity comes from Supabase Auth, by emailed magic link. There are no
-passwords to store, reset, or leak.
+Identity comes from Supabase Auth. Three ways in, all landing on the same
+session:
+
+| Method             | What it is for                                        |
+| ------------------ | ----------------------------------------------------- |
+| Email and password | The everyday way in                                   |
+| Emailed magic link | First sign-in, and getting back in without a password |
+| Google / Apple     | Built, and rendered only where actually configured    |
+
+Passwords were added because the beta ran on magic links alone, and asking a
+store owner to go to their inbox every time they wanted to open the dashboard
+on a Friday night is friction in the wrong place. The link is still there and
+still matters: an invited account exists with no password, so the emailed link
+— or the reset link, which is the same mechanism — is how the first one gets
+set. There is no separate activation flow to keep in step.
 
 `getViewer()` resolves the caller to one of four shapes — `anonymous`,
 `admin`, `store`, `unaffiliated` — and every guard derives from it. It calls
 `getUser()` rather than `getSession()`: the latter reads the cookie without
 verifying it, so it can be forged, and this result gates the admin console.
 
-| Area     | Who reaches it                                                 |
-| -------- | -------------------------------------------------------------- |
-| `/admin` | Accounts listed in `admin_users`                               |
-| `/store` | Accounts with a row in `store_members`                         |
-| `/login` | Anyone, but a link is only sent to accounts that already exist |
+| Area       | Who reaches it                                                    |
+| ---------- | ----------------------------------------------------------------- |
+| `/admin`   | Accounts listed in `admin_users`                                  |
+| `/store`   | Accounts with a row in `store_members`                            |
+| `/account` | Anyone signed in                                                  |
+| `/login`   | Anyone, but nothing is ever sent to an address without an account |
+
+### Sessions, and why there is middleware
+
+`src/middleware.ts` exists for one reason: Supabase access tokens last an hour
+and renew with a _rotating_ refresh token, and the renewal only counts if the
+new pair reaches the browser.
+
+There was no middleware, so renewal happened during page renders — and a
+Server Component cannot set cookies, so the `setAll` in
+`src/lib/supabase/server.ts` caught the new pair and dropped it. Every render
+spent the refresh token and discarded the replacement, invalidating the one the
+browser still held. An hour after signing in, an operator was signed out. It
+looked like a design choice ("sign-in is by emailed link") rather than the bug
+it was.
+
+It also made a signed-in admin read as a stranger: `getViewer` queries
+`admin_users` through the user's own client, and a request carrying a spent
+token reads nothing, so `requireAdmin` bounced them to the marketing site.
+
+Middleware runs before the render and owns a real response, so the refreshed
+cookies survive. It writes them to the request too — the render behind it reads
+that copy, and without it the very render the refresh exists to serve would
+still query as an expired user.
+
+The matcher covers only `/store`, `/admin`, `/account` and `/login`. `getUser`
+is a round trip to the auth server, and the pages where speed matters most —
+the landing page, and `/e/CODE` reached by scanning printed paper on shop wifi
+— have no session at all.
+
+### Passwords
+
+- **Ten characters minimum, seventy-two maximum.** Ten because six is not a
+  password; seventy-two because bcrypt silently truncates past that, and a
+  longer one would appear accepted while only its prefix was ever checked. No
+  composition rules — they produce `Password1!` and are no longer recommended.
+- **Rate limited twice.** Per IP catches one machine working a list; per
+  address catches a botnet spread across many IPs guessing at one known store
+  owner, which a per-IP limit does nothing about.
+- **One failure message.** A wrong password, an unknown address and an account
+  with no password yet are three different facts, and the form reveals none of
+  them — otherwise it becomes a way to enumerate which stores are in the beta.
+  Supabase's own wording is logged, never returned.
+- **No "current password" field** on the change form. Somebody arriving from a
+  reset link has no current password to type, and Supabase's own secure
+  password change setting is the right place to require re-authentication.
+
+### Social sign-in
+
+Wired end to end, and rendered only for providers this deployment has
+configured — `AUTH_PROVIDERS` names them, unset means none, and no button
+renders otherwise. A "Continue with Google" button with no Google client
+behind it is a dead control, which PRODUCT.md forbids.
+
+Two steps that must agree, and only one is in this repository: the credentials
+go in the Supabase dashboard, and `AUTH_PROVIDERS` claims what was configured.
+There is no API that reliably reports which providers a project has enabled, so
+the alternative to asking is guessing — and guessing wrong renders exactly the
+dead button this avoids. The provider name arrives in a form field, so
+`isProviderEnabled` re-checks it server-side before any flow starts.
 
 **Admins are an explicit allow-list with no self-service path.** Rows go into
 `admin_users` by hand, in SQL.
@@ -188,9 +264,14 @@ the viewer itself. The admin layout and the admin page each guard separately
 too — a layout is not a security boundary, and a page added later should not
 inherit the appearance of protection without the substance.
 
-**Sign-in reveals nothing.** `shouldCreateUser` is off and the response is
-identical whether or not the address belongs to a store, so the form cannot be
-used to enumerate who is in the beta.
+**Sign-in reveals nothing.** `shouldCreateUser` is off, and the response is
+identical whether or not the address belongs to a store — on the magic-link
+form, the password form and the reset form alike — so none of them can be used
+to enumerate who is in the beta.
+
+**No account is ever created by signing in.** Password sign-in cannot create
+one, a reset cannot create one, and the magic link will not either. Accounts
+come from an admin inviting a store, which remains the only path.
 
 **Redirects are constrained to this origin.** `safeNextPath` rejects absolute,
 protocol-relative and backslash-prefixed targets; without it `?next=` would be

@@ -9,7 +9,16 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       // Signed-in areas. Each already sends `noindex`; this stops crawlers
       // spending time on routes that will only redirect them to sign in.
-      disallow: ["/admin", "/store", "/login", "/auth/", "/play", "/join", "/e/"],
+      disallow: [
+        "/admin",
+        "/store",
+        "/account",
+        "/login",
+        "/auth/",
+        "/play",
+        "/join",
+        "/e/",
+      ],
     },
     sitemap: `${siteUrl()}/sitemap.xml`,
     host: siteUrl(),

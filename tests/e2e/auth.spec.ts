@@ -18,6 +18,14 @@ test.describe("protected areas", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("the account pages send a signed-out visitor to sign in", async ({ page }) => {
+    for (const path of ["/account", "/account/password"]) {
+      await page.goto(path);
+
+      await expect(page).toHaveURL(/\/login/);
+    }
+  });
+
   /*
    * Nested admin routes inherit the layout's guard, but a layout is not a
    * security boundary on its own — each page calls requireAdmin as well. This
@@ -52,7 +60,7 @@ test.describe("protected areas", () => {
     const robots = await page.request.get("/robots.txt");
     const body = await robots.text();
 
-    for (const path of ["/admin", "/store", "/login", "/auth/"]) {
+    for (const path of ["/admin", "/store", "/account", "/login", "/auth/"]) {
       expect(body).toContain(`Disallow: ${path}`);
     }
   });
@@ -67,27 +75,115 @@ test.describe("protected areas", () => {
   });
 });
 
-test.describe("sign-in form", () => {
-  test("asks for an email and nothing else", async ({ page }) => {
+/**
+ * The sign-in page carries two forms now: a password form, and the emailed
+ * link behind a disclosure. Both have an "Email address" field, so every
+ * locator here is scoped to one of them — an unscoped `getByLabel` matches
+ * both and fails Playwright's strict mode.
+ */
+const passwordForm = (page: import("@playwright/test").Page) =>
+  page.locator("form").filter({ has: page.getByRole("button", { name: "Sign in" }) });
+
+const linkForm = (page: import("@playwright/test").Page) => page.locator("details");
+
+test.describe("sign-in page", () => {
+  test("offers a password as the first way in", async ({ page }) => {
     await page.goto("/login");
 
-    await expect(page.getByLabel("Email address")).toBeVisible();
-    await expect(page.getByRole("button", { name: /sign-in link/i })).toBeVisible();
-    // Magic link only: a password field here would be a regression.
-    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await expect(passwordForm(page).getByLabel("Email address")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  });
+
+  /*
+   * The emailed link is still the recovery path — it is how somebody who has
+   * never set a password gets their first one. Removing it would strand every
+   * invited store.
+   */
+  test("keeps the emailed link available", async ({ page }) => {
+    await page.goto("/login");
+
+    const details = linkForm(page);
+    await expect(details).toBeVisible();
+
+    // A native <details>, so it opens with no JavaScript.
+    await details.getByText(/email me a sign-in link instead/i).click();
+    await expect(details.getByRole("button", { name: /sign-in link/i })).toBeVisible();
+  });
+
+  /*
+   * Two forms on one page both had `id="email"`, so both labels pointed at the
+   * first input and clicking the second one focused the wrong box.
+   */
+  test("does not repeat a DOM id across the two forms", async ({ page }) => {
+    await page.goto("/login");
+
+    const duplicates = await page.evaluate(() => {
+      const ids = [...document.querySelectorAll("[id]")].map((n) => n.id);
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    });
+
+    expect(duplicates).toEqual([]);
+  });
+
+  test("each label focuses its own field", async ({ page }) => {
+    await page.goto("/login");
+    await linkForm(page)
+      .getByText(/email me a sign-in link instead/i)
+      .click();
+
+    await linkForm(page).getByText("Email address").click();
+
+    const focused = await page.evaluate(() => {
+      const active = document.activeElement;
+      return active?.closest("details") !== null;
+    });
+
+    expect(focused).toBe(true);
+  });
+
+  /* Nothing is configured in this environment, so nothing may be offered. */
+  test("shows no social buttons when no provider is configured", async ({ page }) => {
+    await page.goto("/login");
+
+    await expect(page.getByRole("button", { name: /continue with/i })).toHaveCount(0);
+  });
+
+  test("offers a way to set a password", async ({ page }) => {
+    await page.goto("/login");
+    await page.getByRole("link", { name: /forgot your password/i }).click();
+
+    await expect(page).toHaveURL(/\/login\/reset/);
+    await expect(page.getByRole("heading", { name: /set a password/i })).toBeVisible();
   });
 
   test("rejects a malformed address", async ({ page }) => {
     await page.goto("/login");
+    await linkForm(page)
+      .getByText(/email me a sign-in link instead/i)
+      .click();
 
-    await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByRole("button", { name: /sign-in link/i }).click();
+    await linkForm(page).getByLabel("Email address").fill("not-an-email");
+    await linkForm(page)
+      .getByRole("button", { name: /sign-in link/i })
+      .click();
 
-    // Scoped to the page's own content: Next renders a route-announcer element
-    // that also carries role="alert", so an unscoped query matches two nodes.
-    await expect(page.getByRole("main").getByRole("alert")).toContainText(
-      /valid email/i,
-    );
+    /*
+     * Scoped to this form's own alert. Next renders a route-announcer with
+     * role="alert", and the password form above carries one of its own, so
+     * anything broader matches several nodes and fails strict mode.
+     */
+    await expect(linkForm(page).getByRole("alert")).toContainText(/valid email/i);
+  });
+
+  test("rejects a malformed address on the password form too", async ({ page }) => {
+    await page.goto("/login");
+
+    await passwordForm(page).getByLabel("Email address").fill("not-an-email");
+    await page.getByLabel("Password").fill("something long enough");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page.locator("body")).toContainText(/valid email/i);
   });
 
   /*
@@ -102,8 +198,13 @@ test.describe("sign-in form", () => {
     await page.goto("/login");
     await expect(page).not.toHaveURL(/next=/);
 
-    await page.getByLabel("Email address").fill("someone@example.com");
-    await page.getByRole("button", { name: /sign-in link/i }).click();
+    await linkForm(page)
+      .getByText(/email me a sign-in link instead/i)
+      .click();
+    await linkForm(page).getByLabel("Email address").fill("someone@example.com");
+    await linkForm(page)
+      .getByRole("button", { name: /sign-in link/i })
+      .click();
 
     /*
      * Asserted against the whole page, not the alert element.
@@ -137,8 +238,13 @@ test.describe("sign-in form", () => {
 
     for (const email of ["definitely-not-a-store@example.com", "owner@example.com"]) {
       await page.goto("/login");
-      await page.getByLabel("Email address").fill(email);
-      await page.getByRole("button", { name: /sign-in link/i }).click();
+      await linkForm(page)
+        .getByText(/email me a sign-in link instead/i)
+        .click();
+      await linkForm(page).getByLabel("Email address").fill(email);
+      await linkForm(page)
+        .getByRole("button", { name: /sign-in link/i })
+        .click();
       await expect(page.getByRole("status")).toBeVisible();
       responses.push((await page.getByRole("status").innerText()).trim());
     }
