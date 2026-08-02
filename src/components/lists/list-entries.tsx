@@ -1,6 +1,6 @@
 import { Flame, Hand, PackageCheck } from "lucide-react";
 
-import { CardThumbnail } from "@/components/cards/card-thumbnail";
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,13 @@ function Entry({
 }) {
   return (
     <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
-      <CardThumbnail
+      <CardImageZoom
         imageUrl={entry.imageUrl}
         exactName={entry.cardName}
         cardNumber={entry.cardNumber}
         enabled={imagesEnabled}
         anyPrinting={!entry.printingId}
+        caption={entry.printingLabel ?? "Any printing"}
       />
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
