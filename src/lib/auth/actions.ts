@@ -8,6 +8,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { clientKey } from "@/lib/request-context";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { ensureAuthUser } from "./provision";
 import { safeNextPath } from "./redirect";
 import type { SignInState } from "./state";
 
@@ -35,9 +37,15 @@ const signInSchema = z.object({
  * Sends a magic link.
  *
  * The response is identical whether or not the address belongs to a store, so
- * this cannot be used to discover who is in the beta. Supabase only creates an
- * account for addresses that already exist, because `shouldCreateUser` is off
- * — an uninvited address gets the same confirmation and no email.
+ * this cannot be used to discover who is in the beta. `shouldCreateUser` is
+ * off, so typing an address into this form can never create an account with
+ * it — accounts come only from an admin inviting a store.
+ *
+ * That is also what made the first real store sign-in fail silently. Inviting
+ * a store used to write only `stores` and `store_invites`, so Supabase had no
+ * account to send a link to and sent nothing, while this form said "check your
+ * email" as it says to everyone. Inviting now provisions the account, and the
+ * call below is the second chance for anyone invited before that.
  */
 export async function requestSignInLink(
   _previous: SignInState,
@@ -70,6 +78,16 @@ export async function requestSignInLink(
   }
 
   const nextPath = safeNextPath(text(formData, "next"));
+
+  /*
+   * Provision on demand for an address with an invitation still open.
+   *
+   * Scoped to a pending invite, so this cannot be used to create an account
+   * for an arbitrary address — and the response is unchanged either way, so it
+   * reveals nothing about who has been invited.
+   */
+  await provisionIfInvited(parsed.data.email);
+
   const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase.auth.signInWithOtp({
@@ -88,6 +106,30 @@ export async function requestSignInLink(
   }
 
   return { status: "sent" };
+}
+
+/**
+ * Creates the auth account for an address that was invited but never got one.
+ *
+ * Recovery only. The invitation is the authority: no pending invite, no
+ * account, and nothing about the outcome reaches the caller.
+ */
+async function provisionIfInvited(email: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("store_invites")
+    .select("id")
+    .eq("email", email)
+    .is("accepted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not check for a pending invitation", error.message);
+    return;
+  }
+
+  if (data) await ensureAuthUser(email);
 }
 
 export async function signOut(): Promise<void> {

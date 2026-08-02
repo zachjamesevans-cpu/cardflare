@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureAuthUser } from "@/lib/auth/provision";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { StoreRow } from "@/lib/supabase/types";
 import type { InviteStoreInput } from "./schema";
@@ -73,6 +74,17 @@ export async function inviteStore(
       cause: inviteError,
     });
   }
+
+  /*
+   * The invitation is what creates the account.
+   *
+   * Sign-in refuses to create one, so without this the store would receive a
+   * welcome email and then never be able to get in — which is exactly what
+   * happened to the first store invited for real. Failure is logged rather
+   * than thrown: the store and invite rows are already written, the admin can
+   * see the invite, and sign-in provisions on demand as a second chance.
+   */
+  await ensureAuthUser(store.contact_email);
 
   return { outcome: "invited", store };
 }

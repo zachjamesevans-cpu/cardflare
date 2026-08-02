@@ -401,3 +401,29 @@ Before pushing:
 npm run verify   # format check, lint, typecheck, unit tests, production build
 npm run test:e2e
 ```
+
+## Supabase SMTP for store sign-in
+
+Two different senders leave CardFlare, and they fail independently:
+
+| Email                                   | Sent by                   | Configured with                          |
+| --------------------------------------- | ------------------------- | ---------------------------------------- |
+| Waitlist confirmation, store invitation | Resend, from our own code | `RESEND_API_KEY`, `CARDFLARE_FROM_EMAIL` |
+| Store sign-in magic link                | **Supabase Auth**         | Supabase project settings                |
+
+An invitation arriving therefore proves nothing about sign-in. Supabase's
+built-in email service is rate limited to a handful of messages per hour and is
+documented as being for development only, so a store sign-in link may silently
+fail to arrive even when everything in this repository is correct.
+
+Point Supabase at the same Resend account:
+
+1. Resend → **SMTP** → note the host, port `587`, username `resend`, and create
+   or reuse an API key as the password.
+2. Supabase → **Project Settings → Authentication → SMTP Settings** → enable
+   custom SMTP and fill those in. Sender address must be on the verified
+   domain — the same one as `CARDFLARE_FROM_EMAIL`.
+3. Supabase → **Authentication → Email Templates → Magic Link** → reword so it
+   reads as CardFlare rather than as Supabase.
+
+Until step 1 is done, treat store sign-in as untested.
