@@ -11,6 +11,7 @@ import {
   highlightParts,
   MAX_QUERY_LENGTH,
   MIN_QUERY_LENGTH,
+  pickBasePrinting,
   printingLabel,
   type CardResult,
 } from "@/lib/cards/schema";
@@ -124,7 +125,12 @@ function Row({
   onSelect?: (card: CardResult) => void;
   id: string;
 }) {
-  const printing = card.printings[0];
+  /*
+   * The headline is the base printing, not whichever set code sorted first —
+   * otherwise a card whose alternate art happens to come from an earlier set
+   * leads with the alternate art.
+   */
+  const printing = pickBasePrinting(card.printings, card.exactName);
   const label = printing ? printingLabel(printing, card.exactName) : null;
   // With several printings the strip below carries the detail, so repeating
   // the first one's label and the card's rarity up here only adds noise.

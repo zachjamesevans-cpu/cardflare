@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { printingLabel, type CardPrinting } from "@/lib/cards/schema";
+import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { capFor, type AddEntryInput, type ListKind } from "./schema";
 
 /**
@@ -63,14 +63,47 @@ interface EntryRow {
 interface Lookups {
   cards: Map<string, { number: string; name: string }>;
   printings: Map<string, CardPrinting>;
+  /** Per card, the printing to show when the entry names no specific one. */
+  basePrintings: Map<string, CardPrinting>;
   names: Map<string, string>;
 }
 
 const EMPTY_LOOKUPS: Lookups = {
   cards: new Map(),
   printings: new Map(),
+  basePrintings: new Map(),
   names: new Map(),
 };
+
+const PRINTING_COLUMNS =
+  "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url";
+
+type PrintingRow = {
+  id: string;
+  card_id: string;
+  set_code: string | null;
+  set_name: string | null;
+  printing_label: string | null;
+  variant_type: string | null;
+  rarity: string | null;
+  printing_name: string | null;
+  is_promo: boolean | null;
+  image_url: string | null;
+};
+
+function toPrinting(row: PrintingRow): CardPrinting {
+  return {
+    id: row.id,
+    setCode: row.set_code,
+    setName: row.set_name,
+    printingLabel: row.printing_label,
+    variantType: row.variant_type,
+    rarity: row.rarity,
+    printingName: row.printing_name,
+    isPromo: row.is_promo,
+    imageUrl: row.image_url,
+  };
+}
 
 /** Resolves the cards, printings and player names a page of entries refers to. */
 async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups> {
@@ -83,18 +116,26 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
   ];
   const sessionIds = [...new Set(rows.map((row) => row.player_session_id))];
 
-  const [cardRows, printingRows, sessionRows] = await Promise.all([
+  /*
+   * Entries that name no printing still need a picture. "Any printing" used to
+   * show none at all, which is the one case where artwork helps most — someone
+   * who will take any version is usually picturing the ordinary one, and a
+   * nameless row is harder to spot in a binder.
+   */
+  const openCardIds = [
+    ...new Set(rows.filter((row) => !row.printing_id).map((row) => row.card_id)),
+  ];
+
+  const [cardRows, printingRows, openPrintingRows, sessionRows] = await Promise.all([
     admin
       .from("cards")
       .select("id, canonical_card_number, exact_name")
       .in("id", cardIds),
     printingIds.length > 0
-      ? admin
-          .from("card_printings")
-          .select(
-            "id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url",
-          )
-          .in("id", printingIds)
+      ? admin.from("card_printings").select(PRINTING_COLUMNS).in("id", printingIds)
+      : Promise.resolve({ data: [], error: null }),
+    openCardIds.length > 0
+      ? admin.from("card_printings").select(PRINTING_COLUMNS).in("card_id", openCardIds)
       : Promise.resolve({ data: [], error: null }),
     /*
      * Only for the public Flare board. A binder belongs to one player who
@@ -106,33 +147,40 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  for (const result of [cardRows, printingRows, sessionRows]) {
+  for (const result of [cardRows, printingRows, openPrintingRows, sessionRows]) {
     if (result.error) console.error("Could not resolve a list entry", result.error);
   }
 
+  const cards = new Map(
+    (cardRows.data ?? []).map((row) => [
+      row.id,
+      { number: row.canonical_card_number, name: row.exact_name },
+    ]),
+  );
+
+  /* Grouped per card so the base can be chosen against its siblings. */
+  const byCard = new Map<string, CardPrinting[]>();
+  for (const row of (openPrintingRows.data ?? []) as PrintingRow[]) {
+    const list = byCard.get(row.card_id) ?? [];
+    list.push(toPrinting(row));
+    byCard.set(row.card_id, list);
+  }
+
+  const basePrintings = new Map<string, CardPrinting>();
+  for (const [cardId, printings] of byCard) {
+    const base = pickBasePrinting(printings, cards.get(cardId)?.name ?? "");
+    if (base) basePrintings.set(cardId, base);
+  }
+
   return {
-    cards: new Map(
-      (cardRows.data ?? []).map((row) => [
-        row.id,
-        { number: row.canonical_card_number, name: row.exact_name },
-      ]),
-    ),
+    cards,
     printings: new Map(
-      (printingRows.data ?? []).map((row) => [
+      ((printingRows.data ?? []) as PrintingRow[]).map((row) => [
         row.id,
-        {
-          id: row.id,
-          setCode: row.set_code,
-          setName: row.set_name,
-          printingLabel: row.printing_label,
-          variantType: row.variant_type,
-          rarity: row.rarity,
-          printingName: row.printing_name,
-          isPromo: row.is_promo,
-          imageUrl: row.image_url,
-        } satisfies CardPrinting,
+        toPrinting(row),
       ]),
     ),
+    basePrintings,
     names: new Map((sessionRows.data ?? []).map((row) => [row.id, row.display_name])),
   };
 }
@@ -141,6 +189,12 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
   const card = lookups.cards.get(row.card_id);
   const cardName = card?.name ?? "Unknown card";
   const printing = row.printing_id ? lookups.printings.get(row.printing_id) : null;
+
+  /*
+   * The image can come from a stand-in, but the label never does: the entry
+   * still says "Any printing", because that is what was asked for.
+   */
+  const forImage = printing ?? lookups.basePrintings.get(row.card_id) ?? null;
 
   return {
     id: row.id,
@@ -151,7 +205,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     cardName,
     printingId: row.printing_id,
     printingLabel: printing ? printingLabel(printing, cardName) : null,
-    imageUrl: printing?.imageUrl ?? null,
+    imageUrl: forImage?.imageUrl ?? null,
     playerSessionId: row.player_session_id,
     displayName: lookups.names.get(row.player_session_id) ?? null,
     confirmedAt: row.confirmed_at ?? null,

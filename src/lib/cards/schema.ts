@@ -161,3 +161,68 @@ export function highlightParts(
     .filter((part) => part.length > 0)
     .map((part) => ({ text: part, match: part.toLowerCase() === term.toLowerCase() }));
 }
+
+/* -------------------------------------------------------------------------- */
+/* Choosing a representative printing                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Rarity ladder, plainest first.
+ *
+ * Only the codes that actually order a card against itself. `L` is not on it —
+ * every printing of a Leader is `L`, so it separates nothing — and neither is
+ * `PR`, which is handled by the promo flag instead. Anything unrecognised
+ * sorts last rather than being guessed at.
+ */
+const RARITY_ORDER = ["c", "uc", "r", "sr", "sec"];
+
+function rarityRank(rarity: string | null): number {
+  const index = RARITY_ORDER.indexOf((rarity ?? "").trim().toLowerCase());
+  return index === -1 ? RARITY_ORDER.length : index;
+}
+
+/**
+ * The printing to show when someone will take any version of a card.
+ *
+ * "Any printing" used to render no artwork at all, which is the one case where
+ * a picture helps most — most people asking for any version have the ordinary
+ * one in mind, and a nameless row is harder to spot in a binder than a picture.
+ *
+ * Order of preference:
+ *
+ * 1. **It has an image.** A perfectly chosen base printing with no artwork
+ *    shows nothing, which is the problem being fixed. A picture of a different
+ *    version of the right card beats no picture, and the row says "Any
+ *    printing" beside it either way.
+ * 2. **Not a promo.** A promo of a card is the least ordinary version of it.
+ * 3. **Named exactly like the card.** The provider marks a variant by
+ *    appending to the base name, so the printing whose name matches is the
+ *    base one. This is the strongest signal available and the only one that
+ *    works for Leaders, where every printing shares a rarity.
+ * 4. **Plainest rarity**, then **earliest set code**, so the result is stable
+ *    rather than dependent on row order.
+ */
+export function pickBasePrinting(
+  printings: CardPrinting[],
+  cardName: string,
+): CardPrinting | null {
+  if (printings.length === 0) return null;
+
+  return [...printings].sort((a, b) => {
+    const byImage = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
+    if (byImage !== 0) return byImage;
+
+    const byPromo = Number(a.isPromo === true) - Number(b.isPromo === true);
+    if (byPromo !== 0) return byPromo;
+
+    const marked = (printing: CardPrinting) =>
+      Number(printingVariantMark(printing, cardName) !== null);
+    const byMark = marked(a) - marked(b);
+    if (byMark !== 0) return byMark;
+
+    const byRarity = rarityRank(a.rarity) - rarityRank(b.rarity);
+    if (byRarity !== 0) return byRarity;
+
+    return (a.setCode ?? "").localeCompare(b.setCode ?? "");
+  })[0]!;
+}

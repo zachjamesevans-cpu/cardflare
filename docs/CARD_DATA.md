@@ -268,6 +268,29 @@ Both found by reading a real spot check rather than the documentation.
   including Stages and Events that cannot have one. Stored as given; the UI
   omits a counter of zero, because a counter of zero is not a counter.
 
+## "Any printing" still shows a card
+
+A Flare for any printing names no printing, so there was nothing to take
+artwork from and those rows rendered no picture at all — the one case where a
+picture helps most, since somebody who will take any version is usually
+picturing the ordinary one, and a nameless row is hard to spot in a binder.
+
+`pickBasePrinting` chooses a stand-in from the card's other printings, in this
+order: it has artwork, it is not a promo, it is named exactly like the card
+(the provider marks variants by appending to the base name, and this is the
+only signal that works for Leaders where every printing shares a rarity), then
+plainest rarity, then earliest set code.
+
+Artwork is the first test on purpose. A perfectly chosen base printing with no
+image shows nothing, which is the problem being solved.
+
+The **label never uses the stand-in**. The row still reads "Any printing",
+because that is what was asked for, and the thumbnail carries a small layers
+mark so a specific piece of art does not read as a specific request — someone
+holding the alternate art should not conclude they cannot help. The mark is
+icon-only: spelled out it covered most of a 56px thumbnail and hid the artwork
+it was captioning.
+
 ## Mapping decisions
 
 `CANDIDATE_FIELDS` maps each CardFlare field to a list of candidate source

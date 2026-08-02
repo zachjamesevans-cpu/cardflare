@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { Layers } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
@@ -55,6 +56,7 @@ export function CardThumbnail({
   exactName,
   cardNumber,
   enabled,
+  anyPrinting = false,
   className,
 }: {
   imageUrl: string | null;
@@ -62,6 +64,14 @@ export function CardThumbnail({
   cardNumber: string;
   /** Resolved on the server from NEXT_PUBLIC_ENABLE_CARD_IMAGES. */
   enabled: boolean;
+  /**
+   * The artwork is a stand-in for whichever version turns up.
+   *
+   * Marked, because otherwise a specific piece of art reads as a specific
+   * request — and someone holding the alternate art would wrongly conclude
+   * they cannot help.
+   */
+  anyPrinting?: boolean;
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
@@ -92,6 +102,26 @@ export function CardThumbnail({
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
+      )}
+
+      {/*
+       * Only over real artwork. The placeholder already reads as generic, and
+       * a badge on top of it would be marking the absence of a picture.
+       */}
+      {anyPrinting && renderable && (
+        <span
+          /*
+           * Icon only. Spelled out it covered most of a 56px thumbnail and hid
+           * the artwork it was captioning, and the row already says "Any
+           * printing" in words a few pixels to the right — this is a glance
+           * cue, not the explanation.
+           */
+          title="Any version of this card"
+          className="absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded-[4px] bg-canvas/90 text-text-secondary"
+        >
+          <Layers className="size-2.5" aria-hidden="true" />
+          <span className="sr-only">Any version of this card</span>
+        </span>
       )}
     </div>
   );
