@@ -77,12 +77,73 @@ export function CardImageZoom({
    */
   const dwell = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * The animation currently applied to the panel, so it can be called off.
+   *
+   * The close animation has to be `fill: "forwards"` or the panel would snap
+   * back to full size for a frame before the dialog actually closes. Forwards
+   * means it keeps applying after it ends — so on reopening, the panel played
+   * the open animation, looked right for its 220ms, and then collapsed to
+   * `scale(0.16) opacity(0)` the moment the open animation stopped applying
+   * and the stale close animation took back over.
+   *
+   * It also poisoned the measurement: `getBoundingClientRect` reports the
+   * transformed box, so the second open measured a panel that was already
+   * scaled to nothing and animated from nonsense.
+   */
+  const running = useRef<Animation | null>(null);
+
+  /**
+   * Whether the dialog is currently up.
+   *
+   * Closing a `<dialog>` hands focus back to the button that opened it, which
+   * fires the same `focus` that counts as intent — so the image was re-warmed
+   * the instant it was dropped and every card ever opened stayed decoded in
+   * memory. The refocus happens inside `close()`, before the `close` event, so
+   * checking this flag rejects it without depending on the ordering of two
+   * state updates from two different event dispatches.
+   */
+  const isOpen = useRef(false);
+
+  /** Called before measuring, so the panel is measured untransformed. */
+  const stopAnimation = useCallback(() => {
+    running.current?.cancel();
+    running.current = null;
+  }, []);
+
   const cancelDwell = useCallback(() => {
     if (dwell.current) clearTimeout(dwell.current);
     dwell.current = null;
   }, []);
 
   useEffect(() => cancelDwell, [cancelDwell]);
+
+  /**
+   * Drops the full-size image once the dialog is closed, however it closed.
+   *
+   * Otherwise every card opened stays decoded in memory for the life of the
+   * page, which on a phone is how a tab gets killed. Re-warming costs nothing:
+   * the browser still has the bytes, so it is a cache hit.
+   *
+   * A native listener rather than React's `onClose`, because `close` does not
+   * bubble and so never reaches React's delegated handler. Measured: the
+   * element fired `close` while the large image stayed mounted.
+   */
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+
+    const onClose = () => {
+      isOpen.current = false;
+      running.current?.cancel();
+      running.current = null;
+      setWarm(false);
+      setSharp(false);
+    };
+
+    element.addEventListener("close", onClose);
+    return () => element.removeEventListener("close", onClose);
+  }, []);
 
   const reducedMotion = useCallback(
     () =>
@@ -105,6 +166,9 @@ export function CardImageZoom({
 
     if (!element) return;
 
+    stopAnimation();
+    cancelDwell();
+    isOpen.current = true;
     setWarm(true);
     element.showModal();
 
@@ -115,14 +179,14 @@ export function CardImageZoom({
     const dy = from.top + from.height / 2 - (to.top + to.height / 2);
     const scale = to.width > 0 ? from.width / to.width : 0.2;
 
-    box.animate(
+    running.current = box.animate(
       [
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0 },
         { transform: "translate(0, 0) scale(1)", opacity: 1 },
       ],
       { duration: OPEN_MS, easing: EASE },
     );
-  }, [reducedMotion]);
+  }, [cancelDwell, reducedMotion, stopAnimation]);
 
   /** Shrinks back towards the thumbnail, then actually closes. */
   const close = useCallback(() => {
@@ -131,6 +195,8 @@ export function CardImageZoom({
     const to = opener.current?.getBoundingClientRect();
 
     if (!element) return;
+
+    stopAnimation();
 
     if (!box || !to || reducedMotion()) {
       element.close();
@@ -150,8 +216,16 @@ export function CardImageZoom({
       { duration: CLOSE_MS, easing: EASE, fill: "forwards" },
     );
 
-    animation.finished.then(() => element.close()).catch(() => element.close());
-  }, [reducedMotion]);
+    running.current = animation;
+
+    animation.finished
+      .then(() => {
+        // Only if nothing has taken over since — a cancel means somebody
+        // reopened, and closing the dialog they just opened is the bug.
+        if (running.current === animation) element.close();
+      })
+      .catch(() => {});
+  }, [reducedMotion, stopAnimation]);
 
   const thumbnail = (
     <CardThumbnail
@@ -170,8 +244,24 @@ export function CardImageZoom({
   if (!enabled || !isRenderableImageUrl(imageUrl)) return thumbnail;
 
   const intent = () => {
+    if (isOpen.current) return;
     cancelDwell();
     setWarm(true);
+  };
+
+  /**
+   * Intent withdrawn: the pointer moved on, or focus did.
+   *
+   * Cancelling the pending timer is not enough on its own. A pointer that
+   * dwells, warms, opens and closes is still resting on the thumbnail
+   * afterwards, so nothing ever drops that image again — measured as three
+   * dialogs each holding a full-size card after opening and closing three
+   * rows. Leaving has to cool an already-warm image too, not just call off
+   * one that had not started.
+   */
+  const cool = () => {
+    cancelDwell();
+    if (!isOpen.current) setWarm(false);
   };
 
   return (
@@ -182,13 +272,14 @@ export function CardImageZoom({
         onClick={open}
         onPointerEnter={(event) => {
           // Touch fires pointerenter too, and `onTouchStart` already covers it.
-          if (event.pointerType === "touch") return;
+          if (event.pointerType === "touch" || isOpen.current) return;
           cancelDwell();
           dwell.current = setTimeout(() => setWarm(true), DWELL_MS);
         }}
-        onPointerLeave={cancelDwell}
+        onPointerLeave={cool}
         onTouchStart={intent}
         onFocus={intent}
+        onBlur={cool}
         aria-label={`View ${exactName} larger`}
         className="shrink-0 cursor-zoom-in rounded-[7px] transition-transform duration-[var(--duration-base)] hover:ring-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none active:scale-95"
       >
