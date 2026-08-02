@@ -47,6 +47,7 @@ function Entry({
         exactName={entry.cardName}
         cardNumber={entry.cardNumber}
         enabled={imagesEnabled}
+        anyPrinting={!entry.printingId}
       />
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
