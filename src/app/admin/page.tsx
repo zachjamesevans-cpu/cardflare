@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Store as StoreIcon } from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
@@ -113,6 +114,16 @@ export default async function AdminPage() {
           failures={failures}
           recordsSeen={lastRun?.records_seen ?? 0}
         />
+
+        {cardCount > 0 && (
+          <p className="text-sm text-text-secondary">
+            Zero rejections means every record parsed, not that any value is right.{" "}
+            <Link href="/admin/spot-check" className="text-accent hover:underline">
+              Spot check a spread of cards
+            </Link>{" "}
+            against the official card list.
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">
