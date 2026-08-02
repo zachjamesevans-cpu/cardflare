@@ -10,7 +10,10 @@ import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { catalogBySet, failuresForRun } from "@/lib/cards/health";
-import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
+import {
+  DON_EXCLUSION,
+  OptcgApiProvider,
+} from "@/lib/cards/providers/optcgapi/adapter";
 import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
@@ -96,7 +99,7 @@ export default async function AdminPage() {
           </h2>
           <p className="text-sm text-text-secondary">
             Imports One Piece cards from {providerName} so search has something to find.
-            Card data only — no prices, and no artwork is copied.
+            Card data only — no prices, and no artwork is copied. {DON_EXCLUSION}
           </p>
         </div>
 
