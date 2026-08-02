@@ -31,25 +31,33 @@ explicit approval, not an implementation detail.
 
 Use these terms consistently in code, UI copy, and documentation.
 
-| Term            | Meaning                                              |
-| --------------- | ---------------------------------------------------- |
-| **Flare**       | A live request for a card                            |
-| **Flare Match** | A match between a card request and an available card |
-| **Event Room**  | A live digital room tied to a physical TCG event     |
-| **Have List**   | Cards a player has available                         |
-| **Need List**   | Cards a player is seeking                            |
+| Term             | Meaning                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| **Flare**        | A live request for a card                                           |
+| **Flare Match**  | A match between a card request and an available card                |
+| **Event Room**   | A live digital room tied to a physical TCG event                    |
+| **Counter Code** | A store's permanent join code, printed once and left on the counter |
+| **Walk-in Room** | The Event Room a Counter Code opens when no event is scheduled      |
+| **Have List**    | Cards a player has available                                        |
+| **Need List**    | Cards a player is seeking                                           |
 
 ## The core loop
 
 This is the product. Protect it. Every feature should make one of these steps
 faster or more likely to happen.
 
-1. Store creates an event.
+1. Store puts up a code. Once, permanently — or per event, if the event
+   deserves its own sheet.
 2. Player scans a QR code.
 3. Player sends a Flare.
 4. Another player has the card.
 5. CardFlare creates a match.
 6. Players meet and trade.
+
+Step 1 used to require a store to create an event before anything could
+happen, which meant nothing happened on the ordinary afternoons that make up
+most of a store's week. A store now prints one Counter Code and the room takes
+care of itself.
 
 ## Users
 

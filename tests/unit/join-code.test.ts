@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyCode,
   generateJoinCode,
+  generateStoreCode,
   isValidJoinCode,
   JOIN_CODE_ALPHABET,
   JOIN_CODE_LENGTH,
   normalizeJoinCode,
+  STORE_CODE_LENGTH,
+  STORE_CODE_PATTERN,
 } from "@/lib/events/join-code";
 
 describe("JOIN_CODE_ALPHABET", () => {
@@ -108,16 +112,78 @@ describe("isValidJoinCode", () => {
     }
   });
 
+  /* Seven characters is a store's counter code, not a malformed event code. */
+  it("accepts a store code", () => {
+    expect(isValidJoinCode("K3M9PZQ")).toBe(true);
+    expect(isValidJoinCode("0000000")).toBe(true);
+  });
+
   it("rejects the wrong length or case", () => {
-    for (const code of ["K3M9P", "K3M9PZ1", "k3m9pz", "", "K3M9P Z"]) {
+    for (const code of ["K3M9P", "K3M9PZ12", "k3m9pz", "", "K3M9P Z"]) {
       expect(isValidJoinCode(code)).toBe(false);
     }
   });
 
   // The regex must be anchored, or a code with junk around it would pass.
   it("rejects a valid code with anything around it", () => {
-    for (const code of ["XK3M9PZ", "K3M9PZX", "/K3M9PZ", "K3M9PZ\n"]) {
+    for (const code of ["XK3M9PZQ", "K3M9PZQX", "/K3M9PZ", "K3M9PZ\n"]) {
       expect(isValidJoinCode(code)).toBe(false);
+    }
+  });
+});
+
+/**
+ * The two code spaces.
+ *
+ * Length is the only thing separating a store's permanent counter code from a
+ * single event's code, and everything routes on that distinction — so it is
+ * worth pinning down rather than leaving to the regexes.
+ */
+describe("classifyCode", () => {
+  it("calls six characters an event", () => {
+    expect(classifyCode("K3M9PZ")).toBe("event");
+  });
+
+  it("calls seven characters a store", () => {
+    expect(classifyCode("K3M9PZQ")).toBe("store");
+  });
+
+  it("calls anything else nothing at all", () => {
+    for (const code of ["K3M9P", "K3M9PZQ8", "", "k3m9pz", "K3M9PU"]) {
+      expect(classifyCode(code)).toBeNull();
+    }
+  });
+
+  it("never classifies one length as the other", () => {
+    for (let i = 0; i < 200; i += 1) {
+      expect(classifyCode(generateJoinCode())).toBe("event");
+      expect(classifyCode(generateStoreCode())).toBe("store");
+    }
+  });
+});
+
+describe("generateStoreCode", () => {
+  /*
+   * Seven characters, so a store code can never collide with an event code.
+   * Two separate unique indexes would not prevent that, and the failure would
+   * be silent: a laminated counter code resolving to a stranger's event.
+   */
+  it("is one character longer than an event code", () => {
+    expect(generateStoreCode()).toHaveLength(JOIN_CODE_LENGTH + 1);
+    expect(generateStoreCode()).toHaveLength(STORE_CODE_LENGTH);
+  });
+
+  it("uses only the unambiguous alphabet", () => {
+    for (let i = 0; i < 200; i += 1) {
+      expect(generateStoreCode()).toMatch(STORE_CODE_PATTERN);
+    }
+  });
+
+  it("survives normalisation unchanged, so a typed code matches a stored one", () => {
+    for (let i = 0; i < 200; i += 1) {
+      const code = generateStoreCode();
+
+      expect(normalizeJoinCode(code)).toBe(code);
     }
   });
 });

@@ -1,11 +1,21 @@
 import "server-only";
 
 import { ensureAuthUser } from "@/lib/auth/provision";
+import { generateStoreCode } from "@/lib/events/join-code";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { StoreRow } from "@/lib/supabase/types";
 import type { InviteStoreInput } from "./schema";
 
 const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Attempts before giving up on finding an unused counter code.
+ *
+ * Thirty-four billion codes makes a collision remote; three attempts makes it
+ * negligible while still failing loudly rather than looping forever if the
+ * generator itself has broken. Same reasoning as event codes.
+ */
+const CODE_ATTEMPTS = 3;
 
 export type InviteStoreResult =
   { outcome: "invited"; store: StoreRow } | { outcome: "already-invited" };
@@ -40,18 +50,37 @@ export async function inviteStore(
 
   if (existing) return { outcome: "already-invited" };
 
-  const { data: store, error: storeError } = await admin
-    .from("stores")
-    .insert({
-      name: input.name,
-      contact_email: input.contactEmail,
-      city: input.city,
-      region: input.region,
-    })
-    .select()
-    .single();
+  /*
+   * The counter code is minted with the store, not on first request.
+   *
+   * It is the thing the store prints and laminates, so it must exist from the
+   * moment the account does — a store that signed in to find "your code is
+   * being prepared" would have nothing to put on the counter.
+   */
+  let store: StoreRow | null = null;
+  let storeError: { code?: string; message: string } | null = null;
 
-  if (storeError || !store) {
+  for (let attempt = 0; attempt < CODE_ATTEMPTS && !store; attempt += 1) {
+    const result = await admin
+      .from("stores")
+      .insert({
+        name: input.name,
+        contact_email: input.contactEmail,
+        city: input.city,
+        region: input.region,
+        join_code: generateStoreCode(),
+      })
+      .select()
+      .single();
+
+    store = result.data;
+    storeError = result.error;
+
+    // Only a code collision is worth another go; anything else is a real fault.
+    if (storeError && storeError.code !== UNIQUE_VIOLATION) break;
+  }
+
+  if (!store) {
     throw new Error(`Could not create the store: ${storeError?.message}`, {
       cause: storeError,
     });

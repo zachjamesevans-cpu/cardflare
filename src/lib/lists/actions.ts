@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { findEventByJoinCode } from "@/lib/events/repository";
+import { resolveCode } from "@/lib/events/rooms";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
@@ -57,13 +57,19 @@ async function requirePlayerInRoom(
   const session = await getPlayerSession();
   if (!session) return null;
 
-  const event = await findEventByJoinCode(code);
-  if (!event) return null;
+  /*
+   * Resolved, never opened. Posting a Flare is not a way into a room — if the
+   * store's walk-in room has gone quiet since the page rendered, this fails
+   * the membership check below rather than quietly starting a new room and
+   * writing the card into it.
+   */
+  const resolved = await resolveCode(code);
+  if (resolved.outcome !== "room") return null;
 
-  const participation = await findParticipation(event.id, session.id);
+  const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return null;
 
-  return { eventId: event.id, playerSessionId: session.id };
+  return { eventId: resolved.room.id, playerSessionId: session.id };
 }
 
 export async function addToListAction(

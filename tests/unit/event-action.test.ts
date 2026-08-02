@@ -75,7 +75,9 @@ const storeViewer = (storeIds: string[]) => ({
 
 beforeEach(() => {
   createEvent.mockReset().mockResolvedValue({ id: "event-1", store_id: STORE_A });
-  findEventById.mockReset().mockResolvedValue({ id: "event-1", store_id: STORE_A });
+  findEventById
+    .mockReset()
+    .mockResolvedValue({ id: "event-1", store_id: STORE_A, kind: "scheduled" });
   setEventStatus.mockReset().mockResolvedValue(undefined);
   getViewer.mockReset().mockResolvedValue(storeViewer([STORE_A]));
   isSupabaseConfigured.mockReset().mockReturnValue(true);
@@ -209,7 +211,11 @@ describe("setEventStatusAction", () => {
    * of any store could close another store's event by posting its id.
    */
   it("refuses to change an event belonging to another store", async () => {
-    findEventById.mockResolvedValue({ id: "event-9", store_id: STORE_B });
+    findEventById.mockResolvedValue({
+      id: "event-9",
+      store_id: STORE_B,
+      kind: "scheduled",
+    });
 
     await setEventStatusAction(statusForm("closed", "event-9"));
 
@@ -235,7 +241,11 @@ describe("setEventStatusAction", () => {
 
   it("lets an admin change any store's event", async () => {
     getViewer.mockResolvedValue({ kind: "admin", user: { id: "admin-1" } });
-    findEventById.mockResolvedValue({ id: "event-9", store_id: STORE_B });
+    findEventById.mockResolvedValue({
+      id: "event-9",
+      store_id: STORE_B,
+      kind: "scheduled",
+    });
 
     await setEventStatusAction(statusForm("closed", "event-9"));
 
