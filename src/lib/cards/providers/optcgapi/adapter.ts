@@ -159,6 +159,28 @@ function asList(value: unknown): string[] {
 }
 
 /**
+ * Colours, split on whitespace as well as punctuation.
+ *
+ * The provider writes a multicolour card as one space-separated string:
+ * `"Blue Green Purple Red Black Yellow"`. Left whole that is 34 characters,
+ * past the 24-character limit on a colour, so every rainbow Leader was
+ * rejected — and had it fitted, it would have been one meaningless colour that
+ * no colour filter could ever match.
+ *
+ * Safe for colours and nowhere else. One Piece has six colours and each is a
+ * single word. `sub_types` is space-separated too, but its values are not:
+ * "Straw Hat Crew The Four Emperors" is two traits, and splitting on
+ * whitespace would shred it into six. Traits keep the punctuation-only split,
+ * and the fact that they arrive unseparated stays a known limitation rather
+ * than something guessed at here.
+ */
+function asColors(value: unknown): string[] {
+  return asList(value)
+    .flatMap((entry) => entry.split(/\s+/))
+    .filter(Boolean);
+}
+
+/**
  * Adapter for optcgapi.com.
  *
  * `suppliesImages` is true because the API is documented as returning image
@@ -250,7 +272,7 @@ export class OptcgApiProvider implements CardDataProvider {
       canonicalCardNumber: cardNumber ?? "",
       exactName: asString(pick(record, "name")) ?? "",
       cardType: asString(pick(record, "cardType")),
-      colors: asList(pick(record, "color")).map((c) => c.toLowerCase()),
+      colors: asColors(pick(record, "color")).map((c) => c.toLowerCase()),
       traits: asList(pick(record, "traits")),
       cost: asNumber(pick(record, "cost")),
       power: asNumber(pick(record, "power")),

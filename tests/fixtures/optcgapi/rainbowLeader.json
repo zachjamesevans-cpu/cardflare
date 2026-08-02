@@ -1,0 +1,21 @@
+{
+  "life": "5",
+  "rarity": "PR",
+  "set_id": "P",
+  "set_name": "One Piece Promotion Cards",
+  "attribute": "Strike",
+  "card_cost": null,
+  "card_name": "Monkey.D.Luffy (Release Event Leader)",
+  "card_text": "This Leader can only be used in designated events according to the rules.This Leader is treated as a card with all card names, types, and attributes according to the rules.",
+  "card_type": "Leader",
+  "sub_types": "Straw Hat Crew",
+  "card_color": "Blue Green Purple Red Black Yellow",
+  "card_image": null,
+  "card_power": "5000",
+  "card_set_id": "P-700",
+  "date_scraped": "2026-03-26",
+  "market_price": 0.99,
+  "card_image_id": "P-700",
+  "counter_amount": 0,
+  "inventory_price": 0.48
+}
