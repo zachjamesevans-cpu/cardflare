@@ -97,7 +97,9 @@ async function printingsFor(cardIds: string[]): Promise<Map<string, CardPrinting
 
   const { data, error } = await getSupabaseAdmin()
     .from("card_printings")
-    .select("card_id, set_code, set_name, printing_label, variant_type, image_url")
+    .select(
+      "card_id, set_code, set_name, printing_label, variant_type, is_promo, image_url",
+    )
     .in("card_id", cardIds)
     .order("set_code");
 
@@ -114,6 +116,7 @@ async function printingsFor(cardIds: string[]): Promise<Map<string, CardPrinting
       setName: row.set_name,
       printingLabel: row.printing_label,
       variantType: row.variant_type,
+      isPromo: row.is_promo,
       imageUrl: row.image_url,
     });
     grouped.set(row.card_id, list);

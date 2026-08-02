@@ -32,13 +32,13 @@ the local Supabase catalog.
 
 Bulk endpoints, used by the sync:
 
-| Endpoint              | Purpose            |
-| --------------------- | ------------------ |
-| `/api/allSetCards/`   | Booster set cards  |
-| `/api/allSTCards/`    | Starter deck cards |
-| `/api/allPromoCards/` | Promo cards        |
-| `/api/allDonCards/`   | DON!! cards        |
-| `/api/allSets/`       | Set list           |
+| Endpoint            | Purpose            |
+| ------------------- | ------------------ |
+| `/api/allSetCards/` | Booster set cards  |
+| `/api/allSTCards/`  | Starter deck cards |
+| `/api/allPromos/`   | Promo cards        |
+| `/api/allDonCards/` | DON!! cards        |
+| `/api/allSets/`     | Set list           |
 
 Per-record endpoints, used only by `fetchCardByExternalId`:
 
@@ -58,8 +58,8 @@ which is why `card_id` is a candidate for `canonical_card_number` and why
 `fetchCardByExternalId` is passed a card number in practice.
 
 The documentation lists four endpoint groups: **Sets, Starter Decks, Promos,
-Don!!**. Promos therefore exist as a group; only the `/api/allPromoCards/` path
-is wrong. The correct path is still unknown.
+Don!!**. The promo path is `/api/allPromos/` — `/api/allPromoCards/` was
+inferred from the naming of its neighbours, and 404s.
 
 ## Observed response schema
 
@@ -115,11 +115,14 @@ surfaced by accident.
 
 ### Not yet observed
 
-`/api/allSTCards/`, `/api/allDonCards/`, `/api/allSets/` and `/api/allDecks/`
-opened successfully but their records have not been inspected.
-`/api/allPromoCards/` returns 404. Their field names are assumed to match the
-set endpoint, which is a guess — a record that does not match is skipped and
-recorded in `card_sync_failures` rather than imported wrong.
+`/api/allDonCards/`, `/api/allSets/` and `/api/allDecks/` opened successfully
+but their records have not been inspected. Their field names are assumed to
+match the set endpoint, which is a guess — a record that does not match is
+skipped and recorded in `card_sync_failures` rather than imported wrong.
+
+A full sync on 2 Aug 2026 rejected 187 records for a missing card number,
+which is where that guess is most likely to be failing. The offending payloads
+are visible under **Admin → Card catalog → Rejected**.
 
 ## Mapping decisions
 
@@ -185,10 +188,24 @@ provider classifies printings explicitly, map those fields then — not before.
 
 Unknown until the probe runs. What is already known:
 
-- **`/api/allPromoCards/` returns 404**, confirmed by opening it in a browser on
-  2 Aug 2026. Promo coverage is therefore absent unless promos appear inside
-  another endpoint. A missing endpoint no longer fails the sync: it is recorded
-  in `card_sync_failures` and the remaining endpoints still import.
+- **The promo path is `/api/allPromos/`.** `/api/allPromoCards/`, inferred from
+  the naming of its neighbours, 404s — which silently cost the catalog every
+  promo while the sync still reported success. Corrected against the provider's
+  documentation on 2 Aug 2026. A missing endpoint does not fail the sync: it is
+  recorded in `card_sync_failures` and the remaining endpoints still import.
+
+- **A promo repeats the booster printing's card number and set id.** The
+  documented sample has `card_set_id: "OP09-077"` and `set_id: "OP09"`, the same
+  as the booster printing, distinguished only by `set_name` and a parenthetical
+  suffix on the name. The printing key includes the endpoint group for exactly
+  this reason, so the two are stored as two printings of one card rather than
+  merged. `is_promo` is set to true for this group — the provider served it from
+  the promos endpoint, so that is its classification, not an inference. The
+  other three flags stay null.
+
+- **The documented promo records carry no artwork.** Both have `card_image` and
+  `card_image_id` set to null, so promos render the placeholder even with images
+  enabled.
 
 - **Coverage is unverified.** No claim is made that this provider carries every
   One Piece card, or that any set is complete.
