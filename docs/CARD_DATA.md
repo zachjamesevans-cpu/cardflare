@@ -187,6 +187,38 @@ fragments. There is no separator in the data to tell them apart.
 > filtering by an exact trait does not. Fixing this needs a list of valid
 > One Piece traits to match against, which is a data source we do not have.
 
+## One record is malformed at source
+
+`OP10-042` — Usopp (Official Playmat -Limited Edition Vol. 3-) — arrives from
+`/api/allPromos/` with its fields shifted by one:
+
+| Field        | Value                        | What it actually is |
+| ------------ | ---------------------------- | ------------------- |
+| `life`       | `"5000"`                     | a power             |
+| `card_power` | `"Straw Hat Crew Dressrosa"` | traits              |
+| `sub_types`  | `"Ranged"`                   | an attribute        |
+| `attribute`  | `null`                       | —                   |
+
+This is not a mapping error. A correctly-formed record from the same endpoint
+has `life: "5"`, `card_power: "5000"`, a trait list in `sub_types` and an
+attribute in `attribute`. The data is wrong at the provider, and the record is
+skipped.
+
+The rejection reads `life: Too big: expected number to be <=99`, which invites
+raising the ceiling. **Do not.** A One Piece Leader has 3–5 life, so 99 is
+already generous, and a value in the thousands can only be a power. Raising it
+would import a Leader with 5000 life, no power, and an attribute in its trait
+list. `tests/unit/card-shifted-record.test.ts` locks this in.
+
+**Consequence:** OP10-042 is absent from the catalog. One card, and the right
+one to lose.
+
+> **Worth remembering.** This record failed only because the shift pushed a
+> value out of range. A row shifted between two fields of compatible type —
+> two strings, say — would import silently and wrongly. Validation catches
+> impossible values, not implausible ones. That is what the ten-card accuracy
+> check is for, and why it is not optional.
+
 ## Mapping decisions
 
 `CANDIDATE_FIELDS` maps each CardFlare field to a list of candidate source

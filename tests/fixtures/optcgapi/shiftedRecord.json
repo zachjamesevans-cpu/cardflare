@@ -1,0 +1,21 @@
+{
+  "life": "5000",
+  "rarity": "L",
+  "set_id": "OP10",
+  "set_name": "One Piece Promotion Cards",
+  "attribute": null,
+  "card_cost": null,
+  "card_name": "Usopp (Official Playmat -Limited Edition Vol. 3-)",
+  "card_text": "All of your \"Dressrosa\" type Characters with a cost of 2 or more gain +1 cost.\n[Opponent's Turn] [Once Per Turn] This effect can be activated when your \"Dressrosa\" type Character is removed from the field by your opponent's effect or K.O.'d. If you have 5 or less cards in your hand, draw 1 card.",
+  "card_type": "Leader",
+  "sub_types": "Ranged",
+  "card_color": "Blue Black",
+  "card_image": null,
+  "card_power": "Straw Hat Crew Dressrosa",
+  "card_set_id": "OP10-042",
+  "date_scraped": "2026-07-20",
+  "market_price": 170.6,
+  "card_image_id": "OP10-042",
+  "counter_amount": 0,
+  "inventory_price": 320
+}
