@@ -6,14 +6,18 @@ import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { removeListEntryAction } from "@/lib/lists/actions";
 import type { ListEntry } from "@/lib/lists/repository";
-import type { ListKind } from "@/lib/lists/schema";
+import { groupByPlayer, type ListKind } from "@/lib/lists/schema";
 
 /**
  * Flare boards and Have lists.
  *
- * Server components: nothing here is interactive except cancelling, which is a
+ * Server components: nothing here is interactive except removing, which is a
  * plain form posting to a Server Action, so a list of forty cards ships no
  * JavaScript at all.
+ *
+ * An entry is a row rather than its own card. The board groups rows under the
+ * player who posted them — a busy room is a handful of people, not thirty
+ * unrelated requests, and "who do I go and talk to" is the actual question.
  */
 
 function Entry({
@@ -21,26 +25,23 @@ function Entry({
   code,
   kind,
   imagesEnabled,
-  showWho,
   youHaveIt,
-  cancellable,
+  removable,
 }: {
   entry: ListEntry;
   code: string;
   kind: ListKind;
   imagesEnabled: boolean;
-  /** Flares are public and name their owner. Have lists are private. */
-  showWho: boolean;
   /**
    * The viewer holds this card. Computed for this viewer only and never
    * broadcast — a Have list is a list of valuable things a named person is
    * carrying in a room full of strangers.
    */
   youHaveIt?: boolean;
-  cancellable: boolean;
+  removable: boolean;
 }) {
   return (
-    <Card as="li" className="flex items-start gap-3 p-4">
+    <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
       <CardThumbnail
         imageUrl={entry.imageUrl}
         exactName={entry.cardName}
@@ -48,7 +49,7 @@ function Entry({
         enabled={imagesEnabled}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <p className="font-semibold text-text-primary">{entry.cardName}</p>
           {entry.quantity > 1 && (
@@ -68,17 +69,6 @@ function Entry({
         {entry.note && (
           <p className="text-sm text-text-secondary italic">{entry.note}</p>
         )}
-
-        {showWho && entry.displayName && (
-          <div className="mt-0.5 flex items-center gap-2">
-            <PlayerAvatar
-              displayName={entry.displayName}
-              seed={entry.playerSessionId}
-              size="sm"
-            />
-            <span className="text-sm text-text-secondary">{entry.displayName}</span>
-          </div>
-        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -89,7 +79,7 @@ function Entry({
           </Badge>
         )}
 
-        {cancellable && (
+        {removable && (
           <form action={removeListEntryAction}>
             <input type="hidden" name="code" value={code} />
             <input type="hidden" name="kind" value={kind} />
@@ -100,7 +90,7 @@ function Entry({
           </form>
         )}
       </div>
-    </Card>
+    </li>
   );
 }
 
@@ -114,11 +104,12 @@ function Empty({ icon: Icon, children }: { icon: typeof Flame; children: string 
 }
 
 /**
- * Every open Flare in the room.
+ * Every open Flare in the room, gathered under whoever posted it.
  *
  * The board a player reads to find someone to trade with. Until matching
  * exists this is the whole mechanism, and it works: you scan it, you recognise
- * something in your binder, you go and find them.
+ * something in your binder, you go and find them — which is easier when one
+ * person's four cards sit together instead of being scattered by post time.
  */
 export function FlareBoard({
   entries,
@@ -141,25 +132,69 @@ export function FlareBoard({
     );
   }
 
+  const groups = groupByPlayer(entries);
+
   return (
     <ul className="flex flex-col gap-3">
-      {entries.map((entry) => (
-        <Entry
-          key={entry.id}
-          entry={entry}
-          code={code}
-          kind="flare"
-          imagesEnabled={imagesEnabled}
-          showWho
-          youHaveIt={heldCardIds.has(entry.cardId) && entry.playerSessionId !== youId}
-          cancellable={entry.playerSessionId === youId}
-        />
-      ))}
+      {groups.map((group) => {
+        const isYou = group.playerSessionId === youId;
+        const answerable = group.entries.filter(
+          (entry) => !isYou && heldCardIds.has(entry.cardId),
+        ).length;
+        const headingId = `flares-${group.playerSessionId}`;
+
+        return (
+          <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <PlayerAvatar
+                  displayName={group.displayName ?? "?"}
+                  seed={group.playerSessionId}
+                  size="sm"
+                />
+                <p id={headingId} className="truncate font-semibold text-text-primary">
+                  {group.displayName ?? "A player"}
+                  {isYou && <span className="font-normal text-text-muted"> · you</span>}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {/*
+                 * Said once for the group as well as per card. On a long board
+                 * this is the line that decides whether someone walks over.
+                 */}
+                {answerable > 0 && (
+                  <Badge>
+                    You have {answerable} of {group.entries.length}
+                  </Badge>
+                )}
+                <span className="text-sm text-text-muted tabular-nums">
+                  {group.entries.length} {group.entries.length === 1 ? "card" : "cards"}
+                </span>
+              </div>
+            </div>
+
+            <ul aria-labelledby={headingId} className="flex flex-col">
+              {group.entries.map((entry) => (
+                <Entry
+                  key={entry.id}
+                  entry={entry}
+                  code={code}
+                  kind="flare"
+                  imagesEnabled={imagesEnabled}
+                  youHaveIt={!isYou && heldCardIds.has(entry.cardId)}
+                  removable={isYou}
+                />
+              ))}
+            </ul>
+          </Card>
+        );
+      })}
     </ul>
   );
 }
 
-/** One player's own Have list. Never shown to anybody else. */
+/** One player's own binder. Never shown to anybody else. */
 export function HaveList({
   entries,
   code,
@@ -179,18 +214,19 @@ export function HaveList({
   }
 
   return (
-    <ul className="flex flex-col gap-3">
-      {entries.map((entry) => (
-        <Entry
-          key={entry.id}
-          entry={entry}
-          code={code}
-          kind="have"
-          imagesEnabled={imagesEnabled}
-          showWho={false}
-          cancellable
-        />
-      ))}
-    </ul>
+    <Card className="p-4">
+      <ul className="flex flex-col">
+        {entries.map((entry) => (
+          <Entry
+            key={entry.id}
+            entry={entry}
+            code={code}
+            kind="have"
+            imagesEnabled={imagesEnabled}
+            removable
+          />
+        ))}
+      </ul>
+    </Card>
   );
 }
