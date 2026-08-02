@@ -7,6 +7,7 @@ const joinEvent = vi.fn();
 const leaveEvent = vi.fn();
 const createPlayerSession = vi.fn();
 const deletePlayerSession = vi.fn();
+const renamePlayerSession = vi.fn();
 const getPlayerSession = vi.fn();
 const setPlayerCookie = vi.fn();
 const isSupabaseConfigured = vi.fn(() => true);
@@ -53,6 +54,7 @@ vi.mock("@/lib/players/repository", () => ({
   SESSION_TTL_MS: 1000,
   createPlayerSession: (...a: unknown[]) => createPlayerSession(...a),
   deletePlayerSession: (...a: unknown[]) => deletePlayerSession(...a),
+  renamePlayerSession: (...a: unknown[]) => renamePlayerSession(...a),
 }));
 
 vi.mock("@/lib/players/session", async (importOriginal) => {
@@ -97,6 +99,7 @@ beforeEach(() => {
   leaveEvent.mockReset().mockResolvedValue(undefined);
   createPlayerSession.mockReset().mockResolvedValue({ id: "session-new" });
   deletePlayerSession.mockReset().mockResolvedValue(undefined);
+  renamePlayerSession.mockReset().mockResolvedValue(undefined);
   getPlayerSession.mockReset().mockResolvedValue(null);
   setPlayerCookie.mockReset().mockResolvedValue(undefined);
   isSupabaseConfigured.mockReset().mockReturnValue(true);
@@ -168,16 +171,78 @@ describe("joinEventAction — a returning player", () => {
    */
   it("ignores a session id supplied by the client", async () => {
     await captureRedirect(() =>
-      join(formData({ playerSessionId: "someone-else", displayName: "Mallory" })),
+      join(formData({ playerSessionId: "someone-else", displayName: "Zach" })),
     );
 
     expect(joinEvent).toHaveBeenCalledWith("event-1", "session-known");
   });
+});
 
-  it("does not rename them from the form", async () => {
-    await captureRedirect(() => join(formData({ displayName: "Someone Else" })));
+/*
+ * The name the form fills in is editable, and changing it must not cost the
+ * player anything. `player_cards`, `flares` and room membership all hang off
+ * the session id, so a rename that created a new session would silently
+ * abandon the player's binder.
+ */
+describe("joinEventAction — a returning player changing their name", () => {
+  beforeEach(() => {
+    getPlayerSession.mockResolvedValue({ id: "session-known", display_name: "Zach" });
+  });
 
+  it("renames the same session rather than starting a new one", async () => {
+    await captureRedirect(() => join(formData({ displayName: "Zachary" })));
+
+    expect(renamePlayerSession).toHaveBeenCalledWith("session-known", "Zachary");
     expect(createPlayerSession).not.toHaveBeenCalled();
+    expect(deletePlayerSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps them attached to the same identity, so their binder follows", async () => {
+    await captureRedirect(() => join(formData({ displayName: "Zachary" })));
+
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "session-known");
+    expect(setPlayerCookie).not.toHaveBeenCalled();
+  });
+
+  /* No write when nothing changed — this runs on every single join. */
+  it("does not write when the name is unchanged", async () => {
+    await captureRedirect(() => join(formData({ displayName: "Zach" })));
+
+    expect(renamePlayerSession).not.toHaveBeenCalled();
+  });
+
+  it("ignores surrounding whitespace rather than treating it as a change", async () => {
+    await captureRedirect(() => join(formData({ displayName: "  Zach  " })));
+
+    expect(renamePlayerSession).not.toHaveBeenCalled();
+  });
+
+  /*
+   * The field is pre-filled, so an empty one means it never arrived. Keeping
+   * the old name beats refusing to let a known player into the room.
+   */
+  it("keeps the existing name when the field is empty", async () => {
+    await captureRedirect(() => join(formData({ displayName: "" })));
+
+    expect(renamePlayerSession).not.toHaveBeenCalled();
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "session-known");
+  });
+
+  it("applies the same name rules as a new player", async () => {
+    const state = await join(formData({ displayName: "Z" }));
+
+    expect(state.status).toBe("error");
+    expect(renamePlayerSession).not.toHaveBeenCalled();
+    expect(joinEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not drop them into the room if the rename fails", async () => {
+    renamePlayerSession.mockRejectedValue(new Error("database down"));
+
+    const state = await join(formData({ displayName: "Zachary" }));
+
+    expect(state.status).toBe("error");
+    expect(joinEvent).not.toHaveBeenCalled();
   });
 });
 
