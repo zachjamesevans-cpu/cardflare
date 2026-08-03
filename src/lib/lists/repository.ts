@@ -452,25 +452,3 @@ export async function listRoomFlares(eventId: string): Promise<ListEntry[]> {
 
   return rows.map((row) => toEntry(row, lookups));
 }
-
-/**
- * Which cards the viewer has in their binder.
- *
- * A private, read-time cross-reference so a player can see "someone here needs
- * this and it is in your binder" without their inventory being broadcast.
- */
-export async function ownHeldCardIds(playerSessionId: string): Promise<Set<string>> {
-  if (!isSupabaseConfigured()) return new Set();
-
-  const { data, error } = await getSupabaseAdmin()
-    .from("player_cards")
-    .select("card_id")
-    .eq("player_session_id", playerSessionId);
-
-  if (error) {
-    console.error("Could not read the viewer's held cards", error);
-    return new Set();
-  }
-
-  return new Set((data ?? []).map((row) => row.card_id));
-}

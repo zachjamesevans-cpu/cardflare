@@ -43,6 +43,7 @@ src/lib/
   cards/               Card provider interface, importer, search
   events/              Event Rooms: schema, repository, actions, join codes, QR,
                        and rooms.ts — what a scanned code resolves to
+  matching/            Match rules, offers: schema, repository, actions
   players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
@@ -71,6 +72,7 @@ only Client Components are:
 | `JoinEventForm`      | `useActionState`, inline errors                |
 | `PrintButton`        | Calls `window.print()`                         |
 | `PlayerIdentityCard` | Rename disclosure state                        |
+| `RoomTicker`         | Interval + `router.refresh()` while visible    |
 | `AnalyticsTracker`   | Page view and delegated click tracking         |
 
 All routes prerender as static content. The waitlist submits through a Server
@@ -721,6 +723,41 @@ to nothing in particular, and founder feedback was that people wanting to say
 "open to anything" never connected it with posting — the moment somebody
 thinks "I don't know what to search for" is the moment it has to be in front
 of them.
+
+### Matching and offers
+
+Matching is a per-viewer, read-time computation, not a background job: the
+room page derives "which of these Flares can _you_ answer" from the binder it
+already loaded (`src/lib/matching/schema.ts`). There is no matches table to
+drift out of date, and nothing is computed for players who are not looking.
+
+**Printings are honoured, not guessed.** A Flare naming a printing matches
+exactly only on that printing; the base art — or a binder entry that named no
+printing — shows as "you have another printing". `HeldByCard` stores, per held
+card, only the printings the binder _names_: key presence answers "do you have
+the card", the set answers "can you prove which printing".
+
+**An offer is the holder choosing to be found.** `flare_responses` carries the
+responder, the Flare, and an optional 80-character "where to find me" — and
+nothing from the binder: not the printing, not the quantity. The privacy line
+from Milestone 6 (the room learns you can help only when you say so) survives
+matching intact. Offers from players who left the room are hidden at read
+time, since "come find me" is false once they have; rejoining restores them.
+
+The server re-checks every rule the UI already respects, because a Server
+Action is a public POST endpoint: the Flare must be open and in the caller's
+room, never their own, and **the responder's binder must actually hold the
+card** — the check that stops offers being a way to put your name on every
+Flare in a room. Capped at 30 open offers per room.
+
+**Freshness is a poll, not a socket.** `RoomTicker` re-renders the room from
+the server once a minute while the tab is visible, and immediately on return
+— which also keeps `last_seen_at` honest, since the render is the heartbeat.
+Same decision presence made in Milestone 4, for the same reasons: the response
+to a match is a walk across a physical room, and a websocket would trade
+connection management on locked phones for a few seconds nobody needs.
+Supabase Realtime is ruled out regardless — RLS with zero policies means the
+anon key can subscribe to nothing, which is the point of the security model.
 
 ### Avatars
 

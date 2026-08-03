@@ -9,7 +9,9 @@ import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
+import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import { RoomTicker } from "@/components/events/room-ticker";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
@@ -26,6 +28,8 @@ import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { needsConfirming } from "@/lib/lists/schema";
+import { listRoomOffers } from "@/lib/matching/repository";
+import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -158,19 +162,41 @@ export default async function JoinByCodePage({
    * Only read once the player is actually in the room. A visitor looking at a
    * join form has no business causing a read of anybody's lists.
    */
-  const [participants, flares, binder] = inRoom
+  const [participants, flares, binder, roomOffers] = inRoom
     ? await Promise.all([
         listParticipants(event.id),
         listRoomFlares(event.id),
         listBinder(session!.id),
+        listRoomOffers(event.id),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
 
   /*
-   * Derived from the binder that was just read rather than queried again — the
-   * cross-reference is the same set of cards.
+   * The matching engine, such as it is: derived from the binder that was just
+   * read rather than queried again, because the cross-reference *is* the
+   * binder. Computed for this viewer only — the room learns somebody can help
+   * only when that somebody offers.
    */
-  const held = new Set(binder.map((entry) => entry.cardId));
+  const held = heldByCard(binder);
+
+  const matches = new Map(
+    flares.flatMap((entry) => {
+      const match = matchFor(entry, held);
+      return match ? [[entry.id, match] as const] : [];
+    }),
+  );
+
+  const offers = offersByFlare(roomOffers);
+
+  /* The requester's side: offers standing on the viewer's own open Flares. */
+  const myFlaresWithOffers = flares.filter(
+    (entry) =>
+      entry.playerSessionId === session?.id && (offers.get(entry.id) ?? []).length > 0,
+  );
+  const offersOnMine = myFlaresWithOffers.reduce(
+    (sum, entry) => sum + (offers.get(entry.id) ?? []).length,
+    0,
+  );
 
   /*
    * The binder follows the player between events, so before it is trusted in
@@ -246,6 +272,9 @@ export default async function JoinByCodePage({
         </Card>
       ) : inRoom && session ? (
         <>
+          {/* Offers land while people wander; the room re-reads itself. */}
+          <RoomTicker />
+
           <Card className="flex items-center gap-3">
             <PlayerAvatar displayName={session.display_name} seed={session.id} />
             <div className="flex min-w-0 flex-col">
@@ -255,6 +284,12 @@ export default async function JoinByCodePage({
               </p>
             </div>
           </Card>
+
+          <MatchSummary
+            offerCount={offersOnMine}
+            flareCount={myFlaresWithOffers.length}
+            anchor={`#flares-${session.id}`}
+          />
 
           <EventLobby
             code={normalized}
@@ -287,7 +322,8 @@ export default async function JoinByCodePage({
               code={normalized}
               imagesEnabled={images}
               youId={session.id}
-              heldCardIds={held}
+              matches={matches}
+              offers={offers}
               openToTrades={openPlayers}
             />
           </section>

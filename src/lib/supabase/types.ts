@@ -331,6 +331,26 @@ export type FlareInsert = Omit<
 };
 
 /**
+ * A holder's offer to answer a Flare — the moment they choose to be found.
+ *
+ * Carries nothing from the responder's binder: not the printing, not the
+ * quantity. An offer is a hand raised, not an inventory disclosure.
+ */
+export type FlareResponseRow = {
+  id: string;
+  created_at: string;
+  flare_id: string;
+  responder_session_id: string;
+  /** "Table 12". Optional, short, and the only thing the responder says. */
+  message: string | null;
+};
+
+export type FlareResponseInsert = Omit<FlareResponseRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+/**
  * A player's trade binder. Follows the player, not the event.
  *
  * No `event_id` and no `status`: it is not scoped to a room, and a card is
@@ -404,6 +424,7 @@ export type Database = {
       events: Table<EventRow, EventInsert>;
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       flares: Table<FlareRow, FlareInsert>;
+      flare_responses: Table<FlareResponseRow, FlareResponseInsert>;
       player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;

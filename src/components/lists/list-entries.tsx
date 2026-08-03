@@ -1,13 +1,15 @@
-import { Flame, Hand, PackageCheck } from "lucide-react";
+import { Flame, Hand, Layers, PackageCheck } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
+import { OfferList, OfferPanel } from "@/components/matching/offer-controls";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { removeListEntryAction } from "@/lib/lists/actions";
 import type { ListEntry } from "@/lib/lists/repository";
 import { groupByPlayer, type ListKind } from "@/lib/lists/schema";
+import type { MatchKind, Offer } from "@/lib/matching/schema";
 
 /**
  * Flare boards and Have lists.
@@ -26,20 +28,25 @@ function Entry({
   code,
   kind,
   imagesEnabled,
-  youHaveIt,
+  match,
   removable,
+  children,
 }: {
   entry: ListEntry;
   code: string;
   kind: ListKind;
   imagesEnabled: boolean;
   /**
-   * The viewer holds this card. Computed for this viewer only and never
-   * broadcast — a Have list is a list of valuable things a named person is
-   * carrying in a room full of strangers.
+   * How well the viewer's binder answers this Flare. Computed for this viewer
+   * only and never broadcast — a Have list is a list of valuable things a
+   * named person is carrying in a room full of strangers. `other-printing`
+   * is said out loud rather than rounded up to "you have this": the
+   * requester named a printing, and claiming the match would be guessing.
    */
-  youHaveIt?: boolean;
+  match?: MatchKind | null;
   removable: boolean;
+  /** Offer controls or the offers themselves, rendered under the card. */
+  children?: React.ReactNode;
 }) {
   return (
     <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
@@ -72,16 +79,33 @@ function Entry({
         {entry.note && (
           <p className="text-sm text-text-secondary italic">{entry.note}</p>
         )}
+
+        {/*
+         * In the text column rather than the badge column on the right: the
+         * label is long, and a shrink-proof column wide enough for "You have
+         * another printing" crushes the card name into a sliver on a phone.
+         */}
+        {match === "exact" && (
+          <span className="mt-1">
+            <Badge>
+              <PackageCheck className="size-3.5" aria-hidden="true" />
+              You have this
+            </Badge>
+          </span>
+        )}
+        {match === "other-printing" && (
+          <span className="mt-1">
+            <Badge>
+              <Layers className="size-3.5" aria-hidden="true" />
+              You have another printing
+            </Badge>
+          </span>
+        )}
+
+        {children}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">
-        {youHaveIt && (
-          <Badge>
-            <PackageCheck className="size-3.5" aria-hidden="true" />
-            You have this
-          </Badge>
-        )}
-
         {removable && (
           <form action={removeListEntryAction}>
             <input type="hidden" name="code" value={code} />
@@ -149,14 +173,18 @@ export function FlareBoard({
   code,
   imagesEnabled,
   youId,
-  heldCardIds,
+  matches,
+  offers,
   openToTrades = [],
 }: {
   entries: ListEntry[];
   code: string;
   imagesEnabled: boolean;
   youId: string;
-  heldCardIds: Set<string>;
+  /** How well the viewer's binder answers each Flare, keyed by entry id. */
+  matches: Map<string, MatchKind>;
+  /** Standing offers on each Flare, keyed by entry id. */
+  offers: Map<string, Offer[]>;
   /** Players in this room who will consider any trade. */
   openToTrades?: { playerSessionId: string; displayName: string }[];
 }) {
@@ -184,7 +212,7 @@ export function FlareBoard({
       {groups.map((group) => {
         const isYou = group.playerSessionId === youId;
         const answerable = group.entries.filter(
-          (entry) => !isYou && heldCardIds.has(entry.cardId),
+          (entry) => !isYou && matches.has(entry.id),
         ).length;
         const headingId = `flares-${group.playerSessionId}`;
         const alsoOpen = openIds.has(group.playerSessionId);
@@ -221,17 +249,37 @@ export function FlareBoard({
             </div>
 
             <ul aria-labelledby={headingId} className="flex flex-col">
-              {group.entries.map((entry) => (
-                <Entry
-                  key={entry.id}
-                  entry={entry}
-                  code={code}
-                  kind="flare"
-                  imagesEnabled={imagesEnabled}
-                  youHaveIt={!isYou && heldCardIds.has(entry.cardId)}
-                  removable={isYou}
-                />
-              ))}
+              {group.entries.map((entry) => {
+                const match = isYou ? null : (matches.get(entry.id) ?? null);
+                const entryOffers = offers.get(entry.id) ?? [];
+                const ownOffer = entryOffers.find(
+                  (offer) => offer.responderSessionId === youId,
+                );
+
+                return (
+                  <Entry
+                    key={entry.id}
+                    entry={entry}
+                    code={code}
+                    kind="flare"
+                    imagesEnabled={imagesEnabled}
+                    match={match}
+                    removable={isYou}
+                  >
+                    {/*
+                     * Your Flare: everyone who raised a hand. Someone else's
+                     * that you can answer: the hand-raising controls. Never
+                     * both — you cannot offer on your own request.
+                     */}
+                    {isYou && entryOffers.length > 0 && (
+                      <OfferList offers={entryOffers} />
+                    )}
+                    {match && (
+                      <OfferPanel code={code} flareId={entry.id} ownOffer={ownOffer} />
+                    )}
+                  </Entry>
+                );
+              })}
 
               {/*
                * Last, under the specific asks. Somebody has named four cards
