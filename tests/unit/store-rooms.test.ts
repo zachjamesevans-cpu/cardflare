@@ -18,6 +18,7 @@ import type { PublicEvent, PublicStore } from "@/lib/events/schema";
  */
 
 const findEventByJoinCode = vi.fn();
+const findShowByJoinCode = vi.fn();
 const findStoreByJoinCode = vi.fn();
 const findRunningScheduledEvent = vi.fn();
 const findOpenWalkInRoom = vi.fn();
@@ -28,6 +29,7 @@ const openWalkInRoom = vi.fn();
 vi.mock("@/lib/events/repository", () => ({
   findEventByJoinCode: (...args: unknown[]) => findEventByJoinCode(...args),
   findStoreByJoinCode: (...args: unknown[]) => findStoreByJoinCode(...args),
+  findShowByJoinCode: (...args: unknown[]) => findShowByJoinCode(...args),
   findRunningScheduledEvent: (...args: unknown[]) => findRunningScheduledEvent(...args),
   findOpenWalkInRoom: (...args: unknown[]) => findOpenWalkInRoom(...args),
   latestActivityAt: (...args: unknown[]) => latestActivityAt(...args),
@@ -102,6 +104,7 @@ beforeEach(() => {
 
   for (const fn of [
     findEventByJoinCode,
+    findShowByJoinCode,
     findStoreByJoinCode,
     findRunningScheduledEvent,
     findOpenWalkInRoom,
@@ -121,13 +124,37 @@ beforeEach(() => {
 });
 
 describe("resolveCode", () => {
-  it("does not recognise a code that is neither length", async () => {
-    for (const code of ["K3M9P", "K3M9PZQ8", "", "k3m9pz"]) {
+  it("does not recognise a code of no length at all", async () => {
+    // Nine characters, not eight: eight is a show code now.
+    for (const code of ["K3M9P", "K3M9PZQ89", "", "k3m9pz"]) {
       await expect(resolveCode(code)).resolves.toEqual({ outcome: "not-found" });
     }
 
     expect(findEventByJoinCode).not.toHaveBeenCalled();
     expect(findStoreByJoinCode).not.toHaveBeenCalled();
+    expect(findShowByJoinCode).not.toHaveBeenCalled();
+  });
+
+  it("resolves an eight-character code as a show, and only as a show", async () => {
+    findShowByJoinCode.mockResolvedValue({ id: "show-1", name: "Dallas" });
+
+    await expect(resolveCode("K3M9PZQ8")).resolves.toEqual({
+      outcome: "show",
+      show: { id: "show-1", name: "Dallas" },
+    });
+
+    // A show code must never fall through to the store or event lookups —
+    // that would let one code space impersonate another.
+    expect(findEventByJoinCode).not.toHaveBeenCalled();
+    expect(findStoreByJoinCode).not.toHaveBeenCalled();
+  });
+
+  it("reads a show code with no show behind it as not found", async () => {
+    findShowByJoinCode.mockResolvedValue(null);
+
+    await expect(resolveCode("K3M9PZQ8")).resolves.toEqual({
+      outcome: "not-found",
+    });
   });
 
   it("sends a six-character code to the events table and nowhere else", async () => {
@@ -314,6 +341,14 @@ describe("resolveCode", () => {
 });
 
 describe("enterRoomByCode", () => {
+  it("never enters a show — there is nothing to enter", async () => {
+    findShowByJoinCode.mockResolvedValue({ id: "show-1" });
+
+    await expect(enterRoomByCode("K3M9PZQ8")).resolves.toBeNull();
+    expect(findShowByJoinCode).not.toHaveBeenCalled();
+    expect(openWalkInRoom).not.toHaveBeenCalled();
+  });
+
   it("opens the walk-in room when somebody actually joins", async () => {
     findStoreByJoinCode.mockResolvedValue(store());
     openWalkInRoom.mockResolvedValue({ outcome: "opened", room: room({ id: "new" }) });

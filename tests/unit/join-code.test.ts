@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyCode,
+  generateShowCode,
   generateJoinCode,
   generateStoreCode,
   isValidJoinCode,
@@ -119,14 +120,17 @@ describe("isValidJoinCode", () => {
   });
 
   it("rejects the wrong length or case", () => {
-    for (const code of ["K3M9P", "K3M9PZ12", "k3m9pz", "", "K3M9P Z"]) {
+    // Nine characters, not eight: an 8-character code is a show now.
+    for (const code of ["K3M9P", "K3M9PZ123", "k3m9pz", "", "K3M9P Z"]) {
       expect(isValidJoinCode(code)).toBe(false);
     }
   });
 
   // The regex must be anchored, or a code with junk around it would pass.
+  // The junk is non-alphabet on purpose: one more *valid* character is not
+  // junk any more — it is the next code space up.
   it("rejects a valid code with anything around it", () => {
-    for (const code of ["XK3M9PZQ", "K3M9PZQX", "/K3M9PZ", "K3M9PZ\n"]) {
+    for (const code of ["/K3M9PZQ", "K3M9PZQ/", "/K3M9PZ", "K3M9PZ\n", "XK3M9PZQX"]) {
       expect(isValidJoinCode(code)).toBe(false);
     }
   });
@@ -148,16 +152,21 @@ describe("classifyCode", () => {
     expect(classifyCode("K3M9PZQ")).toBe("store");
   });
 
+  it("calls eight characters a show", () => {
+    expect(classifyCode("K3M9PZQ8")).toBe("show");
+  });
+
   it("calls anything else nothing at all", () => {
-    for (const code of ["K3M9P", "K3M9PZQ8", "", "k3m9pz", "K3M9PU"]) {
+    for (const code of ["K3M9P", "K3M9PZQ89", "", "k3m9pz", "K3M9PU"]) {
       expect(classifyCode(code)).toBeNull();
     }
   });
 
-  it("never classifies one length as the other", () => {
+  it("never classifies one length as another", () => {
     for (let i = 0; i < 200; i += 1) {
       expect(classifyCode(generateJoinCode())).toBe("event");
       expect(classifyCode(generateStoreCode())).toBe("store");
+      expect(classifyCode(generateShowCode())).toBe("show");
     }
   });
 });

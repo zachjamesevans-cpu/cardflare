@@ -35,12 +35,22 @@ export const JOIN_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 export const JOIN_CODE_LENGTH = 6;
 export const STORE_CODE_LENGTH = 7;
 
+/**
+ * Eight for a card show. It outlives an event code (printed on banners and
+ * shared in vendor group chats for weeks) and is guessed at by more
+ * strangers than a counter code, so it takes the next 32× step — and the
+ * third length keeps the namespace rule intact: nothing is ever told apart
+ * by a lookup.
+ */
+export const SHOW_CODE_LENGTH = 8;
+
 /** Each matches its column's check constraint exactly. */
 export const JOIN_CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{6}$/;
 export const STORE_CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{7}$/;
+export const SHOW_CODE_PATTERN = /^[0-9A-HJKMNP-TV-Z]{8}$/;
 
 /** What a code refers to, decided by its shape rather than by a lookup. */
-export type CodeKind = "event" | "store";
+export type CodeKind = "event" | "store" | "show";
 
 /**
  * Generates a join code.
@@ -60,6 +70,11 @@ export function generateJoinCode(length: number = JOIN_CODE_LENGTH): string {
 /** A store's permanent counter code. */
 export function generateStoreCode(): string {
   return generateJoinCode(STORE_CODE_LENGTH);
+}
+
+/** A card show's code. */
+export function generateShowCode(): string {
+  return generateJoinCode(SHOW_CODE_LENGTH);
 }
 
 /**
@@ -89,6 +104,7 @@ export function normalizeJoinCode(input: string): string {
 export function classifyCode(input: string): CodeKind | null {
   if (JOIN_CODE_PATTERN.test(input)) return "event";
   if (STORE_CODE_PATTERN.test(input)) return "store";
+  if (SHOW_CODE_PATTERN.test(input)) return "show";
   return null;
 }
 

@@ -53,6 +53,8 @@ export function storeInviteEmail(
    * back to the two-step route, which is what every invitation used to do.
    */
   setupLink?: string | null,
+  /** Changes one paragraph: what the recipient is being invited to *do*. */
+  kind: "lgs" | "vendor" = "lgs",
 ): EmailMessage {
   const name = escapeHtml(storeName);
   const signInUrl = `${origin}/login`;
@@ -99,9 +101,11 @@ export function storeInviteEmail(
       </h1>
 
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
-        CardFlare helps players at your events find the cards they need from
-        other people already in the room. You're one of the first stores trying
-        it.
+        ${
+          kind === "vendor"
+            ? "CardFlare helps card-show attendees find the exact cards they want — and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
+            : "CardFlare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
+        }
       </p>
 
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
@@ -149,11 +153,22 @@ export function storeInviteEmail(
         "after a while, so open it when you have a minute.",
       ];
 
+  const intro =
+    kind === "vendor"
+      ? [
+          "CardFlare helps card-show attendees find the exact cards they want -",
+          "and walks them straight to your booth. Upload your inventory before",
+          "the show, singles and slabs alike.",
+        ]
+      : [
+          "CardFlare helps players at your events find the cards they need from other",
+          "people already in the room. You're one of the first stores trying it.",
+        ];
+
   const text = [
     `${storeName} is in the CardFlare beta.`,
     "",
-    "CardFlare helps players at your events find the cards they need from other",
-    "people already in the room. You're one of the first stores trying it.",
+    ...intro,
     "",
     ...middle,
     "",

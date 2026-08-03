@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { VendorInventoryForm } from "@/components/shows/vendor-inventory-form";
+import { VendorInventoryList } from "@/components/shows/vendor-inventory-list";
+import { VendorShows } from "@/components/shows/vendor-shows";
 import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
@@ -12,6 +15,12 @@ import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
+import { cardImagesEnabled } from "@/lib/cards/images";
+import {
+  boothsForStore,
+  listClaimableShows,
+  listInventory,
+} from "@/lib/shows/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -48,10 +57,62 @@ export default async function StorePage() {
   const supabase = await createSupabaseServerClient();
   const { data: stores } = await supabase
     .from("stores")
-    .select("id, name, city, region, status, join_code, walk_in_enabled, timezone")
+    .select(
+      "id, name, city, region, status, join_code, walk_in_enabled, timezone, kind",
+    )
     .order("name");
 
   const store = stores?.[0];
+
+  /*
+   * A vendor's dashboard is a different job: no rooms, no counter code — an
+   * inventory to state and booths to claim. Same account machinery, split
+   * here where the difference becomes visible.
+   */
+  if (store?.kind === "vendor") {
+    const [lines, shows, booths] = await Promise.all([
+      listInventory(store.id),
+      listClaimableShows(),
+      boothsForStore(store.id),
+    ]);
+
+    return (
+      <AppShell
+        area="Store"
+        email={viewer.user.email ?? ""}
+        title={store.name}
+        description="Upload what you're bringing, claim your booth, and attendees find you."
+      >
+        <section className="flex flex-col gap-5" aria-labelledby="shows-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="shows-heading" className="text-xl font-bold text-text-primary">
+              Shows
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Claim a booth and everything below becomes findable by everyone who scans
+              that show&rsquo;s code.
+            </p>
+          </div>
+          <VendorShows storeId={store.id} shows={shows} booths={booths} />
+        </section>
+
+        <section className="flex flex-col gap-5" aria-labelledby="inventory-heading">
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="inventory-heading" className="text-xl font-bold text-text-primary">
+              Your inventory
+            </h2>
+            <span className="text-sm text-text-muted tabular-nums">
+              {lines.length} {lines.length === 1 ? "line" : "lines"}
+            </span>
+          </div>
+
+          <VendorInventoryForm storeId={store.id} imagesEnabled={cardImagesEnabled()} />
+          <VendorInventoryList storeId={store.id} lines={lines} />
+        </section>
+      </AppShell>
+    );
+  }
+
   const events = store ? await listEventsForStore(store.id) : [];
   const attendance = await countParticipants(events.map((event) => event.id));
   const timeZone = store?.timezone ?? "UTC";

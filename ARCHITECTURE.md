@@ -46,6 +46,7 @@ src/lib/
   matching/            Match rules, offers: schema, repository, actions
   trades/              Trade confirmation, history, binder nudge, event stats
   players/             Guest sessions: schema, repository, cookie, actions
+  shows/               Card shows: vendors, booths, inventory, availability
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
   waitlist/            Schema, parsing, repository, server action
@@ -793,6 +794,42 @@ store. The nudge asks; it never edits the binder itself.
 **Event analytics are counts.** Players, Flares, offers, trades — the funnel
 a store reads after a night. Totals only, never who traded what with whom:
 the store hosts the room, it does not read it.
+
+## Card shows
+
+The second kind of operator, and the third length in the code namespace. A
+**vendor** (`stores.kind = 'vendor'`) arrives through the same invitation
+pipeline and the same sign-in as a game store — one switch decides which
+dashboard the account gets. A **show** belongs to no store: it has a name, a
+weekend-long window in its own timezone, and an **eight-character** code, so
+the same `/e/CODE` route serves events (6), counter codes (7) and shows (8)
+without a lookup ever deciding which is which.
+
+The attendee path is deliberately sessionless: scan, type a card name, read
+booth numbers. No account, no join step, nothing written. `resolveCode`
+returns a show as a place to _look things up_, never a room to enter — no
+participation row exists for a show, and `enterRoomByCode` refuses the length
+outright.
+
+**Inventory models the vendor's two physical realities.** A row is raw or a
+slab, and a slab names its grader (PSA, BGS, CGC — a shape-checked text
+column, because grading companies appear faster than migrations should have
+to) and carries a 1–10 half-step grade, or none for a case marked
+"Authentic". The same card as a raw playset, a PSA 10 and a BGS 9.5 is three
+rows, because those are three different reasons to cross a hall. Restating a
+row replaces its quantity — that is what "upload your inventory before the
+show" means row by row. **No prices anywhere**, per PRODUCT.md.
+
+**Availability is roster-gated.** An attendee search runs the ordinary card
+search, then joins matching inventory against the show's `show_vendors`
+roster — inventory from a vendor who never claimed a booth at this show is
+invisible at this show, which keeps uploading stock from advertising a
+vendor at every show in the system. Results sort by booth as a walking
+route, slabs first, best grade first.
+
+Bulk inventory import (CSV from a vendor's existing tooling) is deliberately
+unbuilt until a real vendor's file has been seen: a guessed column mapping
+that silently mislists someone's stock is worse than an evening of tapping.
 
 ### Avatars
 

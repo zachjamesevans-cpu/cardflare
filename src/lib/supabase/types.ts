@@ -13,6 +13,8 @@ import type { UserType } from "@/lib/waitlist/schema";
 
 export type WaitlistStatus = "active" | "unsubscribed" | "bounced";
 export type StoreStatus = "invited" | "active" | "paused";
+/** lgs runs rooms and events; vendor brings inventory to card-show booths. */
+export type StoreKind = "lgs" | "vendor";
 export type StoreRole = "owner" | "staff";
 
 export type WaitlistSignupRow = {
@@ -55,15 +57,17 @@ export type StoreRow = {
   walk_in_enabled: boolean;
   /** IANA name. Turns a typed event time into an instant, and back. */
   timezone: string;
+  kind: StoreKind;
 };
 
 /** Columns with database defaults are optional on insert. */
 export type StoreInsert = Omit<
   StoreRow,
-  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled" | "timezone"
+  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled" | "timezone" | "kind"
 > & {
   walk_in_enabled?: boolean;
   timezone?: string;
+  kind?: StoreKind;
   id?: string;
   created_at?: string;
   status?: StoreStatus;
@@ -246,6 +250,62 @@ export type CardSearchRow = Pick<
   | "effect_text"
   | "trigger_text"
 > & { score: number };
+
+export type ShowRow = {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  name: string;
+  city: string | null;
+  region: string | null;
+  timezone: string;
+  starts_at: string;
+  ends_at: string;
+  join_code: string;
+};
+
+export type ShowInsert = Omit<ShowRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type ShowVendorRow = {
+  show_id: string;
+  store_id: string;
+  booth: string;
+  created_at: string;
+};
+
+export type ShowVendorInsert = Omit<ShowVendorRow, "created_at"> & {
+  created_at?: string;
+};
+
+export type InventoryForm = "raw" | "slab";
+
+/** A vendor's stock: raw singles and graded slabs. No prices, per PRODUCT.md. */
+export type VendorInventoryRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  store_id: string;
+  card_id: string;
+  printing_id: string | null;
+  form: InventoryForm;
+  grader: string | null;
+  /** Null on a slab means the case says "Authentic" rather than a number. */
+  grade: number | null;
+  quantity: number;
+};
+
+export type VendorInventoryInsert = Omit<
+  VendorInventoryRow,
+  "id" | "created_at" | "updated_at" | "quantity"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  quantity?: number;
+};
 
 export type EventStatus = "draft" | "open" | "closed";
 export type Game = "one_piece";
@@ -451,6 +511,9 @@ export type Database = {
       flares: Table<FlareRow, FlareInsert>;
       flare_responses: Table<FlareResponseRow, FlareResponseInsert>;
       trades: Table<TradeRow, TradeInsert>;
+      shows: Table<ShowRow, ShowInsert>;
+      show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
+      vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;
       player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;

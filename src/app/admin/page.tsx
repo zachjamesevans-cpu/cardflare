@@ -7,6 +7,7 @@ import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
 import { CreateEventForm } from "@/components/events/create-event-form";
+import { CreateShowForm } from "@/components/shows/create-show-form";
 import { EventList } from "@/components/events/event-list";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -20,8 +21,11 @@ import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
+import { listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
 import type { StoreListing } from "@/lib/stores/repository";
+import { formatEventWindow } from "@/lib/events/format";
+import { knownTimeZones } from "@/lib/time/zone";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -46,13 +50,16 @@ export const maxDuration = 60;
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events, cardCount, lastRun, printingImages] = await Promise.all([
-    listStores(),
-    listAllEvents(),
-    countCards(),
-    latestSyncRun(),
-    countPrintingImages(),
-  ]);
+  const [stores, events, cardCount, lastRun, printingImages, shows] = await Promise.all(
+    [
+      listStores(),
+      listAllEvents(),
+      countCards(),
+      latestSyncRun(),
+      countPrintingImages(),
+      listShows(),
+    ],
+  );
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
@@ -187,6 +194,53 @@ export default async function AdminPage() {
           timeZones={timeZones}
           attendance={attendance}
         />
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="shows-heading">
+        <div className="flex flex-col gap-1">
+          <h2 id="shows-heading" className="text-xl font-bold text-text-primary">
+            Card shows
+          </h2>
+          <p className="text-sm text-text-secondary">
+            One code per show. Vendors claim booths from their dashboard; attendees scan
+            and search.
+          </p>
+        </div>
+
+        <Card>
+          <CreateShowForm
+            zones={knownTimeZones("UTC")}
+            defaultZone="UTC"
+            defaultStartsAt={window.startsAt}
+            defaultEndsAt={window.endsAt}
+          />
+        </Card>
+
+        {shows.length > 0 && (
+          <Card className="p-4">
+            <ul className="flex flex-col">
+              {shows.map((show) => (
+                <li
+                  key={show.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                >
+                  <div className="flex min-w-0 flex-1 basis-48 flex-col">
+                    <Link
+                      href={`/admin/shows/${show.id}`}
+                      className="truncate font-semibold text-text-primary underline-offset-4 hover:underline"
+                    >
+                      {show.name}
+                    </Link>
+                    <span className="text-xs text-text-muted">
+                      {formatEventWindow(show.starts_at, show.ends_at, show.timezone)}
+                    </span>
+                  </div>
+                  <Badge tone="neutral">{show.join_code}</Badge>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="stores-heading">

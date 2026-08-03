@@ -8,7 +8,9 @@ import { expect, test } from "@playwright/test";
  */
 test.describe("event room", () => {
   test("a malformed code is a 404 before anything is queried", async ({ page }) => {
-    const response = await page.goto("/e/nonsense");
+    // "nonsense" is no longer nonsense: it normalises to N0NSENSE, a valid
+    // show code. Junk now has to be a length no code space owns.
+    const response = await page.goto("/e/nonsensical");
 
     expect(response?.status()).toBe(404);
   });

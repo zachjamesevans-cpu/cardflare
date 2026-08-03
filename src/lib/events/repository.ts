@@ -8,6 +8,7 @@ import type {
   EventKind,
   EventStatus,
   PublicEvent,
+  PublicShow,
   PublicStore,
 } from "./schema";
 import { WALK_IN_ROOM_NAME } from "./schema";
@@ -235,6 +236,34 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
     region: data.region,
     walkInEnabled: data.walk_in_enabled,
     timeZone: data.timezone,
+  };
+}
+
+/** Resolves a card show's code. */
+export async function findShowByJoinCode(code: string): Promise<PublicShow | null> {
+  if (!canQuery("resolve the show code")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("shows")
+    .select("id, name, city, region, timezone, starts_at, ends_at, join_code")
+    .eq("join_code", code)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not resolve the show code", error);
+    return null;
+  }
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    name: data.name,
+    city: data.city,
+    region: data.region,
+    timeZone: data.timezone,
+    startsAt: data.starts_at,
+    endsAt: data.ends_at,
+    joinCode: data.join_code,
   };
 }
 

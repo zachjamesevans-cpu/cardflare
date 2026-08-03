@@ -12,6 +12,7 @@ import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
 import { RoomTicker } from "@/components/events/room-ticker";
+import { ShowSearch } from "@/components/shows/show-search";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { TradedTonight } from "@/components/trades/traded-tonight";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -118,6 +119,46 @@ export default async function JoinByCodePage({
 
   const resolved = await resolveCode(normalized);
   if (resolved.outcome === "not-found") notFound();
+
+  /*
+   * A card show: search-only, sessionless on purpose. An attendee in a
+   * convention hall gets "booth A12 has it" with nothing between them and
+   * the answer — no name, no join, no account.
+   */
+  if (resolved.outcome === "show") {
+    const show = resolved.show;
+    const where = [show.city, show.region].filter(Boolean).join(", ");
+
+    return (
+      <Shell wide>
+        <Card className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-accent">Card show</p>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+              {show.name}
+            </h1>
+          </div>
+
+          <dl className="flex flex-col gap-2 text-sm text-text-secondary">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
+              <dt className="sr-only">When</dt>
+              <dd>{formatEventWindow(show.startsAt, show.endsAt, show.timeZone)}</dd>
+            </div>
+            {where && (
+              <div className="flex items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-text-muted" aria-hidden />
+                <dt className="sr-only">Where</dt>
+                <dd>{where}</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
+
+        <ShowSearch code={normalized} />
+      </Shell>
+    );
+  }
 
   /* Walk-in trading is off and no event is running. */
   if (resolved.outcome === "quiet") {

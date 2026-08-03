@@ -133,8 +133,21 @@ export interface PublicStore {
  *   `lobby`  nothing is running yet, but joining will start the walk-in room
  *   `quiet`  the store has walk-in trading switched off, so joining will not
  */
+/** A card show, as the attendee page renders it. */
+export interface PublicShow {
+  id: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  timeZone: string;
+  startsAt: string;
+  endsAt: string;
+  joinCode: string;
+}
+
 export type CodeResolution =
   | { outcome: "not-found" }
   | { outcome: "room"; room: PublicEvent }
   | { outcome: "lobby"; store: PublicStore }
-  | { outcome: "quiet"; store: PublicStore };
+  | { outcome: "quiet"; store: PublicStore }
+  | { outcome: "show"; show: PublicShow };
