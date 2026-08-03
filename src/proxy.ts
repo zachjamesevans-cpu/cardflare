@@ -16,17 +16,21 @@ import { createServerClient } from "@supabase/ssr";
  * `admin_users` through the user's own client, and a request carrying a
  * spent token reads nothing, so `requireAdmin` bounced them off the console.
  *
- * Middleware is the fix because it runs before the render and owns a real
- * response object. Touching `getUser()` here is what triggers the refresh; the
- * cookies it produces are copied onto the response and the browser keeps the
- * session.
+ * This runs before the render and owns a real response object, which is what
+ * makes it the fix. Touching `getUser()` here is what triggers the refresh;
+ * the cookies it produces are copied onto the response and the browser keeps
+ * the session.
+ *
+ * The file is `proxy.ts` rather than `middleware.ts` because Next 16
+ * deprecated that convention in favour of this name — same hook, same
+ * semantics, and `next build` warns on the old one.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // An unconfigured deployment has no session to refresh. Pass through rather
-  // than throwing: middleware failures take down every matched route at once.
+  // than throwing: a failure here takes down every matched route at once.
   if (!url || !key) return NextResponse.next();
 
   let response = NextResponse.next({ request });
@@ -39,7 +43,7 @@ export async function middleware(request: NextRequest) {
       setAll(cookiesToSet) {
         /*
          * Written to the request as well as the response. The request copy is
-         * what the page render behind this middleware reads, so without it the
+         * what the page render behind this reads, so without it the
          * very render this refresh exists to serve would still see the old
          * token and query as an expired user.
          */
@@ -62,7 +66,7 @@ export async function middleware(request: NextRequest) {
    * would read the cookie, find it expired, and change nothing.
    *
    * The result is deliberately unused: authorisation is decided per route by
-   * `getViewer`, which re-reads it. Middleware's job is the cookie, not the
+   * `getViewer`, which re-reads it. This layer's job is the cookie, not the
    * decision. Deciding access here as well would put a second, weaker copy of
    * the rules somewhere easy to forget.
    */
@@ -85,5 +89,5 @@ export const config = {
    * nothing is lost by skipping them: the next visit to a matched route
    * renews as normal.
    */
-  matcher: ["/store/:path*", "/admin/:path*", "/account/:path*", "/login"],
+  matcher: ["/store/:path*", "/admin/:path*", "/account/:path*", "/login", "/welcome"],
 };

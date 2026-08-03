@@ -42,7 +42,20 @@ export type InviteEmailOutcome = "sent" | "not-configured" | "failed";
 
 export type InviteStoreState =
   | { status: "idle" }
-  | { status: "success"; storeName: string; email: InviteEmailOutcome }
+  | {
+      status: "success";
+      storeName: string;
+      email: InviteEmailOutcome;
+      /**
+       * The one-click setup link, returned only when the email did not go out.
+       *
+       * It signs the holder in as that store, so it is a credential and is not
+       * echoed back when the store already has it in their inbox. When email
+       * is unconfigured or the provider rejected the message, an admin with no
+       * way to hand it over has no way to onboard the store at all.
+       */
+      setupLink?: string | null;
+    }
   | {
       status: "error";
       message: string;

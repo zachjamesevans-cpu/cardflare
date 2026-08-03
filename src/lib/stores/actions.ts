@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { generateSetupLink } from "@/lib/auth/invite-link";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { sendEmail } from "@/lib/email/client";
@@ -67,10 +68,23 @@ export async function inviteStoreAction(
     };
   }
 
+  /*
+   * The one-click link, minted before the email so it can go inside it. A
+   * failure here is logged and carried as null: the invitation still sends,
+   * and its fallback route — ask for a fresh link — is the flow every
+   * invitation used before this one existed.
+   */
+  const setupLink = await generateSetupLink(result.store.contact_email);
+
   // The store exists from here on. Email failure must not read as failure to
-  // invite — the admin can resend, and the store can sign in regardless.
+  // invite — the admin can resend, and the account is already provisioned.
   const email = await sendEmail(
-    storeInviteEmail(result.store.name, result.store.contact_email, siteUrl()),
+    storeInviteEmail(
+      result.store.name,
+      result.store.contact_email,
+      siteUrl(),
+      setupLink,
+    ),
   );
 
   if (email.status === "failed") {
@@ -79,9 +93,13 @@ export async function inviteStoreAction(
 
   revalidatePath("/admin");
 
+  const outcome = email.status === "skipped" ? "not-configured" : email.status;
+
   return {
     status: "success",
     storeName: result.store.name,
-    email: email.status === "skipped" ? "not-configured" : email.status,
+    email: outcome,
+    // Only when nothing was delivered — otherwise the store already has it.
+    setupLink: outcome === "sent" ? null : setupLink,
   };
 }

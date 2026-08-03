@@ -177,7 +177,7 @@ Asked for by the founder: `/admin` bounced him to the marketing site from his
 phone, and needing a fresh emailed link every time is friction in the wrong
 place for the people who run events.
 
-- **Sessions now survive.** There was no middleware, so a rotating refresh
+- **Sessions now survive.** There was no proxy, so a rotating refresh
   token was spent during page renders and its replacement discarded — a Server
   Component cannot write cookies. Operators were signed out about an hour after
   signing in, and a signed-in admin could read as a stranger and get bounced
@@ -253,6 +253,37 @@ timezone". It turned out to be worse than the display problem it was filed as.
 - Displayed with the abbreviation a person would say — "CDT", not
   "America/Chicago" — which also changes with the season, so it quietly
   confirms the daylight-saving side is right
+
+## ✅ Milestone 6.9 — One-email store invitations
+
+Asked for by the founder: "it's a little convoluted to get an email saying that
+they then have to get ANOTHER email just to set/reset their password."
+
+- **One email, not two.** The invitation used to point at a form that asked for
+  the address it had just been sent to, so a second email could carry the link
+  that actually did something. The first email did nothing but ask for a click
+- **Still no homegrown token.** `generateLink()` mints a real Supabase action
+  link without sending anything, so the invitation carries Supabase's own
+  token, verified by Supabase, redeemed through the same `/auth/callback` a
+  magic link uses. `recovery`, not `invite` — the auth account already exists
+  by then, and an invite link would try to create it and fail
+- **`/welcome`** shows the address they were invited on and asks for a password
+  and a confirmation. Nothing that is already known is asked for again
+- **Expiry is treated as the common case.** These links last an hour by
+  default and a shop owner reads email the next morning, so every failure path
+  lands on `/login/reset?expired=1` — which says the link expired and is one
+  field from a fresh one. Not `/login`, which asks an invited store for a
+  password they do not have yet
+- **The fallback is honest.** When the link cannot be minted, the invitation
+  still sends and its copy changes to describe the two-step route rather than
+  promising a button that is not there. Rendering both messages side by side is
+  what found that they were byte-identical, telling the reader that if the
+  button had expired they should visit the URL the button already pointed at
+- Two bugs found by looking rather than reasoning: that one, and every form in
+  the app emitting `errorid`/`hintid` attributes onto its inputs because
+  `fieldIds()` returned three ids where only `id` belongs on a control
+- `src/middleware.ts` is now `src/proxy.ts`, the convention Next 16 deprecated
+  it in favour of
 
 ### Milestone 7 — Matching
 

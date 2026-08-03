@@ -6,14 +6,14 @@ import { NextRequest } from "next/server";
  *
  * Supabase access tokens last an hour and are renewed with a *rotating*
  * refresh token: spending one invalidates it and issues a replacement. There
- * was no middleware, so renewal happened during page renders — and a Server
+ * was no proxy, so renewal happened during page renders — and a Server
  * Component cannot set cookies, so `setAll` in `src/lib/supabase/server.ts`
  * caught the new pair and dropped it. Every render spent the refresh token and
  * threw away the replacement, which invalidated the one the browser still
  * held. An hour after signing in, an operator was signed out and back to
  * asking for a magic link every single time.
  *
- * So the thing worth asserting is not "middleware runs". It is that the
+ * So the thing worth asserting is not "the proxy runs". It is that the
  * cookies Supabase hands back actually reach the response, which is precisely
  * what was missing.
  */
@@ -43,7 +43,7 @@ vi.mock("@supabase/ssr", () => ({
   }),
 }));
 
-const { middleware, config } = await import("@/middleware");
+const { proxy, config } = await import("@/proxy");
 
 function request(path = "/store") {
   const req = new NextRequest(new URL(`https://cardflare.gg${path}`));
@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-describe("middleware", () => {
+describe("proxy", () => {
   /*
    * The regression, stated directly. Without this the renewed session never
    * reaches the browser and the operator is signed out an hour later.
@@ -71,7 +71,7 @@ describe("middleware", () => {
       { name: "sb-refresh-token", value: "new-refresh", options: { path: "/" } },
     ];
 
-    const response = await middleware(request());
+    const response = await proxy(request());
 
     expect(response.cookies.get("sb-access-token")?.value).toBe("new-access");
     expect(response.cookies.get("sb-refresh-token")?.value).toBe("new-refresh");
@@ -83,26 +83,26 @@ describe("middleware", () => {
    * expired, and change nothing — which is the same do-nothing this replaced.
    */
   it("actually asks the auth server, rather than reading the cookie", async () => {
-    await middleware(request());
+    await proxy(request());
 
     expect(getUser).toHaveBeenCalled();
   });
 
   it("passes a request through untouched when there is nothing to refresh", async () => {
-    const response = await middleware(request());
+    const response = await proxy(request());
 
     expect(response.cookies.get("sb-access-token")).toBeUndefined();
     expect(response.status).toBe(200);
   });
 
   /*
-   * Middleware failures take down every matched route at once, so an
+   * A failure here takes down every matched route at once, so an
    * unconfigured deployment must pass through rather than throw.
    */
   it("does nothing when Supabase is not configured", async () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-    const response = await middleware(request());
+    const response = await proxy(request());
 
     expect(getUser).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
@@ -111,11 +111,11 @@ describe("middleware", () => {
   it("survives an auth server that is down", async () => {
     getUser.mockRejectedValue(new Error("network"));
 
-    await expect(middleware(request())).rejects.toThrow();
+    await expect(proxy(request())).rejects.toThrow();
   });
 });
 
-describe("middleware matcher", () => {
+describe("proxy matcher", () => {
   /*
    * `getUser` is a round trip to the auth server. The pages where speed
    * matters most — the landing page, and `/e/CODE` reached by scanning printed
@@ -131,6 +131,16 @@ describe("middleware matcher", () => {
 
   it("covers the sign-in page, so an existing session is seen there", () => {
     expect(config.matcher).toContain("/login");
+  });
+
+  /*
+   * `/welcome` is reached from a link in an invitation, which a shop owner may
+   * well leave sitting in a tab. Left off the matcher, a reload an hour later
+   * would spend the refresh token during the render and drop the replacement —
+   * signing them out of the page whose whole job is to sign them up.
+   */
+  it("covers the setup screen an invitation lands on", () => {
+    expect(config.matcher).toContain("/welcome");
   });
 
   it("leaves the public pages alone", () => {
