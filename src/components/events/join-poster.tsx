@@ -61,12 +61,13 @@ const STEPS = ["Scan the code", "Enter your name", "Post the cards you need"];
  */
 const GAME = "One Piece Card Game";
 
-export type PosterKind = "event" | "counter";
+export type PosterKind = "event" | "counter" | "show";
 
 /** The card's type line, and what the room actually is. */
 const TYPE_LINE: Record<PosterKind, string> = {
   event: "Event Room",
   counter: "Trade Anytime",
+  show: "Card Show",
 };
 
 function BrandLockup() {

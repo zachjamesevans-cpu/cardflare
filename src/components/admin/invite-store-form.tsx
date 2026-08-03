@@ -137,6 +137,41 @@ export function InviteStoreForm() {
           {state.status === "error" ? state.message : ""}
         </p>
 
+        {/*
+         * Which dashboard this account gets. Radios, not a select: two
+         * options, both visible, no tap to discover the second one exists.
+         */}
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium text-text-secondary">
+            What are they?
+          </legend>
+          <div className="flex flex-wrap gap-3">
+            {(
+              [
+                ["lgs", "Game store", "Runs events and trade rooms."],
+                ["vendor", "Card-show vendor", "Uploads inventory, claims booths."],
+              ] as const
+            ).map(([value, label, hint]) => (
+              <label
+                key={value}
+                className="flex min-w-0 flex-1 basis-52 cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-border bg-canvas px-3.5 py-3 has-checked:border-accent/60 has-checked:bg-accent/[0.06]"
+              >
+                <input
+                  type="radio"
+                  name="kind"
+                  value={value}
+                  defaultChecked={value === "lgs"}
+                  className="mt-1 accent-[var(--color-accent)]"
+                />
+                <span className="flex flex-col">
+                  <span className="text-sm font-medium text-text-primary">{label}</span>
+                  <span className="text-xs text-text-muted">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <div className="grid gap-5 sm:grid-cols-2">
           <Field name="name" label="Store name" error={errorFor(state, "name")}>
             <TextInput

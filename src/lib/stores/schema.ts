@@ -11,6 +11,12 @@ function optionalText(max: number) {
 }
 
 export const inviteStoreSchema = z.object({
+  /**
+   * What kind of operator this is. An LGS runs rooms and events; a card-show
+   * vendor uploads inventory and claims booths. Same pipeline, different
+   * dashboard — decided at the invitation because it is the admin who knows.
+   */
+  kind: z.enum(["lgs", "vendor"]).default("lgs"),
   name: z
     .string()
     .trim()

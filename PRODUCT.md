@@ -38,6 +38,10 @@ Use these terms consistently in code, UI copy, and documentation.
 | **Event Room**     | A live digital room tied to a physical TCG event                    |
 | **Counter Code**   | A store's permanent join code, printed once and left on the counter |
 | **Walk-in Room**   | The Event Room a Counter Code opens when no event is scheduled      |
+| **Card Show**      | A show with many vendors and one scannable code                     |
+| **Vendor**         | A card-show seller: inventory, a booth, no rooms                    |
+| **Booth**          | Where a vendor sits at one show — what attendees walk to            |
+| **Slab**           | A graded card in a case: PSA, BGS, CGC, with a grade on the label   |
 | **Have List**      | Cards a player has available                                        |
 | **Need List**      | Cards a player is seeking                                           |
 | **Open to trades** | A player who wants no card in particular and will consider anything |

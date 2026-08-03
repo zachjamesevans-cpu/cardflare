@@ -106,7 +106,8 @@ test.describe("joining by typed code", () => {
    * database — and it is the case a crawler or scanner will actually hit.
    */
   test("a malformed code in the URL is a 404", async ({ page }) => {
-    const response = await page.goto("/e/nonsense");
+    // Eleven letters: six, seven and eight all mean something now.
+    const response = await page.goto("/e/nonsensical");
 
     expect(response?.status()).toBe(404);
   });
@@ -140,8 +141,20 @@ test.describe("joining by typed code", () => {
     expect(status).not.toBe(404);
   });
 
-  test("eight characters is still nonsense", async ({ page }) => {
+  /*
+   * The third code space. A show's banner code has to survive an outage the
+   * same way a store's laminated sheet does: accepted by shape, never 404.
+   */
+  test("an eight-character show code is a real page, not a 404", async ({ page }) => {
     const response = await page.goto("/e/K3M9PZQ8");
+    const status = response?.status() ?? 0;
+
+    expect(status).toBeLessThan(500);
+    expect(status).not.toBe(404);
+  });
+
+  test("nine characters is still nonsense", async ({ page }) => {
+    const response = await page.goto("/e/K3M9PZQ89");
 
     expect(response?.status()).toBe(404);
   });

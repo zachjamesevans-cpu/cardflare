@@ -68,6 +68,7 @@ export async function inviteStore(
         contact_email: input.contactEmail,
         city: input.city,
         region: input.region,
+        kind: input.kind,
         join_code: generateStoreCode(),
       })
       .select()

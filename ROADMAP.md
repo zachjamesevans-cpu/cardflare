@@ -410,6 +410,46 @@ Founder feedback with screenshots: "the cards are kinda all scattered."
   nothing there to pick for. Driven end to end against a mock PostgREST:
   version tap arrives in the form as that printing, plain tap as "any"
 
+## ✅ Milestone 9 — Card shows
+
+Asked for by the founder: "card show attendees pull up, scan the QR code,
+enter the cards they're looking for — and it finds the vendors that have
+them and which booth they're at."
+
+- **A second kind of operator, one pipeline.** `stores.kind` splits `lgs`
+  from `vendor` at the invitation — the admin picks with a radio, the email
+  says the right thing to each, and everything else (one-email setup,
+  `/welcome`, sign-in) is reused untouched. A vendor's dashboard is
+  inventory and booths; no rooms, no counter code
+- **Shows are the third code length.** Eight characters, extending the
+  split-by-length namespace (six = event, seven = counter), so the one
+  `/e/CODE` route serves all three and nothing is ever told apart by a
+  lookup. Admin creates a show with a weekend-long window in the venue's
+  timezone; the poster prints from the same trading-card sheet
+- **Inventory speaks vendor: raw and slabs.** A line is a raw single or a
+  graded slab — PSA, BGS, CGC, 1–10 in half steps, or "Authentic" with no
+  number. The same card raw, as a PSA 10 and as a BGS 9.5 is three lines,
+  because those are three different reasons to cross a hall. Restating a
+  line replaces its quantity. **No prices anywhere**, per PRODUCT.md
+- **Booths are claimed, not assigned.** A vendor claims (or moves) their
+  booth per show from their dashboard; leaving hides their stock from that
+  show without touching the stock itself. The admin's show page is the
+  roster
+- **The attendee path is sessionless.** Scan, type, read booth numbers — no
+  account, no join step, nothing written. Results sort by booth as a
+  walking route, slabs first, best grade first, and inventory from a vendor
+  not on this show's roster is invisible at this show
+- Verified against a real PostgreSQL instance (slab rules, booth shapes,
+  upsert semantics, roster cascade), and driven end to end against a mocked
+  Supabase API: scan → "perona" → Booth A12 raw ×4, Booth B7 PSA 10 + BGS
+  9.5 ×2
+
+**Deliberately not built:** CSV inventory import (until a real vendor's file
+is seen — a guessed column mapping that mislists someone's stock is worse
+than an evening of tapping), attendee want-lists at shows (search-first ships
+tonight's value; persistence can follow observed use), and vendor
+self-signup (invites gate operators, same as stores).
+
 ## Deferred from Milestone 1
 
 Tracked so they are not lost, none blocking launch.

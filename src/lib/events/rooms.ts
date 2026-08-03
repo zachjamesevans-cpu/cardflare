@@ -6,6 +6,7 @@ import {
   findEventByJoinCode,
   findOpenWalkInRoom,
   findRunningScheduledEvent,
+  findShowByJoinCode,
   findStoreByJoinCode,
   latestActivityAt,
   openWalkInRoom,
@@ -151,6 +152,13 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
     return room ? { outcome: "room", room } : { outcome: "not-found" };
   }
 
+  // A show is a place to look things up, never a room to enter — the page
+  // renders search, and no participation row is ever written against it.
+  if (kind === "show") {
+    const show = await findShowByJoinCode(code);
+    return show ? { outcome: "show", show } : { outcome: "not-found" };
+  }
+
   const store = await findStoreByJoinCode(code);
   if (!store) return { outcome: "not-found" };
 
@@ -175,6 +183,9 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
   if (!kind) return null;
 
   if (kind === "event") return findEventByJoinCode(code);
+
+  // Shows have no join path at all: nothing to enter, nothing to open.
+  if (kind === "show") return null;
 
   const store = await findStoreByJoinCode(code);
   if (!store) return null;

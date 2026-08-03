@@ -37,6 +37,7 @@ export async function inviteStoreAction(
   }
 
   const parsed = inviteStoreSchema.safeParse({
+    kind: text(formData, "kind") || "lgs",
     name: text(formData, "name"),
     contactEmail: text(formData, "contactEmail"),
     city: text(formData, "city"),
@@ -84,6 +85,7 @@ export async function inviteStoreAction(
       result.store.contact_email,
       siteUrl(),
       setupLink,
+      parsed.data.kind,
     ),
   );
 
