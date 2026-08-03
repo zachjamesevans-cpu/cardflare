@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
+import { PasswordSignInForm } from "@/components/auth/password-sign-in-form";
+import { ProviderButtons } from "@/components/auth/provider-buttons";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { SITE } from "@/lib/site";
@@ -16,11 +18,15 @@ export const metadata: Metadata = {
 const ERRORS: Record<string, string> = {
   "invalid-link": "That sign-in link has expired or was already used.",
   "missing-code": "That sign-in link was incomplete.",
+  "provider-unavailable": "That sign-in method is not available.",
+  "provider-failed": "We could not start that sign-in. Please try again.",
+  unavailable: "Sign-in is unavailable right now. Please try again in a moment.",
 };
 
 export default async function LoginPage(props: PageProps<"/login">) {
   const params = await props.searchParams;
-  const next = firstValue(params.next);
+  const rawNext = firstValue(params.next);
+  const next = rawNext ? safeNextPath(rawNext) : undefined;
   const error = ERRORS[firstValue(params.error) ?? ""];
 
   return (
@@ -45,11 +51,33 @@ export default async function LoginPage(props: PageProps<"/login">) {
             role="alert"
             className="rounded-[var(--radius-control)] border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm text-warning"
           >
-            {error} Request a new one below.
+            {error}
           </p>
         )}
 
-        <SignInForm next={next ? safeNextPath(next) : undefined} />
+        {/* Nothing at all unless a provider is actually configured. */}
+        <ProviderButtons next={next} />
+
+        <PasswordSignInForm next={next} />
+
+        {/*
+         * The emailed link is still here, and still matters: it is how someone
+         * who has never set a password gets in the first time, and how anyone
+         * away from their password manager gets in at all. Behind a native
+         * <details> so it stays out of the way without needing any JavaScript
+         * to open.
+         */}
+        <details className="rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-4">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary marker:content-none hover:text-text-primary">
+            <span className="underline underline-offset-4">
+              Email me a sign-in link instead
+            </span>
+          </summary>
+
+          <div className="pt-5">
+            <SignInForm next={next} />
+          </div>
+        </details>
       </div>
     </main>
   );

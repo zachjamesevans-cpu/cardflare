@@ -127,6 +127,52 @@ email rather than a missing setting.
 > under **Project Settings → Authentication → SMTP Settings**. Configuration
 > only — no code change.
 
+### Password sign-in
+
+Operators sign in with an email address and a password. Two settings need
+checking, because the defaults are weaker than what the app asks for. Both live
+in the **Email** provider panel:
+
+**Authentication → Sign In / Providers → Email**, or go straight there with
+`https://supabase.com/dashboard/project/_/auth/providers?provider=Email` —
+the `_` resolves to your most recently opened project, which saves hunting for
+the project ref on a phone.
+
+- **Minimum password length: set it to 10.** Supabase's default is 6. CardFlare
+  refuses anything shorter in `src/lib/auth/schema.ts`, but that only governs
+  CardFlare's own forms — the Supabase setting is the one that holds if a
+  password is ever set any other way.
+- **Leaked password protection: on — Pro plan and above.** Checks new passwords
+  against Have I Been Pwned by hash prefix, so the password itself never leaves
+  Supabase. On the Free plan the toggle is there but gated behind an upgrade
+  prompt. Not a blocker: the length floor and the rate limits do not depend on
+  it, and the app surfaces the rejection if and when it is switched on.
+
+Nothing else is required: an invited store's account already exists with no
+password, and Supabase will send it a recovery link happily, so
+`/login/reset` is both "forgot my password" and "set my first one".
+
+> **Sessions depend on `src/middleware.ts`.** Access tokens last an hour and
+> renew with a rotating refresh token, and the renewed pair only reaches the
+> browser because middleware writes it there. If sign-ins start expiring after
+> about an hour, that file — or its `matcher` — is the first place to look.
+
+### Social sign-in (optional)
+
+Not configured, and nothing renders until it is. Two steps, in order:
+
+1. **Supabase → Authentication → Providers**, enable the provider and paste in
+   its client id and secret. For Google that means an OAuth client in Google
+   Cloud Console with `https://<project-ref>.supabase.co/auth/v1/callback` as
+   an authorised redirect URI. Apple additionally needs an Apple Developer
+   Program membership, a Services ID and a signing key.
+2. **Set `AUTH_PROVIDERS`** in Vercel to a comma-separated list of what you
+   configured — `google`, or `google,apple`.
+
+Both steps are needed. Step 1 without step 2 means no button appears; step 2
+without step 1 means a button that leads to a Supabase error page. Nothing in
+the app can verify step 1, which is exactly why it will not guess.
+
 ### Make yourself an admin
 
 Admins are an explicit allow-list; there is no self-service path into it, by
@@ -170,6 +216,7 @@ In **Project Settings → Environment Variables**, add these for
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key         | Public by design         |
 | `SUPABASE_SERVICE_ROLE_KEY`     | Supabase service_role key | **Secret. Server only.** |
 | `NEXT_PUBLIC_SITE_URL`          | `https://cardflare.gg`    | **Production only**      |
+| `AUTH_PROVIDERS`                | `google` / `google,apple` | Optional. See step 3     |
 
 Leave `NEXT_PUBLIC_SITE_URL` unset on Preview so preview deployments use their
 own URL for canonical tags and sitemap entries instead of advertising the

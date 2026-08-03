@@ -35,9 +35,18 @@ export function AppShell({ area, email, title, description, children }: AppShell
           </div>
 
           <div className="flex min-w-0 items-center gap-3">
-            <span className="hidden truncate text-sm text-text-muted md:block">
+            {/*
+             * The address doubles as the way into the account settings. It was
+             * already the only thing on the page identifying who you are, and
+             * a separate nav item for one page would be more chrome than the
+             * signed-in areas need.
+             */}
+            <Link
+              href="/account"
+              className="hidden truncate text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline md:block"
+            >
               {email}
-            </span>
+            </Link>
             <form action={signOut}>
               <Button type="submit" variant="secondary" size="sm">
                 Sign out
