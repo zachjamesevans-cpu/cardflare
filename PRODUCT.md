@@ -31,15 +31,16 @@ explicit approval, not an implementation detail.
 
 Use these terms consistently in code, UI copy, and documentation.
 
-| Term             | Meaning                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| **Flare**        | A live request for a card                                           |
-| **Flare Match**  | A match between a card request and an available card                |
-| **Event Room**   | A live digital room tied to a physical TCG event                    |
-| **Counter Code** | A store's permanent join code, printed once and left on the counter |
-| **Walk-in Room** | The Event Room a Counter Code opens when no event is scheduled      |
-| **Have List**    | Cards a player has available                                        |
-| **Need List**    | Cards a player is seeking                                           |
+| Term               | Meaning                                                             |
+| ------------------ | ------------------------------------------------------------------- |
+| **Flare**          | A live request for a card                                           |
+| **Flare Match**    | A match between a card request and an available card                |
+| **Event Room**     | A live digital room tied to a physical TCG event                    |
+| **Counter Code**   | A store's permanent join code, printed once and left on the counter |
+| **Walk-in Room**   | The Event Room a Counter Code opens when no event is scheduled      |
+| **Have List**      | Cards a player has available                                        |
+| **Need List**      | Cards a player is seeking                                           |
+| **Open to trades** | A player who wants no card in particular and will consider anything |
 
 ## The core loop
 

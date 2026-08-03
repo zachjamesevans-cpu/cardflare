@@ -200,6 +200,34 @@ handle needs a profiles table, uniqueness and case-folding rules, and a
 username→email lookup), public self-service signup, and MFA. The first two were
 declined by the founder; MFA belongs with a larger admin-hardening pass.
 
+## ✅ Milestone 6.7 — Open to trades
+
+Asked for by the founder, from his own experience as a newer player: most of a
+room is not hunting a specific card, and somebody who has never seen half of
+what is in the binders around them cannot name what they want.
+
+- **A flag on `event_participants`, not a card-less Flare.** A Flare is a
+  request for a card; making `card_id` nullable to hold "nothing in particular"
+  would weaken a constraint that carries meaning and put a non-card into a list
+  built to show cards. Being open to trades is a property of a person in a
+  room, and that table is exactly the row that says so
+- **Per room, so it expires by itself.** Somebody can be up for anything at
+  Friday locals and heads-down at a tournament, and leaving the room drops the
+  row — no stale signal, and no confirmation step needed to fix one
+- **They appear on the Flare board**, including with nothing posted. That board
+  is the one surface everyone reads, and being absent from it was worst for
+  exactly the player this is for. Listed after everyone with a specific
+  request, since a named card is easier to act on
+- **A card of their own** — `OpenToTradesCard`, built to the same box, radius
+  and inner frame as the placeholder so it reads as part of the same family.
+  Two crossing arrows and no text: at the 56px a phone renders it, a label
+  would be unreadable, which the "any printing" marker already taught
+- Public to the room, deliberately, unlike the Have List. It is an invitation
+  to come over rather than a disclosure of what somebody is carrying
+- Verified against a real PostgreSQL instance: the default is false so nobody
+  is silently broadcast, the partial index is the one the planner picks, and
+  the flag leaves with the participant row
+
 ### Milestone 7 — Matching
 
 Matching engine, realtime match notifications, structured meetup responses.

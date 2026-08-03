@@ -88,9 +88,10 @@ export function CounterCode({
         </div>
       </Card>
 
+      {/* No subtitle: a counter sheet is laminated and outlives any date. */}
       <JoinPoster
-        eventName={storeName}
-        eyebrow="Trade cards here"
+        kind="counter"
+        title={storeName}
         joinCode={joinCode}
         url={url}
         qrSvg={qrSvg}

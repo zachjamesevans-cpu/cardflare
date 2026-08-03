@@ -9,6 +9,7 @@ import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
+import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
@@ -180,6 +181,20 @@ export default async function JoinByCodePage({
     event.startsAt,
   );
 
+  /*
+   * Read off the participant list that was already loaded rather than queried
+   * again — being open to trades is a property of being in the room, so the
+   * answer is already in hand.
+   */
+  const openPlayers = participants
+    .filter((participant) => participant.openToTrades)
+    .map(({ playerSessionId, displayName }) => ({ playerSessionId, displayName }));
+
+  const youAreOpen = participants.some(
+    (participant) =>
+      participant.playerSessionId === session?.id && participant.openToTrades,
+  );
+
   const images = cardImagesEnabled();
   const location = [event.storeCity, event.storeRegion].filter(Boolean).join(", ");
 
@@ -241,6 +256,8 @@ export default async function JoinByCodePage({
             </div>
           </Card>
 
+          <OpenToTradesToggle code={normalized} open={youAreOpen} />
+
           <EventLobby
             code={normalized}
             participants={participants}
@@ -253,7 +270,8 @@ export default async function JoinByCodePage({
                 Wanted in this room
               </h2>
               <p className="text-sm text-text-secondary">
-                Every Flare posted here. If you have one of these, go and find them.
+                Every Flare posted here, and everyone open to any trade. If you can
+                help, go and find them.
               </p>
             </div>
 
@@ -265,6 +283,7 @@ export default async function JoinByCodePage({
               imagesEnabled={images}
               youId={session.id}
               heldCardIds={held}
+              openToTrades={openPlayers}
             />
           </section>
 

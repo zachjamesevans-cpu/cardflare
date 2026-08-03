@@ -20,7 +20,12 @@ import {
 import { clientKey } from "@/lib/request-context";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 import { isValidJoinCode, normalizeJoinCode } from "./join-code";
-import { joinEvent, leaveEvent } from "./participants";
+import {
+  findParticipation,
+  joinEvent,
+  leaveEvent,
+  setOpenToTrades,
+} from "./participants";
 import { enterRoomByCode, resolveCode } from "./rooms";
 
 const JOIN_MAX = 20;
@@ -158,6 +163,45 @@ export async function joinEventAction(
   }
 
   if (freshToken) await setPlayerCookie(freshToken);
+
+  revalidatePath(`/e/${code}`);
+  redirect(`/e/${code}`);
+}
+
+/**
+ * Says whether the player will consider any trade.
+ *
+ * Re-establishes the whole chain rather than trusting the page that rendered
+ * the form: a valid session, a room this code actually resolves to, and
+ * membership of it. A Server Action is a public POST endpoint, and the player
+ * always comes from the cookie — a session id in the form would let anyone
+ * advertise somebody else.
+ *
+ * Resolved, never entered: announcing you are open to trades is not a way into
+ * a room.
+ */
+export async function setOpenToTradesAction(formData: FormData): Promise<void> {
+  const code = normalizeJoinCode(text(formData, "code"));
+  if (!isValidJoinCode(code)) return;
+
+  const open = text(formData, "open") === "on";
+
+  const session = await getPlayerSession();
+  if (!session) redirect(`/e/${code}`);
+
+  const resolved = await resolveCode(code);
+  if (resolved.outcome !== "room") redirect(`/e/${code}`);
+
+  const participation = await findParticipation(resolved.room.id, session.id);
+  if (!participation) redirect(`/e/${code}`);
+
+  try {
+    await setOpenToTrades(resolved.room.id, session.id, open);
+  } catch (error) {
+    // Nothing actionable to show: the page re-renders with the old state,
+    // which is honest about what happened.
+    console.error("Could not change the trade status", error);
+  }
 
   revalidatePath(`/e/${code}`);
   redirect(`/e/${code}`);
