@@ -465,6 +465,13 @@ simplify trading, buying and selling at game stores and card shows."
   against a real PostgreSQL — a vendor signup inserts cleanly)
 - No new claims: everything the page now says (booth numbers, slabs
   PSA/BGS/CGC, sessionless show search) shipped in Milestone 9
+- Second pass on founder feedback — the first draft still read player-first.
+  The hero now speaks to both sides ("Buyers stop searching. Sellers stop
+  waiting."), the For-stores section leads with the sales mechanism ("Every
+  buyer in the room, pointed at you" — demand reaches the vendor the moment
+  someone scans in, instead of the buyer working the hall table by table),
+  and the how-it-works coda flips the same search into a buyer delivered to
+  a vendor's table
 
 ## Deferred from Milestone 1
 

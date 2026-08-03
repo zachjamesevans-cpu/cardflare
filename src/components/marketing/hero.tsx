@@ -20,10 +20,11 @@ export function Hero() {
           </h1>
 
           <p className="max-w-xl text-lg leading-relaxed text-pretty text-text-secondary">
-            One hub for the whole room. At game-store events, CardFlare matches you with
-            the players who have the cards you need. At card shows, it searches every
-            vendor&rsquo;s inventory and points you at the booth. Trading, buying,
-            selling &mdash; all in person, all simpler.
+            One hub for the whole room &mdash; the people hunting cards and the people
+            selling them. Players post what they need the moment they walk in, and
+            CardFlare points them at whoever has it: another player at a game-store
+            event, a vendor&rsquo;s booth at a show. Buyers stop searching. Sellers stop
+            waiting.
           </p>
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">

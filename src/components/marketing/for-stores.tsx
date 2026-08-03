@@ -46,9 +46,9 @@ const BENEFITS = [
   },
   {
     icon: MapPin,
-    title: "Buyers walk straight to you",
+    title: "The sale finds you",
     description:
-      "Attendees search the show and get your booth number. No more hoping the right buyer wanders past your table.",
+      "Attendees search the show the moment they arrive and get your booth number. Instead of asking every vendor in the hall, the buyer who wants your card walks straight to your table.",
   },
 ] as const;
 
@@ -58,8 +58,8 @@ export function ForStores() {
       <SectionHeading
         id="for-stores-title"
         eyebrow="For Game Stores & Show Vendors"
-        title="Make your events the ones people travel for"
-        description="CardFlare runs alongside your event, not instead of it. Trades stay in your store between the people standing in it — and at card shows, your inventory is what walks buyers to your booth."
+        title="Every buyer in the room, pointed at you"
+        description="The moment someone scans in, CardFlare knows what they're hunting and sends them to whoever has it — they don't have to work the room table by table, and you don't have to hope they reach yours. Stores get events people travel for; vendors get buyers who arrive already looking for what's in the case."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">
