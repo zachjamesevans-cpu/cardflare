@@ -90,8 +90,9 @@ export default async function EventPage({
             Join code
           </h2>
           <JoinPoster
-            eventName={event.name}
-            eventWindow={formatEventWindow(event.starts_at, event.ends_at)}
+            kind="event"
+            title={event.name}
+            subtitle={formatEventWindow(event.starts_at, event.ends_at)}
             joinCode={event.join_code}
             url={joinUrl(event.join_code)}
             qrSvg={svg}
