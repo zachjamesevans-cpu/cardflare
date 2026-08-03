@@ -152,28 +152,17 @@ Nothing else is required: an invited store's account already exists with no
 password, and Supabase will send it a recovery link happily, so
 `/login/reset` is both "forgot my password" and "set my first one".
 
-### Two settings the invitation depends on
+### One setting the invitation depends on
 
-An invitation now carries a one-click link that finishes account setup, and
-both of these govern whether it works.
+An invitation carries a one-click link that finishes account setup. The link
+is a CardFlare URL (`/auth/confirm?token_hash=…`) redeemed server-side with
+`verifyOtp`, so it works from any device and needs **no entry in Supabase's
+Redirect URLs allowlist** — that list still matters for the magic-link and
+reset emails, which redirect through `/auth/callback`, but those were already
+working before this flow existed.
 
-**1. Redirect URL — required.** Without it the link is silently broken.
-
-**Authentication → URL Configuration**, or
-`https://supabase.com/dashboard/project/_/auth/url-configuration`. Under
-**Redirect URLs**, add:
-
-```
-https://cardflare.gg/auth/callback
-```
-
-Supabase does not raise on a `redirectTo` it does not recognise. It drops the
-value and sends the store to the Site URL instead, so the symptom is an
-invitation that lands somewhere useless rather than an error anybody sees.
-Add the preview origin too if invitations are ever sent from one.
-
-**2. Email OTP Expiration — worth raising.** Same page as the password
-settings, under **Authentication → Sign In / Providers → Email**.
+**Email OTP Expiration — worth raising.** Under the password settings at
+**Authentication → Sign In / Providers → Email**.
 
 The default is **3600 seconds (1 hour)**. That is the whole life of the button
 in an invitation, and a shop owner who opens their email the next morning finds

@@ -3,23 +3,15 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { SITE } from "@/lib/site";
 
-/**
- * `Store sign-in`, not `Sign in`.
- *
- * Players have no account and must never think they need one — the whole
- * point of the guest session is that scanning a code puts you in a room in
- * seconds. Naming the audience in the link keeps a curious player from
- * following it and concluding CardFlare wants them to register.
- *
- * In the footer rather than the header while the beta is invitation-only:
- * store owners are a handful of people who know to look for it, and putting
- * it beside the waitlist CTA would compete with the thing the landing page
- * is actually for.
+/*
+ * The store sign-in lives in the header now — the founder moved it there so
+ * an owner opening the site on a phone is not scrolling past the whole
+ * landing page to get in. It is not repeated here: two links to the same
+ * place in one viewport reads as a mistake.
  */
 const FOOTER_LINKS = [
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
-  { href: "/login", label: "Store sign-in" },
 ] as const;
 
 export function SiteFooter() {

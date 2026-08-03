@@ -302,10 +302,11 @@ the link that actually did something. Two emails to do one thing, and the first
 did nothing but ask for a click.
 
 `src/lib/auth/invite-link.ts` calls `admin.auth.admin.generateLink()`, which
-mints a real Supabase action link **without sending anything**. That link goes
-into CardFlare's own invitation. So there is still no secret of ours: it is
-Supabase's token, verified by Supabase, redeemed through the same
-`/auth/callback` a magic link uses.
+mints the credential **without sending anything**. The email carries a
+CardFlare URL built from the returned `hashed_token`:
+`/auth/confirm?token_hash=…&type=recovery&next=/welcome`, and that route
+redeems it with `verifyOtp()`. So there is still no secret of ours: it is
+Supabase's token, hashed by Supabase, verified by Supabase.
 
 Two details that are silent when wrong:
 
@@ -313,9 +314,21 @@ Two details that are silent when wrong:
   the auth account by this point, and `generateLink({ type: "invite" })`
   creates the user itself and fails on one that exists. Recovery works on an
   account that has never had a password, which is exactly this case.
-- **`redirectTo` must be in Supabase's allowed Redirect URLs.** When it is not,
-  Supabase does not raise — it drops the value and sends the store to the Site
-  URL, which looks like a broken link.
+- **`hashed_token`, never the `action_link` sitting next to it.** The action
+  link points at Supabase's `/auth/v1/verify`, which hands the session back in
+  ways that assume the browser that _requested_ the link is the one opening it
+  — a URL fragment a server route never sees, or a PKCE code whose verifier
+  lives in the requester's cookies. Here the requester was the admin's server
+  and the opener is a shop owner's phone that has never touched CardFlare, so
+  an emailed action link dies on every device that matters. `verifyOtp` with
+  the hashed token asks Supabase directly and needs no prior contact.
+
+That split is also why `/auth/confirm` exists alongside `/auth/callback`
+rather than replacing it: the callback exchanges PKCE codes for the flows a
+visitor starts in their own browser — magic links, password resets, OAuth —
+where the verifier cookie is exactly where it should be. Each route redeems
+the one kind of credential it understands, and `/auth/confirm` accepts only
+`type=recovery`, so neither can be bent into a general-purpose verifier.
 
 The link lands on `/welcome`: signed in already, address shown rather than
 retyped, password and confirmation the only fields.
@@ -701,6 +714,13 @@ The board lists open players after everyone with a specific request, because a
 named card is easier to act on than "surprise me". A player who has posted
 Flares _and_ is open gets one extra row inside their own group rather than a
 second card.
+
+The toggle sits directly under the Post-a-Flare form, styled as the other
+answer to the same question. It began as its own card higher up the page, next
+to nothing in particular, and founder feedback was that people wanting to say
+"open to anything" never connected it with posting — the moment somebody
+thinks "I don't know what to search for" is the moment it has to be in front
+of them.
 
 ### Avatars
 

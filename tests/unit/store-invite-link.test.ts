@@ -6,15 +6,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Inviting a store used to send an email whose only job was to point at a
  * form, which asked for the address that email had just been sent to, so that
  * a *second* email could carry the link that actually did something. This
- * covers the replacement: a real Supabase action link, minted server-side and
+ * covers the replacement: a Supabase-minted token wrapped in our own URL,
  * carried by CardFlare's own invitation.
  *
  * Supabase is mocked at the admin client rather than at `generateSetupLink`,
- * so the arguments we send Supabase are part of what is under test. Two of
- * them are easy to get wrong and silent when wrong: `type` must be `recovery`
- * (an `invite` link creates the user and fails on the one `ensureAuthUser`
- * has already made), and `redirectTo` must be the callback, since Supabase
- * drops a `redirectTo` it does not recognise without raising.
+ * so the arguments we send Supabase are part of what is under test. Two
+ * things are easy to get wrong and silent when wrong: `type` must be
+ * `recovery` (an `invite` link creates the user and fails on the one
+ * `ensureAuthUser` has already made), and the emailed URL must be built from
+ * `hashed_token`, never from the `action_link` Supabase also returns — the
+ * action link only hands a session to the browser that requested it, and the
+ * requester here is the admin's server, not the shop owner's phone.
  */
 
 const generateLink = vi.fn();
@@ -47,8 +49,13 @@ const { generateSetupLink } = await import("@/lib/auth/invite-link");
 const { inviteStoreAction } = await import("@/lib/stores/actions");
 const { INVITE_STORE_IDLE } = await import("@/lib/stores/schema");
 
-const ACTION_LINK =
-  "https://project.supabase.co/auth/v1/verify?token=abc123&type=recovery";
+const TOKEN_HASH = "8f3a1c7e2b4d8f0a6c1e3b5d7f9a2c4e";
+
+/** What Supabase's verify endpoint would have been — the trap, not the link. */
+const ACTION_LINK = `https://project.supabase.co/auth/v1/verify?token=${TOKEN_HASH}&type=recovery`;
+
+/** The link the email must carry: our own domain, redeemable from any device. */
+const SETUP_LINK = `https://cardflare.gg/auth/confirm?token_hash=${TOKEN_HASH}&type=recovery&next=%2Fwelcome`;
 
 function formData() {
   const data = new FormData();
@@ -70,7 +77,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SITE_URL = "https://cardflare.gg";
 
   generateLink.mockReset().mockResolvedValue({
-    data: { properties: { action_link: ACTION_LINK } },
+    data: { properties: { action_link: ACTION_LINK, hashed_token: TOKEN_HASH } },
     error: null,
   });
 
@@ -91,10 +98,23 @@ beforeEach(() => {
 });
 
 describe("generateSetupLink", () => {
-  it("returns the action link Supabase minted", async () => {
+  it("builds the link on our own domain from the hashed token", async () => {
     await expect(generateSetupLink("owner@grandlinegames.com")).resolves.toBe(
-      ACTION_LINK,
+      SETUP_LINK,
     );
+  });
+
+  /*
+   * The action link is the one Supabase makes look obvious, and it only hands
+   * a session to the browser that requested it — which was the admin's
+   * server, not the shop owner's phone. An emailed action link dies on any
+   * device that has never touched CardFlare, which is all of them.
+   */
+  it("never emails the action link, even though Supabase returns one", async () => {
+    const link = await generateSetupLink("owner@grandlinegames.com");
+
+    expect(link).not.toContain("supabase.co");
+    expect(link).not.toBe(ACTION_LINK);
   });
 
   /*
@@ -113,22 +133,24 @@ describe("generateSetupLink", () => {
 
   /*
    * The whole point of the flow: the link must land on the setup screen, via
-   * the callback that turns the token into a session. Sent anywhere else it
+   * the route that turns the token into a session. Sent anywhere else it
    * signs them in and drops them somewhere with no password field.
    */
-  it("sends the store to the callback, bound for the setup screen", async () => {
-    await generateSetupLink("owner@grandlinegames.com");
+  it("aims the link at the setup screen", async () => {
+    const link = new URL((await generateSetupLink("owner@grandlinegames.com"))!);
 
-    const { options } = generateLink.mock.calls[0][0];
-
-    expect(options.redirectTo).toBe(
-      "https://cardflare.gg/auth/callback?next=%2Fwelcome",
-    );
+    expect(link.pathname).toBe("/auth/confirm");
+    expect(link.searchParams.get("next")).toBe("/welcome");
+    expect(link.searchParams.get("type")).toBe("recovery");
+    expect(link.searchParams.get("token_hash")).toBe(TOKEN_HASH);
   });
 
   it.each([
     ["Supabase errors", { data: null, error: { message: "boom" } }],
-    ["the response carries no link", { data: { properties: {} }, error: null }],
+    [
+      "the response carries no token",
+      { data: { properties: { action_link: ACTION_LINK } }, error: null },
+    ],
   ])("returns null when %s", async (_label, response) => {
     generateLink.mockResolvedValue(response);
 
@@ -140,8 +162,8 @@ describe("inviteStoreAction", () => {
   it("puts the one-click link in the email it sends", async () => {
     await invite();
 
-    expect(sentMessage().text).toContain(ACTION_LINK);
-    expect(sentMessage().html).toContain(ACTION_LINK);
+    expect(sentMessage().text).toContain(SETUP_LINK);
+    expect(sentMessage().html).toContain(SETUP_LINK);
   });
 
   /*
@@ -168,7 +190,7 @@ describe("inviteStoreAction", () => {
 
     const state = await invite();
 
-    expect(state).toMatchObject({ email: outcome, setupLink: ACTION_LINK });
+    expect(state).toMatchObject({ email: outcome, setupLink: SETUP_LINK });
   });
 
   /*

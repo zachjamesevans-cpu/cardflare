@@ -67,6 +67,16 @@ export function MobileNav() {
             </a>
           ))}
 
+          {/* Named for its audience, same as the desktop nav: a player must
+              never conclude they need an account. */}
+          <a
+            href="/login"
+            onClick={() => setOpen(false)}
+            className="rounded-[var(--radius-control)] px-3 py-3.5 text-base font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:bg-elevated hover:text-text-primary"
+          >
+            Store sign-in
+          </a>
+
           <a
             href={WAITLIST_ANCHOR}
             onClick={() => setOpen(false)}

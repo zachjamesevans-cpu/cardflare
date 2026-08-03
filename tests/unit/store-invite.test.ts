@@ -134,7 +134,8 @@ describe("storeInviteEmail", () => {
  * link that actually did something. One email now carries it.
  */
 describe("storeInviteEmail with a setup link", () => {
-  const LINK = "https://project.supabase.co/auth/v1/verify?token=abc&type=recovery";
+  const LINK =
+    "https://cardflare.gg/auth/confirm?token_hash=abc123&type=recovery&next=%2Fwelcome";
 
   const withLink = () =>
     storeInviteEmail(

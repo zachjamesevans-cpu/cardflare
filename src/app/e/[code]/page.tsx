@@ -256,8 +256,6 @@ export default async function JoinByCodePage({
             </div>
           </Card>
 
-          <OpenToTradesToggle code={normalized} open={youAreOpen} />
-
           <EventLobby
             code={normalized}
             participants={participants}
@@ -276,6 +274,13 @@ export default async function JoinByCodePage({
             </div>
 
             <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
+
+            {/*
+             * The other way onto the board, directly under the form that is
+             * the first way. "I don't know what to search for" happens right
+             * here, so this is where the answer to it has to be.
+             */}
+            <OpenToTradesToggle code={normalized} open={youAreOpen} />
 
             <FlareBoard
               entries={flares}

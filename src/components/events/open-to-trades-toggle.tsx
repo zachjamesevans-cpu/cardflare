@@ -1,6 +1,7 @@
 import { OpenToTradesCard } from "@/components/cards/open-to-trades-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/cn";
 import { setOpenToTradesAction } from "@/lib/events/join-event-actions";
 
 /**
@@ -12,30 +13,42 @@ import { setOpenToTradesAction } from "@/lib/events/join-event-actions";
  * they did not appear on the Flare board at all — and the board is what people
  * read to decide who to walk over to.
  *
+ * It sits directly under the Post-a-Flare form, because it is the other
+ * answer to the same question. It used to be its own card further up the
+ * page, next to nothing in particular, and founder feedback was that people
+ * looking to say "open to anything" never connected it with posting — the
+ * moment somebody thinks "I don't know what to search for" is the moment this
+ * needs to be in front of them.
+ *
  * A Server Component: the button is a form posting to a Server Action, so this
  * works before hydration and ships no JavaScript.
  */
 export function OpenToTradesToggle({ code, open }: { code: string; open: boolean }) {
   return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex items-start gap-3">
-        <div className="w-11 shrink-0">
-          <OpenToTradesCard />
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="font-semibold text-text-primary">
-            {open ? "You're open to trades" : "Not sure what you're after?"}
-          </p>
-          <p className="text-sm text-text-secondary">
-            {open
-              ? "You're on the board so people know to bring a binder over. Anyone here can see this."
-              : "Say you're open to anything and you'll show up on the board, even without posting a card. Good if you'd rather be shown things than go looking."}
-          </p>
-        </div>
+    <Card
+      className={cn(
+        "flex flex-wrap items-center gap-x-4 gap-y-3 p-4",
+        open && "border-accent/40 bg-accent/[0.05]",
+      )}
+    >
+      <div className="w-9 shrink-0">
+        <OpenToTradesCard />
       </div>
 
-      <form action={setOpenToTradesAction}>
+      <div className="flex min-w-0 flex-1 basis-52 flex-col">
+        <p className="font-semibold text-text-primary">
+          {open
+            ? "You're on the board: open to trades"
+            : "Not after anything specific?"}
+        </p>
+        <p className="text-sm text-text-secondary">
+          {open
+            ? "Anyone in this room can see it — people can bring a binder to you."
+            : "Skip the search and put yourself on the board as open to any trade."}
+        </p>
+      </div>
+
+      <form action={setOpenToTradesAction} className="shrink-0">
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="open" value={open ? "off" : "on"} />
         <Button type="submit" variant={open ? "secondary" : "primary"} size="sm">
