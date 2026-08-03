@@ -307,13 +307,47 @@ the flow before it was merged.
   from the footer rather than duplicated. Still "Store sign-in", never
   "Sign in" — a player must not conclude they need an account
 
-### Milestone 7 — Matching
+## ✅ Milestone 7 — Matching
 
-Matching engine, realtime match notifications, structured meetup responses.
+The core loop closes: the room now tells both sides. Until this, the
+cross-reference only whispered to the holder ("you have this") and the
+requester found out when somebody happened to walk over.
+
+- **The matching engine honours printings now**, paying off the IOU Milestone
+  6 left. A Flare for the alternate art matches a binder's alternate art as
+  "you have this"; the base art — or a binder entry that named no printing —
+  shows as "you have another printing" instead of being rounded up. One wrong
+  "you have this" costs more trust than ten missed matches
+- **Offers.** On a Flare you can answer, one tap — plus an optional "table
+  12" — puts your name under that Flare for its author: `flare_responses`,
+  verified against a real PostgreSQL instance. The requester sees who, where,
+  and whether they are still present; a summary at the top of the room links
+  to their offers. Withdrawing deletes the row; leaving the room hides your
+  offers until you return
+- **The privacy line holds.** An offer carries nothing from the binder — not
+  the printing, not the quantity. The room learns you can help only when you
+  choose to say so, which was the deal since Milestone 6
+- **You must carry the card to offer.** The button renders only on a match,
+  but the server re-checks the binder — a Server Action is a public POST
+  endpoint, and without that check offers become a way to put your name on
+  every Flare in the room. Capped at 30 open offers per room, same shape as
+  the Flare cap
+- **"Realtime" is a one-minute poll, on purpose.** The room re-reads itself
+  while the tab is visible and refreshes on return from a pocket — which
+  also keeps presence honest. The plan said "realtime match notifications";
+  what a physical room actually needs is "fresh by the time you look", and a
+  websocket buys seconds of latency on a signal whose response is a walk
+  across the room, at the price of connection management on locked phones on
+  shop wifi. Supabase Realtime is ruled out anyway by RLS-with-no-policies
+- **Structured meetup responses stayed unbuilt**, same reasoning as note
+  taxonomies: nobody has specified the structure, and "where to find you" as
+  free text is what a player would have typed into any structure we invented
 
 ### Milestone 8 — Trades
 
-Trade confirmation, quantity updates, trade history, event analytics.
+Trade confirmation, quantity updates, trade history, event analytics — and
+offers become the raw material: a confirmed trade closes the Flare and its
+offers together.
 
 ## Deferred from Milestone 1
 
