@@ -53,7 +53,9 @@ export function HowItWorks() {
 
       <p className="mx-auto mt-10 max-w-xl text-center text-pretty text-text-secondary">
         At card shows it&rsquo;s even faster: scan the show&rsquo;s code, search the
-        card, and walk straight to the booth that has it &mdash; raw or graded.
+        card, and walk straight to the booth that has it &mdash; raw or graded. And
+        every search works both ways: it&rsquo;s a buyer delivered to a vendor&rsquo;s
+        table.
       </p>
     </Section>
   );
