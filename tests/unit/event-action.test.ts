@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createEvent = vi.fn();
 const findEventById = vi.fn();
+const findStoreById = vi.fn();
 const setEventStatus = vi.fn();
+const setStoreTimeZone = vi.fn();
+const setWalkInEnabled = vi.fn();
+const findOpenWalkInRoom = vi.fn();
 const getViewer = vi.fn();
 const isSupabaseConfigured = vi.fn(() => true);
 
@@ -35,10 +39,16 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/events/repository", () => ({
   createEvent: (...args: unknown[]) => createEvent(...args),
   findEventById: (...args: unknown[]) => findEventById(...args),
+  findStoreById: (...args: unknown[]) => findStoreById(...args),
   setEventStatus: (...args: unknown[]) => setEventStatus(...args),
+  setStoreTimeZone: (...args: unknown[]) => setStoreTimeZone(...args),
+  setWalkInEnabled: (...args: unknown[]) => setWalkInEnabled(...args),
+  findOpenWalkInRoom: (...args: unknown[]) => findOpenWalkInRoom(...args),
 }));
 
-const { createEventAction, setEventStatusAction } =
+vi.mock("@/lib/events/rooms", () => ({ endWalkInRoomWhenLastUsed: vi.fn() }));
+
+const { createEventAction, setEventStatusAction, setStoreTimeZoneAction } =
   await import("@/lib/events/actions");
 const { CREATE_EVENT_IDLE } = await import("@/lib/events/schema");
 
@@ -79,6 +89,12 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ id: "event-1", store_id: STORE_A, kind: "scheduled" });
   setEventStatus.mockReset().mockResolvedValue(undefined);
+  setStoreTimeZone.mockReset().mockResolvedValue(undefined);
+  // The zone the typed times get attached to. Read from the store, never the
+  // form, so every event test now depends on this being loadable.
+  findStoreById
+    .mockReset()
+    .mockResolvedValue({ id: STORE_A, timezone: "America/Chicago" });
   getViewer.mockReset().mockResolvedValue(storeViewer([STORE_A]));
   isSupabaseConfigured.mockReset().mockReturnValue(true);
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -250,5 +266,119 @@ describe("setEventStatusAction", () => {
     await setEventStatusAction(statusForm("closed", "event-9"));
 
     expect(setEventStatus).toHaveBeenCalledWith("event-9", "closed");
+  });
+});
+
+/**
+ * Setting where the store is.
+ *
+ * The zone decides what a typed "6pm" means, so it has to be as guarded as
+ * anything else a form can post.
+ */
+describe("createEventAction and the store's timezone", () => {
+  /*
+   * The typed times are a wall clock. This is the assertion that they get the
+   * store's zone attached and not the server's — the bug was a 6pm event
+   * stored as 1pm because a bare string parsed as UTC.
+   */
+  it("stores the instant the store's clock actually names", async () => {
+    await captureRedirect(() => create(formData()));
+
+    const [record] = createEvent.mock.calls[0];
+
+    // 18:00 in Chicago in August is CDT, UTC-5.
+    expect(record.startsAt.toISOString()).toBe("2026-08-14T23:00:00.000Z");
+    expect(record.endsAt.toISOString()).toBe("2026-08-15T03:00:00.000Z");
+  });
+
+  it("does not store the typed numbers as if they were UTC", async () => {
+    await captureRedirect(() => create(formData()));
+
+    const [record] = createEvent.mock.calls[0];
+
+    expect(record.startsAt.toISOString()).not.toBe("2026-08-14T18:00:00.000Z");
+  });
+
+  /*
+   * A zone in the form must not decide what the typed time means. The store
+   * row is the only authority, the same way the store id is authorised against
+   * the session rather than trusted from the field.
+   */
+  it("ignores a timezone supplied in the form", async () => {
+    await captureRedirect(() => create(formData({ timezone: "Asia/Tokyo" })));
+
+    const [record] = createEvent.mock.calls[0];
+
+    expect(record.startsAt.toISOString()).toBe("2026-08-14T23:00:00.000Z");
+  });
+
+  it("follows the store when the store is somewhere else", async () => {
+    findStoreById.mockResolvedValue({ id: STORE_A, timezone: "Asia/Tokyo" });
+
+    await captureRedirect(() => create(formData()));
+
+    const [record] = createEvent.mock.calls[0];
+
+    expect(record.startsAt.toISOString()).toBe("2026-08-14T09:00:00.000Z");
+  });
+
+  /* Ordering moved out of the schema, so the action has to surface it. */
+  it("reports an end before the start on the field, and stores nothing", async () => {
+    const result = await create(
+      formData({ startsAt: "2026-08-14T22:00", endsAt: "2026-08-14T18:00" }),
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.status === "error" && result.fieldErrors.endsAt).toBeTruthy();
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+
+  it("reports an event longer than a day, and stores nothing", async () => {
+    const result = await create(
+      formData({ startsAt: "2026-08-14T18:00", endsAt: "2026-08-16T18:00" }),
+    );
+
+    expect(result.status).toBe("error");
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+
+  it("fails safe when the store cannot be loaded", async () => {
+    findStoreById.mockResolvedValue(null);
+
+    const result = await create(formData());
+
+    expect(result.status).toBe("error");
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("setStoreTimeZoneAction", () => {
+  function zoneForm(timezone: string, storeId = STORE_A) {
+    const data = new FormData();
+    data.set("storeId", storeId);
+    data.set("timezone", timezone);
+    return data;
+  }
+
+  it("sets a real zone on the viewer's own store", async () => {
+    await setStoreTimeZoneAction(zoneForm("America/Chicago"));
+
+    expect(setStoreTimeZone).toHaveBeenCalledWith(STORE_A, "America/Chicago");
+  });
+
+  /* The value came from a select, which is to say from a form. */
+  it("refuses a zone the runtime does not know", async () => {
+    for (const zone of ["", "Mars/Olympus", "GMT+5", "'; drop table stores"]) {
+      setStoreTimeZone.mockClear();
+      await setStoreTimeZoneAction(zoneForm(zone));
+
+      expect(setStoreTimeZone).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses to set the zone on somebody else's store", async () => {
+    await setStoreTimeZoneAction(zoneForm("America/Chicago", STORE_B));
+
+    expect(setStoreTimeZone).not.toHaveBeenCalled();
   });
 });

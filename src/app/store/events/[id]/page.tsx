@@ -10,7 +10,7 @@ import { Badge, Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { formatEventWindow } from "@/lib/events/format";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
-import { findEventById } from "@/lib/events/repository";
+import { findEventById, findStoreById } from "@/lib/events/repository";
 import { STATUS_LABELS } from "@/lib/events/schema";
 
 export const metadata: Metadata = {
@@ -39,6 +39,9 @@ export default async function EventPage({
    */
   if (!event) notFound();
 
+  const store = await findStoreById(event.store_id);
+  const timeZone = store?.timezone ?? "UTC";
+
   const canView =
     viewer.kind === "admin" ||
     (viewer.kind === "store" && viewer.storeIds.includes(event.store_id));
@@ -57,7 +60,7 @@ export default async function EventPage({
       area="Store"
       email={viewer.user.email ?? ""}
       title={event.name}
-      description={formatEventWindow(event.starts_at, event.ends_at)}
+      description={formatEventWindow(event.starts_at, event.ends_at, timeZone)}
     >
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
@@ -92,7 +95,7 @@ export default async function EventPage({
           <JoinPoster
             kind="event"
             title={event.name}
-            subtitle={formatEventWindow(event.starts_at, event.ends_at)}
+            subtitle={formatEventWindow(event.starts_at, event.ends_at, timeZone)}
             joinCode={event.join_code}
             url={joinUrl(event.join_code)}
             qrSvg={svg}

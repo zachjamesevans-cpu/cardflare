@@ -593,6 +593,39 @@ websockets — a store wants to know who is around, not who moved their thumb,
 and a polled timestamp survives a phone locking in someone's pocket. Realtime
 belongs with match notifications, where the latency is the feature.
 
+### Event times
+
+An event happens at a place, and the place has a timezone. `stores.timezone`
+holds it; times themselves stay `timestamptz`, because an instant was always
+the right thing to store.
+
+The bug this fixed was not the label. `datetime-local` submits
+"2026-09-12T18:00" with no zone, and `Date.parse` reads a bare string like that
+in the _server's_ zone — UTC on Vercel. A store owner in Austin typing 6pm
+stored one in the afternoon, and the dashboard displayed that wrong instant
+accurately as "6:00 PM UTC".
+
+`src/lib/time/zone.ts` does the conversion on `Intl`, which already carries the
+IANA database — a date library would be several hundred kilobytes to avoid
+forty testable lines. `localToInstant` runs **two passes**: the first guess
+uses the offset in force at the typed time read as UTC, which is on the wrong
+side of a daylight-saving change whenever the real answer is on the other, and
+re-reading the offset at the candidate instant corrects it. One pass is an hour
+wrong for the few hours after a changeover — a store opening early on the
+Sunday the clocks go forward would have printed the wrong time on its counter
+sheet.
+
+Ordering and duration are checked on the converted instants rather than the
+typed strings, because across a change those disagree: twenty-five wall-clock
+hours in autumn is twenty-six real ones.
+
+**The zone comes from the store row, never from the form** — the same rule as
+the store id, which is authorised against the session rather than trusted. A
+submitted zone would otherwise decide what somebody's "6pm" meant.
+
+Defaulting to UTC means nothing moves under an existing store until it says
+where it is, and changing it never moves an event already created.
+
 ### Open to trades
 
 `event_participants.open_to_trades`. Most of a room is not hunting a specific

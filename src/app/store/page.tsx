@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
@@ -47,13 +48,14 @@ export default async function StorePage() {
   const supabase = await createSupabaseServerClient();
   const { data: stores } = await supabase
     .from("stores")
-    .select("id, name, city, region, status, join_code, walk_in_enabled")
+    .select("id, name, city, region, status, join_code, walk_in_enabled, timezone")
     .order("name");
 
   const store = stores?.[0];
   const events = store ? await listEventsForStore(store.id) : [];
   const attendance = await countParticipants(events.map((event) => event.id));
-  const window = defaultEventWindow();
+  const timeZone = store?.timezone ?? "UTC";
+  const window = defaultEventWindow(timeZone);
   const counterQr = store ? await joinQrSvg(store.join_code) : null;
 
   return (
@@ -77,6 +79,15 @@ export default async function StorePage() {
             qrSvg={counterQr}
             walkInEnabled={store.walk_in_enabled}
           />
+        </section>
+      )}
+
+      {store && (
+        <section className="flex flex-col gap-5" aria-labelledby="timezone-heading">
+          <h2 id="timezone-heading" className="text-xl font-bold text-text-primary">
+            Where you are
+          </h2>
+          <TimeZonePicker storeId={store.id} timeZone={timeZone} />
         </section>
       )}
 
@@ -124,7 +135,11 @@ export default async function StorePage() {
           </span>
         </div>
 
-        <EventList events={events} attendance={attendance} />
+        <EventList
+          events={events}
+          attendance={attendance}
+          fallbackTimeZone={timeZone}
+        />
       </section>
     </AppShell>
   );
