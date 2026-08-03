@@ -13,6 +13,7 @@ import {
   MIN_QUERY_LENGTH,
   pickBasePrinting,
   printingLabel,
+  type CardPrinting,
   type CardResult,
 } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
@@ -79,29 +80,57 @@ function Stats({ card }: { card: CardResult }) {
 function PrintingList({
   card,
   imagesEnabled,
+  onPick,
 }: {
   card: CardResult;
   imagesEnabled: boolean;
+  /**
+   * Supplied when the search is a picker. Tapping a version then selects the
+   * card *with that printing*, so someone hunting the parallel art is not
+   * made to pick the card, open a dropdown, and find the art a second time.
+   */
+  onPick?: (printing: CardPrinting) => void;
 }) {
   return (
     <ul className="flex flex-col gap-1.5" aria-label="Versions">
-      {card.printings.map((printing, index) => (
-        <li
-          key={`${printing.setCode}-${printing.rarity}-${index}`}
-          className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5"
-        >
-          <CardThumbnail
-            imageUrl={printing.imageUrl}
-            exactName={card.exactName}
-            cardNumber={card.canonicalCardNumber}
-            enabled={imagesEnabled}
-            className="w-9"
-          />
-          <span className="min-w-0 text-xs leading-snug text-text-secondary">
-            {printingLabel(printing, card.exactName) ?? "Standard printing"}
-          </span>
-        </li>
-      ))}
+      {card.printings.map((printing, index) => {
+        const content = (
+          <>
+            <CardThumbnail
+              imageUrl={printing.imageUrl}
+              exactName={card.exactName}
+              cardNumber={card.canonicalCardNumber}
+              enabled={imagesEnabled}
+              className="w-9"
+            />
+            <span className="min-w-0 flex-1 text-left text-xs leading-snug text-text-secondary">
+              {printingLabel(printing, card.exactName) ?? "Standard printing"}
+            </span>
+          </>
+        );
+
+        const chrome =
+          "flex w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5";
+
+        return (
+          <li key={`${printing.setCode}-${printing.rarity}-${index}`}>
+            {onPick ? (
+              <button
+                type="button"
+                onClick={() => onPick(printing)}
+                className={cn(
+                  chrome,
+                  "transition-colors hover:border-accent/50 hover:bg-accent/[0.06]",
+                )}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className={chrome}>{content}</div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -118,7 +147,7 @@ function Row({
   term: string;
   imagesEnabled: boolean;
   active: boolean;
-  onSelect?: (card: CardResult) => void;
+  onSelect?: (card: CardResult, printing?: CardPrinting) => void;
   id: string;
 }) {
   /*
@@ -213,7 +242,21 @@ function Row({
             />
           </button>
 
-          {showVersions && <PrintingList card={card} imagesEnabled={imagesEnabled} />}
+          {showVersions && (
+            <>
+              {onSelect && (
+                <p className="text-xs text-text-muted">
+                  Tap a version to ask for that exact one. Tap the card above to take
+                  any printing.
+                </p>
+              )}
+              <PrintingList
+                card={card}
+                imagesEnabled={imagesEnabled}
+                onPick={onSelect && ((printing) => onSelect(card, printing))}
+              />
+            </>
+          )}
         </div>
       )}
     </li>
@@ -223,8 +266,12 @@ function Row({
 export interface CardSearchProps {
   /** Resolved on the server from NEXT_PUBLIC_ENABLE_CARD_IMAGES. */
   imagesEnabled: boolean;
-  /** Supplied when the search is being used to pick a card. */
-  onSelect?: (card: CardResult) => void;
+  /**
+   * Supplied when the search is being used to pick a card. The printing is
+   * present only when a specific version was tapped from the expanded list —
+   * a plain row tap means "any printing", which stays the default ask.
+   */
+  onSelect?: (card: CardResult, printing?: CardPrinting) => void;
   autoFocus?: boolean;
 }
 
