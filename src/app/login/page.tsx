@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { Logo } from "@/components/brand/logo";
 import { PasswordSignInForm } from "@/components/auth/password-sign-in-form";
 import { ProviderButtons } from "@/components/auth/provider-buttons";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { safeNextPath } from "@/lib/auth/redirect";
+import { getViewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -28,6 +30,24 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const rawNext = firstValue(params.next);
   const next = rawNext ? safeNextPath(rawNext) : undefined;
   const error = ERRORS[firstValue(params.error) ?? ""];
+
+  /*
+   * Somebody already signed in does not want a sign-in form.
+   *
+   * The footer's "Store sign-in" link points here unconditionally, because the
+   * landing page is statically prerendered and asking who the visitor is would
+   * turn every visit to the marketing site into a round trip to the auth
+   * server. So the question is answered here instead, on a page that is
+   * already dynamic and already has the session in hand.
+   *
+   * `safeNextPath` sends them wherever they were headed, defaulting to
+   * `/store` — which forwards an admin to `/admin` and shows an unaffiliated
+   * account the "no store yet" explanation. That is the same destination
+   * signing in would have produced, so the link behaves as though they had.
+   */
+  const viewer = await getViewer();
+
+  if (viewer.kind !== "anonymous") redirect(safeNextPath(rawNext));
 
   return (
     <main
