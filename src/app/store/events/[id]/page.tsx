@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
+import { EventStatsCard } from "@/components/events/event-stats";
 import { EventStatusControls } from "@/components/events/event-status-controls";
 import { JoinPoster } from "@/components/events/join-poster";
 import { WalkInSession } from "@/components/events/walk-in-session";
@@ -11,6 +12,7 @@ import { getViewer } from "@/lib/auth/session";
 import { formatEventWindow } from "@/lib/events/format";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { findEventById, findStoreById } from "@/lib/events/repository";
+import { eventStats } from "@/lib/trades/repository";
 import { STATUS_LABELS } from "@/lib/events/schema";
 
 export const metadata: Metadata = {
@@ -55,6 +57,8 @@ export default async function EventPage({
    */
   const svg = event.join_code ? await joinQrSvg(event.join_code) : null;
 
+  const stats = await eventStats(event.id);
+
   return (
     <AppShell
       area="Store"
@@ -73,6 +77,15 @@ export default async function EventPage({
           Back to all events
         </Link>
       </div>
+
+      {stats && (
+        <section className="flex flex-col gap-5" aria-labelledby="stats-heading">
+          <h2 id="stats-heading" className="text-xl font-bold text-text-primary">
+            How the room went
+          </h2>
+          <EventStatsCard stats={stats} />
+        </section>
+      )}
 
       <section className="flex flex-col gap-5" aria-labelledby="status-heading">
         <h2 id="status-heading" className="text-xl font-bold text-text-primary">

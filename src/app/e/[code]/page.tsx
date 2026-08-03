@@ -13,6 +13,7 @@ import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
+import { TradedTonight } from "@/components/trades/traded-tonight";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
@@ -30,6 +31,8 @@ import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
+import { listMyTrades } from "@/lib/trades/repository";
+import { binderPrompts } from "@/lib/trades/schema";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -162,14 +165,15 @@ export default async function JoinByCodePage({
    * Only read once the player is actually in the room. A visitor looking at a
    * join form has no business causing a read of anybody's lists.
    */
-  const [participants, flares, binder, roomOffers] = inRoom
+  const [participants, flares, binder, roomOffers, myTrades] = inRoom
     ? await Promise.all([
         listParticipants(event.id),
         listRoomFlares(event.id),
         listBinder(session!.id),
         listRoomOffers(event.id),
+        listMyTrades(event.id, session!.id),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], []];
 
   /*
    * The matching engine, such as it is: derived from the binder that was just
@@ -215,6 +219,12 @@ export default async function JoinByCodePage({
   const openPlayers = participants
     .filter((participant) => participant.openToTrades)
     .map(({ playerSessionId, displayName }) => ({ playerSessionId, displayName }));
+
+  /*
+   * The after-trade binder nudge: holder-side trades newer than the binder
+   * entry's own confirmation. Derived from data already in hand.
+   */
+  const prompts = binderPrompts(myTrades, binder);
 
   const youAreOpen = participants.some(
     (participant) =>
@@ -345,6 +355,13 @@ export default async function JoinByCodePage({
 
             <HaveList entries={binder} code={normalized} imagesEnabled={images} />
           </section>
+
+          <TradedTonight
+            trades={myTrades}
+            prompts={prompts}
+            code={normalized}
+            timeZone={event.storeTimeZone}
+          />
         </>
       ) : (
         <Card>

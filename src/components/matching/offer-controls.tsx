@@ -4,6 +4,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 import { MAX_OFFER_MESSAGE, type Offer } from "@/lib/matching/schema";
+import { confirmTradeAction } from "@/lib/trades/actions";
 
 /**
  * The two sides of an offer, rendered inside a Flare row.
@@ -80,8 +81,21 @@ export function OfferPanel({
   );
 }
 
-/** What the Flare's author sees once somebody has raised a hand. */
-export function OfferList({ offers }: { offers: Offer[] }) {
+/**
+ * What the Flare's author sees once somebody has raised a hand — and the
+ * button that closes the loop. "We traded" writes the trade with this
+ * partner and closes the Flare; the offer row is the proof they said "I
+ * have this", which is what entitles them to appear in the history.
+ */
+export function OfferList({
+  offers,
+  code,
+  flareId,
+}: {
+  offers: Offer[];
+  code: string;
+  flareId: string;
+}) {
   return (
     <ul className="mt-2 flex flex-col gap-1.5">
       {offers.map((offer) => (
@@ -109,8 +123,42 @@ export function OfferList({ offers }: { offers: Offer[] }) {
           {!offer.present && (
             <span className="text-xs text-text-muted">away right now</span>
           )}
+
+          <form action={confirmTradeAction} className="ml-auto shrink-0">
+            <input type="hidden" name="code" value={code} />
+            <input type="hidden" name="flareId" value={flareId} />
+            <input
+              type="hidden"
+              name="partnerSessionId"
+              value={offer.responderSessionId}
+            />
+            <Button type="submit" variant="secondary" size="sm">
+              We traded
+            </Button>
+          </form>
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The tally for a trade that happened without an offer — somebody read the
+ * board and just walked over, which is the core loop working as designed.
+ * Quiet on purpose: it closes the Flare, so it should never look like the
+ * row's main action.
+ */
+export function MarkTraded({ code, flareId }: { code: string; flareId: string }) {
+  return (
+    <form action={confirmTradeAction} className="mt-1.5">
+      <input type="hidden" name="code" value={code} />
+      <input type="hidden" name="flareId" value={flareId} />
+      <button
+        type="submit"
+        className="text-sm text-text-muted underline underline-offset-4 transition-colors hover:text-text-secondary"
+      >
+        Traded it? Mark it done
+      </button>
+    </form>
   );
 }

@@ -2,7 +2,11 @@ import { Flame, Hand, Layers, PackageCheck } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
-import { OfferList, OfferPanel } from "@/components/matching/offer-controls";
+import {
+  MarkTraded,
+  OfferList,
+  OfferPanel,
+} from "@/components/matching/offer-controls";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -267,13 +271,16 @@ export function FlareBoard({
                     removable={isYou}
                   >
                     {/*
-                     * Your Flare: everyone who raised a hand. Someone else's
-                     * that you can answer: the hand-raising controls. Never
-                     * both — you cannot offer on your own request.
+                     * Your Flare: everyone who raised a hand, each with a
+                     * "we traded", plus the quiet tally for a trade that
+                     * happened without an offer. Someone else's that you can
+                     * answer: the hand-raising controls. Never both — you
+                     * cannot offer on your own request.
                      */}
                     {isYou && entryOffers.length > 0 && (
-                      <OfferList offers={entryOffers} />
+                      <OfferList offers={entryOffers} code={code} flareId={entry.id} />
                     )}
+                    {isYou && <MarkTraded code={code} flareId={entry.id} />}
                     {match && (
                       <OfferPanel code={code} flareId={entry.id} ownOffer={ownOffer} />
                     )}
