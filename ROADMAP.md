@@ -400,6 +400,15 @@ Founder feedback with screenshots: "the cards are kinda all scattered."
   `className` now replaces the default width instead of joining it
 - The type/colour badges no longer float in their own right-hand column, and
   rarity is no longer printed twice
+- **Tapping a version picks it** (second round of the same feedback). In the
+  Post-a-Flare search, a tap on an expanded version selects the card with
+  that printing already chosen in the form — nobody finds the alternate art
+  twice. A plain row tap still means "any printing", which stays the default
+  ask, and a preselected version gets a hint under the dropdown pointing back
+  to it: any printing is the ask more people can answer. On the public
+  `/cards` page (same component) the versions stay informational — there is
+  nothing there to pick for. Driven end to end against a mock PostgREST:
+  version tap arrives in the form as that printing, plain tap as "any"
 
 ## Deferred from Milestone 1
 

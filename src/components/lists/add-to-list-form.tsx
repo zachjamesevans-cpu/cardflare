@@ -10,7 +10,7 @@ import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
 import { LIST_IDLE, MAX_NOTE, type ListKind, type ListState } from "@/lib/lists/schema";
-import { printingLabel, type CardResult } from "@/lib/cards/schema";
+import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/schema";
 
 /**
  * Adding a card to a Flare list or a Have list.
@@ -84,7 +84,17 @@ export function AddToListForm({
   imagesEnabled: boolean;
 }) {
   const [state, formAction] = useActionState(addToListAction, LIST_IDLE);
-  const [picked, setPicked] = useState<CardResult | null>(null);
+
+  /*
+   * `printingId` rides along from the search: tapping a specific version in
+   * the expanded list arrives here with that printing already chosen, so
+   * nobody picks the alternate art twice. An empty string is "any printing" —
+   * the same value the select's default option posts.
+   */
+  const [picked, setPicked] = useState<{
+    card: CardResult;
+    printingId: string;
+  } | null>(null);
 
   const copy = COPY[kind];
 
@@ -98,7 +108,12 @@ export function AddToListForm({
       <Outcome state={state} />
 
       {!picked ? (
-        <CardSearch imagesEnabled={imagesEnabled} onSelect={setPicked} />
+        <CardSearch
+          imagesEnabled={imagesEnabled}
+          onSelect={(card: CardResult, printing?: CardPrinting) =>
+            setPicked({ card, printingId: printing?.id ?? "" })
+          }
+        />
       ) : (
         <form
           action={formAction}
@@ -108,20 +123,20 @@ export function AddToListForm({
            * and printing never carry over from the previous card — React keeps
            * an uncontrolled form's values across a re-render otherwise.
            */
-          key={picked.id}
+          key={`${picked.card.id}-${picked.printingId}`}
         >
           <input type="hidden" name="code" value={code} />
           <input type="hidden" name="kind" value={kind} />
-          <input type="hidden" name="cardId" value={picked.id} />
-          <input type="hidden" name="cardName" value={picked.exactName} />
+          <input type="hidden" name="cardId" value={picked.card.id} />
+          <input type="hidden" name="cardName" value={picked.card.exactName} />
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col">
               <p className="truncate font-semibold text-text-primary">
-                {picked.exactName}
+                {picked.card.exactName}
               </p>
               <p className="font-mono text-xs text-text-muted">
-                {picked.canonicalCardNumber}
+                {picked.card.canonicalCardNumber}
               </p>
             </div>
             <Button
@@ -135,21 +150,30 @@ export function AddToListForm({
           </div>
 
           {/*
-           * "Any printing" first and selected by default. It is what most
-           * people mean, and defaulting to a specific art would quietly make
-           * every request narrower than intended.
+           * "Any printing" is first in the list and the default for a plain
+           * row tap — it is what most people mean, and defaulting to a
+           * specific art would quietly make every request narrower than
+           * intended. Tapping a version in the search preselects it here,
+           * and the hint under the select is how "any printing" stays
+           * discoverable on exactly that path.
            */}
-          {picked.printings.length > 1 && (
+          {picked.card.printings.length > 1 && (
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">Printing</span>
-              <Select name="printingId" defaultValue="">
+              <Select name="printingId" defaultValue={picked.printingId}>
                 <option value="">Any printing</option>
-                {picked.printings.map((printing) => (
+                {picked.card.printings.map((printing) => (
                   <option key={printing.id} value={printing.id}>
-                    {printingLabel(printing, picked.exactName) ?? "This printing"}
+                    {printingLabel(printing, picked.card.exactName) ?? "This printing"}
                   </option>
                 ))}
               </Select>
+              {picked.printingId !== "" && (
+                <span className="text-xs text-text-muted">
+                  Asking for this exact version. Switch to &ldquo;Any printing&rdquo;
+                  above if any art will do — more people can answer that.
+                </span>
+              )}
             </label>
           )}
 
