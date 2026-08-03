@@ -16,7 +16,10 @@ export const metadata: Metadata = {
  * no password at all, and Supabase will send a recovery link to it happily,
  * so there is no separate activation flow to build or to keep in step.
  */
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage(props: PageProps<"/login/reset">) {
+  const params = await props.searchParams;
+  const expired = params.expired !== undefined;
+
   return (
     <main
       id="main"
@@ -29,10 +32,12 @@ export default function ResetPasswordPage() {
       <div className="flex w-full max-w-md flex-col gap-5">
         <div className="flex flex-col gap-2 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-            Set a password
+            {expired ? "That link has expired" : "Set a password"}
           </h1>
           <p className="text-text-secondary">
-            We will email you a link to choose a new one.
+            {expired
+              ? "Setup links only last a short while. Enter your address and we will send a fresh one."
+              : "We will email you a link to choose a new one."}
           </p>
         </div>
 

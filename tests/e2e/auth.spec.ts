@@ -37,6 +37,25 @@ test.describe("protected areas", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  /*
+   * `/welcome` is the exception to the rule above, and deliberately so. It is
+   * where an invitation lands, and the only person who reaches it signed out
+   * is a store whose setup link has expired — for whom a sign-in form is a
+   * dead end, because they have no password yet. They go to the reset page,
+   * which is one field from a fresh link and says why they are there.
+   */
+  test("/welcome sends an expired invitation somewhere it can be fixed", async ({
+    page,
+  }) => {
+    await page.goto("/welcome");
+
+    await expect(page).toHaveURL(/\/login\/reset\?expired=1/);
+    await expect(
+      page.getByRole("heading", { name: /link has expired/i }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/email/i)).toBeVisible();
+  });
+
   test("neither leaks anything before redirecting", async ({ page }) => {
     for (const path of ["/admin", "/admin/spot-check", "/store"]) {
       const response = await page.goto(path);
@@ -60,7 +79,14 @@ test.describe("protected areas", () => {
     const robots = await page.request.get("/robots.txt");
     const body = await robots.text();
 
-    for (const path of ["/admin", "/store", "/account", "/login", "/auth/"]) {
+    for (const path of [
+      "/admin",
+      "/store",
+      "/account",
+      "/login",
+      "/welcome",
+      "/auth/",
+    ]) {
       expect(body).toContain(`Disallow: ${path}`);
     }
   });

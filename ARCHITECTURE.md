@@ -37,7 +37,8 @@ src/components/
   ui/                  Design system primitives
   waitlist/            Waitlist form and success state
 src/lib/
-  auth/                Session, viewer roles, guards, sign-in actions
+  auth/                Session, viewer roles, guards, sign-in actions, and
+                       invite-link.ts — the one-click setup link
   email/               Provider client and message templates
   cards/               Card provider interface, importer, search
   events/              Event Rooms: schema, repository, actions, join codes, QR,
@@ -196,13 +197,13 @@ verifying it, so it can be forged, and this result gates the admin console.
 | `/account` | Anyone signed in                                                  |
 | `/login`   | Anyone, but nothing is ever sent to an address without an account |
 
-### Sessions, and why there is middleware
+### Sessions, and why there is a proxy
 
-`src/middleware.ts` exists for one reason: Supabase access tokens last an hour
+`src/proxy.ts` exists for one reason: Supabase access tokens last an hour
 and renew with a _rotating_ refresh token, and the renewal only counts if the
 new pair reaches the browser.
 
-There was no middleware, so renewal happened during page renders — and a
+There was no proxy, so renewal happened during page renders — and a
 Server Component cannot set cookies, so the `setAll` in
 `src/lib/supabase/server.ts` caught the new pair and dropped it. Every render
 spent the refresh token and discarded the replacement, invalidating the one the
@@ -214,12 +215,13 @@ It also made a signed-in admin read as a stranger: `getViewer` queries
 `admin_users` through the user's own client, and a request carrying a spent
 token reads nothing, so `requireAdmin` bounced them to the marketing site.
 
-Middleware runs before the render and owns a real response, so the refreshed
+The proxy runs before the render and owns a real response, so the refreshed
 cookies survive. It writes them to the request too — the render behind it reads
 that copy, and without it the very render the refresh exists to serve would
 still query as an expired user.
 
-The matcher covers only `/store`, `/admin`, `/account` and `/login`. `getUser`
+The matcher covers only `/store`, `/admin`, `/account`, `/login` and
+`/welcome`. `getUser`
 is a round trip to the auth server, and the pages where speed matters most —
 the landing page, and `/e/CODE` reached by scanning printed paper on shop wifi
 — have no session at all.
@@ -288,6 +290,53 @@ and marks the store active. Consumed with the service role, because
 
 Re-running is harmless — it is a no-op once accepted — so a failed membership
 insert simply retries on the next sign-in.
+
+#### One email, not two
+
+Still tokenless in the sense above, and the change is worth reading carefully
+because it looks like a contradiction.
+
+The invitation used to point at `/login/reset`, which asked for the address the
+invitation had just been sent to, which triggered a **second** email carrying
+the link that actually did something. Two emails to do one thing, and the first
+did nothing but ask for a click.
+
+`src/lib/auth/invite-link.ts` calls `admin.auth.admin.generateLink()`, which
+mints a real Supabase action link **without sending anything**. That link goes
+into CardFlare's own invitation. So there is still no secret of ours: it is
+Supabase's token, verified by Supabase, redeemed through the same
+`/auth/callback` a magic link uses.
+
+Two details that are silent when wrong:
+
+- **`type: "recovery"`, not `"invite"`.** `ensureAuthUser` has already created
+  the auth account by this point, and `generateLink({ type: "invite" })`
+  creates the user itself and fails on one that exists. Recovery works on an
+  account that has never had a password, which is exactly this case.
+- **`redirectTo` must be in Supabase's allowed Redirect URLs.** When it is not,
+  Supabase does not raise — it drops the value and sends the store to the Site
+  URL, which looks like a broken link.
+
+The link lands on `/welcome`: signed in already, address shown rather than
+retyped, password and confirmation the only fields.
+
+Minting can fail. When it does the invitation still sends, without the
+shortcut, and its copy changes to describe the two-step route honestly rather
+than promising a button that is not there.
+
+#### Expiry is the common case, not the edge
+
+These links expire after Supabase's **Email OTP Expiration** — one hour by
+default — and a shop owner reads email the next morning. A dead button is
+therefore the likeliest single outcome of the most important message CardFlare
+sends, so every path that can fail lands on `/login/reset?expired=1`, which
+says the link expired and is one field from a fresh one.
+
+Not `/login`: an invited store has no password yet, so a sign-in form asks them
+for something they do not have.
+
+Raising Email OTP Expiration is a deployment setting, and worth doing — see
+`docs/DEPLOYMENT.md`.
 
 ### Row Level Security
 
@@ -592,6 +641,39 @@ minute, with "here now" being a 15-minute window on it. Deliberately not
 websockets — a store wants to know who is around, not who moved their thumb,
 and a polled timestamp survives a phone locking in someone's pocket. Realtime
 belongs with match notifications, where the latency is the feature.
+
+### Event times
+
+An event happens at a place, and the place has a timezone. `stores.timezone`
+holds it; times themselves stay `timestamptz`, because an instant was always
+the right thing to store.
+
+The bug this fixed was not the label. `datetime-local` submits
+"2026-09-12T18:00" with no zone, and `Date.parse` reads a bare string like that
+in the _server's_ zone — UTC on Vercel. A store owner in Austin typing 6pm
+stored one in the afternoon, and the dashboard displayed that wrong instant
+accurately as "6:00 PM UTC".
+
+`src/lib/time/zone.ts` does the conversion on `Intl`, which already carries the
+IANA database — a date library would be several hundred kilobytes to avoid
+forty testable lines. `localToInstant` runs **two passes**: the first guess
+uses the offset in force at the typed time read as UTC, which is on the wrong
+side of a daylight-saving change whenever the real answer is on the other, and
+re-reading the offset at the candidate instant corrects it. One pass is an hour
+wrong for the few hours after a changeover — a store opening early on the
+Sunday the clocks go forward would have printed the wrong time on its counter
+sheet.
+
+Ordering and duration are checked on the converted instants rather than the
+typed strings, because across a change those disagree: twenty-five wall-clock
+hours in autumn is twenty-six real ones.
+
+**The zone comes from the store row, never from the form** — the same rule as
+the store id, which is authorised against the session rather than trusted. A
+submitted zone would otherwise decide what somebody's "6pm" meant.
+
+Defaulting to UTC means nothing moves under an existing store until it says
+where it is, and changing it never moves an event already created.
 
 ### Open to trades
 

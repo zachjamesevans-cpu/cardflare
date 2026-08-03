@@ -40,9 +40,11 @@ function errorFor(state: InviteStoreState, field: keyof InviteStoreFieldErrors) 
 function InviteOutcome({
   storeName,
   email,
+  setupLink,
 }: {
   storeName: string;
   email: InviteEmailOutcome;
+  setupLink?: string | null;
 }) {
   const { Icon, tone, message } = {
     sent: {
@@ -53,28 +55,50 @@ function InviteOutcome({
     "not-configured": {
       Icon: MailWarning,
       tone: "text-warning",
+      /*
+       * This used to say "tell them to sign in", which they cannot do: an
+       * invited account has no password yet, so a sign-in form is a dead end.
+       */
       message:
-        "was invited, but no email was sent because email is not configured yet. Tell them to sign in at cardflare.gg/login with this address — it works regardless.",
+        "was invited, but no email was sent because email is not configured yet. Send them the setup link below, or tell them to request one at cardflare.gg/login/reset.",
     },
     failed: {
       Icon: MailX,
       tone: "text-danger",
       message:
-        "was invited, but the email provider rejected the message. Check the runtime logs. They can still sign in at cardflare.gg/login with this address.",
+        "was invited, but the email provider rejected the message. Check the runtime logs, then send them the setup link below.",
     },
   }[email];
 
   return (
-    <p
+    <div
       role="status"
-      className="flex items-start gap-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-4 py-3 text-sm text-text-secondary"
+      className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-4 py-3 text-sm text-text-secondary"
     >
-      <Icon className={`mt-0.5 size-4 shrink-0 ${tone}`} aria-hidden="true" />
-      <span>
-        <strong className="font-semibold text-text-primary">{storeName}</strong>{" "}
-        {message}
-      </span>
-    </p>
+      <p className="flex items-start gap-2">
+        <Icon className={`mt-0.5 size-4 shrink-0 ${tone}`} aria-hidden="true" />
+        <span>
+          <strong className="font-semibold text-text-primary">{storeName}</strong>{" "}
+          {message}
+        </span>
+      </p>
+
+      {/*
+       * Shown only when nothing was delivered. This link signs its holder in
+       * as that store, so it is a credential — there is no reason to put it on
+       * screen when the store already has it in their inbox.
+       */}
+      {setupLink && (
+        <div className="flex flex-col gap-1.5 border-t border-accent/20 pt-3">
+          <p className="text-xs text-text-muted">
+            Send them this. It signs them in once, then expires.
+          </p>
+          <code className="block max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 font-mono text-xs break-all text-text-primary">
+            {setupLink}
+          </code>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -89,7 +113,11 @@ export function InviteStoreForm() {
   return (
     <div className="flex flex-col gap-4">
       {state.status === "success" && (
-        <InviteOutcome storeName={state.storeName} email={state.email} />
+        <InviteOutcome
+          storeName={state.storeName}
+          email={state.email}
+          setupLink={state.setupLink}
+        />
       )}
 
       <form

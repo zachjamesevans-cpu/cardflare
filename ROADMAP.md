@@ -177,7 +177,7 @@ Asked for by the founder: `/admin` bounced him to the marketing site from his
 phone, and needing a fresh emailed link every time is friction in the wrong
 place for the people who run events.
 
-- **Sessions now survive.** There was no middleware, so a rotating refresh
+- **Sessions now survive.** There was no proxy, so a rotating refresh
   token was spent during page renders and its replacement discarded — a Server
   Component cannot write cookies. Operators were signed out about an hour after
   signing in, and a signed-in admin could read as a stranger and get bounced
@@ -228,6 +228,63 @@ what is in the binders around them cannot name what they want.
   is silently broadcast, the partial index is the one the planner picks, and
   the flag leaves with the participant row
 
+## ✅ Milestone 6.8 — Store timezones
+
+Deferred since Milestone 3 with the note "fix before a pilot outside one
+timezone". It turned out to be worse than the display problem it was filed as.
+
+- **The typed time was being misread, not just mislabelled.** `datetime-local`
+  submits "2026-09-12T18:00" with no zone, and `Date.parse` reads a bare string
+  like that in the server's zone — UTC on Vercel. A store owner in Austin
+  typing 6pm stored one in the afternoon, and the dashboard then displayed that
+  wrong instant accurately as "6:00 PM UTC"
+- **`stores.timezone`**, defaulting to UTC so nothing moves under an existing
+  store until it says where it is. Times stay `timestamptz`: an instant was
+  always the right thing to store, the zone was what was missing
+- Conversion in `src/lib/time/zone.ts`, on `Intl` rather than a date library.
+  Two passes, because a single-pass conversion is an hour wrong for the few
+  hours after a daylight-saving change — a store opening early on the Sunday
+  the clocks go forward would have printed the wrong time on its counter sheet
+- Ordering and duration are checked on the converted instants, not the typed
+  strings: twenty-five wall-clock hours across the autumn change is
+  twenty-six real ones
+- The zone comes from the store row and never from the form, the same way the
+  store id is authorised against the session rather than trusted
+- Displayed with the abbreviation a person would say — "CDT", not
+  "America/Chicago" — which also changes with the season, so it quietly
+  confirms the daylight-saving side is right
+
+## ✅ Milestone 6.9 — One-email store invitations
+
+Asked for by the founder: "it's a little convoluted to get an email saying that
+they then have to get ANOTHER email just to set/reset their password."
+
+- **One email, not two.** The invitation used to point at a form that asked for
+  the address it had just been sent to, so a second email could carry the link
+  that actually did something. The first email did nothing but ask for a click
+- **Still no homegrown token.** `generateLink()` mints a real Supabase action
+  link without sending anything, so the invitation carries Supabase's own
+  token, verified by Supabase, redeemed through the same `/auth/callback` a
+  magic link uses. `recovery`, not `invite` — the auth account already exists
+  by then, and an invite link would try to create it and fail
+- **`/welcome`** shows the address they were invited on and asks for a password
+  and a confirmation. Nothing that is already known is asked for again
+- **Expiry is treated as the common case.** These links last an hour by
+  default and a shop owner reads email the next morning, so every failure path
+  lands on `/login/reset?expired=1` — which says the link expired and is one
+  field from a fresh one. Not `/login`, which asks an invited store for a
+  password they do not have yet
+- **The fallback is honest.** When the link cannot be minted, the invitation
+  still sends and its copy changes to describe the two-step route rather than
+  promising a button that is not there. Rendering both messages side by side is
+  what found that they were byte-identical, telling the reader that if the
+  button had expired they should visit the URL the button already pointed at
+- Two bugs found by looking rather than reasoning: that one, and every form in
+  the app emitting `errorid`/`hintid` attributes onto its inputs because
+  `fieldIds()` returned three ids where only `id` belongs on a control
+- `src/middleware.ts` is now `src/proxy.ts`, the convention Next 16 deprecated
+  it in favour of
+
 ### Milestone 7 — Matching
 
 Matching engine, realtime match notifications, structured meetup responses.
@@ -253,7 +310,6 @@ Tracked so they are not lost, none blocking launch.
 | **Provider terms review**    | Reviewed by the founder on 2 August 2026; images enabled on that basis. Re-check if the provider changes terms or if artwork is used anywhere beyond thumbnails on `/cards`.                |
 | **Card data coverage**       | The importer exists; the full One Piece pool has not been loaded. Needs a source whose terms permit it.                                                                                     |
 | **Realtime presence**        | Presence is a polled `last_seen_at` window, so the lobby updates on load rather than live. Supabase Realtime belongs with match notifications, where latency actually matters.              |
-| **Event timezones**          | Events are stored as UTC instants and rendered in UTC, labelled as such. Correct but not friendly: a store reads its own schedule in local time. Fix before a pilot outside one timezone.   |
 | **Expired session cleanup**  | Expired rows are ignored on lookup but not deleted. One scheduled `delete` — see the migration. Not urgent at pilot volume.                                                                 |
 
 ## Dependency advisories

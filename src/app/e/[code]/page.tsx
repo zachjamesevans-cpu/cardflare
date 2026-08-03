@@ -220,7 +220,7 @@ export default async function JoinByCodePage({
             <dd>
               {event.kind === "walk_in"
                 ? "Trading now"
-                : formatEventWindow(event.startsAt, event.endsAt)}
+                : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}
             </dd>
           </div>
           {location && (

@@ -10,8 +10,22 @@ export const CONTROL_CLASS =
   "hover:border-border-strong focus:border-accent focus:outline-none " +
   "aria-[invalid=true]:border-danger";
 
+/**
+ * The ids a field's label, hint and error message use.
+ *
+ * Internal. `fieldIds` used to return all three and every form spreads that
+ * onto its control, so `errorId` and `hintId` were landing on the `<input>`
+ * itself — React rejects unknown camelCase props, warned twice per field, and
+ * emitted `errorid`/`hintid` attributes into the markup. Only `id` belongs on
+ * the control; the other two belong to the elements it points at.
+ */
+function messageIds(name: string) {
+  return { errorId: `${name}-error`, hintId: `${name}-hint` };
+}
+
+/** The props a control needs. Spread onto the input, select or textarea. */
 export function fieldIds(name: string) {
-  return { id: name, errorId: `${name}-error`, hintId: `${name}-hint` };
+  return { id: name };
 }
 
 interface FieldProps {
@@ -39,7 +53,8 @@ export function Field({
   className,
   children,
 }: FieldProps) {
-  const { id, errorId, hintId } = fieldIds(name);
+  const { id } = fieldIds(name);
+  const { errorId, hintId } = messageIds(name);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -74,7 +89,7 @@ export function Field({
 
 /** Builds the aria wiring a control needs to point at its hint/error. */
 export function describedBy(name: string, hasError: boolean, hasHint: boolean) {
-  const { errorId, hintId } = fieldIds(name);
+  const { errorId, hintId } = messageIds(name);
   const ids = [hasError ? errorId : null, hasHint && !hasError ? hintId : null];
   const value = ids.filter(Boolean).join(" ");
 

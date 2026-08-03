@@ -72,10 +72,11 @@ describe("inviteStoreSchema", () => {
   });
 });
 
-describe("storeInviteEmail", () => {
-  const message = () =>
-    storeInviteEmail("Grand Line Games", "owner@example.com", "https://cardflare.gg");
+/** An invitation with no one-click link — the fallback shape. */
+const message = () =>
+  storeInviteEmail("Grand Line Games", "owner@example.com", "https://cardflare.gg");
 
+describe("storeInviteEmail", () => {
   it("names the store in the subject and body", () => {
     const email = message();
 
@@ -84,13 +85,11 @@ describe("storeInviteEmail", () => {
     expect(email.text).toContain("Grand Line Games");
   });
 
-  it("points at the sign-in page rather than embedding a link that expires", () => {
+  it("still points at the sign-in page", () => {
     const email = message();
 
     expect(email.html).toContain("https://cardflare.gg/login");
     expect(email.text).toContain("https://cardflare.gg/login");
-    // A magic link would be stale long before a shop owner opened the email.
-    expect(email.html).not.toMatch(/token=|code=|access_token/);
   });
 
   it("ships a real plain-text alternative", () => {
@@ -117,19 +116,6 @@ describe("storeInviteEmail", () => {
     expect(email.text).toMatch(/not expecting this/i);
   });
 
-  /*
-   * The first instruction a store ever reads, so it has to describe the flow
-   * that exists. It used to say "there's no password — we email you a link
-   * each time", which stopped being true when password sign-in landed.
-   */
-  it("sends the store to choose a password", () => {
-    const email = message();
-
-    expect(email.html).toContain("https://cardflare.gg/login/reset");
-    expect(email.text).toContain("https://cardflare.gg/login/reset");
-    expect(email.text).toMatch(/choose a password/i);
-  });
-
   it("no longer promises that there is no password", () => {
     const email = message();
 
@@ -138,14 +124,90 @@ describe("storeInviteEmail", () => {
       expect(body).not.toMatch(/link each time/i);
     }
   });
+});
+
+/**
+ * The one-click invitation.
+ *
+ * This message used to point at a form, which asked for the address the
+ * message had just been sent to, which triggered a *second* email carrying the
+ * link that actually did something. One email now carries it.
+ */
+describe("storeInviteEmail with a setup link", () => {
+  const LINK = "https://project.supabase.co/auth/v1/verify?token=abc&type=recovery";
+
+  const withLink = () =>
+    storeInviteEmail(
+      "Grand Line Games",
+      "owner@example.com",
+      "https://cardflare.gg",
+      LINK,
+    );
+
+  it("puts the one-click link in the button and in the text part", () => {
+    const email = withLink();
+
+    expect(email.html).toContain(LINK);
+    expect(email.text).toContain(LINK);
+  });
 
   /*
-   * The emailed link is still the fallback, and an invited store has to know
-   * it exists — some shop owners will not want a password at all.
+   * These links expire in about an hour by default and a shop owner reads
+   * email the next morning, so a dead button with no way forward is the
+   * likeliest single outcome of this message. Saying so is not boilerplate.
    */
-  it("still offers the emailed link as an alternative", () => {
-    const email = message();
+  it("says what to do when the link has expired", () => {
+    const email = withLink();
 
-    expect(email.text).toMatch(/one-time sign-in link/i);
+    for (const body of [email.html, email.text]) {
+      expect(body).toMatch(/expires/i);
+      expect(body).toContain("https://cardflare.gg/login/reset");
+    }
+  });
+
+  /*
+   * Generating the link can fail, and an invitation that arrives without the
+   * shortcut is far better than none — it falls back to the route every
+   * invitation used before.
+   */
+  it("falls back to the reset page when no link could be made", () => {
+    for (const email of [
+      message(),
+      storeInviteEmail("S", "o@e.com", "https://x.gg", null),
+    ]) {
+      expect(email.text).toMatch(/login\/reset/);
+    }
+  });
+
+  /*
+   * Without a generated link there is nothing token-shaped to embed, and the
+   * message must not invent one — the fallback is a plain page URL.
+   */
+  it("embeds nothing token-shaped when it has no link", () => {
+    expect(message().html).not.toMatch(/token=|access_token/);
+  });
+
+  /*
+   * Found by rendering both and looking at them: they came out identical. The
+   * fallback's button already pointed at the reset page, and the paragraph
+   * under it said that if the button had expired the reader should go to the
+   * reset page — the URL they had just tapped. A loop that reads as broken.
+   */
+  it("does not send the reader back to the button they just tapped", () => {
+    const plain = message();
+
+    expect(plain.html).not.toMatch(/button expires/i);
+    expect(plain.text).not.toMatch(/That link expires/i);
+    expect(plain.html).not.toBe(withLink().html);
+  });
+
+  /*
+   * And says what actually happens instead: the reset page asks for the
+   * address and emails a link, which is one more step than the button.
+   */
+  it("promises the extra step the fallback really takes", () => {
+    for (const body of [message().html, message().text]) {
+      expect(body).toMatch(/ask for (a link|this address)/i);
+    }
   });
 });

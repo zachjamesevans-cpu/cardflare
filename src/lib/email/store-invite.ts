@@ -4,17 +4,22 @@ import type { EmailMessage } from "./client";
 /**
  * Sent when a store is added to the beta.
  *
- * Deliberately contains no sign-in link of its own. A magic link would expire
- * long before a shop owner got round to reading it; pointing at the sign-in
- * page instead lets them get a fresh one whenever they are ready. Same
- * reasoning as the waitlist email on styling: inline styles, no images, real
- * plain-text alternative.
+ * One email, one button. It used to take two: this message pointed at a form,
+ * the form asked for the address the message had just been sent to, and only
+ * then did a *second* email arrive carrying the link that actually did
+ * something. The first email did nothing but ask for a click.
  *
- * The copy used to say "there's no password — we email you a link each time",
- * which stopped being true when password sign-in landed. It matters more than
- * most stale copy: this is the first instruction a store ever reads, and it
- * was telling them to expect a flow that is now the fallback rather than the
- * route in.
+ * The button now carries a real Supabase action link, minted server-side, so
+ * tapping it signs the store in and lands them on the setup screen with their
+ * address already filled in.
+ *
+ * It expires — an hour by default — and a shop owner reads email the next
+ * morning, so the message says so plainly and gives the one-step way to get
+ * another. That paragraph is not boilerplate; it is the difference between a
+ * dead link and a recovered one.
+ *
+ * Styling follows the waitlist email: inline styles, no images, a real
+ * plain-text alternative.
  */
 const COLOR = {
   canvas: "#0e1116",
@@ -40,16 +45,46 @@ export function storeInviteEmail(
   storeName: string,
   to: string,
   origin: string,
+  /**
+   * A one-click link that signs them in and lands them on the setup screen.
+   *
+   * Optional because generating it can fail, and an invitation that arrives
+   * without the shortcut is far better than none. Without it the email falls
+   * back to the two-step route, which is what every invitation used to do.
+   */
+  setupLink?: string | null,
 ): EmailMessage {
   const name = escapeHtml(storeName);
   const signInUrl = `${origin}/login`;
   /*
-   * Points at the reset page rather than at sign-in. An invited account exists
-   * with no password, so "choose a password" and "I forgot mine" are the same
-   * flow underneath — and sending a store to a sign-in form they cannot yet
-   * complete is how the first real invitation went wrong once already.
+   * The fallback, and the recovery path when the one-click link has expired.
+   * An invited account exists with no password, so "choose a password" and "I
+   * forgot mine" are the same flow underneath — and sending a store to a
+   * sign-in form they cannot yet complete is how the first real invitation
+   * went wrong once already.
    */
   const passwordUrl = `${origin}/login/reset`;
+  const primaryUrl = setupLink ?? passwordUrl;
+
+  /*
+   * The two messages have to differ, and rendering both proved they did not.
+   * With no link the button already points at the reset page, so telling the
+   * reader "if the button has expired, go to the reset page" sent them to the
+   * URL they had just tapped — a loop that reads as a broken email. The
+   * fallback promises one extra step instead, because that is what happens.
+   */
+  const lead = setupLink
+    ? "Your account is ready on this address. One tap below finishes it — pick a password and you are in."
+    : "Your account is ready on this address. Ask for a link below and we will email you one that sets your password.";
+
+  const buttonLabel = setupLink ? "Finish setting up" : "Choose a password";
+
+  const followUp = setupLink
+    ? `The button expires after a while. If it has, use
+        <a href="${passwordUrl}" style="color:${COLOR.accent};">${SITE.domain}/login/reset</a>
+        and we will send a fresh one to this address.`
+    : `The page will ask for this address, then email you a link. It expires
+        after a while, so open it when you have a minute.`;
 
   const html = `<!doctype html>
 <html lang="en">
@@ -70,19 +105,17 @@ export function storeInviteEmail(
       </p>
 
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
-        Your account is ready on this email address. Choose a password to
-        finish setting it up, and you can sign straight in from then on.
+        ${lead}
       </p>
 
       <p style="margin:0 0 24px;">
-        <a href="${passwordUrl}" style="display:inline-block;background-color:${COLOR.accent};color:${COLOR.accentContrast};font-weight:700;font-size:16px;text-decoration:none;padding:12px 24px;border-radius:10px;">
-          Choose a password
+        <a href="${primaryUrl}" style="display:inline-block;background-color:${COLOR.accent};color:${COLOR.accentContrast};font-weight:700;font-size:16px;text-decoration:none;padding:12px 24px;border-radius:10px;">
+          ${buttonLabel}
         </a>
       </p>
 
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
-        Rather not have one? You can ask for a one-time sign-in link by email
-        instead, every time.
+        ${followUp}
       </p>
 
       <p style="margin:0;padding-top:24px;border-top:1px solid ${COLOR.border};font-size:13px;line-height:1.6;color:${COLOR.textMuted};">
@@ -94,19 +127,35 @@ export function storeInviteEmail(
   </body>
 </html>`;
 
+  const middle = setupLink
+    ? [
+        "Your account is ready on this address. One link below finishes it - pick",
+        "a password and you are in.",
+        "",
+        `Finish setting up: ${setupLink}`,
+        "",
+        "That link expires after a while. If it has, go to the address below and we",
+        "will send a fresh one.",
+        "",
+        `New link: ${passwordUrl}`,
+      ]
+    : [
+        "Your account is ready on this address. Ask for a link below and we will",
+        "email you one that sets your password.",
+        "",
+        `Choose a password: ${passwordUrl}`,
+        "",
+        "That page will ask for this address, then email you a link. It expires",
+        "after a while, so open it when you have a minute.",
+      ];
+
   const text = [
     `${storeName} is in the CardFlare beta.`,
     "",
     "CardFlare helps players at your events find the cards they need from other",
     "people already in the room. You're one of the first stores trying it.",
     "",
-    "Your account is ready on this email address. Choose a password to finish",
-    "setting it up, and you can sign straight in from then on.",
-    "",
-    `Choose a password: ${passwordUrl}`,
-    "",
-    "Rather not have one? You can ask for a one-time sign-in link by email",
-    "instead, every time.",
+    ...middle,
     "",
     `Sign in: ${signInUrl}`,
     "",

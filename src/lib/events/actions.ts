@@ -6,11 +6,15 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
+import { isValidTimeZone } from "@/lib/time/zone";
+import { eventWindowIn } from "./format";
 import {
   createEvent,
   findEventById,
+  findStoreById,
   findOpenWalkInRoom,
   setEventStatus,
+  setStoreTimeZone,
   setWalkInEnabled,
 } from "./repository";
 import { endWalkInRoomWhenLastUsed } from "./rooms";
@@ -94,9 +98,45 @@ export async function createEventAction(
     return failure(GENERIC_ERROR, {}, values);
   }
 
+  /*
+   * The zone comes from the store row, never from the form.
+   *
+   * The typed times are a wall clock with no zone attached, and this is what
+   * attaches one. Taking it from a hidden field would let a submission decide
+   * what "6pm" meant — and, more prosaically, would break the moment a form
+   * was cached with a stale value.
+   */
+  const store = await findStoreById(parsed.data.storeId);
+  if (!store) {
+    console.error("Event creation rejected: the store could not be loaded.");
+    return failure(GENERIC_ERROR, {}, values);
+  }
+
+  const window = eventWindowIn(
+    parsed.data.startsAt,
+    parsed.data.endsAt,
+    store.timezone,
+  );
+
+  if (!window.ok) {
+    return failure(
+      "Please fix the highlighted fields.",
+      { [window.problem.field]: window.problem.message },
+      values,
+    );
+  }
+
   let event;
   try {
-    event = await createEvent(parsed.data, actor.userId);
+    event = await createEvent(
+      {
+        storeId: parsed.data.storeId,
+        name: parsed.data.name,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+      },
+      actor.userId,
+    );
   } catch (error) {
     console.error("Could not create the event", error);
     return failure(GENERIC_ERROR, {}, values);
@@ -138,6 +178,44 @@ export async function setWalkInAction(formData: FormData): Promise<void> {
     }
   } catch (error) {
     console.error("Could not change walk-in trading", error);
+    return;
+  }
+
+  revalidatePath("/store");
+  revalidatePath("/admin");
+}
+
+/**
+ * Sets where the store is.
+ *
+ * Validated against `Intl` rather than a list kept here: the IANA database
+ * changes, and the set that matters is the one the runtime will actually
+ * format with. The value arrives from a `<select>`, which is to say from a
+ * form, which is to say it is not to be trusted.
+ *
+ * Nothing already stored moves. Events hold instants, and an instant does not
+ * depend on the zone it was typed in — only what is typed from now on, and how
+ * all of it is displayed, changes.
+ */
+export async function setStoreTimeZoneAction(formData: FormData): Promise<void> {
+  const storeId = text(formData, "storeId");
+  const timeZone = text(formData, "timezone");
+
+  const actor = await authorizeStore(storeId);
+  if (!actor) {
+    console.error("Rejected a timezone change from an unauthorised viewer.");
+    return;
+  }
+
+  if (!isValidTimeZone(timeZone)) {
+    console.error(`Rejected an unknown timezone: ${timeZone}`);
+    return;
+  }
+
+  try {
+    await setStoreTimeZone(storeId, timeZone);
+  } catch (error) {
+    console.error("Could not change the store timezone", error);
     return;
   }
 

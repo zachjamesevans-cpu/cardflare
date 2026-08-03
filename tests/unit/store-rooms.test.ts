@@ -63,6 +63,7 @@ const store = (over: Partial<PublicStore> = {}): PublicStore => ({
   city: "Austin",
   region: "TX",
   walkInEnabled: true,
+  timeZone: "America/Chicago",
   ...over,
 });
 
@@ -78,6 +79,7 @@ const room = (over: Partial<PublicEvent> = {}): PublicEvent => ({
   storeName: "Grand Line Games",
   storeCity: "Austin",
   storeRegion: "TX",
+  storeTimeZone: "America/Chicago",
   ...over,
 });
 

@@ -9,10 +9,13 @@ import type { EventRow } from "@/lib/supabase/types";
 export function EventRowCard({
   event,
   storeName,
+  timeZone,
   attendance,
 }: {
   event: EventRow;
   storeName?: string;
+  /** The owning store's zone. An event time without one is a wrong time. */
+  timeZone: string;
   attendance?: { total: number; present: number };
 }) {
   return (
@@ -26,7 +29,7 @@ export function EventRowCard({
         </Link>
         <p className="truncate text-sm text-text-muted">
           {storeName ? `${storeName} · ` : ""}
-          {formatEventWindow(event.starts_at, event.ends_at)}
+          {formatEventWindow(event.starts_at, event.ends_at, timeZone)}
         </p>
       </div>
 
@@ -69,11 +72,19 @@ export function EventList({
   events,
   showStore = false,
   storeNames,
+  timeZones,
+  fallbackTimeZone = "UTC",
   attendance,
 }: {
   events: EventRow[];
   showStore?: boolean;
   storeNames?: Record<string, string>;
+  /**
+   * Zone per store, for the admin console where one list spans many stores.
+   * A single store's dashboard passes `fallbackTimeZone` instead.
+   */
+  timeZones?: Record<string, string>;
+  fallbackTimeZone?: string;
   attendance?: Map<string, { total: number; present: number }>;
 }) {
   if (events.length === 0) {
@@ -92,6 +103,7 @@ export function EventList({
           key={event.id}
           event={event}
           storeName={showStore ? storeNames?.[event.store_id] : undefined}
+          timeZone={timeZones?.[event.store_id] ?? fallbackTimeZone}
           attendance={attendance?.get(event.id)}
         />
       ))}

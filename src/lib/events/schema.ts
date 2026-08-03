@@ -4,56 +4,52 @@ import { normalizeJoinCode, JOIN_CODE_PATTERN } from "./join-code";
 
 export const EVENT_NAME_MAX = 80;
 
-/** The longest an event may run. Guards a typo, not a policy. */
-const MAX_DURATION_HOURS = 24;
-
+/**
+ * `datetime-local` submits "2026-08-14T18:00" — a wall clock with no zone.
+ *
+ * Only the shape is checked here. Turning it into an instant needs the store's
+ * timezone, which is not in the form and must not be: it comes from the store
+ * row the server resolved. `eventWindowIn` in `format.ts` does that, and the
+ * ordering and duration checks moved there with it, because comparing two
+ * zoneless strings across a daylight-saving change compares the wrong thing.
+ */
 const localDateTime = z
   .string()
   .trim()
   .min(1, "Please choose a date and time.")
-  // `datetime-local` submits "2026-08-14T18:00", with no timezone. Parsed in
-  // the server's zone, which on Vercel is UTC — see createEventSchema.
-  .refine((value) => !Number.isNaN(Date.parse(value)), {
-    message: "Please choose a valid date and time.",
-  });
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Please choose a valid date and time.");
 
-export const createEventSchema = z
-  .object({
-    /*
-     * `guid`, not `uuid`. Zod's `uuid` enforces the RFC version and variant
-     * nibbles; Postgres accepts any 32 hex digits. The only job here is to
-     * keep malformed input from reaching the query, so matching the database's
-     * leniency avoids rejecting an id the database would have accepted.
-     * Authorisation is checked separately and does not rely on this shape.
-     */
-    storeId: z.guid("Please choose a store."),
-    name: z
-      .string()
-      .transform((value) => value.replace(/\s+/g, " ").trim())
-      .pipe(
-        z
-          .string()
-          .min(1, "Please name the event.")
-          .max(EVENT_NAME_MAX, `Please keep it under ${EVENT_NAME_MAX} characters.`),
-      ),
-    startsAt: localDateTime,
-    endsAt: localDateTime,
-  })
-  .refine((value) => Date.parse(value.endsAt) > Date.parse(value.startsAt), {
-    message: "The end time must be after the start time.",
-    path: ["endsAt"],
-  })
-  .refine(
-    (value) =>
-      Date.parse(value.endsAt) - Date.parse(value.startsAt) <=
-      MAX_DURATION_HOURS * 60 * 60 * 1000,
-    {
-      message: `An event cannot run longer than ${MAX_DURATION_HOURS} hours.`,
-      path: ["endsAt"],
-    },
-  );
+export const createEventSchema = z.object({
+  /*
+   * `guid`, not `uuid`. Zod's `uuid` enforces the RFC version and variant
+   * nibbles; Postgres accepts any 32 hex digits. The only job here is to
+   * keep malformed input from reaching the query, so matching the database's
+   * leniency avoids rejecting an id the database would have accepted.
+   * Authorisation is checked separately and does not rely on this shape.
+   */
+  storeId: z.guid("Please choose a store."),
+  name: z
+    .string()
+    .transform((value) => value.replace(/\s+/g, " ").trim())
+    .pipe(
+      z
+        .string()
+        .min(1, "Please name the event.")
+        .max(EVENT_NAME_MAX, `Please keep it under ${EVENT_NAME_MAX} characters.`),
+    ),
+  startsAt: localDateTime,
+  endsAt: localDateTime,
+});
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+
+/** What the repository stores: real instants, already converted. */
+export interface CreateEventRecord {
+  storeId: string;
+  name: string;
+  startsAt: Date;
+  endsAt: Date;
+}
 
 export const joinCodeSchema = z
   .string()
@@ -112,6 +108,8 @@ export interface PublicEvent {
   storeName: string;
   storeCity: string | null;
   storeRegion: string | null;
+  /** The store's zone. Event times mean nothing without it. */
+  storeTimeZone: string;
 }
 
 /** The little a player sees about a store when no room of its is running. */
@@ -121,6 +119,7 @@ export interface PublicStore {
   city: string | null;
   region: string | null;
   walkInEnabled: boolean;
+  timeZone: string;
 }
 
 /**

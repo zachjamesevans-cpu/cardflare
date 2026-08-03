@@ -53,14 +53,17 @@ export type StoreRow = {
   /** The permanent code on the counter. Seven characters, never rotated. */
   join_code: string;
   walk_in_enabled: boolean;
+  /** IANA name. Turns a typed event time into an instant, and back. */
+  timezone: string;
 };
 
 /** Columns with database defaults are optional on insert. */
 export type StoreInsert = Omit<
   StoreRow,
-  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled"
+  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled" | "timezone"
 > & {
   walk_in_enabled?: boolean;
+  timezone?: string;
   id?: string;
   created_at?: string;
   status?: StoreStatus;

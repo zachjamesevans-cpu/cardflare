@@ -12,18 +12,38 @@ import { updatePassword } from "@/lib/auth/actions";
 import { PASSWORD_MIN } from "@/lib/auth/schema";
 import { NEW_PASSWORD_IDLE } from "@/lib/auth/state";
 
-function SubmitButton() {
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" size="lg" disabled={pending} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-      {pending ? "Saving…" : "Save password"}
+      {pending ? "Saving…" : label}
     </Button>
   );
 }
 
-export function NewPasswordForm({ signedInAs }: { signedInAs: string }) {
+/**
+ * Choosing a password.
+ *
+ * Two contexts, one form. An invited store finishing setup has never had a
+ * password and is arriving from a link in their invitation; somebody signed in
+ * is changing one they already know. The mechanics are identical, so only the
+ * words differ.
+ */
+export function NewPasswordForm({
+  signedInAs,
+  submitLabel = "Save password",
+  savedTitle = "Password saved",
+  savedBody,
+  continueLabel = "Go to your store",
+}: {
+  signedInAs: string;
+  submitLabel?: string;
+  savedTitle?: string;
+  savedBody?: string;
+  continueLabel?: string;
+}) {
   const [state, formAction] = useActionState(updatePassword, NEW_PASSWORD_IDLE);
 
   const errors = state.status === "error" ? state.fieldErrors : {};
@@ -37,15 +57,16 @@ export function NewPasswordForm({ signedInAs }: { signedInAs: string }) {
         <span className="flex size-12 items-center justify-center rounded-full bg-accent/15">
           <CheckCircle2 className="size-6 text-accent" aria-hidden="true" />
         </span>
-        <h2 className="text-xl font-bold text-text-primary">Password saved</h2>
+        <h2 className="text-xl font-bold text-text-primary">{savedTitle}</h2>
         <p className="max-w-sm text-pretty text-text-secondary">
-          You can sign in with {signedInAs} and this password from now on.
+          {savedBody ??
+            `You can sign in with ${signedInAs} and this password from now on.`}
         </p>
         <Link
           href="/store"
           className="text-sm text-accent underline underline-offset-4"
         >
-          Go to your store
+          {continueLabel}
         </Link>
       </div>
     );
@@ -114,7 +135,7 @@ export function NewPasswordForm({ signedInAs }: { signedInAs: string }) {
         />
       </Field>
 
-      <SubmitButton />
+      <SubmitButton label={submitLabel} />
     </form>
   );
 }

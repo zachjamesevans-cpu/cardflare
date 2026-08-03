@@ -59,7 +59,7 @@ export async function getViewer(): Promise<Viewer> {
  * marketing site. The old destination was the landing page, which read as
  * "CardFlare signed me out" — and did so most often when a store owner's token
  * had silently expired and they looked like a stranger to the `admin_users`
- * read below. Middleware fixed the expiry; this fixes the destination.
+ * read below. The proxy fixed the expiry; this fixes the destination.
  *
  * Still deliberately a redirect and not a "you are not an admin" page: nothing
  * here should confirm to a signed-in stranger what lives at `/admin`.

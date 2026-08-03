@@ -56,7 +56,10 @@ export default async function AdminPage() {
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
-  const window = defaultEventWindow();
+  // The admin console spans every store, so each row is formatted in the
+  // zone of the store that owns it rather than in the viewer's.
+  const timeZones = Object.fromEntries(stores.map((s) => [s.id, s.timezone]));
+  const window = defaultEventWindow("UTC");
   const providerName = new OptcgApiProvider().displayName;
 
   // Depends on which run was last, so it cannot join the batch above.
@@ -181,6 +184,7 @@ export default async function AdminPage() {
           events={events}
           showStore
           storeNames={storeNames}
+          timeZones={timeZones}
           attendance={attendance}
         />
       </section>

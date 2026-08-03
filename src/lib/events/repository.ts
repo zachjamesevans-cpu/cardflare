@@ -4,7 +4,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { EventRow, StoreRow } from "@/lib/supabase/types";
 import { generateJoinCode } from "./join-code";
 import type {
-  CreateEventInput,
+  CreateEventRecord,
   EventKind,
   EventStatus,
   PublicEvent,
@@ -48,7 +48,7 @@ function canQuery(action: string): boolean {
  * genuine error still surfaces on the first attempt.
  */
 export async function createEvent(
-  input: CreateEventInput,
+  input: CreateEventRecord,
   createdBy: string | null,
 ): Promise<EventRow> {
   const admin = getSupabaseAdmin();
@@ -60,8 +60,13 @@ export async function createEvent(
         store_id: input.storeId,
         created_by: createdBy,
         name: input.name,
-        starts_at: new Date(input.startsAt).toISOString(),
-        ends_at: new Date(input.endsAt).toISOString(),
+        /*
+         * Already instants. They arrive converted from the store's timezone,
+         * because a bare "2026-09-12T18:00" parsed here would be read in the
+         * server's zone — which is how a 6pm event ended up stored as 1pm.
+         */
+        starts_at: input.startsAt.toISOString(),
+        ends_at: input.endsAt.toISOString(),
         join_code: generateJoinCode(),
       })
       .select()
@@ -147,7 +152,7 @@ export async function findEventById(id: string): Promise<EventRow | null> {
  * column a later migration adds.
  */
 const PUBLIC_ROOM_COLUMNS =
-  "id, name, kind, status, starts_at, ends_at, stores(name, city, region)";
+  "id, name, kind, status, starts_at, ends_at, stores(name, city, region, timezone)";
 
 type PublicRoomRow = {
   id: string;
@@ -156,7 +161,12 @@ type PublicRoomRow = {
   status: EventStatus;
   starts_at: string;
   ends_at: string | null;
-  stores: { name: string; city: string | null; region: string | null } | null;
+  stores: {
+    name: string;
+    city: string | null;
+    region: string | null;
+    timezone: string;
+  } | null;
 };
 
 function toPublicEvent(row: PublicRoomRow): PublicEvent {
@@ -170,6 +180,9 @@ function toPublicEvent(row: PublicRoomRow): PublicEvent {
     storeName: row.stores?.name ?? "A CardFlare store",
     storeCity: row.stores?.city ?? null,
     storeRegion: row.stores?.region ?? null,
+    // UTC is the column default, so it is also the right fallback when the
+    // embed comes back empty: it is what the store had before it said.
+    storeTimeZone: row.stores?.timezone ?? "UTC",
   };
 }
 
@@ -205,7 +218,7 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
 
   const { data, error } = await getSupabaseAdmin()
     .from("stores")
-    .select("id, name, city, region, walk_in_enabled")
+    .select("id, name, city, region, walk_in_enabled, timezone")
     .eq("join_code", code)
     .maybeSingle();
 
@@ -221,6 +234,7 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
     city: data.city,
     region: data.region,
     walkInEnabled: data.walk_in_enabled,
+    timeZone: data.timezone,
   };
 }
 
@@ -372,6 +386,29 @@ export async function openWalkInRoom(
   }
 
   return { outcome: "opened", room: toPublicEvent(data as unknown as PublicRoomRow) };
+}
+
+/**
+ * Sets the store's timezone.
+ *
+ * The value is validated in the action against `Intl`, because that is the
+ * implementation that will format with it. The column's own constraint only
+ * keeps obvious rubbish out.
+ */
+export async function setStoreTimeZone(
+  storeId: string,
+  timeZone: string,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("stores")
+    .update({ timezone: timeZone })
+    .eq("id", storeId);
+
+  if (error) {
+    throw new Error(`Could not change the store timezone: ${error.message}`, {
+      cause: error,
+    });
+  }
 }
 
 /** Turns walk-in trading on or off for a store. */

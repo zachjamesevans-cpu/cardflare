@@ -152,10 +152,47 @@ Nothing else is required: an invited store's account already exists with no
 password, and Supabase will send it a recovery link happily, so
 `/login/reset` is both "forgot my password" and "set my first one".
 
-> **Sessions depend on `src/middleware.ts`.** Access tokens last an hour and
-> renew with a rotating refresh token, and the renewed pair only reaches the
-> browser because middleware writes it there. If sign-ins start expiring after
-> about an hour, that file — or its `matcher` — is the first place to look.
+### Two settings the invitation depends on
+
+An invitation now carries a one-click link that finishes account setup, and
+both of these govern whether it works.
+
+**1. Redirect URL — required.** Without it the link is silently broken.
+
+**Authentication → URL Configuration**, or
+`https://supabase.com/dashboard/project/_/auth/url-configuration`. Under
+**Redirect URLs**, add:
+
+```
+https://cardflare.gg/auth/callback
+```
+
+Supabase does not raise on a `redirectTo` it does not recognise. It drops the
+value and sends the store to the Site URL instead, so the symptom is an
+invitation that lands somewhere useless rather than an error anybody sees.
+Add the preview origin too if invitations are ever sent from one.
+
+**2. Email OTP Expiration — worth raising.** Same page as the password
+settings, under **Authentication → Sign In / Providers → Email**.
+
+The default is **3600 seconds (1 hour)**. That is the whole life of the button
+in an invitation, and a shop owner who opens their email the next morning finds
+it dead. **86400 (24 hours)** is a reasonable setting for a link that only ever
+goes to an address Supabase has already verified.
+
+Nothing breaks if it stays at an hour: the expired link lands on
+`/login/reset?expired=1`, which says so and sends a fresh one. It is one extra
+round trip for the person you least want to lose.
+
+> **Custom SMTP matters more here than anywhere else.** Supabase's built-in
+> sender is capped at 2 emails an hour across the whole project. The
+> invitation itself goes out through Resend, but every "send me a fresh link"
+> after an expiry goes through Supabase.
+
+> **Sessions depend on `src/proxy.ts`.** Access tokens last an hour and renew
+> with a rotating refresh token, and the renewed pair only reaches the browser
+> because the proxy writes it there. If sign-ins start expiring after about an
+> hour, that file — or its `matcher` — is the first place to look.
 
 ### Social sign-in (optional)
 
