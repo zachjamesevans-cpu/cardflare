@@ -302,7 +302,7 @@ export type EventParticipantInsert = Omit<
   open_to_trades?: boolean;
 };
 
-export type FlareStatus = "open" | "cancelled";
+export type FlareStatus = "open" | "cancelled" | "traded";
 
 /** A live request for a card, in one Event Room. Public to that room. */
 export type FlareRow = {
@@ -348,6 +348,31 @@ export type FlareResponseRow = {
 export type FlareResponseInsert = Omit<FlareResponseRow, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
+};
+
+/**
+ * A confirmed in-person trade. A tally mark with names on it.
+ *
+ * The session, flare and printing references are nullable because history
+ * outlives its pointers: sessions expire in 30 days by design, and a store's
+ * event numbers must not quietly shrink as they do.
+ */
+export type TradeRow = {
+  id: string;
+  event_id: string;
+  flare_id: string | null;
+  requester_session_id: string | null;
+  holder_session_id: string | null;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  confirmed_at: string;
+};
+
+export type TradeInsert = Omit<TradeRow, "id" | "confirmed_at" | "quantity"> & {
+  id?: string;
+  confirmed_at?: string;
+  quantity?: number;
 };
 
 /**
@@ -425,6 +450,7 @@ export type Database = {
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       flares: Table<FlareRow, FlareInsert>;
       flare_responses: Table<FlareResponseRow, FlareResponseInsert>;
+      trades: Table<TradeRow, TradeInsert>;
       player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;

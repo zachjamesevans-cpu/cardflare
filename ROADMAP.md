@@ -343,11 +343,46 @@ requester found out when somebody happened to walk over.
   taxonomies: nobody has specified the structure, and "where to find you" as
   free text is what a player would have typed into any structure we invented
 
-### Milestone 8 — Trades
+## ✅ Milestone 8 — Trades
 
-Trade confirmation, quantity updates, trade history, event analytics — and
-offers become the raw material: a confirmed trade closes the Flare and its
-offers together.
+The tally that says the loop actually closed. A trade is written once, by the
+Flare's author, when the cards change hands — a mark with names on it, and
+deliberately nothing more: no prices, no escrow, no marketplace mechanics,
+per PRODUCT.md.
+
+- **Confirming from an offer** — "We traded" on the offer row — records the
+  partner and closes the Flare. The offer is what entitles a name to appear
+  in someone else's history: without a standing offer, a confirm cannot name
+  you, so nobody can be written into a trade they never acknowledged
+- **Confirming without an offer** — "Traded it? Mark it done" — records a
+  partnerless trade, because somebody reading the board and just walking
+  over is the core loop working, and the tally must not miss it
+- **Retry-safe by construction.** The trade row is written before the Flare
+  closes, and the one-trade-per-Flare index turns a retried confirm into
+  "already recorded". A half-completed confirm can under-close, never
+  double-count. Verified against a real PostgreSQL instance, along with the
+  self-trade check and the deletion semantics
+- **History survives its pointers.** Sessions expire in 30 days by design;
+  a store's numbers must not shrink as they do. Session, Flare and printing
+  references go null on deletion — only the event takes its trades with it
+- **"Traded tonight"** shows each player their own night, both sides, in the
+  store's timezone. Private: the store sees totals, never who traded what
+- **The binder nudge.** After a trade in which you were the holder, the room
+  asks about exactly that card — "still have it?" — one tap to remove it or
+  vouch for it. Driven entirely by `confirmed_at` timestamps that already
+  existed; "still have it" is a per-entry re-confirmation, so there is no
+  new state anywhere
+- **Event analytics** on the store's event page: players joined, Flares
+  posted, still wanted, offers made, trades made. The funnel says where a
+  night stalls; the trades number answers "was it worth hosting". Counts
+  only — no prices, and never who traded with whom
+
+**Deliberately not built:** two-sided confirmation (the author confirms, the
+history shows both — a second tap from the partner adds ceremony to a trade
+that already happened across a table), automatic binder decrementing (the
+binder is the holder's private statement; the nudge asks rather than edits),
+and per-trade quantity adjustment (a partial fill is a re-post, which the
+upsert already handles).
 
 ## Deferred from Milestone 1
 

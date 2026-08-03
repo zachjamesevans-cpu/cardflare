@@ -44,6 +44,7 @@ src/lib/
   events/              Event Rooms: schema, repository, actions, join codes, QR,
                        and rooms.ts — what a scanned code resolves to
   matching/            Match rules, offers: schema, repository, actions
+  trades/              Trade confirmation, history, binder nudge, event stats
   players/             Guest sessions: schema, repository, cookie, actions
   stores/              Store invitation schema, repository, actions
   supabase/            Browser/server/service-role clients and schema types
@@ -758,6 +759,40 @@ to a match is a walk across a physical room, and a websocket would trade
 connection management on locked phones for a few seconds nobody needs.
 Supabase Realtime is ruled out regardless — RLS with zero policies means the
 anon key can subscribe to nothing, which is the point of the security model.
+
+### Trades
+
+A trade row is the tally that the loop closed: event, Flare, both sessions,
+card, quantity, `confirmed_at`. Written once, by the Flare's author, when
+cards change hands. No prices anywhere — CardFlare is not a pricing
+application, per PRODUCT.md.
+
+**Who may write whom into history.** Only the author can confirm their own
+Flare, and a named partner must have a standing offer on it — the offer row
+is the proof they said "I have this". Without that rule, confirming would
+let one player write another's name into a trade they never acknowledged.
+A trade with somebody who never tapped "offer" is recorded partnerless.
+
+**Retry-safe ordering.** The trade insert runs before the Flare's close, and
+a partial unique index (`one trade per Flare`) turns a retried confirm into
+"already recorded" — supabase-js cannot name a partial index in `onConflict`,
+so idempotency is the `23505` error code instead. A half-completed confirm
+can only under-close, never double-count.
+
+**History survives its pointers.** Session, Flare and printing references go
+null on deletion rather than cascading: sessions expire in 30 days by design,
+and a store's event numbers must not quietly shrink as they do. Only the
+event takes its trades with it.
+
+**The binder nudge.** After a holder-side trade, the room asks about exactly
+that card. The rule is one comparison — prompt when the trade is newer than
+the entry's own `confirmed_at`, with NaN failing towards stale — so "still
+have it" is just a per-entry re-confirmation and there is no prompt state to
+store. The nudge asks; it never edits the binder itself.
+
+**Event analytics are counts.** Players, Flares, offers, trades — the funnel
+a store reads after a night. Totals only, never who traded what with whom:
+the store hosts the room, it does not read it.
 
 ### Avatars
 

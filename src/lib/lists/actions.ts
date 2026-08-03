@@ -13,6 +13,7 @@ import {
   addToBinder,
   cancelFlare,
   confirmBinder,
+  confirmBinderEntry,
   removeFromBinder,
 } from "./repository";
 import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./schema";
@@ -169,6 +170,24 @@ export async function removeListEntryAction(formData: FormData): Promise<void> {
  * list that follows a player between events quietly rots, and a wrong match
  * costs more trust than a missing one.
  */
+/**
+ * "Still have it" on the after-trade prompt: re-confirms one entry, which is
+ * what hides the prompt — no new state, just a fresher `confirmed_at`.
+ */
+export async function confirmBinderEntryAction(formData: FormData): Promise<void> {
+  const code = text(formData, "code");
+  const entryId = text(formData, "entryId");
+
+  if (!entryId || (await overRate())) return;
+
+  const room = await requirePlayerInRoom(code);
+  if (!room) return;
+
+  await confirmBinderEntry(entryId, room.playerSessionId);
+
+  revalidatePath(`/e/${code}`);
+}
+
 export async function confirmBinderAction(formData: FormData): Promise<void> {
   const code = text(formData, "code");
 
