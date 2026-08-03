@@ -262,11 +262,10 @@ they then have to get ANOTHER email just to set/reset their password."
 - **One email, not two.** The invitation used to point at a form that asked for
   the address it had just been sent to, so a second email could carry the link
   that actually did something. The first email did nothing but ask for a click
-- **Still no homegrown token.** `generateLink()` mints a real Supabase action
-  link without sending anything, so the invitation carries Supabase's own
-  token, verified by Supabase, redeemed through the same `/auth/callback` a
-  magic link uses. `recovery`, not `invite` — the auth account already exists
-  by then, and an invite link would try to create it and fail
+- **Still no homegrown token.** `generateLink()` mints a Supabase token
+  without sending anything; the invitation carries it in a cardflare.gg URL
+  redeemed by `/auth/confirm`. `recovery`, not `invite` — the auth account
+  already exists by then, and an invite link would try to create it and fail
 - **`/welcome`** shows the address they were invited on and asks for a password
   and a confirmation. Nothing that is already known is asked for again
 - **Expiry is treated as the common case.** These links last an hour by
@@ -284,6 +283,29 @@ they then have to get ANOTHER email just to set/reset their password."
   `fieldIds()` returned three ids where only `id` belongs on a control
 - `src/middleware.ts` is now `src/proxy.ts`, the convention Next 16 deprecated
   it in favour of
+
+## ✅ Milestone 6.10 — Feedback round: invite link, board toggle, header sign-in
+
+Three founder asks after using the beta, plus one bug caught by re-checking
+the flow before it was merged.
+
+- **The invitation's link now survives any device.** The first cut emailed
+  Supabase's `action_link`, which only hands a session to the browser that
+  requested the link — and the requester was the admin's server, so the link
+  would have died on every shop owner's phone. The email now carries a
+  cardflare.gg URL built from the `hashed_token`, and a new `/auth/confirm`
+  route redeems it with `verifyOtp`, which needs no prior contact with the
+  site. A side benefit: the button no longer points at `<ref>.supabase.co`,
+  and Supabase's Redirect URLs allowlist is no longer involved
+- **"Open to trades" moved to where the thought happens.** It was its own card
+  higher up the room page, and feedback was that nobody connected it with
+  posting. It now sits directly under the Post-a-Flare form as the other
+  answer to the same question — "I don't know what to search for" — restyled
+  as one compact row that lights up while you are on the board
+- **Store sign-in moved to the header**, desktop nav and phone menu both, so
+  an owner is not scrolling past the whole landing page to get in. Removed
+  from the footer rather than duplicated. Still "Store sign-in", never
+  "Sign in" — a player must not conclude they need an account
 
 ### Milestone 7 — Matching
 

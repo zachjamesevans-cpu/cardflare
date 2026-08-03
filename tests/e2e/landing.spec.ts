@@ -114,15 +114,30 @@ test.describe("legal pages", () => {
   /*
    * Stores are invited, so there is no signup to advertise — but an invited
    * owner arriving at the landing page needs a way in that is not "remember
-   * the /login URL".
+   * the /login URL". In the header since the founder moved it up: an owner on
+   * a phone should not have to scroll the whole landing page to get in.
    */
-  test("the footer offers a store sign-in", async ({ page }) => {
+  test("the header offers a store sign-in", async ({ page, isMobile }) => {
     await page.goto("/");
+    await openNav(page, isMobile);
 
-    await page.getByRole("link", { name: /store sign-in/i }).click();
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: /store sign-in/i })
+      .click();
 
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  });
+
+  test("the footer no longer duplicates the sign-in link", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(
+      page
+        .getByRole("navigation", { name: "Footer" })
+        .getByRole("link", { name: /sign-in/i }),
+    ).toHaveCount(0);
   });
 
   /*
