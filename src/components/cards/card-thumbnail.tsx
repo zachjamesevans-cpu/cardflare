@@ -79,11 +79,18 @@ export function CardThumbnail({
 
   const renderable = enabled && !failed && isRenderableImageUrl(imageUrl);
 
+  /*
+   * `className` REPLACES the default width rather than joining it. `cn` is a
+   * plain join with no conflict resolution, so "w-14" + "w-8" leaves both
+   * classes in the markup and stylesheet order picks the winner — which is
+   * how every "small" thumbnail in the search results quietly rendered at
+   * full size and the founder saw a cluttered mess. Callers own the width.
+   */
   return (
     <div
       className={cn(
-        "relative aspect-[60/84] w-14 shrink-0 overflow-hidden rounded-[6px]",
-        className,
+        "relative aspect-[60/84] shrink-0 overflow-hidden rounded-[6px]",
+        className ?? "w-14",
       )}
     >
       {/* Always mounted underneath, so a failure reveals it with no reflow. */}
