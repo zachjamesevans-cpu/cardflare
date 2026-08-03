@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import { ChevronDown, Loader2, Search } from "lucide-react";
 
 import { CardThumbnail } from "@/components/cards/card-thumbnail";
 import { TextInput } from "@/components/ui/controls";
-import { Badge, Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { searchCardsAction } from "@/lib/cards/actions";
 import {
   highlightParts,
@@ -65,44 +65,40 @@ function Stats({ card }: { card: CardResult }) {
 }
 
 /**
- * Every printing of a card, side by side.
+ * Every printing of a card, revealed on request.
  *
  * A card number is one gameplay identity but can be several physical cards —
  * OP12-034 Perona exists as a base art and an alternate art, and which one
- * someone is hunting is the entire point of a trade. Showing only the first
- * printing hid the other completely.
- *
- * Not interactive: the whole row is already a button, and a button inside a
- * button is invalid. Choosing a specific printing belongs with Flares, where
- * there is something to choose it *for*.
+ * someone is hunting is the entire point of a trade. They used to render as
+ * chips inside every result row, which on a phone wrapped into a scattered
+ * column of artwork and made five Peronas read as five unrelated cards. The
+ * founder called it clutter, and it was: the list's job is "which card",
+ * and "which version" is a question for after that — the Flare form asks it
+ * properly, and this list answers it on a tap for the curious.
  */
-function PrintingStrip({
+function PrintingList({
   card,
   imagesEnabled,
-  term,
 }: {
   card: CardResult;
   imagesEnabled: boolean;
-  term: string;
 }) {
   return (
-    <ul className="mt-1 flex flex-wrap gap-2" aria-label="Printings">
+    <ul className="flex flex-col gap-1.5" aria-label="Versions">
       {card.printings.map((printing, index) => (
         <li
           key={`${printing.setCode}-${printing.rarity}-${index}`}
-          className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated py-1 pr-2.5 pl-1"
+          className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5"
         >
           <CardThumbnail
             imageUrl={printing.imageUrl}
             exactName={card.exactName}
             cardNumber={card.canonicalCardNumber}
             enabled={imagesEnabled}
-            className="w-8"
+            className="w-9"
           />
-          <span className="text-xs text-text-secondary">
-            {printingLabel(printing, card.exactName) ?? (
-              <Highlighted text={card.canonicalCardNumber} term={term} />
-            )}
+          <span className="min-w-0 text-xs leading-snug text-text-secondary">
+            {printingLabel(printing, card.exactName) ?? "Standard printing"}
           </span>
         </li>
       ))}
@@ -132,9 +128,27 @@ function Row({
    */
   const printing = pickBasePrinting(card.printings, card.exactName);
   const label = printing ? printingLabel(printing, card.exactName) : null;
-  // With several printings the strip below carries the detail, so repeating
-  // the first one's label and the card's rarity up here only adds noise.
   const manyPrintings = card.printings.length > 1;
+
+  /*
+   * Collapsed by default, per founder feedback: one card, one row, base art.
+   * A sibling of the select button rather than a child — a button inside a
+   * button is invalid HTML, and the two answer different questions.
+   */
+  const [showVersions, setShowVersions] = useState(false);
+
+  /*
+   * One quiet line under the name: number, type, colours — and the printing
+   * label when there is only one. These used to float in their own column on
+   * the right, which at phone width read as debris orbiting the row.
+   */
+  // No separate rarity element: `printingLabel` already carries it, and the
+  // old row printed it twice.
+  const meta = [
+    manyPrintings ? null : label,
+    card.cardType,
+    card.colors.length > 0 ? card.colors.join(" / ") : null,
+  ].filter((part): part is string => !!part);
 
   return (
     <li
@@ -150,7 +164,7 @@ function Row({
         type="button"
         onClick={() => onSelect?.(card)}
         /* Comfortably past 44px tall: a phone target at a busy counter. */
-        className="flex w-full items-center gap-3 px-2 py-3 text-left"
+        className="flex w-full items-start gap-3 px-2 pt-3 pb-2 text-left"
       >
         <CardThumbnail
           imageUrl={printing?.imageUrl ?? null}
@@ -164,34 +178,44 @@ function Row({
             <Highlighted text={card.exactName} term={term} />
           </p>
 
-          <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-xs text-text-muted">
             <span>
               <Highlighted text={card.canonicalCardNumber} term={term} />
             </span>
-            {manyPrintings ? (
-              <span className="font-sans">{card.printings.length} versions</span>
-            ) : (
-              <>
-                {label && <span className="font-sans">{label}</span>}
-                {card.rarity && <span className="font-sans">{card.rarity}</span>}
-              </>
-            )}
+            {meta.map((part) => (
+              <span key={part} className="font-sans">
+                {part}
+              </span>
+            ))}
           </p>
 
           <Stats card={card} />
-
-          {manyPrintings && (
-            <PrintingStrip card={card} imagesEnabled={imagesEnabled} term={term} />
-          )}
-        </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {card.cardType && <Badge tone="neutral">{card.cardType}</Badge>}
-          {card.colors.length > 0 && (
-            <span className="text-xs text-text-muted">{card.colors.join("/")}</span>
-          )}
         </div>
       </button>
+
+      {manyPrintings && (
+        <div className="flex flex-col gap-2 px-2 pb-3 pl-[4.75rem]">
+          <button
+            type="button"
+            onClick={() => setShowVersions((value) => !value)}
+            aria-expanded={showVersions}
+            className="flex w-fit items-center gap-1 text-xs font-medium text-text-muted underline-offset-4 transition-colors hover:text-text-secondary hover:underline"
+          >
+            {showVersions
+              ? "Hide versions"
+              : `${card.printings.length} versions — alt arts and promos`}
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-3.5 transition-transform duration-[var(--duration-base)]",
+                showVersions && "rotate-180",
+              )}
+            />
+          </button>
+
+          {showVersions && <PrintingList card={card} imagesEnabled={imagesEnabled} />}
+        </div>
+      )}
     </li>
   );
 }

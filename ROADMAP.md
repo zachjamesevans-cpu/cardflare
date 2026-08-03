@@ -384,6 +384,23 @@ binder is the holder's private statement; the nudge asks rather than edits),
 and per-trade quantity adjustment (a partial fill is a re-post, which the
 upsert already handles).
 
+## ✅ Post-milestone polish — card search declutter
+
+Founder feedback with screenshots: "the cards are kinda all scattered."
+
+- **One card, one row.** A result shows the base art, the name, and a single
+  quiet meta line — number, type, colours. Alternate arts and promos collapse
+  behind "N versions — alt arts and promos", expanded on a tap. Which card is
+  the list's question; which version is the Flare form's, and it already asks
+  it properly after picking
+- **The floating debris had one root cause.** `cn` is a plain string join
+  with no conflict resolution, so `CardThumbnail`'s built-in `w-14` fought
+  every caller's smaller width and stylesheet order picked the winner — the
+  "small" printing chips had been rendering at full size all along.
+  `className` now replaces the default width instead of joining it
+- The type/colour badges no longer float in their own right-hand column, and
+  rarity is no longer printed twice
+
 ## Deferred from Milestone 1
 
 Tracked so they are not lost, none blocking launch.
