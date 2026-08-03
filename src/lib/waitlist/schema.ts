@@ -3,6 +3,7 @@ import { z } from "zod";
 export const USER_TYPES = [
   { value: "player", label: "Player" },
   { value: "store", label: "Local game store" },
+  { value: "vendor", label: "Card show vendor" },
   { value: "tournament_organizer", label: "Tournament organizer" },
   { value: "creator", label: "Content creator or community organizer" },
   { value: "other", label: "Other" },

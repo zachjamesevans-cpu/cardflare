@@ -450,6 +450,22 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Landing page — one hub for stores and shows
+
+Asked for by the founder: make the main page read as "the ultimate hub to
+simplify trading, buying and selling at game stores and card shows."
+
+- Hero, How-it-works, For-players, For-stores and the waitlist section now
+  all name both venues; the For-stores section speaks to game stores **and
+  show vendors** (two new benefit cards: upload before the show, buyers walk
+  straight to your booth). The h1 and the "currently being built" honesty
+  line are unchanged — those are pinned by e2e and true
+- The waitlist gains a **"Card show vendor"** signup type
+  (`20260812090000_waitlist_vendor_type.sql` adds the enum value; verified
+  against a real PostgreSQL — a vendor signup inserts cleanly)
+- No new claims: everything the page now says (booth numbers, slabs
+  PSA/BGS/CGC, sessionless show search) shipped in Milestone 9
+
 ## Deferred from Milestone 1
 
 Tracked so they are not lost, none blocking launch.

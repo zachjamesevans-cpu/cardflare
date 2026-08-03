@@ -16,7 +16,7 @@ export function WaitlistSection() {
         id="waitlist-title"
         eyebrow="Early Access"
         title="Join the CardFlare waitlist"
-        description="CardFlare is currently being built and preparing for its first local-store pilots. Join the waitlist for product updates, early testing opportunities, and launch access."
+        description="CardFlare is currently being built and preparing for its first store and card-show pilots. Join the waitlist for product updates, early testing opportunities, and launch access."
       />
 
       <div className="mx-auto mt-12 w-full max-w-2xl">

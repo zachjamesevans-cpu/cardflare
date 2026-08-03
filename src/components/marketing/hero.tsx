@@ -20,8 +20,10 @@ export function Hero() {
           </h1>
 
           <p className="max-w-xl text-lg leading-relaxed text-pretty text-text-secondary">
-            CardFlare connects players at local TCG events so they can find nearby
-            trades, complete their decks, and spend less time searching through binders.
+            One hub for the whole room. At game-store events, CardFlare matches you with
+            the players who have the cards you need. At card shows, it searches every
+            vendor&rsquo;s inventory and points you at the booth. Trading, buying,
+            selling &mdash; all in person, all simpler.
           </p>
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">

@@ -28,7 +28,7 @@ export function HowItWorks() {
         id="how-it-works-title"
         eyebrow="How It Works"
         title="Three steps to a trade"
-        description="No shipping, no negotiating with strangers online. Just the people already in the room with you."
+        description="No shipping, no negotiating with strangers online. Just the people already in the room with you — at your local game store or a card show."
       />
 
       <ol className="mt-14 grid gap-5 md:grid-cols-3">
@@ -50,6 +50,11 @@ export function HowItWorks() {
           </Card>
         ))}
       </ol>
+
+      <p className="mx-auto mt-10 max-w-xl text-center text-pretty text-text-secondary">
+        At card shows it&rsquo;s even faster: scan the show&rsquo;s code, search the
+        card, and walk straight to the booth that has it &mdash; raw or graded.
+      </p>
     </Section>
   );
 }
