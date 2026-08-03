@@ -37,6 +37,7 @@ export function siteUrl(): string {
 export const ANCHORS = {
   howItWorks: "/#how-it-works",
   forPlayers: "/#for-players",
+  forVendors: "/#for-vendors",
   forStores: "/#for-stores",
   waitlist: "/#waitlist",
 } as const;
@@ -44,6 +45,7 @@ export const ANCHORS = {
 export const NAV_LINKS = [
   { href: ANCHORS.howItWorks, label: "How It Works" },
   { href: ANCHORS.forPlayers, label: "For Players" },
+  { href: ANCHORS.forVendors, label: "For Vendors" },
   { href: ANCHORS.forStores, label: "For Stores" },
 ] as const;
 

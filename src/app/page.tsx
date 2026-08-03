@@ -2,6 +2,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ForPlayers } from "@/components/marketing/for-players";
 import { ForStores } from "@/components/marketing/for-stores";
+import { ForVendors } from "@/components/marketing/for-vendors";
 import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { ProductPreview } from "@/components/marketing/product-preview";
@@ -55,6 +56,7 @@ export default function HomePage() {
         <Hero />
         <HowItWorks />
         <ForPlayers />
+        <ForVendors />
         <ForStores />
         <ProductPreview />
         <WaitlistSection />
