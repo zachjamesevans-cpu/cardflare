@@ -21,6 +21,13 @@ export interface Participant {
   lastSeenAt: string;
   /** Seen inside the presence window. */
   present: boolean;
+  /**
+   * Not after anything specific, and will consider any trade.
+   *
+   * Public to the room, unlike the Have list — it is an invitation to come
+   * over, which is the opposite of "this person is carrying a $200 alt art".
+   */
+  openToTrades: boolean;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -82,6 +89,34 @@ export async function leaveEvent(
     .eq("player_session_id", playerSessionId);
 
   if (error) console.error("Could not leave the event", error);
+}
+
+/**
+ * Says whether a player is open to any trade.
+ *
+ * Scoped to one room on purpose: somebody can be up for anything at Friday
+ * locals and heads-down at a tournament, and the flag leaves with them when
+ * they leave the room — so it can never go stale the way a portable list can.
+ *
+ * Both ids are checked in the `where`, so this can only ever change the
+ * caller's own row in the room they are actually in.
+ */
+export async function setOpenToTrades(
+  eventId: string,
+  playerSessionId: string,
+  open: boolean,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("event_participants")
+    .update({ open_to_trades: open })
+    .eq("event_id", eventId)
+    .eq("player_session_id", playerSessionId);
+
+  if (error) {
+    throw new Error(`Could not change the trade status: ${error.message}`, {
+      cause: error,
+    });
+  }
 }
 
 /** Whether this player is already in this room. */
@@ -149,7 +184,7 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
 
   const { data, error } = await getSupabaseAdmin()
     .from("event_participants")
-    .select("player_session_id, joined_at, last_seen_at")
+    .select("player_session_id, joined_at, last_seen_at, open_to_trades")
     .eq("event_id", eventId)
     .order("last_seen_at", { ascending: false });
 
@@ -187,6 +222,7 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
       joinedAt: row.joined_at,
       lastSeenAt: row.last_seen_at,
       present: isPresent(row.last_seen_at, now),
+      openToTrades: row.open_to_trades,
     }))
     .sort((a, b) => Number(b.present) - Number(a.present));
 }

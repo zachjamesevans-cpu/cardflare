@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import { ArrowLeftRight, Users } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
@@ -59,6 +59,24 @@ export function EventLobby({
                 </span>
                 {isYou && <span className="text-text-muted"> · you</span>}
               </span>
+
+              {/*
+               * Repeated from the board on purpose. This list answers "who is
+               * here", and for somebody deciding who to approach, "will look
+               * at anything" is the most useful thing to know about a name.
+               */}
+              {/*
+               * Labelled at every width, not icon-only on small screens. Two
+               * arrows on their own mean nothing to somebody seeing them for
+               * the first time, and a phone is where this is read. The name
+               * beside it truncates, which is the right thing to give up.
+               */}
+              {participant.openToTrades && (
+                <span className="flex shrink-0 items-center gap-1 text-xs text-accent">
+                  <ArrowLeftRight className="size-3.5" aria-hidden="true" />
+                  Open to trades
+                </span>
+              )}
 
               {!participant.present && (
                 <span className="shrink-0 text-xs text-text-muted">away</span>

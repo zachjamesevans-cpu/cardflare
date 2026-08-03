@@ -593,6 +593,33 @@ websockets — a store wants to know who is around, not who moved their thumb,
 and a polled timestamp survives a phone locking in someone's pocket. Realtime
 belongs with match notifications, where the latency is the feature.
 
+### Open to trades
+
+`event_participants.open_to_trades`. Most of a room is not hunting a specific
+card, and a newer player often cannot name what they want — before this they
+had nothing to post, so they never appeared on the Flare board, which is the
+one surface everyone reads.
+
+Not a Flare with a null `card_id`. A Flare is a request for a card, and
+relaxing that constraint to hold "nothing in particular" would put a non-card
+into a list built to show cards and cost the board its meaning. Being open to
+trades is a property of a person in a room, and `event_participants` is exactly
+the row that says so — which also makes it one per player per room for free,
+via the unique index that is already there.
+
+Per room rather than on the session, so it expires by itself: leaving drops the
+row. That avoids the stale-signal problem the portable binder needed a
+confirmation step to solve.
+
+**Public to the room, unlike the Have List.** The two look similar and are
+opposites: a Have List broadcasts what a named person is carrying, which is why
+it is private; this is an invitation to come over.
+
+The board lists open players after everyone with a specific request, because a
+named card is easier to act on than "surprise me". A player who has posted
+Flares _and_ is open gets one extra row inside their own group rather than a
+second card.
+
 ### Avatars
 
 Initials over one of six hues, both derived from the session id. Generated,

@@ -1,6 +1,7 @@
 import { Flame, Hand, PackageCheck } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,12 +107,42 @@ function Empty({ icon: Icon, children }: { icon: typeof Flame; children: string 
 }
 
 /**
+ * The row a player gets when they are not after anything specific.
+ *
+ * Deliberately shaped exactly like a card row — same thumbnail box, same
+ * columns — because it belongs in the same scan. Somebody reading the board is
+ * asking "who do I go and talk to", and "this person will look at anything" is
+ * a perfectly good answer to that.
+ */
+function OpenToTradesEntry({ isYou }: { isYou: boolean }) {
+  return (
+    <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
+      <OpenToTradesThumbnail />
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="font-semibold text-text-primary">Open to trades</p>
+        <p className="text-sm text-text-secondary">
+          {isYou
+            ? "Nothing specific — people can bring a binder to you."
+            : "Nothing specific. Show them something good."}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+/**
  * Every open Flare in the room, gathered under whoever posted it.
  *
  * The board a player reads to find someone to trade with. Until matching
  * exists this is the whole mechanism, and it works: you scan it, you recognise
  * something in your binder, you go and find them — which is easier when one
  * person's four cards sit together instead of being scattered by post time.
+ *
+ * Players who are open to trades appear here too, including those who have
+ * posted nothing at all. They used to be invisible on the one surface everyone
+ * reads, which is a poor outcome for the person most in need of being found —
+ * somebody new enough that they cannot yet name what they want.
  */
 export function FlareBoard({
   entries,
@@ -119,22 +150,34 @@ export function FlareBoard({
   imagesEnabled,
   youId,
   heldCardIds,
+  openToTrades = [],
 }: {
   entries: ListEntry[];
   code: string;
   imagesEnabled: boolean;
   youId: string;
   heldCardIds: Set<string>;
+  /** Players in this room who will consider any trade. */
+  openToTrades?: { playerSessionId: string; displayName: string }[];
 }) {
-  if (entries.length === 0) {
+  const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
+  const groups = groupByPlayer(entries);
+  const posted = new Set(groups.map((group) => group.playerSessionId));
+
+  /*
+   * Somebody open to trades who has also posted Flares already has a group;
+   * this adds only the ones who would otherwise not be on the board.
+   */
+  const browsing = openToTrades.filter((player) => !posted.has(player.playerSessionId));
+
+  if (groups.length === 0 && browsing.length === 0) {
     return (
       <Empty icon={Flame}>
-        No Flares yet. Post the first one and everyone here will see it.
+        No Flares yet. Post the first one, or say you are open to trades and let people
+        bring cards to you.
       </Empty>
     );
   }
-
-  const groups = groupByPlayer(entries);
 
   return (
     <ul className="flex flex-col gap-3">
@@ -144,6 +187,7 @@ export function FlareBoard({
           (entry) => !isYou && heldCardIds.has(entry.cardId),
         ).length;
         const headingId = `flares-${group.playerSessionId}`;
+        const alsoOpen = openIds.has(group.playerSessionId);
 
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
@@ -188,6 +232,46 @@ export function FlareBoard({
                   removable={isYou}
                 />
               ))}
+
+              {/*
+               * Last, under the specific asks. Somebody has named four cards
+               * and will also look at anything — the four cards are the more
+               * actionable half of that.
+               */}
+              {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
+            </ul>
+          </Card>
+        );
+      })}
+
+      {/*
+       * After everyone with a specific request. A named card is easier to act
+       * on than "surprise me", so it should be what a reader hits first.
+       */}
+      {browsing.map((player) => {
+        const isYou = player.playerSessionId === youId;
+        const headingId = `open-${player.playerSessionId}`;
+
+        return (
+          <Card
+            as="li"
+            key={player.playerSessionId}
+            className="flex flex-col gap-3 p-4"
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <PlayerAvatar
+                displayName={player.displayName}
+                seed={player.playerSessionId}
+                size="sm"
+              />
+              <p id={headingId} className="truncate font-semibold text-text-primary">
+                {player.displayName}
+                {isYou && <span className="font-normal text-text-muted"> · you</span>}
+              </p>
+            </div>
+
+            <ul aria-labelledby={headingId} className="flex flex-col">
+              <OpenToTradesEntry isYou={isYou} />
             </ul>
           </Card>
         );

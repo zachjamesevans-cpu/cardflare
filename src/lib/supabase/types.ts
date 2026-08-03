@@ -285,15 +285,18 @@ export type EventParticipantRow = {
   player_session_id: string;
   joined_at: string;
   last_seen_at: string;
+  /** Not after anything specific. Public to the room. */
+  open_to_trades: boolean;
 };
 
 export type EventParticipantInsert = Omit<
   EventParticipantRow,
-  "id" | "joined_at" | "last_seen_at"
+  "id" | "joined_at" | "last_seen_at" | "open_to_trades"
 > & {
   id?: string;
   joined_at?: string;
   last_seen_at?: string;
+  open_to_trades?: boolean;
 };
 
 export type FlareStatus = "open" | "cancelled";
