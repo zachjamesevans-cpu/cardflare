@@ -465,6 +465,14 @@ simplify trading, buying and selling at game stores and card shows."
   against a real PostgreSQL — a vendor signup inserts cleanly)
 - No new claims: everything the page now says (booth numbers, slabs
   PSA/BGS/CGC, sessionless show search) shipped in Milestone 9
+- Third pass: vendors get their own section and nav tab. "For Vendors" sits
+  between For Players and For Stores (page and header both), carrying the
+  "Every buyer in the room, pointed at you" pitch plus four cards — upload
+  before the show, the sale finds you, slabs sell as slabs, one weekend at a
+  time — and its own "Join the Vendor Pilot" CTA that preselects the vendor
+  waitlist type. For Stores returns to pure game-store copy. The desktop nav
+  now waits for the `lg` breakpoint (five links plus the CTA wrapped
+  inside their tabs at `md`), so tablets use the disclosure menu
 - Second pass on founder feedback — the first draft still read player-first.
   The hero now speaks to both sides ("Buyers stop searching. Sellers stop
   waiting."), the For-stores section leads with the sales mechanism ("Every

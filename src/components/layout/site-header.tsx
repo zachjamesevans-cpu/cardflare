@@ -21,7 +21,12 @@ export function SiteHeader() {
           <Logo priority />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+        {/*
+         * Five links plus the CTA no longer fit at md without the labels
+         * wrapping inside their tabs, so the full nav waits for lg and the
+         * disclosure menu covers tablets.
+         */}
+        <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}

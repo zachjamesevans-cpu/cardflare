@@ -1,12 +1,4 @@
-import {
-  BarChart3,
-  CalendarCheck,
-  MapPin,
-  Package,
-  QrCode,
-  Store,
-  TrendingUp,
-} from "lucide-react";
+import { BarChart3, CalendarCheck, QrCode, Store, TrendingUp } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,28 +30,16 @@ const BENEFITS = [
     description:
       "See how much trading your events generate, without exposing individual players' data.",
   },
-  {
-    icon: Package,
-    title: "Vendors: upload before the show",
-    description:
-      "List what you're bringing — raw singles and graded slabs, PSA, BGS or CGC — and claim your booth for the weekend.",
-  },
-  {
-    icon: MapPin,
-    title: "The sale finds you",
-    description:
-      "Attendees search the show the moment they arrive and get your booth number. Instead of asking every vendor in the hall, the buyer who wants your card walks straight to your table.",
-  },
 ] as const;
 
 export function ForStores() {
   return (
-    <Section id="for-stores" labelledBy="for-stores-title">
+    <Section id="for-stores" labelledBy="for-stores-title" className="bg-surface">
       <SectionHeading
         id="for-stores-title"
-        eyebrow="For Game Stores & Show Vendors"
-        title="Every buyer in the room, pointed at you"
-        description="The moment someone scans in, CardFlare knows what they're hunting and sends them to whoever has it — they don't have to work the room table by table, and you don't have to hope they reach yours. Stores get events people travel for; vendors get buyers who arrive already looking for what's in the case."
+        eyebrow="For Game Stores"
+        title="Make your events the ones people travel for"
+        description="CardFlare runs alongside your event, not instead of it. Players post what they're hunting the moment they scan in, matches happen at your tables, and the trades stay in your store between the people standing in it."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">
@@ -83,8 +63,8 @@ export function ForStores() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          We are looking for a small number of stores and card-show vendors to run the
-          first CardFlare pilots and help shape how it works.
+          We are looking for a small number of stores to run the first CardFlare pilots
+          and help shape how it works.
         </p>
         <ButtonLink
           href={STORE_PILOT_ANCHOR}

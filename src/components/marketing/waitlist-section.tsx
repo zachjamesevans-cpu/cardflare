@@ -1,6 +1,10 @@
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { Section, SectionHeading } from "@/components/ui/section";
-import { STORE_PILOT_ANCHOR_ID, WAITLIST_SECTION_ID } from "@/lib/waitlist/preselect";
+import {
+  STORE_PILOT_ANCHOR_ID,
+  VENDOR_PILOT_ANCHOR_ID,
+  WAITLIST_SECTION_ID,
+} from "@/lib/waitlist/preselect";
 
 export function WaitlistSection() {
   return (
@@ -9,8 +13,9 @@ export function WaitlistSection() {
       labelledBy="waitlist-title"
       className="bg-surface"
     >
-      {/* Store-pilot CTAs land here; the form reads the fragment to preselect. */}
+      {/* Pilot CTAs land here; the form reads the fragment to preselect. */}
       <span id={STORE_PILOT_ANCHOR_ID} className="sr-only" />
+      <span id={VENDOR_PILOT_ANCHOR_ID} className="sr-only" />
 
       <SectionHeading
         id="waitlist-title"

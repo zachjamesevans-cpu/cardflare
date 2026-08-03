@@ -13,9 +13,12 @@ import type { UserType } from "./schema";
 export const WAITLIST_SECTION_ID = "waitlist";
 export const STORE_PILOT_ANCHOR_ID = "waitlist-store-pilot";
 export const STORE_PILOT_ANCHOR = `/#${STORE_PILOT_ANCHOR_ID}`;
+export const VENDOR_PILOT_ANCHOR_ID = "waitlist-vendor-pilot";
+export const VENDOR_PILOT_ANCHOR = `/#${VENDOR_PILOT_ANCHOR_ID}`;
 
 const ANCHOR_USER_TYPES: Record<string, UserType> = {
   [STORE_PILOT_ANCHOR_ID]: "store",
+  [VENDOR_PILOT_ANCHOR_ID]: "vendor",
 };
 
 /** Maps a URL fragment to the user type it should preselect, if any. */
