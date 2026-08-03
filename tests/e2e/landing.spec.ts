@@ -112,6 +112,31 @@ test.describe("legal pages", () => {
   });
 
   /*
+   * Stores are invited, so there is no signup to advertise — but an invited
+   * owner arriving at the landing page needs a way in that is not "remember
+   * the /login URL".
+   */
+  test("the footer offers a store sign-in", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("link", { name: /store sign-in/i }).click();
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  });
+
+  /*
+   * Named for its audience on purpose. A player has no account and must never
+   * conclude they need one — scanning a code is the whole point.
+   */
+  test("does not invite players to sign in or register", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("link", { name: /^sign in$/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /sign up|register/i })).toHaveCount(0);
+  });
+
+  /*
    * Regression: these anchors were bare fragments (`#waitlist`), which do
    * nothing on a page that has no such element. Clicking the header CTA on
    * /privacy just rewrote the address bar and stranded the visitor.

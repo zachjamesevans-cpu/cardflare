@@ -116,4 +116,36 @@ describe("storeInviteEmail", () => {
 
     expect(email.text).toMatch(/not expecting this/i);
   });
+
+  /*
+   * The first instruction a store ever reads, so it has to describe the flow
+   * that exists. It used to say "there's no password — we email you a link
+   * each time", which stopped being true when password sign-in landed.
+   */
+  it("sends the store to choose a password", () => {
+    const email = message();
+
+    expect(email.html).toContain("https://cardflare.gg/login/reset");
+    expect(email.text).toContain("https://cardflare.gg/login/reset");
+    expect(email.text).toMatch(/choose a password/i);
+  });
+
+  it("no longer promises that there is no password", () => {
+    const email = message();
+
+    for (const body of [email.html, email.text]) {
+      expect(body).not.toMatch(/no password/i);
+      expect(body).not.toMatch(/link each time/i);
+    }
+  });
+
+  /*
+   * The emailed link is still the fallback, and an invited store has to know
+   * it exists — some shop owners will not want a password at all.
+   */
+  it("still offers the emailed link as an alternative", () => {
+    const email = message();
+
+    expect(email.text).toMatch(/one-time sign-in link/i);
+  });
 });
