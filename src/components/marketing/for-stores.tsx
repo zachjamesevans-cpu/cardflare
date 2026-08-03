@@ -1,4 +1,12 @@
-import { BarChart3, CalendarCheck, QrCode, Store, TrendingUp } from "lucide-react";
+import {
+  BarChart3,
+  CalendarCheck,
+  MapPin,
+  Package,
+  QrCode,
+  Store,
+  TrendingUp,
+} from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,6 +38,18 @@ const BENEFITS = [
     description:
       "See how much trading your events generate, without exposing individual players' data.",
   },
+  {
+    icon: Package,
+    title: "Vendors: upload before the show",
+    description:
+      "List what you're bringing — raw singles and graded slabs, PSA, BGS or CGC — and claim your booth for the weekend.",
+  },
+  {
+    icon: MapPin,
+    title: "Buyers walk straight to you",
+    description:
+      "Attendees search the show and get your booth number. No more hoping the right buyer wanders past your table.",
+  },
 ] as const;
 
 export function ForStores() {
@@ -37,9 +57,9 @@ export function ForStores() {
     <Section id="for-stores" labelledBy="for-stores-title">
       <SectionHeading
         id="for-stores-title"
-        eyebrow="For Local Game Stores"
+        eyebrow="For Game Stores & Show Vendors"
         title="Make your events the ones people travel for"
-        description="CardFlare runs alongside your event, not instead of it. Trades stay in your store, between the people standing in it."
+        description="CardFlare runs alongside your event, not instead of it. Trades stay in your store between the people standing in it — and at card shows, your inventory is what walks buyers to your booth."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">
@@ -63,8 +83,8 @@ export function ForStores() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          We are looking for a small number of stores to run the first CardFlare pilots
-          and help shape how Event Rooms work.
+          We are looking for a small number of stores and card-show vendors to run the
+          first CardFlare pilots and help shape how it works.
         </p>
         <ButtonLink
           href={STORE_PILOT_ANCHOR}
