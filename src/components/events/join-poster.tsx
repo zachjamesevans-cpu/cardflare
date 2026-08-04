@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import { Card } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
 import { PrintButton } from "./print-button";
 import { SITE } from "@/lib/site";
 import mark from "@public/brand/cardflare-mark.png";
@@ -245,10 +246,25 @@ export function JoinPoster({
         </div>
       </Card>
 
-      <div className="flex flex-wrap items-center gap-3 print:hidden">
-        <PrintButton />
-        <p className="text-sm break-all text-text-muted">
-          Links to <span className="text-text-secondary">{url}</span>
+      <div className="flex flex-col gap-2 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          {/*
+           * The PDF is the route that works everywhere. Printing the page
+           * straight from a phone lets the browser stamp its own URL, date
+           * and page count onto the sheet — iOS offers no way to turn that
+           * off — while the PDF is one clean page on every device.
+           */}
+          <ButtonLink href={`/poster/${joinCode}`} target="_blank" rel="noopener">
+            Download PDF
+          </ButtonLink>
+          <PrintButton />
+          <p className="text-sm break-all text-text-muted">
+            Links to <span className="text-text-secondary">{url}</span>
+          </p>
+        </div>
+        <p className="text-xs text-text-muted">
+          Printing from a phone? Use the PDF — it comes out as one clean page with
+          nothing added.
         </p>
       </div>
     </div>
