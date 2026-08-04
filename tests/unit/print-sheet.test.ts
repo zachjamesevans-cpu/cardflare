@@ -29,8 +29,20 @@ function mediaPrintBlock(source: string): string {
 const printBlock = mediaPrintBlock(css);
 
 describe("printing a join poster", () => {
-  it("sets a page margin, so the sheet is not printed edge to edge", () => {
-    expect(printBlock).toMatch(/@page\s*\{[^}]*margin:/);
+  /*
+   * The browser prints its own furniture — date, title, URL, page count —
+   * into the page margins. Zeroing them is what keeps that off a sheet
+   * that sits on a counter; the clearance from the paper edge comes from
+   * body padding instead, asserted below.
+   */
+  it("zeroes the page margin so the browser has nowhere to print its chrome", () => {
+    expect(printBlock).toMatch(/@page\s*\{[^}]*margin:\s*0/);
+  });
+
+  it("gives pages without a poster their breathing room back as padding", () => {
+    expect(printBlock).toMatch(
+      /body:not\(:has\(\[data-print-sheet\]\)\)\s*\{[^}]*padding:\s*[\d.]+mm/,
+    );
   });
 
   /*
@@ -110,9 +122,17 @@ describe("the sheet fits the paper", () => {
   /** Paper widths in millimetres. */
   const PAPER = { A4: 210, Letter: 215.9 };
 
+  /*
+   * The clearance is body padding now, not an @page margin — zero margins
+   * are what suppress the browser's printed header and footer. The regex
+   * skips the combined html,body block (which carries no padding) and
+   * lands on the standalone body rule that does.
+   */
   function pageMarginMm(): number {
-    const match = printBlock.match(/@page\s*\{[^}]*margin:\s*([\d.]+)mm/);
-    if (!match) throw new Error("no millimetre @page margin found");
+    const match = printBlock.match(
+      /body:has\(\[data-print-sheet\]\)\s*\{[^}]*padding:\s*([\d.]+)mm/,
+    );
+    if (!match) throw new Error("no millimetre sheet clearance found");
     return Number(match[1]);
   }
 

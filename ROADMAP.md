@@ -450,6 +450,25 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Clean print: no browser header or footer on the poster
+
+Asked for by the founder: the printed QR sheet carried the browser's own
+furniture — date and title at the top, URL and page count at the bottom —
+which has no place on a counter.
+
+- The browser draws that furniture into the page margins, so the print
+  styles now declare `@page { margin: 0 }` — nowhere to draw it, gone in
+  every browser, no "headers and footers" checkbox for a store to find.
+  Clearance from the paper edge comes from body padding instead: 12mm
+  around the poster, 14mm on ordinary pages
+- Caught in the act: the first version put the padding on `html` and
+  `body` both, doubling it and pushing the card's bottom strip onto a
+  second Letter page. Found by printing to PDF and looking — Letter and
+  A4 now both come out as exactly one page with the full card on it
+- The print-sheet tests now guard the new mechanism: zero page margin,
+  millimetre clearance on the poster body, padding restored for plain
+  pages
+
 ## ✅ One account, every console — the area switcher
 
 Asked for by the founder: invite themselves as a store and a vendor with
