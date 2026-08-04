@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import {
   RoomRoster,
@@ -9,7 +10,6 @@ import {
 } from "@/components/admin/store-detail";
 import { JoinPoster } from "@/components/events/join-poster";
 import { EventList } from "@/components/events/event-list";
-import { AppShell } from "@/components/layout/app-shell";
 import { FlareBoard } from "@/components/lists/list-entries";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -44,7 +44,9 @@ export default async function AdminStorePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireAdmin();
+  // The layout guards too. Duplicated deliberately: a layout is not a
+  // security boundary on its own.
+  await requireAdmin();
   const { id } = await params;
 
   const store = await findStoreById(id);
@@ -55,35 +57,39 @@ export default async function AdminStorePage({
   const isVendor = store.kind === "vendor";
 
   return (
-    <AppShell
-      area="Admin"
-      email={user.email ?? ""}
-      title={store.name}
-      description={store.contact_email}
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge>{KIND_LABEL[store.kind as keyof typeof KIND_LABEL] ?? store.kind}</Badge>
-        <Badge tone="neutral">{store.status}</Badge>
-        {listing?.invitePending ? (
-          <Badge tone="neutral">Invite pending</Badge>
-        ) : (
-          <Badge tone="neutral">
-            {listing?.memberCount ?? 0}{" "}
-            {(listing?.memberCount ?? 0) === 1 ? "member" : "members"}
-          </Badge>
-        )}
-        {location && <Badge tone="neutral">{location}</Badge>}
-        {!isVendor && <Badge tone="neutral">{store.timezone}</Badge>}
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-3">
         <Link
-          href="/admin"
-          className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
+          href="/admin/stores"
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
         >
-          Back to the console
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back to stores
         </Link>
+
+        <h2 className="text-xl font-bold text-text-primary">{store.name}</h2>
+        <p className="text-sm text-text-secondary">{store.contact_email}</p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge>
+            {KIND_LABEL[store.kind as keyof typeof KIND_LABEL] ?? store.kind}
+          </Badge>
+          <Badge tone="neutral">{store.status}</Badge>
+          {listing?.invitePending ? (
+            <Badge tone="neutral">Invite pending</Badge>
+          ) : (
+            <Badge tone="neutral">
+              {listing?.memberCount ?? 0}{" "}
+              {(listing?.memberCount ?? 0) === 1 ? "member" : "members"}
+            </Badge>
+          )}
+          {location && <Badge tone="neutral">{location}</Badge>}
+          {!isVendor && <Badge tone="neutral">{store.timezone}</Badge>}
+        </div>
       </div>
 
       {isVendor ? <VendorSections storeId={store.id} /> : <LgsSections store={store} />}
-    </AppShell>
+    </div>
   );
 }
 

@@ -459,6 +459,36 @@ export async function listBinder(playerSessionId: string): Promise<ListEntry[]> 
  * Public on purpose — this is the board a player reads to find someone to
  * trade with. Binders are never returned here.
  */
+/**
+ * Open Flares per room, for the console's at-a-glance counts.
+ *
+ * One query for however many rooms are live, counted in memory: the number
+ * of open Flares across every live room is bounded by people actually
+ * standing in stores, so the row set stays small.
+ */
+export async function countOpenFlares(
+  eventIds: string[],
+): Promise<Map<string, number>> {
+  if (eventIds.length === 0 || !isSupabaseConfigured()) return new Map();
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("flares")
+    .select("event_id")
+    .in("event_id", eventIds)
+    .eq("status", "open");
+
+  if (error) {
+    console.error("Could not count open Flares", error);
+    return new Map();
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    counts.set(row.event_id, (counts.get(row.event_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function listRoomFlares(eventId: string): Promise<ListEntry[]> {
   if (!isSupabaseConfigured()) return [];
 

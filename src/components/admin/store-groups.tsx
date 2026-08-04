@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Flame } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import type { LiveRoom } from "@/lib/events/rooms";
@@ -14,9 +15,12 @@ import type { StoreListing } from "@/lib/stores/repository";
 export function StoreGroups({
   stores,
   liveRooms,
+  flareCounts,
 }: {
   stores: StoreListing[];
   liveRooms: LiveRoom[];
+  /** Open Flares per live room, keyed by event id. */
+  flareCounts?: Map<string, number>;
 }) {
   /*
    * The summary is read-only and does not know a store's walk-in switch, so
@@ -60,6 +64,7 @@ export function StoreGroups({
                       key={store.id}
                       store={store}
                       liveRoomName={live ? room.name : null}
+                      flares={live ? (flareCounts?.get(room.eventId) ?? 0) : null}
                     />
                   );
                 })}
@@ -75,9 +80,12 @@ export function StoreGroups({
 function StoreRow({
   store,
   liveRoomName,
+  flares,
 }: {
   store: StoreListing;
   liveRoomName: string | null;
+  /** Open Flares in the live room; null when no room is live. */
+  flares: number | null;
 }) {
   const location = [store.city, store.region].filter(Boolean).join(", ");
 
@@ -103,6 +111,12 @@ function StoreRow({
           <Badge>
             <span className="size-1.5 rounded-full bg-accent" />
             Live · {liveRoomName}
+          </Badge>
+        )}
+        {flares !== null && (
+          <Badge tone="neutral">
+            <Flame className="size-3.5" aria-hidden="true" />
+            {flares} {flares === 1 ? "Flare" : "Flares"} out
           </Badge>
         )}
         {store.invitePending ? (

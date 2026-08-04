@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { JoinPoster } from "@/components/events/join-poster";
-import { AppShell } from "@/components/layout/app-shell";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { formatEventWindow } from "@/lib/events/format";
@@ -28,7 +28,9 @@ export default async function ShowPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireAdmin();
+  // The layout guards too. Duplicated deliberately: a layout is not a
+  // security boundary on its own.
+  await requireAdmin();
   const { id } = await params;
 
   const show = await findShowById(id);
@@ -42,20 +44,24 @@ export default async function ShowPage({
   const where = [show.city, show.region].filter(Boolean).join(", ");
 
   return (
-    <AppShell
-      area="Admin"
-      email={user.email ?? ""}
-      title={show.name}
-      description={formatEventWindow(show.starts_at, show.ends_at, show.timezone)}
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        {where && <Badge tone="neutral">{where}</Badge>}
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-3">
         <Link
-          href="/admin"
-          className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
+          href="/admin/shows"
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
         >
-          Back to the console
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back to shows
         </Link>
+
+        <h2 className="text-xl font-bold text-text-primary">{show.name}</h2>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone="neutral">
+            {formatEventWindow(show.starts_at, show.ends_at, show.timezone)}
+          </Badge>
+          {where && <Badge tone="neutral">{where}</Badge>}
+        </div>
       </div>
 
       <section className="flex flex-col gap-5" aria-labelledby="show-qr-heading">
@@ -104,6 +110,6 @@ export default async function ShowPage({
           </Card>
         )}
       </section>
-    </AppShell>
+    </div>
   );
 }
