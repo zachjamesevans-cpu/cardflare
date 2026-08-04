@@ -153,21 +153,45 @@
  * app prints normally.
  */
 @media print {
+  /*
+   * Zero page margins on purpose. The browser prints its own furniture —
+   * date and title at the top, URL and page count at the bottom — into the
+   * page margins, and a sheet that sits on a store counter must not carry
+   * any of it. With no margin there is nowhere to draw it, so it vanishes
+   * without asking anyone to find the "headers and footers" checkbox. The
+   * padding rules below stand in for the margins, so content still clears
+   * the printer's unprintable edge.
+   */
   @page {
-    margin: 14mm;
+    margin: 0;
+  }
+
+  /* Pages without a poster keep the old breathing room, just as padding. */
+  body:not(:has([data-print-sheet])) {
+    padding: 14mm !important;
   }
 
   /*
    * The app shell pins html to `h-full` and body to `min-h-full` so a short
    * page still fills the window. On paper that makes the document exactly one
-   * viewport tall, which is taller than the printable area once @page margins
-   * are taken off — so a one-page poster spilled onto a blank second page.
+   * viewport tall, which is taller than the printable area — so a one-page
+   * poster spilled onto a blank second page.
    */
   html:has([data-print-sheet]),
   body:has([data-print-sheet]) {
     height: auto !important;
     min-height: 0 !important;
     background: #fff;
+  }
+
+  /*
+   * The sheet's clearance from the paper edge, replacing @page margins.
+   * On body alone — html too would double it, and the doubled version was
+   * 3mm too tall for a Letter page. 12mm each side leaves 186mm of width
+   * on A4 and 255mm of height on Letter; the 170×235mm card fits both.
+   */
+  body:has([data-print-sheet]) {
+    padding: 12mm !important;
   }
 
   body:has([data-print-sheet])
