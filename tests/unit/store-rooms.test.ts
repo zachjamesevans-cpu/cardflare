@@ -25,6 +25,7 @@ const findOpenWalkInRoom = vi.fn();
 const latestActivityAt = vi.fn();
 const closeWalkInRoom = vi.fn();
 const openWalkInRoom = vi.fn();
+const listOpenRoomsAcrossStores = vi.fn();
 
 vi.mock("@/lib/events/repository", () => ({
   findEventByJoinCode: (...args: unknown[]) => findEventByJoinCode(...args),
@@ -35,6 +36,7 @@ vi.mock("@/lib/events/repository", () => ({
   latestActivityAt: (...args: unknown[]) => latestActivityAt(...args),
   closeWalkInRoom: (...args: unknown[]) => closeWalkInRoom(...args),
   openWalkInRoom: (...args: unknown[]) => openWalkInRoom(...args),
+  listOpenRoomsAcrossStores: (...args: unknown[]) => listOpenRoomsAcrossStores(...args),
 }));
 
 const {
@@ -42,6 +44,7 @@ const {
   enterRoomByCode,
   endWalkInRoom,
   isIdle,
+  listLiveRooms,
   WALK_IN_IDLE_MS,
   DOORS_OPEN_LEAD_MS,
 } = await import("@/lib/events/rooms");
@@ -111,6 +114,7 @@ beforeEach(() => {
     latestActivityAt,
     closeWalkInRoom,
     openWalkInRoom,
+    listOpenRoomsAcrossStores,
   ]) {
     fn.mockReset();
   }
@@ -121,6 +125,7 @@ beforeEach(() => {
   findOpenWalkInRoom.mockResolvedValue(null);
   latestActivityAt.mockResolvedValue(null);
   closeWalkInRoom.mockResolvedValue(true);
+  listOpenRoomsAcrossStores.mockResolvedValue([]);
 });
 
 describe("resolveCode", () => {
@@ -442,5 +447,106 @@ describe("endWalkInRoom", () => {
     await endWalkInRoom("room-1", startsAt, lastSeen);
 
     expect(closeWalkInRoom).toHaveBeenCalledWith("room-1", lastSeen);
+  });
+});
+
+describe("listLiveRooms", () => {
+  const inMinutes = (n: number) => new Date(NOW + n * 60 * 1000).toISOString();
+
+  function openRoom(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "room-1",
+      storeId: "store-1",
+      name: "Friday Night Locals",
+      kind: "scheduled",
+      startsAt: minutesAgo(60),
+      endsAt: inMinutes(120),
+      ...overrides,
+    };
+  }
+
+  it("counts a scheduled event inside its window as live", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([openRoom()]);
+
+    const live = await listLiveRooms(NOW);
+
+    expect(live).toEqual([
+      {
+        eventId: "room-1",
+        storeId: "store-1",
+        name: "Friday Night Locals",
+        kind: "scheduled",
+      },
+    ]);
+  });
+
+  /*
+   * Same lead the counter code applies: players in the room before doors are
+   * in the event, so the console had better call it live too.
+   */
+  it("counts a scheduled event inside the doors-open lead as live", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({
+        startsAt: new Date(NOW + DOORS_OPEN_LEAD_MS - 60_000).toISOString(),
+        endsAt: inMinutes(600),
+      }),
+    ]);
+
+    expect(await listLiveRooms(NOW)).toHaveLength(1);
+  });
+
+  it("does not count tomorrow's event, however open its status", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({
+        startsAt: new Date(NOW + DOORS_OPEN_LEAD_MS + 60_000).toISOString(),
+        endsAt: inMinutes(600),
+      }),
+    ]);
+
+    expect(await listLiveRooms(NOW)).toEqual([]);
+  });
+
+  it("does not count a scheduled event that already ended", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({ startsAt: minutesAgo(240), endsAt: minutesAgo(5) }),
+    ]);
+
+    expect(await listLiveRooms(NOW)).toEqual([]);
+  });
+
+  it("counts a walk-in room with recent activity as live", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({ kind: "walk_in", endsAt: null }),
+    ]);
+    latestActivityAt.mockResolvedValue(minutesAgo(30));
+
+    expect(await listLiveRooms(NOW)).toHaveLength(1);
+  });
+
+  it("does not count an idle walk-in room, and closes nothing", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({ kind: "walk_in", endsAt: null }),
+    ]);
+    latestActivityAt.mockResolvedValue(
+      new Date(NOW - WALK_IN_IDLE_MS - 1).toISOString(),
+    );
+
+    expect(await listLiveRooms(NOW)).toEqual([]);
+    // Read-only on purpose: cleanup belongs to the scan path, not a summary
+    // that runs every time the console refreshes.
+    expect(closeWalkInRoom).not.toHaveBeenCalled();
+  });
+
+  it("ages a walk-in room nobody ever joined from when it opened", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      openRoom({
+        kind: "walk_in",
+        endsAt: null,
+        startsAt: new Date(NOW - WALK_IN_IDLE_MS - 1).toISOString(),
+      }),
+    ]);
+    latestActivityAt.mockResolvedValue(null);
+
+    expect(await listLiveRooms(NOW)).toEqual([]);
   });
 });

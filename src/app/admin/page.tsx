@@ -5,6 +5,7 @@ import { Store as StoreIcon } from "lucide-react";
 import { CatalogHealth } from "@/components/admin/catalog-health";
 import { ConfigStatus } from "@/components/admin/config-status";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
+import { StoreGroups } from "@/components/admin/store-groups";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { CreateShowForm } from "@/components/shows/create-show-form";
@@ -21,9 +22,9 @@ import { latestSyncRun } from "@/lib/cards/sync";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
+import { listLiveRooms } from "@/lib/events/rooms";
 import { listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
-import type { StoreListing } from "@/lib/stores/repository";
 import { formatEventWindow } from "@/lib/events/format";
 import { knownTimeZones } from "@/lib/time/zone";
 
@@ -50,16 +51,16 @@ export const maxDuration = 60;
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events, cardCount, lastRun, printingImages, shows] = await Promise.all(
-    [
+  const [stores, events, cardCount, lastRun, printingImages, shows, liveRooms] =
+    await Promise.all([
       listStores(),
       listAllEvents(),
       countCards(),
       latestSyncRun(),
       countPrintingImages(),
       listShows(),
-    ],
-  );
+      listLiveRooms(),
+    ]);
 
   const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
   const attendance = await countParticipants(events.map((event) => event.id));
@@ -246,7 +247,7 @@ export default async function AdminPage() {
       <section className="flex flex-col gap-5" aria-labelledby="stores-heading">
         <div className="flex items-center justify-between gap-4">
           <h2 id="stores-heading" className="text-xl font-bold text-text-primary">
-            Stores
+            Stores & vendors
           </h2>
           <span className="text-sm text-text-muted tabular-nums">
             {stores.length} total
@@ -261,40 +262,9 @@ export default async function AdminPage() {
             </p>
           </Card>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {stores.map((store) => (
-              <StoreRow key={store.id} store={store} />
-            ))}
-          </ul>
+          <StoreGroups stores={stores} liveRooms={liveRooms} />
         )}
       </section>
     </div>
-  );
-}
-
-function StoreRow({ store }: { store: StoreListing }) {
-  const location = [store.city, store.region].filter(Boolean).join(", ");
-
-  return (
-    <Card as="li" className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="font-semibold text-text-primary">{store.name}</p>
-        <p className="truncate text-sm text-text-muted">
-          {store.contact_email}
-          {location && ` · ${location}`}
-        </p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
-        {store.invitePending ? (
-          <Badge tone="neutral">Invite pending</Badge>
-        ) : (
-          <Badge>
-            {store.memberCount} {store.memberCount === 1 ? "member" : "members"}
-          </Badge>
-        )}
-        <Badge tone="neutral">{store.status}</Badge>
-      </div>
-    </Card>
   );
 }

@@ -9,9 +9,10 @@ import {
   findShowByJoinCode,
   findStoreByJoinCode,
   latestActivityAt,
+  listOpenRoomsAcrossStores,
   openWalkInRoom,
 } from "./repository";
-import type { CodeResolution, PublicEvent, PublicStore } from "./schema";
+import type { CodeResolution, EventKind, PublicEvent, PublicStore } from "./schema";
 
 /**
  * Where a scanned code leads.
@@ -210,4 +211,57 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
   if (opened.outcome === "raced") return findOpenWalkInRoom(store.id);
 
   return opened.room;
+}
+
+/** A room that is live right now, for the console's store list. */
+export interface LiveRoom {
+  eventId: string;
+  storeId: string;
+  name: string;
+  kind: EventKind;
+}
+
+/**
+ * Every room that is live at this moment, across all stores.
+ *
+ * The console's glance, applying the same rules a scanned counter code does:
+ * a scheduled event is live from doors-open lead until it ends, a walk-in
+ * room only until it has sat idle. Read-only on purpose — closing a stale
+ * room belongs to the scan path, and a summary that writes would close rooms
+ * every time the console refreshes. A store that has switched walk-in
+ * trading off is the caller's check: the console has the store rows, this
+ * function does not.
+ */
+export async function listLiveRooms(now: number = Date.now()): Promise<LiveRoom[]> {
+  const rows = await listOpenRoomsAcrossStores();
+  const live: LiveRoom[] = [];
+
+  for (const row of rows) {
+    if (row.kind === "scheduled") {
+      const doorsOpen = new Date(row.startsAt).getTime() <= now + DOORS_OPEN_LEAD_MS;
+      const stillRunning = !row.endsAt || new Date(row.endsAt).getTime() > now;
+      if (doorsOpen && stillRunning) {
+        live.push({
+          eventId: row.id,
+          storeId: row.storeId,
+          name: row.name,
+          kind: row.kind,
+        });
+      }
+      continue;
+    }
+
+    // A walk-in room nobody ever joined ages from when it opened.
+    const lastActivity = (await latestActivityAt(row.id)) ?? row.startsAt;
+    if (!isIdle(lastActivity, now)) {
+      live.push({
+        eventId: row.id,
+        storeId: row.storeId,
+        name: row.name,
+        kind: row.kind,
+      });
+    }
+  }
+
+  return live;
 }

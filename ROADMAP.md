@@ -450,6 +450,32 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Admin console — store pages, live rooms, invite dropdown
+
+Asked for by the founder: the operators were "all just kinda on the page",
+with no way to click into one, see its QR code, see who is running right now
+or look inside a live room.
+
+- **The operator list reads as two lists.** Game stores and card-show
+  vendors group separately, every name links to `/admin/stores/[id]`, and a
+  store with a room running right now carries a "Live · room name" badge.
+  Liveness applies the same rules a scanned counter code does (doors-open
+  lead for events, idle window for walk-in rooms) but read-only — closing a
+  stale room stays with the scan path, so a console refresh never writes
+- **A page per store.** A game store's page shows what is happening right
+  now (roster with presence and open-to-trades, the Flare board), its
+  printable counter-code poster, and its events with attendance. A vendor's
+  page shows the booths they have claimed and their inventory, read-only,
+  exactly as attendee search will find it
+- **The room view is the player's view.** Names, Flares, open-to-trades —
+  never anyone's binder. The admin sees what someone standing in the room
+  sees, and no more; the page says so on its face
+- **Invite form: the kind is a dropdown.** The lgs/vendor radio cards read
+  as confusing; one labelled select with a hint line replaces them
+- New `listLiveRooms` summary covered by seven unit tests alongside the
+  resolver's; every new surface rendered at 390px and inspected (the badge
+  row needed a wrap fix the screenshots caught)
+
 ## ✅ Landing page — one hub for stores and shows
 
 Asked for by the founder: make the main page read as "the ultimate hub to
