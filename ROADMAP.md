@@ -450,6 +450,30 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ The poster is a PDF now (phones ruined printing)
+
+Found by the founder printing from an iPhone: iOS Safari stamps its own
+URL, date and page count onto the sheet and adds margins that pushed the
+card onto a second page — and offers no setting to stop either. The
+zero-margin CSS fix below holds for desktop browsers; no CSS reaches iOS.
+
+- **`/poster/[code]` serves the sheet as a real one-page PDF**, drawn with
+  pdf-lib from the same data: same trading-card anatomy, the approved mark
+  embedded byte-for-byte, the QR drawn module-by-module as vectors from
+  the same generator at the same error-correction level. One page because
+  the page is declared, blank top and bottom because a PDF has no browser
+  around it
+- **"Download PDF" is now the first button under every poster**, with a
+  note steering phones to it. The old print button stays for desktops,
+  where the zero-margin CSS already prints clean
+- Public like `/e/[code]` and by the same reasoning — the poster's whole
+  job is to hang on a counter; exact-code lookup only, rate limited
+- Verified by looking: generated PDFs for counter, event (long title,
+  truncates with an ellipsis) — one page each — and the QR on the rendered
+  PDF **decoded back to the join URL** with an independent reader. Ten new
+  unit tests pin one-page-always (marathon names included) and the
+  route's guards
+
 ## ✅ Clean print: no browser header or footer on the poster
 
 Asked for by the founder: the printed QR sheet carried the browser's own
