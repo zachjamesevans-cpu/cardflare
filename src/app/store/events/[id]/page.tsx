@@ -16,6 +16,7 @@ import { formatEventWindow } from "@/lib/events/format";
 import { listParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { findEventById, findStoreById } from "@/lib/events/repository";
+import { sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { eventStats } from "@/lib/trades/repository";
@@ -37,6 +38,10 @@ export default async function EventPage({
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect(`/login?next=/store/events/${id}`);
+
+  // Close whatever ran out first, so this page's status badge and room
+  // snapshot describe now rather than the last scan.
+  await sweepStaleRooms();
 
   const event = await findEventById(id);
 

@@ -450,6 +450,30 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Rooms close themselves (bug fix)
+
+Found by the founder: every test event was still "open" days after its
+window. The lifecycle was lazy in exactly one place — a scan of that
+store's counter code — so a room nobody scanned again stayed open forever.
+
+- **`sweepStaleRooms`** now runs when the console or a dashboard renders:
+  scheduled events past `ends_at` flip to closed (one guarded, idempotent
+  UPDATE), and idle walk-in rooms close stamped with when trading actually
+  stopped — the same close a scan would have applied, just not waiting for
+  one. Counter codes are untouched: permanent, reopening on the next scan
+- **An ended event's own code now closes it too.** `resolveCode` and
+  `enterRoomByCode` both catch a stale-open scheduled event past its
+  window, close it, and hand back a closed room — so the page says "this
+  event has finished" and a join is refused, instead of the event code
+  keeping a room alive beside the walk-in room the counter opens next
+  (the split-room failure this module exists to prevent)
+- Closing exactly at `ends_at`, no grace, on purpose: the counter code
+  already stops routing to the event at that instant, and any overlap is a
+  split room. A store that wants overtime sets a longer window
+- Nine new unit tests; the bulk UPDATE probed against real PostgreSQL
+  (closes the ended-open event; leaves running, draft and walk-in rows
+  alone; idempotent on the second run)
+
 ## ✅ Admin console — the operator directory
 
 Asked for by the founder: the stores-and-vendors page still read as two

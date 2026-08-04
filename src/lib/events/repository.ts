@@ -128,6 +128,34 @@ export async function listAllEvents(): Promise<EventRow[]> {
   return data ?? [];
 }
 
+/**
+ * Closes every scheduled event whose window has ended.
+ *
+ * One idempotent statement: `status = 'open'` guards it, so re-running is
+ * free. Closing exactly at `ends_at` is deliberate — the counter code stops
+ * routing to the event at that moment (`findRunningScheduledEvent`), and an
+ * event page that stayed joinable past it would split the room between the
+ * event code and the walk-in room the counter opens next.
+ */
+export async function closeEndedScheduledEvents(nowIso: string): Promise<number> {
+  if (!canQuery("close ended events")) return 0;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .update({ status: "closed" })
+    .eq("kind", "scheduled")
+    .eq("status", "open")
+    .lte("ends_at", nowIso)
+    .select("id");
+
+  if (error) {
+    console.error("Could not close ended events", error);
+    return 0;
+  }
+
+  return (data ?? []).length;
+}
+
 /** An open room as the console's live summary sees it, before liveness rules. */
 export interface OpenRoomRow {
   id: string;
