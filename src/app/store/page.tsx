@@ -16,6 +16,7 @@ import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
+import { sweepStaleRooms } from "@/lib/events/rooms";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import {
   boothsForStore,
@@ -114,6 +115,10 @@ export default async function StorePage() {
       </AppShell>
     );
   }
+
+  // Close whatever ran out since anyone last looked, so the event list's
+  // status badges tell the truth instead of echoing the last scan.
+  await sweepStaleRooms();
 
   const events = store ? await listEventsForStore(store.id) : [];
   const attendance = await countParticipants(events.map((event) => event.id));

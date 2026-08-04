@@ -7,7 +7,7 @@ import { StoreDirectory } from "@/components/admin/store-directory";
 import type { DirectoryStore } from "@/components/admin/store-directory";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
-import { listLiveRooms } from "@/lib/events/rooms";
+import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
 import { listStores } from "@/lib/stores/repository";
 
@@ -23,6 +23,8 @@ export default async function AdminStoresPage() {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
   await requireAdmin();
+
+  await sweepStaleRooms();
 
   const [stores, liveRooms] = await Promise.all([listStores(), listLiveRooms()]);
   const flareCounts = await countOpenFlares(liveRooms.map((room) => room.eventId));

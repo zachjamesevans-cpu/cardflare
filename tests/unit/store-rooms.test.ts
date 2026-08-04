@@ -26,6 +26,7 @@ const latestActivityAt = vi.fn();
 const closeWalkInRoom = vi.fn();
 const openWalkInRoom = vi.fn();
 const listOpenRoomsAcrossStores = vi.fn();
+const closeEndedScheduledEvents = vi.fn();
 
 vi.mock("@/lib/events/repository", () => ({
   findEventByJoinCode: (...args: unknown[]) => findEventByJoinCode(...args),
@@ -37,6 +38,7 @@ vi.mock("@/lib/events/repository", () => ({
   closeWalkInRoom: (...args: unknown[]) => closeWalkInRoom(...args),
   openWalkInRoom: (...args: unknown[]) => openWalkInRoom(...args),
   listOpenRoomsAcrossStores: (...args: unknown[]) => listOpenRoomsAcrossStores(...args),
+  closeEndedScheduledEvents: (...args: unknown[]) => closeEndedScheduledEvents(...args),
 }));
 
 const {
@@ -45,6 +47,7 @@ const {
   endWalkInRoom,
   isIdle,
   listLiveRooms,
+  sweepStaleRooms,
   WALK_IN_IDLE_MS,
   DOORS_OPEN_LEAD_MS,
 } = await import("@/lib/events/rooms");
@@ -116,6 +119,7 @@ beforeEach(() => {
     closeWalkInRoom,
     openWalkInRoom,
     listOpenRoomsAcrossStores,
+    closeEndedScheduledEvents,
   ]) {
     fn.mockReset();
   }
@@ -127,6 +131,7 @@ beforeEach(() => {
   latestActivityAt.mockResolvedValue(null);
   closeWalkInRoom.mockResolvedValue(true);
   listOpenRoomsAcrossStores.mockResolvedValue([]);
+  closeEndedScheduledEvents.mockResolvedValue(0);
 });
 
 describe("resolveCode", () => {
@@ -549,5 +554,112 @@ describe("listLiveRooms", () => {
     latestActivityAt.mockResolvedValue(null);
 
     expect(await listLiveRooms(NOW)).toEqual([]);
+  });
+});
+
+describe("sweepStaleRooms", () => {
+  const walkInRow = (overrides: Record<string, unknown> = {}) => ({
+    id: "room-1",
+    storeId: "store-1",
+    name: "Walk-in trading",
+    kind: "walk_in",
+    startsAt: minutesAgo(60),
+    endsAt: null,
+    ...overrides,
+  });
+
+  it("closes ended scheduled events, stamped with now", async () => {
+    await sweepStaleRooms(NOW);
+
+    expect(closeEndedScheduledEvents).toHaveBeenCalledWith(new Date(NOW).toISOString());
+  });
+
+  it("closes an idle walk-in room at its last activity, not at now", async () => {
+    // Opened yesterday morning, last used just past the idle window ago.
+    const lastSeen = new Date(NOW - WALK_IN_IDLE_MS - 60_000).toISOString();
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      walkInRow({ startsAt: minutesAgo(600) }),
+    ]);
+    latestActivityAt.mockResolvedValue(lastSeen);
+
+    await sweepStaleRooms(NOW);
+
+    expect(closeWalkInRoom).toHaveBeenCalledWith("room-1", lastSeen);
+  });
+
+  it("leaves a walk-in room with recent activity open", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([walkInRow()]);
+    latestActivityAt.mockResolvedValue(minutesAgo(30));
+
+    await sweepStaleRooms(NOW);
+
+    expect(closeWalkInRoom).not.toHaveBeenCalled();
+  });
+
+  it("ages a never-joined walk-in room from when it opened", async () => {
+    const openedAt = new Date(NOW - WALK_IN_IDLE_MS - 60_000).toISOString();
+    listOpenRoomsAcrossStores.mockResolvedValue([walkInRow({ startsAt: openedAt })]);
+    latestActivityAt.mockResolvedValue(null);
+
+    await sweepStaleRooms(NOW);
+
+    // Closed at one second past its start — the same floor a scan applies.
+    const [, endedAt] = closeWalkInRoom.mock.calls[0];
+    expect(Date.parse(endedAt as string)).toBe(Date.parse(openedAt) + 1000);
+  });
+
+  it("never touches scheduled rows through the walk-in path", async () => {
+    listOpenRoomsAcrossStores.mockResolvedValue([
+      walkInRow({ id: "event-1", kind: "scheduled", endsAt: minutesAgo(5) }),
+    ]);
+
+    await sweepStaleRooms(NOW);
+
+    expect(latestActivityAt).not.toHaveBeenCalled();
+    expect(closeWalkInRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("ended events at their own code", () => {
+  const ended = () => scheduled({ startsAt: minutesAgo(240), endsAt: minutesAgo(10) });
+
+  it("resolveCode closes a stale-open ended event and says so", async () => {
+    findEventByJoinCode.mockResolvedValue(ended());
+
+    const result = await resolveCode(EVENT_CODE);
+
+    expect(result).toEqual({
+      outcome: "room",
+      room: { ...ended(), status: "closed" },
+    });
+    expect(closeEndedScheduledEvents).toHaveBeenCalled();
+  });
+
+  it("enterRoomByCode refuses the join the same way", async () => {
+    findEventByJoinCode.mockResolvedValue(ended());
+
+    const room = await enterRoomByCode(EVENT_CODE);
+
+    expect(room?.status).toBe("closed");
+    expect(closeEndedScheduledEvents).toHaveBeenCalled();
+  });
+
+  it("leaves a running event alone", async () => {
+    findEventByJoinCode.mockResolvedValue(scheduled());
+
+    const result = await resolveCode(EVENT_CODE);
+
+    expect(result).toEqual({ outcome: "room", room: scheduled() });
+    expect(closeEndedScheduledEvents).not.toHaveBeenCalled();
+  });
+
+  it("leaves a manually closed event exactly as it is", async () => {
+    const closed = scheduled({ status: "closed", endsAt: minutesAgo(10) });
+    findEventByJoinCode.mockResolvedValue(closed);
+
+    const result = await resolveCode(EVENT_CODE);
+
+    expect(result).toEqual({ outcome: "room", room: closed });
+    expect(closeEndedScheduledEvents).not.toHaveBeenCalled();
   });
 });

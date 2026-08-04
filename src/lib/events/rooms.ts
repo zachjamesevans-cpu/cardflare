@@ -2,6 +2,7 @@ import "server-only";
 
 import { classifyCode } from "./join-code";
 import {
+  closeEndedScheduledEvents,
   closeWalkInRoom,
   findEventByJoinCode,
   findOpenWalkInRoom,
@@ -150,7 +151,27 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
 
   if (kind === "event") {
     const room = await findEventByJoinCode(code);
-    return room ? { outcome: "room", room } : { outcome: "not-found" };
+    if (!room) return { outcome: "not-found" };
+
+    /*
+     * A scheduled event that ran out its window but was never swept is
+     * closed here, at the first scan that notices — the page then says
+     * "this event has finished" instead of rendering a live room. Without
+     * this, the event's own code kept the room joinable while the counter
+     * code was already opening a walk-in room beside it: the split this
+     * module exists to prevent.
+     */
+    if (
+      room.kind === "scheduled" &&
+      room.status === "open" &&
+      room.endsAt &&
+      new Date(room.endsAt).getTime() <= Date.now()
+    ) {
+      await closeEndedScheduledEvents(new Date().toISOString());
+      return { outcome: "room", room: { ...room, status: "closed" } };
+    }
+
+    return { outcome: "room", room };
   }
 
   // A show is a place to look things up, never a room to enter — the page
@@ -183,7 +204,28 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
   const kind = classifyCode(code);
   if (!kind) return null;
 
-  if (kind === "event") return findEventByJoinCode(code);
+  if (kind === "event") {
+    const room = await findEventByJoinCode(code);
+    if (!room) return null;
+
+    /*
+     * Same guard as resolveCode: an ended event whose status was never
+     * swept must not accept a join. Returned closed rather than null so
+     * the join action refuses with "this event has finished" instead of
+     * "code not found" — the code on the sheet is real, just over.
+     */
+    if (
+      room.kind === "scheduled" &&
+      room.status === "open" &&
+      room.endsAt &&
+      new Date(room.endsAt).getTime() <= Date.now()
+    ) {
+      await closeEndedScheduledEvents(new Date().toISOString());
+      return { ...room, status: "closed" };
+    }
+
+    return room;
+  }
 
   // Shows have no join path at all: nothing to enter, nothing to open.
   if (kind === "show") return null;
@@ -264,4 +306,34 @@ export async function listLiveRooms(now: number = Date.now()): Promise<LiveRoom[
   }
 
   return live;
+}
+
+/**
+ * Closes everything that should no longer be open, across all stores.
+ *
+ * The room lifecycle is lazy on purpose — a scan of a store's counter code
+ * closes that store's stale room — but a room nobody ever scans again would
+ * otherwise stay "open" in the console forever, which is exactly what
+ * happened to the first test events. This sweep runs when the console or a
+ * dashboard renders: scheduled events past their window close outright, and
+ * walk-in rooms that sat idle close stamped with when trading actually
+ * stopped, exactly as a scan would have closed them.
+ *
+ * Idempotent and cheap: one guarded UPDATE, plus one activity read per
+ * still-open walk-in room. Store counter codes are untouched — they are
+ * permanent, and their rooms keep opening on the next scan as before.
+ */
+export async function sweepStaleRooms(now: number = Date.now()): Promise<void> {
+  await closeEndedScheduledEvents(new Date(now).toISOString());
+
+  const rows = await listOpenRoomsAcrossStores();
+
+  for (const row of rows) {
+    if (row.kind !== "walk_in") continue;
+
+    const lastActivity = (await latestActivityAt(row.id)) ?? row.startsAt;
+    if (isIdle(lastActivity, now)) {
+      await endWalkInRoom(row.id, row.startsAt, lastActivity);
+    }
+  }
 }

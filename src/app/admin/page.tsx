@@ -24,7 +24,7 @@ import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
-import { listLiveRooms } from "@/lib/events/rooms";
+import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
 import { listClaimableShows, listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
@@ -60,6 +60,10 @@ export const maxDuration = 60;
  */
 export default async function AdminPage() {
   await requireAdmin();
+
+  // Rooms close lazily; the console render is one of the moments that does
+  // it, so the numbers below describe now rather than the last scan.
+  await sweepStaleRooms();
 
   const [
     stores,

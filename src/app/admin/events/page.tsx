@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
+import { sweepStaleRooms } from "@/lib/events/rooms";
 import { listStores } from "@/lib/stores/repository";
 
 export const metadata: Metadata = {
@@ -23,6 +24,10 @@ export default async function AdminEventsPage() {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
   await requireAdmin();
+
+  // Close whatever ran out since anyone last looked, so the list tells the
+  // truth about "open" instead of echoing the last scan.
+  await sweepStaleRooms();
 
   const [stores, events] = await Promise.all([listStores(), listAllEvents()]);
   const attendance = await countParticipants(events.map((event) => event.id));

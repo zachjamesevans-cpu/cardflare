@@ -14,7 +14,7 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { countParticipants, listParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { findStoreById, listEventsForStore } from "@/lib/events/repository";
-import { resolveCode } from "@/lib/events/rooms";
+import { resolveCode, sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { boothsForStore, listInventory, listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
@@ -45,6 +45,8 @@ export default async function AdminStorePage({
   // security boundary on its own.
   await requireAdmin();
   const { id } = await params;
+
+  await sweepStaleRooms();
 
   const store = await findStoreById(id);
   if (!store) notFound();
