@@ -450,6 +450,25 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Admin console — the operator directory
+
+Asked for by the founder: the stores-and-vendors page still read as two
+piles; wanted a dropdown to pick between them and a search box to find an
+operator fast — for their settings, their poster, their room.
+
+- **One list, two controls.** A search box (name, contact email, city,
+  region — case-insensitive) and a kind dropdown (all / game stores /
+  card-show vendors) replace the fixed two-group layout. Filtering runs in
+  the browser over the roster the page already has, so it is instant per
+  keystroke; rows are sorted alphabetically because a directory is for
+  finding a name you know, and each row carries a kind badge plus the live
+  and Flares-out badges from before
+- **The directory comes first.** Finding an operator is the page's job, so
+  the list moved above the invite form
+- Filter rules live in a pure module with eight unit tests; the search,
+  dropdown, combined filtering and the no-match state were driven in a
+  real browser at 390px
+
 ## ✅ Milestone 10 — the counter sells too (store singles sync)
 
 Asked for by the founder, from store feedback: stores worry CardFlare
