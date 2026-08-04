@@ -5,13 +5,18 @@ import Link from "next/link";
 import { EventStatsCard } from "@/components/events/event-stats";
 import { EventStatusControls } from "@/components/events/event-status-controls";
 import { JoinPoster } from "@/components/events/join-poster";
+import { RoomRoster } from "@/components/events/room-roster";
 import { WalkInSession } from "@/components/events/walk-in-session";
 import { AppShell } from "@/components/layout/app-shell";
+import { FlareBoard } from "@/components/lists/list-entries";
 import { Badge, Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
+import { cardImagesEnabled } from "@/lib/cards/images";
 import { formatEventWindow } from "@/lib/events/format";
+import { listParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { findEventById, findStoreById } from "@/lib/events/repository";
+import { listRoomFlares } from "@/lib/lists/repository";
 import { eventStats } from "@/lib/trades/repository";
 import { STATUS_LABELS } from "@/lib/events/schema";
 
@@ -57,7 +62,20 @@ export default async function EventPage({
    */
   const svg = event.join_code ? await joinQrSvg(event.join_code) : null;
 
-  const stats = await eventStats(event.id);
+  const [stats, participants, flares] = await Promise.all([
+    eventStats(event.id),
+    listParticipants(event.id),
+    listRoomFlares(event.id),
+  ]);
+
+  const openPlayers = participants
+    .filter((participant) => participant.openToTrades)
+    .map((participant) => ({
+      playerSessionId: participant.playerSessionId,
+      displayName: participant.displayName,
+    }));
+
+  const boardHasEntries = flares.length > 0 || openPlayers.length > 0;
 
   return (
     <AppShell
@@ -84,6 +102,37 @@ export default async function EventPage({
             How the room went
           </h2>
           <EventStatsCard stats={stats} />
+        </section>
+      )}
+
+      {(participants.length > 0 || boardHasEntries) && (
+        <section className="flex flex-col gap-5" aria-labelledby="room-heading">
+          <div className="flex flex-col gap-1.5">
+            <h2 id="room-heading" className="text-xl font-bold text-text-primary">
+              {event.status === "open" ? "In the room" : "How the board ended"}
+            </h2>
+            <p className="text-sm text-text-secondary">
+              {event.status === "open"
+                ? "The room as a player in it sees it — names, Flares and who is open to trades. Binders stay private, in here as everywhere."
+                : "The Flares still standing when the room closed — the cards people went home without."}
+            </p>
+          </div>
+
+          <RoomRoster participants={participants} />
+
+          {boardHasEntries ? (
+            <FlareBoard
+              entries={flares}
+              code={event.join_code ?? ""}
+              imagesEnabled={cardImagesEnabled()}
+              youId=""
+              matches={new Map()}
+              offers={new Map()}
+              openToTrades={openPlayers}
+            />
+          ) : (
+            <p className="text-sm text-text-muted">No Flares in this room yet.</p>
+          )}
         </section>
       )}
 

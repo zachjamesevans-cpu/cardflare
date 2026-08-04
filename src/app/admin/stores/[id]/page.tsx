@@ -3,11 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import {
-  RoomRoster,
-  VendorBooths,
-  VendorInventoryReadonly,
-} from "@/components/admin/store-detail";
+import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
+import { RoomRoster } from "@/components/events/room-roster";
 import { JoinPoster } from "@/components/events/join-poster";
 import { EventList } from "@/components/events/event-list";
 import { FlareBoard } from "@/components/lists/list-entries";

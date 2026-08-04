@@ -474,6 +474,12 @@ invisible without clicking.
 - `countOpenFlares` counts open Flares per live room in one query; the
   glance row was previewed at 390px and 1024px per the dataviz stat-tile
   contract (label + value in text tokens, no fabricated deltas)
+- **Every event page shows its room's cards** (follow-up ask). The event
+  page each console row links to now carries the roster and the Flare
+  board — for a live room, "In the room", the player's view verbatim; for
+  a closed one, "How the board ended", the Flares still standing when the
+  room closed. Same privacy line as everywhere: names and asks, never
+  binders. Store owners see it too — it is their own room's public board
 
 ## ✅ Admin console — store pages, live rooms, invite dropdown
 
