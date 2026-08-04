@@ -128,6 +128,47 @@ export async function listAllEvents(): Promise<EventRow[]> {
   return data ?? [];
 }
 
+/** An open room as the console's live summary sees it, before liveness rules. */
+export interface OpenRoomRow {
+  id: string;
+  storeId: string;
+  name: string;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string | null;
+}
+
+/**
+ * Every room whose status is still open, across all stores.
+ *
+ * Raw material for the admin console's "live now" summary — `status = 'open'`
+ * alone is not liveness (a scheduled event is open before doors, a walk-in
+ * room can be open but long idle), so the rules live with the other room
+ * rules in `rooms.ts` rather than in this query.
+ */
+export async function listOpenRoomsAcrossStores(): Promise<OpenRoomRow[]> {
+  if (!canQuery("list open rooms")) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select("id, store_id, name, kind, starts_at, ends_at")
+    .eq("status", "open");
+
+  if (error) {
+    console.error("Could not list open rooms", error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    storeId: row.store_id,
+    name: row.name,
+    kind: row.kind as EventKind,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+  }));
+}
+
 export async function findEventById(id: string): Promise<EventRow | null> {
   if (!canQuery("load the event")) return null;
 
