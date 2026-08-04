@@ -307,6 +307,31 @@ export type VendorInventoryInsert = Omit<
   quantity?: number;
 };
 
+export type StoreSingleRow = {
+  id: string;
+  created_at: string;
+  store_id: string;
+  card_id: string;
+  quantity: number;
+};
+
+export type StoreSingleInsert = Omit<StoreSingleRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type StoreSinglesSyncRow = {
+  store_id: string;
+  synced_at: string;
+  lines_seen: number;
+  cards_matched: number;
+  lines_unmatched: number;
+};
+
+export type StoreSinglesSyncInsert = Omit<StoreSinglesSyncRow, "synced_at"> & {
+  synced_at?: string;
+};
+
 export type EventStatus = "draft" | "open" | "closed";
 export type Game = "one_piece";
 
@@ -514,6 +539,8 @@ export type Database = {
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
       vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;
+      store_singles: Table<StoreSingleRow, StoreSingleInsert>;
+      store_singles_syncs: Table<StoreSinglesSyncRow, StoreSinglesSyncInsert>;
       player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;

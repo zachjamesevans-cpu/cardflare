@@ -194,7 +194,7 @@ export async function findEventById(id: string): Promise<EventRow | null> {
  * column a later migration adds.
  */
 const PUBLIC_ROOM_COLUMNS =
-  "id, name, kind, status, starts_at, ends_at, stores(name, city, region, timezone)";
+  "id, name, kind, status, starts_at, ends_at, store_id, stores(name, city, region, timezone)";
 
 type PublicRoomRow = {
   id: string;
@@ -203,6 +203,7 @@ type PublicRoomRow = {
   status: EventStatus;
   starts_at: string;
   ends_at: string | null;
+  store_id: string;
   stores: {
     name: string;
     city: string | null;
@@ -219,6 +220,7 @@ function toPublicEvent(row: PublicRoomRow): PublicEvent {
     status: row.status,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    storeId: row.store_id,
     storeName: row.stores?.name ?? "A CardFlare store",
     storeCity: row.stores?.city ?? null,
     storeRegion: row.stores?.region ?? null,

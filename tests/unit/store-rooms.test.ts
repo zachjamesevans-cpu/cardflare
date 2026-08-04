@@ -81,6 +81,7 @@ const room = (over: Partial<PublicEvent> = {}): PublicEvent => ({
   status: "open",
   startsAt: minutesAgo(60),
   endsAt: null,
+  storeId: "store-1",
   storeName: "Grand Line Games",
   storeCity: "Austin",
   storeRegion: "TX",

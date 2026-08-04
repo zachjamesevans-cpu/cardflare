@@ -29,6 +29,7 @@ import { getPlayerSession } from "@/lib/players/session";
 import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
+import { counterAvailability } from "@/lib/singles/repository";
 import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
@@ -217,6 +218,18 @@ export default async function JoinByCodePage({
     : [[], [], [], [], []];
 
   /*
+   * The counter check: which of the board's cards the store's synced
+   * singles cover. Empty when the store has never synced, so the line
+   * simply never appears — no store setting, no toggle, no dead UI.
+   */
+  const counterHas = inRoom
+    ? await counterAvailability(
+        event.storeId,
+        flares.map((entry) => entry.cardId),
+      )
+    : new Set<string>();
+
+  /*
    * The matching engine, such as it is: derived from the binder that was just
    * read rather than queried again, because the cross-reference *is* the
    * binder. Computed for this viewer only — the room learns somebody can help
@@ -376,6 +389,8 @@ export default async function JoinByCodePage({
               matches={matches}
               offers={offers}
               openToTrades={openPlayers}
+              counterHas={counterHas}
+              counterName={event.storeName}
             />
           </section>
 

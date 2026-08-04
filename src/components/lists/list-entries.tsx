@@ -1,4 +1,4 @@
-import { Flame, Hand, Layers, PackageCheck } from "lucide-react";
+import { Flame, Hand, Layers, PackageCheck, Store } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
@@ -34,6 +34,7 @@ function Entry({
   imagesEnabled,
   match,
   removable,
+  counterName,
   children,
 }: {
   entry: ListEntry;
@@ -49,6 +50,12 @@ function Entry({
    */
   match?: MatchKind | null;
   removable: boolean;
+  /**
+   * The store whose synced counter stock includes this card, if any.
+   * "May", never "has": the sync can be a day old, and the promise the
+   * line makes is only "worth asking at the register".
+   */
+  counterName?: string | null;
   /** Offer controls or the offers themselves, rendered under the card. */
   children?: React.ReactNode;
 }) {
@@ -104,6 +111,13 @@ function Entry({
               You have another printing
             </Badge>
           </span>
+        )}
+
+        {counterName && (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
+            <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+            {counterName} may have this single — ask at the counter.
+          </p>
         )}
 
         {children}
@@ -180,6 +194,8 @@ export function FlareBoard({
   matches,
   offers,
   openToTrades = [],
+  counterHas,
+  counterName,
 }: {
   entries: ListEntry[];
   code: string;
@@ -191,6 +207,10 @@ export function FlareBoard({
   offers: Map<string, Offer[]>;
   /** Players in this room who will consider any trade. */
   openToTrades?: { playerSessionId: string; displayName: string }[];
+  /** Cards the room's store has in its synced counter stock. */
+  counterHas?: Set<string>;
+  /** The store's name, for the "may have it" line. */
+  counterName?: string;
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
   const groups = groupByPlayer(entries);
@@ -269,6 +289,9 @@ export function FlareBoard({
                     imagesEnabled={imagesEnabled}
                     match={match}
                     removable={isYou}
+                    counterName={
+                      counterHas?.has(entry.cardId) ? (counterName ?? null) : null
+                    }
                   >
                     {/*
                      * Your Flare: everyone who raised a hand, each with a
