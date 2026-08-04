@@ -450,6 +450,31 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Admin console — a dashboard, not a scroll
+
+Asked for by the founder: the console scrolled too long, the lists went "on
+and on", and the numbers worth knowing — how many Flares are out — were
+invisible without clicking.
+
+- **The front page is now a glance.** A "Right now" row of stat tiles (live
+  rooms, Flares out, players here now — all real and current) and a
+  "Manage" row of three linked cards carrying their headline counts. The
+  configuration and card-catalog sections stay; everything list-shaped
+  moved off
+- **The lists each get a page.** `/admin/stores` (invite form + the grouped
+  operator list), `/admin/events` (create + full history with attendance),
+  `/admin/shows` (create + all shows). Store rows now show
+  "N Flares out" beside the live badge, so the number the founder wanted is
+  visible without a click
+- **Fixed a double app-shell.** The admin layout already wraps every
+  `/admin` route in the signed-in chrome, but the show and store detail
+  pages were rendering a second shell inside it — two headers, two sign-out
+  buttons. Both now render bare content with a back link, like spot-check
+  always did
+- `countOpenFlares` counts open Flares per live room in one query; the
+  glance row was previewed at 390px and 1024px per the dataviz stat-tile
+  contract (label + value in text tokens, no fabricated deltas)
+
 ## ✅ Admin console — store pages, live rooms, invite dropdown
 
 Asked for by the founder: the operators were "all just kinda on the page",

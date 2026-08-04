@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Store as StoreIcon } from "lucide-react";
+import {
+  CalendarDays,
+  Flame,
+  Radio,
+  Store as StoreIcon,
+  Tent,
+  Users,
+} from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
+import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
-import { InviteStoreForm } from "@/components/admin/invite-store-form";
-import { StoreGroups } from "@/components/admin/store-groups";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
-import { CreateEventForm } from "@/components/events/create-event-form";
-import { CreateShowForm } from "@/components/shows/create-show-form";
-import { EventList } from "@/components/events/event-list";
-import { Badge, Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { catalogBySet, failuresForRun } from "@/lib/cards/health";
 import {
@@ -19,14 +22,12 @@ import {
 } from "@/lib/cards/providers/optcgapi/adapter";
 import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
-import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
 import { listLiveRooms } from "@/lib/events/rooms";
-import { listShows } from "@/lib/shows/repository";
+import { countOpenFlares } from "@/lib/lists/repository";
+import { listClaimableShows, listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
-import { formatEventWindow } from "@/lib/events/format";
-import { knownTimeZones } from "@/lib/time/zone";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -49,25 +50,62 @@ export const dynamic = "force-dynamic";
  */
 export const maxDuration = 60;
 
+/**
+ * The console's front page: tonight's numbers, then doors into the lists.
+ *
+ * Deliberately short. The old page stacked every store, every event and
+ * every show on one scroll, and the thing an admin actually opens it for —
+ * "is anything happening right now?" — was nowhere. The lists live one
+ * click away at /admin/stores, /admin/events and /admin/shows.
+ */
 export default async function AdminPage() {
   await requireAdmin();
-  const [stores, events, cardCount, lastRun, printingImages, shows, liveRooms] =
-    await Promise.all([
-      listStores(),
-      listAllEvents(),
-      countCards(),
-      latestSyncRun(),
-      countPrintingImages(),
-      listShows(),
-      listLiveRooms(),
-    ]);
 
-  const storeNames = Object.fromEntries(stores.map((store) => [store.id, store.name]));
-  const attendance = await countParticipants(events.map((event) => event.id));
-  // The admin console spans every store, so each row is formatted in the
-  // zone of the store that owns it rather than in the viewer's.
-  const timeZones = Object.fromEntries(stores.map((s) => [s.id, s.timezone]));
-  const window = defaultEventWindow("UTC");
+  const [
+    stores,
+    events,
+    shows,
+    runningShows,
+    liveRooms,
+    cardCount,
+    lastRun,
+    printingImages,
+  ] = await Promise.all([
+    listStores(),
+    listAllEvents(),
+    listShows(),
+    listClaimableShows(),
+    listLiveRooms(),
+    countCards(),
+    latestSyncRun(),
+    countPrintingImages(),
+  ]);
+
+  /*
+   * The list applies the walk-in switch (the summary is read-only and does
+   * not know it), so a room at a store that turned walk-ins off does not
+   * count as live here either.
+   */
+  const walkInEnabled = new Map(stores.map((s) => [s.id, s.walk_in_enabled]));
+  const live = liveRooms.filter(
+    (room) => room.kind === "scheduled" || walkInEnabled.get(room.storeId),
+  );
+
+  const [flareCounts, presence] = await Promise.all([
+    countOpenFlares(live.map((room) => room.eventId)),
+    countParticipants(live.map((room) => room.eventId)),
+  ]);
+
+  const flaresOut = [...flareCounts.values()].reduce((sum, n) => sum + n, 0);
+  const hereNow = live.reduce(
+    (sum, room) => sum + (presence.get(room.eventId)?.present ?? 0),
+    0,
+  );
+
+  const gameStores = stores.filter((store) => store.kind === "lgs").length;
+  const vendors = stores.length - gameStores;
+  const upcomingShows = runningShows.length;
+
   const providerName = new OptcgApiProvider().displayName;
 
   // Depends on which run was last, so it cannot join the batch above.
@@ -78,6 +116,53 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-12">
+      <section className="flex flex-col gap-5" aria-labelledby="glance-heading">
+        <h2 id="glance-heading" className="text-xl font-bold text-text-primary">
+          Right now
+        </h2>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatTile
+            icon={Radio}
+            label="Live rooms"
+            value={live.length}
+            live={live.length > 0}
+          />
+          <StatTile icon={Flame} label="Flares out" value={flaresOut} />
+          <StatTile icon={Users} label="Players here now" value={hereNow} />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="areas-heading">
+        <h2 id="areas-heading" className="text-xl font-bold text-text-primary">
+          Manage
+        </h2>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <AreaLink
+            href="/admin/stores"
+            icon={StoreIcon}
+            label="Stores & vendors"
+            value={stores.length}
+            detail={`${gameStores} game ${gameStores === 1 ? "store" : "stores"} · ${vendors} ${vendors === 1 ? "vendor" : "vendors"}`}
+          />
+          <AreaLink
+            href="/admin/events"
+            icon={CalendarDays}
+            label="Events"
+            value={events.length}
+            detail="Create one, or read the history"
+          />
+          <AreaLink
+            href="/admin/shows"
+            icon={Tent}
+            label="Card shows"
+            value={shows.length}
+            detail={`${upcomingShows} upcoming or running`}
+          />
+        </div>
+      </section>
+
       <section className="flex flex-col gap-5" aria-labelledby="config-heading">
         <div className="flex flex-col gap-1.5">
           <h2 id="config-heading" className="text-xl font-bold text-text-primary">
@@ -134,135 +219,6 @@ export default async function AdminPage() {
             </Link>{" "}
             against the official card list.
           </p>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-5" aria-labelledby="invite-heading">
-        <div className="flex flex-col gap-1.5">
-          <h2 id="invite-heading" className="text-xl font-bold text-text-primary">
-            Invite a store
-          </h2>
-          <p className="text-sm text-text-secondary">
-            Adds the store to the beta and emails the contact a sign-in link.
-          </p>
-        </div>
-
-        <Card>
-          <InviteStoreForm />
-        </Card>
-      </section>
-
-      <section className="flex flex-col gap-5" aria-labelledby="new-event-heading">
-        <div className="flex flex-col gap-1.5">
-          <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
-            New event
-          </h2>
-          <p className="text-sm text-text-secondary">
-            Create an event for any store. The first pilot needs nothing from them but
-            the printed sheet.
-          </p>
-        </div>
-
-        <Card>
-          {stores.length === 0 ? (
-            <p className="text-text-secondary">
-              Invite a store first — an event has to belong to one.
-            </p>
-          ) : (
-            <CreateEventForm
-              stores={stores.map((store) => ({ id: store.id, name: store.name }))}
-              defaultStartsAt={window.startsAt}
-              defaultEndsAt={window.endsAt}
-            />
-          )}
-        </Card>
-      </section>
-
-      <section className="flex flex-col gap-5" aria-labelledby="events-heading">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="events-heading" className="text-xl font-bold text-text-primary">
-            Events
-          </h2>
-          <span className="text-sm text-text-muted tabular-nums">
-            {events.length} total
-          </span>
-        </div>
-
-        <EventList
-          events={events}
-          showStore
-          storeNames={storeNames}
-          timeZones={timeZones}
-          attendance={attendance}
-        />
-      </section>
-
-      <section className="flex flex-col gap-5" aria-labelledby="shows-heading">
-        <div className="flex flex-col gap-1">
-          <h2 id="shows-heading" className="text-xl font-bold text-text-primary">
-            Card shows
-          </h2>
-          <p className="text-sm text-text-secondary">
-            One code per show. Vendors claim booths from their dashboard; attendees scan
-            and search.
-          </p>
-        </div>
-
-        <Card>
-          <CreateShowForm
-            zones={knownTimeZones("UTC")}
-            defaultZone="UTC"
-            defaultStartsAt={window.startsAt}
-            defaultEndsAt={window.endsAt}
-          />
-        </Card>
-
-        {shows.length > 0 && (
-          <Card className="p-4">
-            <ul className="flex flex-col">
-              {shows.map((show) => (
-                <li
-                  key={show.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-                >
-                  <div className="flex min-w-0 flex-1 basis-48 flex-col">
-                    <Link
-                      href={`/admin/shows/${show.id}`}
-                      className="truncate font-semibold text-text-primary underline-offset-4 hover:underline"
-                    >
-                      {show.name}
-                    </Link>
-                    <span className="text-xs text-text-muted">
-                      {formatEventWindow(show.starts_at, show.ends_at, show.timezone)}
-                    </span>
-                  </div>
-                  <Badge tone="neutral">{show.join_code}</Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-5" aria-labelledby="stores-heading">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="stores-heading" className="text-xl font-bold text-text-primary">
-            Stores & vendors
-          </h2>
-          <span className="text-sm text-text-muted tabular-nums">
-            {stores.length} total
-          </span>
-        </div>
-
-        {stores.length === 0 ? (
-          <Card className="flex flex-col items-center gap-3 py-12 text-center">
-            <StoreIcon className="size-6 text-text-muted" aria-hidden="true" />
-            <p className="text-text-secondary">
-              No stores yet. Invite the first one above.
-            </p>
-          </Card>
-        ) : (
-          <StoreGroups stores={stores} liveRooms={liveRooms} />
         )}
       </section>
     </div>
