@@ -11,6 +11,7 @@ import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
+import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
@@ -33,11 +34,21 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function StorePage() {
+export default async function StorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ as?: string }>;
+}) {
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect("/login?next=/store");
-  if (viewer.kind === "admin") redirect("/admin");
+
+  /*
+   * An admin who is also a member of stores (the founder testing operator
+   * features on their own account) gets the store dashboard like any other
+   * member; an admin with no memberships has nothing to see here.
+   */
+  if (viewer.kind === "admin" && viewer.storeIds.length === 0) redirect("/admin");
 
   if (viewer.kind === "unaffiliated") {
     return (
@@ -65,7 +76,16 @@ export default async function StorePage() {
     )
     .order("name");
 
-  const store = stores?.[0];
+  /*
+   * Which of this account's stores to show. The area switcher passes `?as=`;
+   * anything not in the RLS-filtered list falls back to the first store, so
+   * the parameter can never reach a store this account is not a member of.
+   */
+  const { as } = await searchParams;
+  const store = stores?.find((row) => row.id === as) ?? stores?.[0];
+
+  const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
+  const currentArea = store ? `/store?as=${store.id}` : undefined;
 
   /*
    * A vendor's dashboard is a different job: no rooms, no counter code — an
@@ -85,6 +105,8 @@ export default async function StorePage() {
         email={viewer.user.email ?? ""}
         title={store.name}
         description="Upload what you're bringing, claim your booth, and attendees find you."
+        areas={areas}
+        currentArea={currentArea}
       >
         <section className="flex flex-col gap-5" aria-labelledby="shows-heading">
           <div className="flex flex-col gap-1">
@@ -145,6 +167,8 @@ export default async function StorePage() {
       email={viewer.user.email ?? ""}
       title={store?.name ?? "Your store"}
       description="One printed code on your counter, plus a room for every event you run."
+      areas={areas}
+      currentArea={currentArea}
     >
       {store && counterQr && (
         <section className="flex flex-col gap-5" aria-labelledby="counter-code-heading">

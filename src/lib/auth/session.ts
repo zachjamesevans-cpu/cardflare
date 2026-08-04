@@ -8,7 +8,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type Viewer =
   | { kind: "anonymous" }
-  | { kind: "admin"; user: User }
+  /**
+   * Admins carry their store memberships too. The founder invites
+   * themselves to a test store or vendor, and the area switcher lets one
+   * signed-in account move between the consoles without re-authenticating.
+   */
+  | { kind: "admin"; user: User; storeIds: string[] }
   | { kind: "store"; user: User; storeIds: string[] }
   | { kind: "unaffiliated"; user: User };
 
@@ -38,15 +43,17 @@ export async function getViewer(): Promise<Viewer> {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (adminRow) return { kind: "admin", user };
-
   const { data: memberships } = await supabase
     .from("store_members")
     .select("store_id")
     .eq("user_id", user.id);
 
-  if (memberships && memberships.length > 0) {
-    return { kind: "store", user, storeIds: memberships.map((m) => m.store_id) };
+  const storeIds = (memberships ?? []).map((m) => m.store_id);
+
+  if (adminRow) return { kind: "admin", user, storeIds };
+
+  if (storeIds.length > 0) {
+    return { kind: "store", user, storeIds };
   }
 
   return { kind: "unaffiliated", user };

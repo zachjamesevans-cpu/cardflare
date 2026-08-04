@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
+import { AreaSwitcher } from "@/components/layout/area-switcher";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
+import type { Area } from "@/lib/auth/areas";
 import { SITE } from "@/lib/site";
 
 interface AppShellProps {
@@ -12,16 +14,34 @@ interface AppShellProps {
   email: string;
   title: string;
   description?: string;
+  /**
+   * Every console this account can stand in. With more than one, a
+   * switcher renders beside the email — one founder account moves between
+   * admin, store and vendor without signing out.
+   */
+  areas?: Area[];
+  /** The option that matches where the viewer is standing right now. */
+  currentArea?: string;
   children: ReactNode;
 }
 
 /** Chrome for the signed-in areas. Deliberately plainer than the landing page. */
-export function AppShell({ area, email, title, description, children }: AppShellProps) {
+export function AppShell({
+  area,
+  email,
+  title,
+  description,
+  areas,
+  currentArea,
+  children,
+}: AppShellProps) {
   return (
     <>
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-5 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+          {/* shrink-0: the wordmark never gives way — the switcher beside
+              the email is the flexible one. */}
+          <div className="flex shrink-0 items-center gap-3">
             <Link href="/" aria-label={`${SITE.name} home`}>
               <Logo size={30} priority />
             </Link>
@@ -35,6 +55,9 @@ export function AppShell({ area, email, title, description, children }: AppShell
           </div>
 
           <div className="flex min-w-0 items-center gap-3">
+            {areas && areas.length > 1 && currentArea && (
+              <AreaSwitcher areas={areas} current={currentArea} />
+            )}
             {/*
              * The address doubles as the way into the account settings. It was
              * already the only thing on the page identifying who you are, and

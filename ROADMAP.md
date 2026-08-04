@@ -450,6 +450,31 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ One account, every console — the area switcher
+
+Asked for by the founder: invite themselves as a store and a vendor with
+the admin email, then swap between admin, store and vendor views from the
+header instead of juggling accounts.
+
+- **A dropdown in the shell header**, beside the email, listing every
+  console the account genuinely has: "Admin console" plus one entry per
+  store membership, labelled by kind ("Store · Grand Line Games",
+  "Vendor · SlabCity Singles"). Hidden entirely for the common one-console
+  account. Memberships, never impersonation — the founder becomes a store
+  the same way any owner does, by claiming an invite, so what they test is
+  exactly what a real operator gets
+- **Self-invites claim themselves.** An invite is normally claimed at the
+  next sign-in, but the admin is already signed in — so the admin layout
+  claims any pending invite for their address on render, and the switcher
+  picks the new membership up immediately
+- **`/store` learned two things**: an admin with memberships is no longer
+  bounced to `/admin`, and `?as=<storeId>` picks which of the account's
+  stores to show — validated against the RLS-filtered membership list, so
+  the parameter can never reach a store the account is not a member of
+- Driven in a real browser: the three options render, picking one
+  navigates, and the header survives 390px (the switcher shrinks; the
+  wordmark and sign-out never give way)
+
 ## ✅ Rooms close themselves (bug fix)
 
 Found by the founder: every test event was still "open" days after its
