@@ -17,6 +17,7 @@ import { listParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { findEventById, findStoreById } from "@/lib/events/repository";
 import { listRoomFlares } from "@/lib/lists/repository";
+import { counterAvailability } from "@/lib/singles/repository";
 import { eventStats } from "@/lib/trades/repository";
 import { STATUS_LABELS } from "@/lib/events/schema";
 
@@ -67,6 +68,11 @@ export default async function EventPage({
     listParticipants(event.id),
     listRoomFlares(event.id),
   ]);
+
+  const counterHas = await counterAvailability(
+    event.store_id,
+    flares.map((entry) => entry.cardId),
+  );
 
   const openPlayers = participants
     .filter((participant) => participant.openToTrades)
@@ -129,6 +135,8 @@ export default async function EventPage({
               matches={new Map()}
               offers={new Map()}
               openToTrades={openPlayers}
+              counterHas={counterHas}
+              counterName={store?.name}
             />
           ) : (
             <p className="text-sm text-text-muted">No Flares in this room yet.</p>

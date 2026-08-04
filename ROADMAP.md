@@ -450,6 +450,42 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Milestone 10 — the counter sells too (store singles sync)
+
+Asked for by the founder, from store feedback: stores worry CardFlare
+cannibalizes their singles case. Flipped: a store uploads its own TCGplayer
+Pro inventory export, and a Flare in its room quietly says the counter may
+have that card — every Flare becomes a potential store sale, including the
+ones no player can answer.
+
+- **The store's own file, never a scrape.** A seller's inventory export is
+  their data; no third-party fetch, no ToS question. The parser is built
+  against TCGplayer's documented export shape (RFC 4180, header aliases,
+  BOM, quoted names) and waits on a real pilot file to become fixtures —
+  same rule as the vendor CSV import we deferred until one existed
+- **Prices are dropped at the door.** The export carries price columns;
+  the parser's output shape has nowhere to put one and the tables have no
+  price column, so a price cannot be stored even by mistake
+- **One stat line, never a list.** The store sees "1,204 cards synced ·
+  updated 9:15 AM · 37 lines not recognised" plus a sample of what fell
+  out. Sold-out rows and other games are skipped on purpose, not counted
+  as failures. A re-upload replaces everything — the export is the truth
+- **"May have it", never "has it."** The board's line — "{Store} may have
+  this single — ask at the counter" — promises only what a day-old sync
+  can honestly promise, and appears on the player's room page and the
+  owner's/admin's event snapshot alike. Matching is by exact card number
+  against the catalog; no fuzzy guesses
+- `store_singles` aggregates per card (bounded by the catalog, not the
+  shelf) and was verified against a real PostgreSQL 16: quantity checks,
+  one-row-per-card, replace semantics, sync upsert, store/card cascades,
+  anon/authenticated lockout. 22 new unit tests across parser and action
+
+**Deliberately not built yet:** automated fetch on a schedule (the manual
+upload proves the value; a store-controlled feed URL or official TCGplayer
+API access can replace the ingestion later without touching the matching),
+and printing-level precision (the counter line answers "worth asking?",
+which card-level answers fully).
+
 ## ✅ Admin console — a dashboard, not a scroll
 
 Asked for by the founder: the console scrolled too long, the lists went "on

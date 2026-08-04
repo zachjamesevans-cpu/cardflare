@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { SyncSinglesForm } from "@/components/singles/sync-singles-form";
 import { VendorInventoryForm } from "@/components/shows/vendor-inventory-form";
 import { VendorInventoryList } from "@/components/shows/vendor-inventory-list";
 import { VendorShows } from "@/components/shows/vendor-shows";
@@ -21,6 +22,7 @@ import {
   listClaimableShows,
   listInventory,
 } from "@/lib/shows/repository";
+import { singlesSyncFor } from "@/lib/singles/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -119,6 +121,19 @@ export default async function StorePage() {
   const window = defaultEventWindow(timeZone);
   const counterQr = store ? await joinQrSvg(store.join_code) : null;
 
+  const sync = store ? await singlesSyncFor(store.id) : null;
+  const lastSync = sync
+    ? {
+        when: new Intl.DateTimeFormat("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone,
+        }).format(new Date(sync.synced_at)),
+        cardsMatched: sync.cards_matched,
+        linesUnmatched: sync.lines_unmatched,
+      }
+    : null;
+
   return (
     <AppShell
       area="Store"
@@ -140,6 +155,22 @@ export default async function StorePage() {
             qrSvg={counterQr}
             walkInEnabled={store.walk_in_enabled}
           />
+        </section>
+      )}
+
+      {store && (
+        <section className="flex flex-col gap-5" aria-labelledby="singles-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="singles-heading" className="text-xl font-bold text-text-primary">
+              Your singles
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Upload your TCGplayer inventory export, and when someone in your room
+              posts a Flare for a card you stock, their Flare says your counter may have
+              it. Your case sells to the exact person looking for it.
+            </p>
+          </div>
+          <SyncSinglesForm storeId={store.id} lastSync={lastSync} />
         </section>
       )}
 

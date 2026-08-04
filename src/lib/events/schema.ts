@@ -105,6 +105,7 @@ export interface PublicEvent {
   startsAt: string;
   /** Null while a walk-in room is still running. */
   endsAt: string | null;
+  storeId: string;
   storeName: string;
   storeCity: string | null;
   storeRegion: string | null;
