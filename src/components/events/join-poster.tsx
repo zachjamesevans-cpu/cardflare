@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import { Card } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
+import { CopyLink } from "./copy-link";
 import { PrintButton } from "./print-button";
 import { SITE } from "@/lib/site";
 import mark from "@public/brand/cardflare-mark.png";
@@ -258,8 +259,17 @@ export function JoinPoster({
             Download PDF
           </ButtonLink>
           <PrintButton />
+          <CopyLink url={url} />
           <p className="text-sm break-all text-text-muted">
-            Links to <span className="text-text-secondary">{url}</span>
+            Links to{" "}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener"
+              className="text-text-secondary underline underline-offset-4 hover:text-text-primary"
+            >
+              {url}
+            </a>
           </p>
         </div>
         <p className="text-xs text-text-muted">

@@ -473,6 +473,10 @@ zero-margin CSS fix below holds for desktop browsers; no CSS reaches iOS.
   PDF **decoded back to the join URL** with an independent reader. Ten new
   unit tests pin one-page-always (marathon names included) and the
   route's guards
+- Follow-up tweak: the "Links to …" line under each poster is a real
+  hyperlink now, with a "Copy link" button beside it that confirms with
+  "Copied". Driven in a browser: the anchor resolves, and the clipboard
+  read back the exact join URL
 
 ## ✅ Clean print: no browser header or footer on the poster
 
