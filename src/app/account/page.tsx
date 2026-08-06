@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { KeyRound, Mail } from "lucide-react";
+import { Flame, KeyRound, Mail } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signOut } from "@/lib/auth/actions";
 import { getViewer } from "@/lib/auth/session";
+import { removeWantAction } from "@/lib/players/account-actions";
+import { playerForUser } from "@/lib/players/accounts";
+import { listWants } from "@/lib/players/wants";
 
 export const metadata: Metadata = {
   title: "Your account",
@@ -33,6 +36,16 @@ export default async function AccountPage() {
   const home =
     viewer.kind === "admin" ? "/admin" : viewer.kind === "store" ? "/store" : null;
 
+  /*
+   * The player behind this account, whatever else it is — the founder is an
+   * admin with a player account, and both halves should work at once.
+   */
+  const playerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const wants = playerId ? await listWants(playerId) : null;
+
   return (
     <AppShell
       area="Account"
@@ -54,6 +67,66 @@ export default async function AccountPage() {
             change.
           </p>
         </Card>
+
+        {wants !== null && (
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <Flame
+                className="mt-0.5 size-5 shrink-0 text-accent"
+                aria-hidden="true"
+              />
+              <div className="flex flex-col gap-1">
+                <p className="font-semibold text-text-primary">Your saved wants</p>
+                <p className="text-sm text-text-secondary">
+                  Saved automatically when you post a Flare while signed in, cleared
+                  when a trade finds the card. Walk into any CardFlare room and it
+                  offers to post these again.
+                </p>
+              </div>
+            </div>
+
+            {wants.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                Nothing yet. Post a Flare at your next event and it will be waiting
+                here.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {wants.map((want) => (
+                  <li
+                    key={want.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex min-w-0 flex-1 basis-48 flex-col">
+                      <span className="truncate font-semibold text-text-primary">
+                        {want.cardName}
+                        {want.quantity > 1 && (
+                          <span className="font-normal text-text-muted tabular-nums">
+                            {" "}
+                            ×{want.quantity}
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-mono text-xs text-text-muted">
+                        {want.cardNumber}
+                        <span className="font-sans">
+                          {" "}
+                          · {want.printingLabel ?? "Any printing"}
+                        </span>
+                      </span>
+                    </div>
+                    <form action={removeWantAction}>
+                      <input type="hidden" name="wantId" value={want.id} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Remove
+                      </Button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
 
         <Card className="flex flex-col gap-4">
           <div className="flex items-start gap-3">

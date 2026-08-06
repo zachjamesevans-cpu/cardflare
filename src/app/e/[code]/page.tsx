@@ -30,6 +30,10 @@ import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
+import { getViewer } from "@/lib/auth/session";
+import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { listWants } from "@/lib/players/wants";
+import { RepostWants } from "@/components/players/repost-wants";
 import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
@@ -230,6 +234,41 @@ export default async function JoinByCodePage({
     : new Set<string>();
 
   /*
+   * The optional account, resolved without ever being required: a guest
+   * has viewer "anonymous" and everything below stays exactly as it was.
+   * A signed-in player gets their session claimed by their account and an
+   * offer to re-post whatever they are still hunting from last time.
+   */
+  const viewer = await getViewer();
+  const accountPlayerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+
+  if (inRoom && session && accountPlayerId && session.player_id === null) {
+    await linkSessionToPlayer(session.id, accountPlayerId);
+  }
+
+  const savedWants = inRoom && accountPlayerId ? await listWants(accountPlayerId) : [];
+
+  /* Outstanding = saved but not already an open Flare of theirs here. */
+  const postedAsks = new Set(
+    flares
+      .filter((entry) => entry.playerSessionId === session?.id)
+      .map((entry) => `${entry.cardId}:${entry.printingId ?? ""}`),
+  );
+  const outstandingWants = savedWants
+    .filter((want) => !postedAsks.has(`${want.cardId}:${want.printingId ?? ""}`))
+    .map((want) => ({
+      id: want.id,
+      label: want.printingLabel
+        ? `${want.cardName} (${want.printingLabel})`
+        : want.cardName,
+    }));
+
+  /*
    * The matching engine, such as it is: derived from the binder that was just
    * read rather than queried again, because the cross-reference *is* the
    * binder. Computed for this viewer only — the room learns somebody can help
@@ -339,6 +378,10 @@ export default async function JoinByCodePage({
           {/* Offers land while people wander; the room re-reads itself. */}
           <RoomTicker />
 
+          {outstandingWants.length > 0 && (
+            <RepostWants code={normalized} wants={outstandingWants} />
+          )}
+
           <Card className="flex items-center gap-3">
             <PlayerAvatar displayName={session.display_name} seed={session.id} />
             <div className="flex min-w-0 flex-col">
@@ -418,6 +461,25 @@ export default async function JoinByCodePage({
             code={normalized}
             timeZone={event.storeTimeZone}
           />
+
+          {/*
+           * The quietest possible mention of accounts, and only to guests.
+           * No sign-up funnel — accounts are invite-only — and nothing about
+           * the room changes without one. Want a quick trade? You already
+           * have everything you need.
+           */}
+          {!accountPlayerId && (
+            <p className="text-center text-xs text-text-muted">
+              Have a CardFlare account?{" "}
+              <Link
+                href={`/login?next=/e/${normalized}`}
+                className="text-text-secondary underline underline-offset-4 hover:text-text-primary"
+              >
+                Sign in
+              </Link>{" "}
+              and the cards you post here will follow you to other stores.
+            </p>
+          )}
         </>
       ) : (
         <Card>
