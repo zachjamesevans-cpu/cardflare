@@ -17,7 +17,11 @@
  * Built against the documented shape of TCGplayer's inventory export
  * (Product Line / Set Name / Product Name / Number / Total Quantity plus
  * price columns). The header mapping is alias-based so the day a real
- * pilot store's file shows a variant header, the fix is one alias.
+ * pilot store's file shows a variant header, the fix is one alias — and
+ * that is exactly how Collectr's collection export joined: same parser,
+ * one "category" alias for the game column. Collectr's price columns
+ * (including "Market Price (As of …)", whose header changes daily) are
+ * never even looked up, because columns are found by name, not position.
  */
 
 /** Reject anything bigger before reading it; no inventory file is this big. */
@@ -130,7 +134,7 @@ const HEADERS = {
   number: ["number", "card number", "no."],
   name: ["product name", "name", "card name"],
   quantity: ["total quantity", "quantity", "qty"],
-  productLine: ["product line", "game"],
+  productLine: ["product line", "game", "category"],
 } as const;
 
 function findColumn(header: string[], aliases: readonly string[]): number {

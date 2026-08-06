@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, KeyRound, Mail } from "lucide-react";
+import { Flame, KeyRound, Library, Mail } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signOut } from "@/lib/auth/actions";
 import { getViewer } from "@/lib/auth/session";
 import { removeWantAction } from "@/lib/players/account-actions";
 import { playerForUser } from "@/lib/players/accounts";
+import { collectionSyncFor } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 
 export const metadata: Metadata = {
@@ -45,6 +47,17 @@ export default async function AccountPage() {
       ? viewer.playerId
       : ((await playerForUser(viewer.user.id))?.id ?? null);
   const wants = playerId ? await listWants(playerId) : null;
+
+  const sync = playerId ? await collectionSyncFor(playerId) : null;
+  const lastSync = sync
+    ? {
+        when: new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+          new Date(sync.synced_at),
+        ),
+        cardsMatched: sync.cards_matched,
+        linesUnmatched: sync.lines_unmatched,
+      }
+    : null;
 
   return (
     <AppShell
@@ -125,6 +138,27 @@ export default async function AccountPage() {
                 ))}
               </ul>
             )}
+          </Card>
+        )}
+
+        {playerId && (
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <Library
+                className="mt-0.5 size-5 shrink-0 text-accent"
+                aria-hidden="true"
+              />
+              <div className="flex flex-col gap-1">
+                <p className="font-semibold text-text-primary">Your collection</p>
+                <p className="text-sm text-text-secondary">
+                  Import your Collectr export and rooms will quietly flag the Flares you
+                  could answer. Nobody else ever sees it — your name appears only when
+                  you choose to offer.
+                </p>
+              </div>
+            </div>
+
+            <SyncCollectionForm lastSync={lastSync} />
           </Card>
         )}
 

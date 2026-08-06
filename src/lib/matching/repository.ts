@@ -1,6 +1,7 @@
 import "server-only";
 
 import { PRESENCE_WINDOW_MS } from "@/lib/events/participants";
+import { sessionCollectionHolds } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { MAX_OFFERS, type Offer } from "./schema";
 
@@ -25,7 +26,8 @@ export type OfferOutcome =
  * - The Flare must be open and in the room the caller proved they are in —
  *   an id harvested from another room's board does nothing.
  * - Not your own Flare.
- * - You must hold the card in your binder, in any printing. The offer button
+ * - You must hold the card — in tonight's binder, or in the imported
+ *   collection of the account this session belongs to. The offer button
  *   only renders on a match, but a Server Action is a public POST endpoint,
  *   and this check is what stops it being a way to put your name on every
  *   Flare in the room without carrying a single card.
@@ -74,7 +76,17 @@ export async function offerTrade(
     return { ok: false, reason: "unavailable" };
   }
 
-  if (!held || held.length === 0) return { ok: false, reason: "not-held" };
+  /*
+   * The binder is tonight's claim; an imported collection is the same claim
+   * made once at import. Checked second because most offers come off the
+   * binder and guests have no collection to ask about.
+   */
+  if (
+    (!held || held.length === 0) &&
+    !(await sessionCollectionHolds(responderSessionId, flare.card_id))
+  ) {
+    return { ok: false, reason: "not-held" };
+  }
 
   const capped = await atOfferCap(responderSessionId, eventId);
   if (capped === "unknown") return { ok: false, reason: "unavailable" };

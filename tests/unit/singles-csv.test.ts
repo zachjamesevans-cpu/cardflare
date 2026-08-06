@@ -164,6 +164,108 @@ describe("parseSinglesExport", () => {
   });
 });
 
+/*
+ * Collectr's collection export, fixtures cut verbatim from the first real
+ * pilot file (August 2026). Same parser: the game column answers to
+ * "Category", the card number and quantity columns already matched, and
+ * the three price columns — including a market-price header that embeds
+ * the export date — are never looked up at all.
+ */
+describe("parseSinglesExport with a Collectr export", () => {
+  const COLLECTR_HEADER =
+    "Portfolio Name,Category,Set,Product Name,Card Number,Rarity,Variance,Grade," +
+    "Card Condition,Average Cost Paid,Quantity,Market Price (As of 2026-08-06)," +
+    "Price Override,Watchlist,Date Added,Notes";
+
+  function collectr(...rows: string[]): string {
+    return [COLLECTR_HEADER, ...rows].join("\n");
+  }
+
+  it("reads real rows, dropping every price on the floor", () => {
+    const parsed = parseSinglesExport(
+      collectr(
+        "One Piece,One Piece,500 Years in the Future,Boa Hancock (051) (Parallel),OP07-051,SR,Foil,Ungraded,Near Mint,0,1,48.72,0,false,2026-07-20,",
+        "One Piece,One Piece,Carrying On His Will,Shanks (028) (Alternate Art),OP13-028,SR,Foil,Ungraded,Near Mint,0,2,15.1,0,false,2026-07-04,",
+      ),
+    );
+
+    expect(parsed).toMatchObject({ ok: true, linesSeen: 2 });
+    if (parsed.ok) {
+      expect(parsed.lines).toEqual([
+        {
+          line: 2,
+          compactNumber: "OP07051",
+          name: "Boa Hancock (051) (Parallel)",
+          quantity: 1,
+        },
+        {
+          line: 3,
+          compactNumber: "OP13028",
+          name: "Shanks (028) (Alternate Art)",
+          quantity: 2,
+        },
+      ]);
+      for (const entry of parsed.lines) {
+        expect(Object.keys(entry).sort()).toEqual([
+          "compactNumber",
+          "line",
+          "name",
+          "quantity",
+        ]);
+      }
+    }
+  });
+
+  it("keeps a product name with escaped quotes intact", () => {
+    const parsed = parseSinglesExport(
+      collectr(
+        'One Piece,One Piece,One Piece Promotion Cards,"Eustass""Captain""Kid (Premium Card Collection -Leader Collection-)",ST02-001,L,Foil,Ungraded,Near Mint,0.0000,1,23.96,0,false,2026-04-11,',
+      ),
+    );
+
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      expect(parsed.lines[0]?.name).toBe(
+        'Eustass"Captain"Kid (Premium Card Collection -Leader Collection-)',
+      );
+    }
+  });
+
+  it("filters other games through the Category column", () => {
+    const parsed = parseSinglesExport(
+      collectr(
+        "Binder,Pokemon,Base Set,Charizard,4/102,Rare Holo,Holo,Ungraded,Near Mint,0,1,300.00,0,false,2026-01-01,",
+        "One Piece,One Piece,Paramount War,Nami (Alternate Art),OP02-036,SR,Foil,Ungraded,Near Mint,0,1,89.33,0,false,2026-07-20,",
+      ),
+    );
+
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      expect(parsed.lines).toHaveLength(1);
+      expect(parsed.lines[0]?.compactNumber).toBe("OP02036");
+      expect(parsed.skipped).toEqual([
+        { line: 2, reason: "other-game", label: "Charizard" },
+      ]);
+    }
+  });
+
+  it("sums the same number across printings — a graded copy still counts", () => {
+    const parsed = parseSinglesExport(
+      collectr(
+        "One Piece,One Piece,Awakening of the New Era,Monkey.D.Luffy (012) (Alternate Art),ST01-012,SR,Foil,PSA 10.0 GEM - MT,Near Mint,220.0000,1,267.57,0,false,2026-05-28,",
+        "One Piece,One Piece,Carrying on His Will: 3rd Anniversary Tournament Cards,Monkey.D.Luffy - ST01-012 (3rd Anniversary Tournament 3 Brothers Pack),ST01-012,SR,Normal,Ungraded,Near Mint,0,1,33.02,0,false,2026-06-12,",
+      ),
+    );
+
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      const totals = aggregateByNumber(parsed.lines);
+      expect(totals.get("ST01012")).toBe(2);
+      expect(totals.size).toBe(1);
+    }
+  });
+});
+
 describe("compactNumber and aggregation", () => {
   it("compacts the way the catalog indexes", () => {
     for (const raw of ["OP01-016", "op01 016", "op01016", " OP01-016 "]) {

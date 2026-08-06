@@ -132,10 +132,38 @@ describe("offerTrade", () => {
 
   /*
    * The rule that keeps offers meaning something: your name only goes on a
-   * Flare when your binder says you carry the card.
+   * Flare when your binder — or your account's imported collection — says
+   * you carry the card.
    */
-  it("refuses a holder whose binder lacks the card", async () => {
+  it("refuses a guest whose binder lacks the card", async () => {
     queue("player_cards", { data: [], error: null });
+    // A guest session: no linked account, so no collection to fall back on.
+    queue("player_sessions", { data: { player_id: null }, error: null });
+
+    await expect(offer()).resolves.toEqual({ ok: false, reason: "not-held" });
+    expect(calls.flare_responses?.upsert).toBeUndefined();
+  });
+
+  it("accepts a holder whose imported collection carries the card", async () => {
+    queue("player_cards", { data: [], error: null });
+    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
+    queue("player_collection", { data: [{ id: "col-1" }], error: null });
+    queue("flare_responses", { data: [], error: null }); // cap count
+    queue("flare_responses", { error: null }); // upsert
+
+    await expect(offer()).resolves.toEqual({ ok: true });
+
+    // The collection was asked about this player and this card, exactly.
+    expect(calls.player_collection.eq).toEqual([
+      ["player_id", "player-1"],
+      ["card_id", "card-1"],
+    ]);
+  });
+
+  it("refuses an account holder whose collection also lacks the card", async () => {
+    queue("player_cards", { data: [], error: null });
+    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
+    queue("player_collection", { data: [], error: null });
 
     await expect(offer()).resolves.toEqual({ ok: false, reason: "not-held" });
     expect(calls.flare_responses?.upsert).toBeUndefined();
