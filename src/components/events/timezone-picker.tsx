@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/controls";
 import { Field, fieldIds } from "@/components/ui/field";
 import { setStoreTimeZoneAction } from "@/lib/events/actions";
-import { knownTimeZones, zoneAbbreviation } from "@/lib/time/zone";
+import { timeZoneChoices } from "@/lib/time/zone-choices";
+import { zoneAbbreviation } from "@/lib/time/zone";
 
 /**
  * Where the store is, which is the only way an event time means anything.
@@ -15,9 +16,10 @@ import { knownTimeZones, zoneAbbreviation } from "@/lib/time/zone";
  * existing store until it says where it is.
  *
  * A Server Component: one form posting to a Server Action, no client
- * JavaScript. The whole IANA list is rendered as a plain `<select>`, which a
- * phone turns into a native scroll wheel with type-ahead — better than any
- * combobox that could be built here, and it works before hydration.
+ * JavaScript. A short, grouped `<select>` rather than the whole IANA list —
+ * four hundred gazetteer names confused the pilot stores, and "Central Time
+ * (Chicago)" is what an owner actually says. The stored value stays a real
+ * IANA name, and a zone outside the short list survives as its own option.
  */
 export function TimeZonePicker({
   storeId,
@@ -28,7 +30,7 @@ export function TimeZonePicker({
 }) {
   // Passing the current zone guarantees it is in the list, so opening the
   // form can never silently reselect something else.
-  const zones = knownTimeZones(timeZone);
+  const groups = timeZoneChoices(timeZone);
   const now = new Date();
 
   // Unset stores sit on UTC, and it is worth naming that rather than letting
@@ -54,10 +56,16 @@ export function TimeZonePicker({
 
         <Field name="timezone" label="Timezone">
           <Select {...fieldIds("timezone")} name="timezone" defaultValue={timeZone}>
-            {zones.map((zone) => (
-              <option key={zone} value={zone}>
-                {zone.replace(/_/g, " ")}
-              </option>
+            {/* The unset default stays selectable, named for what it is. */}
+            <option value="UTC">UTC — no timezone set</option>
+            {groups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.choices.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </Select>
         </Field>

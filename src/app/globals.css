@@ -96,6 +96,28 @@
     scroll-margin-top: 5.5rem;
   }
 
+  /*
+   * iOS WebKit gives date and time inputs an intrinsic layout that ignores
+   * the width every other control obeys, so they jutted past their card on
+   * a phone. Stripping the native appearance makes them honour the shared
+   * control styling; the native wheel picker is untouched — appearance
+   * governs the closed control, not what tapping it opens.
+   */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    /* py-3 padding + one line of text-base, so it matches TextInput. */
+    min-height: 3.125rem;
+  }
+
+  /* iOS centres the value inside these inputs; every other field is left. */
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
   ::selection {
     background-color: --alpha(var(--color-accent) / 30%);
   }
