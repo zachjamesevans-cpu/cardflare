@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
+import { claimPendingPlayerInvite, playerForUser } from "@/lib/players/accounts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -15,6 +16,8 @@ export type Viewer =
    */
   | { kind: "admin"; user: User; storeIds: string[] }
   | { kind: "store"; user: User; storeIds: string[] }
+  /** A signed-in player: someone whose wants follow them between stores. */
+  | { kind: "player"; user: User; playerId: string; playerName: string }
   | { kind: "unaffiliated"; user: User };
 
 /**
@@ -56,6 +59,16 @@ export async function getViewer(): Promise<Viewer> {
     return { kind: "store", user, storeIds };
   }
 
+  const player = await playerForUser(user.id);
+  if (player) {
+    return {
+      kind: "player",
+      user,
+      playerId: player.id,
+      playerName: player.display_name,
+    };
+  }
+
   return { kind: "unaffiliated", user };
 }
 
@@ -94,6 +107,9 @@ export async function requireAdmin(): Promise<User> {
 export async function claimPendingInvite(user: User): Promise<void> {
   const email = user.email?.trim().toLowerCase();
   if (!email) return;
+
+  // Player invitations claim through the same doorways as store ones.
+  await claimPendingPlayerInvite(user);
 
   const admin = getSupabaseAdmin();
 

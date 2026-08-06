@@ -6,6 +6,7 @@ import { resolveCode } from "@/lib/events/rooms";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
+import { saveWant } from "@/lib/players/wants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import {
@@ -52,9 +53,11 @@ async function overRate(): Promise<boolean> {
  * Returns the event and session together so no caller can act on one without
  * having checked the other.
  */
-async function requirePlayerInRoom(
-  code: string,
-): Promise<{ eventId: string; playerSessionId: string } | null> {
+async function requirePlayerInRoom(code: string): Promise<{
+  eventId: string;
+  playerSessionId: string;
+  playerId: string | null;
+} | null> {
   const session = await getPlayerSession();
   if (!session) return null;
 
@@ -70,7 +73,11 @@ async function requirePlayerInRoom(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return null;
 
-  return { eventId: resolved.room.id, playerSessionId: session.id };
+  return {
+    eventId: resolved.room.id,
+    playerSessionId: session.id,
+    playerId: session.player_id,
+  };
 }
 
 export async function addToListAction(
@@ -120,6 +127,15 @@ export async function addToListAction(
     kind.data === "flare"
       ? await addFlare(room.eventId, room.playerSessionId, parsed.data)
       : await addToBinder(room.playerSessionId, parsed.data);
+
+  /*
+   * The quiet half of accounts: a signed-in player's Flare is also saved
+   * as a want, so it follows them to the next store. Best-effort — the
+   * Flare already posted, and a bookkeeping miss must not undo that.
+   */
+  if (result.ok && kind.data === "flare" && room.playerId) {
+    await saveWant(room.playerId, parsed.data);
+  }
 
   if (!result.ok) {
     return {

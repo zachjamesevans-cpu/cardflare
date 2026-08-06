@@ -54,7 +54,7 @@ export function storeInviteEmail(
    */
   setupLink?: string | null,
   /** Changes one paragraph: what the recipient is being invited to *do*. */
-  kind: "lgs" | "vendor" = "lgs",
+  kind: "lgs" | "vendor" | "player" = "lgs",
 ): EmailMessage {
   const name = escapeHtml(storeName);
   const signInUrl = `${origin}/login`;
@@ -104,7 +104,9 @@ export function storeInviteEmail(
         ${
           kind === "vendor"
             ? "CardFlare helps card-show attendees find the exact cards they want — and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
-            : "CardFlare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
+            : kind === "player"
+              ? "A CardFlare account makes your wants follow you: post a card once, and every CardFlare room you walk into offers to post it again until you find it. No account is ever needed just to trade — this one is for keeping your hunt across stores."
+              : "CardFlare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
         }
       </p>
 
@@ -154,16 +156,23 @@ export function storeInviteEmail(
       ];
 
   const intro =
-    kind === "vendor"
+    kind === "player"
       ? [
-          "CardFlare helps card-show attendees find the exact cards they want -",
-          "and walks them straight to your booth. Upload your inventory before",
-          "the show, singles and slabs alike.",
+          "A CardFlare account makes your wants follow you: post a card once, and",
+          "every CardFlare room you walk into offers to post it again until you",
+          "find it. No account is needed just to trade - this one keeps your hunt",
+          "across stores.",
         ]
-      : [
-          "CardFlare helps players at your events find the cards they need from other",
-          "people already in the room. You're one of the first stores trying it.",
-        ];
+      : kind === "vendor"
+        ? [
+            "CardFlare helps card-show attendees find the exact cards they want -",
+            "and walks them straight to your booth. Upload your inventory before",
+            "the show, singles and slabs alike.",
+          ]
+        : [
+            "CardFlare helps players at your events find the cards they need from other",
+            "people already in the room. You're one of the first stores trying it.",
+          ];
 
   const text = [
     `${storeName} is in the CardFlare beta.`,
@@ -184,4 +193,14 @@ export function storeInviteEmail(
     html,
     text,
   };
+}
+
+/** The player flavour, named for what it is at the call site. */
+export function playerInviteEmail(
+  displayName: string,
+  to: string,
+  origin: string,
+  setupLink?: string | null,
+): EmailMessage {
+  return storeInviteEmail(displayName, to, origin, setupLink, "player");
 }

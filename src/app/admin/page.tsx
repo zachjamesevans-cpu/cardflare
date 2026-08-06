@@ -6,6 +6,7 @@ import {
   Radio,
   Store as StoreIcon,
   Tent,
+  UserRound,
   Users,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ import { countParticipants } from "@/lib/events/participants";
 import { listAllEvents } from "@/lib/events/repository";
 import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
+import { listPlayersForAdmin } from "@/lib/players/accounts";
 import { listClaimableShows, listShows } from "@/lib/shows/repository";
 import { listStores } from "@/lib/stores/repository";
 
@@ -106,6 +108,9 @@ export default async function AdminPage() {
     0,
   );
 
+  const { players: playerAccounts } = await listPlayersForAdmin();
+  const playerCount = playerAccounts.length;
+
   const gameStores = stores.filter((store) => store.kind === "lgs").length;
   const vendors = stores.length - gameStores;
   const upcomingShows = runningShows.length;
@@ -142,7 +147,7 @@ export default async function AdminPage() {
           Manage
         </h2>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AreaLink
             href="/admin/stores"
             icon={StoreIcon}
@@ -163,6 +168,13 @@ export default async function AdminPage() {
             label="Card shows"
             value={shows.length}
             detail={`${upcomingShows} upcoming or running`}
+          />
+          <AreaLink
+            href="/admin/players"
+            icon={UserRound}
+            label="Players"
+            value={playerCount}
+            detail="Invite-only accounts"
           />
         </div>
       </section>

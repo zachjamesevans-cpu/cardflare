@@ -450,6 +450,49 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Milestone 11 — player accounts (invite-only), wants that follow you
+
+Asked for by the founder after the first real test night: players wanted to
+sign in so their wants survive the room closing, and to be offered "post
+these Flares again?" at the next store. With one boundary set explicitly:
+**accounts must never take over the flash-event flow.** Want a quick trade?
+No need to make an account. Want your cards to follow you between stores?
+Make one.
+
+- **Guests stay the front door.** Scanning a QR and trading with nothing
+  but a nickname works exactly as before — no sign-in wall, no "create an
+  account" step anywhere in the join path. The only mention a guest sees
+  is one quiet footer line on the room page ("have an account? Sign in —
+  the cards you post here will follow you to other stores")
+- **Accounts are a layer, not a replacement.** `players` links an auth
+  user to a display name; `player_sessions.player_id` (nullable, on
+  delete set null) attaches a guest session to an account when its owner
+  is signed in — the session stays the unit of room participation, so
+  room history, Flares and trades are untouched by accounts existing
+- **Nobody manages a want list.** Posting a Flare while signed in saves
+  the ask; confirming a trade on it clears it; walking into the next room
+  offers to post what is still outstanding, one tap for the lot. The
+  account page lists saved wants only for pruning (capped at 100; at the
+  cap the Flare still posts and the bookkeeping silently skips)
+- **Invite-only, admin-only.** `/admin/players` invites a player by name
+  and email, reusing the operator invite machinery (same setup-link
+  fallback while email sending is unconfigured); the console's Manage row
+  gains a Players tile. Sign-in claims store and player invites alike, so
+  one email can be an owner, a vendor and a player at once
+- Schema (`players`, `player_invites`, `player_wants`,
+  `player_collection` + sync record for Milestone 12, the session link
+  column) verified against a real PostgreSQL 16: constraint bounds,
+  cascade and set-null behaviour, the nulls-not-distinct want upsert,
+  anon/authenticated lockout. Ten new unit tests guard the actions: the
+  invite is admin-only, a re-post re-derives room membership from
+  scratch, a want is removable only through its own player
+
+**Deliberately not built yet:** the Collectr collection upload
+(Milestone 12 — the tables and sync record already exist; the parser
+waits on a real Collectr export file, same discipline as the TCGplayer
+CSV), self-serve signup, and any account requirement anywhere in the
+guest path.
+
 ## ✅ The poster is a PDF now (phones ruined printing)
 
 Found by the founder printing from an iPhone: iOS Safari stamps its own

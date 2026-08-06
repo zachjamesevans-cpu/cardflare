@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { text } from "@/lib/form-value";
+import { getViewer } from "@/lib/auth/session";
+import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   createPlayerSession,
@@ -160,6 +162,23 @@ export async function joinEventAction(
     // than leaving an orphaned session and a cookie pointing at nothing.
     if (freshToken) await deletePlayerSession(session.id);
     return invalid(GENERIC_ERROR, submitted);
+  }
+
+  /*
+   * If a signed-in account is present, the session becomes theirs — that is
+   * the whole difference an account makes at the door. Guests join exactly
+   * as before; nothing above this line knows accounts exist.
+   */
+  if (session.player_id === null) {
+    const viewer = await getViewer();
+    const playerId =
+      viewer.kind === "player"
+        ? viewer.playerId
+        : viewer.kind === "anonymous"
+          ? null
+          : ((await playerForUser(viewer.user.id))?.id ?? null);
+
+    if (playerId) await linkSessionToPlayer(session.id, playerId);
   }
 
   if (freshToken) await setPlayerCookie(freshToken);

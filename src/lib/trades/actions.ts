@@ -10,6 +10,7 @@ import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
+import { clearWantForFlare } from "@/lib/players/wants";
 import { confirmTrade } from "./repository";
 
 /**
@@ -63,6 +64,9 @@ export async function confirmTradeAction(formData: FormData): Promise<void> {
   if (!outcome.ok) {
     // The re-render shows the truthful state; the reason is for the logs.
     console.error(`Trade confirm refused: ${outcome.reason}`);
+  } else {
+    // A found card leaves the requester's saved wants by itself.
+    await clearWantForFlare(flareId);
   }
 
   revalidatePath(`/e/${code}`);

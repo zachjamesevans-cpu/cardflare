@@ -498,15 +498,90 @@ export type PlayerSessionRow = {
   display_name: string;
   /** SHA-256 of the cookie token. The token itself is never stored. */
   token_hash: string;
+  /** The account this session belongs to; null for a guest. */
+  player_id: string | null;
+};
+
+export type PlayerRow = {
+  id: string;
+  created_at: string;
+  user_id: string;
+  display_name: string;
+};
+
+export type PlayerInsert = Omit<PlayerRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type PlayerInviteRow = {
+  id: string;
+  created_at: string;
+  email: string;
+  display_name: string;
+  invited_by: string | null;
+  accepted_at: string | null;
+  accepted_by: string | null;
+};
+
+export type PlayerInviteInsert = Omit<
+  PlayerInviteRow,
+  "id" | "created_at" | "accepted_at" | "accepted_by"
+> & {
+  id?: string;
+  created_at?: string;
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+};
+
+export type PlayerWantRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  note: string | null;
+};
+
+export type PlayerWantInsert = Omit<PlayerWantRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type PlayerCollectionRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  card_id: string;
+  quantity: number;
+};
+
+export type PlayerCollectionInsert = Omit<PlayerCollectionRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type PlayerCollectionSyncRow = {
+  player_id: string;
+  synced_at: string;
+  lines_seen: number;
+  cards_matched: number;
+  lines_unmatched: number;
+};
+
+export type PlayerCollectionSyncInsert = Omit<PlayerCollectionSyncRow, "synced_at"> & {
+  synced_at?: string;
 };
 
 export type PlayerSessionInsert = Omit<
   PlayerSessionRow,
-  "id" | "created_at" | "last_seen_at"
+  "id" | "created_at" | "last_seen_at" | "player_id"
 > & {
   id?: string;
   created_at?: string;
   last_seen_at?: string;
+  player_id?: string | null;
 };
 
 export type AdminUserRow = {
@@ -541,6 +616,14 @@ export type Database = {
       vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;
       store_singles: Table<StoreSingleRow, StoreSingleInsert>;
       store_singles_syncs: Table<StoreSinglesSyncRow, StoreSinglesSyncInsert>;
+      players: Table<PlayerRow, PlayerInsert>;
+      player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
+      player_wants: Table<PlayerWantRow, PlayerWantInsert>;
+      player_collection: Table<PlayerCollectionRow, PlayerCollectionInsert>;
+      player_collection_syncs: Table<
+        PlayerCollectionSyncRow,
+        PlayerCollectionSyncInsert
+      >;
       player_cards: Table<PlayerCardRow, PlayerCardInsert>;
       cards: Table<CardRow, CardInsert>;
       card_printings: Table<CardPrintingRow, CardPrintingInsert>;
