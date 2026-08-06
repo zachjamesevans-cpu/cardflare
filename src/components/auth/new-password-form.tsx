@@ -37,12 +37,15 @@ export function NewPasswordForm({
   savedTitle = "Password saved",
   savedBody,
   continueLabel = "Go to your store",
+  continueHref = "/store",
 }: {
   signedInAs: string;
   submitLabel?: string;
   savedTitle?: string;
   savedBody?: string;
   continueLabel?: string;
+  /** Where "continue" goes — a store's dashboard or a player's account. */
+  continueHref?: string;
 }) {
   const [state, formAction] = useActionState(updatePassword, NEW_PASSWORD_IDLE);
 
@@ -63,7 +66,7 @@ export function NewPasswordForm({
             `You can sign in with ${signedInAs} and this password from now on.`}
         </p>
         <Link
-          href="/store"
+          href={continueHref}
           className="text-sm text-accent underline underline-offset-4"
         >
           {continueLabel}
