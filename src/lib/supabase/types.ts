@@ -554,6 +554,8 @@ export type PlayerCollectionRow = {
   created_at: string;
   player_id: string;
   card_id: string;
+  /** Null when the import could not prove which printing the copies are. */
+  printing_id: string | null;
   quantity: number;
 };
 

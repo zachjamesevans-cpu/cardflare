@@ -278,10 +278,12 @@ export default async function JoinByCodePage({
   const held = heldByCard(binder);
 
   /*
-   * The imported collection joins the cross-reference the quiet way: card
-   * ids only, checked against the board rather than loaded whole, and
-   * printing-unknown — a key with no proven printings, which `matchFor`
-   * honestly downgrades when a Flare names a specific printing.
+   * The imported collection joins the cross-reference the quiet way:
+   * checked against the board rather than loaded whole. A card arrives
+   * with exactly the printings the import proved from the file's own
+   * names — a proven alternate art matches a Flare for that alt art
+   * exactly; an unproven one stays a key with no printings, which
+   * `matchFor` honestly downgrades when a Flare names one.
    */
   const [collectionHas, collectionSync] = accountPlayerId
     ? await Promise.all([
@@ -291,10 +293,12 @@ export default async function JoinByCodePage({
         ),
         collectionSyncFor(accountPlayerId),
       ])
-    : [new Set<string>(), null];
+    : [new Map<string, Set<string>>(), null];
 
-  for (const cardId of collectionHas) {
-    if (!held.has(cardId)) held.set(cardId, new Set());
+  for (const [cardId, printings] of collectionHas) {
+    const proven = held.get(cardId) ?? new Set<string>();
+    for (const printingId of printings) proven.add(printingId);
+    held.set(cardId, proven);
   }
 
   const matches = new Map(

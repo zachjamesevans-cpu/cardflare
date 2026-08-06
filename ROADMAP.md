@@ -450,6 +450,34 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ The collection learns printings (pilot bug)
+
+Found on the first live test of the Collectr import: an alt-art Perona in
+the file, a Flare for exactly that alt art on the board — and the room
+said "you have another printing of this", because the import kept only
+card numbers and the matcher refused to claim a printing it could not
+prove.
+
+- **Names are the proof.** Collectr's product name and the catalog
+  provider's own printing name both come off the printed card; when they
+  agree — "Perona (Alternate Art)" on both sides, case, spacing and
+  punctuation conventions aside — the import pins the row to that
+  printing, and a Flare naming it now matches **exact**. Nothing is
+  inferred from suffixes: no name agreement, no pin, and the row stays
+  printing-unknown with the same honest downgrade as before. Two catalog
+  printings answering to one name is ambiguity and also stays unpinned
+- `player_collection` gains a nullable `printing_id`; one row per
+  (player, card, printing) with nulls not distinct, so a proven alt art,
+  a proven base and an unproven remainder of the same card coexist.
+  Probed on real PostgreSQL 16 (three-row coexistence, duplicate
+  refusal both ways, printing-delete cascades only its rows, API roles
+  hold nothing). Existing rows survive as printing-unknown — a
+  re-upload resolves them
+- Room matching consumes the proven printings directly; the offer path
+  and the one-line room note are unchanged. Nine new unit tests pin the
+  equality rule (with names from the real pilot file) and the
+  per-printing aggregation
+
 ## ✅ Milestone 12 — the Collectr collection, imported and invisible
 
 Asked for by the founder after the first test night, built the day the
