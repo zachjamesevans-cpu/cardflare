@@ -7,7 +7,7 @@ import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { defaultEventWindow, formatEventWindow } from "@/lib/events/format";
 import { listShows } from "@/lib/shows/repository";
-import { knownTimeZones } from "@/lib/time/zone";
+import { timeZoneChoices } from "@/lib/time/zone-choices";
 
 export const metadata: Metadata = {
   title: "Card shows",
@@ -50,7 +50,7 @@ export default async function AdminShowsPage() {
 
         <Card>
           <CreateShowForm
-            zones={knownTimeZones("UTC")}
+            zoneGroups={timeZoneChoices("UTC")}
             defaultZone="UTC"
             defaultStartsAt={window.startsAt}
             defaultEndsAt={window.endsAt}

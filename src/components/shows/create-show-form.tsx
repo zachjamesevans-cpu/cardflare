@@ -9,14 +9,15 @@ import { Select, TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { createShowAction } from "@/lib/shows/actions";
 import { CREATE_SHOW_IDLE } from "@/lib/shows/schema";
+import type { ZoneGroup } from "@/lib/time/zone-choices";
 
 /**
  * Creating a card show.
  *
  * The one form where a timezone is typed alongside the times: a show belongs
- * to no store, so there is no store row to carry the zone. The zones list is
- * rendered server-side into props to keep `Intl.supportedValuesOf` off the
- * client bundle's critical path — same trick as the store's picker.
+ * to no store, so there is no store row to carry the zone. Same short,
+ * grouped list as the store's picker, passed in as props so the page stays
+ * the place that decides what the menu offers.
  */
 
 function SubmitButton() {
@@ -31,12 +32,12 @@ function SubmitButton() {
 }
 
 export function CreateShowForm({
-  zones,
+  zoneGroups,
   defaultZone,
   defaultStartsAt,
   defaultEndsAt,
 }: {
-  zones: string[];
+  zoneGroups: ZoneGroup[];
   defaultZone: string;
   defaultStartsAt: string;
   defaultEndsAt: string;
@@ -118,10 +119,15 @@ export function CreateShowForm({
               name="timezone"
               defaultValue={defaultZone}
             >
-              {zones.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone.replaceAll("_", " ")}
-                </option>
+              <option value="UTC">UTC — no timezone set</option>
+              {zoneGroups.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.choices.map((choice) => (
+                    <option key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </Select>
           </Field>
