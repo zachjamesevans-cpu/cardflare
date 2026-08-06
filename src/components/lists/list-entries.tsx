@@ -128,7 +128,19 @@ function Entry({
               <input type="hidden" name="code" value={code} />
               <input type="hidden" name="kind" value={kind} />
               <input type="hidden" name="entryId" value={entry.id} />
-              <Button type="submit" variant="ghost" size="sm">
+              {/*
+               * Negative margins swallow the ghost button's own padding so
+               * its label sits flush with the card's right edge (level with
+               * the "N cards" count above) and on the card name's first
+               * line. The touch target keeps its full size — only the box's
+               * position moves, not its dimensions.
+               */}
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                className="-mt-1.5 -mr-3.5"
+              >
                 Remove
               </Button>
             </form>
