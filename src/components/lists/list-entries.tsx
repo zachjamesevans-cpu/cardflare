@@ -60,81 +60,89 @@ function Entry({
   children?: React.ReactNode;
 }) {
   return (
-    <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
-      <CardImageZoom
-        imageUrl={entry.imageUrl}
-        exactName={entry.cardName}
-        cardNumber={entry.cardNumber}
-        enabled={imagesEnabled}
-        anyPrinting={!entry.printingId}
-        caption={entry.printingLabel ?? "Any printing"}
-      />
+    <li className="flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0">
+      <div className="flex items-start gap-3">
+        <CardImageZoom
+          imageUrl={entry.imageUrl}
+          exactName={entry.cardName}
+          cardNumber={entry.cardNumber}
+          enabled={imagesEnabled}
+          anyPrinting={!entry.printingId}
+          caption={entry.printingLabel ?? "Any printing"}
+        />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <p className="font-semibold text-text-primary">{entry.cardName}</p>
-          {entry.quantity > 1 && (
-            <span className="text-sm text-text-muted tabular-nums">
-              ×{entry.quantity}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <p className="font-semibold text-text-primary">{entry.cardName}</p>
+            {entry.quantity > 1 && (
+              <span className="text-sm text-text-muted tabular-nums">
+                ×{entry.quantity}
+              </span>
+            )}
+          </div>
+
+          <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
+            <span>{entry.cardNumber}</span>
+            {/* Said explicitly, because "any printing" is a real answer to a
+                question the other player is about to ask. */}
+            <span className="font-sans">{entry.printingLabel ?? "Any printing"}</span>
+          </p>
+
+          {entry.note && (
+            <p className="text-sm text-text-secondary italic">{entry.note}</p>
+          )}
+
+          {/*
+           * In the text column rather than the badge column on the right: the
+           * label is long, and a shrink-proof column wide enough for "You have
+           * another printing" crushes the card name into a sliver on a phone.
+           */}
+          {match === "exact" && (
+            <span className="mt-1">
+              <Badge>
+                <PackageCheck className="size-3.5" aria-hidden="true" />
+                You have this
+              </Badge>
             </span>
+          )}
+          {match === "other-printing" && (
+            <span className="mt-1">
+              <Badge>
+                <Layers className="size-3.5" aria-hidden="true" />
+                You have another printing
+              </Badge>
+            </span>
+          )}
+
+          {counterName && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
+              <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+              {counterName} may have this single — ask at the counter.
+            </p>
           )}
         </div>
 
-        <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
-          <span>{entry.cardNumber}</span>
-          {/* Said explicitly, because "any printing" is a real answer to a
-              question the other player is about to ask. */}
-          <span className="font-sans">{entry.printingLabel ?? "Any printing"}</span>
-        </p>
-
-        {entry.note && (
-          <p className="text-sm text-text-secondary italic">{entry.note}</p>
-        )}
-
-        {/*
-         * In the text column rather than the badge column on the right: the
-         * label is long, and a shrink-proof column wide enough for "You have
-         * another printing" crushes the card name into a sliver on a phone.
-         */}
-        {match === "exact" && (
-          <span className="mt-1">
-            <Badge>
-              <PackageCheck className="size-3.5" aria-hidden="true" />
-              You have this
-            </Badge>
-          </span>
-        )}
-        {match === "other-printing" && (
-          <span className="mt-1">
-            <Badge>
-              <Layers className="size-3.5" aria-hidden="true" />
-              You have another printing
-            </Badge>
-          </span>
-        )}
-
-        {counterName && (
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
-            <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-            {counterName} may have this single — ask at the counter.
-          </p>
-        )}
-
-        {children}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {removable && (
+            <form action={removeListEntryAction}>
+              <input type="hidden" name="code" value={code} />
+              <input type="hidden" name="kind" value={kind} />
+              <input type="hidden" name="entryId" value={entry.id} />
+              <Button type="submit" variant="ghost" size="sm">
+                Remove
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        {removable && (
-          <form action={removeListEntryAction}>
-            <input type="hidden" name="code" value={code} />
-            <input type="hidden" name="kind" value={kind} />
-            <input type="hidden" name="entryId" value={entry.id} />
-            <Button type="submit" variant="ghost" size="sm">
-              Remove
-            </Button>
-          </form>
-        )}
-      </div>
+      {/*
+       * Offers and their controls take the row's full width rather than the
+       * text column's: squeezed between the card image and the Remove
+       * button they went tall and skinny on a phone, which is exactly where
+       * "go find them" gets read.
+       */}
+      {children && <div className="flex flex-col">{children}</div>}
     </li>
   );
 }
