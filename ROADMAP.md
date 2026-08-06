@@ -450,6 +450,42 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Milestone 12 — the Collectr collection, imported and invisible
+
+Asked for by the founder after the first test night, built the day the
+first real Collectr export arrived (the same discipline as the TCGplayer
+parser: no file, no parser). A player imports their collection once, and
+rooms quietly flag the Flares they could answer — without the collection
+ever appearing anywhere as a list.
+
+- **Same parser, one alias.** Collectr's export turned out to be one
+  header alias away from the TCGplayer parser ("Category" for the game
+  column); card number, name and quantity already matched. The real
+  file's quirks are fixtures now: the escaped-quote product name, the
+  market-price header with the export date embedded in it, a PSA-graded
+  copy and an ungraded one of the same number summing into one card
+- **Prices dropped, again by construction.** The export carries three
+  price columns; the parser never looks any of them up and its output
+  shape has no field to carry one
+- **Invisible on purpose.** The room shows the collection's owner one
+  line under "What you brought" — "Your collection (77 cards) is along
+  too" — and shows everyone else nothing at all. A thousand imported
+  cards listed as "what you brought" would be exactly the redundancy the
+  founder ruled out. The account page shows a stat line, not a list
+- **It works by flagging Flares.** The board's cards are checked against
+  the viewer's collection (the narrow way round, so a big collection
+  costs a bounded query per render) and merge into the same match
+  engine as the binder — printing-unknown, so a Flare that names a
+  specific printing honestly downgrades to "other printing"
+- **Offers now honour it.** The server-side "you must hold the card"
+  check behind every offer accepts the imported collection as proof,
+  binder first, collection second — guests resolve to no account and
+  nothing changes for them
+- Re-upload replaces everything, same as the store sync. Eleven new
+  unit tests (parser fixtures from the real file, action guards, the
+  offer path's collection fallback); the tables shipped with Milestone
+  11's migration, so production needs no new SQL
+
 ## ✅ Milestone 11 — player accounts (invite-only), wants that follow you
 
 Asked for by the founder after the first real test night: players wanted to

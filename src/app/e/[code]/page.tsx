@@ -32,6 +32,7 @@ import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { collectionAvailability, collectionSyncFor } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
 import { needsConfirming } from "@/lib/lists/schema";
@@ -276,6 +277,26 @@ export default async function JoinByCodePage({
    */
   const held = heldByCard(binder);
 
+  /*
+   * The imported collection joins the cross-reference the quiet way: card
+   * ids only, checked against the board rather than loaded whole, and
+   * printing-unknown — a key with no proven printings, which `matchFor`
+   * honestly downgrades when a Flare names a specific printing.
+   */
+  const [collectionHas, collectionSync] = accountPlayerId
+    ? await Promise.all([
+        collectionAvailability(
+          accountPlayerId,
+          flares.map((entry) => entry.cardId),
+        ),
+        collectionSyncFor(accountPlayerId),
+      ])
+    : [new Set<string>(), null];
+
+  for (const cardId of collectionHas) {
+    if (!held.has(cardId)) held.set(cardId, new Set());
+  }
+
   const matches = new Map(
     flares.flatMap((entry) => {
       const match = matchFor(entry, held);
@@ -449,6 +470,20 @@ export default async function JoinByCodePage({
             </div>
 
             {staleBinder && <ConfirmBinder code={normalized} count={binder.length} />}
+
+            {/*
+             * The whole collection surface a room ever shows: one line, to
+             * its owner only. A thousand imported cards listed under "what
+             * you brought" would be exactly the redundancy the founder
+             * ruled out — the collection works by flagging Flares above.
+             */}
+            {collectionSync && collectionSync.cards_matched > 0 && (
+              <p className="text-sm text-text-muted">
+                Your collection ({collectionSync.cards_matched.toLocaleString()}{" "}
+                {collectionSync.cards_matched === 1 ? "card" : "cards"}) is along too —
+                it flags Flares you could answer without being listed here.
+              </p>
+            )}
 
             <AddToListForm code={normalized} kind="have" imagesEnabled={images} />
 

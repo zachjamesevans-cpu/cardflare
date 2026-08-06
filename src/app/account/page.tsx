@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, KeyRound, Mail } from "lucide-react";
+import { Flame, KeyRound, Library, Mail } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signOut } from "@/lib/auth/actions";
+import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { removeWantAction } from "@/lib/players/account-actions";
 import { playerForUser } from "@/lib/players/accounts";
+import { collectionSyncFor } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 
 export const metadata: Metadata = {
@@ -20,13 +23,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Small on purpose.
+ * Two jobs, one page, ordered by who is looking.
  *
- * The only things an operator can change about their account are the password
- * and being signed in, so those are the only two things here. The email
- * address is fixed: it is what an admin's invitation was addressed to and what
- * `claimPendingInvite` matches on, so letting it be edited here would quietly
- * detach an account from its store.
+ * For a player this is home: their wants and their collection lead,
+ * sign-in housekeeping follows. For an operator it stays the small
+ * housekeeping page it always was — email and password first — with the
+ * player cards underneath for the accounts that are both. The email
+ * address is fixed either way: it is what the invitation was addressed to
+ * and what `claimPendingInvite` matches on, so letting it be edited here
+ * would quietly detach an account from what it was invited to.
  */
 export default async function AccountPage() {
   const viewer = await getViewer();
@@ -46,108 +51,163 @@ export default async function AccountPage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
   const wants = playerId ? await listWants(playerId) : null;
 
+  const sync = playerId ? await collectionSyncFor(playerId) : null;
+  const lastSync = sync
+    ? {
+        when: new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+          new Date(sync.synced_at),
+        ),
+        cardsMatched: sync.cards_matched,
+        linesUnmatched: sync.lines_unmatched,
+      }
+    : null;
+
+  /*
+   * The same switcher the admin and store headers carry, so an account
+   * that is several things at once (the founder; a store owner who plays)
+   * can leave this page the way they arrived. Marked current only when
+   * the player entry actually exists — for a pure operator this page is
+   * not one of the switcher's destinations.
+   */
+  const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
+  const currentArea = areas.some((area) => area.href === "/account")
+    ? "/account"
+    : undefined;
+
+  const isPlayerHome = viewer.kind === "player";
+
+  const emailCard = (
+    <Card key="email" className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <Mail className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="font-semibold text-text-primary">Email address</p>
+          <p className="truncate text-text-secondary">{viewer.user.email}</p>
+        </div>
+      </div>
+      <p className="text-sm text-text-muted">
+        {isPlayerHome
+          ? "This is the address your invitation was sent to. Get in touch if it needs to change."
+          : "This is the address your store was invited on. Get in touch if it needs to change."}
+      </p>
+    </Card>
+  );
+
+  const wantsCard =
+    wants !== null ? (
+      <Card key="wants" className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <Flame className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-text-primary">Your saved wants</p>
+            <p className="text-sm text-text-secondary">
+              Saved automatically when you post a Flare while signed in, cleared when a
+              trade finds the card. Walk into any CardFlare room and it offers to post
+              these again.
+            </p>
+          </div>
+        </div>
+
+        {wants.length === 0 ? (
+          <p className="text-sm text-text-muted">
+            Nothing yet. Post a Flare at your next event and it will be waiting here.
+          </p>
+        ) : (
+          <ul className="flex flex-col">
+            {wants.map((want) => (
+              <li
+                key={want.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+              >
+                <div className="flex min-w-0 flex-1 basis-48 flex-col">
+                  <span className="truncate font-semibold text-text-primary">
+                    {want.cardName}
+                    {want.quantity > 1 && (
+                      <span className="font-normal text-text-muted tabular-nums">
+                        {" "}
+                        ×{want.quantity}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-xs text-text-muted">
+                    {want.cardNumber}
+                    <span className="font-sans">
+                      {" "}
+                      · {want.printingLabel ?? "Any printing"}
+                    </span>
+                  </span>
+                </div>
+                <form action={removeWantAction}>
+                  <input type="hidden" name="wantId" value={want.id} />
+                  <Button type="submit" variant="ghost" size="sm">
+                    Remove
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    ) : null;
+
+  const collectionCard = playerId ? (
+    <Card key="collection" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Library className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Your collection</p>
+          <p className="text-sm text-text-secondary">
+            Import your Collectr export and rooms will quietly flag the Flares you could
+            answer. Nobody else ever sees it — your name appears only when you choose to
+            offer.
+          </p>
+        </div>
+      </div>
+
+      <SyncCollectionForm lastSync={lastSync} />
+    </Card>
+  ) : null;
+
+  const passwordCard = (
+    <Card key="password" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <KeyRound className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Password</p>
+          <p className="text-text-secondary">
+            Set one and you can sign in straight away, without waiting for an email.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <Link href="/account/password" className={buttonStyles("secondary")}>
+          Set or change your password
+        </Link>
+      </div>
+    </Card>
+  );
+
+  /* A player's own things lead; sign-in housekeeping follows. */
+  const cards = isPlayerHome
+    ? [wantsCard, collectionCard, emailCard, passwordCard]
+    : [emailCard, wantsCard, collectionCard, passwordCard];
+
   return (
     <AppShell
       area="Account"
       email={viewer.user.email ?? ""}
       title="Your account"
-      description="How you sign in to CardFlare."
+      description={
+        isPlayerHome
+          ? "Your wants and your collection, ready for the next room you walk into."
+          : "How you sign in to CardFlare."
+      }
+      areas={areas}
+      currentArea={currentArea}
     >
       <div className="flex max-w-2xl flex-col gap-5">
-        <Card className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <Mail className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="font-semibold text-text-primary">Email address</p>
-              <p className="truncate text-text-secondary">{viewer.user.email}</p>
-            </div>
-          </div>
-          <p className="text-sm text-text-muted">
-            This is the address your store was invited on. Get in touch if it needs to
-            change.
-          </p>
-        </Card>
-
-        {wants !== null && (
-          <Card className="flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <Flame
-                className="mt-0.5 size-5 shrink-0 text-accent"
-                aria-hidden="true"
-              />
-              <div className="flex flex-col gap-1">
-                <p className="font-semibold text-text-primary">Your saved wants</p>
-                <p className="text-sm text-text-secondary">
-                  Saved automatically when you post a Flare while signed in, cleared
-                  when a trade finds the card. Walk into any CardFlare room and it
-                  offers to post these again.
-                </p>
-              </div>
-            </div>
-
-            {wants.length === 0 ? (
-              <p className="text-sm text-text-muted">
-                Nothing yet. Post a Flare at your next event and it will be waiting
-                here.
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {wants.map((want) => (
-                  <li
-                    key={want.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex min-w-0 flex-1 basis-48 flex-col">
-                      <span className="truncate font-semibold text-text-primary">
-                        {want.cardName}
-                        {want.quantity > 1 && (
-                          <span className="font-normal text-text-muted tabular-nums">
-                            {" "}
-                            ×{want.quantity}
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-mono text-xs text-text-muted">
-                        {want.cardNumber}
-                        <span className="font-sans">
-                          {" "}
-                          · {want.printingLabel ?? "Any printing"}
-                        </span>
-                      </span>
-                    </div>
-                    <form action={removeWantAction}>
-                      <input type="hidden" name="wantId" value={want.id} />
-                      <Button type="submit" variant="ghost" size="sm">
-                        Remove
-                      </Button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
-
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-start gap-3">
-            <KeyRound
-              className="mt-0.5 size-5 shrink-0 text-accent"
-              aria-hidden="true"
-            />
-            <div className="flex flex-col gap-1">
-              <p className="font-semibold text-text-primary">Password</p>
-              <p className="text-text-secondary">
-                Set one and you can sign in straight away, without waiting for an email.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <Link href="/account/password" className={buttonStyles("secondary")}>
-              Set or change your password
-            </Link>
-          </div>
-        </Card>
+        {cards}
 
         <div className="flex flex-wrap items-center gap-4">
           <form action={signOut}>

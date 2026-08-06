@@ -27,6 +27,10 @@ export const dynamic = "force-dynamic";
  * Sending them to the reset page rather than to sign-in matters: they have no
  * password yet, so a sign-in form is a dead end, and the reset page is one
  * field away from a fresh link.
+ *
+ * The words match who was invited. A store owner is here to print a counter
+ * code; a player is here so their wants follow them between stores — telling
+ * a player about "your store" was the first pilot player's first bug report.
  */
 export default async function WelcomePage() {
   const viewer = await getViewer();
@@ -34,6 +38,23 @@ export default async function WelcomePage() {
   if (viewer.kind === "anonymous") redirect("/login/reset?expired=1");
 
   const email = viewer.user.email ?? "";
+
+  const copy =
+    viewer.kind === "player"
+      ? {
+          intro: "One password and your account is ready to go.",
+          savedBody:
+            "Your account is ready. Scan in at any CardFlare store, and the cards you hunt will follow you between rooms.",
+          continueLabel: "Go to your account",
+          continueHref: "/account",
+        }
+      : {
+          intro: "One password and your store is ready to go.",
+          savedBody:
+            "Your store is ready. Print your counter code and you can start tonight.",
+          continueLabel: "Go to your store",
+          continueHref: "/store",
+        };
 
   return (
     <main
@@ -49,9 +70,7 @@ export default async function WelcomePage() {
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">
             Finish setting up
           </h1>
-          <p className="text-text-secondary">
-            One password and your store is ready to go.
-          </p>
+          <p className="text-text-secondary">{copy.intro}</p>
         </div>
 
         {/*
@@ -68,8 +87,9 @@ export default async function WelcomePage() {
           signedInAs={email}
           submitLabel="Create my account"
           savedTitle="You're all set"
-          savedBody="Your store is ready. Print your counter code and you can start tonight."
-          continueLabel="Go to your store"
+          savedBody={copy.savedBody}
+          continueLabel={copy.continueLabel}
+          continueHref={copy.continueHref}
         />
       </div>
     </main>
