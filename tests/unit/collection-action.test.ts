@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getViewer = vi.fn();
 const playerForUser = vi.fn();
 const replaceCollection = vi.fn();
+const printingNamesByCard = vi.fn();
 const cardsByCompactNumbers = vi.fn();
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -20,6 +21,7 @@ vi.mock("@/lib/players/accounts", () => ({
 }));
 vi.mock("@/lib/players/collection", () => ({
   replaceCollection: (...a: unknown[]) => replaceCollection(...a),
+  printingNamesByCard: (...a: unknown[]) => printingNamesByCard(...a),
 }));
 vi.mock("@/lib/singles/repository", () => ({
   cardsByCompactNumbers: (...a: unknown[]) => cardsByCompactNumbers(...a),
@@ -51,6 +53,7 @@ beforeEach(() => {
     getViewer,
     playerForUser,
     replaceCollection,
+    printingNamesByCard,
     cardsByCompactNumbers,
   ]) {
     fn.mockReset();
@@ -66,6 +69,18 @@ beforeEach(() => {
     new Map([
       ["OP02036", "card-nami"],
       ["OP09118", "card-roger"],
+    ]),
+  );
+  printingNamesByCard.mockResolvedValue(
+    new Map([
+      [
+        "card-nami",
+        [
+          { id: "p-nami-base", printingName: "Nami" },
+          { id: "p-nami-alt", printingName: "Nami (Alternate Art)" },
+        ],
+      ],
+      ["card-roger", [{ id: "p-roger", printingName: "Gol.D.Roger" }]],
     ]),
   );
   replaceCollection.mockResolvedValue(true);
@@ -88,13 +103,61 @@ describe("syncCollectionAction", () => {
       expect(state.unmatchedSample).toEqual(["Made Up Card"]);
     }
 
+    /*
+     * The printings the file's own names prove: "Nami (Alternate Art)"
+     * matches the catalog's alt-art printing name exactly — the pilot's
+     * Perona bug, pinned — and "Gol.D.Roger" matches its base printing.
+     */
     expect(replaceCollection).toHaveBeenCalledWith(
       "player-1",
-      new Map([
-        ["card-nami", 1],
-        ["card-roger", 2],
-      ]),
+      [
+        { cardId: "card-nami", printingId: "p-nami-alt", quantity: 1 },
+        { cardId: "card-roger", printingId: "p-roger", quantity: 2 },
+      ],
       { linesSeen: 3, cardsMatched: 2, linesUnmatched: 1 },
+    );
+  });
+
+  it("leaves a printing unproven when the names disagree", async () => {
+    printingNamesByCard.mockResolvedValue(
+      new Map([["card-nami", [{ id: "p-nami-base", printingName: "Nami" }]]]),
+    );
+
+    await syncCollectionAction(IDLE, upload([HEADER, ROWS[0]].join("\n")));
+
+    // "Nami (Alternate Art)" with no such catalog name: card kept, printing null.
+    expect(replaceCollection).toHaveBeenCalledWith(
+      "player-1",
+      [{ cardId: "card-nami", printingId: null, quantity: 1 }],
+      expect.any(Object),
+    );
+  });
+
+  it("keeps a resolved and an unresolved copy of one card as two rows", async () => {
+    const state = await syncCollectionAction(
+      IDLE,
+      upload(
+        [
+          HEADER,
+          ROWS[0],
+          "One Piece,One Piece,Paramount War,Nami (Wanted Poster),OP02-036,SR,Foil,Ungraded,Near Mint,0,3,1.00,0,false,2026-07-20,",
+        ].join("\n"),
+      ),
+    );
+
+    expect(state.status).toBe("synced");
+    if (state.status === "synced") {
+      // Two rows, one card: cards stay counted as cards.
+      expect(state.outcome.cardsMatched).toBe(1);
+    }
+
+    expect(replaceCollection).toHaveBeenCalledWith(
+      "player-1",
+      [
+        { cardId: "card-nami", printingId: "p-nami-alt", quantity: 1 },
+        { cardId: "card-nami", printingId: null, quantity: 3 },
+      ],
+      expect.any(Object),
     );
   });
 
@@ -119,7 +182,7 @@ describe("syncCollectionAction", () => {
     expect(state.status).toBe("synced");
     expect(replaceCollection).toHaveBeenCalledWith(
       "player-9",
-      expect.any(Map),
+      expect.any(Array),
       expect.any(Object),
     );
   });

@@ -24,6 +24,14 @@ function chunks<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+/** One aggregated import row: a card, optionally pinned to a printing. */
+export interface CollectionEntry {
+  cardId: string;
+  /** Null when the file's product name proved no particular printing. */
+  printingId: string | null;
+  quantity: number;
+}
+
 /**
  * Replaces the player's collection with a fresh import, and records it.
  *
@@ -34,7 +42,7 @@ function chunks<T>(items: T[], size: number): T[][] {
  */
 export async function replaceCollection(
   playerId: string,
-  totalsByCard: Map<string, number>,
+  entries: CollectionEntry[],
   stats: { linesSeen: number; cardsMatched: number; linesUnmatched: number },
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
@@ -51,10 +59,11 @@ export async function replaceCollection(
     return false;
   }
 
-  const rows = [...totalsByCard.entries()].map(([cardId, quantity]) => ({
+  const rows = entries.map((entry) => ({
     player_id: playerId,
-    card_id: cardId,
-    quantity,
+    card_id: entry.cardId,
+    printing_id: entry.printingId,
+    quantity: entry.quantity,
   }));
 
   for (const batch of chunks(rows, INSERT_CHUNK)) {
@@ -105,39 +114,79 @@ export async function collectionSyncFor(
 }
 
 /**
- * Which of these cards the player's collection holds.
+ * Which of these cards the player's collection holds, and with which
+ * proven printings.
  *
  * Queried the narrow way round — the board's cards against one player's
  * rows — so a room render costs a bounded lookup however large the
- * collection is. Returns card ids only: the collection is card-level and
- * printing-unknown, which is exactly the honesty `matchFor` encodes as a
- * key with no proven printings.
+ * collection is. The shape is the matcher's own: a card key means "have
+ * it", and its set holds only the printings the import actually proved,
+ * so a Flare naming a printing matches exactly when the file named it too
+ * and honestly downgrades when it did not.
  */
 export async function collectionAvailability(
   playerId: string,
   cardIds: string[],
-): Promise<Set<string>> {
-  if (cardIds.length === 0 || !isSupabaseConfigured()) return new Set();
+): Promise<Map<string, Set<string>>> {
+  const held = new Map<string, Set<string>>();
+  if (cardIds.length === 0 || !isSupabaseConfigured()) return held;
 
   const admin = getSupabaseAdmin();
-  const held = new Set<string>();
 
   for (const batch of chunks([...new Set(cardIds)], CHUNK)) {
     const { data, error } = await admin
       .from("player_collection")
-      .select("card_id")
+      .select("card_id, printing_id")
       .eq("player_id", playerId)
       .in("card_id", batch);
 
     if (error) {
       console.error("Could not check the collection", error);
-      return new Set();
+      return new Map();
     }
 
-    for (const row of data ?? []) held.add(row.card_id);
+    for (const row of data ?? []) {
+      const printings = held.get(row.card_id) ?? new Set<string>();
+      if (row.printing_id) printings.add(row.printing_id);
+      held.set(row.card_id, printings);
+    }
   }
 
   return held;
+}
+
+/**
+ * The provider's names for every printing of these cards, for resolving
+ * a file's product names at import time. Chunked like every board-sized
+ * lookup here.
+ */
+export async function printingNamesByCard(
+  cardIds: string[],
+): Promise<Map<string, { id: string; printingName: string | null }[]>> {
+  const byCard = new Map<string, { id: string; printingName: string | null }[]>();
+  if (cardIds.length === 0 || !isSupabaseConfigured()) return byCard;
+
+  const admin = getSupabaseAdmin();
+
+  for (const batch of chunks([...new Set(cardIds)], CHUNK)) {
+    const { data, error } = await admin
+      .from("card_printings")
+      .select("id, card_id, printing_name")
+      .in("card_id", batch);
+
+    if (error) {
+      console.error("Could not load printing names for the import", error);
+      return new Map();
+    }
+
+    for (const row of data ?? []) {
+      const list = byCard.get(row.card_id) ?? [];
+      list.push({ id: row.id, printingName: row.printing_name });
+      byCard.set(row.card_id, list);
+    }
+  }
+
+  return byCard;
 }
 
 /**

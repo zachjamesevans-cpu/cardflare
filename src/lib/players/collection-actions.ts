@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { replaceCollection } from "@/lib/players/collection";
+import {
+  printingNamesByCard,
+  replaceCollection,
+  type CollectionEntry,
+} from "@/lib/players/collection";
+import { resolvePrintingId } from "@/lib/players/collection-match";
 import {
   aggregateByNumber,
   MAX_FILE_BYTES,
@@ -68,22 +73,40 @@ export async function syncCollectionAction(
   const totalsByNumber = aggregateByNumber(parsed.lines);
   const cardIds = await cardsByCompactNumbers([...totalsByNumber.keys()]);
 
-  const totalsByCard = new Map<string, number>();
+  /*
+   * Printing resolution, line by line: the file's product name against the
+   * provider's own printing names for that exact card. "Perona (Alternate
+   * Art)" in the file and in the catalog is a proven printing and matches
+   * a Flare for that alt art exactly; any disagreement leaves the line
+   * printing-unknown, which downgrades honestly instead of guessing.
+   */
+  const printingsByCard = await printingNamesByCard([
+    ...new Set([...cardIds.values()]),
+  ]);
+
+  const totals = new Map<string, CollectionEntry>();
   const unmatchedLabels: string[] = [];
   let matchedRows = 0;
 
   for (const line of parsed.lines) {
-    if (cardIds.has(line.compactNumber)) {
-      matchedRows += 1;
-    } else {
+    const cardId = cardIds.get(line.compactNumber);
+
+    if (!cardId) {
       unmatchedLabels.push(line.name || line.compactNumber);
+      continue;
     }
+
+    matchedRows += 1;
+
+    const printingId = resolvePrintingId(line.name, printingsByCard.get(cardId) ?? []);
+    const key = `${cardId}:${printingId ?? ""}`;
+    const entry = totals.get(key) ?? { cardId, printingId, quantity: 0 };
+    entry.quantity += line.quantity;
+    totals.set(key, entry);
   }
 
-  for (const [number, quantity] of totalsByNumber) {
-    const cardId = cardIds.get(number);
-    if (cardId) totalsByCard.set(cardId, quantity);
-  }
+  const entries = [...totals.values()];
+  const distinctCards = new Set(entries.map((entry) => entry.cardId));
 
   /*
    * Same honesty as the store sync: rows skipped on purpose (other games,
@@ -103,11 +126,11 @@ export async function syncCollectionAction(
 
   const stats = {
     linesSeen: parsed.linesSeen,
-    cardsMatched: totalsByCard.size,
+    cardsMatched: distinctCards.size,
     linesUnmatched,
   };
 
-  if (!(await replaceCollection(playerId, totalsByCard, stats))) {
+  if (!(await replaceCollection(playerId, entries, stats))) {
     return { status: "error", message: GENERIC_ERROR };
   }
 
