@@ -450,6 +450,29 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## 🔶 Milestone 14 — the API the app talks to (phase 1 shipped)
+
+The seam between the website and the native client: JSON routes under
+`/api/v1/`, authenticated by the same Supabase account system the site
+uses — the app sends its access token as a bearer header, the server
+verifies it against the project on every request, and an authenticated
+user is an API player only if a `players` row exists. Every route runs
+the same lib functions the website's pages run, so the two clients
+cannot drift.
+
+**Phase 1 (shipped):** `GET /me` (the account snapshot: player, wants,
+collection stat), `POST/DELETE /devices` (push-token registration —
+upsert on the unique token so a reinstall or handed-down device moves
+cleanly, unregister scoped to the caller's own rows), and
+`GET/POST /notifications` (the inbox the backbone writes; mark-read
+scoped to the caller). Nine unit tests pin the guards: identical 401s
+without a verified token or without a player row, and every write keyed
+on the authenticated player.
+
+**Phase 2 (next):** the room loop — resolve a code, join, read the
+board, post a Flare, offer, confirm — over a session token the app
+holds the way the website holds its cookie.
+
 ## ✅ Milestone 13 — the notification backbone (the app track begins)
 
 Decided by the founder: CardFlare gets a real App Store app, and the two
