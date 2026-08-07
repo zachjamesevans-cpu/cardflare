@@ -7,6 +7,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { resolveCode } from "@/lib/events/rooms";
 import { text } from "@/lib/form-value";
+import { notifyOfferReceived } from "@/lib/notifications/notify";
 import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
@@ -32,7 +33,7 @@ const OFFER_WINDOW_MS = 5 * 60 * 1000;
 
 async function requirePlayerInRoom(
   code: string,
-): Promise<{ eventId: string; playerSessionId: string } | null> {
+): Promise<{ eventId: string; playerSessionId: string; displayName: string } | null> {
   const session = await getPlayerSession();
   if (!session) return null;
 
@@ -43,7 +44,11 @@ async function requirePlayerInRoom(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return null;
 
-  return { eventId: resolved.room.id, playerSessionId: session.id };
+  return {
+    eventId: resolved.room.id,
+    playerSessionId: session.id,
+    displayName: session.display_name,
+  };
 }
 
 export async function offerTradeAction(formData: FormData): Promise<void> {
@@ -73,6 +78,15 @@ export async function offerTradeAction(formData: FormData): Promise<void> {
   if (!outcome.ok) {
     // Logged for the curious; the page re-render shows the truthful state.
     console.error(`Offer refused: ${outcome.reason}`);
+  } else {
+    // The requester may have wandered off; their account gets a nudge.
+    // Deduped inside per (flare, responder), so editing a message is quiet.
+    await notifyOfferReceived(
+      flareId,
+      membership.playerSessionId,
+      membership.displayName,
+      message.success ? message.data : null,
+    );
   }
 
   revalidatePath(`/e/${code}`);

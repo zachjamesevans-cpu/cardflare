@@ -564,6 +564,47 @@ export type PlayerCollectionInsert = Omit<PlayerCollectionRow, "id" | "created_a
   created_at?: string;
 };
 
+export type NotificationRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  kind: "offer-received" | "trade-confirmed";
+  title: string;
+  body: string | null;
+  /** A site-relative path (the room to open), never an absolute URL. */
+  url: string | null;
+  dedupe_key: string | null;
+  read_at: string | null;
+  emailed_at: string | null;
+};
+
+export type NotificationInsert = Omit<
+  NotificationRow,
+  "id" | "created_at" | "body" | "url" | "dedupe_key" | "read_at" | "emailed_at"
+> & {
+  id?: string;
+  created_at?: string;
+  body?: string | null;
+  url?: string | null;
+  dedupe_key?: string | null;
+  read_at?: string | null;
+  emailed_at?: string | null;
+};
+
+export type PlayerDeviceRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  platform: "ios" | "android" | "web";
+  push_token: string;
+  last_seen_at: string;
+};
+
+export type PlayerDeviceInsert = Omit<
+  PlayerDeviceRow,
+  "id" | "created_at" | "last_seen_at"
+> & { id?: string; created_at?: string; last_seen_at?: string };
+
 export type PlayerCollectionSyncRow = {
   player_id: string;
   synced_at: string;
@@ -621,6 +662,8 @@ export type Database = {
       players: Table<PlayerRow, PlayerInsert>;
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
+      notifications: Table<NotificationRow, NotificationInsert>;
+      player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       player_collection: Table<PlayerCollectionRow, PlayerCollectionInsert>;
       player_collection_syncs: Table<
         PlayerCollectionSyncRow,
