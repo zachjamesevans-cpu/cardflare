@@ -20,7 +20,13 @@ const POLL_MS = 20_000;
  * Polled on the same cadence as the website's ticker; pull to refresh
  * for the impatient.
  */
-export function RoomScreen({ code }: { code: string }) {
+export function RoomScreen({
+  code,
+  onPostFlare,
+}: {
+  code: string;
+  onPostFlare: () => void;
+}) {
   const [state, setState] = useState<RoomState | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -150,9 +156,11 @@ export function RoomScreen({ code }: { code: string }) {
         </Muted>
       </Card>
 
+      <Button label="Post a Flare" onPress={onPostFlare} />
+
       {flares.length === 0 && (
         <Card>
-          <Body>No Flares yet. Post the first one on the website — posting from the app is coming.</Body>
+          <Body>No Flares yet. Post the first one and the room will see it.</Body>
         </Card>
       )}
 

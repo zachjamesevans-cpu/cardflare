@@ -112,6 +112,70 @@ async function record(entry: {
   return data?.id ?? null;
 }
 
+/**
+ * Push delivery through Expo's push service — the app track's payoff.
+ *
+ * Sent to every device the player's account has registered. Expo fans
+ * out to Apple and Google; a ticket answering "DeviceNotRegistered"
+ * means the app was deleted from that phone, and the token is pruned so
+ * it is never paid for again. Fire-and-forget like email: the recorded
+ * notification is the truth, delivery is best-effort.
+ */
+const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
+
+async function deliverByPush(
+  playerId: string,
+  title: string,
+  body: string | null,
+  path: string,
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: devices, error } = await admin
+    .from("player_devices")
+    .select("id, push_token")
+    .eq("player_id", playerId);
+
+  if (error || !devices || devices.length === 0) return;
+
+  try {
+    const response = await fetch(EXPO_PUSH_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        devices.map((device) => ({
+          to: device.push_token,
+          title,
+          body: body ?? undefined,
+          sound: "default",
+          data: { url: path },
+        })),
+      ),
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    const result = (await response.json().catch(() => null)) as {
+      data?: { status: string; details?: { error?: string } }[];
+    } | null;
+
+    const dead = devices.filter(
+      (_, index) => result?.data?.[index]?.details?.error === "DeviceNotRegistered",
+    );
+
+    if (dead.length > 0) {
+      await admin
+        .from("player_devices")
+        .delete()
+        .in(
+          "id",
+          dead.map((device) => device.id),
+        );
+    }
+  } catch (caught) {
+    console.error("Could not reach the push service", caught);
+  }
+}
+
 /** Email delivery: plain and short, with the room one tap away. */
 async function deliverByEmail(
   notificationId: string,
@@ -184,8 +248,11 @@ export async function notifyOfferReceived(
       dedupeKey: `offer:${flareId}:${responderSessionId}`,
     });
 
-    if (id && recipient.email) {
-      await deliverByEmail(id, recipient.email, title, body, path);
+    if (id) {
+      await deliverByPush(recipient.playerId, title, body, path);
+      if (recipient.email) {
+        await deliverByEmail(id, recipient.email, title, body, path);
+      }
     }
   } catch (error) {
     console.error("Could not notify the Flare's owner", error);
@@ -225,8 +292,11 @@ export async function notifyTradeConfirmed(
       dedupeKey: `trade:${flareId}:${partnerSessionId}`,
     });
 
-    if (id && recipient.email) {
-      await deliverByEmail(id, recipient.email, title, body, path);
+    if (id) {
+      await deliverByPush(recipient.playerId, title, body, path);
+      if (recipient.email) {
+        await deliverByEmail(id, recipient.email, title, body, path);
+      }
     }
   } catch (error) {
     console.error("Could not notify the trade partner", error);

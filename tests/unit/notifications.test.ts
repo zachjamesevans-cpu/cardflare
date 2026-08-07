@@ -13,7 +13,7 @@ type Response = Record<string, unknown>;
 function chain(response: Response, calls: Record<string, unknown[][]>) {
   const c: Record<string, unknown> = {};
 
-  for (const method of ["select", "eq", "insert", "update", "upsert", "delete"]) {
+  for (const method of ["select", "eq", "in", "insert", "update", "upsert", "delete"]) {
     c[method] = vi.fn((...args: unknown[]) => {
       (calls[method] ??= []).push(args);
       return c;
@@ -135,6 +135,67 @@ describe("notifyOfferReceived", () => {
 
     expect(calls.notifications.insert).toHaveLength(1);
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("push delivery", () => {
+  it("sends to every registered device and prunes the dead ones", async () => {
+    queueFlareContext();
+    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
+    queue("players", { data: { id: "player-1", user_id: "u1" }, error: null });
+    getUserById.mockResolvedValue({ data: { user: { email: null } } });
+    queue("notifications", { data: { id: "n1" }, error: null });
+    queue("player_devices", {
+      data: [
+        { id: "d1", push_token: "ExponentPushToken[live]" },
+        { id: "d2", push_token: "ExponentPushToken[gone]" },
+      ],
+      error: null,
+    });
+    queue("player_devices", { error: null }); // prune delete
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          data: [
+            { status: "ok" },
+            { status: "error", details: { error: "DeviceNotRegistered" } },
+          ],
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await notifyOfferReceived("f1", "resp-sess", "Kaito", "table 2");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://exp.host/--/api/v2/push/send");
+    const payload = JSON.parse(String(init.body)) as { to: string }[];
+    expect(payload.map((message) => message.to)).toEqual([
+      "ExponentPushToken[live]",
+      "ExponentPushToken[gone]",
+    ]);
+
+    // Only the token the push service disowned is deleted.
+    expect(calls.player_devices.in).toEqual([["id", ["d2"]]]);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("touches nothing when the account has no devices", async () => {
+    queueFlareContext();
+    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
+    queue("players", { data: { id: "player-1", user_id: "u1" }, error: null });
+    getUserById.mockResolvedValue({ data: { user: { email: null } } });
+    queue("notifications", { data: { id: "n1" }, error: null });
+    queue("player_devices", { data: [], error: null });
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await notifyOfferReceived("f1", "resp-sess", "Kaito", null);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

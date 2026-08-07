@@ -1,0 +1,178 @@
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+
+import { ApiError, postFlare, searchCards, type CardHit } from "../api";
+import { Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
+import { colors, radius, spacing } from "../theme";
+
+/**
+ * Posting a Flare from the app: search the catalog, pick a card, say
+ * which printing (any, by default — which is what most requests mean),
+ * how many, and an optional note. The same ranked search and the same
+ * server-side validation as the website's picker.
+ */
+export function PostFlareScreen({
+  code,
+  onPosted,
+}: {
+  code: string;
+  onPosted: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<CardHit[]>([]);
+  const [picked, setPicked] = useState<CardHit | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Debounced search: a keystroke pause is the request, not every letter.
+  useEffect(() => {
+    if (picked || query.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void searchCards(query.trim())
+        .then((result) => setHits(result.cards))
+        .catch(() => setHits([]));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query, picked]);
+
+  const submit = async () => {
+    if (!picked) return;
+    setBusy(true);
+    setError(null);
+
+    try {
+      await postFlare(code, {
+        cardId: picked.id,
+        printingId,
+        quantity,
+        note: note.trim() || undefined,
+      });
+      onPosted();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError && caught.code === "at-cap"
+          ? "You have hit the Flare cap for this room."
+          : "Could not post the Flare. Try again.",
+      );
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
+      {!picked ? (
+        <Card>
+          <Title>What are you hunting?</Title>
+          <Input
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Card name or number"
+            autoFocus
+            autoCorrect={false}
+          />
+          {query.trim().length >= 2 && hits.length === 0 && (
+            <Muted>Nothing yet — keep typing, or check the number.</Muted>
+          )}
+          {hits.map((hit) => (
+            <Pressable
+              key={hit.id}
+              onPress={() => {
+                setPicked(hit);
+                setPrintingId(null);
+              }}
+              style={({ pressed }) => ({
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: radius.control,
+                padding: spacing(3),
+                opacity: pressed ? 0.7 : 1,
+                gap: 2,
+              })}
+            >
+              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                {hit.name}
+              </Text>
+              <Muted>{hit.cardNumber}</Muted>
+            </Pressable>
+          ))}
+        </Card>
+      ) : (
+        <Card>
+          <Muted>Posting a Flare for</Muted>
+          <Title>{picked.name}</Title>
+          <Muted>{picked.cardNumber}</Muted>
+
+          <Body>Which printing?</Body>
+          <View style={{ gap: spacing(2) }}>
+            {[
+              { id: null as string | null, label: "Any printing" },
+              ...picked.printings.map((printing) => ({
+                id: printing.id as string | null,
+                label: printing.label ?? "Unnamed printing",
+              })),
+            ].map((option) => (
+              <Pressable
+                key={option.id ?? "any"}
+                onPress={() => setPrintingId(option.id)}
+                style={{
+                  borderColor:
+                    printingId === option.id ? colors.accent : colors.border,
+                  borderWidth: printingId === option.id ? 2 : 1,
+                  borderRadius: radius.control,
+                  padding: spacing(3),
+                }}
+              >
+                <Text style={{ color: colors.textPrimary }}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Body>How many?</Body>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+            <Button
+              label="−"
+              variant="secondary"
+              onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+            />
+            <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
+              {quantity}
+            </Text>
+            <Button
+              label="+"
+              variant="secondary"
+              onPress={() => setQuantity((q) => Math.min(99, q + 1))}
+            />
+          </View>
+
+          <Input
+            value={note}
+            onChangeText={setNote}
+            placeholder="Note for the room (optional)"
+            maxLength={120}
+          />
+
+          <ErrorLine message={error} />
+
+          <Button
+            label={busy ? "Posting…" : "Post the Flare"}
+            onPress={() => void submit()}
+            busy={busy}
+          />
+          <Button
+            label="Pick a different card"
+            variant="secondary"
+            onPress={() => setPicked(null)}
+          />
+        </Card>
+      )}
+    </ScrollView>
+  );
+}
