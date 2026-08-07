@@ -450,7 +450,7 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
-## 🔶 Milestone 14 — the API the app talks to (phase 1 shipped)
+## ✅ Milestone 14 — the API the app talks to
 
 The seam between the website and the native client: JSON routes under
 `/api/v1/`, authenticated by the same Supabase account system the site
@@ -469,9 +469,21 @@ scoped to the caller). Nine unit tests pin the guards: identical 401s
 without a verified token or without a player row, and every write keyed
 on the authenticated player.
 
-**Phase 2 (next):** the room loop — resolve a code, join, read the
-board, post a Flare, offer, confirm — over a session token the app
-holds the way the website holds its cookie.
+**Phase 2 (shipped):** the room loop. `GET/POST /rooms/[code]`
+(resolve any code — room, show, lobby, quiet — and join: session
+created on first join, its token returned exactly once for the app to
+hold the way the website holds its cookie; renames edit in place so a
+binder is never abandoned; a bearer-authenticated user's session is
+claimed by their account at the door), `POST /rooms/[code]/flares`
+(auto-saving the want for linked accounts), `POST/DELETE
+/rooms/[code]/offers` and `POST /rooms/[code]/trades` (both wired into
+the notification backbone), and `GET /cards?q=` (the picker's ranked
+search, unauthenticated because the catalog is public). The room GET
+returns the board with per-viewer matches — binder plus proven
+collection printings — computed server-side exactly as the page
+computes them. Eight more unit tests pin the guards: joining is the
+only door, every write re-establishes membership from scratch, and the
+join token is issued once.
 
 ## ✅ Milestone 13 — the notification backbone (the app track begins)
 
