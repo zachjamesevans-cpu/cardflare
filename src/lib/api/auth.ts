@@ -1,6 +1,8 @@
 import "server-only";
 
 import { playerForUser } from "@/lib/players/accounts";
+import { findPlayerSession, touchPlayerSession } from "@/lib/players/repository";
+import { hashSessionToken } from "@/lib/players/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -54,6 +56,25 @@ export async function apiPlayer(request: Request): Promise<ApiPlayer | null> {
     console.error("Could not authenticate the API request", error);
     return null;
   }
+}
+
+/**
+ * The guest identity, app-held: the same random token the website keeps
+ * in its httpOnly cookie, sent by a native client as `X-Session-Token`.
+ * Same storage, same hashing, same renewal — only the envelope differs,
+ * so a room joined in the app is the same membership the website sees.
+ */
+export async function apiSession(request: Request) {
+  if (!isSupabaseConfigured()) return null;
+
+  const token = request.headers.get("x-session-token");
+  if (!token) return null;
+
+  const session = await findPlayerSession(hashSessionToken(token));
+  if (!session) return null;
+
+  await touchPlayerSession(session);
+  return session;
 }
 
 /** The one shape every unauthenticated response takes. */
