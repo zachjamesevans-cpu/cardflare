@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "CardFlare",
+    "slug": "cardflare",
+    "scheme": "cardflare",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0e1116",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "gg.cardflare.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CardFlare uses the camera only to scan the QR code on a store's counter."
+      }
+    },
+    "android": {
+      "package": "gg.cardflare.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0e1116",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CardFlare uses the camera only to scan the QR code on a store's counter."
+        }
+      ],
+      "expo-notifications",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiBase": "https://cardflare.gg",
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    }
+  }
+}

@@ -450,6 +450,36 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## 🔶 Milestone 15 — CardFlare in the pocket (the Expo app, phase 1)
+
+The native client, living in `mobile/` in this repository — one review
+flow, one set of conventions, and Expo's build service is happy in a
+monorepo. Every request goes through the website's `/api/v1`, so the
+app cannot drift from the site; the design tokens mirror the website's
+`@theme` block, so it does not _look_ like a second product either.
+Guests are untouched: scanning a counter code with a phone camera still
+opens the website with nothing installed.
+
+**Phase 1 (built):** Expo SDK 57 + TypeScript; navigation shell in the
+site's dark skin; **Home** (scan or type a code first — the guest loop
+leads here too — with the account snapshot below for people who have
+one); **Scan** (QR → the poster's `/e/CODE` URL, first scan wins);
+**Room** (join as guest or signed in, the board with per-viewer
+matches, offers, "counter may have it", offer and we-traded actions,
+polled on the website ticker's cadence with pull-to-refresh);
+**Sign-in** (password grant against the same Supabase project, tokens
+in the device keychain, silent refresh on 401); **Inbox** (the
+notification backbone's rows, marked read on view); **push
+registration** after sign-in into `POST /api/v1/devices`. Typechecks
+clean; the web app's verify and e2e are untouched by the monorepo
+addition.
+
+**Phase 2 (next):** the in-app card picker for posting Flares, the
+server-side push-delivery worker (queued notifications → Expo's push
+service) once real device tokens exist, EAS build + TestFlight when the
+founder's Apple Developer enrollment clears — see `mobile/README.md`
+for the exact commands, and the two `expo.extra` values to fill in.
+
 ## ✅ Milestone 14 — the API the app talks to
 
 The seam between the website and the native client: JSON routes under
