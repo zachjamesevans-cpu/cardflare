@@ -450,6 +450,38 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Milestone 13 — the notification backbone (the app track begins)
+
+Decided by the founder: CardFlare gets a real App Store app, and the two
+worlds coexist — guests keep scanning straight into the website with
+nothing installed, while accounts gain a home that can reach them when
+their phone is locked. The backbone ships first because it is
+client-agnostic: every noteworthy event is recorded per _player_, and
+delivery fans out over whatever channels the player has — email today
+(Resend is live), the app's push tokens the day it registers them.
+
+- **`notifications`** — the record and the app's future inbox: kind,
+  display fields, a room path to open, `dedupe_key` unique so one
+  underlying event notifies once (re-offering with a new message updates
+  the room, never pings again). **`player_devices`** — where the app
+  will register push tokens (unique per token, cascade per player).
+  Both probed on real PostgreSQL 16 and locked to the service role
+- **Two notifications, chosen for the moment the loop closes:** somebody
+  offered on your Flare (title, their message, "open the room"), and the
+  requester confirmed a trade with you. Guests are unreachable by design
+  — their room page keeps polling — and the underlying write always
+  succeeds regardless of delivery: nothing here throws
+- Wired after `offerTradeAction` and `confirmTradeAction`; five new unit
+  tests pin the rules (guest silence, dedupe silence, record-without-
+  email for addressless accounts, partner-not-confirmer)
+
+**The app track from here:** an authenticated JSON API over the existing
+lib layer (the same guards Server Actions use, callable by a native
+client), then the Expo app itself — sign-in, QR scan into rooms, push
+registration — in its own repository, TestFlight before the App Store.
+The website changes for none of it: same backend, same account, same
+data on both.
+
 ## ✅ The collection learns printings (pilot bug)
 
 Found on the first live test of the Collectr import: an alt-art Perona in

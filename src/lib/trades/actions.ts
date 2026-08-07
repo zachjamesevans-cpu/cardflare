@@ -7,6 +7,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { resolveCode } from "@/lib/events/rooms";
 import { text } from "@/lib/form-value";
+import { notifyTradeConfirmed } from "@/lib/notifications/notify";
 import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
@@ -67,6 +68,11 @@ export async function confirmTradeAction(formData: FormData): Promise<void> {
   } else {
     // A found card leaves the requester's saved wants by itself.
     await clearWantForFlare(flareId);
+
+    // The partner walked back to their table; their account hears about it.
+    if (partner) {
+      await notifyTradeConfirmed(flareId, partner, session.display_name);
+    }
   }
 
   revalidatePath(`/e/${code}`);

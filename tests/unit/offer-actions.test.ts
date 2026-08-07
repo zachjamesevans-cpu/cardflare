@@ -31,6 +31,10 @@ vi.mock("@/lib/events/rooms", () => ({
 vi.mock("@/lib/events/participants", () => ({
   findParticipation: (...a: unknown[]) => findParticipation(...a),
 }));
+vi.mock("@/lib/notifications/notify", () => ({
+  notifyOfferReceived: vi.fn(),
+  notifyTradeConfirmed: vi.fn(),
+}));
 vi.mock("@/lib/matching/repository", () => ({
   offerTrade: (...a: unknown[]) => offerTrade(...a),
   withdrawOffer: (...a: unknown[]) => withdrawOffer(...a),
