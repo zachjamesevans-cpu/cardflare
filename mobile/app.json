@@ -37,8 +37,8 @@
     ],
     "extra": {
       "apiBase": "https://cardflare.gg",
-      "supabaseUrl": "",
-      "supabaseAnonKey": ""
+      "supabaseUrl": "https://wfpxjqumrkyqcingazsp.supabase.co",
+      "supabaseAnonKey": "sb_publishable_MQMJPdpf-icI6YSEd5a6bA_1FOHvwi2"
     }
   }
 }
