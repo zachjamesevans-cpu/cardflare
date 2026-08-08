@@ -15,6 +15,8 @@ const findParticipation = vi.fn();
 const joinEvent = vi.fn();
 const createPlayerSession = vi.fn();
 const addFlare = vi.fn();
+const cancelFlare = vi.fn();
+const setOpenToTrades = vi.fn();
 const saveWant = vi.fn();
 const offerTrade = vi.fn();
 const confirmTrade = vi.fn();
@@ -40,12 +42,14 @@ vi.mock("@/lib/events/rooms", () => ({
 }));
 vi.mock("@/lib/events/participants", () => ({
   findParticipation: (...a: unknown[]) => findParticipation(...a),
+  setOpenToTrades: (...a: unknown[]) => setOpenToTrades(...a),
   joinEvent: (...a: unknown[]) => joinEvent(...a),
   listParticipants: vi.fn().mockResolvedValue([]),
   touchParticipation: vi.fn(),
 }));
 vi.mock("@/lib/lists/repository", () => ({
   addFlare: (...a: unknown[]) => addFlare(...a),
+  cancelFlare: (...a: unknown[]) => cancelFlare(...a),
   listBinder: vi.fn().mockResolvedValue([]),
   listRoomFlares: vi.fn().mockResolvedValue([]),
 }));
@@ -80,6 +84,7 @@ const rooms = await import("@/app/api/v1/rooms/[code]/route");
 const flares = await import("@/app/api/v1/rooms/[code]/flares/route");
 const offers = await import("@/app/api/v1/rooms/[code]/offers/route");
 const trades = await import("@/app/api/v1/rooms/[code]/trades/route");
+const open = await import("@/app/api/v1/rooms/[code]/open/route");
 
 const CODE = { params: Promise.resolve({ code: "K3M9PZ" }) };
 const SESSION = {
@@ -183,6 +188,23 @@ describe("membership guards on writes", () => {
     expect(addFlare).not.toHaveBeenCalled();
     expect(offerTrade).not.toHaveBeenCalled();
     expect(confirmTrade).not.toHaveBeenCalled();
+  });
+
+  it("removing a Flare is scoped to the caller's own session", async () => {
+    await flares.DELETE(request("DELETE", { flareId: FLARE_ID }), CODE);
+
+    expect(cancelFlare).toHaveBeenCalledWith(FLARE_ID, "sess-1");
+  });
+
+  it("open-to-trades flips only the member's own row", async () => {
+    await open.POST(request("POST", { open: true }), CODE);
+    expect(setOpenToTrades).toHaveBeenCalledWith("event-1", "sess-1", true);
+
+    findParticipation.mockResolvedValue(null);
+    setOpenToTrades.mockClear();
+    const response = await open.POST(request("POST", { open: true }), CODE);
+    expect(response.status).toBe(401);
+    expect(setOpenToTrades).not.toHaveBeenCalled();
   });
 
   it("a posted Flare saves the want only for a linked account", async () => {
