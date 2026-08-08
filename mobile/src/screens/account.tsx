@@ -19,25 +19,39 @@ import { spacing } from "../theme";
 function ConnectionTest() {
   const [result, setResult] = useState<string | null>(null);
 
-  const probe = async (method: "GET" | "POST") => {
+  const probe = async (
+    label: string,
+    method: string,
+    body?: string,
+    contentType?: string,
+  ) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const timer = setTimeout(() => controller.abort(), 10_000);
     const started = Date.now();
     try {
       const response = await fetch(`${API_BASE}/api/v1/ping`, {
         method,
         signal: controller.signal,
-        ...(method === "POST"
-          ? { headers: { "content-type": "application/json" }, body: "{}" }
-          : {}),
+        ...(contentType ? { headers: { "content-type": contentType } } : {}),
+        ...(body === undefined ? {} : { body }),
       });
-      return `${method} ${response.status} in ${Date.now() - started}ms`;
+      return `${label}: ${response.status} in ${Date.now() - started}ms`;
     } catch {
-      return `${method} failed after ${Date.now() - started}ms`;
+      return `${label}: FAILED after ${Date.now() - started}ms`;
     } finally {
       clearTimeout(timer);
     }
   };
+
+  /* Each row changes exactly one variable; the first FAILED names it. */
+  const MATRIX: [string, string, string | undefined, string | undefined][] = [
+    ["GET", "GET", undefined, undefined],
+    ["POST empty", "POST", undefined, undefined],
+    ["POST body+json", "POST", "{}", "application/json"],
+    ["POST body+plain", "POST", "{}", "text/plain"],
+    ["POST body only", "POST", "{}", undefined],
+    ["DELETE empty", "DELETE", undefined, undefined],
+  ];
 
   return (
     <Card>
@@ -49,9 +63,11 @@ function ConnectionTest() {
         onPress={() => {
           setResult("Testing…");
           void (async () => {
-            const get = await probe("GET");
-            const post = await probe("POST");
-            setResult(`${get}\n${post}`);
+            const lines: string[] = [];
+            for (const [label, method, body, type] of MATRIX) {
+              lines.push(await probe(label, method, body, type));
+              setResult(lines.join("\n"));
+            }
           })();
         }}
       />
