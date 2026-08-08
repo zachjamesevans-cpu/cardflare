@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { ScrollView } from "react-native";
 
 import type { StackParams } from "../../App";
+import { API_BASE } from "../config";
 import { getMe, signOut, storedAccessToken, type Me } from "../api";
 import { Body, Button, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
@@ -14,6 +15,50 @@ import { spacing } from "../theme";
  * Guests see the honest pitch, not a wall: the whole room loop works
  * without any of this.
  */
+/** GET and POST the no-auth ping; the verdict names where POSTs die. */
+function ConnectionTest() {
+  const [result, setResult] = useState<string | null>(null);
+
+  const probe = async (method: "GET" | "POST") => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    const started = Date.now();
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/ping`, {
+        method,
+        signal: controller.signal,
+        ...(method === "POST"
+          ? { headers: { "content-type": "application/json" }, body: "{}" }
+          : {}),
+      });
+      return `${method} ${response.status} in ${Date.now() - started}ms`;
+    } catch {
+      return `${method} failed after ${Date.now() - started}ms`;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  return (
+    <Card>
+      <Title>Connection test</Title>
+      {result && <Body>{result}</Body>}
+      <Button
+        label="Run test"
+        variant="secondary"
+        onPress={() => {
+          setResult("Testing…");
+          void (async () => {
+            const get = await probe("GET");
+            const post = await probe("POST");
+            setResult(`${get}\n${post}`);
+          })();
+        }}
+      />
+    </Card>
+  );
+}
+
 export function AccountScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
@@ -75,6 +120,7 @@ export function AccountScreen() {
             its pilot.
           </Body>
         </Card>
+        <ConnectionTest />
       </ScrollView>
     );
   }
@@ -121,6 +167,7 @@ export function AccountScreen() {
           void signOut().then(() => setMe(null));
         }}
       />
+      <ConnectionTest />
     </ScrollView>
   );
 }
