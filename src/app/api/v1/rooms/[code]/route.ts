@@ -22,6 +22,7 @@ import {
 import { createSessionToken, hashSessionToken } from "@/lib/players/session";
 import { joinAsPlayerSchema } from "@/lib/players/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { clientKey } from "@/lib/request-context";
 import { counterAvailability } from "@/lib/singles/repository";
 
 export const dynamic = "force-dynamic";
@@ -145,7 +146,13 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const parsed = joinSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return badRequest("displayName must be a string");
 
-  const rate = checkRateLimit(`api-join:${code}`, JOIN_MAX, JOIN_WINDOW_MS);
+  // Per client, not per code: one keen tester (or one busy Friday) must
+  // never exhaust a whole room's join allowance for everyone else.
+  const rate = checkRateLimit(
+    `api-join:${await clientKey()}`,
+    JOIN_MAX,
+    JOIN_WINDOW_MS,
+  );
   if (!rate.allowed) {
     return Response.json({ error: "rate-limited" }, { status: 429 });
   }
