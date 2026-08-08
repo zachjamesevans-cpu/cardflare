@@ -86,17 +86,51 @@ export function RoomScreen({
     );
   }
 
+  /*
+   * A lobby is a joinable answer: the counter code with no room open yet.
+   * Joining is what opens the walk-in room — same as the website's lobby
+   * form — so the app shows the same door instead of punting.
+   */
+  if (state.state === "lobby") {
+    return (
+      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+        <Card>
+          {state.store && <Muted>{state.store.name}</Muted>}
+          <Title>Nothing on yet — start the room</Title>
+          <Body>
+            Trading is open here. Pick a name and you&rsquo;re in; the room opens
+            with you.
+          </Body>
+          <ErrorLine message={error} />
+          <Input
+            value={name}
+            onChangeText={setName}
+            placeholder="Display name"
+            autoCapitalize="words"
+          />
+          <Button
+            label={busy ? "Joining…" : "Join"}
+            onPress={() => void join()}
+            busy={busy}
+          />
+        </Card>
+      </ScrollView>
+    );
+  }
+
   if (state.state !== "room") {
     return (
       <View style={{ padding: spacing(4) }}>
         <Card>
           <Title>
-            {state.state === "quiet" ? "Nothing on right now" : "Open this one on the website"}
+            {state.state === "quiet"
+              ? "Nothing on right now"
+              : "Open this one on the website"}
           </Title>
           <Body>
             {state.state === "quiet"
               ? "This store is not running a room at the moment. Ask at the counter."
-              : "Card shows and pre-open lobbies live on cardflare.gg for now — scan the same code there."}
+              : "Card shows live on cardflare.gg for now — scan the same code there."}
           </Body>
         </Card>
       </View>

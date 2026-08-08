@@ -49,9 +49,17 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     return Response.json({ error: "not-found" }, { status: 404 });
   }
 
-  // Shows and quiet/lobby states are real answers, not errors.
+  // Shows and quiet/lobby states are real answers, not errors. A lobby is
+  // a joinable one — the POST below opens the walk-in room, exactly as the
+  // website's lobby form does — so it carries the store's name for the
+  // app's join screen.
   if (resolved.outcome !== "room") {
-    return Response.json({ state: resolved.outcome });
+    return Response.json({
+      state: resolved.outcome,
+      ...("store" in resolved && resolved.store
+        ? { store: { name: resolved.store.name } }
+        : {}),
+    });
   }
 
   const room = resolved.room;
