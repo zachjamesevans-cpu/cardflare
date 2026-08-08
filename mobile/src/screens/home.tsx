@@ -1,62 +1,38 @@
-import { useCallback, useEffect, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
-import { getMe, signOut, storedAccessToken, type Me } from "../api";
-import { Body, Button, Card, Input, Muted, Title } from "../ui";
+import type { StackParams } from "../../App";
+import { rememberRoom } from "../api";
+import { Body, Button, Card, Input, Title } from "../ui";
 import { spacing } from "../theme";
 
 /**
- * The front door: scan or type a code (the guest loop, first and
- * biggest, exactly like the website), with the account's things below
- * for people who have one.
+ * The Join tab — the front door, guest-first like the website: scan the
+ * counter code or type it. Everything account-shaped lives in its own
+ * tab; this screen is for getting into a room in two taps.
  */
-export function HomeScreen({
-  onScan,
-  onEnterCode,
-  onSignIn,
-  onInbox,
-  onSignedOut,
-}: {
-  onScan: () => void;
-  onEnterCode: (code: string) => void;
-  onSignIn: () => void;
-  onInbox: () => void;
-  onSignedOut: () => void;
-}) {
+export function HomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [code, setCode] = useState("");
-  const [me, setMe] = useState<Me | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
 
-  const refresh = useCallback(async () => {
-    const token = await storedAccessToken();
-    setSignedIn(Boolean(token));
-
-    if (!token) {
-      setMe(null);
-      return;
-    }
-
-    try {
-      setMe(await getMe());
-    } catch {
-      // A dead token renders the guest view; sign-in fixes it.
-      setMe(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const enter = async (raw: string) => {
+    await rememberRoom(raw.trim().toUpperCase());
+    setCode("");
+    navigation.navigate("Tabs", { screen: "Room" });
+  };
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
       <Card>
         <Title>Join a room</Title>
         <Body>
-          Scan the code on the counter — or type it if scanning is awkward.
+          Scan the code on the store&rsquo;s counter — or type it if scanning is
+          awkward. No account needed.
         </Body>
 
-        <Button label="Scan a QR code" onPress={onScan} />
+        <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
 
         <View style={{ flexDirection: "row", gap: spacing(2) }}>
           <View style={{ flex: 1 }}>
@@ -71,50 +47,18 @@ export function HomeScreen({
           <Button
             label="Go"
             variant="secondary"
-            onPress={() => code.trim() && onEnterCode(code.trim())}
+            onPress={() => code.trim() && void enter(code)}
           />
         </View>
       </Card>
 
-      {me ? (
-        <>
-          <Card>
-            <Title>{`You're in as ${me.player.displayName}`}</Title>
-            <Body>
-              {me.wants.length === 0
-                ? "Nothing saved yet. Post a Flare in a room and it will follow you here."
-                : `Hunting ${me.wants.length} ${me.wants.length === 1 ? "card" : "cards"} — walk into a room and it will offer to post them.`}
-            </Body>
-            {me.collection && (
-              <Muted>
-                {`Collection: ${me.collection.cardsMatched.toLocaleString()} cards along, matched quietly in every room.`}
-              </Muted>
-            )}
-          </Card>
-
-          <Button label="Notifications" variant="secondary" onPress={onInbox} />
-          <Button
-            label="Sign out"
-            variant="secondary"
-            onPress={() => {
-              void signOut().then(() => {
-                void refresh();
-                onSignedOut();
-              });
-            }}
-          />
-        </>
-      ) : (
-        <Card>
-          <Title>Have an account?</Title>
-          <Body>
-            {signedIn
-              ? "Your sign-in expired. Sign in again and your wants come back."
-              : "Sign in and the cards you post follow you between stores — and your phone hears about offers the moment they land."}
-          </Body>
-          <Button label="Sign in" variant="secondary" onPress={onSignIn} />
-        </Card>
-      )}
+      <Card>
+        <Title>How it works</Title>
+        <Body>
+          Post a Flare for the card you&rsquo;re hunting. When somebody in the room
+          has it, they raise a hand — and you go trade, in person, at the table.
+        </Body>
+      </Card>
     </ScrollView>
   );
 }

@@ -129,11 +129,27 @@ async function call<T>(
 
   if (body !== undefined) headers["content-type"] = "application/json";
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  /*
+   * A hard timeout on every call. A phone on flaky store wifi must never
+   * hang a spinner forever — a fetch that cannot finish in 15 seconds is
+   * an error the screen can show and the player can retry.
+   */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      signal: controller.signal,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch (caught) {
+    throw new ApiError(0, controller.signal.aborted ? "timeout" : "network");
+  } finally {
+    clearTimeout(timer);
+  }
 
   // One silent refresh on an expired account token, then give up honestly.
   if (response.status === 401 && access && !retried) {
@@ -251,6 +267,27 @@ export const confirmTrade = (code: string, flareId: string, partnerSessionId?: s
     flareId,
     partnerSessionId,
   });
+
+export const removeFlare = (code: string, flareId: string) =>
+  call<{ ok: true }>("DELETE", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, {
+    flareId,
+  });
+
+export const setOpenToTrades = (code: string, open: boolean) =>
+  call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/open`, {
+    open,
+  });
+
+/** The last room joined, so the Room tab reopens where the player was. */
+const LAST_ROOM_KEY = "cf_last_room";
+
+export async function rememberRoom(code: string): Promise<void> {
+  await SecureStore.setItemAsync(LAST_ROOM_KEY, code);
+}
+
+export async function lastRoom(): Promise<string | null> {
+  return SecureStore.getItemAsync(LAST_ROOM_KEY);
+}
 
 export interface CardHit {
   id: string;

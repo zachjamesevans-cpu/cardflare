@@ -1,8 +1,10 @@
+import { z } from "zod";
+
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
-import { addFlare } from "@/lib/lists/repository";
+import { addFlare, cancelFlare } from "@/lib/lists/repository";
 import { addEntrySchema } from "@/lib/lists/schema";
 import { saveWant } from "@/lib/players/wants";
 
@@ -45,6 +47,29 @@ export async function POST(
   if (session.player_id) {
     await saveWant(session.player_id, parsed.data);
   }
+
+  return Response.json({ ok: true });
+}
+
+const removeSchema = z.object({ flareId: z.guid() });
+
+/** Taking a Flare down — `cancelFlare` only ever touches the caller's own. */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ code: string }> },
+): Promise<Response> {
+  const code = normalizeJoinCode(decodeURIComponent((await params).code));
+  if (!isValidJoinCode(code)) {
+    return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  const session = await apiSession(request);
+  if (!session) return unauthorized();
+
+  const parsed = removeSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return badRequest("flareId is required");
+
+  await cancelFlare(parsed.data.flareId, session.id);
 
   return Response.json({ ok: true });
 }

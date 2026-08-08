@@ -2,6 +2,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
+import { rememberRoom } from "../api";
+
 import { Body, Button, Card, Title } from "../ui";
 import { colors, spacing } from "../theme";
 
@@ -42,7 +44,8 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
           if (!code) return;
 
           fired.current = true;
-          onCode(code.toUpperCase());
+          // Remembered before navigating so the Room tab finds it.
+          void rememberRoom(code.toUpperCase()).then(() => onCode(code.toUpperCase()));
         }}
       />
       <View style={styles.hint}>
