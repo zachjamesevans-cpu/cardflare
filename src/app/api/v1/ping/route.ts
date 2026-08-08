@@ -18,3 +18,7 @@ export async function POST(request: Request): Promise<Response> {
     at: new Date().toISOString(),
   });
 }
+
+export async function DELETE(): Promise<Response> {
+  return Response.json({ ok: true, method: "DELETE", at: new Date().toISOString() });
+}
