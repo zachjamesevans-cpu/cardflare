@@ -25,6 +25,9 @@ const notifyTradeConfirmed = vi.fn();
 const clearWantForFlare = vi.fn();
 const linkSessionToPlayer = vi.fn();
 
+vi.mock("@/lib/request-context", () => ({
+  clientKey: vi.fn().mockResolvedValue("client-1"),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
   getSupabaseAdmin: () => ({ auth: { getUser: vi.fn() } }),

@@ -103,13 +103,16 @@ function RoomScreen({ code }: { code: string }) {
       await joinRoom(code, name.trim() || undefined);
       await refresh();
     } catch (caught) {
+      // The reason is named so a field report can say what actually failed.
       setError(
         caught instanceof ApiError
           ? caught.code === "not-open"
             ? "This room is not open right now."
             : caught.code === "timeout"
               ? "That took too long — check your connection and try again."
-              : "Could not join. Check the name and try again."
+              : caught.code === "rate-limited"
+                ? "Too many joins from here just now — wait a minute and try again."
+                : `Could not join (${caught.code}). Try again.`
           : "Could not join. Try again.",
       );
     } finally {

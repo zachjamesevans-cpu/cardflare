@@ -9,8 +9,11 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 
+import { Image } from "react-native";
+
 import { AccountScreen } from "./src/screens/account";
 import { HomeScreen } from "./src/screens/home";
+import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { PostFlareScreen } from "./src/screens/post-flare";
 import { RoomTab } from "./src/screens/room";
@@ -40,6 +43,7 @@ Notifications.setNotificationHandler({
 export type TabParams = {
   Join: undefined;
   Room: undefined;
+  Flare: undefined;
   Inbox: undefined;
   Account: undefined;
 };
@@ -66,12 +70,26 @@ const theme: Theme = {
   },
 };
 
-const TAB_ICONS: Record<keyof TabParams, keyof typeof Ionicons.glyphMap> = {
+const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>> = {
   Join: "qr-code",
-  Room: "flame",
+  Room: "people",
   Inbox: "notifications",
   Account: "person-circle",
 };
+
+/*
+ * The centre tab wears the mark itself — the approved asset, copied
+ * byte-for-byte from public/brand, sized by height as the brand rules
+ * require. Dimmed when inactive the same way the icon tabs are.
+ */
+function MarkIcon({ focused }: { focused: boolean }) {
+  return (
+    <Image
+      source={require("./assets/cardflare-mark.png")}
+      style={{ height: 34, width: 34, resizeMode: "contain", opacity: focused ? 1 : 0.55 }}
+    />
+  );
+}
 
 function Tabs() {
   return (
@@ -83,13 +101,23 @@ function Tabs() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name={TAB_ICONS[route.name as keyof TabParams]} color={color} size={size} />
-        ),
+        tabBarIcon: ({ color, size, focused }) => {
+          const icon = TAB_ICONS[route.name as keyof TabParams];
+          return icon ? (
+            <Ionicons name={icon} color={color} size={size} />
+          ) : (
+            <MarkIcon focused={focused} />
+          );
+        },
       })}
     >
       <Tab.Screen name="Join" component={HomeScreen} options={{ title: "CardFlare" }} />
       <Tab.Screen name="Room" component={RoomTab} />
+      <Tab.Screen
+        name="Flare"
+        component={HubScreen}
+        options={{ title: "Post a Flare", tabBarLabel: "Flare" }}
+      />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Notifications" }} />
       <Tab.Screen name="Account" component={AccountScreen} />
     </Tab.Navigator>
