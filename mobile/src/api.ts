@@ -118,6 +118,7 @@ async function call<T>(
   path: string,
   body?: unknown,
   retried = false,
+  timeoutMs = 15_000,
 ): Promise<T> {
   const headers: Record<string, string> = {};
 
@@ -135,7 +136,7 @@ async function call<T>(
    * an error the screen can show and the player can retry.
    */
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   try {
@@ -153,7 +154,9 @@ async function call<T>(
 
   // One silent refresh on an expired account token, then give up honestly.
   if (response.status === 401 && access && !retried) {
-    if (await refreshAccessToken()) return call<T>(method, path, body, true);
+    if (await refreshAccessToken()) {
+      return call<T>(method, path, body, true, timeoutMs);
+    }
   }
 
   if (!response.ok) {
@@ -237,11 +240,14 @@ export async function joinRoom(
   code: string,
   displayName?: string,
 ): Promise<{ joined: boolean; you: { sessionId: string; displayName: string } }> {
+  // Joining does the most server work of any call (session creation,
+  // walk-in rooms opening, a possible cold start) — it gets double the
+  // patience before the screen calls it a timeout.
   const result = await call<{
     joined: boolean;
     you: { sessionId: string; displayName: string };
     sessionToken?: string;
-  }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}`, { displayName });
+  }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}`, { displayName }, false, 30_000);
 
   // Handed out exactly once; keep it or the membership is lost.
   if (result.sessionToken) {
