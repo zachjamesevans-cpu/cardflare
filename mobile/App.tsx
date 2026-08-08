@@ -9,6 +9,7 @@ import * as Notifications from "expo-notifications";
 
 import { HomeScreen } from "./src/screens/home";
 import { InboxScreen } from "./src/screens/inbox";
+import { PostFlareScreen } from "./src/screens/post-flare";
 import { RoomScreen } from "./src/screens/room";
 import { ScanScreen } from "./src/screens/scan";
 import { SignInScreen } from "./src/screens/sign-in";
@@ -34,6 +35,7 @@ export type StackParams = {
   SignIn: undefined;
   Scan: undefined;
   Room: { code: string };
+  PostFlare: { code: string };
   Inbox: undefined;
 };
 
@@ -89,7 +91,23 @@ export default function App() {
         </Stack.Screen>
 
         <Stack.Screen name="Room" options={{ title: "Room" }}>
-          {({ route }) => <RoomScreen code={route.params.code} />}
+          {({ route, navigation }) => (
+            <RoomScreen
+              code={route.params.code}
+              onPostFlare={() =>
+                navigation.navigate("PostFlare", { code: route.params.code })
+              }
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
+          {({ route, navigation }) => (
+            <PostFlareScreen
+              code={route.params.code}
+              onPosted={() => navigation.goBack()}
+            />
+          )}
         </Stack.Screen>
 
         <Stack.Screen

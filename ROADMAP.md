@@ -474,11 +474,19 @@ registration** after sign-in into `POST /api/v1/devices`. Typechecks
 clean; the web app's verify and e2e are untouched by the monorepo
 addition.
 
-**Phase 2 (next):** the in-app card picker for posting Flares, the
-server-side push-delivery worker (queued notifications → Expo's push
-service) once real device tokens exist, EAS build + TestFlight when the
-founder's Apple Developer enrollment clears — see `mobile/README.md`
-for the exact commands, and the two `expo.extra` values to fill in.
+**Phase 2 (shipped):** posting a Flare from the app — debounced catalog
+search, printing choice (any by default), quantity, note, the same
+server-side validation as the website — and **push delivery**: when the
+backbone records a notification, every device the account registered
+gets it through Expo's push service, with tokens the service disowns
+("DeviceNotRegistered") pruned so a deleted app never gets paid for
+again. Both `expo.extra` values are filled in (public by design), so
+sign-in works out of the box.
+
+**Remaining:** EAS build + TestFlight when the founder's Apple
+Developer enrollment clears — `mobile/README.md` has the exact
+commands. Push end-to-end needs that development build; everything
+else works in Expo Go today.
 
 ## ✅ Milestone 14 — the API the app talks to
 
