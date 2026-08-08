@@ -193,6 +193,8 @@ export interface RoomFlare {
 
 export interface RoomState {
   state: "room" | "show" | "lobby" | "quiet";
+  /** Present on lobby and quiet states: whose counter this is. */
+  store?: { name: string };
   joined?: boolean;
   room?: {
     name: string;
