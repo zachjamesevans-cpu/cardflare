@@ -6,13 +6,19 @@ import { useRouter } from "next/navigation";
 /**
  * Keeps an open room current without anybody pulling to refresh.
  *
- * A timer that re-renders the page from the server once a minute while the
- * tab is visible. That is the whole component — deliberately, and it is the
- * same decision presence made in Milestone 4: this room runs on polled
+ * A timer that re-renders the page from the server every few seconds while
+ * the tab is visible. That is the whole component — deliberately, and it is
+ * the same decision presence made in Milestone 4: this room runs on polled
  * server state, not on a live connection. A websocket (or Supabase Realtime,
  * which RLS-with-no-policies rules out anyway) would buy a few seconds'
  * latency on a signal whose answer is a walk across a physical room, at the
  * price of connection management on locked phones in a shop with bad wifi.
+ *
+ * Twelve seconds is the founder-calibrated cadence: at sixty, an offer sat
+ * invisible long enough that people reached for pull-to-refresh, which is
+ * the failure this component exists to prevent. A room re-render is a
+ * handful of indexed reads, and hidden tabs pay nothing at all — a shop's
+ * worth of phones at this rate is still trivial load.
  *
  * The interval also doubles as the presence heartbeat: every refresh renders
  * the page, the page touches `last_seen_at` (rate-limited internally), and a
@@ -22,7 +28,7 @@ import { useRouter } from "next/navigation";
  * not need fresh offers, and the refresh on wake happens naturally when the
  * next visible tick fires.
  */
-export function RoomTicker({ intervalMs = 60_000 }: { intervalMs?: number }) {
+export function RoomTicker({ intervalMs = 12_000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {

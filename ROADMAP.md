@@ -497,7 +497,7 @@ next room offers a repost); shows were the gap, and shows are exactly
 where the vendor pitch lives.
 
 **Phase 4 (shipped, field-debugged):** two founder-reported gaps. The
-big one: on the founder's own network, every app request *with a body*
+big one: on the founder's own network, every app request _with a body_
 died in transit while bodyless requests sailed through — proven by the
 in-app six-probe connection matrix (GET 200, POST-empty 200,
 POST-with-body timeout under every content-type, DELETE-empty 200;
@@ -511,6 +511,18 @@ shows card art beside every search result, every printing renders
 with its own artwork so an alternate art is chosen by eye (matching
 the website's versions list), and the room board shows each Flare's
 card image.
+
+**Phase 5 (shipped):** rooms feel live, and versions speak the
+website's language. The website's room ticker now re-renders every
+twelve seconds instead of sixty — at a minute, an offer sat invisible
+long enough that people reached for pull-to-refresh — and the app
+polls at the same cadence. The `/api/v1/cards` picker now labels each
+printing with the website's exact wording (`printingLabel`: set code
+· rarity · variant · promo · SPR-style mark) instead of the bare set
+code, so an alternate art says so in both clients. And the app's
+search results grew the website's versions dropdown: unfold a card's
+printings, each with its own artwork and that full label, and tapping
+one picks the card with that printing already chosen.
 
 **Remaining:** EAS build + TestFlight when the founder's Apple
 Developer enrollment clears — `mobile/README.md` has the exact

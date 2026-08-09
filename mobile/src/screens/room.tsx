@@ -30,7 +30,9 @@ import {
 import { Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
-const POLL_MS = 20_000;
+// The website's room ticker runs at twelve seconds now; the app keeps
+// the same rhythm so an offer never looks slower in the pocket client.
+const POLL_MS = 12_000;
 
 /**
  * The Room tab — the app's rendering of `/e/[code]`, at the website's

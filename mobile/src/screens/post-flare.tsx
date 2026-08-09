@@ -46,6 +46,8 @@ export function PostFlareScreen({
 }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
+  /** Which result's versions are unfolded — one at a time, like the website. */
+  const [versionsFor, setVersionsFor] = useState<string | null>(null);
   const [picked, setPicked] = useState<CardHit | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -108,36 +110,85 @@ export function PostFlareScreen({
             <Muted>Nothing yet — keep typing, or check the number.</Muted>
           )}
           {hits.map((hit) => (
-            <Pressable
+            <View
               key={hit.id}
-              onPress={() => {
-                setPicked(hit);
-                setPrintingId(null);
-              }}
-              style={({ pressed }) => ({
-                flexDirection: "row" as const,
-                alignItems: "center" as const,
-                gap: spacing(3),
+              style={{
                 borderColor: colors.border,
                 borderWidth: 1,
                 borderRadius: radius.control,
                 padding: spacing(2),
-                opacity: pressed ? 0.7 : 1,
-              })}
+                gap: spacing(2),
+              }}
             >
-              <Art imageUrl={leadArt(hit)} width={40} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {hit.name}
+              <Pressable
+                onPress={() => {
+                  setPicked(hit);
+                  setPrintingId(null);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: "row" as const,
+                  alignItems: "center" as const,
+                  gap: spacing(3),
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Art imageUrl={leadArt(hit)} width={40} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {hit.name}
+                  </Text>
+                  <Muted>{hit.cardNumber}</Muted>
+                </View>
+              </Pressable>
+
+              {/*
+               * The website's versions list, on a tap: which physical card —
+               * base art, alt art, SP, promo — with its own artwork. Picking
+               * a version here selects the card *with that printing*, so the
+               * alt-art hunter never chooses twice.
+               */}
+              <Pressable
+                onPress={() =>
+                  setVersionsFor(versionsFor === hit.id ? null : hit.id)
+                }
+              >
+                <Text style={{ color: colors.accent, fontSize: 13 }}>
+                  {versionsFor === hit.id
+                    ? "Hide versions"
+                    : hit.printings.length === 1
+                      ? "Show version ▾"
+                      : `Show ${hit.printings.length} versions ▾`}
                 </Text>
-                <Muted>
-                  {hit.cardNumber}
-                  {hit.printings.length > 1
-                    ? ` · ${hit.printings.length} versions`
-                    : ""}
-                </Muted>
-              </View>
-            </Pressable>
+              </Pressable>
+
+              {versionsFor === hit.id &&
+                hit.printings.map((printing) => (
+                  <Pressable
+                    key={printing.id}
+                    onPress={() => {
+                      setPicked(hit);
+                      setPrintingId(printing.id);
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: "row" as const,
+                      alignItems: "center" as const,
+                      gap: spacing(3),
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: radius.control,
+                      padding: spacing(2),
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Art imageUrl={printing.imageUrl} width={36} />
+                    <Text
+                      style={{ color: colors.textSecondary, flex: 1, fontSize: 13 }}
+                    >
+                      {printing.label ?? "Standard printing"}
+                    </Text>
+                  </Pressable>
+                ))}
+            </View>
           ))}
         </Card>
       ) : (
