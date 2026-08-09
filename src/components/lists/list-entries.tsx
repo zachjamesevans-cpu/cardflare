@@ -253,6 +253,7 @@ function CarouselEntry({
   pledgeLine = null,
   canOffer = false,
   offered = false,
+  ownQuantity = 1,
   early = false,
   covered = false,
   remaining,
@@ -265,10 +266,12 @@ function CarouselEntry({
   removable: boolean;
   /** The hunt's coverage, one short line: "Needs 1 more" and kin. */
   pledgeLine?: string | null;
-  /** Somebody else's Flare and the viewer has not pledged yet. */
+  /** Somebody else's Flare: the pledge control renders. */
   canOffer?: boolean;
-  /** The viewer's pledge is already standing. */
+  /** The viewer's pledge is already standing: filled button, editable. */
   offered?: boolean;
+  /** How many the standing pledge promised. */
+  ownQuantity?: number;
   early?: boolean;
   /** Every asked-for copy is pledged: dimmed and parked at the rail's end. */
   covered?: boolean;
@@ -292,7 +295,11 @@ function CarouselEntry({
 
   return (
     <li
-      className={`relative flex w-14 shrink-0 flex-col gap-1 ${covered ? "opacity-60" : ""}`}
+      className={`relative flex w-14 shrink-0 flex-col gap-1 ${
+        /* Fully covered: dimmed AND drained of colour — "taken care
+           of" should read from across the room. */
+        covered ? "opacity-60 grayscale" : ""
+      }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
       <div className="relative">
@@ -387,6 +394,8 @@ function CarouselEntry({
           flareId={entry.id}
           early={early}
           flareQuantity={entry.quantity}
+          offered={offered}
+          ownQuantity={ownQuantity}
         />
       )}
       {offered && (
@@ -551,8 +560,9 @@ export function FlareBoard({
                 match={match}
                 removable={isYou}
                 pledgeLine={pledgeLine}
-                canOffer={!isYou && !ownOffer}
+                canOffer={!isYou}
                 offered={Boolean(ownOffer)}
+                ownQuantity={ownOffer?.quantity ?? 1}
                 early={early}
                 covered={covered}
                 remaining={remaining}

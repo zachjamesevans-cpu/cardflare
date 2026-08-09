@@ -26,6 +26,7 @@ import {
   type BoardView,
   offerOnFlare,
   postFlare,
+  withdrawOffer,
   rememberRoom,
   removeFlare,
   setOpenToTrades,
@@ -505,19 +506,25 @@ function RoomScreen({
            */
           const { folders, loose } = partitionByDeck(group.flares);
 
-          const tile = (flare: RoomFlare) => (
-            <CarouselFlare
-              key={flare.id}
-              flare={flare}
-              mine={mine}
-              offered={flare.offers.some((o) => o.responderSessionId === youId)}
-              early={room.early}
-              onOffer={(quantity) =>
-                act(() => offerOnFlare(code, flare.id, undefined, quantity))
-              }
-              onRemove={() => void act(() => removeFlare(code, flare.id))}
-            />
-          );
+          const tile = (flare: RoomFlare) => {
+            const own = flare.offers.find((o) => o.responderSessionId === youId);
+
+            return (
+              <CarouselFlare
+                key={flare.id}
+                flare={flare}
+                mine={mine}
+                offered={Boolean(own)}
+                ownQuantity={own?.quantity ?? 1}
+                early={room.early}
+                onOffer={(quantity) =>
+                  act(() => offerOnFlare(code, flare.id, undefined, quantity))
+                }
+                onWithdraw={() => act(() => withdrawOffer(code, flare.id))}
+                onRemove={() => void act(() => removeFlare(code, flare.id))}
+              />
+            );
+          };
 
           /* Fully pledged hunts park at the rail's far end, dimmed but
              present — the bring-extras crowd can still see the ask. */
@@ -696,16 +703,21 @@ function CarouselFlare({
   flare,
   mine,
   offered,
+  ownQuantity,
   early,
   onOffer,
+  onWithdraw,
   onRemove,
 }: {
   flare: RoomFlare;
   mine: boolean;
   /** The viewer's pledge on this Flare is already standing. */
   offered: boolean;
+  /** How many the standing pledge promised, the stepper's start. */
+  ownQuantity: number;
   early: boolean;
   onOffer: (quantity?: number) => Promise<void>;
+  onWithdraw: () => Promise<void>;
   onRemove: () => void;
 }) {
   const pledgeLine = pledgeLineFor(flare);
@@ -727,7 +739,7 @@ function CarouselFlare({
    * and the check submits. No second screen; the tile is the form.
    */
   const [picking, setPicking] = useState(false);
-  const [count, setCount] = useState(1);
+  const [count, setCount] = useState(Math.max(offered ? ownQuantity : 1, 1));
 
   const pledge = async (quantity?: number) => {
     if (pledging) return;
@@ -735,6 +747,18 @@ function CarouselFlare({
     setPledging(true);
     try {
       await onOffer(quantity);
+    } finally {
+      setPledging(false);
+    }
+  };
+
+  const takeBack = async () => {
+    if (pledging) return;
+    setPicking(false);
+    setPledging(true);
+    try {
+      await onWithdraw();
+      setCount(1);
     } finally {
       setPledging(false);
     }
@@ -758,7 +782,17 @@ function CarouselFlare({
   const fan = ghosts * 4;
 
   return (
-    <View style={{ width: 56 + fan, gap: spacing(1), opacity: covered ? 0.6 : 1 }}>
+    // Fully covered: dimmed AND drained of colour — "taken care of"
+    // should read from across the room. (filter needs RN 0.76+ with
+    // the new architecture; this project ships 0.81 with it on.)
+    <View
+      style={{
+        width: 56 + fan,
+        gap: spacing(1),
+        opacity: covered ? 0.6 : 1,
+        filter: covered ? [{ grayscale: 1 }] : undefined,
+      }}
+    >
       <View style={{ width: 56 + fan, height: artHeight }}>
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
           flare.imageUrl ? (
@@ -828,44 +862,61 @@ function CarouselFlare({
       )}
 
       {/* Anyone can pledge — no binder required, the founder's call.
-          The handshake is the whole button; a multi-copy ask flips it
-          to the stepper first. */}
-      {!mine && !offered && !picking && (
+          The handshake is the whole button, and it stays after you
+          commit (filled in) so the pledge can be edited: tap to reopen
+          the stepper at your count, and stepping to zero withdraws. */}
+      {!mine && !picking && (
         <Tap
           onPress={() =>
-            flare.quantity > 1 ? setPicking(true) : void pledge()
+            offered || flare.quantity > 1 ? setPicking(true) : void pledge()
           }
           disabled={pledging}
-          style={styles.pledgeButton}
+          style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
           hitSlop={4}
         >
           <MaterialCommunityIcons
-            name="handshake-outline"
+            name={offered ? "handshake" : "handshake-outline"}
             size={14}
             color={colors.accent}
           />
         </Tap>
       )}
-      {!mine && !offered && picking && (
+      {!mine && picking && (
         <View style={styles.pledgeStepper}>
-          <Tap onPress={() => setCount((n) => Math.max(1, n - 1))} hitSlop={6}>
+          <Tap
+            onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
+            hitSlop={6}
+          >
             <Text style={styles.stepperGlyph}>−</Text>
           </Tap>
           <Text style={styles.stepperCount}>{count}</Text>
           <Tap
-            onPress={() => setCount((n) => Math.min(flare.quantity, n + 1))}
+            onPress={() => setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))}
             hitSlop={6}
           >
             <Text style={styles.stepperGlyph}>+</Text>
           </Tap>
-          <Tap onPress={() => void pledge(count)} hitSlop={6}>
-            <View style={styles.stepperGo}>
-              <Text style={styles.stepperGoGlyph}>✓</Text>
+          {/* Zero is a real answer once a pledge stands: it withdraws. */}
+          <Tap
+            onPress={() =>
+              offered && count === 0 ? void takeBack() : void pledge(count)
+            }
+            hitSlop={6}
+          >
+            <View style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}>
+              <Text
+                style={[
+                  styles.stepperGoGlyph,
+                  offered && count === 0 && { color: colors.textSecondary },
+                ]}
+              >
+                ✓
+              </Text>
             </View>
           </Tap>
         </View>
       )}
-      {!mine && offered && (
+      {!mine && offered && !picking && (
         <Text style={{ color: colors.textMuted, fontSize: 10 }}>You&rsquo;re on it</Text>
       )}
       {mine && (
@@ -1122,6 +1173,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  pledgeButtonOn: {
+    borderColor: colors.accent,
+    backgroundColor: `${colors.accent}40`,
+  },
+  stepperGoOff: {
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   pledgeStepper: {
     flexDirection: "row",
