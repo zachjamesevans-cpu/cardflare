@@ -44,6 +44,8 @@ const getUser = vi.fn();
 const playerForUser = vi.fn();
 const listWants = vi.fn();
 const collectionSyncFor = vi.fn();
+const listLocals = vi.fn();
+const removeLocal = vi.fn();
 
 function queue(table: string, ...responses: Response_[]) {
   (queues[table] ??= []).push(...responses);
@@ -68,10 +70,15 @@ vi.mock("@/lib/players/wants", () => ({
 vi.mock("@/lib/players/collection", () => ({
   collectionSyncFor: (...a: unknown[]) => collectionSyncFor(...a),
 }));
+vi.mock("@/lib/players/locals", () => ({
+  listLocals: (...a: unknown[]) => listLocals(...a),
+  removeLocal: (...a: unknown[]) => removeLocal(...a),
+}));
 
 const me = await import("@/app/api/v1/me/route");
 const devices = await import("@/app/api/v1/devices/route");
 const notifications = await import("@/app/api/v1/notifications/route");
+const locals = await import("@/app/api/v1/locals/route");
 
 function request(
   method: string,
@@ -89,7 +96,14 @@ beforeEach(() => {
   for (const store of [queues, calls]) {
     for (const key of Object.keys(store)) delete store[key];
   }
-  for (const fn of [getUser, playerForUser, listWants, collectionSyncFor]) {
+  for (const fn of [
+    getUser,
+    playerForUser,
+    listWants,
+    collectionSyncFor,
+    listLocals,
+    removeLocal,
+  ]) {
     fn.mockReset();
   }
 
@@ -97,6 +111,8 @@ beforeEach(() => {
   playerForUser.mockResolvedValue({ id: "player-1", display_name: "Kaito" });
   listWants.mockResolvedValue([]);
   collectionSyncFor.mockResolvedValue(null);
+  listLocals.mockResolvedValue([]);
+  removeLocal.mockResolvedValue(undefined);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -152,6 +168,66 @@ describe("GET /api/v1/me", () => {
       cardsMatched: 77,
       syncedAt: "2026-08-06T00:00:00Z",
     });
+  });
+});
+
+describe("your locals over the API", () => {
+  it("includes the saved stores in the /me snapshot", async () => {
+    listLocals.mockResolvedValue([
+      {
+        storeId: "s1",
+        name: "Mox Valley Games",
+        city: "Renton",
+        region: "WA",
+        joinCode: "MXV7Q2R",
+        savedAt: "2026-08-09T00:00:00Z",
+        liveNow: true,
+        nextEventAt: null,
+        nextEventName: null,
+      },
+    ]);
+
+    const body = await (await me.GET(request("GET"))).json();
+
+    expect(listLocals).toHaveBeenCalledWith("player-1");
+    expect(body.locals).toEqual([
+      {
+        storeId: "s1",
+        name: "Mox Valley Games",
+        city: "Renton",
+        region: "WA",
+        code: "MXV7Q2R",
+        liveNow: true,
+        nextEventAt: null,
+        nextEventName: null,
+      },
+    ]);
+  });
+
+  it("removes a local for the authenticated player only", async () => {
+    const storeId = "11111111-1111-4111-8111-111111111111";
+    const response = await locals.DELETE(request("DELETE", { storeId }));
+
+    expect(response.status).toBe(200);
+    expect(removeLocal).toHaveBeenCalledWith("player-1", storeId);
+  });
+
+  it("refuses a removal without a verified player", async () => {
+    playerForUser.mockResolvedValue(null);
+
+    const response = await locals.DELETE(
+      request("DELETE", { storeId: "11111111-1111-4111-8111-111111111111" }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(removeLocal).not.toHaveBeenCalled();
+  });
+
+  it("refuses a malformed store id", async () => {
+    const response = await locals.DELETE(request("DELETE", { storeId: "nope" }));
+
+    expect(response.status).toBe(400);
+    expect(removeLocal).not.toHaveBeenCalled();
   });
 });
 

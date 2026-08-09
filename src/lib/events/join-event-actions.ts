@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { text } from "@/lib/form-value";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { saveLocal } from "@/lib/players/locals";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   createPlayerSession,
@@ -169,6 +170,7 @@ export async function joinEventAction(
    * the whole difference an account makes at the door. Guests join exactly
    * as before; nothing above this line knows accounts exist.
    */
+  let accountPlayerId = session.player_id;
   if (session.player_id === null) {
     const viewer = await getViewer();
     const playerId =
@@ -178,8 +180,15 @@ export async function joinEventAction(
           ? null
           : ((await playerForUser(viewer.user.id))?.id ?? null);
 
-    if (playerId) await linkSessionToPlayer(session.id, playerId);
+    if (playerId) {
+      await linkSessionToPlayer(session.id, playerId);
+      accountPlayerId = playerId;
+    }
   }
+
+  // A signed-in join is what makes a store a local — saved silently here,
+  // never in the way: the join has already succeeded whatever this does.
+  if (accountPlayerId) await saveLocal(accountPlayerId, event.storeId);
 
   if (freshToken) await setPlayerCookie(freshToken);
 

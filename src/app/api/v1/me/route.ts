@@ -1,5 +1,6 @@
 import { apiPlayer, unauthorized } from "@/lib/api/auth";
 import { collectionSyncFor } from "@/lib/players/collection";
+import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +15,10 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [wants, sync] = await Promise.all([
+  const [wants, sync, locals] = await Promise.all([
     listWants(player.playerId),
     collectionSyncFor(player.playerId),
+    listLocals(player.playerId),
   ]);
 
   return Response.json({
@@ -34,5 +36,15 @@ export async function GET(request: Request): Promise<Response> {
     collection: sync
       ? { cardsMatched: sync.cards_matched, syncedAt: sync.synced_at }
       : null,
+    locals: locals.map((local) => ({
+      storeId: local.storeId,
+      name: local.name,
+      city: local.city,
+      region: local.region,
+      code: local.joinCode,
+      liveNow: local.liveNow,
+      nextEventAt: local.nextEventAt,
+      nextEventName: local.nextEventName,
+    })),
   });
 }

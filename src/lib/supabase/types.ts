@@ -534,6 +534,18 @@ export type PlayerInviteInsert = Omit<
   accepted_by?: string | null;
 };
 
+export type PlayerLocalRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  store_id: string;
+};
+
+export type PlayerLocalInsert = Omit<PlayerLocalRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
 export type PlayerWantRow = {
   id: string;
   created_at: string;
@@ -662,6 +674,7 @@ export type Database = {
       players: Table<PlayerRow, PlayerInsert>;
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
+      player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       player_collection: Table<PlayerCollectionRow, PlayerCollectionInsert>;

@@ -195,9 +195,23 @@ export interface Me {
     note: string | null;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
+  locals: {
+    storeId: string;
+    name: string;
+    city: string | null;
+    region: string | null;
+    /** The store's permanent counter code — tap a local, skip the QR. */
+    code: string;
+    liveNow: boolean;
+    nextEventAt: string | null;
+    nextEventName: string | null;
+  }[];
 }
 
 export const getMe = () => call<Me>("GET", "/api/v1/me");
+
+export const removeLocal = (storeId: string) =>
+  call<{ ok: true }>("DELETE", "/api/v1/locals", { storeId });
 
 export interface RoomFlare {
   id: string;
