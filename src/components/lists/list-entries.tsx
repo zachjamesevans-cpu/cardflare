@@ -1,3 +1,4 @@
+import Image from "next/image";
 import {
   Flame,
   Folder,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import { isRenderableImageUrl } from "@/lib/cards/images";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
 import {
   MarkTraded,
@@ -81,6 +83,7 @@ function Entry({
           anyPrinting={!entry.printingId}
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
+          lookingFor={kind === "flare" ? entry.quantity : null}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -269,11 +272,38 @@ function CarouselEntry({
   /** Every asked-for copy is pledged: dimmed and parked at the rail's end. */
   covered?: boolean;
 }) {
+  /*
+   * "2x wanted" said without text: copies 2 through 4 render as faded
+   * layers of the same card behind the art, each nudged down-right, so
+   * the tile reads as a literal stack of what was asked — the founder's
+   * shape. Past four the layers stop being countable, so ×N text
+   * returns; screen readers always get the number either way.
+   */
+  const ghosts = Math.min(entry.quantity, 4) - 1;
+
   return (
     <li
       className={`relative flex w-14 shrink-0 flex-col gap-1 ${covered ? "opacity-60" : ""}`}
     >
-      <div className="relative">
+      <div className={`relative ${ghosts > 0 ? "mb-1" : ""}`}>
+        {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
+          <div
+            key={depth}
+            aria-hidden="true"
+            className="absolute inset-0 overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
+            style={{ transform: `translate(${depth * 2}px, ${depth * 2}px)` }}
+          >
+            {isRenderableImageUrl(entry.imageUrl) && (
+              <Image
+                src={entry.imageUrl}
+                alt=""
+                fill
+                sizes="56px"
+                className="object-cover"
+              />
+            )}
+          </div>
+        ))}
         <CardImageZoom
           imageUrl={entry.imageUrl}
           exactName={entry.cardName}
@@ -282,6 +312,7 @@ function CarouselEntry({
           anyPrinting={!entry.printingId}
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
+          lookingFor={kind === "flare" ? entry.quantity : null}
           thumbClassName="w-full"
         />
         {/* The founder's ask: a note announces itself on the tile, and
@@ -289,7 +320,7 @@ function CarouselEntry({
         {entry.note && (
           <span
             aria-label="Has a note"
-            className="pointer-events-none absolute top-0.5 right-0.5 rounded-full bg-surface/90 p-0.5"
+            className="pointer-events-none absolute top-0.5 right-0.5 z-10 rounded-full bg-surface/90 p-0.5"
           >
             <StickyNote className="size-3 text-accent" aria-hidden="true" />
           </span>
@@ -298,11 +329,14 @@ function CarouselEntry({
 
       <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
         {entry.cardName}
-        {entry.quantity > 1 && (
+        {entry.quantity > 4 && (
           <span className="font-normal text-text-muted tabular-nums">
             {" "}
             ×{entry.quantity}
           </span>
+        )}
+        {entry.quantity > 1 && entry.quantity <= 4 && (
+          <span className="sr-only"> ×{entry.quantity}</span>
         )}
       </p>
 
