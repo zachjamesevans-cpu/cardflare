@@ -2,6 +2,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -414,6 +415,20 @@ function FlareRow({
   return (
     <View style={styles.flare}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing(2) }}>
+        {flare.imageUrl && (
+          <Image
+            source={{ uri: flare.imageUrl }}
+            style={{
+              width: 40,
+              height: 56,
+              borderRadius: radius.control / 2,
+              borderColor: colors.border,
+              borderWidth: 1,
+              backgroundColor: colors.canvas,
+            }}
+            resizeMode="cover"
+          />
+        )}
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}>
             {flare.cardName}

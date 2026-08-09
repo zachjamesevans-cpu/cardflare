@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 
 import { ApiError, postFlare, searchCards, type CardHit } from "../api";
 import { Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
@@ -9,8 +9,34 @@ import { colors, radius, spacing } from "../theme";
  * Posting a Flare from the app: search the catalog, pick a card, say
  * which printing (any, by default — which is what most requests mean),
  * how many, and an optional note. The same ranked search and the same
- * server-side validation as the website's picker.
+ * server-side validation as the website's picker — and the same *look*:
+ * card art beside every result, every printing shown with its own art
+ * so an alternate is chosen by eye, exactly as the website's list does.
  */
+
+/**
+ * The catalog's art, at trading-card proportions (63×88mm), sized by
+ * width. Cards without a provider image get an honest empty frame —
+ * never someone else's artwork.
+ */
+function Art({ imageUrl, width }: { imageUrl: string | null; width: number }) {
+  const frame = {
+    width,
+    height: Math.round((width * 88) / 63),
+    borderRadius: radius.control / 2,
+    backgroundColor: colors.canvas,
+    borderColor: colors.border,
+    borderWidth: 1,
+  };
+
+  if (!imageUrl) return <View style={frame} />;
+  return <Image source={{ uri: imageUrl }} style={frame} resizeMode="cover" />;
+}
+
+/** The art a card leads with: its first pictured printing. */
+function leadArt(hit: CardHit): string | null {
+  return hit.printings.find((printing) => printing.imageUrl)?.imageUrl ?? null;
+}
 export function PostFlareScreen({
   code,
   onPosted,
@@ -89,48 +115,80 @@ export function PostFlareScreen({
                 setPrintingId(null);
               }}
               style={({ pressed }) => ({
+                flexDirection: "row" as const,
+                alignItems: "center" as const,
+                gap: spacing(3),
                 borderColor: colors.border,
                 borderWidth: 1,
                 borderRadius: radius.control,
-                padding: spacing(3),
+                padding: spacing(2),
                 opacity: pressed ? 0.7 : 1,
-                gap: 2,
               })}
             >
-              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                {hit.name}
-              </Text>
-              <Muted>{hit.cardNumber}</Muted>
+              <Art imageUrl={leadArt(hit)} width={40} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  {hit.name}
+                </Text>
+                <Muted>
+                  {hit.cardNumber}
+                  {hit.printings.length > 1
+                    ? ` · ${hit.printings.length} versions`
+                    : ""}
+                </Muted>
+              </View>
             </Pressable>
           ))}
         </Card>
       ) : (
         <Card>
-          <Muted>Posting a Flare for</Muted>
-          <Title>{picked.name}</Title>
-          <Muted>{picked.cardNumber}</Muted>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+            <Art
+              imageUrl={
+                picked.printings.find((printing) => printing.id === printingId)
+                  ?.imageUrl ?? leadArt(picked)
+              }
+              width={64}
+            />
+            <View style={{ flex: 1 }}>
+              <Muted>Posting a Flare for</Muted>
+              <Title>{picked.name}</Title>
+              <Muted>{picked.cardNumber}</Muted>
+            </View>
+          </View>
 
           <Body>Which printing?</Body>
           <View style={{ gap: spacing(2) }}>
             {[
-              { id: null as string | null, label: "Any printing" },
+              {
+                id: null as string | null,
+                label: "Any printing",
+                imageUrl: null as string | null,
+              },
               ...picked.printings.map((printing) => ({
                 id: printing.id as string | null,
-                label: printing.label ?? "Unnamed printing",
+                label: printing.label ?? "Standard printing",
+                imageUrl: printing.imageUrl,
               })),
             ].map((option) => (
               <Pressable
                 key={option.id ?? "any"}
                 onPress={() => setPrintingId(option.id)}
                 style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(3),
                   borderColor:
                     printingId === option.id ? colors.accent : colors.border,
                   borderWidth: printingId === option.id ? 2 : 1,
                   borderRadius: radius.control,
-                  padding: spacing(3),
+                  padding: spacing(2),
                 }}
               >
-                <Text style={{ color: colors.textPrimary }}>{option.label}</Text>
+                {option.id !== null && <Art imageUrl={option.imageUrl} width={36} />}
+                <Text style={{ color: colors.textPrimary, flex: 1 }}>
+                  {option.label}
+                </Text>
               </Pressable>
             ))}
           </View>

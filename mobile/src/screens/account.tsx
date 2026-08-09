@@ -24,6 +24,7 @@ function ConnectionTest() {
     method: string,
     body?: string,
     contentType?: string,
+    payloadHeader?: string,
   ) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
@@ -32,9 +33,24 @@ function ConnectionTest() {
       const response = await fetch(`${API_BASE}/api/v1/ping`, {
         method,
         signal: controller.signal,
-        ...(contentType ? { headers: { "content-type": contentType } } : {}),
+        headers: {
+          ...(contentType ? { "content-type": contentType } : {}),
+          ...(payloadHeader ? { "x-cf-payload": payloadHeader } : {}),
+        },
         ...(body === undefined ? {} : { body }),
       });
+      // The header probe checks arrival, not just status: the server
+      // echoes how many header bytes it saw, and that number must match
+      // what was sent or a middlebox is stripping the header.
+      if (payloadHeader) {
+        const echo = (await response.json().catch(() => ({}))) as {
+          headerBytes?: number;
+        };
+        const intact = echo.headerBytes === payloadHeader.length;
+        return `${label}: ${response.status}, ${
+          intact ? "arrived intact" : "MANGLED"
+        } in ${Date.now() - started}ms`;
+      }
       return `${label}: ${response.status} in ${Date.now() - started}ms`;
     } catch {
       return `${label}: FAILED after ${Date.now() - started}ms`;
@@ -43,14 +59,31 @@ function ConnectionTest() {
     }
   };
 
-  /* Each row changes exactly one variable; the first FAILED names it. */
-  const MATRIX: [string, string, string | undefined, string | undefined][] = [
-    ["GET", "GET", undefined, undefined],
-    ["POST empty", "POST", undefined, undefined],
-    ["POST body+json", "POST", "{}", "application/json"],
-    ["POST body+plain", "POST", "{}", "text/plain"],
-    ["POST body only", "POST", "{}", undefined],
-    ["DELETE empty", "DELETE", undefined, undefined],
+  /*
+   * Each row changes exactly one variable; the first FAILED names it.
+   * The last row is the transport the app's writes actually use now —
+   * payload in the x-cf-payload header, no body — and must pass.
+   */
+  const MATRIX: [
+    string,
+    string,
+    string | undefined,
+    string | undefined,
+    string | undefined,
+  ][] = [
+    ["GET", "GET", undefined, undefined, undefined],
+    ["POST empty", "POST", undefined, undefined, undefined],
+    ["POST body+json", "POST", "{}", "application/json", undefined],
+    ["POST body+plain", "POST", "{}", "text/plain", undefined],
+    ["POST body only", "POST", "{}", undefined, undefined],
+    ["DELETE empty", "DELETE", undefined, undefined, undefined],
+    [
+      "POST header payload",
+      "POST",
+      undefined,
+      undefined,
+      encodeURIComponent(JSON.stringify({ probe: true })),
+    ],
   ];
 
   return (

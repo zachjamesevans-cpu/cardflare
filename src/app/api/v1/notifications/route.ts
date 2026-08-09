@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const parsed = readSchema.safeParse(await request.json().catch(() => null));
+  const parsed = readSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("ids are required");
 
   const { error } = await getSupabaseAdmin()

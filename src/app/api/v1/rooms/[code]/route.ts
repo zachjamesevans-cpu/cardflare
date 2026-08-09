@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiPlayer, apiSession, badRequest } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import {
   findParticipation,
@@ -143,7 +144,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const code = normalized((await params).code);
   if (!code) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const parsed = joinSchema.safeParse(await request.json().catch(() => ({})));
+  const parsed = joinSchema.safeParse((await readJsonPayload(request)) ?? {});
   if (!parsed.success) return badRequest("displayName must be a string");
 
   // Per client, not per code: one keen tester (or one busy Friday) must
