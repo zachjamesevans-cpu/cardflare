@@ -18,6 +18,7 @@ import {
   type InvitePlayerState,
   type RepostState,
 } from "./account-schema";
+import { removeLocal } from "./locals";
 import { listWants, removeWant } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
@@ -89,6 +90,18 @@ export async function invitePlayerAction(
     email: outcome,
     setupLink: outcome === "sent" ? null : setupLink,
   };
+}
+
+/** Forgets one saved store. The player's own locals only. */
+export async function removeLocalAction(formData: FormData): Promise<void> {
+  const storeId = text(formData, "storeId");
+  if (!storeId) return;
+
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return;
+
+  await removeLocal(playerId, storeId);
+  revalidatePath("/account");
 }
 
 /** Removes one saved want. The player's own list only. */

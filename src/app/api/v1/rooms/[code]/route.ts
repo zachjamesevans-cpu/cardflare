@@ -14,6 +14,7 @@ import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
+import { saveLocal } from "@/lib/players/locals";
 import { collectionAvailability } from "@/lib/players/collection";
 import {
   createPlayerSession,
@@ -197,10 +198,18 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
 
   // A bearer-authenticated app user claims the session, exactly as the
   // website links a signed-in viewer. Guests join with nothing extra.
+  let accountPlayerId = session.player_id;
   if (session.player_id === null) {
     const player = await apiPlayer(request);
-    if (player) await linkSessionToPlayer(session.id, player.playerId);
+    if (player) {
+      await linkSessionToPlayer(session.id, player.playerId);
+      accountPlayerId = player.playerId;
+    }
   }
+
+  // Same rule as the website's join: a signed-in join saves the store as
+  // one of the player's locals, silently and idempotently.
+  if (accountPlayerId) await saveLocal(accountPlayerId, event.storeId);
 
   return Response.json({
     joined: true,

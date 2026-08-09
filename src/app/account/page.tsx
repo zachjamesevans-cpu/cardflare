@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, KeyRound, Library, Mail } from "lucide-react";
+import { Flame, KeyRound, Library, Mail, Store } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
@@ -10,9 +10,10 @@ import { Card } from "@/components/ui/card";
 import { signOut } from "@/lib/auth/actions";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
-import { removeWantAction } from "@/lib/players/account-actions";
+import { removeLocalAction, removeWantAction } from "@/lib/players/account-actions";
 import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
+import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ export default async function AccountPage() {
       ? viewer.playerId
       : ((await playerForUser(viewer.user.id))?.id ?? null);
   const wants = playerId ? await listWants(playerId) : null;
+  const locals = playerId ? await listLocals(playerId) : [];
 
   const sync = playerId ? await collectionSyncFor(playerId) : null;
   const lastSync = sync
@@ -92,6 +94,59 @@ export default async function AccountPage() {
       </p>
     </Card>
   );
+
+  const localsCard =
+    playerId && locals.length > 0 ? (
+      <Card key="locals" className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <Store className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-text-primary">Your locals</p>
+            <p className="text-sm text-text-secondary">
+              Saved automatically when you join a room signed in. Tap one to see
+              what&rsquo;s happening there — no QR code needed.
+            </p>
+          </div>
+        </div>
+
+        <ul className="flex flex-col">
+          {locals.map((local) => {
+            const where = [local.city, local.region].filter(Boolean).join(", ");
+            return (
+              <li
+                key={local.storeId}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+              >
+                <div className="flex min-w-0 flex-1 basis-48 flex-col">
+                  <Link
+                    href={`/e/${local.joinCode}`}
+                    className="truncate font-semibold text-text-primary underline-offset-4 hover:underline"
+                  >
+                    {local.name}
+                  </Link>
+                  <span className="text-xs text-text-muted">
+                    {local.liveNow
+                      ? "A room is open right now"
+                      : local.nextEventAt
+                        ? `Next: ${local.nextEventName} · ${new Intl.DateTimeFormat(
+                            "en-US",
+                            { weekday: "short", month: "short", day: "numeric" },
+                          ).format(new Date(local.nextEventAt))}`
+                        : (where ?? "")}
+                  </span>
+                </div>
+                <form action={removeLocalAction}>
+                  <input type="hidden" name="storeId" value={local.storeId} />
+                  <Button type="submit" variant="ghost" size="sm">
+                    Remove
+                  </Button>
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+    ) : null;
 
   const wantsCard =
     wants !== null ? (
@@ -190,8 +245,8 @@ export default async function AccountPage() {
 
   /* A player's own things lead; sign-in housekeeping follows. */
   const cards = isPlayerHome
-    ? [wantsCard, collectionCard, emailCard, passwordCard]
-    : [emailCard, wantsCard, collectionCard, passwordCard];
+    ? [localsCard, wantsCard, collectionCard, emailCard, passwordCard]
+    : [emailCard, localsCard, wantsCard, collectionCard, passwordCard];
 
   return (
     <AppShell

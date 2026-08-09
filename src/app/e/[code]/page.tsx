@@ -33,6 +33,7 @@ import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { saveLocal } from "@/lib/players/locals";
 import { collectionAvailability, collectionSyncFor } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
@@ -305,6 +306,12 @@ export default async function JoinByCodePage({
 
   if (inRoom && session && accountPlayerId && session.player_id === null) {
     await linkSessionToPlayer(session.id, accountPlayerId);
+  }
+
+  // Being in a room signed in is what makes a store a local. Idempotent,
+  // and never in the join path's way — a failed save costs nothing here.
+  if (inRoom && accountPlayerId) {
+    await saveLocal(accountPlayerId, event.storeId);
   }
 
   const savedWants = inRoom && accountPlayerId ? await listWants(accountPlayerId) : [];

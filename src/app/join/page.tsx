@@ -3,6 +3,10 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { JoinCodeForm } from "@/components/events/join-code-form";
+import { Card } from "@/components/ui/card";
+import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
+import { listLocals } from "@/lib/players/locals";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -20,7 +24,21 @@ export const dynamic = "force-dynamic";
  * players will have a camera that will not focus, a locked-down work phone, or
  * a cracked screen. This has to be a first-class way in, not a consolation.
  */
-export default function JoinPage() {
+export default async function JoinPage() {
+  /*
+   * A signed-in player's saved stores appear under the code form: the
+   * places they actually go, one tap, no QR. Guests see the form alone —
+   * the page stays exactly the fallback it has always been.
+   */
+  const viewer = await getViewer();
+  const playerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const locals = playerId ? await listLocals(playerId) : [];
+
   return (
     <main
       id="main"
@@ -41,6 +59,36 @@ export default function JoinPage() {
         </div>
 
         <JoinCodeForm />
+
+        {locals.length > 0 && (
+          <Card className="flex flex-col gap-3">
+            <h2 className="font-semibold text-text-primary">Your locals</h2>
+            <ul className="flex flex-col">
+              {locals.map((local) => (
+                <li
+                  key={local.storeId}
+                  className="border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                >
+                  <Link href={`/e/${local.joinCode}`} className="flex flex-col gap-0.5">
+                    <span className="font-semibold text-text-primary underline-offset-4 hover:underline">
+                      {local.name}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {local.liveNow
+                        ? "A room is open right now"
+                        : local.nextEventAt
+                          ? `Next: ${local.nextEventName} · ${new Intl.DateTimeFormat(
+                              "en-US",
+                              { weekday: "short", month: "short", day: "numeric" },
+                            ).format(new Date(local.nextEventAt))}`
+                          : "Tap to see what's happening"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </div>
     </main>
   );

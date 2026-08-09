@@ -450,6 +450,29 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## 🔶 Milestone 16 — Your locals (approved; phase 1 shipped)
+
+The stores a player actually goes to, remembered — and, in later
+phases, boards that fill up before anyone drives over. Approved shape:
+Phase 1 saved stores; Phase 2 recurring store schedules (with a game
+tag, hidden while there is one game) plus the early-board window with
+"arriving" badges and no-show expiry; Phase 3 the one-tap RSVP that
+posts a want list ahead; Phase 4 "I got you" pledges and the
+night-before digest. The founder's Wednesday beta proved the thesis by
+hand: he shared the link hours early and seventeen players knew what
+to bring from home.
+
+**Phase 1 (shipped):** `player_locals` — probed on real PostgreSQL 16
+(RLS on, zero public grants, unique pair, both cascades verified).
+Saved automatically and silently wherever a signed-in player meets a
+store: the website join form, the room page's session claim, and the
+app's join call. Surfaced with each store's pulse (live room now, or
+the next scheduled event) on the account page and under the `/join`
+form on the website, and as "Your locals" on the app's Join tab —
+tap a local and you are in without a QR code. Removal everywhere
+(server action on the web, `DELETE /api/v1/locals` for the app), both
+scoped to the authenticated player. Guests see none of it, by design.
+
 ## 🔶 Milestone 15 — CardFlare in the pocket (the Expo app, phase 1)
 
 The native client, living in `mobile/` in this repository — one review
