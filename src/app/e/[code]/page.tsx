@@ -542,6 +542,7 @@ export default async function JoinByCodePage({
               openToTrades={openPlayers}
               counterHas={counterHas}
               counterName={event.storeName}
+              early={phase === "early"}
             />
           </section>
 

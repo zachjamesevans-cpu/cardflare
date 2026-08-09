@@ -452,6 +452,7 @@ function RoomScreen({
                   flare={flare}
                   mine={mine}
                   storeName={room.storeName}
+                  early={room.early}
                   onOffer={(message) =>
                     void act(() => offerOnFlare(code, flare.id, message))
                   }
@@ -491,6 +492,7 @@ function FlareRow({
   flare,
   mine,
   storeName,
+  early,
   onOffer,
   onRemove,
   onTraded,
@@ -498,6 +500,8 @@ function FlareRow({
   flare: RoomFlare;
   mine: boolean;
   storeName: string;
+  /** Early board: offers read as pledges to bring the card. */
+  early: boolean;
   onOffer: (message?: string) => void;
   onRemove: () => void;
   onTraded: (partnerSessionId?: string) => void;
@@ -548,9 +552,11 @@ function FlareRow({
       {flare.offers.map((offer) => (
         <View key={offer.responderSessionId} style={styles.offer}>
           <Body>
-            {`${offer.displayName ?? "A player"} has this. Go find them.`}
+            {early
+              ? `${offer.displayName ?? "A player"} is bringing it to the event.`
+              : `${offer.displayName ?? "A player"} has this. Go find them.`}
             {offer.message ? ` “${offer.message}”` : ""}
-            {offer.present ? "" : " (away right now)"}
+            {offer.present || early ? "" : " (away right now)"}
           </Body>
           {mine && (
             <Button
@@ -569,7 +575,10 @@ function FlareRow({
       )}
 
       {!mine && flare.match && !offering && (
-        <Button label="Offer to trade" onPress={() => setOffering(true)} />
+        <Button
+          label={early ? "I got you. I'll bring it" : "Offer to trade"}
+          onPress={() => setOffering(true)}
+        />
       )}
       {!mine && flare.match && offering && (
         <View style={{ gap: spacing(2) }}>

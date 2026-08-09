@@ -20,20 +20,27 @@ export function OfferPanel({
   code,
   flareId,
   ownOffer,
+  early = false,
 }: {
   code: string;
   flareId: string;
   /** The viewer's own standing offer on this Flare, when they have one. */
   ownOffer?: Offer;
+  /** Early board: the offer is a pledge to bring the card, so say so. */
+  early?: boolean;
 }) {
   if (ownOffer) {
     return (
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2">
         <p className="min-w-0 flex-1 basis-40 text-sm text-text-secondary">
-          <span className="font-medium text-accent">You offered.</span>{" "}
+          <span className="font-medium text-accent">
+            {early ? "You've got them." : "You offered."}
+          </span>{" "}
           {ownOffer.message
             ? `They were told: “${ownOffer.message}”`
-            : "They can see your name, so keep an eye out."}
+            : early
+              ? "They know you're bringing it."
+              : "They can see your name, so keep an eye out."}
         </p>
 
         <form action={withdrawOfferAction} className="shrink-0">
@@ -51,7 +58,7 @@ export function OfferPanel({
     <details className="group mt-2">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-accent underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
         <Handshake className="size-4" aria-hidden="true" />
-        Offer to trade
+        {early ? "I got you. I'll bring it" : "Offer to trade"}
       </summary>
 
       <form
@@ -91,10 +98,12 @@ export function OfferList({
   offers,
   code,
   flareId,
+  early = false,
 }: {
   offers: Offer[];
   code: string;
   flareId: string;
+  early?: boolean;
 }) {
   return (
     <ul className="mt-2 flex flex-col gap-1.5">
@@ -111,7 +120,9 @@ export function OfferList({
           <span className="font-semibold text-text-primary">
             {offer.displayName ?? "A player"}
           </span>
-          <span className="text-text-secondary">has this. Go find them.</span>
+          <span className="text-text-secondary">
+            {early ? "is bringing it to the event." : "has this. Go find them."}
+          </span>
 
           {offer.message && (
             <span className="flex min-w-0 items-center gap-1 text-text-secondary">
@@ -120,7 +131,7 @@ export function OfferList({
             </span>
           )}
 
-          {!offer.present && (
+          {!offer.present && !early && (
             <span className="text-xs text-text-muted">away right now</span>
           )}
 
