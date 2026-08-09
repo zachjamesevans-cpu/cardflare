@@ -7,6 +7,7 @@ import {
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
+import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 
 import { Image } from "react-native";
@@ -94,6 +95,13 @@ function MarkIcon({ focused }: { focused: boolean }) {
 function Tabs() {
   return (
     <Tab.Navigator
+      // The same light tick every other control gives — switching tabs
+      // is a tap too, and the bottom bar was the one mute surface left.
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        },
+      }}
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.textPrimary,
@@ -149,12 +157,7 @@ export default function App() {
           )}
         </Stack.Screen>
         <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
-          {({ route, navigation }) => (
-            <PostFlareScreen
-              code={route.params.code}
-              onPosted={() => navigation.goBack()}
-            />
-          )}
+          {({ route }) => <PostFlareScreen code={route.params.code} />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
