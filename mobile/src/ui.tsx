@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useRef, useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -104,6 +104,35 @@ export function CardImage({
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
 
+  /*
+   * The zoom's fade is driven by hand, not by the Modal. The built-in
+   * `animationType="fade"` tears the native modal down while the fade is
+   * still finishing, and that teardown lands as a visible flash of the
+   * screen behind — the founder felt it on device. So the modal itself
+   * presents and dismisses with no animation at all: opening fades the
+   * backdrop in ourselves, and closing fades it all the way out *first*,
+   * only unmounting the modal once nothing is left to see.
+   */
+  const fade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (open) {
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [open, fade]);
+
+  const close = () => {
+    Animated.timing(fade, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => setOpen(false));
+  };
+
   const frame = {
     width,
     height: Math.round((width * 88) / 63),
@@ -123,36 +152,49 @@ export function CardImage({
         <Image source={{ uri: imageUrl }} style={frame} resizeMode="cover" />
       </Tap>
 
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <Pressable style={styles.zoomBackdrop} onPress={() => setOpen(false)}>
-          <View style={styles.zoomPanel}>
-            <View style={{ alignSelf: "stretch" }}>
-              <Text style={styles.title} numberOfLines={1}>
-                {name}
-              </Text>
-              <Text style={styles.muted}>
-                {cardNumber}
-                {caption ? ` · ${caption}` : ""}
-              </Text>
-            </View>
-            <Image
-              source={{ uri: imageUrl }}
-              style={{
-                width: large,
-                height: Math.round((large * 88) / 63),
-                borderRadius: radius.control,
-                backgroundColor: colors.canvas,
-              }}
-              resizeMode="contain"
-            />
-            <Text style={styles.muted}>Tap anywhere to close</Text>
-          </View>
-        </Pressable>
+      <Modal visible={open} transparent animationType="none" onRequestClose={close}>
+        <Animated.View style={[styles.zoomBackdrop, { opacity: fade }]}>
+          <Pressable style={styles.zoomFill} onPress={close}>
+            {/* A whisper of scale rides the fade, so the panel settles
+                into place instead of just appearing. */}
+            <Animated.View
+              style={[
+                styles.zoomPanel,
+                {
+                  transform: [
+                    {
+                      scale: fade.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.97, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View style={{ alignSelf: "stretch" }}>
+                <Text style={styles.title} numberOfLines={1}>
+                  {name}
+                </Text>
+                <Text style={styles.muted}>
+                  {cardNumber}
+                  {caption ? ` · ${caption}` : ""}
+                </Text>
+              </View>
+              <Image
+                source={{ uri: imageUrl }}
+                style={{
+                  width: large,
+                  height: Math.round((large * 88) / 63),
+                  borderRadius: radius.control,
+                  backgroundColor: colors.canvas,
+                }}
+                resizeMode="contain"
+              />
+              <Text style={styles.muted}>Tap anywhere to close</Text>
+            </Animated.View>
+          </Pressable>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -275,6 +317,9 @@ const styles = StyleSheet.create({
   zoomBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.8)",
+  },
+  zoomFill: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing(5),
