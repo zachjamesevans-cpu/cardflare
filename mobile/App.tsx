@@ -4,13 +4,23 @@ import {
   NavigationContainer,
   type Theme,
 } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import {
+  createBottomTabNavigator,
+  type BottomTabBarButtonProps,
+} from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 
-import { Image } from "react-native";
+import { useRef } from "react";
+import {
+  Animated,
+  Image,
+  Pressable,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import { AccountScreen } from "./src/screens/account";
 import { HomeScreen } from "./src/screens/home";
@@ -92,6 +102,64 @@ function MarkIcon({ focused }: { focused: boolean }) {
   );
 }
 
+/*
+ * The tab bar draws its own buttons, so the app-wide Tap primitive never
+ * reaches them — this is the same squeeze-and-pop, rebuilt in the shape
+ * the navigator expects. Press squeezes the whole tab (icon and label),
+ * release springs it back with the overshoot; the haptic tick comes from
+ * the navigator's tabPress listener below, same as everywhere else.
+ */
+function TabButton({
+  children,
+  style,
+  onPress,
+  onLongPress,
+  accessibilityState,
+  accessibilityLabel,
+  testID,
+}: BottomTabBarButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      style={style as StyleProp<ViewStyle>}
+      onPressIn={() => {
+        Animated.spring(scale, {
+          toValue: 0.88,
+          speed: 60,
+          bounciness: 0,
+          useNativeDriver: true,
+        }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scale, {
+          toValue: 1,
+          speed: 25,
+          bounciness: 14,
+          useNativeDriver: true,
+        }).start();
+      }}
+    >
+      <Animated.View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          transform: [{ scale }],
+        }}
+      >
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 function Tabs() {
   return (
     <Tab.Navigator
@@ -106,6 +174,7 @@ function Tabs() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { fontWeight: "700" },
+        tabBarButton: (props) => <TabButton {...props} />,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
