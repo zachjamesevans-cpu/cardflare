@@ -1,4 +1,12 @@
-import { Flame, Folder, Hand, Layers, PackageCheck, Store } from "lucide-react";
+import {
+  Flame,
+  Folder,
+  Hand,
+  Layers,
+  PackageCheck,
+  StickyNote,
+  Store,
+} from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
@@ -8,7 +16,7 @@ import {
   OfferPanel,
   PledgeSummary,
 } from "@/components/matching/offer-controls";
-import { offerTradeAction } from "@/lib/matching/actions";
+import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
@@ -72,6 +80,7 @@ function Entry({
           enabled={imagesEnabled}
           anyPrinting={!entry.printingId}
           caption={entry.printingLabel ?? "Any printing"}
+          note={entry.note}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -242,6 +251,7 @@ function CarouselEntry({
   canOffer = false,
   offered = false,
   early = false,
+  covered = false,
 }: {
   entry: ListEntry;
   code: string;
@@ -256,18 +266,35 @@ function CarouselEntry({
   /** The viewer's pledge is already standing. */
   offered?: boolean;
   early?: boolean;
+  /** Every asked-for copy is pledged: dimmed and parked at the rail's end. */
+  covered?: boolean;
 }) {
   return (
-    <li className="flex w-14 shrink-0 flex-col gap-1">
-      <CardImageZoom
-        imageUrl={entry.imageUrl}
-        exactName={entry.cardName}
-        cardNumber={entry.cardNumber}
-        enabled={imagesEnabled}
-        anyPrinting={!entry.printingId}
-        caption={entry.printingLabel ?? "Any printing"}
-        thumbClassName="w-full"
-      />
+    <li
+      className={`relative flex w-14 shrink-0 flex-col gap-1 ${covered ? "opacity-60" : ""}`}
+    >
+      <div className="relative">
+        <CardImageZoom
+          imageUrl={entry.imageUrl}
+          exactName={entry.cardName}
+          cardNumber={entry.cardNumber}
+          enabled={imagesEnabled}
+          anyPrinting={!entry.printingId}
+          caption={entry.printingLabel ?? "Any printing"}
+          note={entry.note}
+          thumbClassName="w-full"
+        />
+        {/* The founder's ask: a note announces itself on the tile, and
+            the zoom is where it gets read. */}
+        {entry.note && (
+          <span
+            aria-label="Has a note"
+            className="pointer-events-none absolute top-0.5 right-0.5 rounded-full bg-surface/90 p-0.5"
+          >
+            <StickyNote className="size-3 text-accent" aria-hidden="true" />
+          </span>
+        )}
+      </div>
 
       <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
         {entry.cardName}
@@ -310,20 +337,11 @@ function CarouselEntry({
       {/*
        * The one-tap pledge, open to anyone — no binder required, the
        * founder's call. One copy, no note; the stacked view has the
-       * full form for counts and where-to-find-me.
+       * full form for counts and where-to-find-me. While it lands, the
+       * tile greys out under a spinner (the overlay anchors to this
+       * li's `relative`), because a silent button reads as broken.
        */}
-      {canOffer && (
-        <form action={offerTradeAction}>
-          <input type="hidden" name="code" value={code} />
-          <input type="hidden" name="flareId" value={entry.id} />
-          <button
-            type="submit"
-            className="text-[11px] font-semibold text-accent underline underline-offset-2"
-          >
-            {early ? "I got you" : "I got it"}
-          </button>
-        </form>
-      )}
+      {canOffer && <QuickPledge code={code} flareId={entry.id} early={early} />}
       {offered && (
         <p className="text-[10px] leading-tight text-text-muted">You&rsquo;re on it</p>
       )}
@@ -466,10 +484,11 @@ export function FlareBoard({
            */
           if (view === "carousel") {
             const { remaining } = pledgeTally(entryOffers, entry.quantity);
+            const covered = entryOffers.length > 0 && remaining === 0;
             const pledgeLine =
               entryOffers.length === 0
                 ? null
-                : remaining === 0
+                : covered
                   ? entry.quantity > 1
                     ? `All ${entry.quantity} spoken for`
                     : "Spoken for"
@@ -488,6 +507,7 @@ export function FlareBoard({
                 canOffer={!isYou && !ownOffer}
                 offered={Boolean(ownOffer)}
                 early={early}
+                covered={covered}
               />
             );
           }
@@ -574,8 +594,30 @@ export function FlareBoard({
              */}
             {view === "carousel" ? (
               <Rail labelledBy={headingId}>
-                {folders.flatMap((folder) => folder.entries).map(renderEntry)}
-                {loose.map(renderEntry)}
+                {(() => {
+                  /*
+                   * Fully pledged hunts park at the rail's far end, dimmed
+                   * but present — "taken care of" at a glance, while the
+                   * bring-extras crowd can still see what was asked.
+                   */
+                  const isCovered = (entry: ListEntry) => {
+                    const entryOffers = offers.get(entry.id) ?? [];
+                    return (
+                      entryOffers.length > 0 &&
+                      pledgeTally(entryOffers, entry.quantity).remaining === 0
+                    );
+                  };
+
+                  const rail = [
+                    ...folders.flatMap((folder) => folder.entries),
+                    ...loose,
+                  ];
+
+                  return [
+                    ...rail.filter((entry) => !isCovered(entry)),
+                    ...rail.filter(isCovered),
+                  ].map(renderEntry);
+                })()}
                 {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
               </Rail>
             ) : (

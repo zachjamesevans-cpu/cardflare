@@ -93,6 +93,7 @@ export function CardImage({
   name,
   cardNumber,
   caption,
+  note,
 }: {
   imageUrl: string | null;
   width: number;
@@ -100,6 +101,8 @@ export function CardImage({
   cardNumber: string;
   /** The printing, so the large view says which version is being shown. */
   caption?: string | null;
+  /** The Flare's note, shown in the large view under the number. */
+  note?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -180,6 +183,9 @@ export function CardImage({
                   {cardNumber}
                   {caption ? ` · ${caption}` : ""}
                 </Text>
+                {/* The tile has no room for the note; the zoom is where
+                    it gets read. */}
+                {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
               </View>
               <Image
                 source={{ uri: imageUrl }}
@@ -332,5 +338,11 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(3),
     alignItems: "center",
+  },
+  zoomNote: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontStyle: "italic",
+    marginTop: spacing(1),
   },
 });
