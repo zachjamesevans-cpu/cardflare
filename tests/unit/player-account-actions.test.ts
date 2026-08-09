@@ -83,7 +83,7 @@ function form(fields: Record<string, string>) {
   return data;
 }
 
-const want = (id: string, cardId: string) => ({
+const want = (id: string, cardId: string, deckLabel: string | null = null) => ({
   id,
   cardId,
   cardName: "Card",
@@ -92,6 +92,7 @@ const want = (id: string, cardId: string) => ({
   printingLabel: null,
   quantity: 1,
   note: null,
+  deckLabel,
 });
 
 beforeEach(() => {
@@ -180,15 +181,19 @@ describe("repostWantsAction", () => {
   const fields = { code: "K3M9PZ" };
 
   it("posts every saved want into the room", async () => {
+    listWants.mockResolvedValue([want("w1", "c1", "RG Luffy"), want("w2", "c2")]);
+
     const state = await repostWantsAction(REPOST_IDLE, form(fields));
 
     expect(state).toEqual({ status: "posted", count: 2 });
     expect(addFlare).toHaveBeenCalledTimes(2);
+    // The deck label re-posts with the want, so the folder survives the trip.
     expect(addFlare).toHaveBeenCalledWith("event-1", "sess-1", {
       cardId: "c1",
       printingId: null,
       quantity: 1,
       note: null,
+      deckLabel: "RG Luffy",
     });
     expect(linkSessionToPlayer).toHaveBeenCalledWith("sess-1", "player-1");
   });

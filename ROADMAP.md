@@ -450,6 +450,28 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Feedback round — deck folders, and the board leads with the carousel
+
+The founder's ask, in his own example: someone building an RG Luffy
+needs fourteen cards, and fourteen loose rows bury both the deck and
+everyone else's board. The answer is a label, not a decks table — an
+optional "deck name" typed when posting a Flare (`deck_label` on
+`flares` and `player_wants`, 1-40 trimmed characters or null, probed
+on real PostgreSQL 16). Cards sharing a name gather under one named
+folder inside the player's section, on website and app alike; folders
+merge case-insensitively and keep the first spelling seen; loose cards
+stay plain rows below. The name rides the saved want, so the whole
+hunt re-posts as a folder at the next store, through every path —
+form, app, RSVP, re-post panel. Both posting forms keep the typed
+deck name after each post, so a fourteen-card deck is typed once.
+
+The carousel view (shipped a round earlier: same board, same controls,
+file-browser geometry switch) is now the **default** on both clients —
+the stacked reading view is one tap away and the choice still sticks
+on the app. Carousel cards also shrank (website rail 160px → 112px,
+app 130 → 95) after field feedback that the first cut was so large it
+defeated the point: a phone now shows about three cards per shelf.
+
 ## 🔶 Milestone 16 — Your locals (approved; phase 1 shipped)
 
 The stores a player actually goes to, remembered — and, in later

@@ -118,6 +118,7 @@ export async function addToListAction(
     printingId: text(formData, "printingId"),
     quantity: text(formData, "quantity") || 1,
     note: text(formData, "note"),
+    deckLabel: text(formData, "deckLabel"),
   });
 
   if (!parsed.success) {

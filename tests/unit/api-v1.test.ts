@@ -152,6 +152,7 @@ describe("GET /api/v1/me", () => {
         printingLabel: "Alternate Art",
         quantity: 1,
         note: null,
+        deckLabel: "RG Luffy",
       },
     ]);
     collectionSyncFor.mockResolvedValue({
@@ -164,6 +165,8 @@ describe("GET /api/v1/me", () => {
 
     expect(body.player).toEqual({ id: "player-1", displayName: "Kaito" });
     expect(body.wants).toHaveLength(1);
+    // The deck label rides the snapshot so the app can re-post the folder.
+    expect(body.wants[0].deckLabel).toBe("RG Luffy");
     expect(body.collection).toEqual({
       cardsMatched: 77,
       syncedAt: "2026-08-06T00:00:00Z",

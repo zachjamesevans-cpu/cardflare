@@ -415,17 +415,20 @@ export type FlareRow = {
   printing_id: string | null;
   quantity: number;
   note: string | null;
+  /** Groups a player's Flares under a named hunt ("RG Luffy"). Null = loose. */
+  deck_label: string | null;
 };
 
 export type FlareInsert = Omit<
   FlareRow,
-  "id" | "created_at" | "updated_at" | "status" | "quantity"
+  "id" | "created_at" | "updated_at" | "status" | "quantity" | "deck_label"
 > & {
   id?: string;
   created_at?: string;
   updated_at?: string;
   status?: FlareStatus;
   quantity?: number;
+  deck_label?: string | null;
 };
 
 /**
@@ -567,11 +570,17 @@ export type PlayerWantRow = {
   printing_id: string | null;
   quantity: number;
   note: string | null;
+  /** The hunt this want belongs to, so it re-posts as a folder. */
+  deck_label: string | null;
 };
 
-export type PlayerWantInsert = Omit<PlayerWantRow, "id" | "created_at"> & {
+export type PlayerWantInsert = Omit<
+  PlayerWantRow,
+  "id" | "created_at" | "deck_label"
+> & {
   id?: string;
   created_at?: string;
+  deck_label?: string | null;
 };
 
 export type PlayerCollectionRow = {

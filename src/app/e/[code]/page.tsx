@@ -120,11 +120,12 @@ export default async function JoinByCodePage({
 
   /*
    * The board's two layouts, chosen by URL so the page stays a Server
-   * Component with zero client JavaScript for the switch. Anything that
-   * is not "carousel" is the stacked reading view, so a mistyped or
-   * stale parameter can never blank the board.
+   * Component with zero client JavaScript for the switch. Carousel is
+   * the default — a board reads best as a shelf of cards — and anything
+   * that is not "stacked" falls back to it, so a mistyped or stale
+   * parameter can never blank the board.
    */
-  const boardView = (await searchParams).view === "carousel" ? "carousel" : "stacked";
+  const boardView = (await searchParams).view === "stacked" ? "stacked" : "carousel";
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
   if (!isValidJoinCode(normalized)) notFound();
@@ -542,18 +543,6 @@ export default async function JoinByCodePage({
               >
                 <Link
                   href={`/e/${normalized}`}
-                  aria-current={boardView === "stacked" ? "true" : undefined}
-                  className={cn(
-                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
-                    boardView === "stacked"
-                      ? "bg-accent/15 text-accent"
-                      : "text-text-muted hover:text-text-secondary",
-                  )}
-                >
-                  Stacked
-                </Link>
-                <Link
-                  href={`/e/${normalized}?view=carousel`}
                   aria-current={boardView === "carousel" ? "true" : undefined}
                   className={cn(
                     "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
@@ -563,6 +552,18 @@ export default async function JoinByCodePage({
                   )}
                 >
                   Carousel
+                </Link>
+                <Link
+                  href={`/e/${normalized}?view=stacked`}
+                  aria-current={boardView === "stacked" ? "true" : undefined}
+                  className={cn(
+                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
+                    boardView === "stacked"
+                      ? "bg-accent/15 text-accent"
+                      : "text-text-muted hover:text-text-secondary",
+                  )}
+                >
+                  Stacked
                 </Link>
               </div>
             </div>

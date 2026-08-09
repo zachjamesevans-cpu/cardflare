@@ -97,7 +97,7 @@ function RoomScreen({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wants, setWants] = useState<Me["wants"]>([]);
-  const [view, setView] = useState<BoardView>("stacked");
+  const [view, setView] = useState<BoardView>("carousel");
   const inFlight = useRef(false);
 
   useEffect(() => {
@@ -375,7 +375,7 @@ function RoomScreen({
 
           {/* The file-browser trick: same board, two geometries. */}
           <View style={{ flexDirection: "row", gap: spacing(2) }}>
-            {(["stacked", "carousel"] as const).map((option) => (
+            {(["carousel", "stacked"] as const).map((option) => (
               <Tap
                 key={option}
                 onPress={() => pickView(option)}
@@ -394,7 +394,7 @@ function RoomScreen({
                     fontWeight: "600",
                   }}
                 >
-                  {option === "stacked" ? "Stacked" : "Carousel"}
+                  {option === "carousel" ? "Carousel" : "Stacked"}
                 </Text>
               </Tap>
             ))}
@@ -439,6 +439,7 @@ function RoomScreen({
                       printingId: want.printingId,
                       quantity: want.quantity,
                       note: want.note ?? undefined,
+                      deckLabel: want.deckLabel,
                     }).catch(() => {});
                   }
                 })
@@ -480,47 +481,73 @@ function RoomScreen({
         {[...groups.entries()].map(([sessionId, group]) => {
           const mine = sessionId === youId;
 
+          /*
+           * A player's section splits into deck folders and loose cards,
+           * same as the website: "RG Luffy" typed on each card of the
+           * hunt gathers them under one named heading.
+           */
+          const { folders, loose } = partitionByDeck(group.flares);
+
+          const rail = (list: RoomFlare[]) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(3), paddingVertical: spacing(1) }}
+            >
+              {list.map((flare) => (
+                <CarouselFlare
+                  key={flare.id}
+                  flare={flare}
+                  mine={mine}
+                  early={room.early}
+                  onOffer={() => void act(() => offerOnFlare(code, flare.id))}
+                  onRemove={() => void act(() => removeFlare(code, flare.id))}
+                />
+              ))}
+            </ScrollView>
+          );
+
+          const rows = (list: RoomFlare[]) =>
+            list.map((flare) => (
+              <FlareRow
+                key={flare.id}
+                flare={flare}
+                mine={mine}
+                storeName={room.storeName}
+                early={room.early}
+                onOffer={(message) =>
+                  void act(() => offerOnFlare(code, flare.id, message))
+                }
+                onRemove={() => void act(() => removeFlare(code, flare.id))}
+                onTraded={(partner) =>
+                  void act(() => confirmTrade(code, flare.id, partner))
+                }
+              />
+            ));
+
           return (
             <Card key={sessionId}>
               <Title>
                 {mine ? "Your Flares" : (group.name ?? "A player")}
               </Title>
 
-              {view === "carousel" ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: spacing(3), paddingVertical: spacing(1) }}
-                >
-                  {group.flares.map((flare) => (
-                    <CarouselFlare
-                      key={flare.id}
-                      flare={flare}
-                      mine={mine}
-                      early={room.early}
-                      onOffer={() => void act(() => offerOnFlare(code, flare.id))}
-                      onRemove={() => void act(() => removeFlare(code, flare.id))}
-                    />
-                  ))}
-                </ScrollView>
-              ) : (
-                group.flares.map((flare) => (
-                  <FlareRow
-                    key={flare.id}
-                    flare={flare}
-                    mine={mine}
-                    storeName={room.storeName}
-                    early={room.early}
-                    onOffer={(message) =>
-                      void act(() => offerOnFlare(code, flare.id, message))
-                    }
-                    onRemove={() => void act(() => removeFlare(code, flare.id))}
-                    onTraded={(partner) =>
-                      void act(() => confirmTrade(code, flare.id, partner))
-                    }
-                  />
-                ))
-              )}
+              {folders.map((folder) => (
+                <View key={folder.label.toLowerCase()} style={{ gap: spacing(1) }}>
+                  <Text style={styles.folderLabel} numberOfLines={1}>
+                    {`${folder.label} · ${folder.flares.length} ${
+                      folder.flares.length === 1 ? "card" : "cards"
+                    }`}
+                  </Text>
+                  {view === "carousel" ? (
+                    rail(folder.flares)
+                  ) : (
+                    <View>{rows(folder.flares)}</View>
+                  )}
+                </View>
+              ))}
+
+              {loose.length > 0 &&
+                (view === "carousel" ? rail(loose) : <View>{rows(loose)}</View>)}
             </Card>
           );
         })}
@@ -546,6 +573,36 @@ function RoomScreen({
   );
 }
 
+/** The website's partition, in miniature: folders merge case-insensitively
+    and keep the spelling of the first card seen; order follows the board. */
+function partitionByDeck(flares: RoomFlare[]): {
+  folders: { label: string; flares: RoomFlare[] }[];
+  loose: RoomFlare[];
+} {
+  const folders = new Map<string, { label: string; flares: RoomFlare[] }>();
+  const loose: RoomFlare[] = [];
+
+  for (const flare of flares) {
+    const label = flare.deckLabel?.trim();
+
+    if (!label) {
+      loose.push(flare);
+      continue;
+    }
+
+    const key = label.toLowerCase();
+    const existing = folders.get(key);
+
+    if (existing) {
+      existing.flares.push(flare);
+    } else {
+      folders.set(key, { label, flares: [flare] });
+    }
+  }
+
+  return { folders: [...folders.values()], loose };
+}
+
 /**
  * One Flare as the carousel shows it: art-first and narrow, so thirty
  * cards read as one swipeable rail. Browsing and the quick actions live
@@ -565,11 +622,13 @@ function CarouselFlare({
   onOffer: () => void;
   onRemove: () => void;
 }) {
+  // Narrow enough that three cards share a phone screen; the founder
+  // called the first cut huge, which defeated the carousel's point.
   return (
-    <View style={{ width: 130, gap: spacing(1.5) }}>
+    <View style={{ width: 95, gap: spacing(1.5) }}>
       <CardImage
         imageUrl={flare.imageUrl}
-        width={130}
+        width={95}
         name={flare.cardName}
         cardNumber={flare.cardNumber}
         caption={flare.printingLabel ?? "Any printing"}
@@ -750,6 +809,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textDecorationLine: "underline",
     fontSize: 14,
+  },
+  folderLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
   },
   actionBar: {
     position: "absolute",

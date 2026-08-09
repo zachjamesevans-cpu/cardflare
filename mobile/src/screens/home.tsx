@@ -74,6 +74,7 @@ export function HomeScreen() {
           printingId: want.printingId,
           quantity: want.quantity,
           note: want.note ?? undefined,
+          deckLabel: want.deckLabel,
         }).catch(() => {});
       }
       await rememberRoom(local.nextEventCode);

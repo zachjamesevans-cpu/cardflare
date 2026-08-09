@@ -23,6 +23,8 @@ export interface SavedWant {
   printingLabel: string | null;
   quantity: number;
   note: string | null;
+  /** The hunt the want belongs to, so it re-posts as a folder. */
+  deckLabel: string | null;
 }
 
 /** Upserts one ask; re-posting the same card refreshes it, never stacks. */
@@ -33,6 +35,7 @@ export async function saveWant(
     printingId: string | null;
     quantity: number;
     note: string | null;
+    deckLabel: string | null;
   },
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
@@ -55,6 +58,7 @@ export async function saveWant(
       printing_id: entry.printingId,
       quantity: entry.quantity,
       note: entry.note,
+      deck_label: entry.deckLabel,
     },
     { onConflict: "player_id,card_id,printing_id" },
   );
@@ -152,6 +156,7 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
         null,
       quantity: row.quantity,
       note: row.note,
+      deckLabel: row.deck_label ?? null,
     };
   });
 }
