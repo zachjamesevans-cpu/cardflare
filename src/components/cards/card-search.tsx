@@ -232,7 +232,7 @@ function Row({
           >
             {showVersions
               ? "Hide versions"
-              : `${card.printings.length} versions — alt arts and promos`}
+              : `${card.printings.length} versions, alt arts and promos`}
             <ChevronDown
               aria-hidden="true"
               className={cn(

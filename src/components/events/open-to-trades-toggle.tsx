@@ -43,7 +43,7 @@ export function OpenToTradesToggle({ code, open }: { code: string; open: boolean
         </p>
         <p className="text-sm text-text-secondary">
           {open
-            ? "Anyone in this room can see it — people can bring a binder to you."
+            ? "Anyone in this room can see it, so people can bring a binder to you."
             : "Skip the search and put yourself on the board as open to any trade."}
         </p>
       </div>

@@ -212,7 +212,7 @@ export default async function AdminPage() {
           </h2>
           <p className="text-sm text-text-secondary">
             Imports One Piece cards from {providerName} so search has something to find.
-            Card data only — no prices, and no artwork is copied. {DON_EXCLUSION}
+            Card data only. No prices, and no artwork is copied. {DON_EXCLUSION}
           </p>
         </div>
 

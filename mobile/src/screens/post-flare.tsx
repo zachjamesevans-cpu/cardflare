@@ -196,7 +196,7 @@ export function PostFlareScreen({
           autoCorrect={false}
         />
         {query.trim().length >= 2 && hits.length === 0 && (
-          <Muted>Nothing yet — keep typing, or check the number.</Muted>
+          <Muted>Nothing yet. Keep typing, or check the number.</Muted>
         )}
         {hits.map((hit) => {
           const open = expanded === hit.id;
@@ -262,7 +262,7 @@ export function PostFlareScreen({
                   <Stats hit={hit} />
                   {!open && hit.printings.length > 1 && (
                     <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                      {`${hit.printings.length} versions — alt arts and promos`}
+                      {`${hit.printings.length} versions, alt arts and promos`}
                     </Text>
                   )}
                 </View>

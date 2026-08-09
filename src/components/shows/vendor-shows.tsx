@@ -74,7 +74,7 @@ export function VendorShows({
               <TextInput
                 name="booth"
                 defaultValue={booth ?? ""}
-                placeholder="Booth — e.g. A12"
+                placeholder="Booth, e.g. A12"
                 maxLength={12}
                 required
                 aria-label={`Your booth at ${show.name}`}

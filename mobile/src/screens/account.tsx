@@ -164,7 +164,7 @@ export function AccountScreen() {
         </Card>
         <Card>
           <Body>
-            No account? Nothing changes — scan any counter code and trade as a
+            No account? Nothing changes. Scan any counter code and trade as a
             guest, same as always. Accounts are invite-only while CardFlare is in
             its pilot.
           </Body>
@@ -181,7 +181,7 @@ export function AccountScreen() {
         <Title>{me.player.displayName}</Title>
         {me.collection && (
           <Muted>
-            {`Collection: ${me.collection.cardsMatched.toLocaleString()} cards along — matched quietly in every room, never listed.`}
+            {`Collection: ${me.collection.cardsMatched.toLocaleString()} cards along, matched quietly in every room and never listed.`}
           </Muted>
         )}
       </Card>

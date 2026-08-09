@@ -117,8 +117,8 @@ async function LgsSections({
             Right now
           </h2>
           <p className="text-sm text-text-secondary">
-            The room as a player in it sees it — names, Flares and who is open to
-            trades. Binders stay private, in here as everywhere.
+            The room as a player in it sees it: names, Flares and who is open to trades.
+            Binders stay private, in here as everywhere.
           </p>
         </div>
 

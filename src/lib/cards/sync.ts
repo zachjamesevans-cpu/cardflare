@@ -366,7 +366,7 @@ export async function activeSyncRun(
       .update({
         status: "failed",
         finished_at: new Date(now).toISOString(),
-        notes: "Abandoned — the process stopped before the run finished.",
+        notes: "Abandoned: the process stopped before the run finished.",
       })
       .eq("id", data.id)
       .eq("status", "running");

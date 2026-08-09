@@ -8,7 +8,7 @@ const BENEFITS = [
   "Stop flipping through every binder in the room.",
   "Discover trades you would otherwise walk right past.",
   "Request an exact printing, or any printing that works.",
-  "At card shows, search every vendor's booth from your phone — singles and slabs.",
+  "At card shows, search every vendor's booth from your phone, singles and slabs alike.",
   "Spend more time playing and less time searching.",
 ] as const;
 

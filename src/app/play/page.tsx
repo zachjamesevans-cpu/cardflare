@@ -45,7 +45,7 @@ export default async function PlayPage() {
               <h2 className="text-lg font-semibold text-text-primary">No event yet</h2>
               <p className="text-text-secondary">
                 You&rsquo;re set up. Scan the {SITE.name} QR code at a participating
-                store to join their event — that part arrives in the next release.
+                store to join their event. That part arrives in the next release.
               </p>
             </Card>
           </>

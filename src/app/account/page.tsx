@@ -104,7 +104,7 @@ export default async function AccountPage() {
             <p className="font-semibold text-text-primary">Your locals</p>
             <p className="text-sm text-text-secondary">
               Saved automatically when you join a room signed in. Tap one to see
-              what&rsquo;s happening there — no QR code needed.
+              what&rsquo;s happening there, no QR code needed.
             </p>
           </div>
         </div>
@@ -213,8 +213,8 @@ export default async function AccountPage() {
           <p className="font-semibold text-text-primary">Your collection</p>
           <p className="text-sm text-text-secondary">
             Import your Collectr export and rooms will quietly flag the Flares you could
-            answer. Nobody else ever sees it — your name appears only when you choose to
-            offer.
+            answer. Nobody else ever sees it, and your name appears only when you choose
+            to offer.
           </p>
         </div>
       </div>

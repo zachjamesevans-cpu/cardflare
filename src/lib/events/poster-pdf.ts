@@ -134,7 +134,7 @@ function trackedWidth(text: string, font: PDFFont, size: number, gap: number): n
  */
 export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`${input.title} — ${SITE.name}`);
+  doc.setTitle(`${input.title} · ${SITE.name}`);
 
   const page = doc.addPage([PAGE.width, PAGE.height]);
   const helv = await doc.embedFont(StandardFonts.Helvetica);

@@ -59,7 +59,7 @@ export async function syncSinglesAction(
     const message = {
       empty: "That file is empty.",
       "no-header":
-        "That does not look like a TCGplayer inventory export — no card number and quantity columns.",
+        "That does not look like a TCGplayer inventory export: it has no card number and quantity columns.",
       "too-many-lines": "That file has more lines than any inventory export should.",
     }[parsed.problem];
     return { status: "error", message };

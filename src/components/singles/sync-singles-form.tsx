@@ -127,7 +127,7 @@ export function SyncSinglesForm({
 
         <p className="text-xs text-text-muted">
           Your TCGplayer inventory export (CSV). Prices in the file are ignored and
-          never stored — CardFlare keeps card names and quantities only, and players are
+          never stored. CardFlare keeps card names and quantities only, and players are
           pointed to your counter, not to a price.
         </p>
       </form>

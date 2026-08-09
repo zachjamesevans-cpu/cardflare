@@ -57,7 +57,7 @@ export function VendorInventoryForm({
       <div className="flex flex-col gap-1">
         <h3 className="font-semibold text-text-primary">Add stock</h3>
         <p className="text-sm text-text-secondary">
-          List what you&rsquo;re bringing — raw singles and graded slabs. Attendees
+          List what you&rsquo;re bringing, raw singles and graded slabs alike. Attendees
           searching at a show see it with your booth number.
         </p>
       </div>

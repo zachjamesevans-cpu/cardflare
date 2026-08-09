@@ -182,7 +182,8 @@ export function ShowSearch({ code }: { code: string }) {
         </div>
 
         <p className="text-xs text-text-muted">
-          Search a card and see which booths have it — raw singles and graded slabs.
+          Search a card and see which booths have it, raw singles and graded slabs
+          alike.
         </p>
       </div>
 

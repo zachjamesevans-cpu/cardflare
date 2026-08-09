@@ -83,7 +83,7 @@ function fromAddressCheck(): ConfigCheck {
       variable,
       status: "missing",
       detail: legacy
-        ? `Not set — but ${legacy} is. That variable was renamed to ${RENAMED[legacy]}; rename it in your host's settings and redeploy.`
+        ? `Not set, but ${legacy} is. That variable was renamed to ${RENAMED[legacy]}; rename it in your host's settings and redeploy.`
         : "Not set",
     };
   }
@@ -118,7 +118,7 @@ function fromAddressCheck(): ConfigCheck {
     label,
     variable,
     status: "ok",
-    detail: `Sending as ${displayName} <${address}> — this domain must be verified with the provider.`,
+    detail: `Sending as ${displayName} <${address}>. This domain must be verified with the provider.`,
   };
 }
 

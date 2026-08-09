@@ -33,7 +33,7 @@ export function OfferPanel({
           <span className="font-medium text-accent">You offered.</span>{" "}
           {ownOffer.message
             ? `They were told: “${ownOffer.message}”`
-            : "They can see your name — keep an eye out."}
+            : "They can see your name, so keep an eye out."}
         </p>
 
         <form action={withdrawOfferAction} className="shrink-0">
@@ -111,7 +111,7 @@ export function OfferList({
           <span className="font-semibold text-text-primary">
             {offer.displayName ?? "A player"}
           </span>
-          <span className="text-text-secondary">has this — go find them.</span>
+          <span className="text-text-secondary">has this. Go find them.</span>
 
           {offer.message && (
             <span className="flex min-w-0 items-center gap-1 text-text-secondary">

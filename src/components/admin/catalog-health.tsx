@@ -59,7 +59,8 @@ function SetCoverageBlock({
           <p className="border-t border-border pt-3 text-xs text-text-muted">
             {total.toLocaleString()} distinct cards across {sets.length} sets. Compare
             against the official set list before telling anyone the catalog is complete.
-            {truncated && " Counts are partial — the catalog exceeds the read limit."}
+            {truncated &&
+              " Counts are partial because the catalog exceeds the read limit."}
           </p>
         </>
       )}

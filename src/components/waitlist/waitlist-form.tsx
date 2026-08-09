@@ -218,7 +218,7 @@ export function WaitlistForm() {
 
       <fieldset className="flex flex-col gap-5 border-t border-border pt-6">
         <legend className="text-sm font-semibold text-text-muted">
-          Optional — helps us plan the first pilots
+          Optional. It helps us plan the first pilots
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">

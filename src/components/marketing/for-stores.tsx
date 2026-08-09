@@ -16,7 +16,7 @@ const BENEFITS = [
     icon: QrCode,
     title: "Players join by QR code",
     description:
-      "Print one code for the counter. Players scan it and they are in — no account setup at the door.",
+      "Print one code for the counter. Players scan it and they are in, with no account setup at the door.",
   },
   {
     icon: TrendingUp,

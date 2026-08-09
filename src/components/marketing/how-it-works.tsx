@@ -28,7 +28,7 @@ export function HowItWorks() {
         id="how-it-works-title"
         eyebrow="How It Works"
         title="Three steps to a trade"
-        description="No shipping, no negotiating with strangers online. Just the people already in the room with you — at your local game store or a card show."
+        description="No shipping, no negotiating with strangers online. Just the people already in the room with you, at your local game store or a card show."
       />
 
       <ol className="mt-14 grid gap-5 md:grid-cols-3">

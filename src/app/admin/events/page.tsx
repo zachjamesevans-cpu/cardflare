@@ -66,7 +66,7 @@ export default async function AdminEventsPage() {
               <Link href="/admin/stores" className="text-accent hover:underline">
                 Invite a store
               </Link>{" "}
-              first — an event has to belong to one.
+              first, since an event has to belong to one.
             </p>
           ) : (
             <CreateEventForm

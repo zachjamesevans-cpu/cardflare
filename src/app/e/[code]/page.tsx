@@ -462,7 +462,7 @@ export default async function JoinByCodePage({
         <Card className="flex flex-col gap-1 border-accent/30">
           <h2 className="font-semibold text-text-primary">This board is open early</h2>
           <p className="text-sm text-text-secondary">
-            Everyone here is still on their way — the event starts{" "}
+            Everyone here is still on their way. The event starts{" "}
             {formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}. Post
             what you&rsquo;re hunting now, so people know what to bring from home.
             Flares from players who never make it are cleared when the night ends.
@@ -567,8 +567,8 @@ export default async function JoinByCodePage({
             {collectionSync && collectionSync.cards_matched > 0 && (
               <p className="text-sm text-text-muted">
                 Your collection ({collectionSync.cards_matched.toLocaleString()}{" "}
-                {collectionSync.cards_matched === 1 ? "card" : "cards"}) is along too —
-                it flags Flares you could answer without being listed here.
+                {collectionSync.cards_matched === 1 ? "card" : "cards"}) is along too.
+                It flags Flares you could answer without being listed here.
               </p>
             )}
 

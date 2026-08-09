@@ -57,7 +57,7 @@ export function TimeZonePicker({
         <Field name="timezone" label="Timezone">
           <Select {...fieldIds("timezone")} name="timezone" defaultValue={timeZone}>
             {/* The unset default stays selectable, named for what it is. */}
-            <option value="UTC">UTC — no timezone set</option>
+            <option value="UTC">UTC (no timezone set)</option>
             {groups.map((group) => (
               <optgroup key={group.label} label={group.label}>
                 {group.choices.map((choice) => (

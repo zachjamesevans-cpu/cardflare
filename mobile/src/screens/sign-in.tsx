@@ -42,7 +42,7 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         <Title>Sign in</Title>
         <Body>
           The same account you use on cardflare.gg. No account? You can still scan
-          into any room as a guest — accounts are for keeping your wants and
+          into any room as a guest; accounts are for keeping your wants and
           collection with you.
         </Body>
 

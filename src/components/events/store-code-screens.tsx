@@ -62,8 +62,8 @@ export function StoreLobby({
           Trade here today
         </h1>
         <p className="text-text-secondary">
-          Nobody is trading yet. Join and you will be the first — anyone who scans this
-          code after you lands in the same room.
+          Nobody is trading yet. Join and you will be the first, and anyone who scans
+          this code after you lands in the same room.
         </p>
       </Card>
 

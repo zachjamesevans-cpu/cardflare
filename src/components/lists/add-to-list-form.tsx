@@ -171,7 +171,7 @@ export function AddToListForm({
               {picked.printingId !== "" && (
                 <span className="text-xs text-text-muted">
                   Asking for this exact version. Switch to &ldquo;Any printing&rdquo;
-                  above if any art will do — more people can answer that.
+                  above if any art will do, since more people can answer that.
                 </span>
               )}
             </label>
@@ -194,7 +194,7 @@ export function AddToListForm({
               <span className="text-sm font-medium text-text-secondary">
                 Note{" "}
                 <span className="font-normal text-text-muted">
-                  Optional — e.g. &ldquo;NM only&rdquo;
+                  Optional, e.g. &ldquo;NM only&rdquo;
                 </span>
               </span>
               <TextInput name="note" maxLength={MAX_NOTE} />

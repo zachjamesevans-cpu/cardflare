@@ -105,7 +105,7 @@ export function TradedTonight({
                         <input type="hidden" name="kind" value="have" />
                         <input type="hidden" name="entryId" value={prompt.entryId} />
                         <Button type="submit" variant="secondary" size="sm">
-                          Traded away — remove it
+                          Traded away? Remove it
                         </Button>
                       </form>
                       <form action={confirmBinderEntryAction}>

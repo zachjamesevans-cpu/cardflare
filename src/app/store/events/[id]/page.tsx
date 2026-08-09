@@ -101,7 +101,7 @@ export default async function EventPage({
         </Badge>
         {event.repeat_weekly && (
           <Badge tone="neutral">
-            Repeats weekly — next week&rsquo;s appears when this closes
+            Repeats weekly, so next week&rsquo;s appears when this closes
           </Badge>
         )}
         <Link
@@ -129,8 +129,8 @@ export default async function EventPage({
             </h2>
             <p className="text-sm text-text-secondary">
               {event.status === "open"
-                ? "The room as a player in it sees it — names, Flares and who is open to trades. Binders stay private, in here as everywhere."
-                : "The Flares still standing when the room closed — the cards people went home without."}
+                ? "The room as a player in it sees it: names, Flares and who is open to trades. Binders stay private, in here as everywhere."
+                : "The Flares still standing when the room closed: the cards people went home without."}
             </p>
           </div>
 

@@ -45,7 +45,7 @@ export default async function SpotCheckPage() {
         <h2 className="text-xl font-bold text-text-primary">Spot check</h2>
 
         <p className="max-w-2xl text-sm text-text-secondary">
-          A spread of imported cards, chosen by shape rather than by name — one of each
+          A spread of imported cards, chosen by shape rather than by name: one of each
           card type, plus a multicolour card, a card with a counter, one with a trigger,
           and one with no cost. Read each against the official One Piece card list.
           Every value below came from the provider; none of it has been checked by
