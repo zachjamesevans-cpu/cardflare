@@ -306,6 +306,11 @@ export const postFlare = (
   },
 ) => call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
 
+export const withdrawOffer = (code: string, flareId: string) =>
+  call<{ ok: true }>("DELETE", `/api/v1/rooms/${encodeURIComponent(code)}/offers`, {
+    flareId,
+  });
+
 export const offerOnFlare = (
   code: string,
   flareId: string,
