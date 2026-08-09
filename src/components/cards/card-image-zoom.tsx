@@ -55,6 +55,7 @@ export function CardImageZoom({
   anyPrinting = false,
   caption,
   note = null,
+  lookingFor = null,
   thumbClassName,
 }: {
   imageUrl: string | null;
@@ -66,6 +67,8 @@ export function CardImageZoom({
   caption?: string | null;
   /** The Flare's note, shown in the large view under the number. */
   note?: string | null;
+  /** How many the Flare asks for, said in words in the large view. */
+  lookingFor?: number | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
 }) {
@@ -389,6 +392,13 @@ export function CardImageZoom({
                 {cardNumber}
                 {caption && <span className="font-sans"> · {caption}</span>}
               </p>
+              {/* Said in words here even though the tile draws it as a
+                  stack, for anyone who cannot read the layers. */}
+              {lookingFor != null && (
+                <p className="mt-1 text-sm font-medium text-accent">
+                  Looking for {lookingFor}
+                </p>
+              )}
               {/* The note travels with the card: the carousel tile has no
                   room for it, so the zoom is where it gets read. */}
               {note && (

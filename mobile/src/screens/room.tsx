@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -739,9 +740,32 @@ function CarouselFlare({
     }
   };
 
+  /*
+   * "2x wanted" said without text: copies 2 through 4 render as faded
+   * layers of the same card behind the art, nudged down-right, so the
+   * tile reads as a literal stack of what was asked — the founder's
+   * shape. Past four the layers stop being countable, so ×N returns.
+   */
+  const ghosts = Math.min(flare.quantity, 4) - 1;
+  const artHeight = Math.round((56 * 88) / 63);
+
   return (
     <View style={{ width: 56, gap: spacing(1), opacity: covered ? 0.6 : 1 }}>
-      <View>
+      <View style={{ width: 56, height: artHeight + ghosts * 2 }}>
+        {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
+          flare.imageUrl ? (
+            <Image
+              key={depth}
+              source={{ uri: flare.imageUrl }}
+              style={[styles.stackGhost, { top: depth * 2, left: depth * 2 }]}
+            />
+          ) : (
+            <View
+              key={depth}
+              style={[styles.stackGhost, { top: depth * 2, left: depth * 2 }]}
+            />
+          ),
+        )}
         <CardImage
           imageUrl={flare.imageUrl}
           width={56}
@@ -749,6 +773,7 @@ function CarouselFlare({
           cardNumber={flare.cardNumber}
           caption={flare.printingLabel ?? "Any printing"}
           note={flare.note}
+          lookingFor={flare.quantity}
         />
         {/* A note announces itself on the tile; the zoom is where it
             gets read. */}
@@ -768,7 +793,7 @@ function CarouselFlare({
         style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
       >
         {flare.cardName}
-        {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
+        {flare.quantity > 4 ? ` ×${flare.quantity}` : ""}
       </Text>
 
       {/* The deck, said on the tile itself — folders are a caption,
@@ -881,6 +906,7 @@ function FlareRow({
             cardNumber={flare.cardNumber}
             caption={flare.printingLabel ?? "Any printing"}
             note={flare.note}
+            lookingFor={flare.quantity}
           />
         )}
         <View style={{ flex: 1 }}>
@@ -1063,6 +1089,17 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.canvas}99`,
     alignItems: "center",
     justifyContent: "center",
+  },
+  stackGhost: {
+    position: "absolute",
+    width: 56,
+    // The tile's 63:88 card proportions at 56 wide.
+    height: 78,
+    borderRadius: radius.control / 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.canvas,
+    opacity: 0.4,
   },
   pledgeButton: {
     height: 24,

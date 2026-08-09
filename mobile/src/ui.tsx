@@ -94,6 +94,7 @@ export function CardImage({
   cardNumber,
   caption,
   note,
+  lookingFor,
 }: {
   imageUrl: string | null;
   width: number;
@@ -103,6 +104,8 @@ export function CardImage({
   caption?: string | null;
   /** The Flare's note, shown in the large view under the number. */
   note?: string | null;
+  /** How many the Flare asks for, said in words in the large view. */
+  lookingFor?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -183,6 +186,11 @@ export function CardImage({
                   {cardNumber}
                   {caption ? ` · ${caption}` : ""}
                 </Text>
+                {/* Said in words here even though the tile draws it as a
+                    stack, for anyone who cannot read the layers. */}
+                {lookingFor != null ? (
+                  <Text style={styles.zoomLooking}>{`Looking for ${lookingFor}`}</Text>
+                ) : null}
                 {/* The tile has no room for the note; the zoom is where
                     it gets read. */}
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
@@ -343,6 +351,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontStyle: "italic",
+    marginTop: spacing(1),
+  },
+  zoomLooking: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "600",
     marginTop: spacing(1),
   },
 });
