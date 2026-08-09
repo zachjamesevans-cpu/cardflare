@@ -6,7 +6,7 @@ import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { offerTrade, withdrawOffer } from "@/lib/matching/repository";
-import { offerMessageSchema } from "@/lib/matching/schema";
+import { offerMessageSchema, offerQuantitySchema } from "@/lib/matching/schema";
 import { notifyOfferReceived } from "@/lib/notifications/notify";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
 /**
  * Offering on a Flare from the app, and taking it back. `offerTrade`
  * re-checks everything server-side — the Flare's room, not-your-own,
- * binder-or-collection possession, the cap — same as it does for the
- * website, and a successful offer notifies the Flare's owner through
- * the same backbone.
+ * the cap — same as it does for the website, and a successful offer
+ * notifies the Flare's owner through the same backbone. Anyone may
+ * pledge, held card or not, and the pledge can say how many copies.
  */
 
 async function membership(request: Request, rawCode: string) {
@@ -38,6 +38,7 @@ async function membership(request: Request, rawCode: string) {
 const offerSchema = z.object({
   flareId: z.guid(),
   message: z.string().optional(),
+  quantity: offerQuantitySchema.optional(),
 });
 
 export async function POST(
@@ -57,6 +58,7 @@ export async function POST(
     found.eventId,
     found.session.id,
     message.success ? message.data : null,
+    parsed.data.quantity ?? 1,
   );
 
   if (!outcome.ok) {

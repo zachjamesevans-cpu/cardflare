@@ -3,7 +3,7 @@ import { Handshake, MapPin } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
-import { MAX_OFFER_MESSAGE, type Offer } from "@/lib/matching/schema";
+import { MAX_OFFER_MESSAGE, pledgeTally, type Offer } from "@/lib/matching/schema";
 import { confirmTradeAction } from "@/lib/trades/actions";
 
 /**
@@ -15,12 +15,19 @@ import { confirmTradeAction } from "@/lib/trades/actions";
  * costs nothing and opening it needs no hydration.
  */
 
-/** What the holder sees on a Flare they can answer. */
+/**
+ * What anyone can do on somebody else's Flare: pledge to answer it.
+ *
+ * No longer gated on a binder match — the founder's call. Somebody who
+ * knows their box at home has the card should be able to say "I got you"
+ * without having typed an inventory in first.
+ */
 export function OfferPanel({
   code,
   flareId,
   ownOffer,
   early = false,
+  flareQuantity = 1,
 }: {
   code: string;
   flareId: string;
@@ -28,6 +35,8 @@ export function OfferPanel({
   ownOffer?: Offer;
   /** Early board: the offer is a pledge to bring the card, so say so. */
   early?: boolean;
+  /** How many the Flare asks for; above one, the pledge asks "how many". */
+  flareQuantity?: number;
 }) {
   if (ownOffer) {
     return (
@@ -36,6 +45,7 @@ export function OfferPanel({
           <span className="font-medium text-accent">
             {early ? "You've got them." : "You offered."}
           </span>{" "}
+          {ownOffer.quantity > 1 && `You said ${ownOffer.quantity} copies. `}
           {ownOffer.message
             ? `They were told: “${ownOffer.message}”`
             : early
@@ -80,11 +90,55 @@ export function OfferPanel({
           aria-label="Where can they find you?"
           className="w-full min-w-0 flex-1 basis-52 rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none sm:w-auto"
         />
+        {/*
+         * "How many can you bring?" — only when the ask is for more than
+         * one, because that is when partial help is worth saying out loud:
+         * two of a 2x covered by two different people is the plan working.
+         */}
+        {flareQuantity > 1 && (
+          <label className="flex shrink-0 items-center gap-1.5 text-sm text-text-secondary">
+            How many
+            <input
+              type="number"
+              name="quantity"
+              min={1}
+              max={flareQuantity}
+              defaultValue={1}
+              inputMode="numeric"
+              aria-label="How many can you bring?"
+              className="w-14 rounded-[var(--radius-control)] border border-border bg-canvas px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+        )}
         <Button type="submit" size="sm" className="shrink-0">
           Offer
         </Button>
       </form>
     </details>
+  );
+}
+
+/**
+ * The room-readable state of a hunt: how much of the ask is spoken for.
+ *
+ * Visible to everyone, not just the requester — the founder's example is
+ * Damian wanting 2x Brook with Chunc bringing one. The next Brook holder
+ * should read "still needs 1 more" and know their copy matters, and once
+ * everything is pledged, nobody wastes a trip.
+ */
+export function PledgeSummary({ offers, asked }: { offers: Offer[]; asked: number }) {
+  if (offers.length === 0) return null;
+
+  const { remaining } = pledgeTally(offers, asked);
+
+  return (
+    <p className="mt-1.5 text-sm font-medium text-accent">
+      {remaining === 0
+        ? asked > 1
+          ? `All ${asked} spoken for.`
+          : "Spoken for."
+        : `${asked - remaining} of ${asked} spoken for. Still needs ${remaining} more.`}
+    </p>
   );
 }
 
@@ -121,7 +175,13 @@ export function OfferList({
             {offer.displayName ?? "A player"}
           </span>
           <span className="text-text-secondary">
-            {early ? "is bringing it to the event." : "has this. Go find them."}
+            {early
+              ? offer.quantity > 1
+                ? `is bringing ${offer.quantity} to the event.`
+                : "is bringing it to the event."
+              : offer.quantity > 1
+                ? `has ${offer.quantity} of them. Go find them.`
+                : "has this. Go find them."}
           </span>
 
           {offer.message && (

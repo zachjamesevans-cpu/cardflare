@@ -6,7 +6,10 @@ import {
   MarkTraded,
   OfferList,
   OfferPanel,
+  PledgeSummary,
 } from "@/components/matching/offer-controls";
+import { offerTradeAction } from "@/lib/matching/actions";
+import { pledgeTally } from "@/lib/matching/schema";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -235,7 +238,10 @@ function CarouselEntry({
   imagesEnabled,
   match,
   removable,
-  offerCount = 0,
+  pledgeLine = null,
+  canOffer = false,
+  offered = false,
+  early = false,
 }: {
   entry: ListEntry;
   code: string;
@@ -243,8 +249,13 @@ function CarouselEntry({
   imagesEnabled: boolean;
   match?: MatchKind | null;
   removable: boolean;
-  /** Hands up on the viewer's own Flare, surfaced as a count only. */
-  offerCount?: number;
+  /** The hunt's coverage, one short line: "Needs 1 more" and kin. */
+  pledgeLine?: string | null;
+  /** Somebody else's Flare and the viewer has not pledged yet. */
+  canOffer?: boolean;
+  /** The viewer's pledge is already standing. */
+  offered?: boolean;
+  early?: boolean;
 }) {
   return (
     <li className="flex w-14 shrink-0 flex-col gap-1">
@@ -268,6 +279,19 @@ function CarouselEntry({
         )}
       </p>
 
+      {/*
+       * The deck, said on the tile itself. A bordered chip around the
+       * folder's cards read as clutter next to the plain rail — the
+       * founder asked for uniform tiles, so the folder is a caption,
+       * not a container. Partitioning keeps deck-mates side by side.
+       */}
+      {entry.deckLabel && (
+        <p className="flex items-center gap-1 text-[10px] leading-tight text-text-muted">
+          <Folder className="size-3 shrink-0 text-accent" aria-hidden="true" />
+          <span className="min-w-0 truncate">{entry.deckLabel}</span>
+        </p>
+      )}
+
       {match === "exact" && (
         <p className="text-[10px] leading-tight font-semibold text-accent">
           You have this
@@ -277,10 +301,31 @@ function CarouselEntry({
         <p className="text-[10px] leading-tight text-accent">Another printing</p>
       )}
 
-      {offerCount > 0 && (
-        <p className="text-[10px] leading-tight text-accent">
-          {offerCount} {offerCount === 1 ? "hand" : "hands"} up
+      {pledgeLine && (
+        <p className="text-[10px] leading-tight font-semibold text-accent">
+          {pledgeLine}
         </p>
+      )}
+
+      {/*
+       * The one-tap pledge, open to anyone — no binder required, the
+       * founder's call. One copy, no note; the stacked view has the
+       * full form for counts and where-to-find-me.
+       */}
+      {canOffer && (
+        <form action={offerTradeAction}>
+          <input type="hidden" name="code" value={code} />
+          <input type="hidden" name="flareId" value={entry.id} />
+          <button
+            type="submit"
+            className="text-[11px] font-semibold text-accent underline underline-offset-2"
+          >
+            {early ? "I got you" : "I got it"}
+          </button>
+        </form>
+      )}
+      {offered && (
+        <p className="text-[10px] leading-tight text-text-muted">You&rsquo;re on it</p>
       )}
 
       {removable && (
@@ -343,7 +388,7 @@ export function FlareBoard({
   counterHas,
   counterName,
   early = false,
-  view = "stacked",
+  view = "carousel",
 }: {
   entries: ListEntry[];
   code: string;
@@ -361,7 +406,11 @@ export function FlareBoard({
   counterName?: string;
   /** Early board: offers read as pledges to bring the card. */
   early?: boolean;
-  /** Stacked is the reading view; carousel is the browsing view. */
+  /**
+   * Carousel is the browsing view and the default — every surface that
+   * renders the board without asking gets the concise shape; the store
+   * dashboard used to fall back to stacked with no way out.
+   */
   view?: "stacked" | "carousel";
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
@@ -409,11 +458,23 @@ export function FlareBoard({
           );
 
           /*
-           * The carousel item is a contact sheet: signals only, acting
-           * happens in the stacked view. Offers therefore surface there
-           * as a count, never as controls.
+           * The carousel item is a contact sheet with one quick action:
+           * anyone can tap "I got it" on somebody else's card. Counts,
+           * notes and confirms live in the stacked view. The coverage
+           * line is public — the founder's ask — so the next holder
+           * knows whether a hunt still needs them.
            */
           if (view === "carousel") {
+            const { remaining } = pledgeTally(entryOffers, entry.quantity);
+            const pledgeLine =
+              entryOffers.length === 0
+                ? null
+                : remaining === 0
+                  ? entry.quantity > 1
+                    ? `All ${entry.quantity} spoken for`
+                    : "Spoken for"
+                  : `Needs ${remaining} more`;
+
             return (
               <CarouselEntry
                 key={entry.id}
@@ -423,7 +484,10 @@ export function FlareBoard({
                 imagesEnabled={imagesEnabled}
                 match={match}
                 removable={isYou}
-                offerCount={isYou ? entryOffers.length : 0}
+                pledgeLine={pledgeLine}
+                canOffer={!isYou && !ownOffer}
+                offered={Boolean(ownOffer)}
+                early={early}
               />
             );
           }
@@ -431,9 +495,10 @@ export function FlareBoard({
           /*
            * Your Flare: everyone who raised a hand, each with a
            * "we traded", plus the quiet tally for a trade that
-           * happened without an offer. Someone else's that you can
-           * answer: the hand-raising controls. Never both — you
-           * cannot offer on your own request.
+           * happened without an offer. Someone else's: the pledge
+           * controls, for everybody — a binder match is a hint now,
+           * not a permission. Never both — you cannot offer on your
+           * own request. The coverage line renders for all viewers.
            */
           return (
             <Entry
@@ -446,6 +511,7 @@ export function FlareBoard({
               removable={isYou}
               counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
             >
+              <PledgeSummary offers={entryOffers} asked={entry.quantity} />
               {isYou && entryOffers.length > 0 && (
                 <OfferList
                   offers={entryOffers}
@@ -455,12 +521,13 @@ export function FlareBoard({
                 />
               )}
               {isYou && <MarkTraded code={code} flareId={entry.id} />}
-              {match && (
+              {!isYou && (
                 <OfferPanel
                   code={code}
                   flareId={entry.id}
                   ownOffer={ownOffer}
                   early={early}
+                  flareQuantity={entry.quantity}
                 />
               )}
             </Entry>
@@ -499,35 +566,15 @@ export function FlareBoard({
             </div>
 
             {/*
-             * Carousel: ONE rail per player, and a folder is a chip inside
-             * it — its cards side by side in a bordered box with the deck
-             * name on top, loose cards flowing after. The first cut gave
-             * every folder its own rail, which stacked a two-card section
-             * back up to a full screen; the founder caught it on phone and
-             * desktop both. Stacked keeps the header-then-rows shape.
+             * Carousel: ONE rail per player, every tile the same shape —
+             * the founder asked for the folder's cards to look exactly
+             * like the loose ones. The partition keeps a deck's cards
+             * side by side, and each of them names its deck in its own
+             * caption. Stacked keeps the header-then-rows shape.
              */}
             {view === "carousel" ? (
               <Rail labelledBy={headingId}>
-                {folders.map((folder) => (
-                  <li
-                    key={folder.label.toLowerCase()}
-                    className="flex shrink-0 flex-col gap-1 rounded-[8px] border border-accent/25 bg-accent/[0.05] p-1.5"
-                  >
-                    <p className="flex items-center gap-1 text-[10px] font-medium text-text-secondary">
-                      <Folder
-                        className="size-3 shrink-0 text-accent"
-                        aria-hidden="true"
-                      />
-                      <span className="max-w-36 truncate">{folder.label}</span>
-                      <span className="shrink-0 text-text-muted tabular-nums">
-                        · {folder.entries.length}
-                      </span>
-                    </p>
-                    <ul aria-label={`Deck: ${folder.label}`} className="flex gap-2">
-                      {folder.entries.map(renderEntry)}
-                    </ul>
-                  </li>
-                ))}
+                {folders.flatMap((folder) => folder.entries).map(renderEntry)}
                 {loose.map(renderEntry)}
                 {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
               </Rail>

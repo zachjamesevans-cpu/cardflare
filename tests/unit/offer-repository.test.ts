@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * The offer write path's guards, against a scripted Supabase client.
  *
- * The offer button only renders on a match, but a Server Action is a public
- * POST endpoint, so these rules live server-side and each one is pinned here:
- * an id from another room does nothing, you cannot offer on your own Flare,
- * and you cannot put your name on a Flare for a card you do not carry —
- * which is what would turn offers into a spam channel.
+ * A Server Action is a public POST endpoint, so these rules live server-side
+ * and each one is pinned here: an id from another room does nothing, you
+ * cannot offer on your own Flare, and the cap is what keeps one name off
+ * every Flare. There is deliberately no held-card rule any more — the
+ * founder opened pledges to anyone, typed inventory or not.
  */
 
 type Response = Record<string, unknown>;
@@ -72,9 +72,9 @@ const FLARE = {
   status: "open",
 };
 
-function offer(overrides: Partial<typeof FLARE> = {}) {
+function offer(overrides: Partial<typeof FLARE> = {}, quantity?: number) {
   queue("flares", { data: { ...FLARE, ...overrides }, error: null });
-  return offerTrade("flare-1", "event-1", "holder", "table 12");
+  return offerTrade("flare-1", "event-1", "holder", "table 12", quantity);
 }
 
 beforeEach(() => {
@@ -85,22 +85,35 @@ beforeEach(() => {
 });
 
 describe("offerTrade", () => {
-  it("records an offer from a holder who carries the card", async () => {
-    queue("player_cards", { data: [{ id: "pc-1" }], error: null });
+  it("records an offer from anyone in the room, no binder required", async () => {
     queue("flare_responses", { data: [], error: null }); // cap count
     queue("flare_responses", { error: null }); // upsert
 
     await expect(offer()).resolves.toEqual({ ok: true });
 
+    // One copy unless they said otherwise.
     expect(calls.flare_responses.upsert?.[0]?.[0]).toMatchObject({
       flare_id: "flare-1",
       responder_session_id: "holder",
       message: "table 12",
+      quantity: 1,
     });
     // Offering twice must update the message, never stack a second row.
     expect(calls.flare_responses.upsert?.[0]?.[1]).toMatchObject({
       onConflict: "flare_id,responder_session_id",
     });
+    // No binder or collection lookup happened: anyone may pledge.
+    expect(calls.player_cards).toBeUndefined();
+    expect(calls.player_collection).toBeUndefined();
+  });
+
+  it("records how many copies the responder says they can bring", async () => {
+    queue("flare_responses", { data: [], error: null }); // cap count
+    queue("flare_responses", { error: null }); // upsert
+
+    await expect(offer({}, 2)).resolves.toEqual({ ok: true });
+
+    expect(calls.flare_responses.upsert?.[0]?.[0]).toMatchObject({ quantity: 2 });
   });
 
   it.each([
@@ -130,49 +143,9 @@ describe("offerTrade", () => {
     });
   });
 
-  /*
-   * The rule that keeps offers meaning something: your name only goes on a
-   * Flare when your binder — or your account's imported collection — says
-   * you carry the card.
-   */
-  it("refuses a guest whose binder lacks the card", async () => {
-    queue("player_cards", { data: [], error: null });
-    // A guest session: no linked account, so no collection to fall back on.
-    queue("player_sessions", { data: { player_id: null }, error: null });
-
-    await expect(offer()).resolves.toEqual({ ok: false, reason: "not-held" });
-    expect(calls.flare_responses?.upsert).toBeUndefined();
-  });
-
-  it("accepts a holder whose imported collection carries the card", async () => {
-    queue("player_cards", { data: [], error: null });
-    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
-    queue("player_collection", { data: [{ id: "col-1" }], error: null });
-    queue("flare_responses", { data: [], error: null }); // cap count
-    queue("flare_responses", { error: null }); // upsert
-
-    await expect(offer()).resolves.toEqual({ ok: true });
-
-    // The collection was asked about this player and this card, exactly.
-    expect(calls.player_collection.eq).toEqual([
-      ["player_id", "player-1"],
-      ["card_id", "card-1"],
-    ]);
-  });
-
-  it("refuses an account holder whose collection also lacks the card", async () => {
-    queue("player_cards", { data: [], error: null });
-    queue("player_sessions", { data: { player_id: "player-1" }, error: null });
-    queue("player_collection", { data: [], error: null });
-
-    await expect(offer()).resolves.toEqual({ ok: false, reason: "not-held" });
-    expect(calls.flare_responses?.upsert).toBeUndefined();
-  });
-
   it("stops at the cap of open offers in this room", async () => {
     // The flares queue serves the lookup first, then the cap count.
     queue("flares", { data: FLARE, error: null }, { count: 30, error: null });
-    queue("player_cards", { data: [{ id: "pc-1" }], error: null });
     queue("flare_responses", {
       data: Array.from({ length: 30 }, (_, i) => ({ flare_id: `f${i}` })),
       error: null,
@@ -188,7 +161,6 @@ describe("offerTrade", () => {
     // Thirty response rows, but only a handful still point at open Flares
     // in this room — last week's offers must not eat tonight's allowance.
     queue("flares", { data: FLARE, error: null }, { count: 3, error: null });
-    queue("player_cards", { data: [{ id: "pc-1" }], error: null });
     queue(
       "flare_responses",
       {

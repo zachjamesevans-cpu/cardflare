@@ -450,6 +450,29 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Feedback round — pledges for anyone, with a count
+
+Two founder rulings reshaped offers. First: anyone may pledge on any
+Flare — the Milestone 7 rule that your binder or synced collection had
+to hold the card is gone, because plenty of players know exactly what
+is in the box at home without having typed an inventory in, and on an
+early board "I got you, I'll bring it" is a promise about tomorrow.
+The offer cap still keeps one name off every Flare. Second: a pledge
+can say how many. `flare_responses.quantity` (default 1, checked
+1-99, probed on real PostgreSQL 16) rides the whole chain, and the
+founder's example is the spec: Damian asks for 2x Brook, Chunc
+pledges one, and the board tells the whole room "1 of 2 spoken for.
+Still needs 1 more." — so the next Brook holder knows their copy
+matters, and once everything is pledged nobody wastes a trip. On the
+web the offer form asks "How many" when the ask is above one and every
+row shows the coverage line; carousel tiles carry a one-tap "I got
+it" / "I got you" pledge and a "Needs N more" caption. The app
+mirrors all of it with a stepper. Board surfaces also converged: the
+store dashboard's event page gained the same carousel default and
+stacked/carousel switch the room page has (it was stranded stacked on
+desktop), and deck folders became captions on uniform tiles instead
+of bordered chips, after the chip read as clutter.
+
 ## ✅ Feedback round — deck folders, and the board leads with the carousel
 
 The founder's ask, in his own example: someone building an RG Luffy

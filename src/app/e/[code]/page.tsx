@@ -7,6 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
+import { BoardViewToggle } from "@/components/lists/board-view-toggle";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
@@ -535,37 +536,7 @@ export default async function JoinByCodePage({
                 </p>
               </div>
 
-              {/* The file-browser trick: same board, two geometries. */}
-              <div
-                className="flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-border p-1"
-                role="group"
-                aria-label="Board layout"
-              >
-                <Link
-                  href={`/e/${normalized}`}
-                  aria-current={boardView === "carousel" ? "true" : undefined}
-                  className={cn(
-                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
-                    boardView === "carousel"
-                      ? "bg-accent/15 text-accent"
-                      : "text-text-muted hover:text-text-secondary",
-                  )}
-                >
-                  Carousel
-                </Link>
-                <Link
-                  href={`/e/${normalized}?view=stacked`}
-                  aria-current={boardView === "stacked" ? "true" : undefined}
-                  className={cn(
-                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
-                    boardView === "stacked"
-                      ? "bg-accent/15 text-accent"
-                      : "text-text-muted hover:text-text-secondary",
-                  )}
-                >
-                  Stacked
-                </Link>
-              </div>
+              <BoardViewToggle basePath={`/e/${normalized}`} view={boardView} />
             </div>
 
             <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
