@@ -68,7 +68,9 @@ function Outcome({ state }: { state: ListState }) {
       <span>
         {state.status === "error"
           ? state.message
-          : `${state.cardName || "That card"} added.`}
+          : state.kind === "flare"
+            ? `${state.cardName || "That card"} posted. Search for your next card below.`
+            : `${state.cardName || "That card"} added.`}
       </span>
     </p>
   );
@@ -95,6 +97,23 @@ export function AddToListForm({
     card: CardResult;
     printingId: string;
   } | null>(null);
+
+  /*
+   * A successful post hands the screen back to the search. Keeping the
+   * posted card up, with its "Change" button still showing, read as if
+   * the post itself wanted changing; the founder called it out. The
+   * banner above says what just posted, and the search below is the
+   * "next card" the person actually wants now.
+   *
+   * Adjusted during render, the way React documents deriving state from
+   * a changed input: each action result clears the picker exactly once,
+   * so a card picked afterwards is never re-cleared by a re-render.
+   */
+  const [clearedFor, setClearedFor] = useState<ListState>(state);
+  if (state !== clearedFor) {
+    setClearedFor(state);
+    if (state.status === "added") setPicked(null);
+  }
 
   const copy = COPY[kind];
 
