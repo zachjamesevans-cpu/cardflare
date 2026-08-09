@@ -26,8 +26,9 @@ import { AccountScreen } from "./src/screens/account";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
-import { PostFlareScreen } from "./src/screens/post-flare";
+import { FlareCardScreen, PostFlareScreen } from "./src/screens/post-flare";
 import { RoomTab } from "./src/screens/room";
+import type { CardHit } from "./src/api";
 import { ScanScreen } from "./src/screens/scan";
 import { SignInScreen } from "./src/screens/sign-in";
 import { colors } from "./src/theme";
@@ -64,6 +65,8 @@ export type StackParams = {
   SignIn: undefined;
   Scan: undefined;
   PostFlare: { code: string };
+  /** The picked card: a real stack screen so the native back-swipe works. */
+  FlareCard: { code: string; hit: CardHit; printingId: string | null };
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -231,6 +234,15 @@ export default function App() {
         </Stack.Screen>
         <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
           {({ route }) => <PostFlareScreen code={route.params.code} />}
+        </Stack.Screen>
+        <Stack.Screen name="FlareCard" options={{ title: "Post a Flare" }}>
+          {({ route }) => (
+            <FlareCardScreen
+              code={route.params.code}
+              hit={route.params.hit}
+              printingId={route.params.printingId}
+            />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

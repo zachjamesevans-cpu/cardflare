@@ -19,19 +19,23 @@ export function HubScreen() {
   const [code, setCode] = useState<string | null>(null);
 
   /*
-   * Tapping the Flare tab is also "start over": if a card is open in the
-   * picker, the tap pops it back to the search. The counter is the
-   * signal; the picker resets whenever it changes. (tabPress is a tab-
-   * navigator event this screen actually receives, but the hook's typing
-   * follows the stack param list — hence the cast.)
+   * Re-tapping the Flare tab while already ON it means "different card":
+   * the search clears for a fresh hunt. The focus check is the whole
+   * point — someone who looked up a card, wandered to another tab, and
+   * came back has NOT asked to start over, so arriving from elsewhere
+   * never touches their search. (tabPress is a tab-navigator event this
+   * screen actually receives, but the hook's typing follows the stack
+   * param list — hence the cast.)
    */
   const [resetSignal, setResetSignal] = useState(0);
   useEffect(() => {
-    return (
-      navigation as unknown as {
-        addListener: (event: string, callback: () => void) => () => void;
-      }
-    ).addListener("tabPress", () => setResetSignal((n) => n + 1));
+    const nav = navigation as unknown as {
+      addListener: (event: string, callback: () => void) => () => void;
+      isFocused: () => boolean;
+    };
+    return nav.addListener("tabPress", () => {
+      if (nav.isFocused()) setResetSignal((n) => n + 1);
+    });
   }, [navigation]);
 
   useFocusEffect(

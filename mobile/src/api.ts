@@ -310,6 +310,14 @@ export interface CardHit {
   id: string;
   name: string;
   cardNumber: string;
+  cardType: string | null;
+  colors: string[];
+  cost: number | null;
+  life: number | null;
+  power: number | null;
+  counter: number | null;
+  /** The printing whose art leads the row — the website's base-art rule. */
+  basePrintingId: string | null;
   printings: { id: string; label: string | null; imageUrl: string | null }[];
 }
 
