@@ -343,14 +343,21 @@ function CarouselEntry({
             <StickyNote className="size-3 text-accent" aria-hidden="true" />
           </span>
         )}
+        {/* The number, right on the card — the fan draws it, this chip
+            says it, and both count down together as pledges land. */}
+        {visible > 1 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-0.5 bottom-0.5 z-10 rounded-[4px] border border-border bg-canvas/85 px-1 text-[10px] font-bold text-text-primary tabular-nums"
+          >
+            ×{visible}
+          </span>
+        )}
       </div>
 
       <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
         {entry.cardName}
-        {visible > 4 && (
-          <span className="font-normal text-text-muted tabular-nums"> ×{visible}</span>
-        )}
-        {visible > 1 && visible <= 4 && <span className="sr-only"> ×{visible}</span>}
+        {visible > 1 && <span className="sr-only"> ×{visible}</span>}
       </p>
 
       {/*

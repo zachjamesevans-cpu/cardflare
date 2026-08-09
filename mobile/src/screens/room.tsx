@@ -822,6 +822,14 @@ function CarouselFlare({
             <Text style={styles.noteBadgeGlyph}>✎</Text>
           </View>
         ) : null}
+        {/* The number, right on the card — the fan draws it, this chip
+            says it, and both count down together as pledges land.
+            Anchored from the fan's bleed so it sits on the top card. */}
+        {visible > 1 ? (
+          <View style={[styles.countBadge, { right: fan + 2 }]}>
+            <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
+          </View>
+        ) : null}
         {pledging ? (
           <View style={styles.pledgeOverlay}>
             <ActivityIndicator size="small" color={colors.accent} />
@@ -833,7 +841,6 @@ function CarouselFlare({
         style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
       >
         {flare.cardName}
-        {visible > 4 ? ` ×${visible}` : ""}
       </Text>
 
       {/* The deck, said on the tile itself — folders are a caption,
@@ -1182,6 +1189,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.elevated,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  countBadge: {
+    position: "absolute",
+    bottom: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: `${colors.canvas}D9`,
+    paddingHorizontal: 3,
+  },
+  countBadgeText: {
+    color: colors.textPrimary,
+    fontSize: 9,
+    fontWeight: "700",
   },
   pledgeStepper: {
     flexDirection: "row",
