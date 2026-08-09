@@ -29,6 +29,7 @@ import { getPlayerSession } from "@/lib/players/session";
 import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
+import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
@@ -135,6 +136,31 @@ export default async function JoinByCodePage({
     const show = resolved.show;
     const where = [show.city, show.region].filter(Boolean).join(", ");
 
+    /*
+     * The wants a signed-in attendee carries meet the hall's inventory the
+     * moment they scan in — no search, no asking every vendor. Guests get
+     * the same search box as always; this panel simply never renders.
+     */
+    const showViewer = await getViewer();
+    const showPlayerId =
+      showViewer.kind === "player"
+        ? showViewer.playerId
+        : showViewer.kind === "anonymous"
+          ? null
+          : ((await playerForUser(showViewer.user.id))?.id ?? null);
+
+    const showWants = showPlayerId ? await listWants(showPlayerId) : [];
+    const wantHits = showPlayerId
+      ? await showAvailability(
+          show.id,
+          showWants.map((want) => want.cardId),
+        )
+      : new Map<string, import("@/lib/shows/schema").VendorAvailability[]>();
+
+    const matchedWants = showWants.filter(
+      (want) => (wantHits.get(want.cardId) ?? []).length > 0,
+    );
+
     return (
       <Shell wide>
         <Card className="flex flex-col gap-4">
@@ -160,6 +186,35 @@ export default async function JoinByCodePage({
             )}
           </dl>
         </Card>
+
+        {matchedWants.length > 0 && (
+          <Card className="flex flex-col gap-3 border-accent/30">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-semibold text-text-primary">
+                Your wants, in this hall
+              </h2>
+              <p className="text-sm text-text-secondary">
+                {matchedWants.length} of the {showWants.length}{" "}
+                {showWants.length === 1 ? "card" : "cards"} you&rsquo;re hunting{" "}
+                {matchedWants.length === 1 ? "is" : "are"} here right now.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {matchedWants.map((want) => (
+                <li key={want.id} className="flex flex-col">
+                  <span className="font-semibold text-text-primary">
+                    {want.cardName}
+                  </span>
+                  <span className="text-sm text-text-secondary">
+                    {(wantHits.get(want.cardId) ?? [])
+                      .map((hit) => `Booth ${hit.booth} · ${hit.vendorName}`)
+                      .join("  ·  ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         <ShowSearch code={normalized} />
       </Shell>
