@@ -255,6 +255,7 @@ function CarouselEntry({
   offered = false,
   early = false,
   covered = false,
+  remaining,
 }: {
   entry: ListEntry;
   code: string;
@@ -271,27 +272,36 @@ function CarouselEntry({
   early?: boolean;
   /** Every asked-for copy is pledged: dimmed and parked at the rail's end. */
   covered?: boolean;
+  /** Copies still unpledged; equals the ask until someone raises a hand. */
+  remaining?: number;
 }) {
   /*
-   * "2x wanted" said without text: copies 2 through 4 render as faded
-   * layers of the same card behind the art, each nudged down-right, so
-   * the tile reads as a literal stack of what was asked — the founder's
-   * shape. Past four the layers stop being countable, so ×N text
-   * returns; screen readers always get the number either way.
+   * Quantity drawn instead of written — and it is the *live need*, the
+   * founder's confirm: copies still unpledged render as faded layers of
+   * the same card behind the art, fanned out to the RIGHT — sideways
+   * only, because the first cut nudged them downward and every stacked
+   * tile grew taller, knocking names and buttons out of line across the
+   * rail; the founder caught it in one screenshot. Three asked with one
+   * pledged is a fan of two; fully pledged collapses to a single dimmed
+   * card at the rail's end. Past four the layers stop being countable,
+   * so ×N text returns; screen readers always get a number. The fan's
+   * bleed is reserved as margin so neighbours never collide.
    */
-  const ghosts = Math.min(entry.quantity, 4) - 1;
+  const visible = Math.max(remaining ?? entry.quantity, 1);
+  const ghosts = Math.min(visible, 4) - 1;
 
   return (
     <li
       className={`relative flex w-14 shrink-0 flex-col gap-1 ${covered ? "opacity-60" : ""}`}
+      style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      <div className={`relative ${ghosts > 0 ? "mb-1" : ""}`}>
+      <div className="relative">
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
           <div
             key={depth}
             aria-hidden="true"
             className="absolute inset-0 overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
-            style={{ transform: `translate(${depth * 2}px, ${depth * 2}px)` }}
+            style={{ transform: `translate(${depth * 4}px, 0)` }}
           >
             {isRenderableImageUrl(entry.imageUrl) && (
               <Image
@@ -313,6 +323,7 @@ function CarouselEntry({
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
+          stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           thumbClassName="w-full"
         />
         {/* The founder's ask: a note announces itself on the tile, and
@@ -329,15 +340,10 @@ function CarouselEntry({
 
       <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
         {entry.cardName}
-        {entry.quantity > 4 && (
-          <span className="font-normal text-text-muted tabular-nums">
-            {" "}
-            ×{entry.quantity}
-          </span>
+        {visible > 4 && (
+          <span className="font-normal text-text-muted tabular-nums"> ×{visible}</span>
         )}
-        {entry.quantity > 1 && entry.quantity <= 4 && (
-          <span className="sr-only"> ×{entry.quantity}</span>
-        )}
+        {visible > 1 && visible <= 4 && <span className="sr-only"> ×{visible}</span>}
       </p>
 
       {/*
@@ -549,6 +555,7 @@ export function FlareBoard({
                 offered={Boolean(ownOffer)}
                 early={early}
                 covered={covered}
+                remaining={remaining}
               />
             );
           }

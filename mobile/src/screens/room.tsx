@@ -741,29 +741,34 @@ function CarouselFlare({
   };
 
   /*
-   * "2x wanted" said without text: copies 2 through 4 render as faded
-   * layers of the same card behind the art, nudged down-right, so the
-   * tile reads as a literal stack of what was asked — the founder's
-   * shape. Past four the layers stop being countable, so ×N returns.
+   * Quantity drawn instead of written — and it is the *live need*, the
+   * founder's confirm: copies still unpledged render as faded layers
+   * behind the art, fanned out to the RIGHT. Sideways only: the first
+   * cut nudged them downward, every stacked tile grew taller, and the
+   * rail's names and buttons fell out of line. Three asked with one
+   * pledged is a fan of two; fully pledged collapses to a single
+   * dimmed card at the rail's end. Past four ×N returns. The tile
+   * widens by the fan's bleed so neighbours never collide, and the
+   * text stays anchored to the tile's left edge like every other.
    */
-  const ghosts = Math.min(flare.quantity, 4) - 1;
+  const { remaining } = pledgeTally(flare.offers, flare.quantity);
+  const visible = Math.max(remaining, 1);
+  const ghosts = Math.min(visible, 4) - 1;
   const artHeight = Math.round((56 * 88) / 63);
+  const fan = ghosts * 4;
 
   return (
-    <View style={{ width: 56, gap: spacing(1), opacity: covered ? 0.6 : 1 }}>
-      <View style={{ width: 56, height: artHeight + ghosts * 2 }}>
+    <View style={{ width: 56 + fan, gap: spacing(1), opacity: covered ? 0.6 : 1 }}>
+      <View style={{ width: 56 + fan, height: artHeight }}>
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
           flare.imageUrl ? (
             <Image
               key={depth}
               source={{ uri: flare.imageUrl }}
-              style={[styles.stackGhost, { top: depth * 2, left: depth * 2 }]}
+              style={[styles.stackGhost, { top: 0, left: depth * 4 }]}
             />
           ) : (
-            <View
-              key={depth}
-              style={[styles.stackGhost, { top: depth * 2, left: depth * 2 }]}
-            />
+            <View key={depth} style={[styles.stackGhost, { top: 0, left: depth * 4 }]} />
           ),
         )}
         <CardImage
@@ -774,6 +779,7 @@ function CarouselFlare({
           caption={flare.printingLabel ?? "Any printing"}
           note={flare.note}
           lookingFor={flare.quantity}
+          stillNeeds={flare.offers.length > 0 ? remaining : null}
         />
         {/* A note announces itself on the tile; the zoom is where it
             gets read. */}
@@ -793,7 +799,7 @@ function CarouselFlare({
         style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
       >
         {flare.cardName}
-        {flare.quantity > 4 ? ` ×${flare.quantity}` : ""}
+        {visible > 4 ? ` ×${visible}` : ""}
       </Text>
 
       {/* The deck, said on the tile itself — folders are a caption,
@@ -907,6 +913,11 @@ function FlareRow({
             caption={flare.printingLabel ?? "Any printing"}
             note={flare.note}
             lookingFor={flare.quantity}
+            stillNeeds={
+              flare.offers.length > 0
+                ? pledgeTally(flare.offers, flare.quantity).remaining
+                : null
+            }
           />
         )}
         <View style={{ flex: 1 }}>
@@ -1066,7 +1077,9 @@ const styles = StyleSheet.create({
   noteBadge: {
     position: "absolute",
     top: 2,
-    right: 2,
+    // Anchored from the left so it sits on the top card of a fan, not
+    // on the rightmost ghost: 56-wide card, 16-wide badge, 2px inset.
+    left: 38,
     width: 16,
     height: 16,
     borderRadius: 8,

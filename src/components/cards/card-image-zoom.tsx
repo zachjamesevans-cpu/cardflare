@@ -56,6 +56,7 @@ export function CardImageZoom({
   caption,
   note = null,
   lookingFor = null,
+  stillNeeds = null,
   thumbClassName,
 }: {
   imageUrl: string | null;
@@ -69,6 +70,8 @@ export function CardImageZoom({
   note?: string | null;
   /** How many the Flare asks for, said in words in the large view. */
   lookingFor?: number | null;
+  /** Copies still unpledged, when hands are already up. */
+  stillNeeds?: number | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
 }) {
@@ -393,10 +396,16 @@ export function CardImageZoom({
                 {caption && <span className="font-sans"> · {caption}</span>}
               </p>
               {/* Said in words here even though the tile draws it as a
-                  stack, for anyone who cannot read the layers. */}
+                  stack, for anyone who cannot read the layers. Both truths
+                  when hands are up: the ask, and what is still missing. */}
               {lookingFor != null && (
                 <p className="mt-1 text-sm font-medium text-accent">
                   Looking for {lookingFor}
+                  {stillNeeds != null &&
+                    stillNeeds !== lookingFor &&
+                    (stillNeeds === 0
+                      ? " · all spoken for"
+                      : ` · still needs ${stillNeeds}`)}
                 </p>
               )}
               {/* The note travels with the card: the carousel tile has no

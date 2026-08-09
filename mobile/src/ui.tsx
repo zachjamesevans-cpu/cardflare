@@ -95,6 +95,7 @@ export function CardImage({
   caption,
   note,
   lookingFor,
+  stillNeeds,
 }: {
   imageUrl: string | null;
   width: number;
@@ -106,6 +107,8 @@ export function CardImage({
   note?: string | null;
   /** How many the Flare asks for, said in words in the large view. */
   lookingFor?: number | null;
+  /** Copies still unpledged, when hands are already up. */
+  stillNeeds?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -187,9 +190,18 @@ export function CardImage({
                   {caption ? ` · ${caption}` : ""}
                 </Text>
                 {/* Said in words here even though the tile draws it as a
-                    stack, for anyone who cannot read the layers. */}
+                    stack, for anyone who cannot read the layers. Both
+                    truths when hands are up: the ask, and the gap. */}
                 {lookingFor != null ? (
-                  <Text style={styles.zoomLooking}>{`Looking for ${lookingFor}`}</Text>
+                  <Text style={styles.zoomLooking}>
+                    {`Looking for ${lookingFor}${
+                      stillNeeds != null && stillNeeds !== lookingFor
+                        ? stillNeeds === 0
+                          ? " · all spoken for"
+                          : ` · still needs ${stillNeeds}`
+                        : ""
+                    }`}
+                  </Text>
                 ) : null}
                 {/* The tile has no room for the note; the zoom is where
                     it gets read. */}
