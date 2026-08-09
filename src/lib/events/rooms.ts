@@ -1,19 +1,31 @@
 import "server-only";
 
+import { cancelNoShowFlares } from "@/lib/lists/repository";
+import { plusDaysInZone } from "@/lib/time/zone";
 import { classifyCode } from "./join-code";
 import {
   closeEndedScheduledEvents,
   closeWalkInRoom,
+  createEvent,
   findEventByJoinCode,
   findOpenWalkInRoom,
   findRunningScheduledEvent,
   findShowByJoinCode,
   findStoreByJoinCode,
+  findStoreById,
   latestActivityAt,
+  findEarlyBoard,
   listOpenRoomsAcrossStores,
   openWalkInRoom,
+  scheduledEventExistsAt,
 } from "./repository";
-import type { CodeResolution, EventKind, PublicEvent, PublicStore } from "./schema";
+import type {
+  ClosedOccurrence,
+  CodeResolution,
+  EventKind,
+  PublicEvent,
+  PublicStore,
+} from "./schema";
 
 /**
  * Where a scanned code leads.
@@ -54,6 +66,68 @@ export const WALK_IN_IDLE_MS = 6 * 60 * 60 * 1000;
  * a race.
  */
 export const DOORS_OPEN_LEAD_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Everything owed when a scheduled occurrence finishes, in one place —
+ * called by every close path (the sweeps, the resolver, the store's own
+ * close button), because a debt paid on only some paths is a bug with a
+ * schedule.
+ *
+ * Two debts. The early board's: cancel the open Flares of everyone whose
+ * participation never saw the event start — a pre-posted Flare said "I am
+ * coming", and the board must not carry the claim past the night it was
+ * about. The schedule's: a recurring occurrence creates its successor,
+ * seven days later at the same wall-clock time in the store's zone (DST
+ * handled by `plusDaysInZone`), as a fresh draft with its own code. The
+ * dedupe check makes racing sweeps converge on one successor.
+ *
+ * Never throws: closing happened already, and a failed roll or expiry
+ * must not turn a working close into an error a player sees. The next
+ * sweep retries from the same facts.
+ */
+export async function settleClosedOccurrences(
+  closed: ClosedOccurrence[],
+): Promise<void> {
+  for (const occurrence of closed) {
+    try {
+      await cancelNoShowFlares(occurrence.id, occurrence.startsAt);
+
+      if (!occurrence.repeatWeekly || !occurrence.endsAt) continue;
+
+      const store = await findStoreById(occurrence.storeId);
+      if (!store) continue;
+
+      const nextStart = plusDaysInZone(
+        new Date(occurrence.startsAt),
+        7,
+        store.timezone,
+      );
+      const nextEnd = plusDaysInZone(new Date(occurrence.endsAt), 7, store.timezone);
+
+      if (await scheduledEventExistsAt(occurrence.storeId, nextStart.toISOString())) {
+        continue;
+      }
+
+      await createEvent(
+        {
+          storeId: occurrence.storeId,
+          name: occurrence.name,
+          startsAt: nextStart,
+          endsAt: nextEnd,
+          repeatWeekly: true,
+        },
+        null,
+      );
+    } catch (error) {
+      console.error("Could not settle a closed occurrence", error);
+    }
+  }
+}
+
+/** Closes ended scheduled events and settles each one's debts. */
+export async function sweepEndedScheduledEvents(nowIso: string): Promise<void> {
+  await settleClosedOccurrences(await closeEndedScheduledEvents(nowIso));
+}
 
 /** True once a room has been quiet for longer than the idle window. */
 export function isIdle(
@@ -167,7 +241,7 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
       room.endsAt &&
       new Date(room.endsAt).getTime() <= Date.now()
     ) {
-      await closeEndedScheduledEvents(new Date().toISOString());
+      await sweepEndedScheduledEvents(new Date().toISOString());
       return { outcome: "room", room: { ...room, status: "closed" } };
     }
 
@@ -187,7 +261,11 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
   const room = await findLiveRoom(store);
   if (room) return { outcome: "room", room };
 
-  return { outcome: store.walkInEnabled ? "lobby" : "quiet", store };
+  // Nothing at the counter — but an upcoming board may already be taking
+  // Flares, and the lobby is where the pinned link's readers find out.
+  const earlyBoard = await findEarlyBoard(store.id, store.earlyBoardHours);
+
+  return { outcome: store.walkInEnabled ? "lobby" : "quiet", store, earlyBoard };
 }
 
 /**
@@ -220,7 +298,7 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
       room.endsAt &&
       new Date(room.endsAt).getTime() <= Date.now()
     ) {
-      await closeEndedScheduledEvents(new Date().toISOString());
+      await sweepEndedScheduledEvents(new Date().toISOString());
       return { ...room, status: "closed" };
     }
 
@@ -324,7 +402,7 @@ export async function listLiveRooms(now: number = Date.now()): Promise<LiveRoom[
  * permanent, and their rooms keep opening on the next scan as before.
  */
 export async function sweepStaleRooms(now: number = Date.now()): Promise<void> {
-  await closeEndedScheduledEvents(new Date(now).toISOString());
+  await sweepEndedScheduledEvents(new Date(now).toISOString());
 
   const rows = await listOpenRoomsAcrossStores();
 

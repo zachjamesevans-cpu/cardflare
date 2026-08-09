@@ -19,6 +19,7 @@ import {
   lastRoom,
   offerOnFlare,
   postFlare,
+  rememberRoom,
   removeFlare,
   setOpenToTrades,
   storedAccessToken,
@@ -75,10 +76,17 @@ export function RoomTab() {
     );
   }
 
-  return <RoomScreen code={code} />;
+  return <RoomScreen code={code} onSwitch={setCode} />;
 }
 
-function RoomScreen({ code }: { code: string }) {
+function RoomScreen({
+  code,
+  onSwitch,
+}: {
+  code: string;
+  /** Jump this tab to another room — how an early board is stepped into. */
+  onSwitch: (code: string) => void;
+}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [state, setState] = useState<RoomState | null>(null);
   const [name, setName] = useState("");
@@ -192,13 +200,35 @@ function RoomScreen({ code }: { code: string }) {
             busy={busy}
           />
         </Card>
+
+        {/* Nothing at the counter — but a board may already be taking
+            Flares, which is exactly what someone checking from home wants. */}
+        {state.earlyBoard && (
+          <Card>
+            <Title>{`${state.earlyBoard.name} is taking Flares early`}</Title>
+            <Body>
+              {`The board for ${new Date(state.earlyBoard.startsAt).toLocaleDateString(
+                "en-US",
+                { weekday: "long", month: "short", day: "numeric" },
+              )} is already open. Post now so people know what to bring.`}
+            </Body>
+            <Button
+              label="Open the early board"
+              onPress={() => {
+                const early = state.earlyBoard;
+                if (!early) return;
+                void rememberRoom(early.code).then(() => onSwitch(early.code));
+              }}
+            />
+          </Card>
+        )}
       </ScrollView>
     );
   }
 
   if (state.state !== "room") {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
         <Card>
           <Title>
             {state.state === "quiet"
@@ -211,7 +241,29 @@ function RoomScreen({ code }: { code: string }) {
               : "Card shows live on cardflare.gg for now — scan the same code there."}
           </Body>
         </Card>
-      </View>
+
+        {/* Nothing at the counter — but a board may already be taking
+            Flares, which is exactly what someone checking from home wants. */}
+        {state.earlyBoard && (
+          <Card>
+            <Title>{`${state.earlyBoard.name} is taking Flares early`}</Title>
+            <Body>
+              {`The board for ${new Date(state.earlyBoard.startsAt).toLocaleDateString(
+                "en-US",
+                { weekday: "long", month: "short", day: "numeric" },
+              )} is already open. Post now so people know what to bring.`}
+            </Body>
+            <Button
+              label="Open the early board"
+              onPress={() => {
+                const early = state.earlyBoard;
+                if (!early) return;
+                void rememberRoom(early.code).then(() => onSwitch(early.code));
+              }}
+            />
+          </Card>
+        )}
+      </ScrollView>
     );
   }
 
@@ -223,7 +275,7 @@ function RoomScreen({ code }: { code: string }) {
         <Card>
           <Muted>{room.storeName}</Muted>
           <Title>{room.name}</Title>
-          {room.status !== "open" ? (
+          {room.status !== "open" && !room.early ? (
             <Body>This room is not open right now.</Body>
           ) : (
             <>
@@ -296,6 +348,24 @@ function RoomScreen({ code }: { code: string }) {
           <Title>{room.name}</Title>
           <Muted>{`You're in as ${state.you!.displayName}`}</Muted>
         </Card>
+
+        {/* An early board never pretends to be a live room. */}
+        {room.early && (
+          <Card>
+            <Title>This board is open early</Title>
+            <Body>
+              {`Everyone here is still on their way — the event starts ${
+                room.startsAt
+                  ? new Date(room.startsAt).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "soon"
+              }. Post what you're hunting so people know what to bring from home.`}
+            </Body>
+          </Card>
+        )}
 
         {outstanding.length > 0 && (
           <Card>

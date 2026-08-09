@@ -356,6 +356,49 @@ export async function cancelFlare(
 }
 
 /**
+ * Cancels the open Flares of everyone who pre-posted and never showed.
+ *
+ * The early board's honesty debt, paid at close: a Flare posted days ahead
+ * said "I am coming", and if the poster was never seen after doors — their
+ * participation's `last_seen_at` predates the start — the claim expired
+ * with the event. Without this, recaps would count ghosts and the next
+ * occurrence's "traded tonight" numbers would stop meaning anything.
+ *
+ * Cancelled, not deleted, like every other cancellation: history the store
+ * may want. Anyone who showed even once after start is untouched, present
+ * at close or not.
+ */
+export async function cancelNoShowFlares(
+  eventId: string,
+  startsAtIso: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { data: absent, error: readError } = await getSupabaseAdmin()
+    .from("event_participants")
+    .select("player_session_id")
+    .eq("event_id", eventId)
+    .lt("last_seen_at", startsAtIso);
+
+  if (readError) {
+    console.error("Could not find no-show participants", readError);
+    return;
+  }
+
+  const sessions = (absent ?? []).map((row) => row.player_session_id);
+  if (sessions.length === 0) return;
+
+  const { error } = await getSupabaseAdmin()
+    .from("flares")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("event_id", eventId)
+    .eq("status", "open")
+    .in("player_session_id", sessions);
+
+  if (error) console.error("Could not expire no-show Flares", error);
+}
+
+/**
  * Removes a card from the binder.
  *
  * Deleted rather than marked cancelled. A binder is a statement about what is

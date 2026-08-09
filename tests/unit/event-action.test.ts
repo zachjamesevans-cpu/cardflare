@@ -46,7 +46,10 @@ vi.mock("@/lib/events/repository", () => ({
   findOpenWalkInRoom: (...args: unknown[]) => findOpenWalkInRoom(...args),
 }));
 
-vi.mock("@/lib/events/rooms", () => ({ endWalkInRoomWhenLastUsed: vi.fn() }));
+vi.mock("@/lib/events/rooms", () => ({
+  endWalkInRoomWhenLastUsed: vi.fn(),
+  settleClosedOccurrences: vi.fn(),
+}));
 
 const { createEventAction, setEventStatusAction, setStoreTimeZoneAction } =
   await import("@/lib/events/actions");

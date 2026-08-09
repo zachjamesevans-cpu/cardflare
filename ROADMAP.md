@@ -462,6 +462,24 @@ night-before digest. The founder's Wednesday beta proved the thesis by
 hand: he shared the link hours early and seventeen players knew what
 to bring from home.
 
+**Phase 2 (shipped):** the schedule and the early board. Events grew
+"Repeats weekly" — one checkbox at creation, and every close (by clock
+or by hand) settles the occurrence's debts: no-show Flares are
+cancelled (a pre-posted Flare said "I am coming"; the board never
+carries the claim past the night it was about) and a recurring
+occurrence creates next week's draft, seven days later at the same
+wall-clock time in the store's zone (`plusDaysInZone`, DST-proven by
+test: 169- and 167-hour weeks across both changes). Racing sweeps
+converge on one successor via an exists-at dedupe. And boards open
+before doors: `stores.early_board_hours` (default 48, store-settable
+Off/24/48/72/168 on the dashboard) puts a scheduled draft into a new
+"early" room phase — joinable, postable, loudly bannered as "everyone
+here is still on their way" on website and app alike, with the lobby
+and quiet screens (and their API twins) advertising the upcoming board
+so a pinned counter link never goes stale. Walk-in trading keeps
+priority at the counter; the automated version of what the founder
+did by hand at the 17-player Wednesday beta.
+
 **Phase 1 (shipped):** `player_locals` — probed on real PostgreSQL 16
 (RLS on, zero public grants, unique pair, both cascades verified).
 Saved automatically and silently wherever a signed-in player meets a

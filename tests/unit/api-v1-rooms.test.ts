@@ -158,6 +158,40 @@ describe("POST /rooms/[code] (join)", () => {
     expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-new");
   });
 
+  it("joins an early board days before doors", async () => {
+    const HOUR = 60 * 60 * 1000;
+    enterRoomByCode.mockResolvedValue({
+      id: "event-1",
+      kind: "scheduled",
+      status: "draft",
+      startsAt: new Date(Date.now() + 24 * HOUR).toISOString(),
+      endsAt: new Date(Date.now() + 28 * HOUR).toISOString(),
+      earlyBoardHours: 48,
+    });
+
+    const response = await rooms.POST(request("POST", { displayName: "Nami" }), CODE);
+
+    expect(response.status).toBe(200);
+    expect(joinEvent).toHaveBeenCalled();
+  });
+
+  it("refuses a draft outside the early window", async () => {
+    const HOUR = 60 * 60 * 1000;
+    enterRoomByCode.mockResolvedValue({
+      id: "event-1",
+      kind: "scheduled",
+      status: "draft",
+      startsAt: new Date(Date.now() + 100 * HOUR).toISOString(),
+      endsAt: new Date(Date.now() + 104 * HOUR).toISOString(),
+      earlyBoardHours: 48,
+    });
+
+    const response = await rooms.POST(request("POST", { displayName: "Nami" }), CODE);
+
+    expect(response.status).toBe(409);
+    expect(joinEvent).not.toHaveBeenCalled();
+  });
+
   it("joins from the header transport — no body at all", async () => {
     // The app sends its payload this way on networks that eat bodies.
     findPlayerSession.mockResolvedValue(null);

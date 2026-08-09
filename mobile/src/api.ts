@@ -239,6 +239,8 @@ export interface RoomState {
   state: "room" | "show" | "lobby" | "quiet";
   /** Present on lobby and quiet states: whose counter this is. */
   store?: { name: string };
+  /** A nearby board already taking Flares, advertised by lobby and quiet. */
+  earlyBoard?: { code: string; name: string; startsAt: string };
   joined?: boolean;
   room?: {
     name: string;
@@ -247,6 +249,8 @@ export interface RoomState {
     kind: string;
     startsAt: string | null;
     endsAt: string | null;
+    /** The board is open ahead of doors; everyone on it is on their way. */
+    early: boolean;
   };
   you?: { sessionId: string; displayName: string };
   participants?: {

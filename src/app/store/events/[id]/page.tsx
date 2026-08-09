@@ -99,6 +99,11 @@ export default async function EventPage({
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
           {STATUS_LABELS[event.status]}
         </Badge>
+        {event.repeat_weekly && (
+          <Badge tone="neutral">
+            Repeats weekly — next week&rsquo;s appears when this closes
+          </Badge>
+        )}
         <Link
           href={viewer.kind === "admin" ? "/admin" : "/store"}
           className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
