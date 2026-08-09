@@ -141,6 +141,10 @@ export default function App() {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.textPrimary,
           headerTitleStyle: { fontWeight: "700" },
+          // Swipe back from anywhere on the screen, not just the left
+          // edge — the whole surface is the back gesture, like Instagram.
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
         }}
       >
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
