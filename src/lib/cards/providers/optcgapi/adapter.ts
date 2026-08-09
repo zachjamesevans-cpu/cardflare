@@ -381,7 +381,7 @@ export class OptcgApiProvider implements CardDataProvider {
           reason: `${path} is unavailable (${error.status ?? "network"}). Skipped.`,
           raw: null,
         });
-        options.onProgress?.(`  ${path} unavailable — skipped`);
+        options.onProgress?.(`  ${path} unavailable, skipped`);
         continue;
       }
 

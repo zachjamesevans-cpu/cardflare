@@ -126,7 +126,7 @@ export function storeInviteEmail(
 
       <p style="margin:0;padding-top:24px;border-top:1px solid ${COLOR.border};font-size:13px;line-height:1.6;color:${COLOR.textMuted};">
         Sign in any time at <a href="${signInUrl}" style="color:${COLOR.accent};">${SITE.domain}/login</a>.
-        Not expecting this? Reply and let us know &mdash; nothing happens until
+        Not expecting this? Reply and let us know; nothing happens until
         you sign in.
       </p>
     </div>

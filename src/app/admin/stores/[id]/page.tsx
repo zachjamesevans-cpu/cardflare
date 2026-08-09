@@ -260,7 +260,7 @@ async function VendorSections({ storeId }: { storeId: string }) {
             </h2>
             <p className="text-sm text-text-secondary">
               What an attendee&rsquo;s search can find, exactly as the vendor listed it.
-              Read-only &mdash; the list is theirs to manage.
+              Read-only. The list is theirs to manage.
             </p>
           </div>
           <span className="shrink-0 text-sm text-text-muted tabular-nums">

@@ -129,7 +129,7 @@ describe("formatReport", () => {
   it("renders an absent value as a dash rather than blank or null", () => {
     const report = formatReport([entry], new Map(), 1);
 
-    expect(report).toMatch(/life\s+—/);
+    expect(report).toMatch(/life\s+-/);
     expect(report).not.toContain("null");
     expect(report).not.toContain("undefined");
   });
