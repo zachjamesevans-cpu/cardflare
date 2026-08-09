@@ -502,37 +502,15 @@ function RoomScreen({
            */
           const { folders, loose } = partitionByDeck(group.flares);
 
-          const rail = (list: RoomFlare[]) => (
-            <View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  gap: spacing(2),
-                  paddingVertical: spacing(1),
-                }}
-              >
-                {list.map((flare) => (
-                  <CarouselFlare
-                    key={flare.id}
-                    flare={flare}
-                    mine={mine}
-                    early={room.early}
-                    onOffer={() => void act(() => offerOnFlare(code, flare.id))}
-                    onRemove={() => void act(() => removeFlare(code, flare.id))}
-                  />
-                ))}
-              </ScrollView>
-              {/* The founder's ask: the edge fades so the rail visibly
-                  continues instead of the last card looking cut off. */}
-              <LinearGradient
-                pointerEvents="none"
-                colors={[`${colors.surface}00`, colors.surface]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.railFade}
-              />
-            </View>
+          const tile = (flare: RoomFlare) => (
+            <CarouselFlare
+              key={flare.id}
+              flare={flare}
+              mine={mine}
+              early={room.early}
+              onOffer={() => void act(() => offerOnFlare(code, flare.id))}
+              onRemove={() => void act(() => removeFlare(code, flare.id))}
+            />
           );
 
           const rows = (list: RoomFlare[]) =>
@@ -559,23 +537,66 @@ function RoomScreen({
                 {mine ? "Your Flares" : (group.name ?? "A player")}
               </Title>
 
-              {folders.map((folder) => (
-                <View key={folder.label.toLowerCase()} style={{ gap: spacing(1) }}>
-                  <Text style={styles.folderLabel} numberOfLines={1}>
-                    {`${folder.label} · ${folder.flares.length} ${
-                      folder.flares.length === 1 ? "card" : "cards"
-                    }`}
-                  </Text>
-                  {view === "carousel" ? (
-                    rail(folder.flares)
-                  ) : (
-                    <View>{rows(folder.flares)}</View>
-                  )}
+              {/*
+               * Carousel: ONE rail per player, and a folder is a chip
+               * inside it — its cards side by side in a bordered box with
+               * the deck name on top, loose cards flowing after. The first
+               * cut gave every folder its own rail, which stacked a
+               * two-card section back up to a full screen. Stacked keeps
+               * the header-then-rows shape.
+               */}
+              {view === "carousel" ? (
+                <View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                      gap: spacing(2),
+                      paddingVertical: spacing(1),
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    {folders.map((folder) => (
+                      <View key={folder.label.toLowerCase()} style={styles.folderChip}>
+                        <Text style={styles.folderChipLabel} numberOfLines={1}>
+                          {`${folder.label} · ${folder.flares.length}`}
+                        </Text>
+                        <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                          {folder.flares.map(tile)}
+                        </View>
+                      </View>
+                    ))}
+                    {loose.map(tile)}
+                  </ScrollView>
+                  {/* The founder's ask: the edge fades so the rail visibly
+                      continues instead of the last card looking cut off. */}
+                  <LinearGradient
+                    pointerEvents="none"
+                    colors={[`${colors.surface}00`, colors.surface]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.railFade}
+                  />
                 </View>
-              ))}
+              ) : (
+                <>
+                  {folders.map((folder) => (
+                    <View
+                      key={folder.label.toLowerCase()}
+                      style={{ gap: spacing(1) }}
+                    >
+                      <Text style={styles.folderLabel} numberOfLines={1}>
+                        {`${folder.label} · ${folder.flares.length} ${
+                          folder.flares.length === 1 ? "card" : "cards"
+                        }`}
+                      </Text>
+                      <View>{rows(folder.flares)}</View>
+                    </View>
+                  ))}
 
-              {loose.length > 0 &&
-                (view === "carousel" ? rail(loose) : <View>{rows(loose)}</View>)}
+                  {loose.length > 0 && <View>{rows(loose)}</View>}
+                </>
+              )}
             </Card>
           );
         })}
@@ -839,6 +860,19 @@ const styles = StyleSheet.create({
   folderLabel: {
     color: colors.textSecondary,
     fontSize: 13,
+    fontWeight: "600",
+  },
+  folderChip: {
+    borderColor: `${colors.accent}40`,
+    borderWidth: 1,
+    borderRadius: radius.control,
+    backgroundColor: `${colors.accent}0D`,
+    padding: spacing(1.5),
+    gap: spacing(1),
+  },
+  folderChipLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
     fontWeight: "600",
   },
   railFade: {
