@@ -320,7 +320,7 @@ function Rail({
       <ul
         aria-label={ariaLabel}
         aria-labelledby={labelledBy}
-        className="flex gap-2 overflow-x-auto pb-2"
+        className="flex items-start gap-2 overflow-x-auto pb-2"
       >
         {children}
       </ul>
@@ -498,46 +498,77 @@ export function FlareBoard({
               </div>
             </div>
 
-            {folders.map((folder) => (
-              <div key={folder.label.toLowerCase()} className="flex flex-col gap-1.5">
-                <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-                  <Folder className="size-4 shrink-0 text-accent" aria-hidden="true" />
-                  <span className="min-w-0 truncate">{folder.label}</span>
-                  <span className="shrink-0 font-normal text-text-muted tabular-nums">
-                    · {folder.entries.length}{" "}
-                    {folder.entries.length === 1 ? "card" : "cards"}
-                  </span>
-                </p>
-                {view === "carousel" ? (
-                  <Rail ariaLabel={`Deck: ${folder.label}`}>
-                    {folder.entries.map(renderEntry)}
-                  </Rail>
-                ) : (
-                  <ul aria-label={`Deck: ${folder.label}`} className="flex flex-col">
-                    {folder.entries.map(renderEntry)}
+            {/*
+             * Carousel: ONE rail per player, and a folder is a chip inside
+             * it — its cards side by side in a bordered box with the deck
+             * name on top, loose cards flowing after. The first cut gave
+             * every folder its own rail, which stacked a two-card section
+             * back up to a full screen; the founder caught it on phone and
+             * desktop both. Stacked keeps the header-then-rows shape.
+             */}
+            {view === "carousel" ? (
+              <Rail labelledBy={headingId}>
+                {folders.map((folder) => (
+                  <li
+                    key={folder.label.toLowerCase()}
+                    className="flex shrink-0 flex-col gap-1 rounded-[8px] border border-accent/25 bg-accent/[0.05] p-1.5"
+                  >
+                    <p className="flex items-center gap-1 text-[10px] font-medium text-text-secondary">
+                      <Folder
+                        className="size-3 shrink-0 text-accent"
+                        aria-hidden="true"
+                      />
+                      <span className="max-w-36 truncate">{folder.label}</span>
+                      <span className="shrink-0 text-text-muted tabular-nums">
+                        · {folder.entries.length}
+                      </span>
+                    </p>
+                    <ul aria-label={`Deck: ${folder.label}`} className="flex gap-2">
+                      {folder.entries.map(renderEntry)}
+                    </ul>
+                  </li>
+                ))}
+                {loose.map(renderEntry)}
+                {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
+              </Rail>
+            ) : (
+              <>
+                {folders.map((folder) => (
+                  <div
+                    key={folder.label.toLowerCase()}
+                    className="flex flex-col gap-1.5"
+                  >
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                      <Folder
+                        className="size-4 shrink-0 text-accent"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 truncate">{folder.label}</span>
+                      <span className="shrink-0 font-normal text-text-muted tabular-nums">
+                        · {folder.entries.length}{" "}
+                        {folder.entries.length === 1 ? "card" : "cards"}
+                      </span>
+                    </p>
+                    <ul aria-label={`Deck: ${folder.label}`} className="flex flex-col">
+                      {folder.entries.map(renderEntry)}
+                    </ul>
+                  </div>
+                ))}
+
+                {(loose.length > 0 || alsoOpen) && (
+                  <ul aria-labelledby={headingId} className="flex flex-col">
+                    {loose.map(renderEntry)}
+
+                    {/*
+                     * Last, under the specific asks. Somebody has named four
+                     * cards and will also look at anything — the four cards
+                     * are the more actionable half of that.
+                     */}
+                    {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
                   </ul>
                 )}
-              </div>
-            ))}
-
-            {(loose.length > 0 || alsoOpen) &&
-              (view === "carousel" ? (
-                <Rail labelledBy={headingId}>
-                  {loose.map(renderEntry)}
-                  {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
-                </Rail>
-              ) : (
-                <ul aria-labelledby={headingId} className="flex flex-col">
-                  {loose.map(renderEntry)}
-
-                  {/*
-                   * Last, under the specific asks. Somebody has named four
-                   * cards and will also look at anything — the four cards are
-                   * the more actionable half of that.
-                   */}
-                  {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
-                </ul>
-              ))}
+              </>
+            )}
           </Card>
         );
       })}
