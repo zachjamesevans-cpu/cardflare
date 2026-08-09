@@ -178,17 +178,20 @@ export function Button({
   label,
   onPress,
   busy = false,
+  disabled = false,
   variant = "primary",
 }: {
   label: string;
   onPress: () => void;
   busy?: boolean;
+  /** Inert without the spinner — e.g. while "Posted ✓" is on display. */
+  disabled?: boolean;
   variant?: "primary" | "secondary";
 }) {
   return (
     <Tap
       onPress={onPress}
-      disabled={busy}
+      disabled={busy || disabled}
       style={[
         styles.button,
         variant === "secondary" && styles.buttonSecondary,

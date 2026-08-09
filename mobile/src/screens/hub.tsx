@@ -40,10 +40,7 @@ export function HubScreen() {
     );
   }
 
-  return (
-    <PostFlareScreen
-      code={code}
-      onPosted={() => navigation.navigate("Tabs", { screen: "Room" })}
-    />
-  );
+  // No redirect after posting: the screen confirms with "Posted ✓" and
+  // resets itself for the next card. The Room tab is one tap away.
+  return <PostFlareScreen code={code} />;
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { ApiError, postFlare, searchCards, type CardHit } from "../api";
@@ -19,13 +20,7 @@ import { colors, radius, spacing } from "../theme";
 function leadArt(hit: CardHit): string | null {
   return hit.printings.find((printing) => printing.imageUrl)?.imageUrl ?? null;
 }
-export function PostFlareScreen({
-  code,
-  onPosted,
-}: {
-  code: string;
-  onPosted: () => void;
-}) {
+export function PostFlareScreen({ code }: { code: string }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
   /** Which result's versions are unfolded — one at a time, like the website. */
@@ -35,7 +30,17 @@ export function PostFlareScreen({
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // So the posted-state reset never fires into an unmounted screen.
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    },
+    [],
+  );
 
   // Debounced search: a keystroke pause is the request, not every letter.
   useEffect(() => {
@@ -65,7 +70,27 @@ export function PostFlareScreen({
         quantity,
         note: note.trim() || undefined,
       });
-      onPosted();
+
+      /*
+       * The confirmation happens here, on the button that was pressed —
+       * "Posted ✓" and a success buzz — instead of yanking the player to
+       * the Room tab to go find their own card on the board. A breath
+       * later the form clears itself, ready for the next card, which is
+       * what someone working down a want list actually does next.
+       */
+      setBusy(false);
+      setPosted(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+      resetTimer.current = setTimeout(() => {
+        setPosted(false);
+        setPicked(null);
+        setPrintingId(null);
+        setQuantity(1);
+        setNote("");
+        setQuery("");
+      }, 1600);
     } catch (caught) {
       setError(
         caught instanceof ApiError && caught.code === "at-cap"
@@ -277,14 +302,16 @@ export function PostFlareScreen({
           <ErrorLine message={error} />
 
           <Button
-            label={busy ? "Posting…" : "Post the Flare"}
+            label={posted ? "Posted ✓" : busy ? "Posting…" : "Post the Flare"}
             onPress={() => void submit()}
             busy={busy}
+            disabled={busy || posted}
           />
           <Button
             label="Pick a different card"
             variant="secondary"
             onPress={() => setPicked(null)}
+            disabled={busy || posted}
           />
         </Card>
       )}
