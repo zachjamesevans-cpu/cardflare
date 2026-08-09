@@ -62,7 +62,7 @@ export function waitlistConfirmationEmail(
 
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
         We're preparing for our first local-store pilots. You'll hear from us
-        when early testing opens up &mdash; we won't email you for anything else.
+        when early testing opens up, and we won't email you for anything else.
       </p>
 
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">

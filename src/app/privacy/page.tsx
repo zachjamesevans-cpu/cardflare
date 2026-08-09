@@ -66,14 +66,14 @@ export default function PrivacyPage() {
         </p>
         <p>
           Every email we send includes a way to unsubscribe, and unsubscribing does not
-          remove you from the waitlist itself &mdash; tell us if you want both.
+          remove you from the waitlist itself, so tell us if you want both.
         </p>
       </LegalSection>
 
       <LegalSection heading="Playing as a guest">
         <p>
           You can join {SITE.name} as a player without an account. We ask for a display
-          name and nothing else &mdash; no email address, no password, no phone number.
+          name and nothing else: no email address, no password, no phone number.
         </p>
         <p>
           We store that display name, the times the session was created and last used,

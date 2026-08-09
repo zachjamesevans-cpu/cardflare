@@ -99,7 +99,7 @@ export function chooseSpread(rows: ScanRow[]): { row: ScanRow; because: string }
 /** One card, formatted for reading against a real card. */
 function describe(row: ScanRow, because: string, printings: CardPrinting[]): string {
   const field = (label: string, value: unknown) =>
-    `  ${label.padEnd(10)} ${value === null || value === undefined ? "—" : value}`;
+    `  ${label.padEnd(10)} ${value === null || value === undefined ? "-" : value}`;
 
   const effect = row.effect_text
     ? row.effect_text.replace(/\s+/g, " ").slice(0, 240)
@@ -121,7 +121,7 @@ function describe(row: ScanRow, because: string, printings: CardPrinting[]): str
     field("trigger", row.trigger_text?.replace(/\s+/g, " ").slice(0, 160) ?? null),
     field(
       "printings",
-      printings.map((p) => printingLabel(p, row.exact_name) ?? "—").join(" / ") || null,
+      printings.map((p) => printingLabel(p, row.exact_name) ?? "-").join(" / ") || null,
     ),
     field("images", printings.filter((p) => p.imageUrl).length),
   ].join("\n");
@@ -143,7 +143,7 @@ export function formatReport(
   }
 
   return [
-    `CardFlare spot check — ${entries.length} of ${catalogSize.toLocaleString()} cards`,
+    `CardFlare spot check: ${entries.length} of ${catalogSize.toLocaleString()} cards`,
     "Compare each against the official One Piece card list.",
     "",
     ...entries.map(({ row, because }) =>
