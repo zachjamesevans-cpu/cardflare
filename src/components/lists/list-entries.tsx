@@ -176,9 +176,22 @@ function Empty({ icon: Icon, children }: { icon: typeof Flame; children: string 
  * asking "who do I go and talk to", and "this person will look at anything" is
  * a perfectly good answer to that.
  */
-function OpenToTradesEntry({ isYou }: { isYou: boolean }) {
+function OpenToTradesEntry({
+  isYou,
+  rail = false,
+}: {
+  isYou: boolean;
+  /** Inside a carousel rail: fixed width, no row border. */
+  rail?: boolean;
+}) {
   return (
-    <li className="flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
+    <li
+      className={
+        rail
+          ? "flex w-52 shrink-0 items-start gap-3 py-1"
+          : "flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0"
+      }
+    >
       <OpenToTradesThumbnail />
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -207,11 +220,13 @@ function OpenToTradesEntry({ isYou }: { isYou: boolean }) {
  * somebody new enough that they cannot yet name what they want.
  */
 /**
- * One Flare as the carousel view shows it: art first, everything else
- * beneath, sized so a player's thirty cards read as one swipeable rail
- * instead of thirty rows. Every control the stacked row has is here,
- * in the same order; only the geometry changes, exactly like switching
- * icon views in a file browser.
+ * One Flare as the carousel view shows it: a contact sheet, not a row.
+ *
+ * Sized so five cards share a phone's width — the founder's number, after
+ * two rounds of "still too big". At this size the item is for browsing:
+ * art (tap to zoom for everything else), name, count, and one-line
+ * signals. Acting — offering, reading offers, confirming a trade — lives
+ * in the stacked view, one tap away, same as the app.
  */
 function CarouselEntry({
   entry,
@@ -220,8 +235,7 @@ function CarouselEntry({
   imagesEnabled,
   match,
   removable,
-  counterName,
-  children,
+  offerCount = 0,
 }: {
   entry: ListEntry;
   code: string;
@@ -229,11 +243,11 @@ function CarouselEntry({
   imagesEnabled: boolean;
   match?: MatchKind | null;
   removable: boolean;
-  counterName?: string | null;
-  children?: React.ReactNode;
+  /** Hands up on the viewer's own Flare, surfaced as a count only. */
+  offerCount?: number;
 }) {
   return (
-    <li className="flex w-28 shrink-0 flex-col gap-1.5">
+    <li className="flex w-14 shrink-0 flex-col gap-1">
       <CardImageZoom
         imageUrl={entry.imageUrl}
         exactName={entry.cardName}
@@ -244,46 +258,28 @@ function CarouselEntry({
         thumbClassName="w-full"
       />
 
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-text-primary">
-          {entry.cardName}
-        </p>
+      <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
+        {entry.cardName}
         {entry.quantity > 1 && (
-          <span className="shrink-0 text-xs text-text-muted tabular-nums">
+          <span className="font-normal text-text-muted tabular-nums">
+            {" "}
             ×{entry.quantity}
           </span>
         )}
-      </div>
-
-      <p className="truncate text-xs text-text-muted">
-        {entry.printingLabel ?? "Any printing"}
       </p>
 
-      {entry.note && (
-        <p className="truncate text-xs text-text-secondary italic">{entry.note}</p>
-      )}
-
       {match === "exact" && (
-        <span>
-          <Badge>
-            <PackageCheck className="size-3.5" aria-hidden="true" />
-            You have this
-          </Badge>
-        </span>
+        <p className="text-[10px] leading-tight font-semibold text-accent">
+          You have this
+        </p>
       )}
       {match === "other-printing" && (
-        <span>
-          <Badge>
-            <Layers className="size-3.5" aria-hidden="true" />
-            Another printing
-          </Badge>
-        </span>
+        <p className="text-[10px] leading-tight text-accent">Another printing</p>
       )}
 
-      {counterName && (
-        <p className="flex items-center gap-1 text-xs text-text-secondary">
-          <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          At the counter, maybe
+      {offerCount > 0 && (
+        <p className="text-[10px] leading-tight text-accent">
+          {offerCount} {offerCount === 1 ? "hand" : "hands"} up
         </p>
       )}
 
@@ -294,15 +290,45 @@ function CarouselEntry({
           <input type="hidden" name="entryId" value={entry.id} />
           <button
             type="submit"
-            className="text-xs text-text-muted underline underline-offset-4 hover:text-text-secondary"
+            className="text-[10px] text-text-muted underline underline-offset-2 hover:text-text-secondary"
           >
             Remove
           </button>
         </form>
       )}
-
-      {children && <div className="flex flex-col text-sm">{children}</div>}
     </li>
+  );
+}
+
+/**
+ * A horizontal shelf of carousel entries with a fade on its trailing
+ * edge — the founder's ask: the sixth card looked cut off rather than
+ * scrollable, so the edge now visibly "continues". Half the item's
+ * height, so the fade reads as a hint, not a wall.
+ */
+function Rail({
+  children,
+  ariaLabel,
+  labelledBy,
+}: {
+  children: React.ReactNode;
+  ariaLabel?: string;
+  labelledBy?: string;
+}) {
+  return (
+    <div className="relative">
+      <ul
+        aria-label={ariaLabel}
+        aria-labelledby={labelledBy}
+        className="flex gap-2 overflow-x-auto pb-2"
+      >
+        {children}
+      </ul>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 right-0 h-1/2 w-8 bg-gradient-to-l from-surface to-transparent"
+      />
+    </div>
   );
 }
 
@@ -375,9 +401,6 @@ export function FlareBoard({
          */
         const { folders, loose } = partitionByDeck(group.entries);
 
-        const listClass =
-          view === "carousel" ? "flex gap-3 overflow-x-auto pb-2" : "flex flex-col";
-
         const renderEntry = (entry: ListEntry) => {
           const match = isYou ? null : (matches.get(entry.id) ?? null);
           const entryOffers = offers.get(entry.id) ?? [];
@@ -386,16 +409,43 @@ export function FlareBoard({
           );
 
           /*
+           * The carousel item is a contact sheet: signals only, acting
+           * happens in the stacked view. Offers therefore surface there
+           * as a count, never as controls.
+           */
+          if (view === "carousel") {
+            return (
+              <CarouselEntry
+                key={entry.id}
+                entry={entry}
+                code={code}
+                kind="flare"
+                imagesEnabled={imagesEnabled}
+                match={match}
+                removable={isYou}
+                offerCount={isYou ? entryOffers.length : 0}
+              />
+            );
+          }
+
+          /*
            * Your Flare: everyone who raised a hand, each with a
            * "we traded", plus the quiet tally for a trade that
            * happened without an offer. Someone else's that you can
            * answer: the hand-raising controls. Never both — you
-           * cannot offer on your own request. The same controls ride
-           * both layouts; a view change must never change what a
-           * player can do.
+           * cannot offer on your own request.
            */
-          const controls = (
-            <>
+          return (
+            <Entry
+              key={entry.id}
+              entry={entry}
+              code={code}
+              kind="flare"
+              imagesEnabled={imagesEnabled}
+              match={match}
+              removable={isYou}
+              counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
+            >
               {isYou && entryOffers.length > 0 && (
                 <OfferList
                   offers={entryOffers}
@@ -413,24 +463,7 @@ export function FlareBoard({
                   early={early}
                 />
               )}
-            </>
-          );
-
-          const Row = view === "carousel" ? CarouselEntry : Entry;
-
-          return (
-            <Row
-              key={entry.id}
-              entry={entry}
-              code={code}
-              kind="flare"
-              imagesEnabled={imagesEnabled}
-              match={match}
-              removable={isYou}
-              counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
-            >
-              {controls}
-            </Row>
+            </Entry>
           );
         };
 
@@ -475,24 +508,36 @@ export function FlareBoard({
                     {folder.entries.length === 1 ? "card" : "cards"}
                   </span>
                 </p>
-                <ul aria-label={`Deck: ${folder.label}`} className={listClass}>
-                  {folder.entries.map(renderEntry)}
-                </ul>
+                {view === "carousel" ? (
+                  <Rail ariaLabel={`Deck: ${folder.label}`}>
+                    {folder.entries.map(renderEntry)}
+                  </Rail>
+                ) : (
+                  <ul aria-label={`Deck: ${folder.label}`} className="flex flex-col">
+                    {folder.entries.map(renderEntry)}
+                  </ul>
+                )}
               </div>
             ))}
 
-            {(loose.length > 0 || alsoOpen) && (
-              <ul aria-labelledby={headingId} className={listClass}>
-                {loose.map(renderEntry)}
+            {(loose.length > 0 || alsoOpen) &&
+              (view === "carousel" ? (
+                <Rail labelledBy={headingId}>
+                  {loose.map(renderEntry)}
+                  {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
+                </Rail>
+              ) : (
+                <ul aria-labelledby={headingId} className="flex flex-col">
+                  {loose.map(renderEntry)}
 
-                {/*
-                 * Last, under the specific asks. Somebody has named four cards
-                 * and will also look at anything — the four cards are the more
-                 * actionable half of that.
-                 */}
-                {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
-              </ul>
-            )}
+                  {/*
+                   * Last, under the specific asks. Somebody has named four
+                   * cards and will also look at anything — the four cards are
+                   * the more actionable half of that.
+                   */}
+                  {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
+                </ul>
+              ))}
           </Card>
         );
       })}
