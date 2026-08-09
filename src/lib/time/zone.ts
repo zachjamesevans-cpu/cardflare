@@ -143,6 +143,26 @@ export function instantToLocal(instant: Date, timeZone: string): string {
 }
 
 /**
+ * The same wall-clock time, some days later, in a zone.
+ *
+ * How a recurring event rolls forward: "+7 × 24 hours" is wrong twice a
+ * year — a 6pm Wednesday event crossing a daylight-saving change would
+ * drift to 5pm or 7pm. Going instant → wall clock → +days → instant keeps
+ * 6pm meaning 6pm, which is the only thing a store's schedule promises.
+ */
+export function plusDaysInZone(instant: Date, days: number, timeZone: string): Date {
+  const wall = instantToLocal(instant, timeZone);
+  const shifted = new Date(Date.parse(`${wall}:00.000Z`) + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 16);
+
+  return (
+    localToInstant(shifted, timeZone) ??
+    new Date(instant.getTime() + days * 24 * 60 * 60 * 1000)
+  );
+}
+
+/**
  * A short label for a zone, as somebody would recognise it.
  *
  * "CDT" beats "America/Chicago" on a dashboard: it is what a store owner would

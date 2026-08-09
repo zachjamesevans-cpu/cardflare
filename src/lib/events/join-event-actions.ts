@@ -30,6 +30,7 @@ import {
   setOpenToTrades,
 } from "./participants";
 import { enterRoomByCode, resolveCode } from "./rooms";
+import { roomPhase } from "./schema";
 
 const JOIN_MAX = 20;
 const JOIN_WINDOW_MS = 10 * 60 * 1000;
@@ -95,8 +96,10 @@ export async function joinEventAction(
   if (!event) return invalid("That room could not be found.", submitted);
 
   // Checked at the moment of joining, not when the page rendered: a store can
-  // close the room between a player loading it and tapping the button.
-  if (event.status !== "open") {
+  // close the room between a player loading it and tapping the button. An
+  // early board is a real door — joining days ahead is the whole feature.
+  const phase = roomPhase(event, Date.now());
+  if (phase !== "live" && phase !== "early") {
     return invalid("This room is not open right now.", submitted);
   }
 

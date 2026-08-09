@@ -11,6 +11,7 @@ import {
 } from "@/lib/events/participants";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
+import { roomPhase } from "@/lib/events/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
@@ -62,6 +63,10 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       ...("store" in resolved && resolved.store
         ? { store: { name: resolved.store.name } }
         : {}),
+      // Nothing at the counter, but a board may already be taking Flares.
+      ...("earlyBoard" in resolved && resolved.earlyBoard
+        ? { earlyBoard: resolved.earlyBoard }
+        : {}),
     });
   }
 
@@ -73,6 +78,10 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     await touchParticipation(room.id, session.id, participation.lastSeenAt);
   }
 
+  // An early board is a joinable room days before doors; the flag lets
+  // the app say so instead of pretending the event is live.
+  const phase = roomPhase(room, Date.now());
+
   const base = {
     state: "room" as const,
     room: {
@@ -82,10 +91,11 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       kind: room.kind,
       startsAt: room.startsAt,
       endsAt: room.endsAt,
+      early: phase === "early",
     },
   };
 
-  if (!session || !participation || room.status !== "open") {
+  if (!session || !participation || (phase !== "live" && phase !== "early")) {
     return Response.json({ ...base, joined: false });
   }
 
@@ -160,8 +170,10 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   }
 
   // The only place a walk-in room is opened, same as the website's form.
+  // Early boards accept joins too: posting ahead is the whole feature.
   const event = await enterRoomByCode(code);
-  if (!event || event.status !== "open") {
+  const joinPhase = event ? roomPhase(event, Date.now()) : null;
+  if (!event || (joinPhase !== "live" && joinPhase !== "early")) {
     return Response.json({ error: "not-open" }, { status: 409 });
   }
 

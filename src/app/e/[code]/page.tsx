@@ -40,6 +40,7 @@ import { RepostWants } from "@/components/players/repost-wants";
 import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
+import { roomPhase } from "@/lib/events/schema";
 import { listMyTrades } from "@/lib/trades/repository";
 import { binderPrompts } from "@/lib/trades/schema";
 import { cn } from "@/lib/cn";
@@ -226,7 +227,7 @@ export default async function JoinByCodePage({
   if (resolved.outcome === "quiet") {
     return (
       <Shell>
-        <StoreQuiet storeName={resolved.store.name} />
+        <StoreQuiet storeName={resolved.store.name} earlyBoard={resolved.earlyBoard} />
       </Shell>
     );
   }
@@ -246,6 +247,7 @@ export default async function JoinByCodePage({
           storeName={resolved.store.name}
           code={normalized}
           knownAs={waiting?.display_name}
+          earlyBoard={resolved.earlyBoard}
         />
       </Shell>
     );
@@ -263,6 +265,13 @@ export default async function JoinByCodePage({
   }
 
   const inRoom = Boolean(participation && session);
+
+  /*
+   * One phase, decided once, rendered everywhere below. "early" is a real
+   * room days before doors: the join form works, the board works, and a
+   * loud banner says the people on it are still on their way.
+   */
+  const phase = roomPhase(event);
 
   /*
    * Only read once the player is actually in the room. A visitor looking at a
@@ -449,14 +458,26 @@ export default async function JoinByCodePage({
         </dl>
       </Card>
 
-      {event.status !== "open" ? (
+      {phase === "early" && (
+        <Card className="flex flex-col gap-1 border-accent/30">
+          <h2 className="font-semibold text-text-primary">This board is open early</h2>
+          <p className="text-sm text-text-secondary">
+            Everyone here is still on their way — the event starts{" "}
+            {formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}. Post
+            what you&rsquo;re hunting now, so people know what to bring from home.
+            Flares from players who never make it are cleared when the night ends.
+          </p>
+        </Card>
+      )}
+
+      {phase === "pending" || phase === "finished" ? (
         <Card className="flex flex-col gap-2">
           <h2 className="font-semibold text-text-primary">
-            {event.status === "draft" ? "Not open yet" : "This event has finished"}
+            {phase === "pending" ? "Not open yet" : "This event has finished"}
           </h2>
           <p className="text-text-secondary">
-            {event.status === "draft"
-              ? "The store hasn't opened this room yet. Try again once the event starts."
+            {phase === "pending"
+              ? "The store hasn't opened this room yet. Try again closer to the start."
               : "Thanks for coming. Ask the store about their next event."}
           </p>
         </Card>

@@ -6,6 +6,7 @@ import { SyncSinglesForm } from "@/components/singles/sync-singles-form";
 import { VendorInventoryForm } from "@/components/shows/vendor-inventory-form";
 import { VendorInventoryList } from "@/components/shows/vendor-inventory-list";
 import { VendorShows } from "@/components/shows/vendor-shows";
+import { EarlyBoardPicker } from "@/components/events/early-board-picker";
 import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
@@ -80,7 +81,7 @@ export default async function StorePage({
   const { data: stores } = await supabase
     .from("stores")
     .select(
-      "id, name, city, region, status, join_code, walk_in_enabled, timezone, kind",
+      "id, name, city, region, status, join_code, walk_in_enabled, timezone, kind, early_board_hours",
     )
     .order("name");
 
@@ -217,6 +218,15 @@ export default async function StorePage({
             Where you are
           </h2>
           <TimeZonePicker storeId={store.id} timeZone={timeZone} />
+        </section>
+      )}
+
+      {store && (
+        <section className="flex flex-col gap-5" aria-labelledby="early-board-heading">
+          <h2 id="early-board-heading" className="text-xl font-bold text-text-primary">
+            Before your events
+          </h2>
+          <EarlyBoardPicker storeId={store.id} hours={store.early_board_hours} />
         </section>
       )}
 

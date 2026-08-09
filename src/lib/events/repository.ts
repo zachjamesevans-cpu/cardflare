@@ -4,7 +4,9 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { EventRow, StoreRow } from "@/lib/supabase/types";
 import { generateJoinCode } from "./join-code";
 import type {
+  ClosedOccurrence,
   CreateEventRecord,
+  EarlyBoard,
   EventKind,
   EventStatus,
   PublicEvent,
@@ -69,6 +71,7 @@ export async function createEvent(
         starts_at: input.startsAt.toISOString(),
         ends_at: input.endsAt.toISOString(),
         join_code: generateJoinCode(),
+        ...(input.repeatWeekly ? { repeat_weekly: true } : {}),
       })
       .select()
       .single();
@@ -137,8 +140,10 @@ export async function listAllEvents(): Promise<EventRow[]> {
  * event page that stayed joinable past it would split the room between the
  * event code and the walk-in room the counter opens next.
  */
-export async function closeEndedScheduledEvents(nowIso: string): Promise<number> {
-  if (!canQuery("close ended events")) return 0;
+export async function closeEndedScheduledEvents(
+  nowIso: string,
+): Promise<ClosedOccurrence[]> {
+  if (!canQuery("close ended events")) return [];
 
   const { data, error } = await getSupabaseAdmin()
     .from("events")
@@ -146,14 +151,54 @@ export async function closeEndedScheduledEvents(nowIso: string): Promise<number>
     .eq("kind", "scheduled")
     .eq("status", "open")
     .lte("ends_at", nowIso)
-    .select("id");
+    .select("id, store_id, name, starts_at, ends_at, repeat_weekly");
 
   if (error) {
     console.error("Could not close ended events", error);
-    return 0;
+    return [];
   }
 
-  return (data ?? []).length;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    storeId: row.store_id,
+    name: row.name,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    repeatWeekly: row.repeat_weekly,
+  }));
+}
+
+/**
+ * Whether a scheduled event already sits at this exact start.
+ *
+ * The recurrence roll's dedupe: two sweeps racing to create "next
+ * Wednesday" must not produce two Wednesdays. A second-precision equality
+ * check is enough — successors are computed from the same predecessor, so
+ * duplicates land on the same instant.
+ */
+export async function scheduledEventExistsAt(
+  storeId: string,
+  startsAtIso: string,
+): Promise<boolean> {
+  if (!canQuery("check for an existing occurrence")) return true;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select("id")
+    .eq("store_id", storeId)
+    .eq("kind", "scheduled")
+    .eq("starts_at", startsAtIso)
+    .limit(1);
+
+  if (error) {
+    // Claiming it exists is the safe failure: a missed roll is recoverable
+    // (the next sweep tries again from the same predecessor), a duplicate
+    // event on the store's calendar is a mess someone has to clean up.
+    console.error("Could not check for an existing occurrence", error);
+    return true;
+  }
+
+  return (data ?? []).length > 0;
 }
 
 /** An open room as the console's live summary sees it, before liveness rules. */
@@ -222,7 +267,7 @@ export async function findEventById(id: string): Promise<EventRow | null> {
  * column a later migration adds.
  */
 const PUBLIC_ROOM_COLUMNS =
-  "id, name, kind, status, starts_at, ends_at, store_id, stores(name, city, region, timezone)";
+  "id, name, kind, status, starts_at, ends_at, store_id, repeat_weekly, stores(name, city, region, timezone, early_board_hours)";
 
 type PublicRoomRow = {
   id: string;
@@ -232,11 +277,13 @@ type PublicRoomRow = {
   starts_at: string;
   ends_at: string | null;
   store_id: string;
+  repeat_weekly: boolean;
   stores: {
     name: string;
     city: string | null;
     region: string | null;
     timezone: string;
+    early_board_hours: number;
   } | null;
 };
 
@@ -255,6 +302,10 @@ function toPublicEvent(row: PublicRoomRow): PublicEvent {
     // UTC is the column default, so it is also the right fallback when the
     // embed comes back empty: it is what the store had before it said.
     storeTimeZone: row.stores?.timezone ?? "UTC",
+    repeatWeekly: row.repeat_weekly,
+    // Zero (off) is the safe fallback for a missing embed: a board must
+    // never open early on a guess.
+    earlyBoardHours: row.stores?.early_board_hours ?? 0,
   };
 }
 
@@ -290,7 +341,7 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
 
   const { data, error } = await getSupabaseAdmin()
     .from("stores")
-    .select("id, name, city, region, walk_in_enabled, timezone")
+    .select("id, name, city, region, walk_in_enabled, timezone, early_board_hours")
     .eq("join_code", code)
     .maybeSingle();
 
@@ -307,7 +358,44 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
     region: data.region,
     walkInEnabled: data.walk_in_enabled,
     timeZone: data.timezone,
+    earlyBoardHours: data.early_board_hours,
   };
+}
+
+/**
+ * The next scheduled draft whose board is already inside the early window.
+ *
+ * What a store's lobby or quiet screen advertises: nothing is running at
+ * the counter, but Wednesday's board is taking Flares — here is its code.
+ */
+export async function findEarlyBoard(
+  storeId: string,
+  earlyBoardHours: number,
+  now: number = Date.now(),
+): Promise<EarlyBoard | null> {
+  if (earlyBoardHours <= 0) return null;
+  if (!canQuery("look for an early board")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select("join_code, name, starts_at")
+    .eq("store_id", storeId)
+    .eq("kind", "scheduled")
+    .eq("status", "draft")
+    .gt("starts_at", new Date(now).toISOString())
+    .lte("starts_at", new Date(now + earlyBoardHours * 60 * 60 * 1000).toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(1);
+
+  if (error) {
+    console.error("Could not look for an early board", error);
+    return null;
+  }
+
+  const row = (data ?? [])[0];
+  if (!row?.join_code) return null;
+
+  return { code: row.join_code, name: row.name, startsAt: row.starts_at };
 }
 
 /** Resolves a card show's code. */
@@ -512,6 +600,22 @@ export async function setStoreTimeZone(
 }
 
 /** Turns walk-in trading on or off for a store. */
+export async function setEarlyBoardHours(
+  storeId: string,
+  hours: number,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("stores")
+    .update({ early_board_hours: hours })
+    .eq("id", storeId);
+
+  if (error) {
+    throw new Error(`Could not change the early-board window: ${error.message}`, {
+      cause: error,
+    });
+  }
+}
+
 export async function setWalkInEnabled(
   storeId: string,
   enabled: boolean,

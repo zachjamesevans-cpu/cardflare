@@ -158,6 +158,21 @@ export function CreateEventForm({
         </Field>
       </div>
 
+      <label className="flex items-start gap-3 text-sm text-text-secondary">
+        <input
+          type="checkbox"
+          name="repeatWeekly"
+          defaultChecked={values?.repeatWeekly ?? false}
+          className="mt-0.5 size-4 accent-accent"
+        />
+        <span>
+          <span className="font-medium text-text-primary">Repeats weekly</span>
+          {" — "}
+          when this one closes, next week&rsquo;s appears by itself. Enter your
+          Wednesday locals once, never again.
+        </span>
+      </label>
+
       <div>
         <SubmitButton />
       </div>

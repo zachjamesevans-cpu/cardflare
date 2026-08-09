@@ -27,8 +27,13 @@ const closeWalkInRoom = vi.fn();
 const openWalkInRoom = vi.fn();
 const listOpenRoomsAcrossStores = vi.fn();
 const closeEndedScheduledEvents = vi.fn();
+const findEarlyBoard = vi.fn();
 
 vi.mock("@/lib/events/repository", () => ({
+  createEvent: vi.fn(),
+  findEarlyBoard: (...args: unknown[]) => findEarlyBoard(...args),
+  findStoreById: vi.fn(),
+  scheduledEventExistsAt: vi.fn(),
   findEventByJoinCode: (...args: unknown[]) => findEventByJoinCode(...args),
   findStoreByJoinCode: (...args: unknown[]) => findStoreByJoinCode(...args),
   findShowByJoinCode: (...args: unknown[]) => findShowByJoinCode(...args),
@@ -72,6 +77,7 @@ const store = (over: Partial<PublicStore> = {}): PublicStore => ({
   region: "TX",
   walkInEnabled: true,
   timeZone: "America/Chicago",
+  earlyBoardHours: 48,
   ...over,
 });
 
@@ -89,6 +95,8 @@ const room = (over: Partial<PublicEvent> = {}): PublicEvent => ({
   storeCity: "Austin",
   storeRegion: "TX",
   storeTimeZone: "America/Chicago",
+  repeatWeekly: false,
+  earlyBoardHours: 48,
   ...over,
 });
 
@@ -120,10 +128,14 @@ beforeEach(() => {
     openWalkInRoom,
     listOpenRoomsAcrossStores,
     closeEndedScheduledEvents,
+    findEarlyBoard,
   ]) {
     fn.mockReset();
   }
 
+  // The sweep iterates what it closed; nothing closed is an empty list.
+  closeEndedScheduledEvents.mockResolvedValue([]);
+  findEarlyBoard.mockResolvedValue(null);
   findEventByJoinCode.mockResolvedValue(null);
   findStoreByJoinCode.mockResolvedValue(null);
   findRunningScheduledEvent.mockResolvedValue(null);
@@ -131,7 +143,7 @@ beforeEach(() => {
   latestActivityAt.mockResolvedValue(null);
   closeWalkInRoom.mockResolvedValue(true);
   listOpenRoomsAcrossStores.mockResolvedValue([]);
-  closeEndedScheduledEvents.mockResolvedValue(0);
+  closeEndedScheduledEvents.mockResolvedValue([]);
 });
 
 describe("resolveCode", () => {
@@ -264,7 +276,7 @@ describe("resolveCode", () => {
     const result = await resolveCode(STORE_CODE);
 
     expect(closeWalkInRoom).toHaveBeenCalledWith("stale", expect.any(String));
-    expect(result).toEqual({ outcome: "lobby", store: store() });
+    expect(result).toEqual({ outcome: "lobby", store: store(), earlyBoard: null });
   });
 
   /*
@@ -306,6 +318,7 @@ describe("resolveCode", () => {
     expect(result).toEqual({
       outcome: "quiet",
       store: store({ walkInEnabled: false }),
+      earlyBoard: null,
     });
   });
 

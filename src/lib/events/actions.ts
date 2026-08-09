@@ -13,11 +13,12 @@ import {
   findEventById,
   findStoreById,
   findOpenWalkInRoom,
+  setEarlyBoardHours,
   setEventStatus,
   setStoreTimeZone,
   setWalkInEnabled,
 } from "./repository";
-import { endWalkInRoomWhenLastUsed } from "./rooms";
+import { endWalkInRoomWhenLastUsed, settleClosedOccurrences } from "./rooms";
 import {
   createEventSchema,
   type CreateEventFieldErrors,
@@ -35,6 +36,7 @@ function valuesFrom(formData: FormData): CreateEventValues {
     name: text(formData, "name"),
     startsAt: text(formData, "startsAt"),
     endsAt: text(formData, "endsAt"),
+    repeatWeekly: text(formData, "repeatWeekly") === "on",
   };
 }
 
@@ -134,6 +136,7 @@ export async function createEventAction(
         name: parsed.data.name,
         startsAt: window.startsAt,
         endsAt: window.endsAt,
+        repeatWeekly: parsed.data.repeatWeekly,
       },
       actor.userId,
     );
@@ -159,6 +162,39 @@ export async function createEventAction(
  * Scheduled events are untouched either way: this governs only what the
  * counter code does when nothing is scheduled.
  */
+/**
+ * Sets how long before doors a store's boards take Flares.
+ *
+ * The value arrives from a `<select>`, which is to say from a form, which
+ * is to say it is not to be trusted: clamped to the same 0–168 range the
+ * database constraint enforces, and whole hours only.
+ */
+export async function setEarlyBoardAction(formData: FormData): Promise<void> {
+  const storeId = text(formData, "storeId");
+  const parsed = Number.parseInt(text(formData, "earlyBoardHours"), 10);
+
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 168) {
+    console.error(`Rejected an early-board window: ${parsed}`);
+    return;
+  }
+
+  const actor = await authorizeStore(storeId);
+  if (!actor) {
+    console.error("Rejected an early-board change from an unauthorised viewer.");
+    return;
+  }
+
+  try {
+    await setEarlyBoardHours(storeId, parsed);
+  } catch (error) {
+    console.error("Could not change the early-board window", error);
+    return;
+  }
+
+  revalidatePath("/store");
+  revalidatePath("/admin");
+}
+
 export async function setWalkInAction(formData: FormData): Promise<void> {
   const storeId = text(formData, "storeId");
   const enabled = text(formData, "enabled") === "on";
@@ -299,6 +335,21 @@ export async function setEventStatusAction(formData: FormData): Promise<void> {
   } catch (error) {
     console.error("Could not change the event status", error);
     return;
+  }
+
+  // Closing by hand owes the same debts closing by clock pays: no-show
+  // Flares expire, and a recurring event creates next week's occurrence.
+  if (status === "closed") {
+    await settleClosedOccurrences([
+      {
+        id: event.id,
+        storeId: event.store_id,
+        name: event.name,
+        startsAt: event.starts_at,
+        endsAt: event.ends_at,
+        repeatWeekly: event.repeat_weekly,
+      },
+    ]);
   }
 
   revalidatePath(`/store/events/${event.id}`);

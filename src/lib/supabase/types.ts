@@ -58,16 +58,26 @@ export type StoreRow = {
   /** IANA name. Turns a typed event time into an instant, and back. */
   timezone: string;
   kind: StoreKind;
+  /** Hours before start that a scheduled board accepts Flares. 0 = off. */
+  early_board_hours: number;
 };
 
 /** Columns with database defaults are optional on insert. */
 export type StoreInsert = Omit<
   StoreRow,
-  "id" | "created_at" | "status" | "is_pilot" | "walk_in_enabled" | "timezone" | "kind"
+  | "id"
+  | "created_at"
+  | "status"
+  | "is_pilot"
+  | "walk_in_enabled"
+  | "timezone"
+  | "kind"
+  | "early_board_hours"
 > & {
   walk_in_enabled?: boolean;
   timezone?: string;
   kind?: StoreKind;
+  early_board_hours?: number;
   id?: string;
   created_at?: string;
   status?: StoreStatus;
@@ -354,15 +364,18 @@ export type EventRow = {
   ends_at: string | null;
   status: EventStatus;
   join_code: string | null;
+  /** When true, closing this occurrence creates the next one, +7 days. */
+  repeat_weekly: boolean;
 };
 
 export type EventInsert = Omit<
   EventRow,
-  "id" | "created_at" | "status" | "game" | "kind"
+  "id" | "created_at" | "status" | "game" | "kind" | "repeat_weekly"
 > & {
   id?: string;
   created_at?: string;
   status?: EventStatus;
+  repeat_weekly?: boolean;
   game?: Game;
   kind?: EventKind;
 };

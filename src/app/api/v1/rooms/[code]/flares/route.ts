@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
+import { roomPhase } from "@/lib/events/schema";
 import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
@@ -30,7 +31,13 @@ export async function POST(
   if (!session) return unauthorized();
 
   const resolved = await resolveCode(code);
-  if (resolved.outcome !== "room" || resolved.room.status !== "open") {
+  if (resolved.outcome !== "room") {
+    return Response.json({ error: "not-open" }, { status: 409 });
+  }
+
+  // Live rooms and early boards both take Flares; nothing else does.
+  const flarePhase = roomPhase(resolved.room, Date.now());
+  if (flarePhase !== "live" && flarePhase !== "early") {
     return Response.json({ error: "not-open" }, { status: 409 });
   }
 
