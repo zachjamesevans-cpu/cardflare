@@ -103,6 +103,31 @@ describe("offerTradeAction", () => {
       "room-1",
       "holder-1",
       "table 12",
+      1,
+    );
+  });
+
+  it("carries the pledged count through", async () => {
+    await offer({ quantity: "2" });
+
+    expect(offerTrade).toHaveBeenCalledWith(
+      "flare-1",
+      "room-1",
+      "holder-1",
+      "table 12",
+      2,
+    );
+  });
+
+  it("treats a mangled count as one copy, never a refusal", async () => {
+    await offer({ quantity: "lots" });
+
+    expect(offerTrade).toHaveBeenCalledWith(
+      "flare-1",
+      "room-1",
+      "holder-1",
+      "table 12",
+      1,
     );
   });
 
@@ -113,13 +138,13 @@ describe("offerTradeAction", () => {
   it("drops a malformed message rather than the offer", async () => {
     await offer({ message: "evil‮text" });
 
-    expect(offerTrade).toHaveBeenCalledWith("flare-1", "room-1", "holder-1", null);
+    expect(offerTrade).toHaveBeenCalledWith("flare-1", "room-1", "holder-1", null, 1);
   });
 
   it("sends no message as null", async () => {
     await offer({ message: "" });
 
-    expect(offerTrade).toHaveBeenCalledWith("flare-1", "room-1", "holder-1", null);
+    expect(offerTrade).toHaveBeenCalledWith("flare-1", "room-1", "holder-1", null, 1);
   });
 
   it("ignores a session id smuggled into the form", async () => {
@@ -130,6 +155,7 @@ describe("offerTradeAction", () => {
       "room-1",
       "holder-1",
       "table 12",
+      1,
     );
   });
 

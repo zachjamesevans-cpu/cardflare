@@ -12,7 +12,7 @@ import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { offerTrade, withdrawOffer } from "./repository";
-import { offerMessageSchema } from "./schema";
+import { offerMessageSchema, offerQuantitySchema } from "./schema";
 
 /**
  * Offering to answer a Flare, and taking the offer back.
@@ -66,6 +66,9 @@ export async function offerTradeAction(formData: FormData): Promise<void> {
 
   const message = offerMessageSchema.safeParse(text(formData, "message") ?? "");
 
+  // "How many can you bring?" — anything unparseable is one copy.
+  const quantity = offerQuantitySchema.parse(text(formData, "quantity") || 1);
+
   const outcome = await offerTrade(
     flareId,
     membership.eventId,
@@ -73,6 +76,7 @@ export async function offerTradeAction(formData: FormData): Promise<void> {
     // An over-long or malformed message costs the note, never the offer —
     // the offer is the thing that matters and the note is a nicety.
     message.success ? message.data : null,
+    quantity,
   );
 
   if (!outcome.ok) {

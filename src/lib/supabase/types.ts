@@ -444,11 +444,17 @@ export type FlareResponseRow = {
   responder_session_id: string;
   /** "Table 12". Optional, short, and the only thing the responder says. */
   message: string | null;
+  /** How many copies they say they can bring. Defaults to one. */
+  quantity: number;
 };
 
-export type FlareResponseInsert = Omit<FlareResponseRow, "id" | "created_at"> & {
+export type FlareResponseInsert = Omit<
+  FlareResponseRow,
+  "id" | "created_at" | "quantity"
+> & {
   id?: string;
   created_at?: string;
+  quantity?: number;
 };
 
 /**

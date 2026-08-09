@@ -1,7 +1,6 @@
 import "server-only";
 
 import { PRESENCE_WINDOW_MS } from "@/lib/events/participants";
-import { sessionCollectionHolds } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { MAX_OFFERS, type Offer } from "./schema";
 
@@ -15,7 +14,7 @@ export type OfferOutcome =
   | { ok: true }
   | {
       ok: false;
-      reason: "not-found" | "own-flare" | "not-held" | "at-cap" | "unavailable";
+      reason: "not-found" | "own-flare" | "at-cap" | "unavailable";
     };
 
 /**
@@ -26,20 +25,23 @@ export type OfferOutcome =
  * - The Flare must be open and in the room the caller proved they are in —
  *   an id harvested from another room's board does nothing.
  * - Not your own Flare.
- * - You must hold the card — in tonight's binder, or in the imported
- *   collection of the account this session belongs to. The offer button
- *   only renders on a match, but a Server Action is a public POST endpoint,
- *   and this check is what stops it being a way to put your name on every
- *   Flare in the room without carrying a single card.
  *
- * Offering again is an update to your message, never a second row — the
- * unique index this upserts against says so.
+ * There is deliberately no "must hold the card" check any more. Milestone 7
+ * required the card to be in tonight's binder or a synced collection; the
+ * founder overturned it — plenty of players know exactly what is in the box
+ * at home without ever having typed it in, and on an early board "I got
+ * you, I'll bring it" is a promise about tomorrow, not an inventory claim.
+ * The offer cap below is what still stops a name landing on every Flare.
+ *
+ * Offering again is an update to your message and count, never a second
+ * row — the unique index this upserts against says so.
  */
 export async function offerTrade(
   flareId: string,
   eventId: string,
   responderSessionId: string,
   message: string | null,
+  quantity: number = 1,
 ): Promise<OfferOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -64,30 +66,6 @@ export async function offerTrade(
     return { ok: false, reason: "own-flare" };
   }
 
-  const { data: held, error: heldError } = await admin
-    .from("player_cards")
-    .select("id")
-    .eq("player_session_id", responderSessionId)
-    .eq("card_id", flare.card_id)
-    .limit(1);
-
-  if (heldError) {
-    console.error("Could not check the responder's binder", heldError);
-    return { ok: false, reason: "unavailable" };
-  }
-
-  /*
-   * The binder is tonight's claim; an imported collection is the same claim
-   * made once at import. Checked second because most offers come off the
-   * binder and guests have no collection to ask about.
-   */
-  if (
-    (!held || held.length === 0) &&
-    !(await sessionCollectionHolds(responderSessionId, flare.card_id))
-  ) {
-    return { ok: false, reason: "not-held" };
-  }
-
   const capped = await atOfferCap(responderSessionId, eventId);
   if (capped === "unknown") return { ok: false, reason: "unavailable" };
   if (capped) return { ok: false, reason: "at-cap" };
@@ -97,6 +75,7 @@ export async function offerTrade(
       flare_id: flareId,
       responder_session_id: responderSessionId,
       message,
+      quantity,
     },
     { onConflict: "flare_id,responder_session_id" },
   );
@@ -208,7 +187,7 @@ export async function listRoomOffers(eventId: string): Promise<Offer[]> {
 
   const { data: responses, error: responseError } = await admin
     .from("flare_responses")
-    .select("flare_id, responder_session_id, message, created_at")
+    .select("flare_id, responder_session_id, message, quantity, created_at")
     .in("flare_id", flareIds)
     .order("created_at", { ascending: true });
 
@@ -253,6 +232,7 @@ export async function listRoomOffers(eventId: string): Promise<Offer[]> {
       responderSessionId: row.responder_session_id,
       displayName: names.get(row.responder_session_id) ?? null,
       message: row.message,
+      quantity: row.quantity,
       present:
         now - new Date(lastSeen.get(row.responder_session_id)!).getTime() <=
         PRESENCE_WINDOW_MS,

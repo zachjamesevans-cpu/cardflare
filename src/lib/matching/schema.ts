@@ -98,14 +98,49 @@ export const offerMessageSchema = z
   )
   .transform((value) => value || null);
 
+/**
+ * "How many can you bring?" — clamped to the same 1..99 the Flare's own
+ * quantity lives in. Anything unparseable is one copy, never a refusal:
+ * the pledge is the thing that matters and the count is a refinement.
+ */
+export const offerQuantitySchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(99)
+  .catch(1)
+  .default(1);
+
 /** One offer, as the Flare's author sees it. */
 export interface Offer {
   flareId: string;
   responderSessionId: string;
   displayName: string | null;
   message: string | null;
+  /** How many copies they said they can bring. */
+  quantity: number;
   /** Inside the presence window, same rule as the lobby. */
   present: boolean;
+}
+
+/**
+ * The arithmetic under "still needs one more".
+ *
+ * The founder's example: Damian asks for 2x Brook, Chunc pledges one —
+ * the room should read "1 of 2 spoken for, still needs 1 more", so the
+ * next holder knows the hunt is still on. Pledged is capped at the ask
+ * for display (three people bringing five copies of a two-of is still
+ * "all 2 spoken for"), remaining never goes below zero.
+ */
+export function pledgeTally(
+  offers: Offer[],
+  asked: number,
+): { pledged: number; remaining: number } {
+  const total = offers.reduce((sum, offer) => sum + offer.quantity, 0);
+  return {
+    pledged: Math.min(total, asked),
+    remaining: Math.max(0, asked - total),
+  };
 }
 
 /** Offers grouped by the Flare they answer, for O(1) lookup while rendering. */

@@ -139,6 +139,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
         responderSessionId: offer.responderSessionId,
         displayName: offer.displayName,
         message: offer.message,
+        quantity: offer.quantity,
         present: offer.present,
       })),
     })),

@@ -238,6 +238,8 @@ export interface RoomFlare {
     responderSessionId: string;
     displayName: string | null;
     message: string | null;
+    /** How many copies they said they can bring. */
+    quantity: number;
     present: boolean;
   }[];
 }
@@ -304,10 +306,16 @@ export const postFlare = (
   },
 ) => call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
 
-export const offerOnFlare = (code: string, flareId: string, message?: string) =>
+export const offerOnFlare = (
+  code: string,
+  flareId: string,
+  message?: string,
+  quantity?: number,
+) =>
   call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/offers`, {
     flareId,
     message,
+    quantity,
   });
 
 export const confirmTrade = (code: string, flareId: string, partnerSessionId?: string) =>

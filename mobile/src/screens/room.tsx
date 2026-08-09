@@ -507,6 +507,7 @@ function RoomScreen({
               key={flare.id}
               flare={flare}
               mine={mine}
+              offered={flare.offers.some((o) => o.responderSessionId === youId)}
               early={room.early}
               onOffer={() => void act(() => offerOnFlare(code, flare.id))}
               onRemove={() => void act(() => removeFlare(code, flare.id))}
@@ -521,8 +522,8 @@ function RoomScreen({
                 mine={mine}
                 storeName={room.storeName}
                 early={room.early}
-                onOffer={(message) =>
-                  void act(() => offerOnFlare(code, flare.id, message))
+                onOffer={(message, quantity) =>
+                  void act(() => offerOnFlare(code, flare.id, message, quantity))
                 }
                 onRemove={() => void act(() => removeFlare(code, flare.id))}
                 onTraded={(partner) =>
@@ -538,12 +539,12 @@ function RoomScreen({
               </Title>
 
               {/*
-               * Carousel: ONE rail per player, and a folder is a chip
-               * inside it — its cards side by side in a bordered box with
-               * the deck name on top, loose cards flowing after. The first
-               * cut gave every folder its own rail, which stacked a
-               * two-card section back up to a full screen. Stacked keeps
-               * the header-then-rows shape.
+               * Carousel: ONE rail per player, every tile the same shape —
+               * the founder asked for the folder's cards to look exactly
+               * like the loose ones (the bordered chip read as clutter).
+               * The partition keeps a deck's cards side by side, and each
+               * names its deck in its own caption. Stacked keeps the
+               * header-then-rows shape.
                */}
               {view === "carousel" ? (
                 <View>
@@ -556,16 +557,7 @@ function RoomScreen({
                       alignItems: "flex-start",
                     }}
                   >
-                    {folders.map((folder) => (
-                      <View key={folder.label.toLowerCase()} style={styles.folderChip}>
-                        <Text style={styles.folderChipLabel} numberOfLines={1}>
-                          {`${folder.label} · ${folder.flares.length}`}
-                        </Text>
-                        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                          {folder.flares.map(tile)}
-                        </View>
-                      </View>
-                    ))}
+                    {folders.flatMap((folder) => folder.flares).map(tile)}
                     {loose.map(tile)}
                   </ScrollView>
                   {/* The founder's ask: the edge fades so the rail visibly
@@ -622,6 +614,29 @@ function RoomScreen({
   );
 }
 
+/** The website's pledge arithmetic, in miniature: how much of the ask is
+    spoken for, and what is still missing. */
+function pledgeTally(
+  offers: RoomFlare["offers"],
+  asked: number,
+): { pledged: number; remaining: number } {
+  const total = offers.reduce((sum, offer) => sum + offer.quantity, 0);
+  return {
+    pledged: Math.min(total, asked),
+    remaining: Math.max(0, asked - total),
+  };
+}
+
+/** The one-line coverage caption a tile or row shows the whole room. */
+function pledgeLineFor(flare: RoomFlare): string | null {
+  if (flare.offers.length === 0) return null;
+  const { remaining } = pledgeTally(flare.offers, flare.quantity);
+  if (remaining === 0) {
+    return flare.quantity > 1 ? `All ${flare.quantity} spoken for` : "Spoken for";
+  }
+  return `Needs ${remaining} more`;
+}
+
 /** The website's partition, in miniature: folders merge case-insensitively
     and keep the spelling of the first card seen; order follows the board. */
 function partitionByDeck(flares: RoomFlare[]): {
@@ -664,16 +679,21 @@ function partitionByDeck(flares: RoomFlare[]): {
 function CarouselFlare({
   flare,
   mine,
+  offered,
   early,
   onOffer,
   onRemove,
 }: {
   flare: RoomFlare;
   mine: boolean;
+  /** The viewer's pledge on this Flare is already standing. */
+  offered: boolean;
   early: boolean;
   onOffer: () => void;
   onRemove: () => void;
 }) {
+  const pledgeLine = pledgeLineFor(flare);
+
   return (
     <View style={{ width: 56, gap: spacing(1) }}>
       <CardImage
@@ -691,6 +711,14 @@ function CarouselFlare({
         {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
       </Text>
 
+      {/* The deck, said on the tile itself — folders are a caption,
+          not a container, so every tile keeps the same shape. */}
+      {flare.deckLabel && (
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 10 }}>
+          {flare.deckLabel}
+        </Text>
+      )}
+
       {flare.match === "exact" && (
         <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "700" }}>
           You have this
@@ -700,18 +728,25 @@ function CarouselFlare({
         <Text style={{ color: colors.accent, fontSize: 10 }}>Another printing</Text>
       )}
 
-      {mine && flare.offers.length > 0 && (
-        <Text style={{ color: colors.accent, fontSize: 10 }}>
-          {`${flare.offers.length} ${flare.offers.length === 1 ? "hand" : "hands"} up`}
+      {/* Coverage is public: the next holder should know whether the
+          hunt still needs them, or whether every copy is spoken for. */}
+      {pledgeLine && (
+        <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "700" }}>
+          {pledgeLine}
         </Text>
       )}
 
-      {!mine && flare.match && (
+      {/* Anyone can pledge — no binder required, the founder's call.
+          One copy from here; the stacked view asks "how many". */}
+      {!mine && !offered && (
         <Tap onPress={onOffer} hitSlop={6}>
           <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "600" }}>
-            {early ? "I got you" : "Offer"}
+            {early ? "I got you" : "I got it"}
           </Text>
         </Tap>
+      )}
+      {!mine && offered && (
+        <Text style={{ color: colors.textMuted, fontSize: 10 }}>You&rsquo;re on it</Text>
       )}
       {mine && (
         <Tap onPress={onRemove} hitSlop={6}>
@@ -737,12 +772,14 @@ function FlareRow({
   storeName: string;
   /** Early board: offers read as pledges to bring the card. */
   early: boolean;
-  onOffer: (message?: string) => void;
+  onOffer: (message?: string, quantity?: number) => void;
   onRemove: () => void;
   onTraded: (partnerSessionId?: string) => void;
 }) {
   const [offering, setOffering] = useState(false);
   const [message, setMessage] = useState("");
+  const [bringing, setBringing] = useState(1);
+  const pledgeLine = pledgeLineFor(flare);
 
   return (
     <View style={styles.flare}>
@@ -784,12 +821,25 @@ function FlareRow({
         <Muted>{`${storeName} may have this single. Ask at the counter.`}</Muted>
       )}
 
+      {/* Coverage first, for everyone: the founder's example is Damian
+          asking for 2x with one pledged — the room should read "still
+          needs 1 more", not "someone's got it". */}
+      {pledgeLine && (
+        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+          {pledgeLine}
+        </Text>
+      )}
+
       {flare.offers.map((offer) => (
         <View key={offer.responderSessionId} style={styles.offer}>
           <Body>
             {early
-              ? `${offer.displayName ?? "A player"} is bringing it to the event.`
-              : `${offer.displayName ?? "A player"} has this. Go find them.`}
+              ? `${offer.displayName ?? "A player"} is bringing ${
+                  offer.quantity > 1 ? offer.quantity : "it"
+                } to the event.`
+              : offer.quantity > 1
+                ? `${offer.displayName ?? "A player"} has ${offer.quantity} of them. Go find them.`
+                : `${offer.displayName ?? "A player"} has this. Go find them.`}
             {offer.message ? ` “${offer.message}”` : ""}
             {offer.present || early ? "" : " (away right now)"}
           </Body>
@@ -809,14 +859,42 @@ function FlareRow({
         </Tap>
       )}
 
-      {!mine && flare.match && !offering && (
+      {/* Anyone can pledge — no binder match required, the founder's
+          call. The match badge above stays a hint, not a permission. */}
+      {!mine && !offering && (
         <Button
           label={early ? "I got you. I'll bring it" : "Offer to trade"}
           onPress={() => setOffering(true)}
         />
       )}
-      {!mine && flare.match && offering && (
+      {!mine && offering && (
         <View style={{ gap: spacing(2) }}>
+          {flare.quantity > 1 && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(3),
+              }}
+            >
+              <Muted>{early ? "How many can you bring?" : "How many do you have?"}</Muted>
+              <Button
+                label="−"
+                variant="secondary"
+                onPress={() => setBringing((n) => Math.max(1, n - 1))}
+              />
+              <Text
+                style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "700" }}
+              >
+                {bringing}
+              </Text>
+              <Button
+                label="+"
+                variant="secondary"
+                onPress={() => setBringing((n) => Math.min(flare.quantity, n + 1))}
+              />
+            </View>
+          )}
           <Input
             value={message}
             onChangeText={setMessage}
@@ -827,7 +905,7 @@ function FlareRow({
             label="Send the offer"
             onPress={() => {
               setOffering(false);
-              onOffer(message.trim() || undefined);
+              onOffer(message.trim() || undefined, bringing);
             }}
           />
         </View>
@@ -860,19 +938,6 @@ const styles = StyleSheet.create({
   folderLabel: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: "600",
-  },
-  folderChip: {
-    borderColor: `${colors.accent}40`,
-    borderWidth: 1,
-    borderRadius: radius.control,
-    backgroundColor: `${colors.accent}0D`,
-    padding: spacing(1.5),
-    gap: spacing(1),
-  },
-  folderChipLabel: {
-    color: colors.textSecondary,
-    fontSize: 10,
     fontWeight: "600",
   },
   railFade: {

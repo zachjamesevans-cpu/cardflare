@@ -4,7 +4,9 @@ import {
   heldByCard,
   matchFor,
   offerMessageSchema,
+  offerQuantitySchema,
   offersByFlare,
+  pledgeTally,
   MAX_OFFER_MESSAGE,
   type Offer,
 } from "@/lib/matching/schema";
@@ -83,6 +85,7 @@ describe("offersByFlare", () => {
     responderSessionId: responder,
     displayName: responder,
     message: null,
+    quantity: 1,
     present: true,
   });
 
@@ -127,5 +130,52 @@ describe("offerMessageSchema", () => {
     for (const bad of ["table\u202E21", "here\u200Bthere", "beep\u0007boop"]) {
       expect(offerMessageSchema.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe("offerQuantitySchema", () => {
+  it("coerces form strings and clamps to the 1..99 window", () => {
+    expect(offerQuantitySchema.parse("2")).toBe(2);
+    expect(offerQuantitySchema.parse(99)).toBe(99);
+  });
+
+  it("turns anything unparseable into one copy, never a refusal", () => {
+    expect(offerQuantitySchema.parse("lots")).toBe(1);
+    expect(offerQuantitySchema.parse(0)).toBe(1);
+    expect(offerQuantitySchema.parse(100)).toBe(1);
+    expect(offerQuantitySchema.parse(undefined)).toBe(1);
+  });
+});
+
+describe("pledgeTally", () => {
+  const pledge = (quantity: number): Offer => ({
+    flareId: "f1",
+    responderSessionId: "r1",
+    displayName: "Chunc",
+    message: null,
+    quantity,
+    present: true,
+  });
+
+  it("reads the founder's example: 2x asked, 1 pledged, 1 still needed", () => {
+    expect(pledgeTally([pledge(1)], 2)).toEqual({ pledged: 1, remaining: 1 });
+  });
+
+  it("caps the pledged count at the ask for display", () => {
+    expect(pledgeTally([pledge(3), pledge(4)], 2)).toEqual({
+      pledged: 2,
+      remaining: 0,
+    });
+  });
+
+  it("sums pledges across responders", () => {
+    expect(pledgeTally([pledge(1), pledge(1)], 3)).toEqual({
+      pledged: 2,
+      remaining: 1,
+    });
+  });
+
+  it("is quiet arithmetic on an unanswered Flare", () => {
+    expect(pledgeTally([], 2)).toEqual({ pledged: 0, remaining: 2 });
   });
 });
