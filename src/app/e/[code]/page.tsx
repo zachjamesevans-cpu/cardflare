@@ -111,10 +111,20 @@ function Unavailable() {
  */
 export default async function JoinByCodePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { code } = await params;
+
+  /*
+   * The board's two layouts, chosen by URL so the page stays a Server
+   * Component with zero client JavaScript for the switch. Anything that
+   * is not "carousel" is the stacked reading view, so a mistyped or
+   * stale parameter can never blank the board.
+   */
+  const boardView = (await searchParams).view === "carousel" ? "carousel" : "stacked";
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
   if (!isValidJoinCode(normalized)) notFound();
@@ -513,14 +523,48 @@ export default async function JoinByCodePage({
           />
 
           <section className="flex flex-col gap-4" aria-labelledby="flares-heading">
-            <div className="flex flex-col gap-1">
-              <h2 id="flares-heading" className="text-lg font-bold text-text-primary">
-                Wanted in this room
-              </h2>
-              <p className="text-sm text-text-secondary">
-                Every Flare posted here, and everyone open to any trade. If you can
-                help, go and find them.
-              </p>
+            <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2 id="flares-heading" className="text-lg font-bold text-text-primary">
+                  Wanted in this room
+                </h2>
+                <p className="text-sm text-text-secondary">
+                  Every Flare posted here, and everyone open to any trade. If you can
+                  help, go and find them.
+                </p>
+              </div>
+
+              {/* The file-browser trick: same board, two geometries. */}
+              <div
+                className="flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-border p-1"
+                role="group"
+                aria-label="Board layout"
+              >
+                <Link
+                  href={`/e/${normalized}`}
+                  aria-current={boardView === "stacked" ? "true" : undefined}
+                  className={cn(
+                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
+                    boardView === "stacked"
+                      ? "bg-accent/15 text-accent"
+                      : "text-text-muted hover:text-text-secondary",
+                  )}
+                >
+                  Stacked
+                </Link>
+                <Link
+                  href={`/e/${normalized}?view=carousel`}
+                  aria-current={boardView === "carousel" ? "true" : undefined}
+                  className={cn(
+                    "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors",
+                    boardView === "carousel"
+                      ? "bg-accent/15 text-accent"
+                      : "text-text-muted hover:text-text-secondary",
+                  )}
+                >
+                  Carousel
+                </Link>
+              </div>
             </div>
 
             <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
@@ -543,6 +587,7 @@ export default async function JoinByCodePage({
               counterHas={counterHas}
               counterName={event.storeName}
               early={phase === "early"}
+              view={boardView}
             />
           </section>
 

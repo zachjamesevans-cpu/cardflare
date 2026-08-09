@@ -17,6 +17,9 @@ import {
   getRoom,
   joinRoom,
   lastRoom,
+  rememberBoardView,
+  storedBoardView,
+  type BoardView,
   offerOnFlare,
   postFlare,
   rememberRoom,
@@ -94,7 +97,17 @@ function RoomScreen({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wants, setWants] = useState<Me["wants"]>([]);
+  const [view, setView] = useState<BoardView>("stacked");
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    void storedBoardView().then(setView);
+  }, []);
+
+  const pickView = (next: BoardView) => {
+    setView(next);
+    void rememberBoardView(next).catch(() => {});
+  };
 
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
@@ -359,6 +372,33 @@ function RoomScreen({
           <Muted>{room.storeName}</Muted>
           <Title>{room.name}</Title>
           <Muted>{`You're in as ${state.you!.displayName}`}</Muted>
+
+          {/* The file-browser trick: same board, two geometries. */}
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            {(["stacked", "carousel"] as const).map((option) => (
+              <Tap
+                key={option}
+                onPress={() => pickView(option)}
+                style={{
+                  borderColor: view === option ? colors.accent : colors.border,
+                  borderWidth: 1,
+                  borderRadius: radius.control,
+                  paddingVertical: spacing(1.5),
+                  paddingHorizontal: spacing(3),
+                }}
+              >
+                <Text
+                  style={{
+                    color: view === option ? colors.accent : colors.textMuted,
+                    fontSize: 13,
+                    fontWeight: "600",
+                  }}
+                >
+                  {option === "stacked" ? "Stacked" : "Carousel"}
+                </Text>
+              </Tap>
+            ))}
+          </View>
         </Card>
 
         {/* An early board never pretends to be a live room. */}
@@ -446,22 +486,41 @@ function RoomScreen({
                 {mine ? "Your Flares" : (group.name ?? "A player")}
               </Title>
 
-              {group.flares.map((flare) => (
-                <FlareRow
-                  key={flare.id}
-                  flare={flare}
-                  mine={mine}
-                  storeName={room.storeName}
-                  early={room.early}
-                  onOffer={(message) =>
-                    void act(() => offerOnFlare(code, flare.id, message))
-                  }
-                  onRemove={() => void act(() => removeFlare(code, flare.id))}
-                  onTraded={(partner) =>
-                    void act(() => confirmTrade(code, flare.id, partner))
-                  }
-                />
-              ))}
+              {view === "carousel" ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing(3), paddingVertical: spacing(1) }}
+                >
+                  {group.flares.map((flare) => (
+                    <CarouselFlare
+                      key={flare.id}
+                      flare={flare}
+                      mine={mine}
+                      early={room.early}
+                      onOffer={() => void act(() => offerOnFlare(code, flare.id))}
+                      onRemove={() => void act(() => removeFlare(code, flare.id))}
+                    />
+                  ))}
+                </ScrollView>
+              ) : (
+                group.flares.map((flare) => (
+                  <FlareRow
+                    key={flare.id}
+                    flare={flare}
+                    mine={mine}
+                    storeName={room.storeName}
+                    early={room.early}
+                    onOffer={(message) =>
+                      void act(() => offerOnFlare(code, flare.id, message))
+                    }
+                    onRemove={() => void act(() => removeFlare(code, flare.id))}
+                    onTraded={(partner) =>
+                      void act(() => confirmTrade(code, flare.id, partner))
+                    }
+                  />
+                ))
+              )}
             </Card>
           );
         })}
@@ -483,6 +542,76 @@ function RoomScreen({
           />
         </View>
       </View>
+    </View>
+  );
+}
+
+/**
+ * One Flare as the carousel shows it: art-first and narrow, so thirty
+ * cards read as one swipeable rail. Browsing and the quick actions live
+ * here; writing an offer note and confirming a trade stay in the
+ * stacked view, where there is room to do them properly.
+ */
+function CarouselFlare({
+  flare,
+  mine,
+  early,
+  onOffer,
+  onRemove,
+}: {
+  flare: RoomFlare;
+  mine: boolean;
+  early: boolean;
+  onOffer: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={{ width: 130, gap: spacing(1.5) }}>
+      <CardImage
+        imageUrl={flare.imageUrl}
+        width={130}
+        name={flare.cardName}
+        cardNumber={flare.cardNumber}
+        caption={flare.printingLabel ?? "Any printing"}
+      />
+      <Text
+        numberOfLines={1}
+        style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}
+      >
+        {flare.cardName}
+        {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
+      </Text>
+      <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11 }}>
+        {flare.printingLabel ?? "Any printing"}
+      </Text>
+
+      {flare.match === "exact" && (
+        <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
+          You have this
+        </Text>
+      )}
+      {flare.match === "other-printing" && (
+        <Text style={{ color: colors.accent, fontSize: 12 }}>Another printing</Text>
+      )}
+
+      {mine && flare.offers.length > 0 && (
+        <Text style={{ color: colors.accent, fontSize: 12 }}>
+          {`${flare.offers.length} ${flare.offers.length === 1 ? "hand" : "hands"} up. See Stacked`}
+        </Text>
+      )}
+
+      {!mine && flare.match && (
+        <Button
+          label={early ? "I got you" : "Offer"}
+          variant="secondary"
+          onPress={onOffer}
+        />
+      )}
+      {mine && (
+        <Tap onPress={onRemove} hitSlop={6}>
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>Remove</Text>
+        </Tap>
+      )}
     </View>
   );
 }

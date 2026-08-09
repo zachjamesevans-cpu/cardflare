@@ -206,6 +206,106 @@ function OpenToTradesEntry({ isYou }: { isYou: boolean }) {
  * reads, which is a poor outcome for the person most in need of being found —
  * somebody new enough that they cannot yet name what they want.
  */
+/**
+ * One Flare as the carousel view shows it: art first, everything else
+ * beneath, sized so a player's thirty cards read as one swipeable rail
+ * instead of thirty rows. Every control the stacked row has is here,
+ * in the same order; only the geometry changes, exactly like switching
+ * icon views in a file browser.
+ */
+function CarouselEntry({
+  entry,
+  code,
+  kind,
+  imagesEnabled,
+  match,
+  removable,
+  counterName,
+  children,
+}: {
+  entry: ListEntry;
+  code: string;
+  kind: ListKind;
+  imagesEnabled: boolean;
+  match?: MatchKind | null;
+  removable: boolean;
+  counterName?: string | null;
+  children?: React.ReactNode;
+}) {
+  return (
+    <li className="flex w-40 shrink-0 flex-col gap-1.5">
+      <CardImageZoom
+        imageUrl={entry.imageUrl}
+        exactName={entry.cardName}
+        cardNumber={entry.cardNumber}
+        enabled={imagesEnabled}
+        anyPrinting={!entry.printingId}
+        caption={entry.printingLabel ?? "Any printing"}
+        thumbClassName="w-full"
+      />
+
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold text-text-primary">
+          {entry.cardName}
+        </p>
+        {entry.quantity > 1 && (
+          <span className="shrink-0 text-xs text-text-muted tabular-nums">
+            ×{entry.quantity}
+          </span>
+        )}
+      </div>
+
+      <p className="truncate text-xs text-text-muted">
+        {entry.printingLabel ?? "Any printing"}
+      </p>
+
+      {entry.note && (
+        <p className="truncate text-xs text-text-secondary italic">{entry.note}</p>
+      )}
+
+      {match === "exact" && (
+        <span>
+          <Badge>
+            <PackageCheck className="size-3.5" aria-hidden="true" />
+            You have this
+          </Badge>
+        </span>
+      )}
+      {match === "other-printing" && (
+        <span>
+          <Badge>
+            <Layers className="size-3.5" aria-hidden="true" />
+            Another printing
+          </Badge>
+        </span>
+      )}
+
+      {counterName && (
+        <p className="flex items-center gap-1 text-xs text-text-secondary">
+          <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+          At the counter, maybe
+        </p>
+      )}
+
+      {removable && (
+        <form action={removeListEntryAction}>
+          <input type="hidden" name="code" value={code} />
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="entryId" value={entry.id} />
+          <button
+            type="submit"
+            className="text-xs text-text-muted underline underline-offset-4 hover:text-text-secondary"
+          >
+            Remove
+          </button>
+        </form>
+      )}
+
+      {children && <div className="flex flex-col text-sm">{children}</div>}
+    </li>
+  );
+}
+
 export function FlareBoard({
   entries,
   code,
@@ -217,6 +317,7 @@ export function FlareBoard({
   counterHas,
   counterName,
   early = false,
+  view = "stacked",
 }: {
   entries: ListEntry[];
   code: string;
@@ -234,6 +335,8 @@ export function FlareBoard({
   counterName?: string;
   /** Early board: offers read as pledges to bring the card. */
   early?: boolean;
+  /** Stacked is the reading view; carousel is the browsing view. */
+  view?: "stacked" | "carousel";
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
   const groups = groupByPlayer(entries);
@@ -295,7 +398,14 @@ export function FlareBoard({
               </div>
             </div>
 
-            <ul aria-labelledby={headingId} className="flex flex-col">
+            <ul
+              aria-labelledby={headingId}
+              className={
+                view === "carousel"
+                  ? "flex gap-3 overflow-x-auto pb-2"
+                  : "flex flex-col"
+              }
+            >
               {group.entries.map((entry) => {
                 const match = isYou ? null : (matches.get(entry.id) ?? null);
                 const entryOffers = offers.get(entry.id) ?? [];
@@ -303,26 +413,17 @@ export function FlareBoard({
                   (offer) => offer.responderSessionId === youId,
                 );
 
-                return (
-                  <Entry
-                    key={entry.id}
-                    entry={entry}
-                    code={code}
-                    kind="flare"
-                    imagesEnabled={imagesEnabled}
-                    match={match}
-                    removable={isYou}
-                    counterName={
-                      counterHas?.has(entry.cardId) ? (counterName ?? null) : null
-                    }
-                  >
-                    {/*
-                     * Your Flare: everyone who raised a hand, each with a
-                     * "we traded", plus the quiet tally for a trade that
-                     * happened without an offer. Someone else's that you can
-                     * answer: the hand-raising controls. Never both — you
-                     * cannot offer on your own request.
-                     */}
+                /*
+                 * Your Flare: everyone who raised a hand, each with a
+                 * "we traded", plus the quiet tally for a trade that
+                 * happened without an offer. Someone else's that you can
+                 * answer: the hand-raising controls. Never both — you
+                 * cannot offer on your own request. The same controls ride
+                 * both layouts; a view change must never change what a
+                 * player can do.
+                 */
+                const controls = (
+                  <>
                     {isYou && entryOffers.length > 0 && (
                       <OfferList
                         offers={entryOffers}
@@ -340,7 +441,26 @@ export function FlareBoard({
                         early={early}
                       />
                     )}
-                  </Entry>
+                  </>
+                );
+
+                const Row = view === "carousel" ? CarouselEntry : Entry;
+
+                return (
+                  <Row
+                    key={entry.id}
+                    entry={entry}
+                    code={code}
+                    kind="flare"
+                    imagesEnabled={imagesEnabled}
+                    match={match}
+                    removable={isYou}
+                    counterName={
+                      counterHas?.has(entry.cardId) ? (counterName ?? null) : null
+                    }
+                  >
+                    {controls}
+                  </Row>
                 );
               })}
 
