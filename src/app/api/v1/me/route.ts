@@ -45,6 +45,8 @@ export async function GET(request: Request): Promise<Response> {
       liveNow: local.liveNow,
       nextEventAt: local.nextEventAt,
       nextEventName: local.nextEventName,
+      nextEventCode: local.nextEventCode,
+      earlyOpen: local.earlyOpen,
     })),
   });
 }

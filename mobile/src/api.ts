@@ -205,6 +205,9 @@ export interface Me {
     liveNow: boolean;
     nextEventAt: string | null;
     nextEventName: string | null;
+    /** The next event's own code, when a board can be walked onto early. */
+    nextEventCode: string | null;
+    earlyOpen: boolean;
   }[];
 }
 
@@ -240,7 +243,7 @@ export interface RoomState {
   /** Present on lobby and quiet states: whose counter this is. */
   store?: { name: string };
   /** A nearby board already taking Flares, advertised by lobby and quiet. */
-  earlyBoard?: { code: string; name: string; startsAt: string };
+  earlyBoard?: { code: string; name: string; startsAt: string; playersIn: number };
   joined?: boolean;
   room?: {
     name: string;

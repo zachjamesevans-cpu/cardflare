@@ -27,6 +27,10 @@ export interface LocalStore {
   /** The next scheduled event's start, if one is on the calendar. */
   nextEventAt: string | null;
   nextEventName: string | null;
+  /** The next event's own code, for walking straight onto its board. */
+  nextEventCode: string | null;
+  /** True when the next event's board is already taking Flares. */
+  earlyOpen: boolean;
 }
 
 /** Remembers that this player goes to this store. Idempotent, silent. */
@@ -75,7 +79,7 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
   const [{ data: stores }, { data: events }] = await Promise.all([
     getSupabaseAdmin()
       .from("stores")
-      .select("id, name, city, region, join_code")
+      .select("id, name, city, region, join_code, early_board_hours")
       .in("id", storeIds),
     /*
      * One query answers both "is a room live right now" (status open) and
@@ -84,7 +88,7 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
      */
     getSupabaseAdmin()
       .from("events")
-      .select("store_id, name, status, starts_at")
+      .select("store_id, name, status, starts_at, join_code")
       .in("store_id", storeIds)
       .neq("status", "closed"),
   ]);
@@ -93,13 +97,20 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
   const now = Date.now();
 
   const live = new Set<string>();
-  const next = new Map<string, { name: string; startsAt: string }>();
+  const next = new Map<
+    string,
+    { name: string; startsAt: string; joinCode: string | null }
+  >();
   for (const event of events ?? []) {
     if (event.status === "open") live.add(event.store_id);
     if (event.status === "draft" && Date.parse(event.starts_at) > now) {
       const current = next.get(event.store_id);
       if (!current || event.starts_at < current.startsAt) {
-        next.set(event.store_id, { name: event.name, startsAt: event.starts_at });
+        next.set(event.store_id, {
+          name: event.name,
+          startsAt: event.starts_at,
+          joinCode: event.join_code,
+        });
       }
     }
   }
@@ -109,6 +120,16 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
     if (!store) return [];
 
     const upcoming = next.get(row.store_id) ?? null;
+
+    // The board is already open when the start is inside the store's
+    // early window; that is when "I'll be there" earns a button.
+    const earlyOpen = Boolean(
+      upcoming &&
+      upcoming.joinCode &&
+      store.early_board_hours > 0 &&
+      Date.parse(upcoming.startsAt) - store.early_board_hours * 60 * 60 * 1000 <= now,
+    );
+
     return [
       {
         storeId: store.id,
@@ -120,6 +141,8 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
         liveNow: live.has(store.id),
         nextEventAt: upcoming?.startsAt ?? null,
         nextEventName: upcoming?.name ?? null,
+        nextEventCode: upcoming?.joinCode ?? null,
+        earlyOpen,
       },
     ];
   });

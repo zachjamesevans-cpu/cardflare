@@ -1,16 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { generateSetupLink } from "@/lib/auth/invite-link";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { sendEmail } from "@/lib/email/client";
 import { playerInviteEmail } from "@/lib/email/store-invite";
-import { findParticipation } from "@/lib/events/participants";
-import { resolveCode } from "@/lib/events/rooms";
+import { findParticipation, joinEvent } from "@/lib/events/participants";
+import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
+import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import { addFlare } from "@/lib/lists/repository";
-import { getPlayerSession } from "@/lib/players/session";
+import { createPlayerSession } from "@/lib/players/repository";
+import {
+  createSessionToken,
+  getPlayerSession,
+  hashSessionToken,
+  setPlayerCookie,
+} from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 import { invitePlayer, linkSessionToPlayer, playerForUser } from "./accounts";
 import {
@@ -18,7 +26,7 @@ import {
   type InvitePlayerState,
   type RepostState,
 } from "./account-schema";
-import { removeLocal } from "./locals";
+import { removeLocal, saveLocal } from "./locals";
 import { listWants, removeWant } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
@@ -90,6 +98,83 @@ export async function invitePlayerAction(
     email: outcome,
     setupLink: outcome === "sent" ? null : setupLink,
   };
+}
+
+/**
+ * "I'll be there": one tap that walks a signed-in player onto an
+ * upcoming board and posts everything they are still hunting.
+ *
+ * No RSVP table behind it, on purpose. Being in the room before doors
+ * IS the RSVP: participation counts you among who is coming, the board
+ * carries your Flares days early, leaving the room takes it back, and
+ * the no-show expiry already cleans up after anyone whose plans fell
+ * through. A second record of the same fact would drift from the first.
+ *
+ * Everything is re-derived here because a Server Action is a public
+ * POST endpoint: the signed-in player from the cookie, the room from
+ * the code, and the phase from the clock. Guests never reach this
+ * (their path is the join form, exactly as before); duplicate wants
+ * already on the board are skipped by the repository.
+ */
+export async function rsvpAction(formData: FormData): Promise<void> {
+  const code = text(formData, "code");
+  if (!code) return;
+
+  const viewer = await getViewer();
+  const playerId = await playerIdFor(viewer);
+  if (!playerId) return;
+
+  const event = await enterRoomByCode(code);
+  if (!event) return;
+
+  const phase = roomPhase(event, Date.now());
+  if (phase !== "early" && phase !== "live") return;
+
+  /*
+   * The player's session, created on the spot when this browser has
+   * none: the same identity machinery the join form uses, seeded with
+   * the account's own display name so nothing has to be typed.
+   */
+  let session = await getPlayerSession();
+  if (!session) {
+    const displayName =
+      viewer.kind === "player"
+        ? viewer.playerName
+        : viewer.kind === "anonymous"
+          ? null
+          : ((await playerForUser(viewer.user.id))?.display_name ?? null);
+    if (!displayName) return;
+
+    const freshToken = createSessionToken();
+    try {
+      session = await createPlayerSession(displayName, hashSessionToken(freshToken));
+    } catch (error) {
+      console.error("Could not create a session for the RSVP", error);
+      return;
+    }
+    await setPlayerCookie(freshToken);
+  }
+
+  const joined = await joinEvent(event.id, session.id);
+  if (!joined) return;
+
+  if (session.player_id === null) await linkSessionToPlayer(session.id, playerId);
+  await saveLocal(playerId, event.storeId);
+
+  // Post the whole want list; the board's duplicates are skipped and the
+  // cap stops the loop the same way the repost panel's does.
+  const wants = await listWants(playerId);
+  for (const want of wants) {
+    const result = await addFlare(event.id, session.id, {
+      cardId: want.cardId,
+      printingId: want.printingId,
+      quantity: want.quantity,
+      note: want.note,
+    });
+    if (!result.ok && result.reason === "at-cap") break;
+  }
+
+  redirect(`/e/${code}`);
 }
 
 /** Forgets one saved store. The player's own locals only. */

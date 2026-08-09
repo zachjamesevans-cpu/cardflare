@@ -210,7 +210,13 @@ function RoomScreen({
               {`The board for ${new Date(state.earlyBoard.startsAt).toLocaleDateString(
                 "en-US",
                 { weekday: "long", month: "short", day: "numeric" },
-              )} is already open. Post now so people know what to bring.`}
+              )} is already open.${
+                state.earlyBoard.playersIn > 0
+                  ? ` ${state.earlyBoard.playersIn} ${
+                      state.earlyBoard.playersIn === 1 ? "player is" : "players are"
+                    } already on it.`
+                  : ""
+              } Post now so people know what to bring.`}
             </Body>
             <Button
               label="Open the early board"
@@ -251,7 +257,13 @@ function RoomScreen({
               {`The board for ${new Date(state.earlyBoard.startsAt).toLocaleDateString(
                 "en-US",
                 { weekday: "long", month: "short", day: "numeric" },
-              )} is already open. Post now so people know what to bring.`}
+              )} is already open.${
+                state.earlyBoard.playersIn > 0
+                  ? ` ${state.earlyBoard.playersIn} ${
+                      state.earlyBoard.playersIn === 1 ? "player is" : "players are"
+                    } already on it.`
+                  : ""
+              } Post now so people know what to bring.`}
             </Body>
             <Button
               label="Open the early board"

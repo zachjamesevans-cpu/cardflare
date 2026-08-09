@@ -191,6 +191,8 @@ export interface EarlyBoard {
   code: string;
   name: string;
   startsAt: string;
+  /** How many players are already on it. Social proof, honestly counted. */
+  playersIn: number;
 }
 
 /**
