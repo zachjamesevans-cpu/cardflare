@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -510,7 +511,9 @@ function RoomScreen({
               mine={mine}
               offered={flare.offers.some((o) => o.responderSessionId === youId)}
               early={room.early}
-              onOffer={() => act(() => offerOnFlare(code, flare.id))}
+              onOffer={(quantity) =>
+                act(() => offerOnFlare(code, flare.id, undefined, quantity))
+              }
               onRemove={() => void act(() => removeFlare(code, flare.id))}
             />
           );
@@ -701,7 +704,7 @@ function CarouselFlare({
   /** The viewer's pledge on this Flare is already standing. */
   offered: boolean;
   early: boolean;
-  onOffer: () => Promise<void>;
+  onOffer: (quantity?: number) => Promise<void>;
   onRemove: () => void;
 }) {
   const pledgeLine = pledgeLineFor(flare);
@@ -713,15 +716,24 @@ function CarouselFlare({
    * "I got it" was a silent button: nothing on screen said the tap took
    * until the next poll repainted the board, which on store wifi reads
    * as broken — the founder's complaint. While the pledge is in flight
-   * the art greys out under a spinner, and the link cannot double-fire.
+   * the art greys out under a spinner, and the button cannot double-fire.
    */
   const [pledging, setPledging] = useState(false);
 
-  const pledge = async () => {
+  /*
+   * The founder's shape for the multi-copy case: tapping the handshake
+   * flips it in place to a minimal stepper — minus, count, plus, check —
+   * and the check submits. No second screen; the tile is the form.
+   */
+  const [picking, setPicking] = useState(false);
+  const [count, setCount] = useState(1);
+
+  const pledge = async (quantity?: number) => {
     if (pledging) return;
+    setPicking(false);
     setPledging(true);
     try {
-      await onOffer();
+      await onOffer(quantity);
     } finally {
       setPledging(false);
     }
@@ -785,13 +797,42 @@ function CarouselFlare({
       )}
 
       {/* Anyone can pledge — no binder required, the founder's call.
-          One copy from here; the stacked view asks "how many". */}
-      {!mine && !offered && (
-        <Tap onPress={() => void pledge()} disabled={pledging} hitSlop={6}>
-          <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "600" }}>
-            {pledging ? "On it…" : early ? "I got you" : "I got it"}
-          </Text>
+          The handshake is the whole button; a multi-copy ask flips it
+          to the stepper first. */}
+      {!mine && !offered && !picking && (
+        <Tap
+          onPress={() =>
+            flare.quantity > 1 ? setPicking(true) : void pledge()
+          }
+          disabled={pledging}
+          style={styles.pledgeButton}
+          hitSlop={4}
+        >
+          <MaterialCommunityIcons
+            name="handshake-outline"
+            size={14}
+            color={colors.accent}
+          />
         </Tap>
+      )}
+      {!mine && !offered && picking && (
+        <View style={styles.pledgeStepper}>
+          <Tap onPress={() => setCount((n) => Math.max(1, n - 1))} hitSlop={6}>
+            <Text style={styles.stepperGlyph}>−</Text>
+          </Tap>
+          <Text style={styles.stepperCount}>{count}</Text>
+          <Tap
+            onPress={() => setCount((n) => Math.min(flare.quantity, n + 1))}
+            hitSlop={6}
+          >
+            <Text style={styles.stepperGlyph}>+</Text>
+          </Tap>
+          <Tap onPress={() => void pledge(count)} hitSlop={6}>
+            <View style={styles.stepperGo}>
+              <Text style={styles.stepperGoGlyph}>✓</Text>
+            </View>
+          </Tap>
+        </View>
       )}
       {!mine && offered && (
         <Text style={{ color: colors.textMuted, fontSize: 10 }}>You&rsquo;re on it</Text>
@@ -1022,6 +1063,48 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.canvas}99`,
     alignItems: "center",
     justifyContent: "center",
+  },
+  pledgeButton: {
+    height: 24,
+    borderWidth: 1,
+    borderColor: `${colors.accent}66`,
+    backgroundColor: `${colors.accent}1A`,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pledgeStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 24,
+  },
+  stepperGlyph: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: "700",
+    width: 12,
+    textAlign: "center",
+  },
+  stepperCount: {
+    color: colors.textPrimary,
+    fontSize: 11,
+    fontWeight: "700",
+    minWidth: 10,
+    textAlign: "center",
+  },
+  stepperGo: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperGoGlyph: {
+    color: colors.accentContrast,
+    fontSize: 10,
+    fontWeight: "700",
   },
   actionBar: {
     position: "absolute",

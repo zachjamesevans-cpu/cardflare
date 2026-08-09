@@ -341,7 +341,14 @@ function CarouselEntry({
        * tile greys out under a spinner (the overlay anchors to this
        * li's `relative`), because a silent button reads as broken.
        */}
-      {canOffer && <QuickPledge code={code} flareId={entry.id} early={early} />}
+      {canOffer && (
+        <QuickPledge
+          code={code}
+          flareId={entry.id}
+          early={early}
+          flareQuantity={entry.quantity}
+        />
+      )}
       {offered && (
         <p className="text-[10px] leading-tight text-text-muted">You&rsquo;re on it</p>
       )}
