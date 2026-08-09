@@ -1,6 +1,13 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import {
+  Animated,
+  Dimensions,
+  PanResponder,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 import { ApiError, postFlare, searchCards, type CardHit } from "../api";
 import { Body, Button, Card, CardImage, ErrorLine, Input, Muted, Tap, Title } from "../ui";
@@ -41,6 +48,57 @@ export function PostFlareScreen({ code }: { code: string }) {
     },
     [],
   );
+
+  /*
+   * Swipe back from the picked card to the search — by hand, because
+   * both halves are one screen, so the navigator's back gesture has
+   * nothing to pop. A drag starting at the left edge carries the card
+   * step with the finger; past the threshold it slides off and the
+   * search returns, short of it it springs back. Locked while a post
+   * is in flight or the "Posted ✓" beat is showing.
+   */
+  const slide = useRef(new Animated.Value(0)).current;
+  const swipeLocked = useRef(false);
+  swipeLocked.current = busy || posted;
+
+  const backSwipe = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        !swipeLocked.current &&
+        gesture.x0 < 80 &&
+        gesture.dx > 12 &&
+        Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      onPanResponderMove: (_event, gesture) => {
+        slide.setValue(Math.max(0, gesture.dx));
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (gesture.dx > 90) {
+          Animated.timing(slide, {
+            toValue: Dimensions.get("window").width,
+            duration: 160,
+            useNativeDriver: true,
+          }).start(() => {
+            setPicked(null);
+            setPrintingId(null);
+            slide.setValue(0);
+          });
+        } else {
+          Animated.spring(slide, {
+            toValue: 0,
+            bounciness: 4,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(slide, {
+          toValue: 0,
+          bounciness: 4,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
 
   // Debounced search: a keystroke pause is the request, not every letter.
   useEffect(() => {
@@ -209,6 +267,10 @@ export function PostFlareScreen({ code }: { code: string }) {
           ))}
         </Card>
       ) : (
+        <Animated.View
+          {...backSwipe.panHandlers}
+          style={{ transform: [{ translateX: slide }] }}
+        >
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
             <CardImage
@@ -314,6 +376,7 @@ export function PostFlareScreen({ code }: { code: string }) {
             disabled={busy || posted}
           />
         </Card>
+        </Animated.View>
       )}
     </ScrollView>
   );
