@@ -319,6 +319,20 @@ export const setOpenToTrades = (code: string, open: boolean) =>
 /** The last room joined, so the Room tab reopens where the player was. */
 const LAST_ROOM_KEY = "cf_last_room";
 
+/** The board layout the player last chose. A preference, never a gate. */
+const BOARD_VIEW_KEY = "cf_board_view";
+
+export type BoardView = "stacked" | "carousel";
+
+export async function rememberBoardView(view: BoardView): Promise<void> {
+  await SecureStore.setItemAsync(BOARD_VIEW_KEY, view);
+}
+
+export async function storedBoardView(): Promise<BoardView> {
+  const value = await SecureStore.getItemAsync(BOARD_VIEW_KEY);
+  return value === "carousel" ? "carousel" : "stacked";
+}
+
 export async function rememberRoom(code: string): Promise<void> {
   await SecureStore.setItemAsync(LAST_ROOM_KEY, code);
 }

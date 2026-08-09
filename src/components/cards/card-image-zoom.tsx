@@ -40,6 +40,7 @@ export function CardImageZoom({
   enabled,
   anyPrinting = false,
   caption,
+  thumbClassName,
 }: {
   imageUrl: string | null;
   exactName: string;
@@ -48,6 +49,8 @@ export function CardImageZoom({
   anyPrinting?: boolean;
   /** The printing, so the large view says which version is being shown. */
   caption?: string | null;
+  /** Sizes the thumbnail; the carousel view renders cards art-first. */
+  thumbClassName?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -234,6 +237,7 @@ export function CardImageZoom({
       cardNumber={cardNumber}
       enabled={enabled}
       anyPrinting={anyPrinting}
+      className={thumbClassName}
     />
   );
 
@@ -281,7 +285,7 @@ export function CardImageZoom({
         onFocus={intent}
         onBlur={cool}
         aria-label={`View ${exactName} larger`}
-        className="shrink-0 cursor-zoom-in rounded-[7px] transition-transform duration-[var(--duration-base)] hover:ring-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none active:scale-95"
+        className={`shrink-0 cursor-zoom-in rounded-[7px] transition-transform duration-[var(--duration-base)] hover:ring-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none active:scale-95 ${thumbClassName ? "w-full" : ""}`}
       >
         {thumbnail}
       </button>
