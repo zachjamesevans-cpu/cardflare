@@ -12,6 +12,7 @@ import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import { addFlare } from "@/lib/lists/repository";
+import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { createPlayerSession } from "@/lib/players/repository";
 import {
   createSessionToken,
@@ -172,6 +173,12 @@ export async function rsvpAction(formData: FormData): Promise<void> {
       note: want.note,
     });
     if (!result.ok && result.reason === "at-cap") break;
+  }
+
+  // An RSVP's Flares wake the store's regulars the same way any early
+  // post does; the dedupe makes this free when the digest already went.
+  if (phase === "early" && wants.length > 0) {
+    void notifyEarlyBoardFlares(event.id);
   }
 
   redirect(`/e/${code}`);

@@ -216,6 +216,7 @@ export function FlareBoard({
   openToTrades = [],
   counterHas,
   counterName,
+  early = false,
 }: {
   entries: ListEntry[];
   code: string;
@@ -231,6 +232,8 @@ export function FlareBoard({
   counterHas?: Set<string>;
   /** The store's name, for the "may have it" line. */
   counterName?: string;
+  /** Early board: offers read as pledges to bring the card. */
+  early?: boolean;
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
   const groups = groupByPlayer(entries);
@@ -321,11 +324,21 @@ export function FlareBoard({
                      * cannot offer on your own request.
                      */}
                     {isYou && entryOffers.length > 0 && (
-                      <OfferList offers={entryOffers} code={code} flareId={entry.id} />
+                      <OfferList
+                        offers={entryOffers}
+                        code={code}
+                        flareId={entry.id}
+                        early={early}
+                      />
                     )}
                     {isYou && <MarkTraded code={code} flareId={entry.id} />}
                     {match && (
-                      <OfferPanel code={code} flareId={entry.id} ownOffer={ownOffer} />
+                      <OfferPanel
+                        code={code}
+                        flareId={entry.id}
+                        ownOffer={ownOffer}
+                        early={early}
+                      />
                     )}
                   </Entry>
                 );

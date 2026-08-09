@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { resolveCode } from "@/lib/events/rooms";
+import { roomPhase, type PublicEvent } from "@/lib/events/schema";
+import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
@@ -57,6 +59,7 @@ async function requirePlayerInRoom(code: string): Promise<{
   eventId: string;
   playerSessionId: string;
   playerId: string | null;
+  room: PublicEvent;
 } | null> {
   const session = await getPlayerSession();
   if (!session) return null;
@@ -77,6 +80,7 @@ async function requirePlayerInRoom(code: string): Promise<{
     eventId: resolved.room.id,
     playerSessionId: session.id,
     playerId: session.player_id,
+    room: resolved.room,
   };
 }
 
@@ -135,6 +139,12 @@ export async function addToListAction(
    */
   if (result.ok && kind.data === "flare" && room.playerId) {
     await saveWant(room.playerId, parsed.data);
+  }
+
+  // The first Flares on an early board wake the store's regulars. Fire
+  // and forget: the dedupe makes repeats free, and the post already won.
+  if (result.ok && kind.data === "flare" && roomPhase(room.room) === "early") {
+    void notifyEarlyBoardFlares(room.eventId);
   }
 
   if (!result.ok) {

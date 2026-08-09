@@ -462,6 +462,23 @@ night-before digest. The founder's Wednesday beta proved the thesis by
 hand: he shared the link hours early and seventeen players knew what
 to bring from home.
 
+**Phase 4 (shipped, closing the milestone):** the bring-from-home
+loop, both halves. Pledges: on an early board, an offer already was
+one in everything but words, so the words changed tense - the button
+reads "I got you. I'll bring it", the row reads "is bringing it to
+the event", the away-right-now tag stays quiet before doors, and the
+existing caps, notifications, withdraw and confirm machinery carry it
+unchanged on website and app alike. And the digest: the first Flares
+landing on an early board wake every player who saved that store as a
+local (excluding anyone already on the board), each with their own
+count - "5 cards are already wanted for Wednesday, and you own 2 of
+them. Bring the binder." - recorded through the backbone with one
+dedupe key per player per event, delivered by push and email, fired
+lazily from all three posting paths (web form, app API, RSVP) so no
+cron exists anywhere. One tiny migration extends the notifications
+kind check; probed on real PostgreSQL 16. Seven new unit tests pin
+the digest's dedupe, exclusions and empty-board silence.
+
 **Phase 3 (shipped):** "I'll be there", one tap. A signed-in player's
 locals now carry the next event's own code and whether its board is
 already open; when it is, the account page, the `/join` page and the

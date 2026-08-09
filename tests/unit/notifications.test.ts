@@ -49,8 +49,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/email/client", () => ({
   sendEmail: (...a: unknown[]) => sendEmail(...a),
 }));
+const collectionAvailability = vi.fn();
+vi.mock("@/lib/players/collection", () => ({
+  collectionAvailability: (...a: unknown[]) => collectionAvailability(...a),
+}));
 
-const { notifyOfferReceived, notifyTradeConfirmed } =
+const { notifyOfferReceived, notifyTradeConfirmed, notifyEarlyBoardFlares } =
   await import("@/lib/notifications/notify");
 
 /** The Flare, its card and its room, queued for `flareContext`. */
@@ -221,5 +225,76 @@ describe("notifyTradeConfirmed", () => {
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "partner@example.com" }),
     );
+  });
+});
+
+describe("notifyEarlyBoardFlares", () => {
+  const EVENT = {
+    data: {
+      id: "e1",
+      name: "Wednesday Locals",
+      join_code: "K3M9PZ",
+      starts_at: "2026-08-12T18:00:00Z",
+      store_id: "store-1",
+    },
+    error: null,
+  };
+
+  beforeEach(() => {
+    collectionAvailability.mockReset();
+    collectionAvailability.mockResolvedValue(new Map());
+  });
+
+  it("records one digest per saver, with their own match count", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("flares", { data: [{ card_id: "c1" }, { card_id: "c2" }], error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", { data: [], error: null });
+    collectionAvailability.mockResolvedValue(new Map([["c1", new Set(["pr1"])]]));
+    queue("notifications", { data: { id: "n1" }, error: null });
+    queue("player_devices", { data: [], error: null });
+    queue("players", { data: { user_id: "u9" }, error: null });
+    getUserById.mockResolvedValue({ data: { user: { email: "p9@x.gg" } } });
+    sendEmail.mockResolvedValue({ status: "sent" });
+
+    await notifyEarlyBoardFlares("e1");
+
+    const inserted = calls.notifications.insert?.[0]?.[0] as Record<string, unknown>;
+    expect(inserted).toMatchObject({
+      player_id: "p9",
+      kind: "early-board",
+      dedupe_key: "early-board:e1:p9",
+      url: "/e/K3M9PZ",
+    });
+    expect(String(inserted.body)).toContain("you own 1 of them");
+  });
+
+  it("skips savers who are already on the board", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("flares", { data: [{ card_id: "c1" }], error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", {
+      data: [{ player_session_id: "sess-9" }],
+      error: null,
+    });
+    queue("player_sessions", { data: [{ player_id: "p9" }], error: null });
+
+    await notifyEarlyBoardFlares("e1");
+
+    expect(calls.notifications?.insert).toBeUndefined();
+  });
+
+  it("stays silent while the board is empty", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("flares", { data: [], error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", { data: [], error: null });
+
+    await notifyEarlyBoardFlares("e1");
+
+    expect(calls.notifications?.insert).toBeUndefined();
   });
 });

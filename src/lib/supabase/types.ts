@@ -593,7 +593,7 @@ export type NotificationRow = {
   id: string;
   created_at: string;
   player_id: string;
-  kind: "offer-received" | "trade-confirmed";
+  kind: "offer-received" | "trade-confirmed" | "early-board";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */

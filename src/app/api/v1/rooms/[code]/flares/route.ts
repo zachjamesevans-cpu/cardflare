@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
 import { roomPhase } from "@/lib/events/schema";
+import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
@@ -51,6 +52,9 @@ export async function POST(
   if (!result.ok) {
     return Response.json({ error: result.reason }, { status: 409 });
   }
+
+  // The first Flares on an early board wake the store's regulars.
+  if (flarePhase === "early") void notifyEarlyBoardFlares(resolved.room.id);
 
   if (session.player_id) {
     await saveWant(session.player_id, parsed.data);

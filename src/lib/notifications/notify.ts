@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendEmail } from "@/lib/email/client";
+import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/site";
 
@@ -82,7 +83,7 @@ async function flareContext(
  */
 async function record(entry: {
   playerId: string;
-  kind: "offer-received" | "trade-confirmed";
+  kind: "offer-received" | "trade-confirmed" | "early-board";
   title: string;
   body: string | null;
   url: string;
@@ -256,6 +257,109 @@ export async function notifyOfferReceived(
     }
   } catch (error) {
     console.error("Could not notify the Flare's owner", error);
+  }
+}
+
+/**
+ * "Wednesday's board is open, and you own cards these players want."
+ *
+ * The digest that gets binders into cars. Fired lazily, the way
+ * everything here works: the first Flares landing on an early board
+ * trigger it, and the dedupe key (one per player per event) makes every
+ * later trigger free. Sent to players who saved this store as a local,
+ * excluding anyone already on the board - they know. Guests are
+ * unreachable by design, as everywhere.
+ *
+ * Never throws, never blocks a post: the Flare that triggered this
+ * already succeeded, and a digest is worth nothing if it costs a post.
+ */
+export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+
+    const { data: event } = await admin
+      .from("events")
+      .select("id, name, join_code, starts_at, store_id")
+      .eq("id", eventId)
+      .maybeSingle();
+    if (!event?.join_code) return;
+
+    const [{ data: store }, { data: flares }, { data: savers }, { data: inRoom }] =
+      await Promise.all([
+        admin.from("stores").select("name").eq("id", event.store_id).maybeSingle(),
+        admin
+          .from("flares")
+          .select("card_id")
+          .eq("event_id", eventId)
+          .eq("status", "open"),
+        admin.from("player_locals").select("player_id").eq("store_id", event.store_id),
+        admin
+          .from("event_participants")
+          .select("player_session_id")
+          .eq("event_id", eventId),
+      ]);
+
+    const cardIds = [...new Set((flares ?? []).map((row) => row.card_id))];
+    if (cardIds.length === 0) return;
+
+    // Players already on the board need no invitation to it.
+    const sessionIds = (inRoom ?? []).map((row) => row.player_session_id);
+    const joinedPlayers = new Set<string>();
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await admin
+        .from("player_sessions")
+        .select("player_id")
+        .in("id", sessionIds);
+      for (const row of sessions ?? []) {
+        if (row.player_id) joinedPlayers.add(row.player_id);
+      }
+    }
+
+    const day = new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      timeZone: "UTC",
+    }).format(new Date(event.starts_at));
+    const storeName = store?.name ?? "your local store";
+    const title = `The ${event.name} board is open at ${storeName}`;
+    const path = `/e/${event.join_code}`;
+
+    for (const saver of savers ?? []) {
+      if (joinedPlayers.has(saver.player_id)) continue;
+
+      const matches = await collectionAvailability(saver.player_id, cardIds);
+      const body =
+        matches.size > 0
+          ? `${cardIds.length} ${cardIds.length === 1 ? "card is" : "cards are"} already wanted for ${day}, and you own ${matches.size} of them. Bring the binder.`
+          : `${cardIds.length} ${cardIds.length === 1 ? "card is" : "cards are"} already wanted for ${day}. Post yours and see who is coming.`;
+
+      const id = await record({
+        playerId: saver.player_id,
+        kind: "early-board",
+        title,
+        body,
+        url: path,
+        dedupeKey: `early-board:${eventId}:${saver.player_id}`,
+      });
+
+      if (id) {
+        await deliverByPush(saver.player_id, title, body, path);
+
+        const { data: player } = await admin
+          .from("players")
+          .select("user_id")
+          .eq("id", saver.player_id)
+          .maybeSingle();
+        if (player) {
+          const { data: user } = await admin.auth.admin.getUserById(player.user_id);
+          const email = user?.user?.email ?? null;
+          if (email) await deliverByEmail(id, email, title, body, path);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Could not send the early-board digest", error);
   }
 }
 
