@@ -271,6 +271,26 @@ describe("membership guards on writes", () => {
     expect(saveWant).toHaveBeenCalledWith("player-1", expect.any(Object));
   });
 
+  it("the deck label rides the Flare into the board and the saved want", async () => {
+    findPlayerSession.mockResolvedValue({ ...SESSION, player_id: "player-1" });
+
+    await flares.POST(
+      request("POST", { cardId: FLARE_ID, quantity: 1, deckLabel: "  RG  Luffy " }),
+      CODE,
+    );
+
+    // Whitespace collapsed by the shared schema, exactly like a note.
+    expect(addFlare).toHaveBeenCalledWith(
+      "event-1",
+      "sess-1",
+      expect.objectContaining({ deckLabel: "RG Luffy" }),
+    );
+    expect(saveWant).toHaveBeenCalledWith(
+      "player-1",
+      expect.objectContaining({ deckLabel: "RG Luffy" }),
+    );
+  });
+
   it("an offer notifies through the backbone; a confirm notifies the partner", async () => {
     await offers.POST(request("POST", { flareId: FLARE_ID, message: "table 2" }), CODE);
     expect(notifyOfferReceived).toHaveBeenCalledWith(

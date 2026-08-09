@@ -171,6 +171,7 @@ export async function rsvpAction(formData: FormData): Promise<void> {
       printingId: want.printingId,
       quantity: want.quantity,
       note: want.note,
+      deckLabel: want.deckLabel,
     });
     if (!result.ok && result.reason === "at-cap") break;
   }
@@ -253,6 +254,7 @@ export async function repostWantsAction(
       printingId: want.printingId,
       quantity: want.quantity,
       note: want.note,
+      deckLabel: want.deckLabel,
     });
 
     if (result.ok) {

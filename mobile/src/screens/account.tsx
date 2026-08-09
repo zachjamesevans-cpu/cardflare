@@ -202,7 +202,9 @@ export function AccountScreen() {
                 {want.quantity > 1 ? ` ×${want.quantity}` : ""}
               </Body>
               <Muted>
-                {`${want.cardNumber} · ${want.printingLabel ?? "Any printing"}`}
+                {`${want.cardNumber} · ${want.printingLabel ?? "Any printing"}${
+                  want.deckLabel ? ` · ${want.deckLabel}` : ""
+                }`}
               </Muted>
             </Card>
           ))

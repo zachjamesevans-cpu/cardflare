@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
-import { LIST_IDLE, MAX_NOTE, type ListKind, type ListState } from "@/lib/lists/schema";
+import {
+  LIST_IDLE,
+  MAX_DECK_LABEL,
+  MAX_NOTE,
+  type ListKind,
+  type ListState,
+} from "@/lib/lists/schema";
 import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/schema";
 
 /**
@@ -97,6 +103,14 @@ export function AddToListForm({
     card: CardResult;
     printingId: string;
   } | null>(null);
+
+  /*
+   * The deck name survives the post on purpose. Somebody building an RG
+   * Luffy types the name once and posts fourteen cards; the form remounts
+   * per card (see the `key` below), so the draft lives out here and comes
+   * back as the next card's default.
+   */
+  const [deckDraft, setDeckDraft] = useState("");
 
   /*
    * A successful post hands the screen back to the search. Keeping the
@@ -219,6 +233,27 @@ export function AddToListForm({
               <TextInput name="note" maxLength={MAX_NOTE} />
             </label>
           </div>
+
+          {kind === "flare" && (
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-text-secondary">
+                Building a deck?{" "}
+                <span className="font-normal text-text-muted">
+                  Optional, e.g. &ldquo;RG Luffy&rdquo;
+                </span>
+              </span>
+              <TextInput
+                name="deckLabel"
+                maxLength={MAX_DECK_LABEL}
+                defaultValue={deckDraft}
+                onChange={(event) => setDeckDraft(event.target.value)}
+              />
+              <span className="text-xs text-text-muted">
+                Cards with the same deck name show as one folder on the board. The name
+                sticks around so you can post the whole deck.
+              </span>
+            </label>
+          )}
 
           <div>
             <SubmitButton label={copy.submit} />

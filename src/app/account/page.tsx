@@ -201,6 +201,7 @@ export default async function AccountPage() {
                     <span className="font-sans">
                       {" "}
                       · {want.printingLabel ?? "Any printing"}
+                      {want.deckLabel && <> · {want.deckLabel}</>}
                     </span>
                   </span>
                 </div>

@@ -1,4 +1,4 @@
-import { Flame, Hand, Layers, PackageCheck, Store } from "lucide-react";
+import { Flame, Folder, Hand, Layers, PackageCheck, Store } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
@@ -12,7 +12,7 @@ import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { removeListEntryAction } from "@/lib/lists/actions";
 import type { ListEntry } from "@/lib/lists/repository";
-import { groupByPlayer, type ListKind } from "@/lib/lists/schema";
+import { groupByPlayer, partitionByDeck, type ListKind } from "@/lib/lists/schema";
 import type { MatchKind, Offer } from "@/lib/matching/schema";
 
 /**
@@ -233,7 +233,7 @@ function CarouselEntry({
   children?: React.ReactNode;
 }) {
   return (
-    <li className="flex w-40 shrink-0 flex-col gap-1.5">
+    <li className="flex w-28 shrink-0 flex-col gap-1.5">
       <CardImageZoom
         imageUrl={entry.imageUrl}
         exactName={entry.cardName}
@@ -367,6 +367,73 @@ export function FlareBoard({
         const headingId = `flares-${group.playerSessionId}`;
         const alsoOpen = openIds.has(group.playerSessionId);
 
+        /*
+         * A player's section splits into deck folders and loose cards.
+         * The fourteen cards of an "RG Luffy" hunt read as one named
+         * thing instead of burying the rest of the board; a card wanted
+         * on its own stays a plain row below the folders.
+         */
+        const { folders, loose } = partitionByDeck(group.entries);
+
+        const listClass =
+          view === "carousel" ? "flex gap-3 overflow-x-auto pb-2" : "flex flex-col";
+
+        const renderEntry = (entry: ListEntry) => {
+          const match = isYou ? null : (matches.get(entry.id) ?? null);
+          const entryOffers = offers.get(entry.id) ?? [];
+          const ownOffer = entryOffers.find(
+            (offer) => offer.responderSessionId === youId,
+          );
+
+          /*
+           * Your Flare: everyone who raised a hand, each with a
+           * "we traded", plus the quiet tally for a trade that
+           * happened without an offer. Someone else's that you can
+           * answer: the hand-raising controls. Never both — you
+           * cannot offer on your own request. The same controls ride
+           * both layouts; a view change must never change what a
+           * player can do.
+           */
+          const controls = (
+            <>
+              {isYou && entryOffers.length > 0 && (
+                <OfferList
+                  offers={entryOffers}
+                  code={code}
+                  flareId={entry.id}
+                  early={early}
+                />
+              )}
+              {isYou && <MarkTraded code={code} flareId={entry.id} />}
+              {match && (
+                <OfferPanel
+                  code={code}
+                  flareId={entry.id}
+                  ownOffer={ownOffer}
+                  early={early}
+                />
+              )}
+            </>
+          );
+
+          const Row = view === "carousel" ? CarouselEntry : Entry;
+
+          return (
+            <Row
+              key={entry.id}
+              entry={entry}
+              code={code}
+              kind="flare"
+              imagesEnabled={imagesEnabled}
+              match={match}
+              removable={isYou}
+              counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
+            >
+              {controls}
+            </Row>
+          );
+        };
+
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -398,79 +465,34 @@ export function FlareBoard({
               </div>
             </div>
 
-            <ul
-              aria-labelledby={headingId}
-              className={
-                view === "carousel"
-                  ? "flex gap-3 overflow-x-auto pb-2"
-                  : "flex flex-col"
-              }
-            >
-              {group.entries.map((entry) => {
-                const match = isYou ? null : (matches.get(entry.id) ?? null);
-                const entryOffers = offers.get(entry.id) ?? [];
-                const ownOffer = entryOffers.find(
-                  (offer) => offer.responderSessionId === youId,
-                );
+            {folders.map((folder) => (
+              <div key={folder.label.toLowerCase()} className="flex flex-col gap-1.5">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                  <Folder className="size-4 shrink-0 text-accent" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{folder.label}</span>
+                  <span className="shrink-0 font-normal text-text-muted tabular-nums">
+                    · {folder.entries.length}{" "}
+                    {folder.entries.length === 1 ? "card" : "cards"}
+                  </span>
+                </p>
+                <ul aria-label={`Deck: ${folder.label}`} className={listClass}>
+                  {folder.entries.map(renderEntry)}
+                </ul>
+              </div>
+            ))}
 
-                /*
-                 * Your Flare: everyone who raised a hand, each with a
-                 * "we traded", plus the quiet tally for a trade that
-                 * happened without an offer. Someone else's that you can
-                 * answer: the hand-raising controls. Never both — you
-                 * cannot offer on your own request. The same controls ride
-                 * both layouts; a view change must never change what a
-                 * player can do.
-                 */
-                const controls = (
-                  <>
-                    {isYou && entryOffers.length > 0 && (
-                      <OfferList
-                        offers={entryOffers}
-                        code={code}
-                        flareId={entry.id}
-                        early={early}
-                      />
-                    )}
-                    {isYou && <MarkTraded code={code} flareId={entry.id} />}
-                    {match && (
-                      <OfferPanel
-                        code={code}
-                        flareId={entry.id}
-                        ownOffer={ownOffer}
-                        early={early}
-                      />
-                    )}
-                  </>
-                );
+            {(loose.length > 0 || alsoOpen) && (
+              <ul aria-labelledby={headingId} className={listClass}>
+                {loose.map(renderEntry)}
 
-                const Row = view === "carousel" ? CarouselEntry : Entry;
-
-                return (
-                  <Row
-                    key={entry.id}
-                    entry={entry}
-                    code={code}
-                    kind="flare"
-                    imagesEnabled={imagesEnabled}
-                    match={match}
-                    removable={isYou}
-                    counterName={
-                      counterHas?.has(entry.cardId) ? (counterName ?? null) : null
-                    }
-                  >
-                    {controls}
-                  </Row>
-                );
-              })}
-
-              {/*
-               * Last, under the specific asks. Somebody has named four cards
-               * and will also look at anything — the four cards are the more
-               * actionable half of that.
-               */}
-              {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
-            </ul>
+                {/*
+                 * Last, under the specific asks. Somebody has named four cards
+                 * and will also look at anything — the four cards are the more
+                 * actionable half of that.
+                 */}
+                {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
+              </ul>
+            )}
           </Card>
         );
       })}

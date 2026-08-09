@@ -95,6 +95,14 @@ export function PostFlareScreen({
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+
+  /*
+   * The deck name survives on purpose — across posts, folds, and even the
+   * Flare-tab re-tap. Somebody building an RG Luffy types the name once
+   * and posts fourteen cards; each one lands in the same folder on the
+   * board. Clearing the field is the way out of the deck.
+   */
+  const [deck, setDeck] = useState("");
   const [busy, setBusy] = useState(false);
   const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +168,7 @@ export function PostFlareScreen({
         printingId,
         quantity,
         note: note.trim() || undefined,
+        deckLabel: deck.trim() || undefined,
       });
 
       // The confirmation happens on the button that was pressed —
@@ -366,6 +375,20 @@ export function PostFlareScreen({
                     placeholder="Note for the room (optional)"
                     maxLength={120}
                   />
+
+                  <Input
+                    value={deck}
+                    onChangeText={setDeck}
+                    placeholder={'Building a deck? e.g. "RG Luffy" (optional)'}
+                    maxLength={40}
+                    autoCapitalize="words"
+                  />
+                  {deck.trim().length > 0 && (
+                    <Muted>
+                      Cards with the same deck name group into one folder on the
+                      board. The name sticks for your next card.
+                    </Muted>
+                  )}
 
                   <ErrorLine message={error} />
 

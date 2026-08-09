@@ -19,6 +19,8 @@ export interface ListEntry {
   id: string;
   quantity: number;
   note: string | null;
+  /** The named hunt this Flare belongs to. Null = a loose card. */
+  deckLabel: string | null;
   cardId: string;
   cardNumber: string;
   cardName: string;
@@ -45,7 +47,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, created_at, card_id, printing_id, player_session_id";
+  "id, quantity, note, deck_label, created_at, card_id, printing_id, player_session_id";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
 
@@ -53,6 +55,8 @@ interface EntryRow {
   id: string;
   quantity: number;
   note: string | null;
+  /** Flares only; binder selects never ask for it. */
+  deck_label?: string | null;
   created_at: string;
   card_id: string;
   printing_id: string | null;
@@ -200,6 +204,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     id: row.id,
     quantity: row.quantity,
     note: row.note,
+    deckLabel: row.deck_label ?? null,
     cardId: row.card_id,
     cardNumber: card?.number ?? "",
     cardName,
@@ -273,6 +278,7 @@ export async function addFlare(
         printing_id: input.printingId,
         quantity: input.quantity,
         note: input.note,
+        deck_label: input.deckLabel,
         status: "open" as const,
         updated_at: new Date().toISOString(),
       },

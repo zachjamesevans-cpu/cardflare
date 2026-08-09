@@ -193,6 +193,8 @@ export interface Me {
     printingLabel: string | null;
     quantity: number;
     note: string | null;
+    /** The named hunt this want belongs to. Null = a loose card. */
+    deckLabel: string | null;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {
@@ -228,6 +230,8 @@ export interface RoomFlare {
   imageUrl: string | null;
   quantity: number;
   note: string | null;
+  /** The named hunt this Flare belongs to. Null = a loose card. */
+  deckLabel: string | null;
   match: "exact" | "other-printing" | null;
   counterMayHave: boolean;
   offers: {
@@ -291,7 +295,13 @@ export async function joinRoom(
 
 export const postFlare = (
   code: string,
-  entry: { cardId: string; printingId?: string | null; quantity: number; note?: string },
+  entry: {
+    cardId: string;
+    printingId?: string | null;
+    quantity: number;
+    note?: string;
+    deckLabel?: string | null;
+  },
 ) => call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
 
 export const offerOnFlare = (code: string, flareId: string, message?: string) =>
@@ -330,7 +340,8 @@ export async function rememberBoardView(view: BoardView): Promise<void> {
 
 export async function storedBoardView(): Promise<BoardView> {
   const value = await SecureStore.getItemAsync(BOARD_VIEW_KEY);
-  return value === "carousel" ? "carousel" : "stacked";
+  // Carousel is the default: a board reads best as a shelf of cards.
+  return value === "stacked" ? "stacked" : "carousel";
 }
 
 export async function rememberRoom(code: string): Promise<void> {

@@ -60,6 +60,26 @@ export const noteSchema = z
   )
   .transform((value) => value || null);
 
+export const MAX_DECK_LABEL = 40;
+
+/**
+ * The deck a Flare belongs to. A label, not a decks table: "RG Luffy" typed
+ * on each card of the hunt is what groups them into a folder on the board.
+ * Cleaned the same way notes are, for the same shared-board reasons.
+ */
+export const deckLabelSchema = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, " ").trim())
+  .pipe(
+    z
+      .string()
+      .max(MAX_DECK_LABEL, `Keep the deck name under ${MAX_DECK_LABEL} characters.`)
+      .refine((value) => !UNSAFE_CHARACTERS.test(value), {
+        message: "Please use ordinary characters.",
+      }),
+  )
+  .transform((value) => value || null);
+
 export const addEntrySchema = z.object({
   cardId: z.guid("Pick a card from the list."),
   /** Omitted or empty means any printing will do. */
@@ -74,6 +94,7 @@ export const addEntrySchema = z.object({
     .max(MAX_QUANTITY, `At most ${MAX_QUANTITY}.`)
     .default(1),
   note: noteSchema.nullish().transform((value) => value ?? null),
+  deckLabel: deckLabelSchema.nullish().transform((value) => value ?? null),
 });
 
 export type AddEntryInput = z.infer<typeof addEntrySchema>;
@@ -176,4 +197,52 @@ export function groupByPlayer<
   }
 
   return [...groups.values()];
+}
+
+/** A named hunt inside one player's section of the board. */
+export interface DeckFolder<T> {
+  /** As the player first typed it — display exactly this. */
+  label: string;
+  entries: T[];
+}
+
+/** One player's entries split into named folders and loose cards. */
+export interface FolderedEntries<T> {
+  folders: DeckFolder<T>[];
+  loose: T[];
+}
+
+/**
+ * Splits one player's entries into deck folders and loose cards.
+ *
+ * The label is typed once per card, so "RG Luffy" and "rg luffy" are the
+ * same hunt: folders merge case-insensitively and keep the spelling of the
+ * first card seen. Folder order and card order both follow the order in,
+ * which the board already sorts newest first.
+ */
+export function partitionByDeck<T extends { deckLabel: string | null }>(
+  entries: T[],
+): FolderedEntries<T> {
+  const folders = new Map<string, DeckFolder<T>>();
+  const loose: T[] = [];
+
+  for (const entry of entries) {
+    const label = entry.deckLabel?.trim();
+
+    if (!label) {
+      loose.push(entry);
+      continue;
+    }
+
+    const key = label.toLowerCase();
+    const existing = folders.get(key);
+
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      folders.set(key, { label, entries: [entry] });
+    }
+  }
+
+  return { folders: [...folders.values()], loose };
 }
