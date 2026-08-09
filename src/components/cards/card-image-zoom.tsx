@@ -33,6 +33,20 @@ const DWELL_MS = 120;
 /** Matches the thumbnail's own `sizes`, so it reuses that exact cached image. */
 const THUMB_SIZES = "56px";
 
+/*
+ * Transparent ↔ the same dimmer the stylesheet's `backdrop:` classes
+ * declare, blur included — animating only the colour would leave a
+ * bare 2px blur on screen for a frame at the end of the close.
+ */
+const BACKDROP_CLEAR: Keyframe = {
+  backgroundColor: "rgb(0 0 0 / 0)",
+  backdropFilter: "blur(0px)",
+};
+const BACKDROP_DIM: Keyframe = {
+  backgroundColor: "rgb(0 0 0 / 0.75)",
+  backdropFilter: "blur(2px)",
+};
+
 export function CardImageZoom({
   imageUrl,
   exactName,
@@ -97,6 +111,44 @@ export function CardImageZoom({
   const running = useRef<Animation | null>(null);
 
   /**
+   * The backdrop's animation, tracked for the same call-it-off reasons.
+   *
+   * The panel always animated; the backdrop never did. `showModal()` slams
+   * the dimmer on at full strength and `close()` rips it away in one frame,
+   * and that one-frame jump back to a bright page is the flash the founder
+   * felt on the phone — the panel's own 140ms shrink was already over by
+   * then. So the dimmer now fades with the panel, both ways, driven on the
+   * `::backdrop` pseudo-element. Close keeps `fill: "forwards"` so the
+   * dialog is dismissed from an already-transparent backdrop.
+   */
+  const backdropRunning = useRef<Animation | null>(null);
+
+  /**
+   * Fades the backdrop, tolerating browsers that cannot.
+   *
+   * Animating a pseudo-element needs the `pseudoElement` option, which older
+   * WebKit throws on — there, the backdrop pops exactly as it always did,
+   * which is a fallback, not a regression.
+   */
+  const fadeBackdrop = useCallback(
+    (
+      element: HTMLDialogElement,
+      frames: [Keyframe, Keyframe],
+      options: KeyframeAnimationOptions,
+    ) => {
+      try {
+        backdropRunning.current = element.animate(frames, {
+          ...options,
+          pseudoElement: "::backdrop",
+        });
+      } catch {
+        backdropRunning.current = null;
+      }
+    },
+    [],
+  );
+
+  /**
    * Whether the dialog is currently up.
    *
    * Closing a `<dialog>` hands focus back to the button that opened it, which
@@ -112,6 +164,8 @@ export function CardImageZoom({
   const stopAnimation = useCallback(() => {
     running.current?.cancel();
     running.current = null;
+    backdropRunning.current?.cancel();
+    backdropRunning.current = null;
   }, []);
 
   const cancelDwell = useCallback(() => {
@@ -140,6 +194,8 @@ export function CardImageZoom({
       isOpen.current = false;
       running.current?.cancel();
       running.current = null;
+      backdropRunning.current?.cancel();
+      backdropRunning.current = null;
       setWarm(false);
       setSharp(false);
     };
@@ -177,6 +233,11 @@ export function CardImageZoom({
 
     if (!box || !from || reducedMotion()) return;
 
+    fadeBackdrop(element, [BACKDROP_CLEAR, BACKDROP_DIM], {
+      duration: OPEN_MS,
+      easing: EASE,
+    });
+
     const to = box.getBoundingClientRect();
     const dx = from.left + from.width / 2 - (to.left + to.width / 2);
     const dy = from.top + from.height / 2 - (to.top + to.height / 2);
@@ -189,7 +250,7 @@ export function CardImageZoom({
       ],
       { duration: OPEN_MS, easing: EASE },
     );
-  }, [cancelDwell, reducedMotion, stopAnimation]);
+  }, [cancelDwell, fadeBackdrop, reducedMotion, stopAnimation]);
 
   /** Shrinks back towards the thumbnail, then actually closes. */
   const close = useCallback(() => {
@@ -211,6 +272,12 @@ export function CardImageZoom({
     const dy = to.top + to.height / 2 - (from.top + from.height / 2);
     const scale = from.width > 0 ? to.width / from.width : 0.2;
 
+    fadeBackdrop(element, [BACKDROP_DIM, BACKDROP_CLEAR], {
+      duration: CLOSE_MS,
+      easing: EASE,
+      fill: "forwards",
+    });
+
     const animation = box.animate(
       [
         { transform: "translate(0, 0) scale(1)", opacity: 1 },
@@ -228,7 +295,7 @@ export function CardImageZoom({
         if (running.current === animation) element.close();
       })
       .catch(() => {});
-  }, [reducedMotion, stopAnimation]);
+  }, [fadeBackdrop, reducedMotion, stopAnimation]);
 
   const thumbnail = (
     <CardThumbnail
