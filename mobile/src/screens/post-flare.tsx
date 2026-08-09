@@ -5,6 +5,7 @@ import {
   Dimensions,
   PanResponder,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -56,12 +57,16 @@ export function PostFlareScreen({
     [],
   );
 
-  // Tapping the Flare tab while a card is open pops back to the search
-  // (results intact). The tab bumps the counter; the value is noise.
+  // Tapping the Flare tab means "different card": back to a blank
+  // search, typed text and all. The tab bumps the counter; the value
+  // is noise.
   useEffect(() => {
     if (resetSignal !== undefined) {
       setPicked(null);
       setPrintingId(null);
+      setQuery("");
+      setHits([]);
+      setVersionsFor(null);
     }
   }, [resetSignal]);
 
@@ -123,8 +128,10 @@ export function PostFlareScreen({
   ).current;
 
   // Debounced search: a keystroke pause is the request, not every letter.
+  // Results deliberately survive picking a card — the search screen stays
+  // mounted underneath, so the back-swipe reveals it exactly as it was.
   useEffect(() => {
-    if (picked || query.trim().length < 2) {
+    if (query.trim().length < 2) {
       setHits([]);
       return;
     }
@@ -136,7 +143,7 @@ export function PostFlareScreen({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, picked]);
+  }, [query]);
 
   const submit = async () => {
     if (!picked) return;
@@ -183,8 +190,10 @@ export function PostFlareScreen({
 
   return (
     <View style={{ flex: 1 }} {...backSwipe.panHandlers}>
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
-      {!picked ? (
+      {/* The search screen never unmounts: it is the surface the picked
+          card slides over, so a slow back-swipe reveals it live — query,
+          results and unfolded versions exactly as they were left. */}
+      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
         <Card>
           <Title>What are you hunting?</Title>
           <Input
@@ -266,6 +275,7 @@ export function PostFlareScreen({
                       flexDirection: "row",
                       alignItems: "center",
                       gap: spacing(3),
+                      backgroundColor: colors.elevated,
                       borderColor: colors.border,
                       borderWidth: 1,
                       borderRadius: radius.control,
@@ -289,8 +299,24 @@ export function PostFlareScreen({
             </View>
           ))}
         </Card>
-      ) : (
-        <Animated.View style={{ transform: [{ translateX: slide }] }}>
+      </ScrollView>
+
+      {picked && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: colors.canvas,
+              transform: [{ translateX: slide }],
+              shadowColor: "#000",
+              shadowOffset: { width: -4, height: 0 },
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 8,
+            },
+          ]}
+        >
+        <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
             <CardImage
@@ -334,6 +360,7 @@ export function PostFlareScreen({
                   flexDirection: "row",
                   alignItems: "center",
                   gap: spacing(3),
+                  backgroundColor: colors.elevated,
                   borderColor:
                     printingId === option.id ? colors.accent : colors.border,
                   borderWidth: printingId === option.id ? 2 : 1,
@@ -350,7 +377,7 @@ export function PostFlareScreen({
                     caption={option.label}
                   />
                 )}
-                <Text style={{ color: colors.textPrimary, flex: 1 }}>
+                <Text style={{ color: colors.textSecondary, flex: 1, fontSize: 13 }}>
                   {option.label}
                 </Text>
               </Tap>
@@ -396,9 +423,9 @@ export function PostFlareScreen({
             disabled={busy || posted}
           />
         </Card>
+        </ScrollView>
         </Animated.View>
       )}
-    </ScrollView>
     </View>
   );
 }
