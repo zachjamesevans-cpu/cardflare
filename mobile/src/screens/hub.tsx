@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -17,6 +17,22 @@ import { spacing } from "../theme";
 export function HubScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [code, setCode] = useState<string | null>(null);
+
+  /*
+   * Tapping the Flare tab is also "start over": if a card is open in the
+   * picker, the tap pops it back to the search. The counter is the
+   * signal; the picker resets whenever it changes. (tabPress is a tab-
+   * navigator event this screen actually receives, but the hook's typing
+   * follows the stack param list — hence the cast.)
+   */
+  const [resetSignal, setResetSignal] = useState(0);
+  useEffect(() => {
+    return (
+      navigation as unknown as {
+        addListener: (event: string, callback: () => void) => () => void;
+      }
+    ).addListener("tabPress", () => setResetSignal((n) => n + 1));
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,5 +58,5 @@ export function HubScreen() {
 
   // No redirect after posting: the screen confirms with "Posted ✓" and
   // resets itself for the next card. The Room tab is one tap away.
-  return <PostFlareScreen code={code} />;
+  return <PostFlareScreen code={code} resetSignal={resetSignal} />;
 }
