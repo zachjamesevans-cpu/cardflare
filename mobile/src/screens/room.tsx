@@ -2,7 +2,6 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -27,7 +26,17 @@ import {
   type RoomFlare,
   type RoomState,
 } from "../api";
-import { Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
+import {
+  Body,
+  Button,
+  Card,
+  CardImage,
+  ErrorLine,
+  Input,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 // The website's room ticker runs at twelve seconds now; the app keeps
@@ -418,17 +427,12 @@ function FlareRow({
     <View style={styles.flare}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing(2) }}>
         {flare.imageUrl && (
-          <Image
-            source={{ uri: flare.imageUrl }}
-            style={{
-              width: 40,
-              height: 56,
-              borderRadius: radius.control / 2,
-              borderColor: colors.border,
-              borderWidth: 1,
-              backgroundColor: colors.canvas,
-            }}
-            resizeMode="cover"
+          <CardImage
+            imageUrl={flare.imageUrl}
+            width={40}
+            name={flare.cardName}
+            cardNumber={flare.cardNumber}
+            caption={flare.printingLabel ?? "Any printing"}
           />
         )}
         <View style={{ flex: 1 }}>
@@ -441,9 +445,9 @@ function FlareRow({
           </Muted>
         </View>
         {mine && (
-          <Text style={styles.removeLink} onPress={onRemove}>
-            Remove
-          </Text>
+          <Tap onPress={onRemove} hitSlop={8}>
+            <Text style={styles.removeLink}>Remove</Text>
+          </Tap>
         )}
       </View>
 
@@ -477,9 +481,9 @@ function FlareRow({
       ))}
 
       {mine && flare.offers.length === 0 && (
-        <Text style={styles.removeLink} onPress={() => onTraded(undefined)}>
-          Traded it? Mark it done
-        </Text>
+        <Tap onPress={() => onTraded(undefined)} hitSlop={8}>
+          <Text style={styles.removeLink}>Traded it? Mark it done</Text>
+        </Tap>
       )}
 
       {!mine && flare.match && !offering && (

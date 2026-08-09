@@ -524,6 +524,16 @@ search results grew the website's versions dropdown: unfold a card's
 printings, each with its own artwork and that full label, and tapping
 one picks the card with that printing already chosen.
 
+**Phase 6 (shipped):** touch feel. Every touchable in the app now goes
+through one `Tap` primitive — a finger landing squeezes the control
+down a hair, release springs it back with a little overshoot, and the
+completed tap lands a light haptic tick (`expo-haptics`; fired on the
+tap, not on touch-down, so scrolling never buzzes). And card art
+zooms: tapping any card image — board, search results, versions,
+printing choices — opens it at a readable size with the card's name,
+number and version on top, tap anywhere to dismiss, mirroring the
+website's thumbnail zoom.
+
 **Remaining:** EAS build + TestFlight when the founder's Apple
 Developer enrollment clears — `mobile/README.md` has the exact
 commands. Push end-to-end needs that development build; everything
