@@ -144,7 +144,15 @@ export function PostFlareScreen({
             }}
           >
             <Tap
-              onPress={() => pick(hit, null)}
+              // An open folder closes from its top: with versions unfolded
+              // the card header reads as the folder's lid, so tapping it
+              // collapses the list instead of picking — picking happens
+              // when the folder is shut, or on a specific version inside.
+              onPress={() =>
+                versionsFor === hit.id
+                  ? setVersionsFor(null)
+                  : pick(hit, null)
+              }
               style={{
                 flexDirection: "row",
                 alignItems: "flex-start",
@@ -218,7 +226,7 @@ export function PostFlareScreen({
             {versionsFor === hit.id && hit.printings.length > 1 && (
               <Muted>
                 Tap a version to ask for that exact one. Tap the card above to
-                take any printing.
+                close.
               </Muted>
             )}
 
