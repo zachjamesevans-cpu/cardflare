@@ -3,6 +3,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -509,10 +510,22 @@ function RoomScreen({
               mine={mine}
               offered={flare.offers.some((o) => o.responderSessionId === youId)}
               early={room.early}
-              onOffer={() => void act(() => offerOnFlare(code, flare.id))}
+              onOffer={() => act(() => offerOnFlare(code, flare.id))}
               onRemove={() => void act(() => removeFlare(code, flare.id))}
             />
           );
+
+          /* Fully pledged hunts park at the rail's far end, dimmed but
+             present — the bring-extras crowd can still see the ask. */
+          const isCovered = (flare: RoomFlare) =>
+            flare.offers.length > 0 &&
+            pledgeTally(flare.offers, flare.quantity).remaining === 0;
+
+          const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
+          const orderedRail = [
+            ...railFlares.filter((f) => !isCovered(f)),
+            ...railFlares.filter(isCovered),
+          ];
 
           const rows = (list: RoomFlare[]) =>
             list.map((flare) => (
@@ -557,8 +570,7 @@ function RoomScreen({
                       alignItems: "flex-start",
                     }}
                   >
-                    {folders.flatMap((folder) => folder.flares).map(tile)}
-                    {loose.map(tile)}
+                    {orderedRail.map(tile)}
                   </ScrollView>
                   {/* The founder's ask: the edge fades so the rail visibly
                       continues instead of the last card looking cut off. */}
@@ -689,20 +701,56 @@ function CarouselFlare({
   /** The viewer's pledge on this Flare is already standing. */
   offered: boolean;
   early: boolean;
-  onOffer: () => void;
+  onOffer: () => Promise<void>;
   onRemove: () => void;
 }) {
   const pledgeLine = pledgeLineFor(flare);
+  const covered =
+    flare.offers.length > 0 &&
+    pledgeTally(flare.offers, flare.quantity).remaining === 0;
+
+  /*
+   * "I got it" was a silent button: nothing on screen said the tap took
+   * until the next poll repainted the board, which on store wifi reads
+   * as broken — the founder's complaint. While the pledge is in flight
+   * the art greys out under a spinner, and the link cannot double-fire.
+   */
+  const [pledging, setPledging] = useState(false);
+
+  const pledge = async () => {
+    if (pledging) return;
+    setPledging(true);
+    try {
+      await onOffer();
+    } finally {
+      setPledging(false);
+    }
+  };
 
   return (
-    <View style={{ width: 56, gap: spacing(1) }}>
-      <CardImage
-        imageUrl={flare.imageUrl}
-        width={56}
-        name={flare.cardName}
-        cardNumber={flare.cardNumber}
-        caption={flare.printingLabel ?? "Any printing"}
-      />
+    <View style={{ width: 56, gap: spacing(1), opacity: covered ? 0.6 : 1 }}>
+      <View>
+        <CardImage
+          imageUrl={flare.imageUrl}
+          width={56}
+          name={flare.cardName}
+          cardNumber={flare.cardNumber}
+          caption={flare.printingLabel ?? "Any printing"}
+          note={flare.note}
+        />
+        {/* A note announces itself on the tile; the zoom is where it
+            gets read. */}
+        {flare.note ? (
+          <View style={styles.noteBadge}>
+            <Text style={styles.noteBadgeGlyph}>✎</Text>
+          </View>
+        ) : null}
+        {pledging ? (
+          <View style={styles.pledgeOverlay}>
+            <ActivityIndicator size="small" color={colors.accent} />
+          </View>
+        ) : null}
+      </View>
       <Text
         numberOfLines={1}
         style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
@@ -739,9 +787,9 @@ function CarouselFlare({
       {/* Anyone can pledge — no binder required, the founder's call.
           One copy from here; the stacked view asks "how many". */}
       {!mine && !offered && (
-        <Tap onPress={onOffer} hitSlop={6}>
+        <Tap onPress={() => void pledge()} disabled={pledging} hitSlop={6}>
           <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "600" }}>
-            {early ? "I got you" : "I got it"}
+            {pledging ? "On it…" : early ? "I got you" : "I got it"}
           </Text>
         </Tap>
       )}
@@ -791,6 +839,7 @@ function FlareRow({
             name={flare.cardName}
             cardNumber={flare.cardNumber}
             caption={flare.printingLabel ?? "Any printing"}
+            note={flare.note}
           />
         )}
         <View style={{ flex: 1 }}>
@@ -946,6 +995,33 @@ const styles = StyleSheet.create({
     top: 0,
     width: 28,
     height: "50%",
+  },
+  noteBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noteBadgeGlyph: {
+    color: colors.accentContrast,
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  pledgeOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radius.control / 2,
+    backgroundColor: `${colors.canvas}99`,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionBar: {
     position: "absolute",

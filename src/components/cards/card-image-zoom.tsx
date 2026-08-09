@@ -54,6 +54,7 @@ export function CardImageZoom({
   enabled,
   anyPrinting = false,
   caption,
+  note = null,
   thumbClassName,
 }: {
   imageUrl: string | null;
@@ -63,6 +64,8 @@ export function CardImageZoom({
   anyPrinting?: boolean;
   /** The printing, so the large view says which version is being shown. */
   caption?: string | null;
+  /** The Flare's note, shown in the large view under the number. */
+  note?: string | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
 }) {
@@ -386,6 +389,11 @@ export function CardImageZoom({
                 {cardNumber}
                 {caption && <span className="font-sans"> · {caption}</span>}
               </p>
+              {/* The note travels with the card: the carousel tile has no
+                  room for it, so the zoom is where it gets read. */}
+              {note && (
+                <p className="mt-1 text-sm text-text-secondary italic">{note}</p>
+              )}
             </div>
 
             <button
