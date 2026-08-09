@@ -26,9 +26,8 @@ import { AccountScreen } from "./src/screens/account";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
-import { FlareCardScreen, PostFlareScreen } from "./src/screens/post-flare";
+import { PostFlareScreen } from "./src/screens/post-flare";
 import { RoomTab } from "./src/screens/room";
-import type { CardHit } from "./src/api";
 import { ScanScreen } from "./src/screens/scan";
 import { SignInScreen } from "./src/screens/sign-in";
 import { colors } from "./src/theme";
@@ -65,8 +64,6 @@ export type StackParams = {
   SignIn: undefined;
   Scan: undefined;
   PostFlare: { code: string };
-  /** The picked card: a real stack screen so the native back-swipe works. */
-  FlareCard: { code: string; hit: CardHit; printingId: string | null };
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -220,29 +217,31 @@ export default function App() {
         }}
       >
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-        <Stack.Screen name="SignIn" options={{ title: "Sign in" }}>
+        <Stack.Screen
+          name="SignIn"
+          options={{ title: "Sign in", headerBackTitle: "Back" }}
+        >
           {({ navigation }) => (
             <SignInScreen onSignedIn={() => navigation.goBack()} />
           )}
         </Stack.Screen>
-        <Stack.Screen name="Scan" options={{ title: "Scan" }}>
+        <Stack.Screen
+          name="Scan"
+          options={{ title: "Scan", headerBackTitle: "Back" }}
+        >
           {({ navigation }) => (
             <ScanScreen
               onCode={() => navigation.navigate("Tabs", { screen: "Room" })}
             />
           )}
         </Stack.Screen>
-        <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
+        <Stack.Screen
+          name="PostFlare"
+          // The back button names where it goes, not the screen's internal
+          // name — "Tabs" meant nothing to anyone at a counter.
+          options={{ title: "Post a Flare", headerBackTitle: "Room" }}
+        >
           {({ route }) => <PostFlareScreen code={route.params.code} />}
-        </Stack.Screen>
-        <Stack.Screen name="FlareCard" options={{ title: "Post a Flare" }}>
-          {({ route }) => (
-            <FlareCardScreen
-              code={route.params.code}
-              hit={route.params.hit}
-              printingId={route.params.printingId}
-            />
-          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
