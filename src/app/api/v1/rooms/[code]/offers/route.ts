@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
@@ -46,7 +47,7 @@ export async function POST(
   const found = await membership(request, (await params).code);
   if (!found) return unauthorized();
 
-  const parsed = offerSchema.safeParse(await request.json().catch(() => null));
+  const parsed = offerSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");
 
   const message = offerMessageSchema.safeParse(parsed.data.message ?? "");
@@ -81,7 +82,7 @@ export async function DELETE(
   const found = await membership(request, (await params).code);
   if (!found) return unauthorized();
 
-  const parsed = withdrawSchema.safeParse(await request.json().catch(() => null));
+  const parsed = withdrawSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");
 
   await withdrawOffer(parsed.data.flareId, found.session.id);

@@ -496,6 +496,22 @@ tournaments already flowed (post → want saved → trade clears it →
 next room offers a repost); shows were the gap, and shows are exactly
 where the vendor pitch lives.
 
+**Phase 4 (shipped, field-debugged):** two founder-reported gaps. The
+big one: on the founder's own network, every app request *with a body*
+died in transit while bodyless requests sailed through — proven by the
+in-app six-probe connection matrix (GET 200, POST-empty 200,
+POST-with-body timeout under every content-type, DELETE-empty 200;
+Safari fine, so it is the native path plus that network). The app's
+writes now travel in an `x-cf-payload` header — URI-encoded JSON, pure
+ASCII, tiny by construction — which every `/api/v1` write accepts via
+`readJsonPayload` (header wins, body still parsed for every ordinary
+client), and the connection test grew a seventh probe that verifies
+the header arrives byte-intact. And parity: the app's card picker now
+shows card art beside every search result, every printing renders
+with its own artwork so an alternate art is chosen by eye (matching
+the website's versions list), and the room board shows each Flare's
+card image.
+
 **Remaining:** EAS build + TestFlight when the founder's Apple
 Developer enrollment clears — `mobile/README.md` has the exact
 commands. Push end-to-end needs that development build; everything

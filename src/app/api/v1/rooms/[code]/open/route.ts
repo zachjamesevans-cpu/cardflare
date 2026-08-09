@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation, setOpenToTrades } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
@@ -33,7 +34,7 @@ export async function POST(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
 
-  const parsed = openSchema.safeParse(await request.json().catch(() => null));
+  const parsed = openSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("open must be true or false");
 
   await setOpenToTrades(resolved.room.id, session.id, parsed.data.open);

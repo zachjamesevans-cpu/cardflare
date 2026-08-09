@@ -128,7 +128,18 @@ async function call<T>(
   const session = await storedSessionToken();
   if (session) headers["x-session-token"] = session;
 
-  if (body !== undefined) headers["content-type"] = "application/json";
+  /*
+   * The payload rides in a header, not the body. Field fact from the
+   * founder's own network: every app request *with a body* died in
+   * transit while bodyless ones sailed through, under every
+   * content-type — the six-probe connection test proved it. Headers
+   * demonstrably arrive, so the server accepts `x-cf-payload`
+   * (URI-encoded JSON, pure ASCII) as the write's payload everywhere.
+   * Our payloads are tiny — a name, a card id, a 120-char note.
+   */
+  if (body !== undefined) {
+    headers["x-cf-payload"] = encodeURIComponent(JSON.stringify(body));
+  }
 
   /*
    * A hard timeout on every call. A phone on flaky store wifi must never
@@ -140,11 +151,11 @@ async function call<T>(
 
   let response: Response;
   try {
+    // Deliberately no body — see the header note above.
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
       signal: controller.signal,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch (caught) {
     throw new ApiError(0, controller.signal.aborted ? "timeout" : "network");

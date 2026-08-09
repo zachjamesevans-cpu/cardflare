@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
@@ -36,7 +37,7 @@ export async function POST(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
 
-  const parsed = addEntrySchema.safeParse(await request.json().catch(() => null));
+  const parsed = addEntrySchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("cardId and quantity are required");
 
   const result = await addFlare(resolved.room.id, session.id, parsed.data);
@@ -66,7 +67,7 @@ export async function DELETE(
   const session = await apiSession(request);
   if (!session) return unauthorized();
 
-  const parsed = removeSchema.safeParse(await request.json().catch(() => null));
+  const parsed = removeSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");
 
   await cancelFlare(parsed.data.flareId, session.id);

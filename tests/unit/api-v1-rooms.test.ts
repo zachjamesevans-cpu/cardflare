@@ -158,6 +158,24 @@ describe("POST /rooms/[code] (join)", () => {
     expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-new");
   });
 
+  it("joins from the header transport — no body at all", async () => {
+    // The app sends its payload this way on networks that eat bodies.
+    findPlayerSession.mockResolvedValue(null);
+    createPlayerSession.mockResolvedValue({ ...SESSION, id: "sess-new" });
+
+    const headerJoin = new Request("https://cardflare.gg/api/v1/rooms/K3M9PZ", {
+      method: "POST",
+      headers: {
+        "x-cf-payload": encodeURIComponent(JSON.stringify({ displayName: "Nami" })),
+      },
+    });
+    const response = await rooms.POST(headerJoin, CODE);
+    const body = await response.json();
+
+    expect(body.joined).toBe(true);
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-new");
+  });
+
   it("refuses a nameless first join", async () => {
     findPlayerSession.mockResolvedValue(null);
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -37,7 +38,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "rate-limited" }, { status: 429 });
   }
 
-  const parsed = registerSchema.safeParse(await request.json().catch(() => null));
+  const parsed = registerSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("platform and pushToken are required");
 
   const { error } = await getSupabaseAdmin().from("player_devices").upsert(
@@ -64,7 +65,7 @@ export async function DELETE(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const parsed = unregisterSchema.safeParse(await request.json().catch(() => null));
+  const parsed = unregisterSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("pushToken is required");
 
   const { error } = await getSupabaseAdmin()

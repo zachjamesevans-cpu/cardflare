@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
@@ -42,7 +43,7 @@ export async function POST(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
 
-  const parsed = confirmSchema.safeParse(await request.json().catch(() => null));
+  const parsed = confirmSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");
 
   const outcome = await confirmTrade(
