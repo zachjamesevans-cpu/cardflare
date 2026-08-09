@@ -1,5 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshControl,
@@ -98,6 +99,13 @@ function RoomScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [wants, setWants] = useState<Me["wants"]>([]);
   const [view, setView] = useState<BoardView>("carousel");
+
+  /*
+   * "Never mind" on the re-post banner. Without it the banner could only
+   * be obeyed; the founder called it out. Per visit, not forever: the
+   * wants stay saved, and switching rooms asks the question fresh.
+   */
+  const [repostDismissed, setRepostDismissed] = useState(false);
   const inFlight = useRef(false);
 
   useEffect(() => {
@@ -140,6 +148,7 @@ function RoomScreen({
 
   useEffect(() => {
     setState(null);
+    setRepostDismissed(false);
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
     return () => clearInterval(timer);
@@ -419,7 +428,7 @@ function RoomScreen({
           </Card>
         )}
 
-        {outstanding.length > 0 && (
+        {outstanding.length > 0 && !repostDismissed && (
           <Card>
             <Title>Still hunting these from last time?</Title>
             <Body>
@@ -444,6 +453,11 @@ function RoomScreen({
                   }
                 })
               }
+            />
+            <Button
+              label="Never mind"
+              variant="secondary"
+              onPress={() => setRepostDismissed(true)}
             />
           </Card>
         )}
@@ -489,22 +503,36 @@ function RoomScreen({
           const { folders, loose } = partitionByDeck(group.flares);
 
           const rail = (list: RoomFlare[]) => (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing(3), paddingVertical: spacing(1) }}
-            >
-              {list.map((flare) => (
-                <CarouselFlare
-                  key={flare.id}
-                  flare={flare}
-                  mine={mine}
-                  early={room.early}
-                  onOffer={() => void act(() => offerOnFlare(code, flare.id))}
-                  onRemove={() => void act(() => removeFlare(code, flare.id))}
-                />
-              ))}
-            </ScrollView>
+            <View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  gap: spacing(2),
+                  paddingVertical: spacing(1),
+                }}
+              >
+                {list.map((flare) => (
+                  <CarouselFlare
+                    key={flare.id}
+                    flare={flare}
+                    mine={mine}
+                    early={room.early}
+                    onOffer={() => void act(() => offerOnFlare(code, flare.id))}
+                    onRemove={() => void act(() => removeFlare(code, flare.id))}
+                  />
+                ))}
+              </ScrollView>
+              {/* The founder's ask: the edge fades so the rail visibly
+                  continues instead of the last card looking cut off. */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={[`${colors.surface}00`, colors.surface]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.railFade}
+              />
+            </View>
           );
 
           const rows = (list: RoomFlare[]) =>
@@ -604,10 +632,13 @@ function partitionByDeck(flares: RoomFlare[]): {
 }
 
 /**
- * One Flare as the carousel shows it: art-first and narrow, so thirty
- * cards read as one swipeable rail. Browsing and the quick actions live
- * here; writing an offer note and confirming a trade stay in the
- * stacked view, where there is room to do them properly.
+ * One Flare as the carousel shows it: a contact sheet, not a row.
+ *
+ * Sized so five cards share a phone's width — the founder's number,
+ * after two rounds of "still too big". At this size the tile is for
+ * browsing: art (tap to zoom for the rest), name, count, and one-line
+ * signals. The quick offer stays as a text link; writing a note,
+ * reading offers and confirming trades live in the stacked view.
  */
 function CarouselFlare({
   flare,
@@ -622,53 +653,48 @@ function CarouselFlare({
   onOffer: () => void;
   onRemove: () => void;
 }) {
-  // Narrow enough that three cards share a phone screen; the founder
-  // called the first cut huge, which defeated the carousel's point.
   return (
-    <View style={{ width: 95, gap: spacing(1.5) }}>
+    <View style={{ width: 56, gap: spacing(1) }}>
       <CardImage
         imageUrl={flare.imageUrl}
-        width={95}
+        width={56}
         name={flare.cardName}
         cardNumber={flare.cardNumber}
         caption={flare.printingLabel ?? "Any printing"}
       />
       <Text
         numberOfLines={1}
-        style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}
+        style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
       >
         {flare.cardName}
         {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
       </Text>
-      <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 11 }}>
-        {flare.printingLabel ?? "Any printing"}
-      </Text>
 
       {flare.match === "exact" && (
-        <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
+        <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "700" }}>
           You have this
         </Text>
       )}
       {flare.match === "other-printing" && (
-        <Text style={{ color: colors.accent, fontSize: 12 }}>Another printing</Text>
+        <Text style={{ color: colors.accent, fontSize: 10 }}>Another printing</Text>
       )}
 
       {mine && flare.offers.length > 0 && (
-        <Text style={{ color: colors.accent, fontSize: 12 }}>
-          {`${flare.offers.length} ${flare.offers.length === 1 ? "hand" : "hands"} up. See Stacked`}
+        <Text style={{ color: colors.accent, fontSize: 10 }}>
+          {`${flare.offers.length} ${flare.offers.length === 1 ? "hand" : "hands"} up`}
         </Text>
       )}
 
       {!mine && flare.match && (
-        <Button
-          label={early ? "I got you" : "Offer"}
-          variant="secondary"
-          onPress={onOffer}
-        />
+        <Tap onPress={onOffer} hitSlop={6}>
+          <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "600" }}>
+            {early ? "I got you" : "Offer"}
+          </Text>
+        </Tap>
       )}
       {mine && (
         <Tap onPress={onRemove} hitSlop={6}>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>Remove</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 10 }}>Remove</Text>
         </Tap>
       )}
     </View>
@@ -814,6 +840,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "600",
+  },
+  railFade: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 28,
+    height: "50%",
   },
   actionBar: {
     position: "absolute",

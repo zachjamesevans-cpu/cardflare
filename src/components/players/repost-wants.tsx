@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, History, Loader2 } from "lucide-react";
 
@@ -39,6 +39,15 @@ export function RepostWants({
 }) {
   const [state, formAction] = useActionState(repostWantsAction, REPOST_IDLE);
 
+  /*
+   * "Never mind" is a real answer. Without it the panel could only be
+   * obeyed, which made a suggestion feel like a demand; the founder
+   * called it out. Dismissal is per visit, not forever: the wants are
+   * still saved, and next event the question is fresh.
+   */
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
   if (state.status === "posted") {
     return (
       <Card className="flex items-center gap-3 border-accent/30 bg-accent/[0.06]">
@@ -68,6 +77,9 @@ export function RepostWants({
       <form action={formAction} className="flex flex-wrap items-center gap-3">
         <input type="hidden" name="code" value={code} />
         <SubmitButton count={wants.length} />
+        <Button type="button" variant="ghost" onClick={() => setDismissed(true)}>
+          Never mind
+        </Button>
         {state.status === "error" && (
           <p role="alert" className="text-sm text-danger">
             {state.message}
