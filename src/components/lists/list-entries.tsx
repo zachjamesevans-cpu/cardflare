@@ -117,7 +117,7 @@ function Entry({
           {counterName && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
               <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-              {counterName} may have this single — ask at the counter.
+              {counterName} may have this single. Ask at the counter.
             </p>
           )}
         </div>
@@ -185,7 +185,7 @@ function OpenToTradesEntry({ isYou }: { isYou: boolean }) {
         <p className="font-semibold text-text-primary">Open to trades</p>
         <p className="text-sm text-text-secondary">
           {isYou
-            ? "Nothing specific — people can bring a binder to you."
+            ? "Nothing specific, so people can bring a binder to you."
             : "Nothing specific. Show them something good."}
         </p>
       </div>

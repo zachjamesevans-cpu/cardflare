@@ -76,7 +76,7 @@ export function storeInviteEmail(
    * fallback promises one extra step instead, because that is what happens.
    */
   const lead = setupLink
-    ? "Your account is ready on this address. One tap below finishes it — pick a password and you are in."
+    ? "Your account is ready on this address. One tap below finishes it: pick a password and you are in."
     : "Your account is ready on this address. Ask for a link below and we will email you one that sets your password.";
 
   const buttonLabel = setupLink ? "Finish setting up" : "Choose a password";
@@ -103,9 +103,9 @@ export function storeInviteEmail(
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
         ${
           kind === "vendor"
-            ? "CardFlare helps card-show attendees find the exact cards they want — and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
+            ? "CardFlare helps card-show attendees find the exact cards they want, and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
             : kind === "player"
-              ? "A CardFlare account makes your wants follow you: post a card once, and every CardFlare room you walk into offers to post it again until you find it. No account is ever needed just to trade — this one is for keeping your hunt across stores."
+              ? "A CardFlare account makes your wants follow you: post a card once, and every CardFlare room you walk into offers to post it again until you find it. No account is ever needed just to trade; this one is for keeping your hunt across stores."
               : "CardFlare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
         }
       </p>

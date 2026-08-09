@@ -119,7 +119,7 @@ export function CreateShowForm({
               name="timezone"
               defaultValue={defaultZone}
             >
-              <option value="UTC">UTC — no timezone set</option>
+              <option value="UTC">UTC (no timezone set)</option>
               {zoneGroups.map((group) => (
                 <optgroup key={group.label} label={group.label}>
                   {group.choices.map((choice) => (

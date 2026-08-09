@@ -35,7 +35,7 @@ export function WalkInSession({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-text-secondary">
-        Players are trading here now. Nobody has to open or close this — it ends by
+        Players are trading here now. Nobody has to open or close this; it ends by
         itself once the room has been quiet for a few hours.
       </p>
 

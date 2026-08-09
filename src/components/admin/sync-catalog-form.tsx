@@ -21,12 +21,12 @@ import {
 const MODES = [
   {
     value: "sample",
-    label: "Sample — a few dozen cards, about a minute",
+    label: "Sample: a few dozen cards, about a minute",
     blurb: "Enough to check the import is correct end to end. Safe to run repeatedly.",
   },
   {
     value: "full",
-    label: "Full — the provider's entire catalog",
+    label: "Full: the provider's entire catalog",
     blurb:
       "Thousands of records from a free service. Run it when you actually need the whole catalog, not to test.",
   },

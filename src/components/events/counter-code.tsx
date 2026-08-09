@@ -65,8 +65,8 @@ export function CounterCode({
           <div className="flex flex-col gap-2">
             <p className="font-semibold text-text-primary">Print this once</p>
             <p className="text-text-secondary">
-              This code never changes. Put it somewhere players can see it — the
-              counter, the door, the end of a table — and leave it there. It opens
+              This code never changes. Put it somewhere players can see it, like the
+              counter, the door or the end of a table, and leave it there. It opens
               whichever room is running: your event if you have one on, otherwise a
               walk-in room that starts the moment somebody joins.
             </p>

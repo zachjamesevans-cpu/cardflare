@@ -68,7 +68,7 @@ export function JoinEventForm({
         label={returning ? "Joining as" : "What should other players call you?"}
         hint={
           returning
-            ? "Change it if you like — your cards and history stay with you."
+            ? "Change it if you like. Your cards and history stay with you."
             : "Shown to other people in this room. No account needed."
         }
         error={error}

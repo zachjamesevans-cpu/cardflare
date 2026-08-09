@@ -121,7 +121,7 @@ export async function syncCatalogAction(
     return {
       status: "failed",
       message:
-        "The sync failed part-way. Nothing was deleted, and re-running is safe — " +
+        "The sync failed part-way. Nothing was deleted, and re-running is safe. " +
         "check the runtime logs and card_sync_failures for the reason.",
     };
   }

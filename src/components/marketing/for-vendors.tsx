@@ -10,7 +10,7 @@ const BENEFITS = [
     icon: Package,
     title: "Upload before the show",
     description:
-      "List what you're bringing from your dashboard — raw singles and graded slabs, PSA, BGS or CGC — so your inventory is searchable the moment the doors open.",
+      "List what you're bringing from your dashboard, raw singles and graded slabs alike (PSA, BGS or CGC), so your inventory is searchable the moment the doors open.",
   },
   {
     icon: MapPin,
@@ -28,7 +28,7 @@ const BENEFITS = [
     icon: Tent,
     title: "One weekend at a time",
     description:
-      "Claim your booth for each show and move it if the floor plan changes. Leave a show and your stock disappears from it — your list stays ready for the next one.",
+      "Claim your booth for each show and move it if the floor plan changes. Leave a show and your stock disappears from it, while your list stays ready for the next one.",
   },
 ] as const;
 
@@ -39,7 +39,7 @@ export function ForVendors() {
         id="for-vendors-title"
         eyebrow="For Card Show Vendors"
         title="Every buyer in the room, pointed at you"
-        description="The moment someone scans in, CardFlare knows what they're hunting and sends them to the booth that has it. Buyers stop working the hall table by table — and you stop hoping the right one reaches yours."
+        description="The moment someone scans in, CardFlare knows what they're hunting and sends them to the booth that has it. Buyers stop working the hall table by table, and you stop hoping the right one reaches yours."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">

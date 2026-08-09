@@ -166,10 +166,9 @@ export function CreateEventForm({
           className="mt-0.5 size-4 accent-accent"
         />
         <span>
-          <span className="font-medium text-text-primary">Repeats weekly</span>
-          {" — "}
-          when this one closes, next week&rsquo;s appears by itself. Enter your
-          Wednesday locals once, never again.
+          <span className="font-medium text-text-primary">Repeats weekly.</span> When
+          this one closes, next week&rsquo;s appears by itself. Enter your Wednesday
+          locals once, never again.
         </span>
       </label>
 

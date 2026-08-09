@@ -192,7 +192,7 @@ async function deliverByEmail(
     <div style="font-family: sans-serif; line-height: 1.6; color: #1a1a1a;">
       <p style="font-size: 16px; font-weight: bold;">${title}</p>
       ${body ? `<p>${body}</p>` : ""}
-      <p><a href="${link}">Open the room</a> — the board has the latest.</p>
+      <p><a href="${link}">Open the room</a> for the latest board.</p>
       <p style="font-size: 12px; color: #777;">
         CardFlare tells you when something needs you in a room. You got this
         because you posted or offered while signed in.
@@ -236,7 +236,7 @@ export async function notifyOfferReceived(
     const title = `${responderName} has your ${context.cardName}`;
     const body = message
       ? `They said: “${message}”`
-      : "They offered to trade — go find them in the room.";
+      : "They offered to trade. Go find them in the room.";
     const path = `/e/${context.code}`;
 
     const id = await record({

@@ -33,7 +33,7 @@ export function InboxScreen() {
       {items?.length === 0 && (
         <Card>
           <Body>
-            Nothing yet. When somebody offers on one of your Flares, it lands here —
+            Nothing yet. When somebody offers on one of your Flares, it lands here,
             and on your lock screen.
           </Body>
         </Card>

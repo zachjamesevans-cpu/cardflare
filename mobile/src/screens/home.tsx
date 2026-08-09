@@ -72,7 +72,7 @@ export function HomeScreen() {
       <Card>
         <Title>Join a room</Title>
         <Body>
-          Scan the code on the store&rsquo;s counter — or type it if scanning is
+          Scan the code on the store&rsquo;s counter, or type it if scanning is
           awkward. No account needed.
         </Body>
 
@@ -100,7 +100,7 @@ export function HomeScreen() {
         <Card>
           <Title>Your locals</Title>
           <Muted>
-            Saved automatically when you join signed in. Tap one to walk in — no
+            Saved automatically when you join signed in. Tap one to walk in, no
             QR needed.
           </Muted>
           {locals.map((local) => (
@@ -145,7 +145,7 @@ export function HomeScreen() {
         <Title>How it works</Title>
         <Body>
           Post a Flare for the card you&rsquo;re hunting. When somebody in the room
-          has it, they raise a hand — and you go trade, in person, at the table.
+          has it, they raise a hand, and you go trade, in person, at the table.
         </Body>
       </Card>
     </ScrollView>

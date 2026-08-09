@@ -273,7 +273,7 @@ export function JoinPoster({
           </p>
         </div>
         <p className="text-xs text-text-muted">
-          Printing from a phone? Use the PDF — it comes out as one clean page with
+          Printing from a phone? Use the PDF. It comes out as one clean page with
           nothing added.
         </p>
       </div>

@@ -19,7 +19,7 @@ import { setEarlyBoardAction } from "@/lib/events/actions";
  */
 
 const CHOICES = [
-  { hours: 0, label: "Off — boards open at doors" },
+  { hours: 0, label: "Off. Boards open at doors" },
   { hours: 24, label: "The day before (24 hours)" },
   { hours: 48, label: "Two days before (48 hours)" },
   { hours: 72, label: "Three days before (72 hours)" },
@@ -49,8 +49,8 @@ export function EarlyBoardPicker({
           <p className="font-semibold text-text-primary">Early boards</p>
           <p className="text-sm text-text-secondary">
             {hours > 0
-              ? `Your event boards start taking Flares ${hours} hours before doors — players post from home, and everyone knows what to bring. Flares from anyone who never shows are cleared when the night ends.`
-              : "Your event boards open when the event does. Turn this on and players can post Flares from home before your locals — so people know what to bring."}
+              ? `Your event boards start taking Flares ${hours} hours before doors, so players post from home and everyone knows what to bring. Flares from anyone who never shows are cleared when the night ends.`
+              : "Your event boards open when the event does. Turn this on and players can post Flares from home before your locals, so people know what to bring."}
           </p>
         </div>
       </div>

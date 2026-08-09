@@ -64,7 +64,7 @@ export async function syncCollectionAction(
     const message = {
       empty: "That file is empty.",
       "no-header":
-        "That does not look like a Collectr export — no card number and quantity columns.",
+        "That does not look like a Collectr export: it has no card number and quantity columns.",
       "too-many-lines": "That file has more lines than any collection export should.",
     }[parsed.problem];
     return { status: "error", message };

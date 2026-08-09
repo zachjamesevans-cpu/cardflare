@@ -118,7 +118,7 @@ function RoomScreen({
       setError(
         caught instanceof ApiError && caught.status === 404
           ? "That code does not point at a room."
-          : "Could not reach the room — check your connection and pull to retry.",
+          : "Could not reach the room. Check your connection and pull to retry.",
       );
     } finally {
       inFlight.current = false;
@@ -145,9 +145,9 @@ function RoomScreen({
           ? caught.code === "not-open"
             ? "This room is not open right now."
             : caught.code === "timeout"
-              ? "That took too long — check your connection and try again."
+              ? "That took too long. Check your connection and try again."
               : caught.code === "rate-limited"
-                ? "Too many joins from here just now — wait a minute and try again."
+                ? "Too many joins from here just now. Wait a minute and try again."
                 : `Could not join (${caught.code}). Try again.`
           : "Could not join. Try again.",
       );
@@ -182,7 +182,7 @@ function RoomScreen({
       <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
         <Card>
           {state.store && <Muted>{state.store.name}</Muted>}
-          <Title>Nothing on yet — start the room</Title>
+          <Title>Nothing on yet. Start the room</Title>
           <Body>
             Trading is open here. Pick a name and you&rsquo;re in; the room opens
             with you.
@@ -238,7 +238,7 @@ function RoomScreen({
           <Body>
             {state.state === "quiet"
               ? "This store is not running a room at the moment. Ask at the counter."
-              : "Card shows live on cardflare.gg for now — scan the same code there."}
+              : "Card shows live on cardflare.gg for now. Scan the same code there."}
           </Body>
         </Card>
 
@@ -354,7 +354,7 @@ function RoomScreen({
           <Card>
             <Title>This board is open early</Title>
             <Body>
-              {`Everyone here is still on their way — the event starts ${
+              {`Everyone here is still on their way. The event starts ${
                 room.startsAt
                   ? new Date(room.startsAt).toLocaleDateString("en-US", {
                       weekday: "long",
@@ -530,13 +530,13 @@ function FlareRow({
         <Text style={{ color: colors.accent }}>You have another printing</Text>
       )}
       {flare.counterMayHave && (
-        <Muted>{`${storeName} may have this single — ask at the counter.`}</Muted>
+        <Muted>{`${storeName} may have this single. Ask at the counter.`}</Muted>
       )}
 
       {flare.offers.map((offer) => (
         <View key={offer.responderSessionId} style={styles.offer}>
           <Body>
-            {`${offer.displayName ?? "A player"} has this — go find them.`}
+            {`${offer.displayName ?? "A player"} has this. Go find them.`}
             {offer.message ? ` “${offer.message}”` : ""}
             {offer.present ? "" : " (away right now)"}
           </Body>

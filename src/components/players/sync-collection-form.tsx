@@ -118,8 +118,8 @@ export function SyncCollectionForm({
 
         <p className="text-xs text-text-muted">
           Your Collectr export (CSV). Private: rooms never show your collection to
-          anyone — it only flags Flares you could answer, and your name appears only
-          when you choose to offer. Prices in the file are ignored and never stored.
+          anyone. It only flags Flares you could answer, and your name appears only when
+          you choose to offer. Prices in the file are ignored and never stored.
         </p>
       </form>
     </div>
