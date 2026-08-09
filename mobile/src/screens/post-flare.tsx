@@ -27,7 +27,14 @@ import { colors, radius, spacing } from "../theme";
 function leadArt(hit: CardHit): string | null {
   return hit.printings.find((printing) => printing.imageUrl)?.imageUrl ?? null;
 }
-export function PostFlareScreen({ code }: { code: string }) {
+export function PostFlareScreen({
+  code,
+  resetSignal,
+}: {
+  code: string;
+  /** Bumped by the host (the Flare tab on re-tap) to pop back to search. */
+  resetSignal?: number;
+}) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
   /** Which result's versions are unfolded — one at a time, like the website. */
@@ -49,6 +56,15 @@ export function PostFlareScreen({ code }: { code: string }) {
     [],
   );
 
+  // Tapping the Flare tab while a card is open pops back to the search
+  // (results intact). The tab bumps the counter; the value is noise.
+  useEffect(() => {
+    if (resetSignal !== undefined) {
+      setPicked(null);
+      setPrintingId(null);
+    }
+  }, [resetSignal]);
+
   /*
    * Swipe back from the picked card to the search — by hand, because
    * both halves are one screen, so the navigator's back gesture has
@@ -56,16 +72,22 @@ export function PostFlareScreen({ code }: { code: string }) {
    * step with the finger; past the threshold it slides off and the
    * search returns, short of it it springs back. Locked while a post
    * is in flight or the "Posted ✓" beat is showing.
+   *
+   * Claimed in the CAPTURE phase, on the container wrapping the
+   * ScrollView: the scroll view competes for every drag and was winning
+   * before the child handler got a look — capture is checked parent-
+   * first, so an edge-started, clearly horizontal drag is ours before
+   * the scroll or any button hears about it.
    */
   const slide = useRef(new Animated.Value(0)).current;
   const swipeLocked = useRef(false);
-  swipeLocked.current = busy || posted;
+  swipeLocked.current = busy || posted || picked === null;
 
   const backSwipe = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_event, gesture) =>
+      onMoveShouldSetPanResponderCapture: (_event, gesture) =>
         !swipeLocked.current &&
-        gesture.x0 < 80 &&
+        gesture.x0 < 100 &&
         gesture.dx > 12 &&
         Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
       onPanResponderMove: (_event, gesture) => {
@@ -160,6 +182,7 @@ export function PostFlareScreen({ code }: { code: string }) {
   };
 
   return (
+    <View style={{ flex: 1 }} {...backSwipe.panHandlers}>
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
       {!picked ? (
         <Card>
@@ -267,10 +290,7 @@ export function PostFlareScreen({ code }: { code: string }) {
           ))}
         </Card>
       ) : (
-        <Animated.View
-          {...backSwipe.panHandlers}
-          style={{ transform: [{ translateX: slide }] }}
-        >
+        <Animated.View style={{ transform: [{ translateX: slide }] }}>
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
             <CardImage
@@ -379,5 +399,6 @@ export function PostFlareScreen({ code }: { code: string }) {
         </Animated.View>
       )}
     </ScrollView>
+    </View>
   );
 }
