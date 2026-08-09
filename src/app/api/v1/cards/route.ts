@@ -1,3 +1,4 @@
+import { printingLabel } from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,10 @@ export async function GET(request: Request): Promise<Response> {
       cardNumber: card.canonicalCardNumber,
       printings: card.printings.map((printing) => ({
         id: printing.id,
-        label: printing.printingLabel ?? printing.printingName ?? printing.setCode,
+        // The website's exact wording for a version — set code, rarity,
+        // variant, promo, SPR-style mark — not the bare set code. The two
+        // pickers must say the same thing about the same physical card.
+        label: printingLabel(printing, card.exactName),
         imageUrl: printing.imageUrl,
       })),
     })),
