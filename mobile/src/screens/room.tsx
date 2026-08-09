@@ -13,12 +13,16 @@ import type { StackParams } from "../../App";
 import {
   ApiError,
   confirmTrade,
+  getMe,
   getRoom,
   joinRoom,
   lastRoom,
   offerOnFlare,
+  postFlare,
   removeFlare,
   setOpenToTrades,
+  storedAccessToken,
+  type Me,
   type RoomFlare,
   type RoomState,
 } from "../api";
@@ -69,6 +73,7 @@ function RoomScreen({ code }: { code: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [wants, setWants] = useState<Me["wants"]>([]);
   const inFlight = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -76,8 +81,19 @@ function RoomScreen({ code }: { code: string }) {
     inFlight.current = true;
 
     try {
-      setState(await getRoom(code));
+      const fresh = await getRoom(code);
+      setState(fresh);
       setError(null);
+
+      // The account's saved wants ride along so the room can offer to
+      // re-post what is still outstanding — the whole point of signing in.
+      if (fresh.joined && (await storedAccessToken())) {
+        try {
+          setWants((await getMe()).wants);
+        } catch {
+          setWants([]);
+        }
+      }
     } catch (caught) {
       setError(
         caught instanceof ApiError && caught.status === 404
@@ -226,6 +242,17 @@ function RoomScreen({ code }: { code: string }) {
     (p) => p.playerSessionId === youId && p.openToTrades,
   );
 
+  /* Outstanding = saved but not already my open Flare here, same rule as
+     the website's re-post panel. */
+  const myAsks = new Set(
+    flares
+      .filter((f) => f.playerSessionId === youId)
+      .map((f) => `${f.cardId}:${f.printingId ?? ""}`),
+  );
+  const outstanding = wants.filter(
+    (want) => !myAsks.has(`${want.cardId}:${want.printingId ?? ""}`),
+  );
+
   /* The board groups under whoever posted, same as the website. */
   const groups = new Map<string, { name: string | null; flares: RoomFlare[] }>();
   for (const flare of flares) {
@@ -257,6 +284,34 @@ function RoomScreen({ code }: { code: string }) {
           <Title>{room.name}</Title>
           <Muted>{`You're in as ${state.you!.displayName}`}</Muted>
         </Card>
+
+        {outstanding.length > 0 && (
+          <Card>
+            <Title>Still hunting these from last time?</Title>
+            <Body>
+              {outstanding
+                .map((w) =>
+                  w.printingLabel ? `${w.cardName} (${w.printingLabel})` : w.cardName,
+                )
+                .join(" · ")}
+            </Body>
+            <Button
+              label={`Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`}
+              onPress={() =>
+                void act(async () => {
+                  for (const want of outstanding) {
+                    await postFlare(code, {
+                      cardId: want.cardId,
+                      printingId: want.printingId,
+                      quantity: want.quantity,
+                      note: want.note ?? undefined,
+                    }).catch(() => {});
+                  }
+                })
+              }
+            />
+          </Card>
+        )}
 
         {/* The lobby: who is here, present players first. */}
         <Card>

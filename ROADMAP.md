@@ -483,6 +483,19 @@ gets it through Expo's push service, with tokens the service disowns
 again. Both `expo.extra` values are filled in (public by design), so
 sign-in works out of the box.
 
+**Phase 3 (shipped, the "wants follow you everywhere" pass):** the
+saved-wants loop now closes in every venue kind, not just tournament
+rooms. On the website, a signed-in attendee opening a card show's
+`/e/CODE` page sees **"Your wants, in this hall"** — their standing
+wants matched against every vendor's uploaded inventory at once, each
+hit naming the booth and vendor, before they search for anything. In
+the app, the Room screen greets a signed-in player with **"Still
+hunting these from last time?"** — the wants they have not already
+posted in this room, with one button that posts them all. Stores and
+tournaments already flowed (post → want saved → trade clears it →
+next room offers a repost); shows were the gap, and shows are exactly
+where the vendor pitch lives.
+
 **Remaining:** EAS build + TestFlight when the founder's Apple
 Developer enrollment clears — `mobile/README.md` has the exact
 commands. Push end-to-end needs that development build; everything
