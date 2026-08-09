@@ -23,9 +23,54 @@ import { colors, radius, spacing } from "../theme";
  * a readable size), every printing its own full-width bar.
  */
 
-/** The art a card leads with: its first pictured printing. */
+/** The art a card leads with: the base printing, the website's rule. */
 function leadArt(hit: CardHit): string | null {
-  return hit.printings.find((printing) => printing.imageUrl)?.imageUrl ?? null;
+  return (
+    hit.printings.find((printing) => printing.id === hit.basePrintingId)
+      ?.imageUrl ??
+    hit.printings.find((printing) => printing.imageUrl)?.imageUrl ??
+    null
+  );
+}
+
+/** The website's search highlight: the matched part of a name lights up. */
+function Highlighted({ text, term }: { text: string; term: string }) {
+  const needle = term.trim().toLowerCase();
+  const at = needle ? text.toLowerCase().indexOf(needle) : -1;
+  if (at < 0) return <>{text}</>;
+
+  return (
+    <>
+      {text.slice(0, at)}
+      <Text style={{ backgroundColor: `${colors.accent}40` }}>
+        {text.slice(at, at + needle.length)}
+      </Text>
+      {text.slice(at + needle.length)}
+    </>
+  );
+}
+
+/** The stats that apply differ by card type, so only present ones render. */
+function Stats({ hit }: { hit: CardHit }) {
+  const stats = [
+    hit.cost !== null && { label: "Cost", value: hit.cost },
+    hit.life !== null && { label: "Life", value: hit.life },
+    hit.power !== null && { label: "Power", value: hit.power },
+    hit.counter ? { label: "Counter", value: hit.counter } : false,
+  ].filter(Boolean) as { label: string; value: number }[];
+
+  if (stats.length === 0) return null;
+
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: spacing(3) }}>
+      {stats.map((stat) => (
+        <Text key={stat.label} style={{ fontSize: 12 }}>
+          <Text style={{ color: colors.textMuted }}>{stat.label} </Text>
+          <Text style={{ color: colors.textSecondary }}>{stat.value}</Text>
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 export function PostFlareScreen({
@@ -102,7 +147,7 @@ export function PostFlareScreen({
               onPress={() => pick(hit, null)}
               style={{
                 flexDirection: "row",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: spacing(3),
               }}
             >
@@ -112,34 +157,70 @@ export function PostFlareScreen({
                 name={hit.name}
                 cardNumber={hit.cardNumber}
               />
-              <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {hit.name}
+                  <Highlighted text={hit.name} term={query} />
                 </Text>
-                <Muted>{hit.cardNumber}</Muted>
+                {/* The website's quiet line: number, type, colours — and
+                    the printing label when there is only one version. */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    columnGap: spacing(2),
+                  }}
+                >
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    <Highlighted text={hit.cardNumber} term={query} />
+                  </Text>
+                  {[
+                    hit.printings.length === 1
+                      ? (hit.printings[0]?.label ?? null)
+                      : null,
+                    hit.cardType,
+                    hit.colors.length > 0 ? hit.colors.join(" / ") : null,
+                  ]
+                    .filter((part): part is string => !!part)
+                    .map((part) => (
+                      <Text
+                        key={part}
+                        style={{ color: colors.textMuted, fontSize: 12 }}
+                      >
+                        {part}
+                      </Text>
+                    ))}
+                </View>
+                <Stats hit={hit} />
               </View>
             </Tap>
 
             {/*
-             * The website's versions list, on a tap: which physical card —
-             * base art, alt art, SP, promo — with its own artwork. Picking
-             * a version here opens the card *with that printing*, so the
-             * alt-art hunter never chooses twice.
+             * The website's versions list, word for word: which physical
+             * card — base art, alt art, SP, promo — each with its own
+             * artwork. Picking a version opens the card *with that
+             * printing*, so the alt-art hunter never chooses twice.
              */}
-            <Tap
-              onPress={() =>
-                setVersionsFor(versionsFor === hit.id ? null : hit.id)
-              }
-              hitSlop={8}
-            >
-              <Text style={{ color: colors.accent, fontSize: 13 }}>
-                {versionsFor === hit.id
-                  ? "Hide versions"
-                  : hit.printings.length === 1
-                    ? "Show version ▾"
-                    : `Show ${hit.printings.length} versions ▾`}
-              </Text>
-            </Tap>
+            {hit.printings.length > 1 && (
+              <Tap
+                onPress={() =>
+                  setVersionsFor(versionsFor === hit.id ? null : hit.id)
+                }
+                hitSlop={8}
+              >
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  {versionsFor === hit.id
+                    ? "Hide versions ▴"
+                    : `${hit.printings.length} versions — alt arts and promos ▾`}
+                </Text>
+              </Tap>
+            )}
+
+            {versionsFor === hit.id && hit.printings.length > 1 && (
+              <Muted>
+                Tap a version to ask for that exact one. Tap the card above to
+                take any printing.
+              </Muted>
+            )}
 
             {versionsFor === hit.id &&
               hit.printings.map((printing) => (

@@ -1,4 +1,4 @@
-import { printingLabel } from "@/lib/cards/schema";
+import { pickBasePrinting, printingLabel } from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,17 @@ export async function GET(request: Request): Promise<Response> {
       id: card.id,
       name: card.exactName,
       cardNumber: card.canonicalCardNumber,
+      // What the website's result row shows under the name — the app's
+      // picker renders the same line and the same stats, so both send it.
+      cardType: card.cardType,
+      colors: card.colors,
+      cost: card.cost,
+      life: card.life,
+      power: card.power,
+      counter: card.counter,
+      // The website leads with the base printing's art, not whichever
+      // set code sorted first; the app must lead with the same one.
+      basePrintingId: pickBasePrinting(card.printings, card.exactName)?.id ?? null,
       printings: card.printings.map((printing) => ({
         id: printing.id,
         // The website's exact wording for a version — set code, rarity,
