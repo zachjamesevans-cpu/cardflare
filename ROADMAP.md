@@ -462,6 +462,21 @@ night-before digest. The founder's Wednesday beta proved the thesis by
 hand: he shared the link hours early and seventeen players knew what
 to bring from home.
 
+**Phase 3 (shipped):** "I'll be there", one tap. A signed-in player's
+locals now carry the next event's own code and whether its board is
+already open; when it is, the account page, the `/join` page and the
+app's Join tab grow an RSVP button that joins the early board under
+the account's own name (creating the session cookie on the spot when
+the browser has none) and posts every saved want in one motion, with
+the board's duplicate rule keeping repeats harmless. Deliberately no
+`event_rsvps` table: being on the board before doors IS the RSVP -
+participation counts you among who is coming (lobby and quiet screens
+and their API twins now say "N players are already on it"), leaving
+the room takes it back, and phase 2's no-show expiry already cleans up
+after anyone whose plans fell through. Four unit tests pin the action:
+join+post, session bootstrapping from the account's display name, the
+window guard, and the silent no-op for anyone without an account.
+
 **Phase 2 (shipped):** the schedule and the early board. Events grew
 "Repeats weekly" — one checkbox at creation, and every close (by clock
 or by hand) settles the occurrence's debts: no-show Flares are

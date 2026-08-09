@@ -10,7 +10,11 @@ import { Card } from "@/components/ui/card";
 import { signOut } from "@/lib/auth/actions";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
-import { removeLocalAction, removeWantAction } from "@/lib/players/account-actions";
+import {
+  removeLocalAction,
+  removeWantAction,
+  rsvpAction,
+} from "@/lib/players/account-actions";
 import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
@@ -135,6 +139,14 @@ export default async function AccountPage() {
                         : (where ?? "")}
                   </span>
                 </div>
+                {local.earlyOpen && local.nextEventCode && (
+                  <form action={rsvpAction}>
+                    <input type="hidden" name="code" value={local.nextEventCode} />
+                    <Button type="submit" variant="secondary" size="sm">
+                      I&rsquo;ll be there
+                    </Button>
+                  </form>
+                )}
                 <form action={removeLocalAction}>
                   <input type="hidden" name="storeId" value={local.storeId} />
                   <Button type="submit" variant="ghost" size="sm">

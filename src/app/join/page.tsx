@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { JoinCodeForm } from "@/components/events/join-code-form";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { rsvpAction } from "@/lib/players/account-actions";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { listLocals } from "@/lib/players/locals";
@@ -67,7 +69,7 @@ export default async function JoinPage() {
               {locals.map((local) => (
                 <li
                   key={local.storeId}
-                  className="border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                  className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
                 >
                   <Link href={`/e/${local.joinCode}`} className="flex flex-col gap-0.5">
                     <span className="font-semibold text-text-primary underline-offset-4 hover:underline">
@@ -84,6 +86,15 @@ export default async function JoinPage() {
                           : "Tap to see what's happening"}
                     </span>
                   </Link>
+                  {/* One tap: onto the board, wants and all, days early. */}
+                  {local.earlyOpen && local.nextEventCode && (
+                    <form action={rsvpAction}>
+                      <input type="hidden" name="code" value={local.nextEventCode} />
+                      <Button type="submit" variant="secondary" size="sm">
+                        I&rsquo;ll be there. Post my wants
+                      </Button>
+                    </form>
+                  )}
                 </li>
               ))}
             </ul>

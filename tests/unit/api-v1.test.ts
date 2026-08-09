@@ -184,6 +184,8 @@ describe("your locals over the API", () => {
         liveNow: true,
         nextEventAt: null,
         nextEventName: null,
+        nextEventCode: "K3M9PZ",
+        earlyOpen: true,
       },
     ]);
 
@@ -200,6 +202,8 @@ describe("your locals over the API", () => {
         liveNow: true,
         nextEventAt: null,
         nextEventName: null,
+        nextEventCode: "K3M9PZ",
+        earlyOpen: true,
       },
     ]);
   });

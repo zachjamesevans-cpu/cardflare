@@ -6,6 +6,8 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import {
   getMe,
+  joinRoom,
+  postFlare,
   rememberRoom,
   removeLocal,
   storedAccessToken,
@@ -23,7 +25,9 @@ import { colors, spacing } from "../theme";
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [code, setCode] = useState("");
-  const [locals, setLocals] = useState<Me["locals"]>([]);
+  const [me, setMe] = useState<Me | null>(null);
+  const [rsvping, setRsvping] = useState<string | null>(null);
+  const locals = me?.locals ?? [];
 
   useFocusEffect(
     useCallback(() => {
@@ -31,14 +35,14 @@ export function HomeScreen() {
 
       void (async () => {
         if (!(await storedAccessToken())) {
-          if (live) setLocals([]);
+          if (live) setMe(null);
           return;
         }
         try {
-          const me = await getMe();
-          if (live) setLocals(me.locals);
+          const fresh = await getMe();
+          if (live) setMe(fresh);
         } catch {
-          if (live) setLocals([]);
+          if (live) setMe(null);
         }
       })();
 
@@ -52,6 +56,33 @@ export function HomeScreen() {
     await rememberRoom(raw.trim().toUpperCase());
     setCode("");
     navigation.navigate("Tabs", { screen: "Room" });
+  };
+
+  /*
+   * "I'll be there", the app's way: join the early board under the
+   * account's own name and post every saved want. Duplicates already on
+   * the board are skipped by the server, so this is safe to repeat.
+   */
+  const rsvp = async (local: Me["locals"][number]) => {
+    if (!me || !local.nextEventCode || rsvping) return;
+    setRsvping(local.storeId);
+    try {
+      await joinRoom(local.nextEventCode, me.player.displayName);
+      for (const want of me.wants) {
+        await postFlare(local.nextEventCode, {
+          cardId: want.cardId,
+          printingId: want.printingId,
+          quantity: want.quantity,
+          note: want.note ?? undefined,
+        }).catch(() => {});
+      }
+      await rememberRoom(local.nextEventCode);
+      navigation.navigate("Tabs", { screen: "Room" });
+    } catch {
+      // The Room tab shows the truthful state; nothing to add here.
+    } finally {
+      setRsvping(null);
+    }
   };
 
   const nextLine = (local: Me["locals"][number]) => {
@@ -127,8 +158,15 @@ export function HomeScreen() {
               </Tap>
               <Tap
                 onPress={() => {
-                  setLocals((current) =>
-                    current.filter((entry) => entry.storeId !== local.storeId),
+                  setMe((current) =>
+                    current
+                      ? {
+                          ...current,
+                          locals: current.locals.filter(
+                            (entry) => entry.storeId !== local.storeId,
+                          ),
+                        }
+                      : current,
                   );
                   void removeLocal(local.storeId).catch(() => {});
                 }}
@@ -138,6 +176,21 @@ export function HomeScreen() {
               </Tap>
             </View>
           ))}
+          {locals.some((local) => local.earlyOpen && local.nextEventCode) &&
+            locals
+              .filter((local) => local.earlyOpen && local.nextEventCode)
+              .map((local) => (
+                <Button
+                  key={`rsvp-${local.storeId}`}
+                  label={
+                    rsvping === local.storeId
+                      ? "Joining the board…"
+                      : `I'll be there: ${local.nextEventName ?? local.name}`
+                  }
+                  onPress={() => void rsvp(local)}
+                  busy={rsvping === local.storeId}
+                />
+              ))}
         </Card>
       )}
 

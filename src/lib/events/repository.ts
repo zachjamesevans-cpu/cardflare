@@ -378,7 +378,7 @@ export async function findEarlyBoard(
 
   const { data, error } = await getSupabaseAdmin()
     .from("events")
-    .select("join_code, name, starts_at")
+    .select("id, join_code, name, starts_at")
     .eq("store_id", storeId)
     .eq("kind", "scheduled")
     .eq("status", "draft")
@@ -395,7 +395,19 @@ export async function findEarlyBoard(
   const row = (data ?? [])[0];
   if (!row?.join_code) return null;
 
-  return { code: row.join_code, name: row.name, startsAt: row.starts_at };
+  // Who has already said "I'll be there", by the only measure that
+  // counts: they are on the board. Zero on a count failure, never a lie.
+  const { count } = await getSupabaseAdmin()
+    .from("event_participants")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", row.id);
+
+  return {
+    code: row.join_code,
+    name: row.name,
+    startsAt: row.starts_at,
+    playersIn: count ?? 0,
+  };
 }
 
 /** Resolves a card show's code. */
