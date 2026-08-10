@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  LayoutAnimation,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -110,6 +111,14 @@ function RoomScreen({
    * wants stay saved, and switching rooms asks the question fresh.
    */
   const [repostDismissed, setRepostDismissed] = useState(false);
+
+  /*
+   * The roster folds shut by default — the founder's call: ten names
+   * above the board pushed the product below the fold, and the counts
+   * are what a scanning eye needs. LayoutAnimation makes the unfold
+   * slide instead of snap.
+   */
+  const [rosterOpen, setRosterOpen] = useState(false);
   const inFlight = useRef(false);
 
   useEffect(() => {
@@ -466,28 +475,56 @@ function RoomScreen({
           </Card>
         )}
 
-        {/* The lobby: who is here, present players first. */}
+        {/* The lobby: counts up front, names one tap behind the chevron. */}
         <Card>
-          <Title>{`In the room (${participants.length})`}</Title>
-          <View style={styles.lobby}>
-            {[...participants]
-              .sort((a, b) => Number(b.present) - Number(a.present))
-              .map((p) => (
-                <View key={p.playerSessionId} style={styles.person}>
-                  <View
-                    style={[
-                      styles.dot,
-                      { backgroundColor: p.present ? colors.accent : colors.border },
-                    ]}
-                  />
-                  <Text style={{ color: colors.textSecondary }} numberOfLines={1}>
-                    {p.displayName ?? "A player"}
-                    {p.playerSessionId === youId ? " (you)" : ""}
-                    {p.openToTrades ? " · open to trades" : ""}
-                  </Text>
-                </View>
-              ))}
-          </View>
+          <Tap
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setRosterOpen((current) => !current);
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: spacing(2),
+            }}
+          >
+            <Title>In this room</Title>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+            >
+              <Muted>
+                {`${participants.filter((p) => p.present).length} here now · ${participants.length} total`}
+              </Muted>
+              <MaterialCommunityIcons
+                name={rosterOpen ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.textMuted}
+              />
+            </View>
+          </Tap>
+
+          {rosterOpen && (
+            <View style={styles.lobby}>
+              {[...participants]
+                .sort((a, b) => Number(b.present) - Number(a.present))
+                .map((p) => (
+                  <View key={p.playerSessionId} style={styles.person}>
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: p.present ? colors.accent : colors.border },
+                      ]}
+                    />
+                    <Text style={{ color: colors.textSecondary }} numberOfLines={1}>
+                      {p.displayName ?? "A player"}
+                      {p.playerSessionId === youId ? " (you)" : ""}
+                      {p.openToTrades ? " · open to trades" : ""}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          )}
         </Card>
 
         {groups.size === 0 && (
