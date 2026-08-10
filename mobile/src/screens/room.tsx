@@ -22,9 +22,6 @@ import {
   getRoom,
   joinRoom,
   lastRoom,
-  rememberBoardView,
-  storedBoardView,
-  type BoardView,
   offerOnFlare,
   postFlare,
   withdrawOffer,
@@ -103,7 +100,6 @@ function RoomScreen({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wants, setWants] = useState<Me["wants"]>([]);
-  const [view, setView] = useState<BoardView>("carousel");
 
   /*
    * "Never mind" on the re-post banner. Without it the banner could only
@@ -119,16 +115,15 @@ function RoomScreen({
    * slide instead of snap.
    */
   const [rosterOpen, setRosterOpen] = useState(false);
+
+  /*
+   * The founder's synthesis, replacing the stacked/carousel toggle: the
+   * rail is every player's default face, and the chevron on a player's
+   * header unfolds THEM into the full stacked view — the same gesture
+   * the roster taught. Detail is a per-person question, not a mode.
+   */
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const inFlight = useRef(false);
-
-  useEffect(() => {
-    void storedBoardView().then(setView);
-  }, []);
-
-  const pickView = (next: BoardView) => {
-    setView(next);
-    void rememberBoardView(next).catch(() => {});
-  };
 
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
@@ -162,6 +157,7 @@ function RoomScreen({
   useEffect(() => {
     setState(null);
     setRepostDismissed(false);
+    setExpandedGroups({});
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
     return () => clearInterval(timer);
@@ -394,33 +390,6 @@ function RoomScreen({
           <Muted>{room.storeName}</Muted>
           <Title>{room.name}</Title>
           <Muted>{`You're in as ${state.you!.displayName}`}</Muted>
-
-          {/* The file-browser trick: same board, two geometries. */}
-          <View style={{ flexDirection: "row", gap: spacing(2) }}>
-            {(["carousel", "stacked"] as const).map((option) => (
-              <Tap
-                key={option}
-                onPress={() => pickView(option)}
-                style={{
-                  borderColor: view === option ? colors.accent : colors.border,
-                  borderWidth: 1,
-                  borderRadius: radius.control,
-                  paddingVertical: spacing(1.5),
-                  paddingHorizontal: spacing(3),
-                }}
-              >
-                <Text
-                  style={{
-                    color: view === option ? colors.accent : colors.textMuted,
-                    fontSize: 13,
-                    fontWeight: "600",
-                  }}
-                >
-                  {option === "carousel" ? "Carousel" : "Stacked"}
-                </Text>
-              </Tap>
-            ))}
-          </View>
         </Card>
 
         {/* An early board never pretends to be a live room. */}
@@ -593,21 +562,53 @@ function RoomScreen({
               />
             ));
 
+          const groupOpen = Boolean(expandedGroups[sessionId]);
+
           return (
             <Card key={sessionId}>
-              <Title>
-                {mine ? "Your Flares" : (group.name ?? "A player")}
-              </Title>
-
               {/*
-               * Carousel: ONE rail per player, every tile the same shape —
-               * the founder asked for the folder's cards to look exactly
-               * like the loose ones (the bordered chip read as clutter).
-               * The partition keeps a deck's cards side by side, and each
-               * names its deck in its own caption. Stacked keeps the
-               * header-then-rows shape.
+               * The founder's synthesis, replacing the page-wide toggle:
+               * the rail is every player's default face, and the chevron
+               * on their header unfolds THEM into the full stacked view —
+               * the same gesture the roster taught.
                */}
-              {view === "carousel" ? (
+              <Tap
+                onPress={() => {
+                  LayoutAnimation.configureNext(
+                    LayoutAnimation.Presets.easeInEaseOut,
+                  );
+                  setExpandedGroups((current) => ({
+                    ...current,
+                    [sessionId]: !current[sessionId],
+                  }));
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing(2),
+                }}
+              >
+                <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(1.5),
+                  }}
+                >
+                  <Muted>
+                    {`${group.flares.length} ${group.flares.length === 1 ? "card" : "cards"}`}
+                  </Muted>
+                  <MaterialCommunityIcons
+                    name={groupOpen ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                </View>
+              </Tap>
+
+              {!groupOpen ? (
                 <View>
                   <ScrollView
                     horizontal

@@ -8,7 +8,6 @@ import { JoinPoster } from "@/components/events/join-poster";
 import { RoomRoster } from "@/components/events/room-roster";
 import { WalkInSession } from "@/components/events/walk-in-session";
 import { AppShell } from "@/components/layout/app-shell";
-import { BoardViewToggle } from "@/components/lists/board-view-toggle";
 import { FlareBoard } from "@/components/lists/list-entries";
 import { Badge, Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
@@ -32,17 +31,11 @@ export const dynamic = "force-dynamic";
 
 export default async function EventPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string }>;
 }) {
   const { id } = await params;
 
-  // Same rule as the room page: the bare URL is the carousel. This page
-  // is where the founder actually reads boards on a desktop, and it was
-  // stuck stacked with no way to switch.
-  const boardView = (await searchParams).view === "stacked" ? "stacked" : "carousel";
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect(`/login?next=/store/events/${id}`);
@@ -145,21 +138,17 @@ export default async function EventPage({
           <RoomRoster participants={participants} />
 
           {boardHasEntries ? (
-            <>
-              <BoardViewToggle basePath={`/store/events/${id}`} view={boardView} />
-              <FlareBoard
-                entries={flares}
-                code={event.join_code ?? ""}
-                imagesEnabled={cardImagesEnabled()}
-                youId=""
-                matches={new Map()}
-                offers={new Map()}
-                openToTrades={openPlayers}
-                counterHas={counterHas}
-                counterName={store?.name}
-                view={boardView}
-              />
-            </>
+            <FlareBoard
+              entries={flares}
+              code={event.join_code ?? ""}
+              imagesEnabled={cardImagesEnabled()}
+              youId=""
+              matches={new Map()}
+              offers={new Map()}
+              openToTrades={openPlayers}
+              counterHas={counterHas}
+              counterName={store?.name}
+            />
           ) : (
             <p className="text-sm text-text-muted">No Flares in this room yet.</p>
           )}
