@@ -333,8 +333,29 @@ function CarouselEntry({
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           thumbClassName="w-full"
         />
-        {/* The founder's ask: a note announces itself on the tile, and
-            the zoom is where it gets read. */}
+        {/*
+         * Every signal that used to be its own caption line lives on
+         * the art as a badge now. The founder's screenshot counted the
+         * handshake at three different heights in one rail — variable
+         * caption stacks were the culprit, so the tile below the art is
+         * a fixed grid: one name line, one caption slot, one action
+         * row. Same anatomy on every tile, buttons on one line, always.
+         */}
+        {match && (
+          <span
+            aria-label={
+              match === "exact" ? "You have this" : "You have another printing"
+            }
+            title={match === "exact" ? "You have this" : "You have another printing"}
+            className="pointer-events-none absolute top-0.5 left-0.5 z-10 rounded-full bg-surface/90 p-0.5"
+          >
+            {match === "exact" ? (
+              <PackageCheck className="size-3 text-accent" aria-hidden="true" />
+            ) : (
+              <Layers className="size-3 text-accent" aria-hidden="true" />
+            )}
+          </span>
+        )}
         {entry.note && (
           <span
             aria-label="Has a note"
@@ -355,73 +376,57 @@ function CarouselEntry({
         )}
       </div>
 
-      <p className="truncate text-[11px] leading-tight font-semibold text-text-primary">
+      <p className="min-h-[14px] truncate text-[11px] leading-[14px] font-semibold text-text-primary">
         {entry.cardName}
         {visible > 1 && <span className="sr-only"> ×{visible}</span>}
+        {match && (
+          <span className="sr-only">
+            {match === "exact" ? " You have this." : " You have another printing."}
+          </span>
+        )}
       </p>
 
       {/*
-       * The deck, said on the tile itself. A bordered chip around the
-       * folder's cards read as clutter next to the plain rail — the
-       * founder asked for uniform tiles, so the folder is a caption,
-       * not a container. Partitioning keeps deck-mates side by side.
+       * The caption slot: exactly one line tall whether or not there is
+       * a deck to name, so the action row below never drifts.
        */}
-      {entry.deckLabel && (
-        <p className="flex items-center gap-1 text-[10px] leading-tight text-text-muted">
-          <Folder className="size-3 shrink-0 text-accent" aria-hidden="true" />
-          <span className="min-w-0 truncate">{entry.deckLabel}</span>
-        </p>
-      )}
+      <p className="flex min-h-[13px] items-center gap-1 text-[10px] leading-[13px] text-text-muted">
+        {entry.deckLabel && (
+          <>
+            <Folder className="size-3 shrink-0 text-accent" aria-hidden="true" />
+            <span className="min-w-0 truncate">{entry.deckLabel}</span>
+          </>
+        )}
+      </p>
 
-      {match === "exact" && (
-        <p className="text-[10px] leading-tight font-semibold text-accent">
-          You have this
-        </p>
-      )}
-      {match === "other-printing" && (
-        <p className="text-[10px] leading-tight text-accent">Another printing</p>
-      )}
-
-      {pledgeLine && (
-        <p className="text-[10px] leading-tight font-semibold text-accent">
-          {pledgeLine}
-        </p>
-      )}
-
-      {/*
-       * The one-tap pledge, open to anyone — no binder required, the
-       * founder's call. One copy, no note; the stacked view has the
-       * full form for counts and where-to-find-me. While it lands, the
-       * tile greys out under a spinner (the overlay anchors to this
-       * li's `relative`), because a silent button reads as broken.
-       */}
-      {canOffer && (
-        <QuickPledge
-          code={code}
-          flareId={entry.id}
-          early={early}
-          flareQuantity={entry.quantity}
-          offered={offered}
-          ownQuantity={ownQuantity}
-        />
-      )}
-      {offered && (
-        <p className="text-[10px] leading-tight text-text-muted">You&rsquo;re on it</p>
-      )}
-
-      {removable && (
-        <form action={removeListEntryAction}>
-          <input type="hidden" name="code" value={code} />
-          <input type="hidden" name="kind" value={kind} />
-          <input type="hidden" name="entryId" value={entry.id} />
-          <button
-            type="submit"
-            className="text-[10px] text-text-muted underline underline-offset-2 hover:text-text-secondary"
-          >
-            Remove
-          </button>
-        </form>
-      )}
+      {/* The action row: reserved on every tile, one control per side
+          of the trade. Pledging is open to anyone — no binder required,
+          the founder's call — and the stepper opens over the art. */}
+      <div className="h-7">
+        {canOffer && (
+          <QuickPledge
+            code={code}
+            flareId={entry.id}
+            early={early}
+            flareQuantity={entry.quantity}
+            offered={offered}
+            ownQuantity={ownQuantity}
+          />
+        )}
+        {removable && (
+          <form action={removeListEntryAction}>
+            <input type="hidden" name="code" value={code} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="entryId" value={entry.id} />
+            <button
+              type="submit"
+              className="flex h-7 w-full items-center justify-center rounded-[6px] border border-border text-[10px] font-medium text-text-muted transition-colors hover:text-text-secondary"
+            >
+              Remove
+            </button>
+          </form>
+        )}
+      </div>
     </li>
   );
 }
