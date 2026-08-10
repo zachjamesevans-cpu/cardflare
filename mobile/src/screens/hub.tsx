@@ -4,19 +4,27 @@ import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { lastRoom } from "../api";
-import { PostFlareScreen } from "./post-flare";
-import { Body, Button, Card, Title } from "../ui";
+import { getRoom, lastRoom, storedAccessToken } from "../api";
+import { PostFlareScreen, type PostTarget } from "./post-flare";
+import { Body, Button, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
 
 /**
  * The centre tab — the mark itself, and the product's one verb behind
- * it: post a Flare. In a room it goes straight to the picker; outside
- * one it points at the door, honestly, rather than pretending.
+ * it: post a Flare. Where the Flare lands depends on where the player
+ * actually is:
+ *
+ * - In a live (or early) room they have joined: straight onto that
+ *   board, tonight's loop.
+ * - Signed in with no live room — the founder's midnight bug: posting
+ *   used to target the *last* room regardless, quietly keeping a
+ *   closed store's room warm. Now it saves to the account list
+ *   instead, and the next room they walk into offers to post it.
+ * - A guest with no room: pointed at the door, honestly.
  */
 export function HubScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const [code, setCode] = useState<string | null>(null);
+  const [target, setTarget] = useState<PostTarget | "scan" | null>(null);
 
   /*
    * Re-tapping the Flare tab while already ON it means "different card":
@@ -40,11 +48,48 @@ export function HubScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void lastRoom().then(setCode);
+      let stale = false;
+
+      const decide = async () => {
+        const code = await lastRoom();
+        const signedIn = Boolean(await storedAccessToken());
+
+        if (code) {
+          try {
+            const state = await getRoom(code);
+            const live =
+              state.state === "room" &&
+              Boolean(state.joined) &&
+              (state.room?.status === "open" || state.room?.early);
+
+            if (live) {
+              if (!stale) setTarget({ kind: "room", code });
+              return;
+            }
+          } catch {
+            // Unreachable room counts as "not live"; fall through.
+          }
+        }
+
+        if (!stale) setTarget(signedIn ? { kind: "list" } : "scan");
+      };
+
+      void decide();
+      return () => {
+        stale = true;
+      };
     }, []),
   );
 
-  if (!code) {
+  if (target === null) {
+    return (
+      <View style={{ padding: spacing(4) }}>
+        <Muted>One moment…</Muted>
+      </View>
+    );
+  }
+
+  if (target === "scan") {
     return (
       <View style={{ padding: spacing(4) }}>
         <Card>
@@ -60,7 +105,7 @@ export function HubScreen() {
     );
   }
 
-  // No redirect after posting: the screen confirms with "Posted ✓" and
-  // resets itself for the next card. The Room tab is one tap away.
-  return <PostFlareScreen code={code} resetSignal={resetSignal} />;
+  // No redirect after posting: the screen confirms in place and resets
+  // itself for the next card. The Room tab is one tap away.
+  return <PostFlareScreen target={target} resetSignal={resetSignal} />;
 }

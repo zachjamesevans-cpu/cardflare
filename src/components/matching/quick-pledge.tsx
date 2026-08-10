@@ -41,13 +41,20 @@ function PendingOverlay() {
   );
 }
 
+/**
+ * Grey means "you could", green means "you are" — the founder's rule,
+ * and the classic one: neutral is an available action, colour is a
+ * state change. The card carries everyone else's status (fan, chip,
+ * grayscale); the button's colour answers exactly one question, is
+ * the viewer on this hunt.
+ */
 function HandshakeFace({ offered }: { offered: boolean }) {
   return (
     <span
       className={`flex h-7 w-full items-center justify-center rounded-[6px] border transition-colors ${
         offered
           ? "border-accent bg-accent/25 text-accent"
-          : "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+          : "border-border text-text-muted hover:border-border-strong hover:text-text-secondary"
       }`}
     >
       <Handshake className="size-4" aria-hidden="true" />

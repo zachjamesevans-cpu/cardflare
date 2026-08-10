@@ -27,7 +27,15 @@ export interface SavedWant {
   deckLabel: string | null;
 }
 
-/** Upserts one ask; re-posting the same card refreshes it, never stacks. */
+/**
+ * Upserts one ask; re-posting the same card refreshes it, never stacks.
+ *
+ * The outcome is returned for callers that saved *directly* to the list
+ * (the app's no-room path) and owe the player the truth. The piggyback
+ * callers — a Flare that also saves a want — keep ignoring it: there the
+ * Flare already succeeded, and blocking a live trade over a bookkeeping
+ * list would be backwards.
+ */
 export async function saveWant(
   playerId: string,
   entry: {
@@ -37,8 +45,8 @@ export async function saveWant(
     note: string | null;
     deckLabel: string | null;
   },
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+): Promise<"saved" | "at-cap" | "unavailable"> {
+  if (!isSupabaseConfigured()) return "unavailable";
 
   const admin = getSupabaseAdmin();
 
@@ -47,9 +55,7 @@ export async function saveWant(
     .select("id", { count: "exact", head: true })
     .eq("player_id", playerId);
 
-  // At the cap the save is skipped silently: the Flare itself succeeded,
-  // and blocking a live trade over a bookkeeping list would be backwards.
-  if ((count ?? 0) >= MAX_WANTS) return;
+  if ((count ?? 0) >= MAX_WANTS) return "at-cap";
 
   const { error } = await admin.from("player_wants").upsert(
     {
@@ -63,7 +69,12 @@ export async function saveWant(
     { onConflict: "player_id,card_id,printing_id" },
   );
 
-  if (error) console.error("Could not save the want", error);
+  if (error) {
+    console.error("Could not save the want", error);
+    return "unavailable";
+  }
+
+  return "saved";
 }
 
 /** Clears the want a traded Flare was posted from, exact ask only. */

@@ -241,7 +241,9 @@ export default function App() {
           // name — "Tabs" meant nothing to anyone at a counter.
           options={{ title: "Post a Flare", headerBackTitle: "Room" }}
         >
-          {({ route }) => <PostFlareScreen code={route.params.code} />}
+          {({ route }) => (
+            <PostFlareScreen target={{ kind: "room", code: route.params.code }} />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

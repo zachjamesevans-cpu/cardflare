@@ -295,6 +295,19 @@ export async function joinRoom(
   return result;
 }
 
+/**
+ * A hunt saved straight to the account — no room involved, so a
+ * midnight Flare never keeps a closed store's room warm. The next room
+ * the player walks into offers to post it.
+ */
+export const saveToList = (entry: {
+  cardId: string;
+  printingId?: string | null;
+  quantity: number;
+  note?: string;
+  deckLabel?: string | null;
+}) => call<{ ok: true }>("POST", "/api/v1/wants", entry);
+
 export const postFlare = (
   code: string,
   entry: {
