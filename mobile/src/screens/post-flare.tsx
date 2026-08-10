@@ -2,7 +2,7 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
-import { ApiError, postFlare, searchCards, type CardHit } from "../api";
+import { ApiError, postFlare, saveToList, searchCards, type CardHit } from "../api";
 import {
   Body,
   Button,
@@ -79,11 +79,19 @@ function Stats({ hit }: { hit: CardHit }) {
   );
 }
 
+/**
+ * Where a posted Flare lands: tonight's board, or — signed in with no
+ * live room — the account list, so a midnight Flare never keeps a
+ * closed store's room warm. The hub decides; this screen just says
+ * honestly which one it is doing.
+ */
+export type PostTarget = { kind: "room"; code: string } | { kind: "list" };
+
 export function PostFlareScreen({
-  code,
+  target,
   resetSignal,
 }: {
-  code: string;
+  target: PostTarget;
   /** Bumped by the Flare tab on a re-tap while focused: "different card". */
   resetSignal?: number;
 }) {
@@ -163,13 +171,19 @@ export function PostFlareScreen({
     setError(null);
 
     try {
-      await postFlare(code, {
+      const entry = {
         cardId: hit.id,
         printingId,
         quantity,
         note: note.trim() || undefined,
         deckLabel: deck.trim() || undefined,
-      });
+      };
+
+      if (target.kind === "room") {
+        await postFlare(target.code, entry);
+      } else {
+        await saveToList(entry);
+      }
 
       // The confirmation happens on the button that was pressed —
       // "Posted ✓" and a success buzz — then the row folds itself up,
@@ -186,8 +200,12 @@ export function PostFlareScreen({
     } catch (caught) {
       setError(
         caught instanceof ApiError && caught.code === "at-cap"
-          ? "You have hit the Flare cap for this room."
-          : "Could not post the Flare. Try again.",
+          ? target.kind === "room"
+            ? "You have hit the Flare cap for this room."
+            : "Your list is full. Remove something on the Account tab first."
+          : target.kind === "room"
+            ? "Could not post the Flare. Try again."
+            : "Could not save it. Try again.",
       );
       setBusy(false);
     }
@@ -197,6 +215,13 @@ export function PostFlareScreen({
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
       <Card>
         <Title>What are you hunting?</Title>
+        {/* Said up front, so nobody thinks a couch Flare reached a room. */}
+        {target.kind === "list" && (
+          <Muted>
+            No room right now, so this saves to your list. Every room you join
+            will offer to post it.
+          </Muted>
+        )}
         <Input
           value={query}
           onChangeText={setQuery}
@@ -394,7 +419,17 @@ export function PostFlareScreen({
 
                   <Button
                     label={
-                      posted ? "Posted ✓" : busy ? "Posting…" : "Post the Flare"
+                      target.kind === "room"
+                        ? posted
+                          ? "Posted ✓"
+                          : busy
+                            ? "Posting…"
+                            : "Post the Flare"
+                        : posted
+                          ? "Saved ✓"
+                          : busy
+                            ? "Saving…"
+                            : "Save to my list"
                     }
                     onPress={() => void submit(hit)}
                     busy={busy}
