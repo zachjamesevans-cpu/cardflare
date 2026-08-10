@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-store-form";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
+import { listStoreMembers } from "@/lib/admin/records";
 import { RoomRoster } from "@/components/events/room-roster";
 import { JoinPoster } from "@/components/events/join-poster";
 import { EventList } from "@/components/events/event-list";
@@ -87,8 +89,87 @@ export default async function AdminStorePage({
         </div>
       </div>
 
+      <StoreDetailsSection store={store} />
+
       {isVendor ? <VendorSections storeId={store.id} /> : <LgsSections store={store} />}
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The record itself: rename in place, never re-invite                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A store that changes its name or its address should not have to start
+ * over. Re-inviting was the only tool an admin had, and it mints a new
+ * store with a new counter code, orphaning the singles already uploaded
+ * and the history already earned. This edits the record they own.
+ */
+async function StoreDetailsSection({
+  store,
+}: {
+  store: {
+    id: string;
+    name: string;
+    contact_email: string;
+    city: string | null;
+    region: string | null;
+  };
+}) {
+  const members = await listStoreMembers(store.id);
+
+  return (
+    <section className="flex flex-col gap-5" aria-labelledby="details-heading">
+      <div className="flex flex-col gap-1.5">
+        <h2 id="details-heading" className="text-xl font-bold text-text-primary">
+          Store details
+        </h2>
+        <p className="text-sm text-text-secondary">
+          Edited in place: the counter code, the singles they have uploaded and every
+          past room stay exactly where they are.
+        </p>
+      </div>
+
+      <Card>
+        <EditStoreForm
+          store={{
+            id: store.id,
+            name: store.name,
+            contactEmail: store.contact_email,
+            city: store.city,
+            region: store.region,
+          }}
+        />
+      </Card>
+
+      <div className="flex flex-col gap-1.5">
+        <h3 className="text-lg font-bold text-text-primary">Who can sign in</h3>
+        <p className="text-sm text-text-secondary">
+          The address each person types to get in, which is a separate thing from the
+          contact email above. A change takes effect immediately and their password is
+          untouched.
+        </p>
+      </div>
+
+      <Card className="flex flex-col gap-5">
+        {members.length === 0 ? (
+          <p className="text-sm text-text-muted">
+            Nobody has finished setting up yet. The invitation link is what creates
+            their sign-in.
+          </p>
+        ) : (
+          members.map((member) => (
+            <EditSignInEmailForm
+              key={member.userId}
+              userId={member.userId}
+              email={member.email}
+              storeId={store.id}
+            />
+          ))
+        )}
+      </Card>
+    </section>
   );
 }
 
