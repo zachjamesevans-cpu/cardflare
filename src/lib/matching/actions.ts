@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { findParticipation } from "@/lib/events/participants";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
@@ -51,18 +50,25 @@ async function requirePlayerInRoom(
   };
 }
 
+/*
+ * No redirect on any path, deliberately. These fire from buttons halfway
+ * down a long board, and a redirect is a navigation — the browser
+ * re-anchors the scroll and the player "teleports" down the page, which
+ * a beta tester reported. `revalidatePath` re-renders in place and the
+ * viewport stays exactly where the tap happened.
+ */
 export async function offerTradeAction(formData: FormData): Promise<void> {
   const code = normalizeJoinCode(text(formData, "code"));
   if (!isValidJoinCode(code)) return;
 
   const flareId = text(formData, "flareId");
-  if (!flareId) redirect(`/e/${code}`);
+  if (!flareId) return;
 
   const rate = checkRateLimit(`offer:${await clientKey()}`, OFFER_MAX, OFFER_WINDOW_MS);
-  if (!rate.allowed) redirect(`/e/${code}`);
+  if (!rate.allowed) return;
 
   const membership = await requirePlayerInRoom(code);
-  if (!membership) redirect(`/e/${code}`);
+  if (!membership) return;
 
   const message = offerMessageSchema.safeParse(text(formData, "message") ?? "");
 
@@ -94,7 +100,6 @@ export async function offerTradeAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/e/${code}`);
-  redirect(`/e/${code}`);
 }
 
 export async function withdrawOfferAction(formData: FormData): Promise<void> {
@@ -102,13 +107,12 @@ export async function withdrawOfferAction(formData: FormData): Promise<void> {
   if (!isValidJoinCode(code)) return;
 
   const flareId = text(formData, "flareId");
-  if (!flareId) redirect(`/e/${code}`);
+  if (!flareId) return;
 
   const membership = await requirePlayerInRoom(code);
-  if (!membership) redirect(`/e/${code}`);
+  if (!membership) return;
 
   await withdrawOffer(flareId, membership.playerSessionId);
 
   revalidatePath(`/e/${code}`);
-  redirect(`/e/${code}`);
 }

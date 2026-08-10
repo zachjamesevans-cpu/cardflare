@@ -720,7 +720,6 @@ function CarouselFlare({
   onWithdraw: () => Promise<void>;
   onRemove: () => void;
 }) {
-  const pledgeLine = pledgeLineFor(flare);
   const covered =
     flare.offers.length > 0 &&
     pledgeTally(flare.offers, flare.quantity).remaining === 0;
@@ -815,8 +814,22 @@ function CarouselFlare({
           lookingFor={flare.quantity}
           stillNeeds={flare.offers.length > 0 ? remaining : null}
         />
-        {/* A note announces itself on the tile; the zoom is where it
-            gets read. */}
+        {/*
+         * Every signal that used to be its own caption line lives on
+         * the art as a badge now. The founder's screenshot counted the
+         * handshake at three heights in one rail — variable caption
+         * stacks were the culprit, so below the art the tile is a
+         * fixed grid: one name line, one caption slot, one action row.
+         */}
+        {flare.match ? (
+          <View style={styles.matchBadge}>
+            <MaterialCommunityIcons
+              name={flare.match === "exact" ? "check-bold" : "layers-outline"}
+              size={9}
+              color={colors.accent}
+            />
+          </View>
+        ) : null}
         {flare.note ? (
           <View style={styles.noteBadge}>
             <Text style={styles.noteBadgeGlyph}>✎</Text>
@@ -830,107 +843,103 @@ function CarouselFlare({
             <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
           </View>
         ) : null}
+
+        {/* The stepper opens OVER the art, never in the flow: inline it
+            shoved the neighbouring tiles' buttons around, which is the
+            misalignment the founder photographed. */}
+        {picking ? (
+          <View style={styles.stepperPanel}>
+            <Tap onPress={() => setPicking(false)} hitSlop={6} style={styles.stepperClose}>
+              <Text style={{ color: colors.textMuted, fontSize: 11 }}>✕</Text>
+            </Tap>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+              <Tap
+                onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
+                hitSlop={6}
+              >
+                <Text style={styles.stepperGlyph}>−</Text>
+              </Tap>
+              <Text style={styles.stepperCount}>{count}</Text>
+              <Tap
+                onPress={() =>
+                  setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))
+                }
+                hitSlop={6}
+              >
+                <Text style={styles.stepperGlyph}>+</Text>
+              </Tap>
+            </View>
+            {/* Zero is a real answer once a pledge stands: it withdraws. */}
+            <Tap
+              onPress={() =>
+                offered && count === 0 ? void takeBack() : void pledge(count)
+              }
+              hitSlop={6}
+            >
+              <View
+                style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}
+              >
+                <Text
+                  style={[
+                    styles.stepperGoGlyph,
+                    offered && count === 0 && { color: colors.textSecondary },
+                  ]}
+                >
+                  {offered && count === 0 ? "Undo" : "✓"}
+                </Text>
+              </View>
+            </Tap>
+          </View>
+        ) : null}
+
         {pledging ? (
           <View style={styles.pledgeOverlay}>
             <ActivityIndicator size="small" color={colors.accent} />
           </View>
         ) : null}
       </View>
-      <Text
-        numberOfLines={1}
-        style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
-      >
+
+      <Text numberOfLines={1} style={styles.tileName}>
         {flare.cardName}
       </Text>
 
-      {/* The deck, said on the tile itself — folders are a caption,
-          not a container, so every tile keeps the same shape. */}
-      {flare.deckLabel && (
-        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 10 }}>
-          {flare.deckLabel}
-        </Text>
-      )}
+      {/* The caption slot: exactly one line tall whether or not there
+          is a deck to name, so the action row below never drifts. */}
+      <Text numberOfLines={1} style={styles.tileCaption}>
+        {flare.deckLabel ?? " "}
+      </Text>
 
-      {flare.match === "exact" && (
-        <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "700" }}>
-          You have this
-        </Text>
-      )}
-      {flare.match === "other-printing" && (
-        <Text style={{ color: colors.accent, fontSize: 10 }}>Another printing</Text>
-      )}
-
-      {/* Coverage is public: the next holder should know whether the
-          hunt still needs them, or whether every copy is spoken for. */}
-      {pledgeLine && (
-        <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "700" }}>
-          {pledgeLine}
-        </Text>
-      )}
-
-      {/* Anyone can pledge — no binder required, the founder's call.
-          The handshake is the whole button, and it stays after you
-          commit (filled in) so the pledge can be edited: tap to reopen
-          the stepper at your count, and stepping to zero withdraws. */}
-      {!mine && !picking && (
-        <Tap
-          onPress={() =>
-            offered || flare.quantity > 1 ? setPicking(true) : void pledge()
-          }
-          disabled={pledging}
-          style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
-          hitSlop={4}
-        >
-          <MaterialCommunityIcons
-            name={offered ? "handshake" : "handshake-outline"}
-            size={14}
-            color={colors.accent}
-          />
-        </Tap>
-      )}
-      {!mine && picking && (
-        <View style={styles.pledgeStepper}>
-          <Tap
-            onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
-            hitSlop={6}
-          >
-            <Text style={styles.stepperGlyph}>−</Text>
-          </Tap>
-          <Text style={styles.stepperCount}>{count}</Text>
-          <Tap
-            onPress={() => setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))}
-            hitSlop={6}
-          >
-            <Text style={styles.stepperGlyph}>+</Text>
-          </Tap>
-          {/* Zero is a real answer once a pledge stands: it withdraws. */}
+      {/* The action row: reserved on every tile. Pledging is open to
+          anyone — no binder required, the founder's call — and a
+          standing pledge keeps the button, filled in, tap to edit. */}
+      <View style={{ height: 24 }}>
+        {!mine ? (
           <Tap
             onPress={() =>
-              offered && count === 0 ? void takeBack() : void pledge(count)
+              picking
+                ? setPicking(false)
+                : offered || flare.quantity > 1
+                  ? setPicking(true)
+                  : void pledge()
             }
-            hitSlop={6}
+            disabled={pledging}
+            style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
+            hitSlop={4}
           >
-            <View style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}>
-              <Text
-                style={[
-                  styles.stepperGoGlyph,
-                  offered && count === 0 && { color: colors.textSecondary },
-                ]}
-              >
-                ✓
-              </Text>
-            </View>
+            <MaterialCommunityIcons
+              name={offered ? "handshake" : "handshake-outline"}
+              size={14}
+              color={colors.accent}
+            />
           </Tap>
-        </View>
-      )}
-      {!mine && offered && !picking && (
-        <Text style={{ color: colors.textMuted, fontSize: 10 }}>You&rsquo;re on it</Text>
-      )}
-      {mine && (
-        <Tap onPress={onRemove} hitSlop={6}>
-          <Text style={{ color: colors.textMuted, fontSize: 10 }}>Remove</Text>
-        </Tap>
-      )}
+        ) : (
+          <Tap onPress={onRemove} hitSlop={4} style={styles.removeButton}>
+            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}>
+              Remove
+            </Text>
+          </Tap>
+        )}
+      </View>
     </View>
   );
 }
@@ -1204,11 +1213,57 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
   },
-  pledgeStepper: {
-    flexDirection: "row",
+  matchBadge: {
+    position: "absolute",
+    top: 2,
+    left: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: `${colors.surface}E6`,
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+  },
+  tileName: {
+    color: colors.textPrimary,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    minHeight: 14,
+  },
+  tileCaption: {
+    color: colors.textMuted,
+    fontSize: 10,
+    lineHeight: 13,
+    minHeight: 13,
+  },
+  removeButton: {
     height: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperPanel: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 56,
+    // The art's 63:88 box, covered edge to edge.
+    height: 78,
+    borderRadius: radius.control / 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: `${colors.canvas}F2`,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(1.5),
+  },
+  stepperClose: {
+    position: "absolute",
+    top: 1,
+    right: 3,
   },
   stepperGlyph: {
     color: colors.textSecondary,
@@ -1225,8 +1280,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stepperGo: {
-    width: 18,
+    minWidth: 18,
     height: 18,
+    paddingHorizontal: 5,
     borderRadius: 4,
     backgroundColor: colors.accent,
     alignItems: "center",

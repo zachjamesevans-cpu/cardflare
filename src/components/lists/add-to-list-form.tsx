@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, Loader2, X } from "lucide-react";
 
@@ -113,6 +113,21 @@ export function AddToListForm({
   const [deckDraft, setDeckDraft] = useState("");
 
   /*
+   * Picking a card collapses the tall results list into a short form,
+   * which yanks everything below it upward while the browser holds its
+   * scroll offset — a beta tester reported the page "teleporting" down.
+   * Anchoring the panel back into view on each pick keeps the form
+   * exactly where the eye already was.
+   */
+  const panel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (picked) {
+      panel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [picked]);
+
+  /*
    * A successful post hands the screen back to the search. Keeping the
    * posted card up, with its "Change" button still showing, read as if
    * the post itself wanted changing; the founder called it out. The
@@ -133,6 +148,8 @@ export function AddToListForm({
 
   return (
     <Card className="flex flex-col gap-4">
+      {/* Zero-height scroll anchor: the Card itself may not forward refs. */}
+      <div ref={panel} aria-hidden="true" />
       <div className="flex flex-col gap-1">
         <h3 className="font-semibold text-text-primary">{copy.title}</h3>
         <p className="text-sm text-text-secondary">{copy.hint}</p>

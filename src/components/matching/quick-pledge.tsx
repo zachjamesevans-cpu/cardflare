@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, Handshake, Loader2, Minus, Plus } from "lucide-react";
+import { Check, Handshake, Loader2, Minus, Plus, X } from "lucide-react";
 
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 
@@ -11,19 +11,20 @@ import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
  * founder's pick over a text link — at tile size an icon reads faster
  * than words, and the handshake is already the offer's mark elsewhere.
  *
- * Fresh pledge, one copy asked: the tap is the pledge. More than one:
- * the button flips in place to a minimal stepper — minus, count, plus,
- * check — and the check submits. No popover; the tile is the form.
+ * Fresh pledge, one copy asked: the tap is the pledge. Anything with a
+ * count to choose opens the stepper — and the stepper is an overlay
+ * panel ON the card art, not an inline expansion. The founder's
+ * screenshots showed why: expanding in the flow shoved neighbouring
+ * tiles' buttons around, and the rail's alignment is the whole point.
+ * The panel floats above the tile (`z-20` against the li's `relative`),
+ * the button underneath never moves, and tapping the button again
+ * closes the panel.
  *
- * A standing pledge keeps the button, filled in — the founder's call:
- * committing should not take the control away. Tapping it reopens the
- * stepper at your current count to change how many you are bringing,
- * and stepping down to zero turns the check into a withdraw. One
- * control, every state of the promise.
- *
- * While anything is in flight the whole tile greys out under a spinner
- * (the overlay anchors to the tile's `relative`), because a silent
- * button reads as broken — the founder felt it on device.
+ * A standing pledge keeps the button, filled in — committing should not
+ * take the control away. Reopening starts at your promised count, and
+ * stepping to zero turns the check into a withdraw. While anything is
+ * in flight the tile greys out under a spinner, because a silent button
+ * reads as broken.
  */
 
 function PendingOverlay() {
@@ -33,7 +34,7 @@ function PendingOverlay() {
   return (
     <span
       aria-hidden="true"
-      className="absolute inset-0 z-10 flex items-center justify-center rounded-[8px] bg-canvas/60"
+      className="absolute inset-0 z-30 flex items-center justify-center rounded-[8px] bg-canvas/60"
     >
       <Loader2 className="size-5 animate-spin text-accent" />
     </span>
@@ -105,65 +106,82 @@ export function QuickPledge({
     );
   }
 
-  if (!picking) {
-    return (
+  /* Zero is a real answer once a pledge stands: the check withdraws it. */
+  const floor = offered ? 0 : 1;
+  const withdrawing = offered && count === 0;
+
+  return (
+    <>
+      {picking && (
+        <div className="absolute inset-x-0 top-0 z-20 flex aspect-[63/88] flex-col items-center justify-center gap-1.5 rounded-[7px] border border-border bg-canvas/95">
+          <button
+            type="button"
+            onClick={() => setPicking(false)}
+            aria-label="Never mind"
+            className="absolute top-1 right-1 text-text-muted hover:text-text-secondary"
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </button>
+
+          <form
+            action={withdrawing ? withdrawOfferAction : offerTradeAction}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <input type="hidden" name="code" value={code} />
+            <input type="hidden" name="flareId" value={flareId} />
+            {!withdrawing && <input type="hidden" name="quantity" value={count} />}
+            <PendingOverlay />
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCount((n) => Math.max(floor, n - 1))}
+                aria-label="One fewer"
+                className="flex size-5 shrink-0 items-center justify-center rounded-[4px] border border-border text-text-secondary"
+              >
+                <Minus className="size-3" aria-hidden="true" />
+              </button>
+              <span className="min-w-4 text-center text-xs font-bold text-text-primary tabular-nums">
+                {count}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCount((n) => Math.min(Math.max(flareQuantity, 1), n + 1))
+                }
+                aria-label="One more"
+                className="flex size-5 shrink-0 items-center justify-center rounded-[4px] border border-border text-text-secondary"
+              >
+                <Plus className="size-3" aria-hidden="true" />
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              aria-label={
+                withdrawing ? "Take the pledge back" : `${label}, bringing ${count}`
+              }
+              className={`flex h-5 w-11 items-center justify-center rounded-[4px] text-[10px] font-semibold ${
+                withdrawing
+                  ? "border border-border text-text-secondary"
+                  : "bg-accent text-accent-contrast"
+              }`}
+            >
+              {withdrawing ? "Undo" : <Check className="size-3" aria-hidden="true" />}
+            </button>
+          </form>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={() => setPicking(true)}
+        onClick={() => setPicking((open) => !open)}
         aria-label={offered ? "Change your pledge" : label}
         title={offered ? "Change your pledge" : label}
         className="w-full"
       >
         <HandshakeFace offered={offered} />
       </button>
-    );
-  }
-
-  /* Zero is a real answer once a pledge stands: the check withdraws it. */
-  const floor = offered ? 0 : 1;
-  const withdrawing = offered && count === 0;
-
-  return (
-    <form
-      action={withdrawing ? withdrawOfferAction : offerTradeAction}
-      className="flex h-7 items-center gap-0.5"
-    >
-      <input type="hidden" name="code" value={code} />
-      <input type="hidden" name="flareId" value={flareId} />
-      {!withdrawing && <input type="hidden" name="quantity" value={count} />}
-      <PendingOverlay />
-      <button
-        type="button"
-        onClick={() => setCount((n) => Math.max(floor, n - 1))}
-        aria-label="One fewer"
-        className="flex size-5 shrink-0 items-center justify-center rounded-[4px] border border-border text-text-secondary"
-      >
-        <Minus className="size-3" aria-hidden="true" />
-      </button>
-      <span className="min-w-3 text-center text-[11px] font-semibold text-text-primary tabular-nums">
-        {count}
-      </span>
-      <button
-        type="button"
-        onClick={() => setCount((n) => Math.min(Math.max(flareQuantity, 1), n + 1))}
-        aria-label="One more"
-        className="flex size-5 shrink-0 items-center justify-center rounded-[4px] border border-border text-text-secondary"
-      >
-        <Plus className="size-3" aria-hidden="true" />
-      </button>
-      <button
-        type="submit"
-        aria-label={
-          withdrawing ? "Take the pledge back" : `${label}, bringing ${count}`
-        }
-        className={`flex size-5 shrink-0 items-center justify-center rounded-[4px] ${
-          withdrawing
-            ? "border border-border text-text-secondary"
-            : "bg-accent text-accent-contrast"
-        }`}
-      >
-        <Check className="size-3" aria-hidden="true" />
-      </button>
-    </form>
+    </>
   );
 }
