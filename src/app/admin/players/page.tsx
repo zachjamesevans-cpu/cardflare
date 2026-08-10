@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, UserRound } from "lucide-react";
 
+import { EditPlayerName } from "@/components/admin/edit-player-form";
 import { InvitePlayerForm } from "@/components/admin/invite-player-form";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -101,6 +102,10 @@ export default async function AdminPlayersPage() {
                       </span>
                     )}
                   </div>
+                  <EditPlayerName
+                    playerId={player.id}
+                    displayName={player.displayName}
+                  />
                   <Badge>active</Badge>
                 </li>
               ))}
