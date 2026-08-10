@@ -7,7 +7,6 @@ import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
-import { BoardViewToggle } from "@/components/lists/board-view-toggle";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
@@ -112,21 +111,11 @@ function Unavailable() {
  */
 export default async function JoinByCodePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ view?: string }>;
 }) {
   const { code } = await params;
 
-  /*
-   * The board's two layouts, chosen by URL so the page stays a Server
-   * Component with zero client JavaScript for the switch. Carousel is
-   * the default — a board reads best as a shelf of cards — and anything
-   * that is not "stacked" falls back to it, so a mistyped or stale
-   * parameter can never blank the board.
-   */
-  const boardView = (await searchParams).view === "stacked" ? "stacked" : "carousel";
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
   if (!isValidJoinCode(normalized)) notFound();
@@ -535,8 +524,6 @@ export default async function JoinByCodePage({
                   help, go and find them.
                 </p>
               </div>
-
-              <BoardViewToggle basePath={`/e/${normalized}`} view={boardView} />
             </div>
 
             <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
@@ -559,7 +546,6 @@ export default async function JoinByCodePage({
               counterHas={counterHas}
               counterName={event.storeName}
               early={phase === "early"}
-              view={boardView}
             />
           </section>
 

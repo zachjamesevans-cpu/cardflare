@@ -18,6 +18,7 @@ import {
   OfferPanel,
   PledgeSummary,
 } from "@/components/matching/offer-controls";
+import { GroupView } from "@/components/lists/group-view";
 import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -474,7 +475,6 @@ export function FlareBoard({
   counterHas,
   counterName,
   early = false,
-  view = "carousel",
 }: {
   entries: ListEntry[];
   code: string;
@@ -492,12 +492,6 @@ export function FlareBoard({
   counterName?: string;
   /** Early board: offers read as pledges to bring the card. */
   early?: boolean;
-  /**
-   * Carousel is the browsing view and the default — every surface that
-   * renders the board without asking gets the concise shape; the store
-   * dashboard used to fall back to stacked with no way out.
-   */
-  view?: "stacked" | "carousel";
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
   const groups = groupByPlayer(entries);
@@ -536,60 +530,64 @@ export function FlareBoard({
          */
         const { folders, loose } = partitionByDeck(group.entries);
 
-        const renderEntry = (entry: ListEntry) => {
+        /*
+         * The carousel tile is a contact sheet with one quick action:
+         * anyone can tap the handshake on somebody else's card. The
+         * coverage is public — the founder's ask — so the next holder
+         * knows whether a hunt still needs them.
+         */
+        const renderTile = (entry: ListEntry) => {
+          const match = isYou ? null : (matches.get(entry.id) ?? null);
+          const entryOffers = offers.get(entry.id) ?? [];
+          const ownOffer = entryOffers.find(
+            (offer) => offer.responderSessionId === youId,
+          );
+          const { remaining } = pledgeTally(entryOffers, entry.quantity);
+          const covered = entryOffers.length > 0 && remaining === 0;
+          const pledgeLine =
+            entryOffers.length === 0
+              ? null
+              : covered
+                ? entry.quantity > 1
+                  ? `All ${entry.quantity} spoken for`
+                  : "Spoken for"
+                : `Needs ${remaining} more`;
+
+          return (
+            <CarouselEntry
+              key={entry.id}
+              entry={entry}
+              code={code}
+              kind="flare"
+              imagesEnabled={imagesEnabled}
+              match={match}
+              removable={isYou}
+              pledgeLine={pledgeLine}
+              canOffer={!isYou}
+              offered={Boolean(ownOffer)}
+              ownQuantity={ownOffer?.quantity ?? 1}
+              early={early}
+              covered={covered}
+              remaining={remaining}
+            />
+          );
+        };
+
+        /*
+         * The unfolded row. Your Flare: everyone who raised a hand,
+         * each with a "we traded", plus the quiet tally for a trade
+         * that happened without an offer. Someone else's: the pledge
+         * controls, for everybody — a binder match is a hint now, not
+         * a permission. Never both — you cannot offer on your own
+         * request. The coverage line renders for all viewers.
+         */
+        const renderRow = (entry: ListEntry) => {
           const match = isYou ? null : (matches.get(entry.id) ?? null);
           const entryOffers = offers.get(entry.id) ?? [];
           const ownOffer = entryOffers.find(
             (offer) => offer.responderSessionId === youId,
           );
 
-          /*
-           * The carousel item is a contact sheet with one quick action:
-           * anyone can tap "I got it" on somebody else's card. Counts,
-           * notes and confirms live in the stacked view. The coverage
-           * line is public — the founder's ask — so the next holder
-           * knows whether a hunt still needs them.
-           */
-          if (view === "carousel") {
-            const { remaining } = pledgeTally(entryOffers, entry.quantity);
-            const covered = entryOffers.length > 0 && remaining === 0;
-            const pledgeLine =
-              entryOffers.length === 0
-                ? null
-                : covered
-                  ? entry.quantity > 1
-                    ? `All ${entry.quantity} spoken for`
-                    : "Spoken for"
-                  : `Needs ${remaining} more`;
-
-            return (
-              <CarouselEntry
-                key={entry.id}
-                entry={entry}
-                code={code}
-                kind="flare"
-                imagesEnabled={imagesEnabled}
-                match={match}
-                removable={isYou}
-                pledgeLine={pledgeLine}
-                canOffer={!isYou}
-                offered={Boolean(ownOffer)}
-                ownQuantity={ownOffer?.quantity ?? 1}
-                early={early}
-                covered={covered}
-                remaining={remaining}
-              />
-            );
-          }
-
-          /*
-           * Your Flare: everyone who raised a hand, each with a
-           * "we traded", plus the quiet tally for a trade that
-           * happened without an offer. Someone else's: the pledge
-           * controls, for everybody — a binder match is a hint now,
-           * not a permission. Never both — you cannot offer on your
-           * own request. The coverage line renders for all viewers.
-           */
           return (
             <Entry
               key={entry.id}
@@ -624,110 +622,115 @@ export function FlareBoard({
           );
         };
 
+        /*
+         * Fully pledged hunts park at the rail's far end, dimmed but
+         * present — "taken care of" at a glance, while the bring-extras
+         * crowd can still see what was asked.
+         */
+        const isCovered = (entry: ListEntry) => {
+          const entryOffers = offers.get(entry.id) ?? [];
+          return (
+            entryOffers.length > 0 &&
+            pledgeTally(entryOffers, entry.quantity).remaining === 0
+          );
+        };
+
+        const railEntries = [...folders.flatMap((folder) => folder.entries), ...loose];
+
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <PlayerAvatar
-                  displayName={group.displayName ?? "?"}
-                  seed={group.playerSessionId}
-                  size="sm"
-                />
-                <p id={headingId} className="truncate font-semibold text-text-primary">
-                  {group.displayName ?? "A player"}
-                  {isYou && <span className="font-normal text-text-muted"> · you</span>}
-                </p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                {/*
-                 * Said once for the group as well as per card. On a long board
-                 * this is the line that decides whether someone walks over.
-                 */}
-                {answerable > 0 && (
-                  <Badge>
-                    You have {answerable} of {group.entries.length}
-                  </Badge>
-                )}
-                <span className="text-sm text-text-muted tabular-nums">
-                  {group.entries.length} {group.entries.length === 1 ? "card" : "cards"}
-                </span>
-              </div>
-            </div>
-
             {/*
-             * Carousel: ONE rail per player, every tile the same shape —
-             * the founder asked for the folder's cards to look exactly
-             * like the loose ones. The partition keeps a deck's cards
-             * side by side, and each of them names its deck in its own
-             * caption. Stacked keeps the header-then-rows shape.
+             * The founder's synthesis, replacing the page-wide toggle:
+             * the rail is every player's default face, and the chevron
+             * on their header unfolds THEM into the full stacked view.
              */}
-            {view === "carousel" ? (
-              <Rail labelledBy={headingId}>
-                {(() => {
-                  /*
-                   * Fully pledged hunts park at the rail's far end, dimmed
-                   * but present — "taken care of" at a glance, while the
-                   * bring-extras crowd can still see what was asked.
-                   */
-                  const isCovered = (entry: ListEntry) => {
-                    const entryOffers = offers.get(entry.id) ?? [];
-                    return (
-                      entryOffers.length > 0 &&
-                      pledgeTally(entryOffers, entry.quantity).remaining === 0
-                    );
-                  };
-
-                  const rail = [
-                    ...folders.flatMap((folder) => folder.entries),
-                    ...loose,
-                  ];
-
-                  return [
-                    ...rail.filter((entry) => !isCovered(entry)),
-                    ...rail.filter(isCovered),
-                  ].map(renderEntry);
-                })()}
-                {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
-              </Rail>
-            ) : (
-              <>
-                {folders.map((folder) => (
-                  <div
-                    key={folder.label.toLowerCase()}
-                    className="flex flex-col gap-1.5"
+            <GroupView
+              identity={
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <PlayerAvatar
+                    displayName={group.displayName ?? "?"}
+                    seed={group.playerSessionId}
+                    size="sm"
+                  />
+                  <span
+                    id={headingId}
+                    className="truncate font-semibold text-text-primary"
                   >
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-                      <Folder
-                        className="size-4 shrink-0 text-accent"
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 truncate">{folder.label}</span>
-                      <span className="shrink-0 font-normal text-text-muted tabular-nums">
-                        · {folder.entries.length}{" "}
-                        {folder.entries.length === 1 ? "card" : "cards"}
-                      </span>
-                    </p>
-                    <ul aria-label={`Deck: ${folder.label}`} className="flex flex-col">
-                      {folder.entries.map(renderEntry)}
+                    {group.displayName ?? "A player"}
+                    {isYou && (
+                      <span className="font-normal text-text-muted"> · you</span>
+                    )}
+                  </span>
+                </span>
+              }
+              meta={
+                <>
+                  {/*
+                   * Said once for the group as well as per card. On a long
+                   * board this is the line that decides who to walk over to.
+                   */}
+                  {answerable > 0 && (
+                    <Badge>
+                      You have {answerable} of {group.entries.length}
+                    </Badge>
+                  )}
+                  <span className="text-sm text-text-muted tabular-nums">
+                    {group.entries.length}{" "}
+                    {group.entries.length === 1 ? "card" : "cards"}
+                  </span>
+                </>
+              }
+              rail={
+                <Rail labelledBy={headingId}>
+                  {[
+                    ...railEntries.filter((entry) => !isCovered(entry)),
+                    ...railEntries.filter(isCovered),
+                  ].map(renderTile)}
+                  {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
+                </Rail>
+              }
+              stacked={
+                <div className="flex flex-col gap-3 pt-1">
+                  {folders.map((folder) => (
+                    <div
+                      key={folder.label.toLowerCase()}
+                      className="flex flex-col gap-1.5"
+                    >
+                      <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                        <Folder
+                          className="size-4 shrink-0 text-accent"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 truncate">{folder.label}</span>
+                        <span className="shrink-0 font-normal text-text-muted tabular-nums">
+                          · {folder.entries.length}{" "}
+                          {folder.entries.length === 1 ? "card" : "cards"}
+                        </span>
+                      </p>
+                      <ul
+                        aria-label={`Deck: ${folder.label}`}
+                        className="flex flex-col"
+                      >
+                        {folder.entries.map(renderRow)}
+                      </ul>
+                    </div>
+                  ))}
+
+                  {(loose.length > 0 || alsoOpen) && (
+                    <ul aria-labelledby={headingId} className="flex flex-col">
+                      {loose.map(renderRow)}
+
+                      {/*
+                       * Last, under the specific asks. Somebody has named
+                       * four cards and will also look at anything — the four
+                       * cards are the more actionable half of that.
+                       */}
+                      {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
                     </ul>
-                  </div>
-                ))}
-
-                {(loose.length > 0 || alsoOpen) && (
-                  <ul aria-labelledby={headingId} className="flex flex-col">
-                    {loose.map(renderEntry)}
-
-                    {/*
-                     * Last, under the specific asks. Somebody has named four
-                     * cards and will also look at anything — the four cards
-                     * are the more actionable half of that.
-                     */}
-                    {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
-                  </ul>
-                )}
-              </>
-            )}
+                  )}
+                </div>
+              }
+            />
           </Card>
         );
       })}
