@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
+import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { JoinCodeForm } from "@/components/events/join-code-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -42,65 +43,74 @@ export default async function JoinPage() {
   const locals = playerId ? await listLocals(playerId) : [];
 
   return (
-    <main
-      id="main"
-      className="flex min-h-dvh flex-col items-center justify-center gap-8 px-5 py-16"
-    >
-      <Link href="/" aria-label={`${SITE.name} home`}>
-        <Logo size={40} priority />
-      </Link>
+    <>
+      <main
+        id="main"
+        className="flex min-h-dvh flex-col items-center justify-center gap-8 px-5 py-16"
+      >
+        <Link href="/" aria-label={`${SITE.name} home`}>
+          <Logo size={40} priority />
+        </Link>
 
-      <div className="flex w-full max-w-md flex-col gap-5">
-        <div className="flex flex-col gap-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-            Join an event
-          </h1>
-          <p className="text-text-secondary">
-            Enter the code from the sheet at your store.
-          </p>
+        <div className="flex w-full max-w-md flex-col gap-5">
+          <div className="flex flex-col gap-2 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+              Join an event
+            </h1>
+            <p className="text-text-secondary">
+              Enter the code from the sheet at your store.
+            </p>
+          </div>
+
+          <JoinCodeForm />
+
+          {locals.length > 0 && (
+            <Card className="flex flex-col gap-3">
+              <h2 className="font-semibold text-text-primary">Your locals</h2>
+              <ul className="flex flex-col">
+                {locals.map((local) => (
+                  <li
+                    key={local.storeId}
+                    className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
+                  >
+                    <Link
+                      href={`/e/${local.joinCode}`}
+                      className="flex flex-col gap-0.5"
+                    >
+                      <span className="font-semibold text-text-primary underline-offset-4 hover:underline">
+                        {local.name}
+                      </span>
+                      <span className="text-xs text-text-muted">
+                        {local.liveNow
+                          ? "A room is open right now"
+                          : local.nextEventAt
+                            ? `Next: ${local.nextEventName} · ${new Intl.DateTimeFormat(
+                                "en-US",
+                                { weekday: "short", month: "short", day: "numeric" },
+                              ).format(new Date(local.nextEventAt))}`
+                            : "Tap to see what's happening"}
+                      </span>
+                    </Link>
+                    {/* One tap: onto the board, wants and all, days early. */}
+                    {local.earlyOpen && local.nextEventCode && (
+                      <form action={rsvpAction}>
+                        <input type="hidden" name="code" value={local.nextEventCode} />
+                        <Button type="submit" variant="secondary" size="sm">
+                          I&rsquo;ll be there. Post my wants
+                        </Button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </div>
 
-        <JoinCodeForm />
+        <TabBarSpacer />
+      </main>
 
-        {locals.length > 0 && (
-          <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-text-primary">Your locals</h2>
-            <ul className="flex flex-col">
-              {locals.map((local) => (
-                <li
-                  key={local.storeId}
-                  className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-                >
-                  <Link href={`/e/${local.joinCode}`} className="flex flex-col gap-0.5">
-                    <span className="font-semibold text-text-primary underline-offset-4 hover:underline">
-                      {local.name}
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {local.liveNow
-                        ? "A room is open right now"
-                        : local.nextEventAt
-                          ? `Next: ${local.nextEventName} · ${new Intl.DateTimeFormat(
-                              "en-US",
-                              { weekday: "short", month: "short", day: "numeric" },
-                            ).format(new Date(local.nextEventAt))}`
-                          : "Tap to see what's happening"}
-                    </span>
-                  </Link>
-                  {/* One tap: onto the board, wants and all, days early. */}
-                  {local.earlyOpen && local.nextEventCode && (
-                    <form action={rsvpAction}>
-                      <input type="hidden" name="code" value={local.nextEventCode} />
-                      <Button type="submit" variant="secondary" size="sm">
-                        I&rsquo;ll be there. Post my wants
-                      </Button>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </div>
-    </main>
+      <PlayerTabBar />
+    </>
   );
 }
