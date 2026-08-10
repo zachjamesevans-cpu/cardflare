@@ -929,7 +929,7 @@ function CarouselFlare({
             <MaterialCommunityIcons
               name={offered ? "handshake" : "handshake-outline"}
               size={14}
-              color={colors.accent}
+              color={offered ? colors.accent : colors.textMuted}
             />
           </Tap>
         ) : (
@@ -1181,11 +1181,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
     opacity: 0.4,
   },
+  // Grey means "you could", green means "you are" — the founder's
+  // rule: the card carries everyone else's status, the button's
+  // colour answers only whether the viewer is on this hunt.
   pledgeButton: {
     height: 24,
     borderWidth: 1,
-    borderColor: `${colors.accent}66`,
-    backgroundColor: `${colors.accent}1A`,
+    borderColor: colors.border,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
