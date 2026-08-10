@@ -6,6 +6,7 @@ import { CalendarClock, MapPin } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { ConfirmBinder } from "@/components/lists/confirm-binder";
 import { FlareBoard, HaveList } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
@@ -67,22 +68,30 @@ function Shell({
   wide?: boolean;
 }) {
   return (
-    <main
-      id="main"
-      className={cn(
-        "flex min-h-dvh flex-col items-center gap-8 px-5 py-16",
-        wide ? "justify-start" : "justify-center",
-      )}
-    >
-      <Link href="/" aria-label={`${SITE.name} home`}>
-        <Logo size={40} priority />
-      </Link>
-      <div
-        className={cn("flex w-full flex-col gap-5", wide ? "max-w-2xl" : "max-w-md")}
+    <>
+      <main
+        id="main"
+        className={cn(
+          "flex min-h-dvh flex-col items-center gap-8 px-5 py-16",
+          wide ? "justify-start" : "justify-center",
+        )}
       >
-        {children}
-      </div>
-    </main>
+        <Link href="/" aria-label={`${SITE.name} home`}>
+          <Logo size={40} priority />
+        </Link>
+        <div
+          className={cn("flex w-full flex-col gap-5", wide ? "max-w-2xl" : "max-w-md")}
+        >
+          {children}
+        </div>
+
+        {/* The board's last control must not hide under the tab bar. */}
+        <TabBarSpacer />
+      </main>
+
+      {/* The app's bottom bar, so a room feels the same in both. */}
+      <PlayerTabBar />
+    </>
   );
 }
 

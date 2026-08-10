@@ -266,7 +266,7 @@ export async function findEventById(id: string): Promise<EventRow | null> {
  * holding the code and `select()` would quietly start returning whatever
  * column a later migration adds.
  */
-const PUBLIC_ROOM_COLUMNS =
+export const PUBLIC_ROOM_COLUMNS =
   "id, name, kind, status, starts_at, ends_at, store_id, repeat_weekly, stores(name, city, region, timezone, early_board_hours)";
 
 type PublicRoomRow = {
@@ -287,7 +287,7 @@ type PublicRoomRow = {
   } | null;
 };
 
-function toPublicEvent(row: PublicRoomRow): PublicEvent {
+export function toPublicEvent(row: PublicRoomRow): PublicEvent {
   return {
     id: row.id,
     name: row.name,

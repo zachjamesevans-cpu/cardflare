@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
+import { saveWantAction } from "@/lib/players/account-actions";
 import {
   LIST_IDLE,
   MAX_DECK_LABEL,
@@ -52,7 +53,7 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-function Outcome({ state }: { state: ListState }) {
+function Outcome({ state, saved = false }: { state: ListState; saved?: boolean }) {
   if (state.status === "idle") return null;
 
   const isError = state.status === "error";
@@ -74,9 +75,11 @@ function Outcome({ state }: { state: ListState }) {
       <span>
         {state.status === "error"
           ? state.message
-          : state.kind === "flare"
-            ? `${state.cardName || "That card"} posted. Search for your next card below.`
-            : `${state.cardName || "That card"} added.`}
+          : saved
+            ? `${state.cardName || "That card"} saved to your list. Search for your next card below.`
+            : state.kind === "flare"
+              ? `${state.cardName || "That card"} posted. Search for your next card below.`
+              : `${state.cardName || "That card"} added.`}
       </span>
     </p>
   );
@@ -86,12 +89,22 @@ export function AddToListForm({
   code,
   kind,
   imagesEnabled,
+  target = "room",
 }: {
   code: string;
   kind: ListKind;
   imagesEnabled: boolean;
+  /**
+   * Where the card lands. "room" is the board in front of you; "list"
+   * is the account's saved wants, for a player with no room open — the
+   * couch case, which used to have nowhere to go but a stale room.
+   */
+  target?: "room" | "list";
 }) {
-  const [state, formAction] = useActionState(addToListAction, LIST_IDLE);
+  const [state, formAction] = useActionState(
+    target === "list" ? saveWantAction : addToListAction,
+    LIST_IDLE,
+  );
 
   /*
    * `printingId` rides along from the search: tapping a specific version in
@@ -144,7 +157,14 @@ export function AddToListForm({
     if (state.status === "added") setPicked(null);
   }
 
-  const copy = COPY[kind];
+  const copy =
+    target === "list"
+      ? {
+          title: "Save to your list",
+          hint: "No room open right now, so this waits on your account. Every room you join offers to post it.",
+          submit: "Save to my list",
+        }
+      : COPY[kind];
 
   return (
     <Card className="flex flex-col gap-4">
@@ -155,7 +175,7 @@ export function AddToListForm({
         <p className="text-sm text-text-secondary">{copy.hint}</p>
       </div>
 
-      <Outcome state={state} />
+      <Outcome state={state} saved={target === "list"} />
 
       {!picked ? (
         <CardSearch

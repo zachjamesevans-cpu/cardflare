@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { signOut } from "@/lib/auth/actions";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
@@ -262,38 +263,43 @@ export default async function AccountPage() {
     : [emailCard, localsCard, wantsCard, collectionCard, passwordCard];
 
   return (
-    <AppShell
-      area="Account"
-      email={viewer.user.email ?? ""}
-      title="Your account"
-      description={
-        isPlayerHome
-          ? "Your wants and your collection, ready for the next room you walk into."
-          : "How you sign in to CardFlare."
-      }
-      areas={areas}
-      currentArea={currentArea}
-    >
-      <div className="flex max-w-2xl flex-col gap-5">
-        {cards}
+    <>
+      <AppShell
+        area="Account"
+        email={viewer.user.email ?? ""}
+        title="Your account"
+        description={
+          isPlayerHome
+            ? "Your wants and your collection, ready for the next room you walk into."
+            : "How you sign in to CardFlare."
+        }
+        areas={areas}
+        currentArea={currentArea}
+      >
+        <div className="flex max-w-2xl flex-col gap-5">
+          {cards}
 
-        <div className="flex flex-wrap items-center gap-4">
-          <form action={signOut}>
-            <Button type="submit" variant="secondary">
-              Sign out
-            </Button>
-          </form>
+          <div className="flex flex-wrap items-center gap-4">
+            <form action={signOut}>
+              <Button type="submit" variant="secondary">
+                Sign out
+              </Button>
+            </form>
 
-          {home && (
-            <Link
-              href={home}
-              className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
-            >
-              Back to {viewer.kind === "admin" ? "the admin console" : "your store"}
-            </Link>
-          )}
+            {home && (
+              <Link
+                href={home}
+                className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
+              >
+                Back to {viewer.kind === "admin" ? "the admin console" : "your store"}
+              </Link>
+            )}
+          </div>
+          <TabBarSpacer />
         </div>
-      </div>
-    </AppShell>
+      </AppShell>
+
+      <PlayerTabBar />
+    </>
   );
 }

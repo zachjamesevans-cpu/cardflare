@@ -12,6 +12,7 @@ import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import { addFlare } from "@/lib/lists/repository";
+import { addEntrySchema, type ListState } from "@/lib/lists/schema";
 import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { createPlayerSession } from "@/lib/players/repository";
 import {
@@ -28,7 +29,7 @@ import {
   type RepostState,
 } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
-import { listWants, removeWant } from "./wants";
+import { listWants, removeWant, saveWant } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -268,4 +269,60 @@ export async function repostWantsAction(
 
   revalidatePath(`/e/${code}`);
   return { status: "posted", count: posted };
+}
+
+/**
+ * Saves a hunt straight to the account list, no room involved.
+ *
+ * The website's twin of `POST /api/v1/wants`, and the same founder bug
+ * behind both: a Flare posted from the couch used to need a room, and
+ * the only room going was one that had no business being open at
+ * midnight. A want saved here touches no event; the next room the
+ * player walks into offers to post it.
+ */
+export async function saveWantAction(
+  _previous: ListState,
+  formData: FormData,
+): Promise<ListState> {
+  const playerId = await playerIdFor(await getViewer());
+
+  if (!playerId) {
+    return { status: "error", message: "Sign in to keep a list between events." };
+  }
+
+  const parsed = addEntrySchema.safeParse({
+    cardId: text(formData, "cardId"),
+    printingId: text(formData, "printingId"),
+    quantity: text(formData, "quantity") || 1,
+    note: text(formData, "note"),
+    deckLabel: text(formData, "deckLabel"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Please check the details.",
+    };
+  }
+
+  const outcome = await saveWant(playerId, parsed.data);
+
+  if (outcome !== "saved") {
+    return {
+      status: "error",
+      message:
+        outcome === "at-cap"
+          ? "Your list is full. Remove something on your account page first."
+          : "Something went wrong. Please try again in a moment.",
+    };
+  }
+
+  revalidatePath("/account");
+  revalidatePath("/flare");
+
+  return {
+    status: "added",
+    kind: "flare",
+    cardName: text(formData, "cardName").slice(0, 200),
+  };
 }
