@@ -90,6 +90,7 @@ export function AddToListForm({
   kind,
   imagesEnabled,
   target = "room",
+  footer,
 }: {
   code: string;
   kind: ListKind;
@@ -100,6 +101,13 @@ export function AddToListForm({
    * couch case, which used to have nowhere to go but a stale room.
    */
   target?: "room" | "list";
+  /**
+   * A row renting the bottom of this card, under the form. Server-
+   * rendered by the page (the open-to-trades switch lives here), so the
+   * founder's rule holds: one block for the two answers to "what are
+   * you here for?", without this form knowing what its tenant does.
+   */
+  footer?: React.ReactNode;
 }) {
   const [state, formAction] = useActionState(
     target === "list" ? saveWantAction : addToListAction,
@@ -297,6 +305,8 @@ export function AddToListForm({
           </div>
         </form>
       )}
+
+      {footer}
     </Card>
   );
 }

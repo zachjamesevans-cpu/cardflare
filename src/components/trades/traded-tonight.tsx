@@ -1,21 +1,19 @@
-import { ArrowLeftRight, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { confirmBinderEntryAction, removeListEntryAction } from "@/lib/lists/actions";
-import type { BinderPrompt, TradeRecord } from "@/lib/trades/schema";
+import type { TradeRecord } from "@/lib/trades/schema";
 
 /**
- * The room's history for one viewer: what they traded tonight, both sides —
- * plus the one-tap binder update after a trade in which they were the
- * holder. The prompt exists because a binder rots the moment cards change
- * hands, and "confirm on arrival" cannot help mid-event.
+ * The room's history for one viewer: what they traded tonight, both sides.
  *
- * "Still have it" re-confirms the entry (fresher `confirmed_at`, prompt
- * gone); "remove it" is the ordinary binder removal. No new state anywhere.
+ * The binder-update prompt that used to ride along ("still have X in
+ * your binder?") went with the "What you brought" section: it asked
+ * about a list that no longer has a surface, and a nudge to maintain
+ * something invisible is exactly the clutter the founder cut. The
+ * timeZone is the store's own — the clock on the wall of the room.
  */
 
-/** "7:42 PM", in the store's own zone — the clock on the wall of the room. */
+/** "7:42 PM", in the store's own zone. */
 function timeIn(timeZone: string, iso: string): string {
   try {
     return new Intl.DateTimeFormat("en-US", {
@@ -30,18 +28,12 @@ function timeIn(timeZone: string, iso: string): string {
 
 export function TradedTonight({
   trades,
-  prompts,
-  code,
   timeZone,
 }: {
   trades: TradeRecord[];
-  prompts: BinderPrompt[];
-  code: string;
   timeZone: string;
 }) {
   if (trades.length === 0) return null;
-
-  const promptByTrade = new Map(prompts.map((prompt) => [prompt.tradeId, prompt]));
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="trades-heading">
@@ -58,7 +50,6 @@ export function TradedTonight({
       <Card className="p-4">
         <ul className="flex flex-col">
           {trades.map((trade) => {
-            const prompt = promptByTrade.get(trade.id);
             const when = timeIn(timeZone, trade.confirmedAt);
 
             return (
@@ -88,36 +79,6 @@ export function TradedTonight({
                   </span>
                   {when && <span className="text-xs text-text-muted">· {when}</span>}
                 </div>
-
-                {prompt && (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] border border-warning/40 bg-warning/[0.08] px-3 py-2">
-                    <p className="min-w-0 flex-1 basis-44 text-sm text-text-secondary">
-                      <ArrowLeftRight
-                        className="mr-1.5 inline size-3.5 -translate-y-px text-warning"
-                        aria-hidden="true"
-                      />
-                      Still have <strong>{prompt.cardName}</strong> in your binder?
-                    </p>
-
-                    <div className="flex shrink-0 items-center gap-2">
-                      <form action={removeListEntryAction}>
-                        <input type="hidden" name="code" value={code} />
-                        <input type="hidden" name="kind" value="have" />
-                        <input type="hidden" name="entryId" value={prompt.entryId} />
-                        <Button type="submit" variant="secondary" size="sm">
-                          Traded away? Remove it
-                        </Button>
-                      </form>
-                      <form action={confirmBinderEntryAction}>
-                        <input type="hidden" name="code" value={code} />
-                        <input type="hidden" name="entryId" value={prompt.entryId} />
-                        <Button type="submit" variant="ghost" size="sm">
-                          Still have it
-                        </Button>
-                      </form>
-                    </div>
-                  </div>
-                )}
               </li>
             );
           })}

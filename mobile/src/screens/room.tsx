@@ -1111,7 +1111,16 @@ function WantRow({
 
   return (
     <View style={styles.wantRow}>
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+      {/* Two layers again: dim the row, keep the spinner above it at
+          full strength — the same trick every removal wears now. */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: spacing(2),
+          opacity: busy ? 0.6 : 1,
+          filter: busy ? [{ grayscale: 1 }] : undefined,
+        }}
+      >
         <CardImage
           imageUrl={want.imageUrl}
           width={40}
@@ -1150,11 +1159,16 @@ function WantRow({
           <View
             style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
           >
+            {/* Minus counts all the way down: at one it removes the
+                card outright, the founder's call, so the stepper is
+                never a dead end and never sits greyed out. */}
             <Tap
-              onPress={() => void run(() => onNudge(-1))}
-              disabled={busy || want.quantity <= 1}
+              onPress={() =>
+                void run(want.quantity <= 1 ? onDrop : () => onNudge(-1))
+              }
+              disabled={busy}
               hitSlop={6}
-              style={[styles.stepButton, want.quantity <= 1 && { opacity: 0.4 }]}
+              style={styles.stepButton}
             >
               <MaterialCommunityIcons name="minus" size={14} color={colors.textSecondary} />
             </Tap>
@@ -1170,6 +1184,12 @@ function WantRow({
           </View>
         </View>
       </View>
+
+      {busy ? (
+        <View style={[styles.removeOverlay, { right: 0, bottom: 0 }]}>
+          <ActivityIndicator size="small" color={colors.accent} />
+        </View>
+      ) : null}
     </View>
   );
 }
