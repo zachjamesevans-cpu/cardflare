@@ -569,7 +569,7 @@ function RoomScreen({
                   act(() => offerOnFlare(code, flare.id, undefined, quantity))
                 }
                 onWithdraw={() => act(() => withdrawOffer(code, flare.id))}
-                onRemove={() => void act(() => removeFlare(code, flare.id))}
+                onRemove={() => act(() => removeFlare(code, flare.id))}
               />
             );
           };
@@ -597,7 +597,7 @@ function RoomScreen({
                 onOffer={(message, quantity) =>
                   void act(() => offerOnFlare(code, flare.id, message, quantity))
                 }
-                onRemove={() => void act(() => removeFlare(code, flare.id))}
+                onRemove={() => act(() => removeFlare(code, flare.id))}
                 onTraded={(partner) =>
                   void act(() => confirmTrade(code, flare.id, partner))
                 }
@@ -798,7 +798,7 @@ function CarouselFlare({
   early: boolean;
   onOffer: (quantity?: number) => Promise<void>;
   onWithdraw: () => Promise<void>;
-  onRemove: () => void;
+  onRemove: () => Promise<void>;
 }) {
   const covered =
     flare.offers.length > 0 &&
@@ -844,6 +844,27 @@ function CarouselFlare({
   };
 
   /*
+   * Same complaint, the other side of the trade: Remove sat there
+   * looking untouched until the next poll repainted the board. Now the
+   * whole tile greys out under a spinner the moment it is tapped, so
+   * the tap is visibly taken. Whole tile, not just the art — the card
+   * is the thing going away.
+   */
+  const [removing, setRemoving] = useState(false);
+
+  const remove = async () => {
+    if (removing) return;
+    setRemoving(true);
+    try {
+      await onRemove();
+    } finally {
+      /* The board usually repaints this tile out of existence first;
+         this is for the case where the write failed and it stays. */
+      setRemoving(false);
+    }
+  };
+
+  /*
    * Quantity drawn instead of written — and it is the *live need*, the
    * founder's confirm: copies still unpledged render as faded layers
    * behind the art, fanned out to the RIGHT. Sideways only: the first
@@ -861,165 +882,183 @@ function CarouselFlare({
   const fan = ghosts * 4;
 
   return (
-    // Fully covered: dimmed AND drained of colour — "taken care of"
-    // should read from across the room. (filter needs RN 0.76+ with
-    // the new architecture; this project ships 0.81 with it on.)
-    <View
-      style={{
-        width: 56 + fan,
-        gap: spacing(1),
-        opacity: covered ? 0.6 : 1,
-        filter: covered ? [{ grayscale: 1 }] : undefined,
-      }}
-    >
-      <View style={{ width: 56 + fan, height: artHeight }}>
-        {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
-          flare.imageUrl ? (
-            <Image
-              key={depth}
-              source={{ uri: flare.imageUrl }}
-              style={[styles.stackGhost, { left: depth * 4 }]}
-            />
-          ) : (
-            <View key={depth} style={[styles.stackGhost, { left: depth * 4 }]} />
-          ),
-        )}
-        <CardImage
-          imageUrl={flare.imageUrl}
-          width={56}
-          name={flare.cardName}
-          cardNumber={flare.cardNumber}
-          caption={flare.printingLabel ?? "Any printing"}
-          note={flare.note}
-          lookingFor={flare.quantity}
-          stillNeeds={flare.offers.length > 0 ? remaining : null}
-        />
-        {/*
-         * Every signal that used to be its own caption line lives on
-         * the art as a badge now. The founder's screenshot counted the
-         * handshake at three heights in one rail — variable caption
-         * stacks were the culprit, so below the art the tile is a
-         * fixed grid: one name line, one caption slot, one action row.
-         */}
-        {flare.match ? (
-          <View style={styles.matchBadge}>
-            <MaterialCommunityIcons
-              name={flare.match === "exact" ? "check-bold" : "layers-outline"}
-              size={9}
-              color={colors.accent}
-            />
-          </View>
-        ) : null}
-        {flare.note ? (
-          <View style={styles.noteBadge}>
-            <Text style={styles.noteBadgeGlyph}>✎</Text>
-          </View>
-        ) : null}
-        {/* The number, right on the card — the fan draws it, this chip
-            says it, and both count down together as pledges land.
-            Anchored from the fan's bleed so it sits on the top card. */}
-        {visible > 1 ? (
-          <View style={[styles.countBadge, { right: fan + 2 }]}>
-            <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
-          </View>
-        ) : null}
+    // Two layers on purpose: the dimming lives on the inner view so the
+    // spinner above it keeps its colour and full strength. Grey the
+    // whole tile including the spinner and the feedback disappears into
+    // the thing it is meant to be feedback about.
+    <View style={{ width: 56 + fan }}>
+      {/* Fully covered: dimmed AND drained of colour — "taken care of"
+          should read from across the room. Being removed looks the
+          same, because it is the same sentence: this one is handled.
+          (filter needs RN 0.76+ with the new architecture; this
+          project ships 0.81 with it on.) */}
+      <View
+        style={{
+          gap: spacing(1),
+          opacity: covered || removing ? 0.6 : 1,
+          filter: covered || removing ? [{ grayscale: 1 }] : undefined,
+        }}
+      >
+        <View style={{ width: 56 + fan, height: artHeight }}>
+          {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
+            flare.imageUrl ? (
+              <Image
+                key={depth}
+                source={{ uri: flare.imageUrl }}
+                style={[styles.stackGhost, { left: depth * 4 }]}
+              />
+            ) : (
+              <View key={depth} style={[styles.stackGhost, { left: depth * 4 }]} />
+            ),
+          )}
+          <CardImage
+            imageUrl={flare.imageUrl}
+            width={56}
+            name={flare.cardName}
+            cardNumber={flare.cardNumber}
+            caption={flare.printingLabel ?? "Any printing"}
+            note={flare.note}
+            lookingFor={flare.quantity}
+            stillNeeds={flare.offers.length > 0 ? remaining : null}
+          />
+          {/*
+           * Every signal that used to be its own caption line lives on
+           * the art as a badge now. The founder's screenshot counted the
+           * handshake at three heights in one rail — variable caption
+           * stacks were the culprit, so below the art the tile is a
+           * fixed grid: one name line, one caption slot, one action row.
+           */}
+          {flare.match ? (
+            <View style={styles.matchBadge}>
+              <MaterialCommunityIcons
+                name={flare.match === "exact" ? "check-bold" : "layers-outline"}
+                size={9}
+                color={colors.accent}
+              />
+            </View>
+          ) : null}
+          {flare.note ? (
+            <View style={styles.noteBadge}>
+              <Text style={styles.noteBadgeGlyph}>✎</Text>
+            </View>
+          ) : null}
+          {/* The number, right on the card — the fan draws it, this chip
+              says it, and both count down together as pledges land.
+              Anchored from the fan's bleed so it sits on the top card. */}
+          {visible > 1 ? (
+            <View style={[styles.countBadge, { right: fan + 2 }]}>
+              <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
+            </View>
+          ) : null}
 
-        {/* The stepper opens OVER the art, never in the flow: inline it
-            shoved the neighbouring tiles' buttons around, which is the
-            misalignment the founder photographed. */}
-        {picking ? (
-          <View style={styles.stepperPanel}>
-            <Tap onPress={() => setPicking(false)} hitSlop={6} style={styles.stepperClose}>
-              <Text style={{ color: colors.textMuted, fontSize: 11 }}>✕</Text>
-            </Tap>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
-              <Tap
-                onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
-                hitSlop={6}
-              >
-                <Text style={styles.stepperGlyph}>−</Text>
+          {/* The stepper opens OVER the art, never in the flow: inline it
+              shoved the neighbouring tiles' buttons around, which is the
+              misalignment the founder photographed. */}
+          {picking ? (
+            <View style={styles.stepperPanel}>
+              <Tap onPress={() => setPicking(false)} hitSlop={6} style={styles.stepperClose}>
+                <Text style={{ color: colors.textMuted, fontSize: 11 }}>✕</Text>
               </Tap>
-              <Text style={styles.stepperCount}>{count}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+                <Tap
+                  onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
+                  hitSlop={6}
+                >
+                  <Text style={styles.stepperGlyph}>−</Text>
+                </Tap>
+                <Text style={styles.stepperCount}>{count}</Text>
+                <Tap
+                  onPress={() =>
+                    setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))
+                  }
+                  hitSlop={6}
+                >
+                  <Text style={styles.stepperGlyph}>+</Text>
+                </Tap>
+              </View>
+              {/* Zero is a real answer once a pledge stands: it withdraws. */}
               <Tap
                 onPress={() =>
-                  setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))
+                  offered && count === 0 ? void takeBack() : void pledge(count)
                 }
                 hitSlop={6}
               >
-                <Text style={styles.stepperGlyph}>+</Text>
+                <View
+                  style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}
+                >
+                  <Text
+                    style={[
+                      styles.stepperGoGlyph,
+                      offered && count === 0 && { color: colors.textSecondary },
+                    ]}
+                  >
+                    {offered && count === 0 ? "Undo" : "✓"}
+                  </Text>
+                </View>
               </Tap>
             </View>
-            {/* Zero is a real answer once a pledge stands: it withdraws. */}
+          ) : null}
+
+          {pledging ? (
+            <View style={styles.pledgeOverlay}>
+              <ActivityIndicator size="small" color={colors.accent} />
+            </View>
+          ) : null}
+        </View>
+
+        <Text numberOfLines={1} style={styles.tileName}>
+          {flare.cardName}
+        </Text>
+
+        {/* The caption slot: exactly one line tall whether or not there
+            is a deck to name, so the action row below never drifts. */}
+        <Text numberOfLines={1} style={styles.tileCaption}>
+          {flare.deckLabel ?? " "}
+        </Text>
+
+        {/* The action row: reserved on every tile. Pledging is open to
+            anyone — no binder required, the founder's call — and a
+            standing pledge keeps the button, filled in, tap to edit. */}
+        <View style={{ height: 24 }}>
+          {!mine ? (
             <Tap
               onPress={() =>
-                offered && count === 0 ? void takeBack() : void pledge(count)
+                picking
+                  ? setPicking(false)
+                  : offered || flare.quantity > 1
+                    ? setPicking(true)
+                    : void pledge()
               }
-              hitSlop={6}
+              disabled={pledging}
+              style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
+              hitSlop={4}
             >
-              <View
-                style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}
-              >
-                <Text
-                  style={[
-                    styles.stepperGoGlyph,
-                    offered && count === 0 && { color: colors.textSecondary },
-                  ]}
-                >
-                  {offered && count === 0 ? "Undo" : "✓"}
-                </Text>
-              </View>
+              <MaterialCommunityIcons
+                name={offered ? "handshake" : "handshake-outline"}
+                size={14}
+                color={offered ? colors.accent : colors.textMuted}
+              />
             </Tap>
-          </View>
-        ) : null}
-
-        {pledging ? (
-          <View style={styles.pledgeOverlay}>
-            <ActivityIndicator size="small" color={colors.accent} />
-          </View>
-        ) : null}
+          ) : (
+            <Tap
+              onPress={() => void remove()}
+              disabled={removing}
+              hitSlop={4}
+              style={styles.removeButton}
+            >
+              <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}>
+                Remove
+              </Text>
+            </Tap>
+          )}
+        </View>
       </View>
 
-      <Text numberOfLines={1} style={styles.tileName}>
-        {flare.cardName}
-      </Text>
-
-      {/* The caption slot: exactly one line tall whether or not there
-          is a deck to name, so the action row below never drifts. */}
-      <Text numberOfLines={1} style={styles.tileCaption}>
-        {flare.deckLabel ?? " "}
-      </Text>
-
-      {/* The action row: reserved on every tile. Pledging is open to
-          anyone — no binder required, the founder's call — and a
-          standing pledge keeps the button, filled in, tap to edit. */}
-      <View style={{ height: 24 }}>
-        {!mine ? (
-          <Tap
-            onPress={() =>
-              picking
-                ? setPicking(false)
-                : offered || flare.quantity > 1
-                  ? setPicking(true)
-                  : void pledge()
-            }
-            disabled={pledging}
-            style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
-            hitSlop={4}
-          >
-            <MaterialCommunityIcons
-              name={offered ? "handshake" : "handshake-outline"}
-              size={14}
-              color={offered ? colors.accent : colors.textMuted}
-            />
-          </Tap>
-        ) : (
-          <Tap onPress={onRemove} hitSlop={4} style={styles.removeButton}>
-            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}>
-              Remove
-            </Text>
-          </Tap>
-        )}
-      </View>
+      {removing ? (
+        <View style={styles.removeOverlay}>
+          <ActivityIndicator size="small" color={colors.accent} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1040,7 +1079,7 @@ function FlareRow({
   /** Early board: offers read as pledges to bring the card. */
   early: boolean;
   onOffer: (message?: string, quantity?: number) => void;
-  onRemove: () => void;
+  onRemove: () => Promise<void>;
   onTraded: (partnerSessionId?: string) => void;
 }) {
   const [offering, setOffering] = useState(false);
@@ -1048,142 +1087,166 @@ function FlareRow({
   const [bringing, setBringing] = useState(1);
   const pledgeLine = pledgeLineFor(flare);
 
+  /* Same acknowledgement as the carousel tile: the row greys out under
+     a spinner the moment Remove is tapped. */
+  const [removing, setRemoving] = useState(false);
+
+  const remove = async () => {
+    if (removing) return;
+    setRemoving(true);
+    try {
+      await onRemove();
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   return (
-    <View style={styles.flare}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing(2) }}>
-        {flare.imageUrl && (
-          <CardImage
-            imageUrl={flare.imageUrl}
-            width={40}
-            name={flare.cardName}
-            cardNumber={flare.cardNumber}
-            caption={flare.printingLabel ?? "Any printing"}
-            note={flare.note}
-            lookingFor={flare.quantity}
-            stillNeeds={
-              flare.offers.length > 0
-                ? pledgeTally(flare.offers, flare.quantity).remaining
-                : null
-            }
+    <View>
+      <View
+        style={[styles.flare, removing && { opacity: 0.6, filter: [{ grayscale: 1 }] }]}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing(2) }}>
+          {flare.imageUrl && (
+            <CardImage
+              imageUrl={flare.imageUrl}
+              width={40}
+              name={flare.cardName}
+              cardNumber={flare.cardNumber}
+              caption={flare.printingLabel ?? "Any printing"}
+              note={flare.note}
+              lookingFor={flare.quantity}
+              stillNeeds={
+                flare.offers.length > 0
+                  ? pledgeTally(flare.offers, flare.quantity).remaining
+                  : null
+              }
+            />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}>
+              {flare.cardName}
+              {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
+            </Text>
+            <Muted>
+              {`${flare.cardNumber} · ${flare.printingLabel ?? "Any printing"}`}
+            </Muted>
+          </View>
+          {mine && (
+            <Tap onPress={() => void remove()} disabled={removing} hitSlop={8}>
+              <Text style={styles.removeLink}>Remove</Text>
+            </Tap>
+          )}
+        </View>
+
+        {flare.note && <Body>{flare.note}</Body>}
+
+        {flare.match === "exact" && (
+          <Text style={{ color: colors.accent, fontWeight: "700" }}>You have this</Text>
+        )}
+        {flare.match === "other-printing" && (
+          <Text style={{ color: colors.accent }}>You have another printing</Text>
+        )}
+        {flare.counterMayHave && (
+          <Muted>{`${storeName} may have this single. Ask at the counter.`}</Muted>
+        )}
+
+        {/* Coverage first, for everyone: the founder's example is Damian
+            asking for 2x with one pledged — the room should read "still
+            needs 1 more", not "someone's got it". */}
+        {pledgeLine && (
+          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+            {pledgeLine}
+          </Text>
+        )}
+
+        {flare.offers.map((offer) => (
+          <View key={offer.responderSessionId} style={styles.offer}>
+            <Body>
+              {early
+                ? `${offer.displayName ?? "A player"} is bringing ${
+                    offer.quantity > 1 ? offer.quantity : "it"
+                  } to the event.`
+                : offer.quantity > 1
+                  ? `${offer.displayName ?? "A player"} has ${offer.quantity} of them. Go find them.`
+                  : `${offer.displayName ?? "A player"} has this. Go find them.`}
+              {offer.message ? ` “${offer.message}”` : ""}
+              {offer.present || early ? "" : " (away right now)"}
+            </Body>
+            {mine && (
+              <Button
+                label="We traded"
+                variant="secondary"
+                onPress={() => onTraded(offer.responderSessionId)}
+              />
+            )}
+          </View>
+        ))}
+
+        {mine && flare.offers.length === 0 && (
+          <Tap onPress={() => onTraded(undefined)} hitSlop={8}>
+            <Text style={styles.removeLink}>Traded it? Mark it done</Text>
+          </Tap>
+        )}
+
+        {/* Anyone can pledge — no binder match required, the founder's
+            call. The match badge above stays a hint, not a permission. */}
+        {!mine && !offering && (
+          <Button
+            label={early ? "I got you. I'll bring it" : "Offer to trade"}
+            onPress={() => setOffering(true)}
           />
         )}
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}>
-            {flare.cardName}
-            {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
-          </Text>
-          <Muted>
-            {`${flare.cardNumber} · ${flare.printingLabel ?? "Any printing"}`}
-          </Muted>
-        </View>
-        {mine && (
-          <Tap onPress={onRemove} hitSlop={8}>
-            <Text style={styles.removeLink}>Remove</Text>
-          </Tap>
+        {!mine && offering && (
+          <View style={{ gap: spacing(2) }}>
+            {flare.quantity > 1 && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(3),
+                }}
+              >
+                <Muted>{early ? "How many can you bring?" : "How many do you have?"}</Muted>
+                <Button
+                  label="−"
+                  variant="secondary"
+                  onPress={() => setBringing((n) => Math.max(1, n - 1))}
+                />
+                <Text
+                  style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "700" }}
+                >
+                  {bringing}
+                </Text>
+                <Button
+                  label="+"
+                  variant="secondary"
+                  onPress={() => setBringing((n) => Math.min(flare.quantity, n + 1))}
+                />
+              </View>
+            )}
+            <Input
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Where to find you? (optional)"
+              maxLength={80}
+            />
+            <Button
+              label="Send the offer"
+              onPress={() => {
+                setOffering(false);
+                onOffer(message.trim() || undefined, bringing);
+              }}
+            />
+          </View>
         )}
       </View>
 
-      {flare.note && <Body>{flare.note}</Body>}
-
-      {flare.match === "exact" && (
-        <Text style={{ color: colors.accent, fontWeight: "700" }}>You have this</Text>
-      )}
-      {flare.match === "other-printing" && (
-        <Text style={{ color: colors.accent }}>You have another printing</Text>
-      )}
-      {flare.counterMayHave && (
-        <Muted>{`${storeName} may have this single. Ask at the counter.`}</Muted>
-      )}
-
-      {/* Coverage first, for everyone: the founder's example is Damian
-          asking for 2x with one pledged — the room should read "still
-          needs 1 more", not "someone's got it". */}
-      {pledgeLine && (
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-          {pledgeLine}
-        </Text>
-      )}
-
-      {flare.offers.map((offer) => (
-        <View key={offer.responderSessionId} style={styles.offer}>
-          <Body>
-            {early
-              ? `${offer.displayName ?? "A player"} is bringing ${
-                  offer.quantity > 1 ? offer.quantity : "it"
-                } to the event.`
-              : offer.quantity > 1
-                ? `${offer.displayName ?? "A player"} has ${offer.quantity} of them. Go find them.`
-                : `${offer.displayName ?? "A player"} has this. Go find them.`}
-            {offer.message ? ` “${offer.message}”` : ""}
-            {offer.present || early ? "" : " (away right now)"}
-          </Body>
-          {mine && (
-            <Button
-              label="We traded"
-              variant="secondary"
-              onPress={() => onTraded(offer.responderSessionId)}
-            />
-          )}
+      {removing ? (
+        <View style={styles.removeOverlay}>
+          <ActivityIndicator size="small" color={colors.accent} />
         </View>
-      ))}
-
-      {mine && flare.offers.length === 0 && (
-        <Tap onPress={() => onTraded(undefined)} hitSlop={8}>
-          <Text style={styles.removeLink}>Traded it? Mark it done</Text>
-        </Tap>
-      )}
-
-      {/* Anyone can pledge — no binder match required, the founder's
-          call. The match badge above stays a hint, not a permission. */}
-      {!mine && !offering && (
-        <Button
-          label={early ? "I got you. I'll bring it" : "Offer to trade"}
-          onPress={() => setOffering(true)}
-        />
-      )}
-      {!mine && offering && (
-        <View style={{ gap: spacing(2) }}>
-          {flare.quantity > 1 && (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing(3),
-              }}
-            >
-              <Muted>{early ? "How many can you bring?" : "How many do you have?"}</Muted>
-              <Button
-                label="−"
-                variant="secondary"
-                onPress={() => setBringing((n) => Math.max(1, n - 1))}
-              />
-              <Text
-                style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "700" }}
-              >
-                {bringing}
-              </Text>
-              <Button
-                label="+"
-                variant="secondary"
-                onPress={() => setBringing((n) => Math.min(flare.quantity, n + 1))}
-              />
-            </View>
-          )}
-          <Input
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Where to find you? (optional)"
-            maxLength={80}
-          />
-          <Button
-            label="Send the offer"
-            onPress={() => {
-              setOffering(false);
-              onOffer(message.trim() || undefined, bringing);
-            }}
-          />
-        </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -1325,6 +1388,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 13,
     minHeight: 13,
+  },
+  // The whole tile, not just the art: Remove takes the card away, so
+  // the card is what acknowledges the tap.
+  removeOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${colors.canvas}66`,
   },
   removeButton: {
     height: 24,

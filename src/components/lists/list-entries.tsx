@@ -23,8 +23,7 @@ import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { removeListEntryAction } from "@/lib/lists/actions";
+import { RemoveEntry } from "@/components/lists/remove-entry";
 import type { ListEntry } from "@/lib/lists/repository";
 import { groupByPlayer, partitionByDeck, type ListKind } from "@/lib/lists/schema";
 import type { MatchKind, Offer } from "@/lib/matching/schema";
@@ -74,7 +73,8 @@ function Entry({
   children?: React.ReactNode;
 }) {
   return (
-    <li className="flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0">
+    /* `relative` so Remove's pending veil covers the whole row. */
+    <li className="relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0">
       <div className="flex items-start gap-3">
         <CardImageZoom
           imageUrl={entry.imageUrl}
@@ -140,26 +140,7 @@ function Entry({
 
         <div className="flex shrink-0 flex-col items-end gap-2">
           {removable && (
-            <form action={removeListEntryAction}>
-              <input type="hidden" name="code" value={code} />
-              <input type="hidden" name="kind" value={kind} />
-              <input type="hidden" name="entryId" value={entry.id} />
-              {/*
-               * Negative margins swallow the ghost button's own padding so
-               * its label sits flush with the card's right edge (level with
-               * the "N cards" count above) and on the card name's first
-               * line. The touch target keeps its full size — only the box's
-               * position moves, not its dimensions.
-               */}
-              <Button
-                type="submit"
-                variant="ghost"
-                size="sm"
-                className="-mt-1.5 -mr-3.5"
-              >
-                Remove
-              </Button>
-            </form>
+            <RemoveEntry code={code} kind={kind} entryId={entry.id} variant="row" />
           )}
         </div>
       </div>
@@ -421,17 +402,13 @@ function CarouselEntry({
           />
         )}
         {removable && (
-          <form action={removeListEntryAction}>
-            <input type="hidden" name="code" value={code} />
-            <input type="hidden" name="kind" value={kind} />
-            <input type="hidden" name="entryId" value={entry.id} />
-            <button
-              type="submit"
-              className="flex h-7 w-full items-center justify-center rounded-[6px] border border-border text-[10px] font-medium text-text-muted transition-colors hover:text-text-secondary"
-            >
-              Remove
-            </button>
-          </form>
+          <RemoveEntry
+            code={code}
+            kind={kind}
+            entryId={entry.id}
+            variant="tile"
+            bleed={ghosts * 4}
+          />
         )}
       </div>
     </li>
