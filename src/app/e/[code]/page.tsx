@@ -65,6 +65,7 @@ function Shell({
   wide = false,
 }: {
   children: React.ReactNode;
+  /** Wide is for a player in the room; everything else stays narrow. */
   wide?: boolean;
 }) {
   return (
@@ -72,8 +73,7 @@ function Shell({
       <main
         id="main"
         className={cn(
-          "flex min-h-dvh flex-col items-center gap-8 px-5 py-16",
-          wide ? "justify-start" : "justify-center",
+          "flex min-h-dvh flex-col items-center justify-start gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12",
         )}
       >
         <Link href="/" aria-label={`${SITE.name} home`}>

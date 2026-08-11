@@ -45,7 +45,10 @@ export default async function FlarePage() {
 
   return (
     <>
-      <main id="main" className="flex min-h-dvh flex-col items-center gap-8 px-5 py-16">
+      <main
+        id="main"
+        className="flex min-h-dvh flex-col items-center gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12"
+      >
         <Link href="/" aria-label={`${SITE.name} home`}>
           <Logo size={40} priority />
         </Link>

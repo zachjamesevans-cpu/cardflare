@@ -276,7 +276,7 @@ export default async function AccountPage() {
         areas={areas}
         currentArea={currentArea}
       >
-        <div className="flex max-w-2xl flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           {cards}
 
           <div className="flex flex-wrap items-center gap-4">
