@@ -1,11 +1,5 @@
-import { Minus, Plus } from "lucide-react";
-
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
-import { Button } from "@/components/ui/button";
-import {
-  nudgeWantQuantityAction,
-  removeWantAction,
-} from "@/lib/players/account-actions";
+import { WantNudge, WantRemove } from "@/components/players/want-controls";
 
 /** One outstanding ask, as the room page resolves it. */
 export interface OutstandingWant {
@@ -50,9 +44,10 @@ export function WantEntries({
   return (
     <ul className="flex flex-col pt-4">
       {wants.map((want) => (
+        /* `relative` anchors the controls' pending veil to the row. */
         <li
           key={want.id}
-          className="flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0"
+          className="relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0"
         >
           <div className="flex items-start gap-3">
             <CardImageZoom
@@ -72,13 +67,7 @@ export function WantEntries({
                 <p className="min-w-0 font-semibold text-text-primary">
                   {want.cardName}
                 </p>
-                <form action={removeWantAction} className="ml-auto shrink-0">
-                  <input type="hidden" name="code" value={code} />
-                  <input type="hidden" name="wantId" value={want.id} />
-                  <Button type="submit" variant="ghost" size="sm" className="-mr-3.5">
-                    Remove
-                  </Button>
-                </form>
+                <WantRemove code={code} wantId={want.id} />
               </div>
 
               <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
@@ -97,26 +86,27 @@ export function WantEntries({
                * The quantity, shown once, where it can be changed. The
                * board writes ×4 beside the name; here that number is a
                * setting rather than a fact, so it sits between the two
-               * buttons that move it. Minus at one is disabled rather
-               * than a deletion — removal has its own word above.
+               * buttons that move it. Minus counts all the way down —
+               * at one it removes the card outright, the founder's
+               * call, so the stepper is never a dead end.
                */}
               <div className="mt-1 flex items-center gap-1.5">
-                <QuantityNudge
+                <WantNudge
                   code={code}
                   wantId={want.id}
                   delta={-1}
-                  label={`One fewer ${want.cardName}`}
-                  disabled={want.quantity <= 1}
+                  quantity={want.quantity}
+                  cardName={want.cardName}
                 />
                 <span className="w-7 text-center text-sm font-semibold text-text-primary tabular-nums">
                   {want.quantity}
                 </span>
-                <QuantityNudge
+                <WantNudge
                   code={code}
                   wantId={want.id}
                   delta={1}
-                  label={`One more ${want.cardName}`}
-                  disabled={want.quantity >= 99}
+                  quantity={want.quantity}
+                  cardName={want.cardName}
                 />
               </div>
             </div>
@@ -124,39 +114,5 @@ export function WantEntries({
         </li>
       ))}
     </ul>
-  );
-}
-
-function QuantityNudge({
-  code,
-  wantId,
-  delta,
-  label,
-  disabled,
-}: {
-  code: string;
-  wantId: string;
-  delta: number;
-  label: string;
-  disabled: boolean;
-}) {
-  return (
-    <form action={nudgeWantQuantityAction}>
-      <input type="hidden" name="code" value={code} />
-      <input type="hidden" name="wantId" value={wantId} />
-      <input type="hidden" name="delta" value={delta} />
-      <button
-        type="submit"
-        disabled={disabled}
-        aria-label={label}
-        className="flex size-7 items-center justify-center rounded-[6px] border border-border text-text-secondary transition-colors hover:text-text-primary disabled:opacity-40"
-      >
-        {delta < 0 ? (
-          <Minus className="size-3.5" aria-hidden="true" />
-        ) : (
-          <Plus className="size-3.5" aria-hidden="true" />
-        )}
-      </button>
-    </form>
   );
 }

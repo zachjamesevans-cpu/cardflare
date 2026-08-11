@@ -7,8 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
-import { ConfirmBinder } from "@/components/lists/confirm-binder";
-import { FlareBoard, HaveList } from "@/components/lists/list-entries";
+import { FlareBoard } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
@@ -35,16 +34,14 @@ import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { saveLocal } from "@/lib/players/locals";
-import { collectionAvailability, collectionSyncFor } from "@/lib/players/collection";
+import { collectionAvailability } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
 import { WantEntries } from "@/components/players/want-entries";
-import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
 import { listMyTrades } from "@/lib/trades/repository";
-import { binderPrompts } from "@/lib/trades/schema";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -371,15 +368,12 @@ export default async function JoinByCodePage({
    * exactly; an unproven one stays a key with no printings, which
    * `matchFor` honestly downgrades when a Flare names one.
    */
-  const [collectionHas, collectionSync] = accountPlayerId
-    ? await Promise.all([
-        collectionAvailability(
-          accountPlayerId,
-          flares.map((entry) => entry.cardId),
-        ),
-        collectionSyncFor(accountPlayerId),
-      ])
-    : [new Map<string, Set<string>>(), null];
+  const collectionHas = accountPlayerId
+    ? await collectionAvailability(
+        accountPlayerId,
+        flares.map((entry) => entry.cardId),
+      )
+    : new Map<string, Set<string>>();
 
   for (const [cardId, printings] of collectionHas) {
     const proven = held.get(cardId) ?? new Set<string>();
@@ -407,15 +401,6 @@ export default async function JoinByCodePage({
   );
 
   /*
-   * The binder follows the player between events, so before it is trusted in
-   * this room the player is asked once whether it is still accurate.
-   */
-  const staleBinder = needsConfirming(
-    binder.map((entry) => entry.confirmedAt ?? ""),
-    event.startsAt,
-  );
-
-  /*
    * Read off the participant list that was already loaded rather than queried
    * again — being open to trades is a property of being in the room, so the
    * answer is already in hand.
@@ -423,12 +408,6 @@ export default async function JoinByCodePage({
   const openPlayers = participants
     .filter((participant) => participant.openToTrades)
     .map(({ playerSessionId, displayName }) => ({ playerSessionId, displayName }));
-
-  /*
-   * The after-trade binder nudge: holder-side trades newer than the binder
-   * entry's own confirmation. Derived from data already in hand.
-   */
-  const prompts = binderPrompts(myTrades, binder);
 
   const youAreOpen = participants.some(
     (participant) =>
@@ -546,14 +525,17 @@ export default async function JoinByCodePage({
               </div>
             </div>
 
-            <AddToListForm code={normalized} kind="flare" imagesEnabled={images} />
-
             {/*
-             * The other way onto the board, directly under the form that is
-             * the first way. "I don't know what to search for" happens right
-             * here, so this is where the answer to it has to be.
+             * Both ways onto the board share one card: the form for a
+             * named hunt, and (as the card's footer row) the open-to-any-
+             * trade switch for everyone who cannot name one.
              */}
-            <OpenToTradesToggle code={normalized} open={youAreOpen} />
+            <AddToListForm
+              code={normalized}
+              kind="flare"
+              imagesEnabled={images}
+              footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
+            />
 
             <FlareBoard
               entries={flares}
@@ -569,44 +551,15 @@ export default async function JoinByCodePage({
             />
           </section>
 
-          <section className="flex flex-col gap-4" aria-labelledby="haves-heading">
-            <div className="flex flex-col gap-1">
-              <h2 id="haves-heading" className="text-lg font-bold text-text-primary">
-                What you brought
-              </h2>
-              <p className="text-sm text-text-secondary">
-                Private to you, and it follows you to every event. Used to flag Flares
-                above that you can answer.
-              </p>
-            </div>
-
-            {staleBinder && <ConfirmBinder code={normalized} count={binder.length} />}
-
-            {/*
-             * The whole collection surface a room ever shows: one line, to
-             * its owner only. A thousand imported cards listed under "what
-             * you brought" would be exactly the redundancy the founder
-             * ruled out — the collection works by flagging Flares above.
-             */}
-            {collectionSync && collectionSync.cards_matched > 0 && (
-              <p className="text-sm text-text-muted">
-                Your collection ({collectionSync.cards_matched.toLocaleString()}{" "}
-                {collectionSync.cards_matched === 1 ? "card" : "cards"}) is along too.
-                It flags Flares you could answer without being listed here.
-              </p>
-            )}
-
-            <AddToListForm code={normalized} kind="have" imagesEnabled={images} />
-
-            <HaveList entries={binder} code={normalized} imagesEnabled={images} />
-          </section>
-
-          <TradedTonight
-            trades={myTrades}
-            prompts={prompts}
-            code={normalized}
-            timeZone={event.storeTimeZone}
-          />
+          {/*
+           * There is deliberately no "What you brought" section any more.
+           * The founder's read, and it holds up: nobody types their binder
+           * in at a store table, and someone who sees a Flare already
+           * knows whether they have the card. The binder and the imported
+           * collection still power the "You have this" badges on the
+           * board above — silently, which is all they were ever good for.
+           */}
+          <TradedTonight trades={myTrades} timeZone={event.storeTimeZone} />
 
           {/*
            * The quietest possible mention of accounts, and only to guests.
