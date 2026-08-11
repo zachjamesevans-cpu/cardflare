@@ -190,10 +190,12 @@ function Tabs() {
     >
       <Tab.Screen name="Join" component={HomeScreen} options={{ title: "CardFlare" }} />
       <Tab.Screen name="Room" component={RoomTab} />
+      {/* The tab keeps the product's name; the header says what the
+          hub holds now: your standing list, not just the post form. */}
       <Tab.Screen
         name="Flare"
         component={HubScreen}
-        options={{ title: "Post a Flare", tabBarLabel: "Flare" }}
+        options={{ title: "Your Flares", tabBarLabel: "Flare" }}
       />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Notifications" }} />
       <Tab.Screen name="Account" component={AccountScreen} />

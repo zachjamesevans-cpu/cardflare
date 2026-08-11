@@ -201,12 +201,13 @@ export async function removeLocalAction(formData: FormData): Promise<void> {
 /**
  * Repaints wherever the want list is on screen.
  *
- * The account page always; the room too when the form came from the
- * re-post panel, which now edits the list in place rather than only
- * offering to post it.
+ * The account page and the Flare tab always — the Flare tab is the
+ * list's home now — and the room too when the form came from the
+ * re-post panel, which edits the list in place.
  */
 function revalidateWants(code: string): void {
   revalidatePath("/account");
+  revalidatePath("/flare");
   if (code) {
     revalidatePath(`/e/${code}`);
     revalidatePath("/room");

@@ -90,10 +90,16 @@ export type PostTarget = { kind: "room"; code: string } | { kind: "list" };
 export function PostFlareScreen({
   target,
   resetSignal,
+  onPosted,
+  footer,
 }: {
   target: PostTarget;
   /** Bumped by the Flare tab on a re-tap while focused: "different card". */
   resetSignal?: number;
+  /** A successful post or save landed; the hub refreshes its list. */
+  onPosted?: () => void;
+  /** The Flare tab's standing list, rendered under the search. */
+  footer?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
@@ -190,6 +196,7 @@ export function PostFlareScreen({
       // search intact, ready for the next card on the want list.
       setBusy(false);
       setPosted(true);
+      onPosted?.();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
@@ -441,6 +448,7 @@ export function PostFlareScreen({
           );
         })}
       </Card>
+      {footer}
     </ScrollView>
   );
 }
