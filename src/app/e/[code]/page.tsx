@@ -15,8 +15,7 @@ import { RoomTicker } from "@/components/events/room-ticker";
 import { ShowSearch } from "@/components/shows/show-search";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { TradedTonight } from "@/components/trades/traded-tonight";
-import { PlayerAvatar } from "@/components/players/player-avatar";
-import { Card } from "@/components/ui/card";
+import { Badge, Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import {
@@ -416,6 +415,7 @@ export default async function JoinByCodePage({
 
   const images = cardImagesEnabled();
   const location = [event.storeCity, event.storeRegion].filter(Boolean).join(", ");
+  const presentCount = participants.filter((participant) => participant.present).length;
 
   return (
     <Shell wide={inRoom}>
@@ -450,6 +450,23 @@ export default async function JoinByCodePage({
             </div>
           )}
         </dl>
+
+        {/*
+         * The room's pulse, promoted to the door: how many people are
+         * here and how many hunts are live. The founder's reorder — the
+         * roster's count used to be the only place this lived, a whole
+         * tile down the page for two numbers a glance wants first.
+         */}
+        {inRoom && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={presentCount > 0 ? "accent" : "neutral"}>
+              {presentCount} here now
+            </Badge>
+            <Badge tone={flares.length > 0 ? "accent" : "neutral"}>
+              {flares.length} {flares.length === 1 ? "Flare" : "Flares"}
+            </Badge>
+          </div>
+        )}
       </Card>
 
       {phase === "early" && (
@@ -490,41 +507,13 @@ export default async function JoinByCodePage({
             </RepostWants>
           )}
 
-          <Card className="flex items-center gap-3">
-            <PlayerAvatar displayName={session.display_name} seed={session.id} />
-            <div className="flex min-w-0 flex-col">
-              <p className="text-sm text-text-muted">You&rsquo;re in as</p>
-              <p className="truncate font-semibold text-text-primary">
-                {session.display_name}
-              </p>
-            </div>
-          </Card>
-
           <MatchSummary
             offerCount={offersOnMine}
             flareCount={myFlaresWithOffers.length}
             anchor={`#flares-${session.id}`}
           />
 
-          <EventLobby
-            code={normalized}
-            participants={participants}
-            youId={session.id}
-          />
-
-          <section className="flex flex-col gap-4" aria-labelledby="flares-heading">
-            <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 id="flares-heading" className="text-lg font-bold text-text-primary">
-                  Wanted in this room
-                </h2>
-                <p className="text-sm text-text-secondary">
-                  Every Flare posted here, and everyone open to any trade. If you can
-                  help, go and find them.
-                </p>
-              </div>
-            </div>
-
+          <section className="flex flex-col gap-4" aria-label="Wanted in this room">
             {/*
              * Both ways onto the board share one card: the form for a
              * named hunt, and (as the card's footer row) the open-to-any-
@@ -560,6 +549,18 @@ export default async function JoinByCodePage({
            * board above — silently, which is all they were ever good for.
            */}
           <TradedTonight trades={myTrades} timeZone={event.storeTimeZone} />
+
+          {/*
+           * Who is here, parked at the foot of the page — the founder's
+           * reorder. The names are reference material, not a decision
+           * anyone makes on arrival; the counts they used to headline
+           * now live on the room's door card at the top.
+           */}
+          <EventLobby
+            code={normalized}
+            participants={participants}
+            youId={session.id}
+          />
 
           {/*
            * The quietest possible mention of accounts, and only to guests.
