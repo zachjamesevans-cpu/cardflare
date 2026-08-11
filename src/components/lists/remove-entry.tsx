@@ -27,27 +27,67 @@ import type { ListKind } from "@/lib/lists/schema";
  * this, not forty.
  */
 
-function RemovingVeil({ bleed }: { bleed: number }) {
+/**
+ * The card's box at the top-left of the entry, measured by the caller.
+ *
+ * `width` spans the quantity fan as well, so a three-of greys out whole;
+ * `cardWidth` is the front card alone, which is what the spinner centres
+ * on. Those are different numbers and using one for both puts the circle
+ * visibly off the card it belongs to.
+ */
+export type VeilBox = { width: number; height: number; cardWidth: number };
+
+function RemovingVeil({ cover }: { cover?: VeilBox }) {
   const { pending } = useFormStatus();
   if (!pending) return null;
 
+  const spinner = <Loader2 className="size-5 animate-spin text-accent" />;
+  const announce = (
+    <span role="status" className="sr-only">
+      Removing this card
+    </span>
+  );
+
+  /*
+   * No box given: fill the positioned ancestor. That is the stacked
+   * row, where the whole row is the thing going away.
+   */
+  if (!cover) {
+    return (
+      <>
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 z-30 flex items-center justify-center rounded-[8px] bg-canvas/60 backdrop-grayscale"
+        >
+          {spinner}
+        </span>
+        {announce}
+      </>
+    );
+  }
+
+  /*
+   * The card, and only the card — the founder's correction. A veil over
+   * the whole tile greyed the name and the button too, and put the
+   * circle in the gap below the art. Grey and spinner are separate
+   * elements because they want different widths: the grey covers the
+   * fan, the circle centres on the front card.
+   */
   return (
     <>
       <span
         aria-hidden="true"
-        /*
-         * `bleed` reaches past the tile's right edge to cover the fanned
-         * ghost copies, which sit in the margin outside it. Without it a
-         * three-of goes grey with a bright sliver of card still showing.
-         */
-        style={bleed > 0 ? { right: -bleed } : undefined}
-        className="absolute inset-0 z-30 flex items-center justify-center rounded-[8px] bg-canvas/60 backdrop-grayscale"
+        style={{ width: cover.width, height: cover.height }}
+        className="absolute top-0 left-0 z-30 rounded-[6px] bg-canvas/60 backdrop-grayscale"
+      />
+      <span
+        aria-hidden="true"
+        style={{ width: cover.cardWidth, height: cover.height }}
+        className="absolute top-0 left-0 z-30 flex items-center justify-center"
       >
-        <Loader2 className="size-5 animate-spin text-accent" />
+        {spinner}
       </span>
-      <span role="status" className="sr-only">
-        Removing this card
-      </span>
+      {announce}
     </>
   );
 }
@@ -93,24 +133,24 @@ export function RemoveEntry({
   kind,
   entryId,
   variant,
-  bleed = 0,
+  cover,
 }: {
   code: string;
   kind: ListKind;
   entryId: string;
   /** `tile` is the carousel's full-width control; `row` the stacked list's. */
   variant: "tile" | "row";
-  /** Pixels the quantity fan overhangs the tile on the right. */
-  bleed?: number;
+  /** The card's box, top-left of the entry. Omitted fills the entry. */
+  cover?: VeilBox;
 }) {
   return (
     <form action={removeListEntryAction}>
       <input type="hidden" name="code" value={code} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="entryId" value={entryId} />
-      {/* Positioned against the entry's <li>, so the veil covers the whole
-          card and not just the button that started it. */}
-      <RemovingVeil bleed={bleed} />
+      {/* Positioned against the entry's <li>, so the veil lands on the
+          card and not on the button that started it. */}
+      <RemovingVeil cover={cover} />
       {variant === "tile" ? <TileButton /> : <RowButton />}
     </form>
   );

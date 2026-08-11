@@ -888,18 +888,27 @@ function CarouselFlare({
     // the thing it is meant to be feedback about.
     <View style={{ width: 56 + fan }}>
       {/* Fully covered: dimmed AND drained of colour — "taken care of"
-          should read from across the room. Being removed looks the
-          same, because it is the same sentence: this one is handled.
-          (filter needs RN 0.76+ with the new architecture; this
-          project ships 0.81 with it on.) */}
+          should read from across the room. (filter needs RN 0.76+ with
+          the new architecture; this project ships 0.81 with it on.) */}
       <View
         style={{
           gap: spacing(1),
-          opacity: covered || removing ? 0.6 : 1,
-          filter: covered || removing ? [{ grayscale: 1 }] : undefined,
+          opacity: covered ? 0.6 : 1,
+          filter: covered ? [{ grayscale: 1 }] : undefined,
         }}
       >
-        <View style={{ width: 56 + fan, height: artHeight }}>
+        {/* Being removed greys the card and nothing else — the founder's
+            correction. Dimming the tile took the name and the button
+            with it, which said "this row is disabled" rather than "this
+            card is on its way out". */}
+        <View
+          style={{
+            width: 56 + fan,
+            height: artHeight,
+            opacity: removing ? 0.6 : 1,
+            filter: removing ? [{ grayscale: 1 }] : undefined,
+          }}
+        >
           {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
             flare.imageUrl ? (
               <Image
@@ -1054,8 +1063,12 @@ function CarouselFlare({
         </View>
       </View>
 
+      {/* Over the front card only, not the fan: "dead centre of the
+          card" means the card you are looking at. A sibling of the
+          greyed art rather than a child, so the spinner keeps its
+          colour while everything under it loses its own. */}
       {removing ? (
-        <View style={styles.removeOverlay}>
+        <View style={[styles.removeOverlay, { width: 56, height: artHeight }]}>
           <ActivityIndicator size="small" color={colors.accent} />
         </View>
       ) : null}
@@ -1242,8 +1255,10 @@ function FlareRow({
         )}
       </View>
 
+      {/* The stacked row dims whole: here the row is the entry, not a
+          picture with a caption under it. */}
       {removing ? (
-        <View style={styles.removeOverlay}>
+        <View style={[styles.removeOverlay, { right: 0, bottom: 0 }]}>
           <ActivityIndicator size="small" color={colors.accent} />
         </View>
       ) : null}
@@ -1389,17 +1404,14 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     minHeight: 13,
   },
-  // The whole tile, not just the art: Remove takes the card away, so
-  // the card is what acknowledges the tap.
+  // The card, and only the card. Sized by the caller, because the
+  // carousel tile wants the art's box and the stacked row wants its own.
   removeOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: `${colors.canvas}66`,
   },
   removeButton: {
     height: 24,

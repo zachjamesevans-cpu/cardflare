@@ -217,6 +217,15 @@ function OpenToTradesEntry({
  * somebody new enough that they cannot yet name what they want.
  */
 /**
+ * The carousel tile's art box, in pixels: `w-14` at the card's 60:84
+ * ratio. Tailwind resolves the same two numbers from the classes; they
+ * are written out here because the pending veil has to land on the card
+ * exactly, and "roughly the card" is what the founder sent back.
+ */
+const TILE_ART_WIDTH = 56;
+const TILE_ART_HEIGHT = (TILE_ART_WIDTH * 84) / 60;
+
+/**
  * One Flare as the carousel view shows it: a contact sheet, not a row.
  *
  * Sized so five cards share a phone's width — the founder's number, after
@@ -407,7 +416,11 @@ function CarouselEntry({
             kind={kind}
             entryId={entry.id}
             variant="tile"
-            bleed={ghosts * 4}
+            cover={{
+              width: TILE_ART_WIDTH + ghosts * 4,
+              height: TILE_ART_HEIGHT,
+              cardWidth: TILE_ART_WIDTH,
+            }}
           />
         )}
       </div>
