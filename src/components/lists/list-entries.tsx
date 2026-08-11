@@ -282,10 +282,12 @@ function CarouselEntry({
   /*
    * Quantity drawn instead of written — and it is the *live need*, the
    * founder's confirm: copies still unpledged render as faded layers of
-   * the same card behind the art, fanned out to the RIGHT — sideways
-   * only, because the first cut nudged them downward and every stacked
-   * tile grew taller, knocking names and buttons out of line across the
-   * rail; the founder caught it in one screenshot. Three asked with one
+   * the same card behind the art, fanned out to the RIGHT and pinned to
+   * the card's bottom edge, so every card in a stack shares a baseline.
+   * Sideways only, and bottom-anchored rather than merely the same
+   * height: the first cut nudged the layers downward, every stacked
+   * tile grew taller, and names and buttons fell out of line across the
+   * rail. Three asked with one
    * pledged is a fan of two; fully pledged collapses to a single dimmed
    * card at the rail's end. Past four the layers stop being countable,
    * so ×N text returns; screen readers always get a number. The fan's
@@ -308,7 +310,7 @@ function CarouselEntry({
           <div
             key={depth}
             aria-hidden="true"
-            className="absolute inset-0 overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
+            className="absolute inset-x-0 bottom-0 aspect-[60/84] overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
             style={{ transform: `translate(${depth * 4}px, 0)` }}
           >
             {isRenderableImageUrl(entry.imageUrl) && (
