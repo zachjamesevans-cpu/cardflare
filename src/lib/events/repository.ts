@@ -13,7 +13,7 @@ import type {
   PublicShow,
   PublicStore,
 } from "./schema";
-import { WALK_IN_ROOM_NAME } from "./schema";
+import { earlyBoardOpensAt, WALK_IN_ROOM_NAME } from "./schema";
 
 export const UNIQUE_VIOLATION = "23505";
 
@@ -371,10 +371,20 @@ export async function findStoreByJoinCode(code: string): Promise<PublicStore | n
 export async function findEarlyBoard(
   storeId: string,
   earlyBoardHours: number,
+  timeZone: string,
   now: number = Date.now(),
 ): Promise<EarlyBoard | null> {
   if (earlyBoardHours <= 0) return null;
   if (!canQuery("look for an early board")) return null;
+
+  /*
+   * The SQL bound over-fetches on purpose: the true open moment is the
+   * earlier of the hours window and midnight of event day (the
+   * founder's rule), and midnight is at most 24 hours out. The precise
+   * cut happens in JS with the same helper every phase check uses, so
+   * this list can never advertise a board roomPhase would call pending.
+   */
+  const reach = Math.max(earlyBoardHours, 24) * 60 * 60 * 1000;
 
   const { data, error } = await getSupabaseAdmin()
     .from("events")
@@ -383,7 +393,7 @@ export async function findEarlyBoard(
     .eq("kind", "scheduled")
     .eq("status", "draft")
     .gt("starts_at", new Date(now).toISOString())
-    .lte("starts_at", new Date(now + earlyBoardHours * 60 * 60 * 1000).toISOString())
+    .lte("starts_at", new Date(now + reach).toISOString())
     .order("starts_at", { ascending: true })
     .limit(1);
 
@@ -392,7 +402,15 @@ export async function findEarlyBoard(
     return null;
   }
 
-  const row = (data ?? [])[0];
+  const candidate = (data ?? [])[0];
+  const opensAt = candidate
+    ? earlyBoardOpensAt({
+        startsAt: candidate.starts_at,
+        earlyBoardHours,
+        storeTimeZone: timeZone,
+      })
+    : null;
+  const row = opensAt !== null && opensAt <= now ? candidate : undefined;
   if (!row?.join_code) return null;
 
   // Who has already said "I'll be there", by the only measure that

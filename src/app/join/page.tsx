@@ -10,6 +10,7 @@ import { rsvpAction } from "@/lib/players/account-actions";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { listLocals } from "@/lib/players/locals";
+import { listWants } from "@/lib/players/wants";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -40,7 +41,9 @@ export default async function JoinPage() {
       : viewer.kind === "anonymous"
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
-  const locals = playerId ? await listLocals(playerId) : [];
+  const [locals, wants] = playerId
+    ? await Promise.all([listLocals(playerId), listWants(playerId)])
+    : [[], []];
 
   return (
     <>
@@ -91,12 +94,18 @@ export default async function JoinPage() {
                             : "Tap to see what's happening"}
                       </span>
                     </Link>
-                    {/* One tap: onto the board, wants and all, days early. */}
+                    {/* One tap: onto the board, Flares and all, from the
+                        moment the board opens. The button carries the
+                        count so the tap never posts more than it said. */}
                     {local.earlyOpen && local.nextEventCode && (
                       <form action={rsvpAction}>
                         <input type="hidden" name="code" value={local.nextEventCode} />
                         <Button type="submit" variant="secondary" size="sm">
-                          I&rsquo;ll be there. Post my wants
+                          {wants.length > 0
+                            ? `I'll be there. Post my ${wants.length} ${
+                                wants.length === 1 ? "Flare" : "Flares"
+                              }`
+                            : "I'll be there"}
                         </Button>
                       </form>
                     )}

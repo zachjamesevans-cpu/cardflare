@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { roomPhase } from "@/lib/events/schema";
+import { earlyBoardOpensAt, roomPhase } from "@/lib/events/schema";
 import { plusDaysInZone } from "@/lib/time/zone";
 
 /**
@@ -22,6 +22,9 @@ function draftEvent(startsInMs: number, earlyBoardHours: number, now: number) {
     startsAt: new Date(now + startsInMs).toISOString(),
     endsAt: new Date(now + startsInMs + 4 * HOUR).toISOString(),
     earlyBoardHours,
+    // UTC in the generic cases so wall clock and instant agree; the
+    // midnight rule gets its own zoned cases below.
+    storeTimeZone: "UTC",
   };
 }
 
@@ -55,6 +58,76 @@ describe("roomPhase", () => {
   it("a draft whose window already ended is not early", () => {
     // Never opened, never swept: the event is over, not upcoming.
     expect(roomPhase(draftEvent(-30 * HOUR, 48, now), now)).toBe("pending");
+  });
+
+  it("a short window still opens at midnight of event day", () => {
+    // 6pm event, 6-hour window (noon). At 9am the hours window has not
+    // started, but it is already tournament day: the board is open.
+    const nineAm = Date.parse("2026-08-14T09:00:00Z");
+    const event = {
+      kind: "scheduled" as const,
+      status: "draft" as const,
+      startsAt: "2026-08-14T18:00:00.000Z",
+      endsAt: "2026-08-14T22:00:00.000Z",
+      earlyBoardHours: 6,
+      storeTimeZone: "UTC",
+    };
+
+    expect(roomPhase(event, nineAm)).toBe("early");
+  });
+});
+
+describe("earlyBoardOpensAt", () => {
+  it("opens at midnight of event day when the hours window is shorter", () => {
+    // 6pm Chicago event with a 6-hour window (noon). Midnight wins.
+    const opens = earlyBoardOpensAt({
+      startsAt: "2026-08-14T23:00:00.000Z", // 6pm America/Chicago (UTC-5)
+      earlyBoardHours: 6,
+      storeTimeZone: "America/Chicago",
+    });
+
+    expect(opens).toBe(Date.parse("2026-08-14T05:00:00.000Z")); // 00:00 Chicago
+  });
+
+  it("keeps a window that reaches back further than midnight", () => {
+    const startsAt = "2026-08-14T23:00:00.000Z";
+    const opens = earlyBoardOpensAt({
+      startsAt,
+      earlyBoardHours: 48,
+      storeTimeZone: "America/Chicago",
+    });
+
+    expect(opens).toBe(Date.parse(startsAt) - 48 * HOUR);
+  });
+
+  it("is off entirely at zero hours", () => {
+    expect(
+      earlyBoardOpensAt({
+        startsAt: "2026-08-14T23:00:00.000Z",
+        earlyBoardHours: 0,
+        storeTimeZone: "America/Chicago",
+      }),
+    ).toBeNull();
+  });
+
+  it("computes midnight in the store's zone, not the server's", () => {
+    // The same instant is Aug 14 in Tokyo and Aug 13 in Los Angeles, so
+    // the two stores' midnights are 16 hours apart.
+    const startsAt = "2026-08-14T03:00:00.000Z";
+
+    const tokyo = earlyBoardOpensAt({
+      startsAt,
+      earlyBoardHours: 1,
+      storeTimeZone: "Asia/Tokyo",
+    });
+    const la = earlyBoardOpensAt({
+      startsAt,
+      earlyBoardHours: 1,
+      storeTimeZone: "America/Los_Angeles",
+    });
+
+    expect(tokyo).toBe(Date.parse("2026-08-13T15:00:00.000Z")); // 00:00 Aug 14 JST
+    expect(la).toBe(Date.parse("2026-08-13T07:00:00.000Z")); // 00:00 Aug 13 PDT
   });
 });
 
