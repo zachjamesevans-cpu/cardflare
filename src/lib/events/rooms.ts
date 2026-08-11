@@ -263,7 +263,11 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
 
   // Nothing at the counter — but an upcoming board may already be taking
   // Flares, and the lobby is where the pinned link's readers find out.
-  const earlyBoard = await findEarlyBoard(store.id, store.earlyBoardHours);
+  const earlyBoard = await findEarlyBoard(
+    store.id,
+    store.earlyBoardHours,
+    store.timeZone,
+  );
 
   return { outcome: store.walkInEnabled ? "lobby" : "quiet", store, earlyBoard };
 }

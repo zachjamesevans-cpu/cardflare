@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { instantToLocal, localToInstant } from "@/lib/time/zone";
 import { normalizeJoinCode, JOIN_CODE_PATTERN } from "./join-code";
 
 export const EVENT_NAME_MAX = 80;
@@ -147,10 +148,38 @@ export interface PublicEvent {
  */
 export type RoomPhase = "early" | "live" | "pending" | "finished";
 
+/**
+ * When a scheduled event's board starts taking Flares, as an epoch ms —
+ * or null when the store has early boards off entirely.
+ *
+ * Two clocks race, and the earlier one wins: the store's hours window
+ * (startsAt minus earlyBoardHours), and midnight of the event's own day
+ * in the store's zone. The midnight leg is the founder's rule — "the
+ * board opens at midnight of tournament day" is a promise a player can
+ * hold in their head, and it guarantees a whole-day board even for a
+ * store that set a short window. A store whose window reaches back
+ * further than midnight keeps every hour of it. Midnight is computed
+ * through the DST-correct zone helpers, because "00:00 in the store's
+ * town" is exactly the wall-clock arithmetic that breaks twice a year.
+ */
+export function earlyBoardOpensAt(
+  event: Pick<PublicEvent, "startsAt" | "earlyBoardHours" | "storeTimeZone">,
+): number | null {
+  if (event.earlyBoardHours <= 0) return null;
+
+  const start = new Date(event.startsAt);
+  const hoursOpen = start.getTime() - event.earlyBoardHours * 60 * 60 * 1000;
+
+  const eventDay = instantToLocal(start, event.storeTimeZone).slice(0, 10);
+  const midnight = localToInstant(`${eventDay}T00:00`, event.storeTimeZone);
+
+  return midnight ? Math.min(hoursOpen, midnight.getTime()) : hoursOpen;
+}
+
 export function roomPhase(
   event: Pick<
     PublicEvent,
-    "kind" | "status" | "startsAt" | "endsAt" | "earlyBoardHours"
+    "kind" | "status" | "startsAt" | "endsAt" | "earlyBoardHours" | "storeTimeZone"
   >,
   // Defaulted so Server Components can call this without their own
   // Date.now(), which the compiler lint rightly refuses mid-render.
@@ -161,11 +190,10 @@ export function roomPhase(
 
   // Draft. Walk-in rooms are never drafts, so this is a scheduled event
   // that the store has not opened yet.
+  const opensAt = event.kind === "scheduled" ? earlyBoardOpensAt(event) : null;
   if (
-    event.kind === "scheduled" &&
-    event.earlyBoardHours > 0 &&
-    now >=
-      new Date(event.startsAt).getTime() - event.earlyBoardHours * 60 * 60 * 1000 &&
+    opensAt !== null &&
+    now >= opensAt &&
     (!event.endsAt || now < new Date(event.endsAt).getTime())
   ) {
     return "early";

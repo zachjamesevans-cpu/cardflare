@@ -1,5 +1,6 @@
 import "server-only";
 
+import { earlyBoardOpensAt } from "@/lib/events/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -79,7 +80,7 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
   const [{ data: stores }, { data: events }] = await Promise.all([
     getSupabaseAdmin()
       .from("stores")
-      .select("id, name, city, region, join_code, early_board_hours")
+      .select("id, name, city, region, join_code, early_board_hours, timezone")
       .in("id", storeIds),
     /*
      * One query answers both "is a room live right now" (status open) and
@@ -122,12 +123,17 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
     const upcoming = next.get(row.store_id) ?? null;
 
     // The board is already open when the start is inside the store's
-    // early window; that is when "I'll be there" earns a button.
+    // early window — or when it is already event day, the founder's
+    // midnight rule; that is when "I'll be there" earns a button.
+    const opensAt = upcoming
+      ? earlyBoardOpensAt({
+          startsAt: upcoming.startsAt,
+          earlyBoardHours: store.early_board_hours,
+          storeTimeZone: store.timezone,
+        })
+      : null;
     const earlyOpen = Boolean(
-      upcoming &&
-      upcoming.joinCode &&
-      store.early_board_hours > 0 &&
-      Date.parse(upcoming.startsAt) - store.early_board_hours * 60 * 60 * 1000 <= now,
+      upcoming && upcoming.joinCode && opensAt !== null && opensAt <= now,
     );
 
     return [

@@ -49,7 +49,7 @@ export function EarlyBoardPicker({
           <p className="font-semibold text-text-primary">Early boards</p>
           <p className="text-sm text-text-secondary">
             {hours > 0
-              ? `Your event boards start taking Flares ${hours} hours before doors, so players post from home and everyone knows what to bring. Flares from anyone who never shows are cleared when the night ends.`
+              ? `Your event boards start taking Flares ${hours} hours before doors, and always by midnight of event day, so players post from home and everyone knows what to bring. Flares from anyone who never shows are cleared when the night ends.`
               : "Your event boards open when the event does. Turn this on and players can post Flares from home before your locals, so people know what to bring."}
           </p>
         </div>

@@ -183,10 +183,17 @@ export function HomeScreen() {
               .map((local) => (
                 <Button
                   key={`rsvp-${local.storeId}`}
+                  /* The button says everything the tap does: an RSVP
+                     posts the whole list, and a silent broadcast is not
+                     a thing this product does. */
                   label={
                     rsvping === local.storeId
                       ? "Joining the board…"
-                      : `I'll be there: ${local.nextEventName ?? local.name}`
+                      : me && me.wants.length > 0
+                        ? `I'll be there with my ${me.wants.length} ${
+                            me.wants.length === 1 ? "Flare" : "Flares"
+                          }: ${local.nextEventName ?? local.name}`
+                        : `I'll be there: ${local.nextEventName ?? local.name}`
                   }
                   onPress={() => void rsvp(local)}
                   busy={rsvping === local.storeId}

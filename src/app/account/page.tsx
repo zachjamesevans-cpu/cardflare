@@ -143,8 +143,15 @@ export default async function AccountPage() {
                 {local.earlyOpen && local.nextEventCode && (
                   <form action={rsvpAction}>
                     <input type="hidden" name="code" value={local.nextEventCode} />
+                    {/* The button says everything the tap does: an RSVP
+                        posts the whole list, and a silent broadcast is
+                        not a thing this product does. */}
                     <Button type="submit" variant="secondary" size="sm">
-                      I&rsquo;ll be there
+                      {wants && wants.length > 0
+                        ? `I'll be there. Post my ${wants.length} ${
+                            wants.length === 1 ? "Flare" : "Flares"
+                          }`
+                        : "I'll be there"}
                     </Button>
                   </form>
                 )}
