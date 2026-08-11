@@ -107,6 +107,7 @@ function RoomScreen({
    * wants stay saved, and switching rooms asks the question fresh.
    */
   const [repostDismissed, setRepostDismissed] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
 
   /*
    * The roster folds shut by default — the founder's call: ten names
@@ -157,6 +158,7 @@ function RoomScreen({
   useEffect(() => {
     setState(null);
     setRepostDismissed(false);
+    setRepostOpen(false);
     setExpandedGroups({});
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
@@ -412,14 +414,54 @@ function RoomScreen({
 
         {outstanding.length > 0 && !repostDismissed && (
           <Card>
-            <Title>Still hunting these from last time?</Title>
-            <Body>
-              {outstanding
-                .map((w) =>
-                  w.printingLabel ? `${w.cardName} (${w.printingLabel})` : w.cardName,
-                )
-                .join(" · ")}
-            </Body>
+            {/*
+             * Folded shut, wearing the same header-and-chevron the
+             * roster and the board's player sections wear — the
+             * founder's point: one gesture that means "more inside",
+             * everywhere.
+             */}
+            <Tap
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setRepostOpen((current) => !current);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing(2),
+              }}
+            >
+              <Title>Still hunting these?</Title>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(1.5),
+                }}
+              >
+                <Muted>
+                  {`${outstanding.length} ${outstanding.length === 1 ? "card" : "cards"}`}
+                </Muted>
+                <MaterialCommunityIcons
+                  name={repostOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={colors.textMuted}
+                />
+              </View>
+            </Tap>
+
+            {repostOpen && (
+              <View style={{ gap: spacing(1) }}>
+                {outstanding.map((w) => (
+                  <Text key={w.id} style={styles.repostRow} numberOfLines={1}>
+                    {`${w.cardName}${w.quantity > 1 ? ` ×${w.quantity}` : ""}${
+                      w.printingLabel ? ` · ${w.printingLabel}` : ""
+                    }`}
+                  </Text>
+                ))}
+              </View>
+            )}
             <Button
               label={`Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`}
               onPress={() =>
@@ -836,10 +878,10 @@ function CarouselFlare({
             <Image
               key={depth}
               source={{ uri: flare.imageUrl }}
-              style={[styles.stackGhost, { top: 0, left: depth * 4 }]}
+              style={[styles.stackGhost, { left: depth * 4 }]}
             />
           ) : (
-            <View key={depth} style={[styles.stackGhost, { top: 0, left: depth * 4 }]} />
+            <View key={depth} style={[styles.stackGhost, { left: depth * 4 }]} />
           ),
         )}
         <CardImage
@@ -1167,6 +1209,10 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     fontSize: 14,
   },
+  repostRow: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
   folderLabel: {
     color: colors.textSecondary,
     fontSize: 13,
@@ -1210,6 +1256,9 @@ const styles = StyleSheet.create({
   },
   stackGhost: {
     position: "absolute",
+    // Pinned to the bottom, not the top: the founder's rule is that a
+    // stack's cards share a baseline, whatever their height.
+    bottom: 0,
     width: 56,
     // The tile's 63:88 card proportions at 56 wide.
     height: 78,

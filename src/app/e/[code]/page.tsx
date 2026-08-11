@@ -348,6 +348,8 @@ export default async function JoinByCodePage({
       label: want.printingLabel
         ? `${want.cardName} (${want.printingLabel})`
         : want.cardName,
+      quantity: want.quantity,
+      deckLabel: want.deckLabel,
     }));
 
   /*
