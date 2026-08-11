@@ -282,12 +282,16 @@ function CarouselEntry({
   /*
    * Quantity drawn instead of written — and it is the *live need*, the
    * founder's confirm: copies still unpledged render as faded layers of
-   * the same card behind the art, fanned out to the RIGHT and pinned to
-   * the card's bottom edge, so every card in a stack shares a baseline.
-   * Sideways only, and bottom-anchored rather than merely the same
-   * height: the first cut nudged the layers downward, every stacked
-   * tile grew taller, and names and buttons fell out of line across the
-   * rail. Three asked with one
+   * the same card behind the art, fanned out to the RIGHT so every card
+   * in the stack shares one bottom edge.
+   *
+   * The wrapper below is `flex` for exactly that reason, and it is not
+   * cosmetic. A `<button>` is inline-block, so a plain block wrapper
+   * reserves descender space under it — measured at six pixels — and
+   * anything positioned against the wrapper (these layers, the count
+   * chip, the note badge) sat six pixels below the card it belonged to.
+   * A flex container has no line box, so the wrapper is exactly the
+   * card and everything anchored to it lands on the card's own edges. Three asked with one
    * pledged is a fan of two; fully pledged collapses to a single dimmed
    * card at the rail's end. Past four the layers stop being countable,
    * so ×N text returns; screen readers always get a number. The fan's
@@ -305,12 +309,12 @@ function CarouselEntry({
       }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      <div className="relative">
+      <div className="relative flex">
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
           <div
             key={depth}
             aria-hidden="true"
-            className="absolute inset-x-0 bottom-0 aspect-[60/84] overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
+            className="absolute inset-0 overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
             style={{ transform: `translate(${depth * 4}px, 0)` }}
           >
             {isRenderableImageUrl(entry.imageUrl) && (
