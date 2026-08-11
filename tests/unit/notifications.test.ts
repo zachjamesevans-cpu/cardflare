@@ -54,8 +54,12 @@ vi.mock("@/lib/players/collection", () => ({
   collectionAvailability: (...a: unknown[]) => collectionAvailability(...a),
 }));
 
-const { notifyOfferReceived, notifyTradeConfirmed, notifyEarlyBoardFlares } =
-  await import("@/lib/notifications/notify");
+const {
+  notifyOfferReceived,
+  notifyTradeConfirmed,
+  notifyEarlyBoardFlares,
+  notifyBoardOpen,
+} = await import("@/lib/notifications/notify");
 
 /** The Flare, its card and its room, queued for `flareContext`. */
 function queueFlareContext() {
@@ -294,6 +298,81 @@ describe("notifyEarlyBoardFlares", () => {
     queue("event_participants", { data: [], error: null });
 
     await notifyEarlyBoardFlares("e1");
+
+    expect(calls.notifications?.insert).toBeUndefined();
+  });
+});
+
+describe("notifyBoardOpen", () => {
+  const EVENT = {
+    data: {
+      id: "e1",
+      name: "Friday Night One Piece",
+      join_code: "K3M9PZ",
+      starts_at: "2026-08-14T18:00:00Z",
+      store_id: "store-1",
+    },
+    error: null,
+  };
+
+  it("rings each saver with their own Flare count, push only, no email", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", { data: [], error: null });
+    queue("player_wants", { count: 5, data: null, error: null });
+    queue("notifications", { data: { id: "n1" }, error: null });
+    queue("player_devices", { data: [], error: null });
+
+    await notifyBoardOpen("e1");
+
+    const inserted = calls.notifications.insert?.[0]?.[0] as Record<string, unknown>;
+    expect(inserted).toMatchObject({
+      player_id: "p9",
+      kind: "board-open",
+      title: "The board is open: Friday Night One Piece at Mox Valley Games",
+      url: "/e/K3M9PZ",
+      dedupe_key: "board-open:e1:p9",
+    });
+    expect(String(inserted.body)).toContain("hunting 5 cards");
+    // The doorbell never emails: midnight is phone territory.
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("skips savers who are already on the board", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", {
+      data: [{ player_session_id: "sess-9" }],
+      error: null,
+    });
+    queue("player_sessions", { data: [{ player_id: "p9" }], error: null });
+
+    await notifyBoardOpen("e1");
+
+    expect(calls.notifications?.insert).toBeUndefined();
+  });
+
+  it("invites an empty-listed saver to post rather than counting at them", async () => {
+    queue("events", EVENT);
+    queue("stores", { data: { name: "Mox Valley Games" }, error: null });
+    queue("player_locals", { data: [{ player_id: "p9" }], error: null });
+    queue("event_participants", { data: [], error: null });
+    queue("player_wants", { count: 0, data: null, error: null });
+    queue("notifications", { data: { id: "n1" }, error: null });
+    queue("player_devices", { data: [], error: null });
+
+    await notifyBoardOpen("e1");
+
+    const inserted = calls.notifications.insert?.[0]?.[0] as Record<string, unknown>;
+    expect(String(inserted.body)).toContain("Post what you are hunting");
+  });
+
+  it("does nothing for an event with no join code", async () => {
+    queue("events", { data: { ...EVENT.data, join_code: null }, error: null });
+
+    await notifyBoardOpen("e1");
 
     expect(calls.notifications?.insert).toBeUndefined();
   });

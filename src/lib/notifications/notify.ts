@@ -83,7 +83,7 @@ async function flareContext(
  */
 async function record(entry: {
   playerId: string;
-  kind: "offer-received" | "trade-confirmed" | "early-board";
+  kind: "offer-received" | "trade-confirmed" | "early-board" | "board-open";
   title: string;
   body: string | null;
   url: string;
@@ -360,6 +360,95 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
     }
   } catch (error) {
     console.error("Could not send the early-board digest", error);
+  }
+}
+
+/**
+ * The doorbell: "the board for Friday's locals is open."
+ *
+ * Fired by the hourly cron the moment a scheduled event's board opens —
+ * the store's early window or midnight of event day, whichever comes
+ * first — so the board starts filling before anyone is in the building.
+ * Sent to players who saved this store as a local, excluding anyone
+ * already on the board; the body carries the player's own Flare count,
+ * because "RSVP and your 5 Flares go up" is the whole pitch.
+ *
+ * Push and inbox only, no email on purpose. This can fire at midnight,
+ * which is phone-notification territory; the early-board digest keeps
+ * the email lane for when there is actually a board worth reading.
+ * The per-player dedupe key makes every re-run of the cron free.
+ */
+export async function notifyBoardOpen(eventId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+
+    const { data: event } = await admin
+      .from("events")
+      .select("id, name, join_code, starts_at, store_id")
+      .eq("id", eventId)
+      .maybeSingle();
+    if (!event?.join_code) return;
+
+    const [{ data: store }, { data: savers }, { data: inRoom }] = await Promise.all([
+      admin.from("stores").select("name").eq("id", event.store_id).maybeSingle(),
+      admin.from("player_locals").select("player_id").eq("store_id", event.store_id),
+      admin
+        .from("event_participants")
+        .select("player_session_id")
+        .eq("event_id", eventId),
+    ]);
+
+    if (!savers || savers.length === 0) return;
+
+    // Players already on the board rang their own doorbell.
+    const sessionIds = (inRoom ?? []).map((row) => row.player_session_id);
+    const joinedPlayers = new Set<string>();
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await admin
+        .from("player_sessions")
+        .select("player_id")
+        .in("id", sessionIds);
+      for (const row of sessions ?? []) {
+        if (row.player_id) joinedPlayers.add(row.player_id);
+      }
+    }
+
+    const day = new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      timeZone: "UTC",
+    }).format(new Date(event.starts_at));
+    const storeName = store?.name ?? "your local store";
+    const title = `The board is open: ${event.name} at ${storeName}`;
+    const path = `/e/${event.join_code}`;
+
+    for (const saver of savers) {
+      if (joinedPlayers.has(saver.player_id)) continue;
+
+      const { count } = await admin
+        .from("player_wants")
+        .select("id", { count: "exact", head: true })
+        .eq("player_id", saver.player_id);
+
+      const body =
+        (count ?? 0) > 0
+          ? `You are hunting ${count} ${count === 1 ? "card" : "cards"}. RSVP and ${count === 1 ? "it goes" : "they go"} up for ${day}.`
+          : `Post what you are hunting and see who is coming ${day}.`;
+
+      const id = await record({
+        playerId: saver.player_id,
+        kind: "board-open",
+        title,
+        body,
+        url: path,
+        dedupeKey: `board-open:${eventId}:${saver.player_id}`,
+      });
+
+      if (id) await deliverByPush(saver.player_id, title, body, path);
+    }
+  } catch (error) {
+    console.error("Could not ring the board-open doorbell", error);
   }
 }
 
