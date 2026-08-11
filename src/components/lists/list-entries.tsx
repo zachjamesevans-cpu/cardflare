@@ -88,12 +88,29 @@ function Entry({
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <p className="font-semibold text-text-primary">{entry.cardName}</p>
+          {/*
+           * Remove sits *in* the name's line, not in a column beside it.
+           * As its own column the two boxes were aligned by their tops,
+           * which is not where either one's text is: the founder's
+           * screenshot caught "Yamato" and "Remove" a few pixels apart,
+           * and a list of them read as crooked. One flex row on a shared
+           * baseline cannot drift, whatever either font does.
+           */}
+          <div className="flex items-baseline gap-x-2">
+            <p className="min-w-0 font-semibold text-text-primary">{entry.cardName}</p>
             {entry.quantity > 1 && (
-              <span className="text-sm text-text-muted tabular-nums">
+              <span className="shrink-0 text-sm text-text-muted tabular-nums">
                 ×{entry.quantity}
               </span>
+            )}
+            {removable && (
+              <RemoveEntry
+                code={code}
+                kind={kind}
+                entryId={entry.id}
+                variant="row"
+                className="ml-auto shrink-0"
+              />
             )}
           </div>
 
@@ -135,12 +152,6 @@ function Entry({
               <Store className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
               {counterName} may have this single. Ask at the counter.
             </p>
-          )}
-        </div>
-
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          {removable && (
-            <RemoveEntry code={code} kind={kind} entryId={entry.id} variant="row" />
           )}
         </div>
       </div>

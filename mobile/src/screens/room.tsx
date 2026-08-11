@@ -18,10 +18,12 @@ import type { StackParams } from "../../App";
 import {
   ApiError,
   confirmTrade,
+  dropWant,
   getMe,
   getRoom,
   joinRoom,
   lastRoom,
+  nudgeWant,
   offerOnFlare,
   postFlare,
   withdrawOffer,
@@ -451,14 +453,19 @@ function RoomScreen({
               </View>
             </Tap>
 
+            {/* Open, the panel is the stacked board in miniature — art,
+                name, number, printing — plus the two controls the board
+                has no business carrying: how many of a *saved* ask, and
+                dropping it for good. */}
             {repostOpen && (
-              <View style={{ gap: spacing(1) }}>
-                {outstanding.map((w) => (
-                  <Text key={w.id} style={styles.repostRow} numberOfLines={1}>
-                    {`${w.cardName}${w.quantity > 1 ? ` ×${w.quantity}` : ""}${
-                      w.printingLabel ? ` · ${w.printingLabel}` : ""
-                    }`}
-                  </Text>
+              <View>
+                {outstanding.map((want) => (
+                  <WantRow
+                    key={want.id}
+                    want={want}
+                    onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
+                    onDrop={() => act(() => dropWant(want.id))}
+                  />
                 ))}
               </View>
             )}
@@ -1076,6 +1083,102 @@ function CarouselFlare({
   );
 }
 
+/**
+ * One saved want inside "Still hunting these?".
+ *
+ * Deliberately the stacked Flare row's anatomy rather than a line of
+ * text: the founder's ask was that opening this panel look like opening
+ * a player's section of the board. The two extra controls are what make
+ * it worth opening — the quantity of a saved ask, editable here, and a
+ * Remove that drops it from the account rather than from a room.
+ */
+function WantRow({
+  want,
+  onNudge,
+  onDrop,
+}: {
+  want: Me["wants"][number];
+  onNudge: (delta: number) => Promise<void>;
+  onDrop: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  const run = async (work: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await work();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.wantRow}>
+      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+        <CardImage
+          imageUrl={want.imageUrl}
+          width={40}
+          name={want.cardName}
+          cardNumber={want.cardNumber}
+          caption={want.printingLabel ?? "Any printing"}
+          note={want.note}
+          lookingFor={want.quantity}
+        />
+
+        <View style={{ flex: 1, gap: spacing(1) }}>
+          {/* Name and Remove on one row, tops aligned to the same line
+              box — the founder caught these drifting apart on the web. */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: spacing(2),
+            }}
+          >
+            <Text style={styles.wantName} numberOfLines={2}>
+              {want.cardName}
+            </Text>
+            <Tap onPress={() => void run(onDrop)} disabled={busy} hitSlop={8}>
+              <Text style={styles.removeLink}>Remove</Text>
+            </Tap>
+          </View>
+
+          <Muted>
+            {`${want.cardNumber} · ${want.printingLabel ?? "Any printing"}`}
+          </Muted>
+
+          {want.deckLabel ? <Muted>{want.deckLabel}</Muted> : null}
+
+          <View
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+          >
+            <Tap
+              onPress={() => void run(() => onNudge(-1))}
+              disabled={busy || want.quantity <= 1}
+              hitSlop={6}
+              style={[styles.stepButton, want.quantity <= 1 && { opacity: 0.4 }]}
+            >
+              <MaterialCommunityIcons name="minus" size={14} color={colors.textSecondary} />
+            </Tap>
+            <Text style={styles.stepCount}>{want.quantity}</Text>
+            <Tap
+              onPress={() => void run(() => onNudge(1))}
+              disabled={busy || want.quantity >= 99}
+              hitSlop={6}
+              style={[styles.stepButton, want.quantity >= 99 && { opacity: 0.4 }]}
+            >
+              <MaterialCommunityIcons name="plus" size={14} color={colors.textSecondary} />
+            </Tap>
+            <Muted>{want.quantity === 1 ? "copy" : "copies"}</Muted>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 /** One Flare on the board: the card, your match, its offers, its actions. */
 function FlareRow({
   flare,
@@ -1287,9 +1390,32 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     fontSize: 14,
   },
-  repostRow: {
-    color: colors.textSecondary,
-    fontSize: 13,
+  wantRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingVertical: spacing(2),
+  },
+  wantName: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  stepButton: {
+    width: 28,
+    height: 28,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepCount: {
+    minWidth: 20,
+    textAlign: "center",
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
   },
   folderLabel: {
     color: colors.textSecondary,

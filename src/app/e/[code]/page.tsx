@@ -345,10 +345,12 @@ export default async function JoinByCodePage({
     .filter((want) => !postedAsks.has(`${want.cardId}:${want.printingId ?? ""}`))
     .map((want) => ({
       id: want.id,
-      label: want.printingLabel
-        ? `${want.cardName} (${want.printingLabel})`
-        : want.cardName,
+      cardName: want.cardName,
+      cardNumber: want.cardNumber,
+      printingLabel: want.printingLabel,
+      imageUrl: want.imageUrl,
       quantity: want.quantity,
+      note: want.note,
       deckLabel: want.deckLabel,
     }));
 
@@ -499,7 +501,11 @@ export default async function JoinByCodePage({
           <RoomTicker />
 
           {outstandingWants.length > 0 && (
-            <RepostWants code={normalized} wants={outstandingWants} />
+            <RepostWants
+              code={normalized}
+              wants={outstandingWants}
+              imagesEnabled={images}
+            />
           )}
 
           <Card className="flex items-center gap-3">
