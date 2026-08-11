@@ -38,6 +38,7 @@ import { saveLocal } from "@/lib/players/locals";
 import { collectionAvailability, collectionSyncFor } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
+import { WantEntries } from "@/components/players/want-entries";
 import { needsConfirming } from "@/lib/lists/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
@@ -501,11 +502,13 @@ export default async function JoinByCodePage({
           <RoomTicker />
 
           {outstandingWants.length > 0 && (
-            <RepostWants
-              code={normalized}
-              wants={outstandingWants}
-              imagesEnabled={images}
-            />
+            <RepostWants code={normalized} count={outstandingWants.length}>
+              <WantEntries
+                code={normalized}
+                wants={outstandingWants}
+                imagesEnabled={images}
+              />
+            </RepostWants>
           )}
 
           <Card className="flex items-center gap-3">
