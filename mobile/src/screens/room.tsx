@@ -391,7 +391,14 @@ function RoomScreen({
         <Card>
           <Muted>{room.storeName}</Muted>
           <Title>{room.name}</Title>
-          <Muted>{`You're in as ${state.you!.displayName}`}</Muted>
+          {/* The room's pulse on the door card, the founder's reorder:
+              the two numbers a glance wants first. "You're in as" is
+              gone — your own board section already says "you". */}
+          <Muted>
+            {`${participants.filter((p) => p.present).length} here now · ${flares.length} ${
+              flares.length === 1 ? "Flare" : "Flares"
+            }`}
+          </Muted>
         </Card>
 
         {/* An early board never pretends to be a live room. */}
@@ -488,58 +495,6 @@ function RoomScreen({
             )}
           </Card>
         )}
-
-        {/* The lobby: counts up front, names one tap behind the chevron. */}
-        <Card>
-          <Tap
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setRosterOpen((current) => !current);
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: spacing(2),
-            }}
-          >
-            <Title>In this room</Title>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
-            >
-              <Muted>
-                {`${participants.filter((p) => p.present).length} here now · ${participants.length} total`}
-              </Muted>
-              <MaterialCommunityIcons
-                name={rosterOpen ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.textMuted}
-              />
-            </View>
-          </Tap>
-
-          {rosterOpen && (
-            <View style={styles.lobby}>
-              {[...participants]
-                .sort((a, b) => Number(b.present) - Number(a.present))
-                .map((p) => (
-                  <View key={p.playerSessionId} style={styles.person}>
-                    <View
-                      style={[
-                        styles.dot,
-                        { backgroundColor: p.present ? colors.accent : colors.border },
-                      ]}
-                    />
-                    <Text style={{ color: colors.textSecondary }} numberOfLines={1}>
-                      {p.displayName ?? "A player"}
-                      {p.playerSessionId === youId ? " (you)" : ""}
-                      {p.openToTrades ? " · open to trades" : ""}
-                    </Text>
-                  </View>
-                ))}
-            </View>
-          )}
-        </Card>
 
         {groups.size === 0 && (
           <Card>
@@ -698,6 +653,60 @@ function RoomScreen({
             </Card>
           );
         })}
+
+        {/* The lobby, parked at the foot of the page: the names are
+            reference material, and their counts now live on the door
+            card at the top. Same fold, same chevron, further down. */}
+        <Card>
+          <Tap
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setRosterOpen((current) => !current);
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: spacing(2),
+            }}
+          >
+            <Title>In this room</Title>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+            >
+              <Muted>
+                {`${participants.filter((p) => p.present).length} here now · ${participants.length} total`}
+              </Muted>
+              <MaterialCommunityIcons
+                name={rosterOpen ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={colors.textMuted}
+              />
+            </View>
+          </Tap>
+
+          {rosterOpen && (
+            <View style={styles.lobby}>
+              {[...participants]
+                .sort((a, b) => Number(b.present) - Number(a.present))
+                .map((p) => (
+                  <View key={p.playerSessionId} style={styles.person}>
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: p.present ? colors.accent : colors.border },
+                      ]}
+                    />
+                    <Text style={{ color: colors.textSecondary }} numberOfLines={1}>
+                      {p.displayName ?? "A player"}
+                      {p.playerSessionId === youId ? " (you)" : ""}
+                      {p.openToTrades ? " · open to trades" : ""}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          )}
+        </Card>
       </ScrollView>
 
       {/* The action bar: the two things a thumb reaches for in a room. */}
