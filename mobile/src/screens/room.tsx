@@ -104,11 +104,10 @@ function RoomScreen({
   const [wants, setWants] = useState<Me["wants"]>([]);
 
   /*
-   * "Never mind" on the re-post banner. Without it the banner could only
-   * be obeyed; the founder called it out. Per visit, not forever: the
-   * wants stay saved, and switching rooms asks the question fresh.
+   * The re-post panel starts folded, and that IS the "no thanks": the
+   * founder cut the old "Never mind" button once the closed tile became
+   * a single quiet line. The wants stay saved either way.
    */
-  const [repostDismissed, setRepostDismissed] = useState(false);
   const [repostOpen, setRepostOpen] = useState(false);
 
   /*
@@ -159,7 +158,6 @@ function RoomScreen({
 
   useEffect(() => {
     setState(null);
-    setRepostDismissed(false);
     setRepostOpen(false);
     setExpandedGroups({});
     void refresh();
@@ -414,14 +412,15 @@ function RoomScreen({
           </Card>
         )}
 
-        {outstanding.length > 0 && !repostDismissed && (
+        {/*
+         * Closed, this tile is exactly the roster's silhouette: one
+         * header line, nothing under it. The Post button lives inside
+         * the fold with the list it posts, and "Never mind" is gone —
+         * the founder's call: a tile that starts closed does not need a
+         * second way to be ignored.
+         */}
+        {outstanding.length > 0 && (
           <Card>
-            {/*
-             * Folded shut, wearing the same header-and-chevron the
-             * roster and the board's player sections wear — the
-             * founder's point: one gesture that means "more inside",
-             * everywhere.
-             */}
             <Tap
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -458,38 +457,35 @@ function RoomScreen({
                 has no business carrying: how many of a *saved* ask, and
                 dropping it for good. */}
             {repostOpen && (
-              <View>
-                {outstanding.map((want) => (
-                  <WantRow
-                    key={want.id}
-                    want={want}
-                    onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
-                    onDrop={() => act(() => dropWant(want.id))}
-                  />
-                ))}
+              <View style={{ gap: spacing(2) }}>
+                <View>
+                  {outstanding.map((want) => (
+                    <WantRow
+                      key={want.id}
+                      want={want}
+                      onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
+                      onDrop={() => act(() => dropWant(want.id))}
+                    />
+                  ))}
+                </View>
+                <Button
+                  label={`Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`}
+                  onPress={() =>
+                    void act(async () => {
+                      for (const want of outstanding) {
+                        await postFlare(code, {
+                          cardId: want.cardId,
+                          printingId: want.printingId,
+                          quantity: want.quantity,
+                          note: want.note ?? undefined,
+                          deckLabel: want.deckLabel,
+                        }).catch(() => {});
+                      }
+                    })
+                  }
+                />
               </View>
             )}
-            <Button
-              label={`Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`}
-              onPress={() =>
-                void act(async () => {
-                  for (const want of outstanding) {
-                    await postFlare(code, {
-                      cardId: want.cardId,
-                      printingId: want.printingId,
-                      quantity: want.quantity,
-                      note: want.note ?? undefined,
-                      deckLabel: want.deckLabel,
-                    }).catch(() => {});
-                  }
-                })
-              }
-            />
-            <Button
-              label="Never mind"
-              variant="secondary"
-              onPress={() => setRepostDismissed(true)}
-            />
           </Card>
         )}
 
@@ -1171,7 +1167,6 @@ function WantRow({
             >
               <MaterialCommunityIcons name="plus" size={14} color={colors.textSecondary} />
             </Tap>
-            <Muted>{want.quantity === 1 ? "copy" : "copies"}</Muted>
           </View>
         </View>
       </View>
@@ -1395,10 +1390,11 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingVertical: spacing(2),
   },
+  // The Flare row's name scale exactly, so the two lists read as one.
   wantName: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
   },
   stepButton: {
