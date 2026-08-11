@@ -33,6 +33,7 @@ export async function GET(request: Request): Promise<Response> {
       quantity: want.quantity,
       note: want.note,
       deckLabel: want.deckLabel,
+      imageUrl: want.imageUrl,
     })),
     collection: sync
       ? { cardsMatched: sync.cards_matched, syncedAt: sync.synced_at }

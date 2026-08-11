@@ -195,6 +195,8 @@ export interface Me {
     note: string | null;
     /** The named hunt this want belongs to. Null = a loose card. */
     deckLabel: string | null;
+    /** Artwork, resolved server-side the way the Flare board resolves it. */
+    imageUrl: string | null;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {
@@ -307,6 +309,22 @@ export const saveToList = (entry: {
   note?: string;
   deckLabel?: string | null;
 }) => call<{ ok: true }>("POST", "/api/v1/wants", entry);
+
+/**
+ * Nudges a saved want's quantity, plus or minus, and returns where it
+ * landed after the server clamped it. A delta rather than an absolute so
+ * two quick taps add two, not one.
+ */
+export const nudgeWant = (wantId: string, delta: number) =>
+  call<{ ok: true; quantity: number }>(
+    "POST",
+    `/api/v1/wants/${encodeURIComponent(wantId)}`,
+    { delta },
+  );
+
+/** Drops a saved want for good. */
+export const dropWant = (wantId: string) =>
+  call<{ ok: true }>("DELETE", `/api/v1/wants/${encodeURIComponent(wantId)}`);
 
 export const postFlare = (
   code: string,

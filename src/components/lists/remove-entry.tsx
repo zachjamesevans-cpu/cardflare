@@ -111,17 +111,18 @@ function RowButton() {
 
   return (
     /*
-     * Negative margins swallow the ghost button's own padding so its
-     * label sits flush with the card's right edge (level with the "N
-     * cards" count above) and on the card name's first line. The touch
-     * target keeps its full size — only the box's position moves.
+     * A negative right margin swallows the ghost button's own padding so
+     * its label sits flush with the card's right edge, level with the "N
+     * cards" count above. The touch target keeps its full size — only the
+     * box's position moves. Nothing vertical: the row aligns this button
+     * to the card name's baseline, and a margin there would undo it.
      */
     <Button
       type="submit"
       variant="ghost"
       size="sm"
       disabled={pending}
-      className="-mt-1.5 -mr-3.5"
+      className="-mr-3.5"
     >
       Remove
     </Button>
@@ -134,6 +135,7 @@ export function RemoveEntry({
   entryId,
   variant,
   cover,
+  className,
 }: {
   code: string;
   kind: ListKind;
@@ -142,9 +144,11 @@ export function RemoveEntry({
   variant: "tile" | "row";
   /** The card's box, top-left of the entry. Omitted fills the entry. */
   cover?: VeilBox;
+  /** Placement classes for the form itself, which is the flex item. */
+  className?: string;
 }) {
   return (
-    <form action={removeListEntryAction}>
+    <form action={removeListEntryAction} className={className}>
       <input type="hidden" name="code" value={code} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="entryId" value={entryId} />

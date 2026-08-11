@@ -1,5 +1,6 @@
 import "server-only";
 
+import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -25,7 +26,19 @@ export interface SavedWant {
   note: string | null;
   /** The hunt the want belongs to, so it re-posts as a folder. */
   deckLabel: string | null;
+  /**
+   * Artwork, resolved the same way the Flare board resolves it: the named
+   * printing's picture, or the plainest printing of the card when the want
+   * takes any version. A saved want reads as a list of words without it,
+   * and the re-post panel is exactly where you are deciding "yes, that
+   * one" at a glance.
+   */
+  imageUrl: string | null;
 }
+
+/** The bounds a want's quantity is held to, matching a Flare's. */
+export const MIN_WANT_QUANTITY = 1;
+export const MAX_WANT_QUANTITY = 99;
 
 /**
  * Upserts one ask; re-posting the same card refreshes it, never stacks.
@@ -99,6 +112,37 @@ export async function clearWant(
   if (error) console.error("Could not clear the want", error);
 }
 
+/**
+ * Sets one want's quantity, the player's own list only.
+ *
+ * Clamped rather than rejected: the control that drives this is a pair of
+ * plus/minus buttons, and the honest answer to "minus at one" is one, not
+ * an error message. Dropping to zero is a removal, and removal has its own
+ * button — this never deletes behind the player's back.
+ */
+export async function setWantQuantity(
+  id: string,
+  playerId: string,
+  quantity: number,
+): Promise<number> {
+  const clamped = Math.min(
+    Math.max(Math.round(quantity), MIN_WANT_QUANTITY),
+    MAX_WANT_QUANTITY,
+  );
+
+  if (!isSupabaseConfigured()) return clamped;
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_wants")
+    .update({ quantity: clamped })
+    .eq("id", id)
+    .eq("player_id", playerId);
+
+  if (error) console.error("Could not set the want quantity", error);
+
+  return clamped;
+}
+
 export async function removeWant(id: string, playerId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
@@ -134,25 +178,59 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
   const cardIds = [...new Set(rows.map((row) => row.card_id))];
   const printingIds = rows.flatMap((row) => (row.printing_id ? [row.printing_id] : []));
 
-  const [cards, printings] = await Promise.all([
+  /*
+   * A want that takes any printing still needs a picture — the same call
+   * the Flare board makes, and for the same reason: someone who will take
+   * any version is picturing the ordinary one, and a nameless row is
+   * harder to recognise than a piece of art.
+   */
+  const openCardIds = [
+    ...new Set(rows.filter((row) => !row.printing_id).map((row) => row.card_id)),
+  ];
+
+  const columns =
+    "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url";
+
+  const [cards, printings, openPrintings] = await Promise.all([
     admin
       .from("cards")
       .select("id, exact_name, canonical_card_number")
       .in("id", cardIds),
     printingIds.length > 0
-      ? admin
-          .from("card_printings")
-          .select("id, printing_label, printing_name, set_code")
-          .in("id", printingIds)
+      ? admin.from("card_printings").select(columns).in("id", printingIds)
+      : Promise.resolve({ data: [], error: null }),
+    openCardIds.length > 0
+      ? admin.from("card_printings").select(columns).in("card_id", openCardIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
   const cardById = new Map((cards.data ?? []).map((row) => [row.id, row]));
   const printingById = new Map((printings.data ?? []).map((row) => [row.id, row]));
 
+  /* Grouped per card so the base can be chosen against its siblings. */
+  const byCard = new Map<string, CardPrinting[]>();
+  for (const row of openPrintings.data ?? []) {
+    const list = byCard.get(row.card_id) ?? [];
+    list.push({
+      id: row.id,
+      setCode: row.set_code,
+      setName: row.set_name,
+      printingLabel: row.printing_label,
+      variantType: row.variant_type,
+      rarity: row.rarity,
+      printingName: row.printing_name,
+      isPromo: row.is_promo,
+      imageUrl: row.image_url,
+    });
+    byCard.set(row.card_id, list);
+  }
+
   return rows.map((row) => {
     const card = cardById.get(row.card_id);
     const printing = row.printing_id ? printingById.get(row.printing_id) : null;
+    const base = row.printing_id
+      ? null
+      : pickBasePrinting(byCard.get(row.card_id) ?? [], card?.exact_name ?? "");
 
     return {
       id: row.id,
@@ -160,6 +238,7 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
       cardName: card?.exact_name ?? "Unknown card",
       cardNumber: card?.canonical_card_number ?? "",
       printingId: row.printing_id,
+      /* The image can come from a stand-in; the label never does. */
       printingLabel:
         printing?.printing_label ??
         printing?.printing_name ??
@@ -168,6 +247,7 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
       quantity: row.quantity,
       note: row.note,
       deckLabel: row.deck_label ?? null,
+      imageUrl: printing?.image_url ?? base?.imageUrl ?? null,
     };
   });
 }

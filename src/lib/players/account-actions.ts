@@ -29,7 +29,7 @@ import {
   type RepostState,
 } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
-import { listWants, removeWant, saveWant } from "./wants";
+import { listWants, removeWant, saveWant, setWantQuantity } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -198,6 +198,21 @@ export async function removeLocalAction(formData: FormData): Promise<void> {
   revalidatePath("/account");
 }
 
+/**
+ * Repaints wherever the want list is on screen.
+ *
+ * The account page always; the room too when the form came from the
+ * re-post panel, which now edits the list in place rather than only
+ * offering to post it.
+ */
+function revalidateWants(code: string): void {
+  revalidatePath("/account");
+  if (code) {
+    revalidatePath(`/e/${code}`);
+    revalidatePath("/room");
+  }
+}
+
 /** Removes one saved want. The player's own list only. */
 export async function removeWantAction(formData: FormData): Promise<void> {
   const wantId = text(formData, "wantId");
@@ -207,7 +222,32 @@ export async function removeWantAction(formData: FormData): Promise<void> {
   if (!playerId) return;
 
   await removeWant(wantId, playerId);
-  revalidatePath("/account");
+  revalidateWants(text(formData, "code"));
+}
+
+/**
+ * Nudges one saved want's quantity up or down.
+ *
+ * A delta rather than an absolute, because the control is a pair of
+ * buttons and two thumbs racing each other should land on "two more",
+ * not on whichever number was on screen when the first tap started. The
+ * repository clamps; one at minus stays one, and removal has its own
+ * button.
+ */
+export async function nudgeWantQuantityAction(formData: FormData): Promise<void> {
+  const wantId = text(formData, "wantId");
+  const delta = Number(text(formData, "delta"));
+  if (!wantId || !Number.isFinite(delta) || delta === 0) return;
+
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return;
+
+  const wants = await listWants(playerId);
+  const want = wants.find((entry) => entry.id === wantId);
+  if (!want) return;
+
+  await setWantQuantity(wantId, playerId, want.quantity + Math.trunc(delta));
+  revalidateWants(text(formData, "code"));
 }
 
 /**

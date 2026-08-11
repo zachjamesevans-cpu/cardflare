@@ -2,12 +2,37 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCircle2, ChevronDown, History, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Folder,
+  History,
+  Loader2,
+  Minus,
+  Plus,
+} from "lucide-react";
 
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { repostWantsAction } from "@/lib/players/account-actions";
+import {
+  nudgeWantQuantityAction,
+  removeWantAction,
+  repostWantsAction,
+} from "@/lib/players/account-actions";
 import { REPOST_IDLE } from "@/lib/players/account-schema";
+
+/** One outstanding ask, as the room resolves it. */
+export interface OutstandingWant {
+  id: string;
+  cardName: string;
+  cardNumber: string;
+  printingLabel: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  note: string | null;
+  deckLabel: string | null;
+}
 
 function SubmitButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
@@ -23,12 +48,148 @@ function SubmitButton({ count }: { count: number }) {
 }
 
 /**
- * "Post these Flares again?" — the payoff of an account, folded shut.
+ * Plus, minus and remove: a saved want is editable where it is read.
+ *
+ * The founder's ask — the panel should not be a read-only reminder you
+ * have to leave in order to correct. Each control is its own tiny form
+ * posting to a Server Action, so the list is still server-rendered and
+ * the numbers can never drift from the database.
+ */
+function Nudge({
+  code,
+  wantId,
+  delta,
+  label,
+  disabled = false,
+  children,
+}: {
+  code: string;
+  wantId: string;
+  delta: number;
+  label: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <form action={nudgeWantQuantityAction}>
+      <input type="hidden" name="code" value={code} />
+      <input type="hidden" name="wantId" value={wantId} />
+      <input type="hidden" name="delta" value={delta} />
+      <button
+        type="submit"
+        disabled={disabled}
+        aria-label={label}
+        className="flex size-7 items-center justify-center rounded-[6px] border border-border text-text-secondary transition-colors hover:text-text-primary disabled:opacity-40"
+      >
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function WantRow({
+  code,
+  want,
+  imagesEnabled,
+}: {
+  code: string;
+  want: OutstandingWant;
+  imagesEnabled: boolean;
+}) {
+  return (
+    <li className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 first:pt-0">
+      <div className="flex items-start gap-3">
+        <CardImageZoom
+          imageUrl={want.imageUrl}
+          exactName={want.cardName}
+          cardNumber={want.cardNumber}
+          enabled={imagesEnabled}
+          anyPrinting={!want.printingLabel}
+          caption={want.printingLabel ?? "Any printing"}
+          note={want.note}
+          lookingFor={want.quantity}
+          thumbClassName="w-10"
+        />
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {/*
+           * Name and Remove share one baseline row, the same correction
+           * the Flare board got: two columns aligned by their box tops
+           * put the word "Remove" a few pixels below the card's name,
+           * and a rail of them read as crooked.
+           */}
+          <div className="flex items-baseline gap-x-2">
+            <p className="min-w-0 font-semibold text-text-primary">{want.cardName}</p>
+            <form action={removeWantAction} className="ml-auto shrink-0">
+              <input type="hidden" name="code" value={code} />
+              <input type="hidden" name="wantId" value={want.id} />
+              <Button type="submit" variant="ghost" size="sm" className="-mr-3.5">
+                Remove
+              </Button>
+            </form>
+          </div>
+
+          <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
+            <span>{want.cardNumber}</span>
+            <span className="font-sans">{want.printingLabel ?? "Any printing"}</span>
+          </p>
+
+          {want.note && (
+            <p className="text-sm text-text-secondary italic">{want.note}</p>
+          )}
+
+          {want.deckLabel && (
+            <p className="flex items-center gap-1.5 text-xs text-text-muted">
+              <Folder className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+              {want.deckLabel}
+            </p>
+          )}
+
+          <div className="mt-1 flex items-center gap-2">
+            <Nudge
+              code={code}
+              wantId={want.id}
+              delta={-1}
+              label={`One fewer ${want.cardName}`}
+              disabled={want.quantity <= 1}
+            >
+              <Minus className="size-3.5" aria-hidden="true" />
+            </Nudge>
+            <span className="min-w-6 text-center text-sm font-semibold text-text-primary tabular-nums">
+              {want.quantity}
+            </span>
+            <Nudge
+              code={code}
+              wantId={want.id}
+              delta={1}
+              label={`One more ${want.cardName}`}
+              disabled={want.quantity >= 99}
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+            </Nudge>
+            <span className="text-xs text-text-muted">
+              {want.quantity === 1 ? "copy" : "copies"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * "Still hunting these?" — the payoff of an account, folded shut.
  *
  * Third surface to wear the same gesture, and the founder's point: a
  * header with a count and a chevron now means "there is more inside"
  * everywhere in CardFlare — the room's roster, a player's section of
- * the board, and this. Learn it once.
+ * the board, and this. Learn it once. The header is one line, never
+ * two: the question used to be long enough to wrap the count onto its
+ * own row, which is what made this tile look unlike the other two.
+ *
+ * Open, it is the stacked board in miniature — art, name, number,
+ * printing, note, folder — plus the controls the board has no business
+ * carrying: the quantity of a *saved* ask, and dropping it for good.
  *
  * Shown only when the signed-in player has saved wants that are not
  * already on this board. One tap posts the lot; the panel disappears on
@@ -37,10 +198,13 @@ function SubmitButton({ count }: { count: number }) {
 export function RepostWants({
   code,
   wants,
+  imagesEnabled,
 }: {
   code: string;
   /** Outstanding asks, resolved by the page. */
-  wants: { id: string; label: string; quantity: number; deckLabel: string | null }[];
+  wants: OutstandingWant[];
+  /** Resolved on the server from NEXT_PUBLIC_ENABLE_CARD_IMAGES. */
+  imagesEnabled: boolean;
 }) {
   const [state, formAction] = useActionState(repostWantsAction, REPOST_IDLE);
   const [open, setOpen] = useState(false);
@@ -72,14 +236,12 @@ export function RepostWants({
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 text-left"
+        className="flex w-full items-center justify-between gap-3 text-left"
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <h2 className="flex min-w-0 items-center gap-2 font-semibold text-text-primary">
           <History className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          <span className="font-semibold text-text-primary">
-            Still hunting these from last time?
-          </span>
-        </span>
+          <span className="truncate">Still hunting these?</span>
+        </h2>
         <span className="flex shrink-0 items-center gap-2">
           <span className="text-sm text-text-muted tabular-nums">
             {wants.length} {wants.length === 1 ? "card" : "cards"}
@@ -99,20 +261,14 @@ export function RepostWants({
         }`}
       >
         <div className="overflow-hidden">
-          <ul className="flex flex-col pt-3">
+          <ul className="flex flex-col pt-4">
             {wants.map((want) => (
-              <li
+              <WantRow
                 key={want.id}
-                className="flex flex-wrap items-baseline gap-x-2 border-t border-border py-2 text-sm first:border-t-0 first:pt-0"
-              >
-                <span className="text-text-primary">{want.label}</span>
-                {want.quantity > 1 && (
-                  <span className="text-text-muted tabular-nums">×{want.quantity}</span>
-                )}
-                {want.deckLabel && (
-                  <span className="text-xs text-text-muted">{want.deckLabel}</span>
-                )}
-              </li>
+                code={code}
+                want={want}
+                imagesEnabled={imagesEnabled}
+              />
             ))}
           </ul>
         </div>
