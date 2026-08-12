@@ -5,6 +5,7 @@ import {
   Hand,
   Layers,
   PackageCheck,
+  Sparkles,
   StickyNote,
   Store,
 } from "lucide-react";
@@ -25,7 +26,13 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { RemoveEntry } from "@/components/lists/remove-entry";
 import type { ListEntry } from "@/lib/lists/repository";
-import { groupByPlayer, partitionByDeck, type ListKind } from "@/lib/lists/schema";
+import {
+  groupByPlayer,
+  partitionByDeck,
+  partitionByIntent,
+  type ListKind,
+} from "@/lib/lists/schema";
+import { ShowcaseShine } from "@/components/lists/showcase-shine";
 import type { MatchKind, Offer } from "@/lib/matching/schema";
 
 /**
@@ -130,6 +137,15 @@ function Entry({
            * label is long, and a shrink-proof column wide enough for "You have
            * another printing" crushes the card name into a sliver on a phone.
            */}
+          {entry.intent === "showcase" && (
+            <span className="mt-1">
+              <Badge tone="accent">
+                <Sparkles className="size-3.5" aria-hidden="true" />
+                Up for grabs
+              </Badge>
+            </span>
+          )}
+
           {match === "exact" && (
             <span className="mt-1">
               <Badge>
@@ -164,6 +180,29 @@ function Entry({
        */}
       {children && <div className="flex flex-col">{children}</div>}
     </li>
+  );
+}
+
+/**
+ * The art box, foiled when the card is one somebody will let go.
+ *
+ * A plain wrapper for an ordinary Flare, so the overwhelming majority
+ * of tiles keep shipping zero JavaScript; the client island only
+ * mounts on the cards that actually shimmer.
+ */
+function ShowcaseArt({
+  showcase,
+  children,
+}: {
+  showcase: boolean;
+  children: React.ReactNode;
+}) {
+  if (!showcase) return <div className="relative flex">{children}</div>;
+
+  return (
+    <ShowcaseShine>
+      <div className="relative flex">{children}</div>
+    </ShowcaseShine>
   );
 }
 
@@ -310,7 +349,7 @@ function CarouselEntry({
       }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      <div className="relative flex">
+      <ShowcaseArt showcase={entry.intent === "showcase"}>
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
           <div
             key={depth}
@@ -382,7 +421,7 @@ function CarouselEntry({
             ×{visible}
           </span>
         )}
-      </div>
+      </ShowcaseArt>
 
       <p className="min-h-[14px] truncate text-[11px] leading-[14px] font-semibold text-text-primary">
         {entry.cardName}
@@ -535,7 +574,14 @@ export function FlareBoard({
          * thing instead of burying the rest of the board; a card wanted
          * on its own stays a plain row below the folders.
          */
-        const { folders, loose } = partitionByDeck(group.entries);
+        /*
+         * Showcases come out first and stay out. They are the opposite
+         * statement to a Flare — "I have this" against "I need this" —
+         * and reading the two as one list is how somebody walks over
+         * about a card the owner was trying to get rid of.
+         */
+        const { showcases, wants } = partitionByIntent(group.entries);
+        const { folders, loose } = partitionByDeck(wants);
 
         /*
          * The carousel tile is a contact sheet with one quick action:
@@ -642,7 +688,11 @@ export function FlareBoard({
           );
         };
 
-        const railEntries = [...folders.flatMap((folder) => folder.entries), ...loose];
+        const railEntries = [
+          ...showcases,
+          ...folders.flatMap((folder) => folder.entries),
+          ...loose,
+        ];
 
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">

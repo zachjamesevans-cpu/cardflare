@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { capFor, type AddEntryInput, type ListKind } from "./schema";
+import type { FlareIntent } from "@/lib/supabase/types";
 
 /**
  * Reads and writes for Flares and the trade binder.
@@ -33,6 +34,12 @@ export interface ListEntry {
   displayName: string | null;
   /** Binder entries only: when the owner last said they still had it. */
   confirmedAt: string | null;
+  /**
+   * Which way the card points. "want" is the original Flare — I need
+   * this. "showcase" is the founder's reverse: I have this and would
+   * let it go. Binder entries are always "want"-shaped and ignore it.
+   */
+  intent: FlareIntent;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -47,7 +54,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, deck_label, created_at, card_id, printing_id, player_session_id";
+  "id, quantity, note, deck_label, intent, created_at, card_id, printing_id, player_session_id";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
 
@@ -55,8 +62,9 @@ interface EntryRow {
   id: string;
   quantity: number;
   note: string | null;
-  /** Flares only; binder selects never ask for it. */
+  /** Flares only; binder selects never ask for either. */
   deck_label?: string | null;
+  intent?: FlareIntent;
   created_at: string;
   card_id: string;
   printing_id: string | null;
@@ -214,6 +222,9 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     playerSessionId: row.player_session_id,
     displayName: lookups.names.get(row.player_session_id) ?? null,
     confirmedAt: row.confirmed_at ?? null,
+    /* Binder rows never carry one, and a binder entry is a thing you
+       have rather than a thing pointing anywhere. */
+    intent: row.intent ?? "want",
   };
 }
 
@@ -261,6 +272,8 @@ export async function addFlare(
   eventId: string,
   playerSessionId: string,
   input: AddEntryInput,
+  /** "showcase" posts the card as one the player is offering up. */
+  intent: FlareIntent = "want",
 ): Promise<AddResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -279,10 +292,13 @@ export async function addFlare(
         quantity: input.quantity,
         note: input.note,
         deck_label: input.deckLabel,
+        intent,
         status: "open" as const,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "event_id,player_session_id,card_id,printing_id" },
+      /* Matches the unique index, intent included: showcasing a card
+         you are also hunting is two rows, not a conflict. */
+      { onConflict: "event_id,player_session_id,card_id,printing_id,intent" },
     );
 
   if (error) {

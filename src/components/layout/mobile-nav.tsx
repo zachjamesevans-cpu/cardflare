@@ -67,6 +67,14 @@ export function MobileNav() {
             </a>
           ))}
 
+          <a
+            href="/contact"
+            onClick={() => setOpen(false)}
+            className="rounded-[var(--radius-control)] px-3 py-3.5 text-base font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:bg-elevated hover:text-text-primary"
+          >
+            Contact
+          </a>
+
           {/* Named for its audience, same as the desktop nav: a player must
               never conclude they need an account. */}
           <a

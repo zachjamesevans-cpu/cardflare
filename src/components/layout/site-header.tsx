@@ -44,6 +44,12 @@ export function SiteHeader() {
            * the landing page is actually for.
            */}
           <Link
+            href="/contact"
+            className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:text-text-primary"
+          >
+            Contact
+          </Link>
+          <Link
             href="/login"
             className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:text-text-primary"
           >

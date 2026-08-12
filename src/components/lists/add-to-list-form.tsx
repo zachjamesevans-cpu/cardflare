@@ -6,7 +6,7 @@ import { Check, Loader2, X } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
 import { Button } from "@/components/ui/button";
-import { Select, TextInput } from "@/components/ui/controls";
+import { Checkbox, Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
 import { saveWantAction } from "@/lib/players/account-actions";
@@ -134,6 +134,13 @@ export function AddToListForm({
   const [deckDraft, setDeckDraft] = useState("");
 
   /*
+   * Reset on every posted card rather than kept like the deck name: a
+   * showcase is a one-off statement about one card, and leaving the box
+   * ticked would quietly turn the next hunt into an offer.
+   */
+  const [showcase, setShowcase] = useState(false);
+
+  /*
    * Picking a card collapses the tall results list into a short form,
    * which yanks everything below it upward while the browser holds its
    * scroll offset — a beta tester reported the page "teleporting" down.
@@ -162,7 +169,10 @@ export function AddToListForm({
   const [clearedFor, setClearedFor] = useState<ListState>(state);
   if (state !== clearedFor) {
     setClearedFor(state);
-    if (state.status === "added") setPicked(null);
+    if (state.status === "added") {
+      setPicked(null);
+      setShowcase(false);
+    }
   }
 
   const copy =
@@ -300,8 +310,37 @@ export function AddToListForm({
             </label>
           )}
 
+          {/*
+           * The one control that turns a Flare around. A showcase is
+           * the same post pointed the other way — "I have this" rather
+           * than "I need this" — so it belongs on this form rather than
+           * behind a second one, and the submit label follows it so
+           * nobody posts the opposite of what they meant.
+           */}
+          {kind === "flare" && target === "room" && (
+            <Checkbox
+              id="intent"
+              name="intent"
+              value="showcase"
+              checked={showcase}
+              onChange={(event) => setShowcase(event.target.checked)}
+              label={
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-medium text-text-primary">
+                    I have this one and would let it go
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    Posts it as a showcase: it sits at the top of your cards on the
+                    board with a foil shine, and anyone here already hunting it is told
+                    you have it.
+                  </span>
+                </span>
+              }
+            />
+          )}
+
           <div>
-            <SubmitButton label={copy.submit} />
+            <SubmitButton label={showcase ? "Showcase this card" : copy.submit} />
           </div>
         </form>
       )}

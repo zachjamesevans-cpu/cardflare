@@ -97,7 +97,34 @@ describe("posting to a list requires being in the room", () => {
   it("writes against the session's own id, never one from the form", async () => {
     await add({ playerSessionId: "99999999-9999-9999-9999-999999999999" });
 
-    expect(addFlare).toHaveBeenCalledWith(EVENT.id, SESSION.id, expect.anything());
+    expect(addFlare).toHaveBeenCalledWith(
+      EVENT.id,
+      SESSION.id,
+      expect.anything(),
+      "want",
+    );
+  });
+});
+
+describe("showcases", () => {
+  it("posts a Flare as a want unless the form says otherwise", async () => {
+    await add();
+
+    expect(addFlare.mock.calls[0]![3]).toBe("want");
+  });
+
+  it("posts a showcase when the form asks for one", async () => {
+    await add({ intent: "showcase" });
+
+    expect(addFlare.mock.calls[0]![3]).toBe("showcase");
+  });
+
+  /* Anything other than the exact word is a want: a showcase is an
+     opt-in statement, never something a stray value turns on. */
+  it("treats an unrecognised intent as a want", async () => {
+    await add({ intent: "selling" });
+
+    expect(addFlare.mock.calls[0]![3]).toBe("want");
   });
 });
 

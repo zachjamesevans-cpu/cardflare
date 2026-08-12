@@ -47,14 +47,17 @@ async function notifiablePlayerForSession(
 }
 
 /** The Flare's card name and its room's join code, for the message. */
-async function flareContext(
-  flareId: string,
-): Promise<{ ownerSessionId: string; cardName: string; code: string } | null> {
+async function flareContext(flareId: string): Promise<{
+  ownerSessionId: string;
+  cardName: string;
+  code: string;
+  intent: "want" | "showcase";
+} | null> {
   const admin = getSupabaseAdmin();
 
   const { data: flare } = await admin
     .from("flares")
-    .select("player_session_id, card_id, event_id")
+    .select("player_session_id, card_id, event_id, intent")
     .eq("id", flareId)
     .maybeSingle();
 
@@ -71,6 +74,7 @@ async function flareContext(
     ownerSessionId: flare.player_session_id,
     cardName: card?.exact_name ?? "your card",
     code: event.join_code,
+    intent: flare.intent,
   };
 }
 
@@ -234,10 +238,22 @@ export async function notifyOfferReceived(
     const recipient = await notifiablePlayerForSession(context.ownerSessionId);
     if (!recipient) return;
 
-    const title = `${responderName} has your ${context.cardName}`;
+    /*
+     * The wording follows the card, not the button. On a Flare the
+     * responder HAS what the owner needs; on a showcase the owner has
+     * it and the responder WANTS it. One sentence for each, because
+     * "Kaito has your Perona" sent to the person holding Perona reads
+     * as nonsense.
+     */
+    const title =
+      context.intent === "showcase"
+        ? `${responderName} wants your ${context.cardName}`
+        : `${responderName} has your ${context.cardName}`;
     const body = message
       ? `They said: “${message}”`
-      : "They offered to trade. Go find them in the room.";
+      : context.intent === "showcase"
+        ? "They asked about your showcase. Go find them in the room."
+        : "They offered to trade. Go find them in the room.";
     const path = `/e/${context.code}`;
 
     const id = await record({
@@ -360,6 +376,59 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
     }
   } catch (error) {
     console.error("Could not send the early-board digest", error);
+  }
+}
+
+/**
+ * "Zach has your Perona" — a showcase answering a Flare already up.
+ *
+ * The other half of the founder's showcase loop, and the half that
+ * makes it worth posting: somebody offers a card up, and the people in
+ * this room who already asked for that card are told, without the
+ * shower speaking to anyone.
+ *
+ * Recorded as an offer-received, because that is exactly what it means
+ * to the person receiving it — somebody in this room can answer your
+ * Flare. The dedupe key is the pair, so one showcase tells one hunter
+ * once however many times the board re-reads.
+ */
+export async function notifyShowcaseMatch(
+  showcaseFlareId: string,
+  showcaserName: string,
+  hunters: { flareId: string; playerSessionId: string }[],
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const context = await flareContext(showcaseFlareId);
+    if (!context) return;
+
+    const title = `${showcaserName} has your ${context.cardName}`;
+    const body = "They posted it as a card they will let go. Go find them in the room.";
+    const path = `/e/${context.code}`;
+
+    for (const hunter of hunters) {
+      const recipient = await notifiablePlayerForSession(hunter.playerSessionId);
+      if (!recipient) continue;
+
+      const id = await record({
+        playerId: recipient.playerId,
+        kind: "offer-received",
+        title,
+        body,
+        url: path,
+        dedupeKey: `showcase:${showcaseFlareId}:${hunter.flareId}`,
+      });
+
+      if (id) {
+        await deliverByPush(recipient.playerId, title, body, path);
+        if (recipient.email) {
+          await deliverByEmail(id, recipient.email, title, body, path);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Could not notify the showcase's matches", error);
   }
 }
 

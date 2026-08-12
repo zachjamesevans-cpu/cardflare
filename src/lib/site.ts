@@ -7,6 +7,16 @@ export const SITE = {
   description:
     "CardFlare is the hub for in-person card trading, buying and selling. Players post the cards they need the moment they walk in, and the players, stores and vendors who have them get found first.",
   contactEmail: "hello@cardflare.gg",
+  /**
+   * Where the contact form delivers.
+   *
+   * Separate from `contactEmail` on purpose: that address is published
+   * in the privacy policy, the terms and the waitlist unsubscribe line,
+   * so it is a promise made to people who already have it. This one is
+   * where the form's mail lands, and the two can diverge without
+   * rewriting legal copy.
+   */
+  contactInbox: "info@cardflare.gg",
 } as const;
 
 /**
