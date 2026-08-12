@@ -363,6 +363,12 @@ function RoomScreen({
     (want) => !myAsks.has(`${want.cardId}:${want.printingId ?? ""}`),
   );
 
+  /* Being open to trades is a fact about the person, so the board says
+     it on their name rather than as a card in their rail. */
+  const openIds = new Set(
+    participants.filter((p) => p.openToTrades).map((p) => p.playerSessionId),
+  );
+
   /* The board groups under whoever posted, same as the website. */
   const groups = new Map<string, { name: string | null; flares: RoomFlare[] }>();
   for (const flare of flares) {
@@ -602,7 +608,23 @@ function RoomScreen({
                   gap: spacing(2),
                 }}
               >
-                <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(1.5),
+                    flexShrink: 1,
+                  }}
+                >
+                  <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                  {openIds.has(sessionId) && (
+                    <Text
+                      style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}
+                    >
+                      {"\u21c4 Open to trades"}
+                    </Text>
+                  )}
+                </View>
                 <View
                   style={{
                     flexDirection: "row",

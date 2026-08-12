@@ -1,5 +1,6 @@
 import Image from "next/image";
 import {
+  ArrowLeftRight,
   ArrowUpRight,
   Banknote,
   Flame,
@@ -14,7 +15,6 @@ import {
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { isRenderableImageUrl } from "@/lib/cards/images";
-import { OpenToTradesThumbnail } from "@/components/cards/open-to-trades-card";
 import {
   MarkTraded,
   OfferList,
@@ -24,6 +24,7 @@ import {
 import { GroupView } from "@/components/lists/group-view";
 import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
+import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { RemoveEntry } from "@/components/lists/remove-entry";
@@ -231,44 +232,6 @@ function Empty({ icon: Icon, children }: { icon: typeof Flame; children: string 
       <Icon className="size-6 text-text-muted" aria-hidden="true" />
       <p className="max-w-sm text-text-secondary">{children}</p>
     </Card>
-  );
-}
-
-/**
- * The row a player gets when they are not after anything specific.
- *
- * Deliberately shaped exactly like a card row — same thumbnail box, same
- * columns — because it belongs in the same scan. Somebody reading the board is
- * asking "who do I go and talk to", and "this person will look at anything" is
- * a perfectly good answer to that.
- */
-function OpenToTradesEntry({
-  isYou,
-  rail = false,
-}: {
-  isYou: boolean;
-  /** Inside a carousel rail: fixed width, no row border. */
-  rail?: boolean;
-}) {
-  return (
-    <li
-      className={
-        rail
-          ? "flex w-52 shrink-0 items-start gap-3 py-1"
-          : "flex items-start gap-3 border-t border-border py-3 first:border-t-0 first:pt-0"
-      }
-    >
-      <OpenToTradesThumbnail />
-
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="font-semibold text-text-primary">Open to trades</p>
-        <p className="text-sm text-text-secondary">
-          {isYou
-            ? "Nothing specific, so people can bring a binder to you."
-            : "Nothing specific. Show them something good."}
-        </p>
-      </div>
-    </li>
   );
 }
 
@@ -752,6 +715,12 @@ export function FlareBoard({
                       <span className="font-normal text-text-muted"> · you</span>
                     )}
                   </span>
+                  {/*
+                   * On the name, not in the list. It is a fact about the
+                   * person, and as a row it cost this player's whole
+                   * section to say one short sentence.
+                   */}
+                  {alsoOpen && <OpenToTradesTag />}
                 </span>
               }
               meta={
@@ -781,12 +750,11 @@ export function FlareBoard({
                       </Rail>
                     </div>
 
-                    {(wantEntries.length > 0 || alsoOpen) && (
+                    {wantEntries.length > 0 && (
                       <div className="flex flex-col gap-1">
                         <DirectionHeading direction="want" count={wantEntries.length} />
                         <Rail ariaLabel="Cards this player is looking for">
                           {inTileOrder(wantEntries).map(renderTile)}
-                          {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
                         </Rail>
                       </div>
                     )}
@@ -794,7 +762,6 @@ export function FlareBoard({
                 ) : (
                   <Rail labelledBy={headingId}>
                     {inTileOrder(wantEntries).map(renderTile)}
-                    {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
                   </Rail>
                 )
               }
@@ -846,16 +813,9 @@ export function FlareBoard({
                     </div>
                   ))}
 
-                  {(loose.length > 0 || alsoOpen) && (
+                  {loose.length > 0 && (
                     <ul aria-labelledby={headingId} className="flex flex-col">
                       {loose.map(renderRow)}
-
-                      {/*
-                       * Last, under the specific asks. Somebody has named
-                       * four cards and will also look at anything — the four
-                       * cards are the more actionable half of that.
-                       */}
-                      {alsoOpen && <OpenToTradesEntry isYou={isYou} />}
                     </ul>
                   )}
                 </div>
@@ -866,37 +826,60 @@ export function FlareBoard({
       })}
 
       {/*
-       * After everyone with a specific request. A named card is easier to act
-       * on than "surprise me", so it should be what a reader hits first.
+       * Everyone who is here for a trade but has named nothing, in one
+       * block rather than a section each.
+       *
+       * They used to get a full card apiece, which meant a room of five
+       * browsers pushed every actual Flare off the screen. They still
+       * have to be findable — somebody new enough that they cannot name
+       * a card is exactly who most needs to be found — but "who is up
+       * for anything" is one answer to one question, so it reads as one
+       * line of names.
+       *
+       * Last, after the specific asks: a named card is easier to act on
+       * than "surprise me", so it should be what a reader hits first.
        */}
-      {browsing.map((player) => {
-        const isYou = player.playerSessionId === youId;
-        const headingId = `open-${player.playerSessionId}`;
-
-        return (
-          <Card
-            as="li"
-            key={player.playerSessionId}
-            className="flex flex-col gap-3 p-4"
+      {browsing.length > 0 && (
+        <Card as="li" className="flex flex-col gap-2.5 p-4">
+          <p
+            id="open-to-trades-heading"
+            className="flex items-center gap-1.5 text-sm font-medium text-text-secondary"
           >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <PlayerAvatar
-                displayName={player.displayName}
-                seed={player.playerSessionId}
-                size="sm"
-              />
-              <p id={headingId} className="truncate font-semibold text-text-primary">
-                {player.displayName}
-                {isYou && <span className="font-normal text-text-muted"> · you</span>}
-              </p>
-            </div>
+            <ArrowLeftRight
+              className="size-4 shrink-0 text-accent"
+              aria-hidden="true"
+            />
+            Open to any trade
+            <span className="font-normal text-text-muted tabular-nums">
+              · {browsing.length}
+            </span>
+          </p>
 
-            <ul aria-labelledby={headingId} className="flex flex-col">
-              <OpenToTradesEntry isYou={isYou} />
-            </ul>
-          </Card>
-        );
-      })}
+          <ul
+            aria-labelledby="open-to-trades-heading"
+            className="flex flex-wrap gap-x-4 gap-y-2"
+          >
+            {browsing.map((player) => (
+              <li
+                key={player.playerSessionId}
+                className="flex min-w-0 items-center gap-1.5"
+              >
+                <PlayerAvatar
+                  displayName={player.displayName}
+                  seed={player.playerSessionId}
+                  size="sm"
+                />
+                <span className="min-w-0 truncate text-sm text-text-primary">
+                  {player.displayName}
+                  {player.playerSessionId === youId && (
+                    <span className="font-normal text-text-muted"> · you</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </ul>
   );
 }
