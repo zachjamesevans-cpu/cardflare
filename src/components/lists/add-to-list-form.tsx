@@ -185,28 +185,6 @@ function Chip({
   );
 }
 
-/**
- * "That posted", said where the posting happened.
- *
- * In the inline composer the banner at the top of the card is no use:
- * post from the fifth result and the confirmation is off screen. So the
- * composer collapses into this, in the same row, and stays until the
- * next card is tapped.
- */
-function PostedNote({ cardName }: { cardName: string }) {
-  return (
-    <p
-      role="status"
-      className="flex slide-open items-center gap-2 border-t border-border px-3 py-2.5 text-sm text-text-secondary"
-    >
-      <Check className="size-4 shrink-0 text-accent" aria-hidden="true" />
-      <span className="min-w-0">
-        <span className="font-medium text-text-primary">{cardName}</span> posted.
-      </span>
-    </p>
-  );
-}
-
 /** Where a selection's composer belongs, in the key CardSearch matches on. */
 function composerKeyFor(picked: { card: CardResult; printingId: string }): string {
   return picked.printingId ? `${picked.card.id}:${picked.printingId}` : picked.card.id;
@@ -520,7 +498,16 @@ export function AddToListForm({
    * Posting from the fifth result should not put the only confirmation
    * off screen.
    */
-  const [posted, setPosted] = useState<{ key: string; cardName: string } | null>(null);
+  /*
+   * Bumped on every successful post to clear the search.
+   *
+   * The founder's report: posting left the search sitting there with the
+   * alternate-art list still hanging open under the card that had just
+   * gone up, which reads as though nothing happened. Clearing it makes
+   * the next card the obvious next move, which is what somebody posting
+   * a deck actually wants.
+   */
+  const [searchReset, setSearchReset] = useState(0);
 
   /*
    * The two-step flow collapses a tall results list into a short form,
@@ -543,6 +530,18 @@ export function AddToListForm({
   }, [inline, picked]);
 
   /*
+   * The one time the inline composer is allowed to scroll: a post has
+   * just cleared the search, so the results a reader was standing in
+   * genuinely no longer exist. `block: "nearest"` keeps it honest — it
+   * does nothing at all when the card is already on screen, which is
+   * the common case.
+   */
+  useEffect(() => {
+    if (!inline || searchReset === 0) return;
+    panel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [inline, searchReset]);
+
+  /*
    * A successful post hands the screen back to the search. Keeping the
    * posted card up, with its "Change" button still showing, read as if
    * the post itself wanted changing; the founder called it out. The
@@ -557,12 +556,7 @@ export function AddToListForm({
   if (state !== clearedFor) {
     setClearedFor(state);
     if (state.status === "added") {
-      if (picked) {
-        setPosted({
-          key: composerKeyFor(picked),
-          cardName: state.cardName || "That card",
-        });
-      }
+      setSearchReset((count) => count + 1);
       setPicked(null);
       setShowcase(false);
       setQuantity(1);
@@ -592,7 +586,7 @@ export function AddToListForm({
         <p className="text-sm text-text-secondary">{copy.hint}</p>
       </div>
 
-      {!inline && <Outcome state={state} saved={target === "list"} />}
+      <Outcome state={state} saved={target === "list"} />
 
       {inline ? (
         /*
@@ -603,7 +597,6 @@ export function AddToListForm({
         <CardSearch
           imagesEnabled={imagesEnabled}
           onSelect={(card: CardResult, printing?: CardPrinting) => {
-            setPosted(null);
             const key = printing ? `${card.id}:${printing.id}` : card.id;
             /* Tapping the row that is already open closes it. */
             setPicked((current) =>
@@ -612,7 +605,8 @@ export function AddToListForm({
                 : { card, printingId: printing?.id ?? "" },
             );
           }}
-          composerKey={picked ? composerKeyFor(picked) : (posted?.key ?? null)}
+          resetSignal={searchReset}
+          composerKey={picked ? composerKeyFor(picked) : null}
           composer={
             picked ? (
               <InlineComposer
@@ -625,8 +619,6 @@ export function AddToListForm({
                 onClose={() => setPicked(null)}
                 error={state.status === "error" ? state.message : null}
               />
-            ) : posted ? (
-              <PostedNote cardName={posted.cardName} />
             ) : null
           }
         />

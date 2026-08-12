@@ -348,6 +348,16 @@ export interface CardSearchProps {
    * `cardId + ":" + printingId` for one version. Null closes it.
    */
   composerKey?: string | null;
+  /**
+   * Bumped by the caller to clear the query and the results.
+   *
+   * Posting a Flare finishes with the search still showing whatever was
+   * typed, often with an alternate-art list hanging open under the card
+   * that was just posted. That reads as unfinished. The caller owns
+   * "what just happened", so it owns the reset; the same signal pattern
+   * the app's post screen already uses.
+   */
+  resetSignal?: number;
 }
 
 /**
@@ -363,6 +373,7 @@ export function CardSearch({
   autoFocus = false,
   composer = null,
   composerKey = null,
+  resetSignal = 0,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -386,6 +397,20 @@ export function CardSearch({
   const inputId = useId();
   /* Guards against an earlier, slower response overwriting a later one. */
   const requestId = useRef(0);
+
+  /*
+   * Skips the first run: a mounted, empty search does not need clearing,
+   * and doing it anyway would wipe a query typed before hydration.
+   */
+  const lastReset = useRef(resetSignal);
+
+  useEffect(() => {
+    if (resetSignal === lastReset.current) return;
+    lastReset.current = resetSignal;
+    setQuery("");
+    setSettled(null);
+    setActive(0);
+  }, [resetSignal]);
 
   const trimmed = query.trim();
   const tooShort = trimmed.length < MIN_QUERY_LENGTH;
