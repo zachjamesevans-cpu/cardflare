@@ -249,3 +249,75 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/*
+ * The holofoil sheen on a showcased card.
+ *
+ * A showcase is a card somebody will let go, and the founder's cue for
+ * that is the thing every player already recognises: foil. The rest of
+ * the board is matte, so the shimmer alone says "this one is available"
+ * without a word of copy.
+ *
+ * It plays on tap or click rather than forever. A rail of permanently
+ * animating cards is a distraction and a battery cost, and the gesture
+ * is the point — you touch the card, it catches the light, the way a
+ * real one does when you tilt it.
+ *
+ * `mix-blend-mode: color-dodge` over the artwork is what makes it read
+ * as light on the surface rather than a coloured film laid on top.
+ */
+@keyframes cf-holo-sweep {
+  from {
+    background-position: 0% 50%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    background-position: 200% 50%;
+    opacity: 0;
+  }
+}
+
+@utility holo-sheen {
+  position: relative;
+}
+
+@utility holo-sheen-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255, 92, 199, 0.55) 32%,
+    rgba(120, 220, 255, 0.55) 42%,
+    rgba(198, 238, 79, 0.55) 52%,
+    rgba(255, 214, 92, 0.55) 62%,
+    transparent 78%
+  );
+  background-size: 200% 100%;
+  mix-blend-mode: color-dodge;
+}
+
+/* Added by the client island for the length of one sweep. */
+@utility holo-playing {
+  animation: cf-holo-sweep 900ms ease-out;
+}
+
+/*
+ * Nobody gets a light show they did not ask for. The static tint keeps
+ * the "this one is foil" signal without any movement at all.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .holo-playing {
+    animation: none;
+    opacity: 0.35;
+  }
+}

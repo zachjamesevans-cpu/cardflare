@@ -403,6 +403,8 @@ export type EventParticipantInsert = Omit<
 export type FlareStatus = "open" | "cancelled" | "traded";
 
 /** A live request for a card, in one Event Room. Public to that room. */
+export type FlareIntent = "want" | "showcase";
+
 export type FlareRow = {
   id: string;
   created_at: string;
@@ -417,11 +419,13 @@ export type FlareRow = {
   note: string | null;
   /** Groups a player's Flares under a named hunt ("RG Luffy"). Null = loose. */
   deck_label: string | null;
+  /** Which way the card points: wanted, or offered up. */
+  intent: FlareIntent;
 };
 
 export type FlareInsert = Omit<
   FlareRow,
-  "id" | "created_at" | "updated_at" | "status" | "quantity" | "deck_label"
+  "id" | "created_at" | "updated_at" | "status" | "quantity" | "deck_label" | "intent"
 > & {
   id?: string;
   created_at?: string;
@@ -429,6 +433,7 @@ export type FlareInsert = Omit<
   status?: FlareStatus;
   quantity?: number;
   deck_label?: string | null;
+  intent?: FlareIntent;
 };
 
 /**

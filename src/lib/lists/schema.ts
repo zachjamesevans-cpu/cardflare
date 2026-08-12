@@ -246,3 +246,23 @@ export function partitionByDeck<T extends { deckLabel: string | null }>(
 
   return { folders: [...folders.values()], loose };
 }
+
+/**
+ * Splits a player's entries into what they are offering and what they
+ * need, showcases first.
+ *
+ * The founder's placement: a showcase sits at the top of that player's
+ * nest, above their hunt. Somebody scanning the board for a card to
+ * pick up should meet the cards on offer before the cards being asked
+ * for, and the two lists never interleave — they are opposite
+ * statements and reading them as one list is how you walk over to
+ * somebody about a card they were trying to get rid of.
+ */
+export function partitionByIntent<T extends { intent: "want" | "showcase" }>(
+  entries: T[],
+): { showcases: T[]; wants: T[] } {
+  return {
+    showcases: entries.filter((entry) => entry.intent === "showcase"),
+    wants: entries.filter((entry) => entry.intent !== "showcase"),
+  };
+}

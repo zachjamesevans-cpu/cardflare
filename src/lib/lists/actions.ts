@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { resolveCode } from "@/lib/events/rooms";
 import { roomPhase, type PublicEvent } from "@/lib/events/schema";
-import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
+import {
+  notifyEarlyBoardFlares,
+  notifyShowcaseMatch,
+} from "@/lib/notifications/notify";
+import { hasFeature } from "@/lib/billing/features";
+import { tierForPlayer } from "@/lib/billing/repository";
+import { findShowcase, huntersFor } from "./showcase";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
@@ -31,6 +37,44 @@ import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./sche
  */
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
+
+/**
+ * Tells everyone hunting this card that somebody just offered one up.
+ *
+ * Deliberately best-effort and never awaited by the caller: the
+ * showcase is on the board either way, and a notification outage must
+ * not turn a successful post into a visible failure.
+ */
+async function announceShowcase(
+  room: {
+    eventId: string;
+    playerSessionId: string;
+  },
+  entry: { cardId: string; printingId: string | null },
+): Promise<void> {
+  try {
+    const hunters = await huntersFor({
+      eventId: room.eventId,
+      cardId: entry.cardId,
+      printingId: entry.printingId,
+      excludeSessionId: room.playerSessionId,
+    });
+    if (hunters.length === 0) return;
+
+    const session = await getPlayerSession();
+    const showcase = await findShowcase(
+      room.eventId,
+      room.playerSessionId,
+      entry.cardId,
+      entry.printingId,
+    );
+    if (!showcase) return;
+
+    await notifyShowcaseMatch(showcase, session?.display_name ?? "A player", hunters);
+  } catch (error) {
+    console.error("Could not announce the showcase", error);
+  }
+}
 
 /**
  * Generous, because a player emptying a binder into the app is using the
@@ -128,9 +172,37 @@ export async function addToListAction(
     };
   }
 
+  /*
+   * A showcase is a Flare pointed the other way: same board, same row,
+   * opposite direction. The intent rides in the form because the two
+   * are posted from the same control.
+   */
+  const showcase = text(formData, "intent") === "showcase";
+
+  /*
+   * The gate, written now and open now. `hasFeature` answers from one
+   * table (src/lib/billing/features.ts), so making showcases a Pro
+   * feature later is a single word there — not a hunt through actions.
+   * While the feature is free this costs no query at all.
+   */
+  if (showcase && !hasFeature("showcase", null)) {
+    const tier = room.playerId ? await tierForPlayer(room.playerId) : null;
+    if (!hasFeature("showcase", tier)) {
+      return {
+        status: "error",
+        message: "Showcasing a card is a CardFlare Pro feature.",
+      };
+    }
+  }
+
   const result =
     kind.data === "flare"
-      ? await addFlare(room.eventId, room.playerSessionId, parsed.data)
+      ? await addFlare(
+          room.eventId,
+          room.playerSessionId,
+          parsed.data,
+          showcase ? "showcase" : "want",
+        )
       : await addToBinder(room.playerSessionId, parsed.data);
 
   /*
@@ -138,14 +210,28 @@ export async function addToListAction(
    * as a want, so it follows them to the next store. Best-effort — the
    * Flare already posted, and a bookkeeping miss must not undo that.
    */
-  if (result.ok && kind.data === "flare" && room.playerId) {
+  if (result.ok && kind.data === "flare" && !showcase && room.playerId) {
     await saveWant(room.playerId, parsed.data);
   }
 
   // The first Flares on an early board wake the store's regulars. Fire
   // and forget: the dedupe makes repeats free, and the post already won.
-  if (result.ok && kind.data === "flare" && roomPhase(room.room) === "early") {
+  if (
+    result.ok &&
+    kind.data === "flare" &&
+    !showcase &&
+    roomPhase(room.room) === "early"
+  ) {
     void notifyEarlyBoardFlares(room.eventId);
+  }
+
+  /*
+   * The payoff: a card offered up finds the people already asking for
+   * it, and tells them. Fire and forget — the showcase is already on
+   * the board, and the dedupe makes a repeat post free.
+   */
+  if (result.ok && kind.data === "flare" && showcase) {
+    void announceShowcase(room, parsed.data);
   }
 
   if (!result.ok) {
