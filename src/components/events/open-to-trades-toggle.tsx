@@ -1,5 +1,5 @@
 import { OpenToTradesCard } from "@/components/cards/open-to-trades-card";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { setOpenToTradesAction } from "@/lib/events/join-event-actions";
 
 /**
@@ -18,8 +18,10 @@ import { setOpenToTradesAction } from "@/lib/events/join-event-actions";
  * form fields so it cannot be read as a property of the Flare being
  * typed above it. It is your status in this room, not the post's.
  *
- * A Server Component: the button is a form posting to a Server Action,
- * so this works before hydration and ships no JavaScript.
+ * Still a Server Component. Only the button is a client island, so it
+ * can show that a press landed — the founder's rule: a press that waits
+ * on the server has to say so, or the screen reads as frozen and gets
+ * pressed again. Going on the board is a round trip like any other.
  */
 export function OpenToTradesToggle({ code, open }: { code: string; open: boolean }) {
   return (
@@ -41,9 +43,12 @@ export function OpenToTradesToggle({ code, open }: { code: string; open: boolean
       <form action={setOpenToTradesAction} className="shrink-0">
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="open" value={open ? "off" : "on"} />
-        <Button type="submit" variant={open ? "secondary" : "primary"} size="sm">
-          {open ? "Never mind" : "I'm open to trades"}
-        </Button>
+        <SubmitButton
+          label={open ? "Never mind" : "I'm open to trades"}
+          pendingLabel="Updating…"
+          variant={open ? "secondary" : "primary"}
+          size="sm"
+        />
       </form>
     </div>
   );

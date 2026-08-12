@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Loader2, Search } from "lucide-react";
+import { ChevronRight, Loader2, Search } from "lucide-react";
 
-import { CardThumbnail } from "@/components/cards/card-thumbnail";
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { searchCardsAction } from "@/lib/cards/actions";
@@ -94,39 +94,48 @@ function PrintingList({
   return (
     <ul className="flex flex-col gap-1.5" aria-label="Versions">
       {card.printings.map((printing, index) => {
-        const content = (
-          <>
-            <CardThumbnail
-              imageUrl={printing.imageUrl}
-              exactName={card.exactName}
-              cardNumber={card.canonicalCardNumber}
-              enabled={imagesEnabled}
-              className="w-9"
-            />
-            <span className="min-w-0 flex-1 text-left text-xs leading-snug text-text-secondary">
-              {printingLabel(printing, card.exactName) ?? "Standard printing"}
-            </span>
-          </>
-        );
-
-        const chrome =
-          "flex w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5";
+        const label = printingLabel(printing, card.exactName) ?? "Standard printing";
 
         return (
-          <li key={`${printing.setCode}-${printing.rarity}-${index}`}>
+          <li
+            key={`${printing.setCode}-${printing.rarity}-${index}`}
+            className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5"
+          >
+            {/*
+             * The art is its own control, so an alternate art can be
+             * looked at properly before it is chosen. That is the whole
+             * reason somebody opened this list.
+             */}
+            {/*
+             * Boxed to a fixed width on purpose. `thumbClassName` makes
+             * the zoom's own button `w-full` — right for the carousel,
+             * where the tile is art-first — so without this wrapper the
+             * picture swallows the row and the label it sits beside
+             * collapses to nothing. Measured: 342px of art, 0px of text.
+             */}
+            <span className="w-9 shrink-0">
+              <CardImageZoom
+                imageUrl={printing.imageUrl}
+                exactName={card.exactName}
+                cardNumber={card.canonicalCardNumber}
+                enabled={imagesEnabled}
+                caption={label}
+                thumbClassName="w-full"
+              />
+            </span>
+
             {onPick ? (
               <button
                 type="button"
                 onClick={() => onPick(printing)}
-                className={cn(
-                  chrome,
-                  "transition-colors hover:border-accent/50 hover:bg-accent/[0.06]",
-                )}
+                className="min-w-0 flex-1 rounded-[var(--radius-control)] py-1 text-left text-xs leading-snug text-text-secondary transition-colors hover:text-text-primary"
               >
-                {content}
+                {label}
               </button>
             ) : (
-              <div className={chrome}>{content}</div>
+              <span className="min-w-0 flex-1 text-left text-xs leading-snug text-text-secondary">
+                {label}
+              </span>
             )}
           </li>
         );
@@ -180,29 +189,44 @@ function Row({
   ].filter((part): part is string => !!part);
 
   return (
+    /*
+     * One card, one block, every block the same. The founder's ask was
+     * to bring the board's own language up here: a bordered block with a
+     * header and a chevron that folds more open is what a deck folder, a
+     * player's nest and the posting form's details all already look
+     * like, so the search stops being the one screen with its own rules.
+     */
     <li
       id={id}
       role="option"
       aria-selected={active}
       className={cn(
-        "rounded-[var(--radius-control)] border transition-colors",
-        active ? "border-accent/50 bg-accent/[0.06]" : "border-transparent",
+        "overflow-hidden rounded-[var(--radius-card)] border bg-surface transition-colors",
+        active ? "border-accent/50 bg-accent/[0.06]" : "border-border",
       )}
     >
-      <button
-        type="button"
-        onClick={() => onSelect?.(card)}
-        /* Comfortably past 44px tall: a phone target at a busy counter. */
-        className="flex w-full items-start gap-3 px-2 pt-3 pb-2 text-left"
-      >
-        <CardThumbnail
+      <div className="flex items-start gap-3 p-3">
+        {/*
+         * The art is its own button now, not part of the select target.
+         * The founder's report: you could not look at a card properly
+         * from search, which is exactly where you most want to, because
+         * the thumbnail lived inside the row's button and a button
+         * cannot hold another one.
+         */}
+        <CardImageZoom
           imageUrl={printing?.imageUrl ?? null}
           exactName={card.exactName}
           cardNumber={card.canonicalCardNumber}
           enabled={imagesEnabled}
+          caption={label}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => onSelect?.(card)}
+          /* Comfortably past 44px tall: a phone target at a busy counter. */
+          className="flex min-w-0 flex-1 flex-col gap-1 self-stretch rounded-[var(--radius-control)] text-left"
+        >
           <p className="truncate font-semibold text-text-primary">
             <Highlighted text={card.exactName} term={term} />
           </p>
@@ -219,35 +243,35 @@ function Row({
           </p>
 
           <Stats card={card} />
-        </div>
-      </button>
+        </button>
+      </div>
 
       {manyPrintings && (
-        <div className="flex flex-col gap-2 px-2 pb-3 pl-[4.75rem]">
+        <>
           <button
             type="button"
             onClick={() => setShowVersions((value) => !value)}
             aria-expanded={showVersions}
-            className="flex w-fit items-center gap-1 text-xs font-medium text-text-muted underline-offset-4 transition-colors hover:text-text-secondary hover:underline"
+            className="flex w-full items-center gap-1.5 border-t border-border px-3 py-2.5 text-left text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
           >
-            {showVersions
-              ? "Hide versions"
-              : `${card.printings.length} versions, alt arts and promos`}
-            <ChevronDown
+            <ChevronRight
               aria-hidden="true"
               className={cn(
-                "size-3.5 transition-transform duration-[var(--duration-base)]",
-                showVersions && "rotate-180",
+                "size-4 shrink-0 text-accent transition-transform duration-[var(--duration-base)]",
+                showVersions && "rotate-90",
               )}
             />
+            <span className="min-w-0 flex-1">
+              {card.printings.length} versions, alt arts and promos
+            </span>
           </button>
 
           {showVersions && (
-            <>
+            <div className="flex flex-col gap-2 border-t border-border p-3">
               {onSelect && (
                 <p className="text-xs text-text-muted">
-                  Tap a version to ask for that exact one. Tap the card above to take
-                  any printing.
+                  Tap a version to ask for that exact one, or the card above to take any
+                  printing. Tap any picture to see it full size.
                 </p>
               )}
               <PrintingList
@@ -255,9 +279,9 @@ function Row({
                 imagesEnabled={imagesEnabled}
                 onPick={onSelect && ((printing) => onSelect(card, printing))}
               />
-            </>
+            </div>
           )}
-        </div>
+        </>
       )}
     </li>
   );
@@ -462,7 +486,7 @@ export function CardSearch({
           id={listId}
           role="listbox"
           aria-label="Card results"
-          className="flex flex-col gap-1"
+          className="flex flex-col gap-2"
         >
           {results.map((card, index) => (
             <Row
