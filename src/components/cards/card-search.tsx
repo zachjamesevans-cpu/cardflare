@@ -81,9 +81,15 @@ function PrintingList({
   card,
   imagesEnabled,
   onPick,
+  composerFor = null,
+  composer = null,
 }: {
   card: CardResult;
   imagesEnabled: boolean;
+  /** The printing id whose row is currently hosting the composer. */
+  composerFor?: string | null;
+  /** Rendered under that row, so the controls land under the thumb. */
+  composer?: React.ReactNode;
   /**
    * Supplied when the search is a picker. Tapping a version then selects the
    * card *with that printing*, so someone hunting the parallel art is not
@@ -96,47 +102,58 @@ function PrintingList({
       {card.printings.map((printing, index) => {
         const label = printingLabel(printing, card.exactName) ?? "Standard printing";
 
+        const hosting = composerFor === printing.id;
+
         return (
           <li
             key={`${printing.setCode}-${printing.rarity}-${index}`}
-            className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated px-1.5 py-1.5"
-          >
-            {/*
-             * The art is its own control, so an alternate art can be
-             * looked at properly before it is chosen. That is the whole
-             * reason somebody opened this list.
-             */}
-            {/*
-             * Boxed to a fixed width on purpose. `thumbClassName` makes
-             * the zoom's own button `w-full` — right for the carousel,
-             * where the tile is art-first — so without this wrapper the
-             * picture swallows the row and the label it sits beside
-             * collapses to nothing. Measured: 342px of art, 0px of text.
-             */}
-            <span className="w-9 shrink-0">
-              <CardImageZoom
-                imageUrl={printing.imageUrl}
-                exactName={card.exactName}
-                cardNumber={card.canonicalCardNumber}
-                enabled={imagesEnabled}
-                caption={label}
-                thumbClassName="w-full"
-              />
-            </span>
-
-            {onPick ? (
-              <button
-                type="button"
-                onClick={() => onPick(printing)}
-                className="min-w-0 flex-1 rounded-[var(--radius-control)] py-1 text-left text-xs leading-snug text-text-secondary transition-colors hover:text-text-primary"
-              >
-                {label}
-              </button>
-            ) : (
-              <span className="min-w-0 flex-1 text-left text-xs leading-snug text-text-secondary">
-                {label}
-              </span>
+            className={cn(
+              "rounded-[var(--radius-control)] border bg-elevated",
+              hosting ? "border-accent/50" : "border-border",
             )}
+          >
+            <div className="flex items-center gap-2.5 px-1.5 py-1.5">
+              {/*
+               * The art is its own control, so an alternate art can be
+               * looked at properly before it is chosen. That is the whole
+               * reason somebody opened this list.
+               */}
+              {/*
+               * Boxed to a fixed width on purpose. `thumbClassName` makes
+               * the zoom's own button `w-full` — right for the carousel,
+               * where the tile is art-first — so without this wrapper the
+               * picture swallows the row and the label it sits beside
+               * collapses to nothing. Measured: 342px of art, 0px of text.
+               */}
+              <span className="w-9 shrink-0">
+                <CardImageZoom
+                  imageUrl={printing.imageUrl}
+                  exactName={card.exactName}
+                  cardNumber={card.canonicalCardNumber}
+                  enabled={imagesEnabled}
+                  caption={label}
+                  thumbClassName="w-full"
+                />
+              </span>
+
+              {onPick ? (
+                <button
+                  type="button"
+                  onClick={() => onPick(printing)}
+                  aria-expanded={composer ? hosting : undefined}
+                  className="min-w-0 flex-1 rounded-[var(--radius-control)] py-1 text-left text-xs leading-snug text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {label}
+                </button>
+              ) : (
+                <span className="min-w-0 flex-1 text-left text-xs leading-snug text-text-secondary">
+                  {label}
+                </span>
+              )}
+            </div>
+
+            {/* Attached to this exact version, which is the point. */}
+            {hosting && composer}
           </li>
         );
       })}
@@ -151,6 +168,8 @@ function Row({
   active,
   onSelect,
   id,
+  composerFor = null,
+  composer = null,
 }: {
   card: CardResult;
   term: string;
@@ -158,6 +177,12 @@ function Row({
   active: boolean;
   onSelect?: (card: CardResult, printing?: CardPrinting) => void;
   id: string;
+  /**
+   * Where the composer belongs in this result, if anywhere: `""` for the
+   * card itself (any printing), or a printing id for one version.
+   */
+  composerFor?: string | null;
+  composer?: React.ReactNode;
 }) {
   /*
    * The headline is the base printing, not whichever set code sorted first —
@@ -174,6 +199,10 @@ function Row({
    * button is invalid HTML, and the two answer different questions.
    */
   const [showVersions, setShowVersions] = useState(false);
+
+  /* Folding the list shut while it holds the open composer would take the
+     controls out from under the thumb that just used them. */
+  const versionsOpen = showVersions || Boolean(composer && composerFor);
 
   /*
    * One quiet line under the name: number, type, colours — and the printing
@@ -202,7 +231,9 @@ function Row({
       aria-selected={active}
       className={cn(
         "overflow-hidden rounded-[var(--radius-card)] border bg-surface transition-colors",
-        active ? "border-accent/50 bg-accent/[0.06]" : "border-border",
+        active || (composer && composerFor !== null)
+          ? "border-accent/50 bg-accent/[0.06]"
+          : "border-border",
       )}
     >
       <div className="flex items-start gap-3 p-3">
@@ -224,6 +255,7 @@ function Row({
         <button
           type="button"
           onClick={() => onSelect?.(card)}
+          aria-expanded={composer ? composerFor === "" : undefined}
           /* Comfortably past 44px tall: a phone target at a busy counter. */
           className="flex min-w-0 flex-1 flex-col gap-1 self-stretch rounded-[var(--radius-control)] text-left"
         >
@@ -246,19 +278,22 @@ function Row({
         </button>
       </div>
 
+      {/* Opened from the header, so it appears right below it. */}
+      {composerFor === "" && composer}
+
       {manyPrintings && (
         <>
           <button
             type="button"
             onClick={() => setShowVersions((value) => !value)}
-            aria-expanded={showVersions}
+            aria-expanded={versionsOpen}
             className="flex w-full items-center gap-1.5 border-t border-border px-3 py-2.5 text-left text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
           >
             <ChevronRight
               aria-hidden="true"
               className={cn(
                 "size-4 shrink-0 text-accent transition-transform duration-[var(--duration-base)]",
-                showVersions && "rotate-90",
+                versionsOpen && "rotate-90",
               )}
             />
             <span className="min-w-0 flex-1">
@@ -266,7 +301,7 @@ function Row({
             </span>
           </button>
 
-          {showVersions && (
+          {versionsOpen && (
             <div className="flex flex-col gap-2 border-t border-border p-3">
               {onSelect && (
                 <p className="text-xs text-text-muted">
@@ -278,6 +313,8 @@ function Row({
                 card={card}
                 imagesEnabled={imagesEnabled}
                 onPick={onSelect && ((printing) => onSelect(card, printing))}
+                composerFor={composerFor}
+                composer={composer}
               />
             </div>
           )}
@@ -297,6 +334,20 @@ export interface CardSearchProps {
    */
   onSelect?: (card: CardResult, printing?: CardPrinting) => void;
   autoFocus?: boolean;
+  /**
+   * A panel to render inside the result that is currently selected,
+   * rather than in place of the whole list.
+   *
+   * The founder's ask: posting a Flare should not send a thumb across
+   * the screen. Search knows where the tapped row is; the caller knows
+   * what the panel contains. This is the seam between those two.
+   */
+  composer?: React.ReactNode;
+  /**
+   * Which result hosts it: `cardId` for any printing, or
+   * `cardId + ":" + printingId` for one version. Null closes it.
+   */
+  composerKey?: string | null;
 }
 
 /**
@@ -310,6 +361,8 @@ export function CardSearch({
   imagesEnabled,
   onSelect,
   autoFocus = false,
+  composer = null,
+  composerKey = null,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -488,17 +541,25 @@ export function CardSearch({
           aria-label="Card results"
           className="flex flex-col gap-2"
         >
-          {results.map((card, index) => (
-            <Row
-              key={card.id}
-              id={`${listId}-${index}`}
-              card={card}
-              term={term}
-              imagesEnabled={imagesEnabled}
-              active={index === active}
-              onSelect={onSelect}
-            />
-          ))}
+          {results.map((card, index) => {
+            /* "" is the card itself; anything else names one printing. */
+            const [keyCard, keyPrinting] = (composerKey ?? "").split(":");
+            const mine = composerKey !== null && keyCard === card.id;
+
+            return (
+              <Row
+                key={card.id}
+                id={`${listId}-${index}`}
+                card={card}
+                term={term}
+                imagesEnabled={imagesEnabled}
+                active={index === active}
+                onSelect={onSelect}
+                composerFor={mine ? (keyPrinting ?? "") : null}
+                composer={mine ? composer : null}
+              />
+            );
+          })}
         </ul>
       )}
     </div>

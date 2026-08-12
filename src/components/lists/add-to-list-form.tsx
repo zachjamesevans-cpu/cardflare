@@ -20,6 +20,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
+import { composerMode } from "@/lib/lists/composer-mode";
 import { saveWantAction } from "@/lib/players/account-actions";
 import {
   LIST_IDLE,
@@ -184,6 +185,261 @@ function Chip({
   );
 }
 
+/**
+ * "That posted", said where the posting happened.
+ *
+ * In the inline composer the banner at the top of the card is no use:
+ * post from the fifth result and the confirmation is off screen. So the
+ * composer collapses into this, in the same row, and stays until the
+ * next card is tapped.
+ */
+function PostedNote({ cardName }: { cardName: string }) {
+  return (
+    <p
+      role="status"
+      className="flex slide-open items-center gap-2 border-t border-border px-3 py-2.5 text-sm text-text-secondary"
+    >
+      <Check className="size-4 shrink-0 text-accent" aria-hidden="true" />
+      <span className="min-w-0">
+        <span className="font-medium text-text-primary">{cardName}</span> posted.
+      </span>
+    </p>
+  );
+}
+
+/** Where a selection's composer belongs, in the key CardSearch matches on. */
+function composerKeyFor(picked: { card: CardResult; printingId: string }): string {
+  return picked.printingId ? `${picked.card.id}:${picked.printingId}` : picked.card.id;
+}
+
+/**
+ * The compact composer, opened inside the result that was tapped.
+ *
+ * The founder's goal, in their words: post a Flare without your finger
+ * jumping around the page. So this is not a form the search hands you
+ * off to — it is a panel that grows out of the row you just touched,
+ * with the controls you are most likely to want stacked in the order
+ * you are most likely to want them, and Post as the largest target of
+ * the lot, a thumb's width from where the tap landed.
+ *
+ * What is on the surface: which way the card points, how many, and
+ * Post. Everything else — terms, note, deck name — is one tap away
+ * behind "More", which expands in place rather than anywhere else, for
+ * the same reason.
+ *
+ * Not a swipe between panels, though the founder offered that as an
+ * option. A horizontal swipe inside a vertically scrolling list is a
+ * coin toss on a phone, and it hides that there is anything to find.
+ * The button says so and costs the same one tap.
+ */
+function InlineComposer({
+  picked,
+  code,
+  kind,
+  onBoard,
+  formAction,
+  onClose,
+  error = null,
+}: {
+  picked: { card: CardResult; printingId: string };
+  code: string;
+  kind: ListKind;
+  onBoard: boolean;
+  formAction: (formData: FormData) => void;
+  onClose: () => void;
+  /** Shown here rather than at the top of the page, where it would be
+      off screen for anything but the first result. */
+  error?: string | null;
+}) {
+  const { card, printingId } = picked;
+  const [showcase, setShowcase] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [acceptsTrade, setAcceptsTrade] = useState(false);
+  const [acceptsCash, setAcceptsCash] = useState(false);
+  const [more, setMore] = useState(false);
+
+  const printing = printingId
+    ? (card.printings.find((entry) => entry.id === printingId) ?? null)
+    : null;
+
+  const which = printing
+    ? (printingLabel(printing, card.exactName) ?? "This printing")
+    : "Any printing";
+
+  return (
+    <form
+      action={formAction}
+      className="flex slide-open flex-col gap-2 border-t border-border p-3"
+    >
+      <input type="hidden" name="code" value={code} />
+      <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="cardId" value={card.id} />
+      <input type="hidden" name="cardName" value={card.exactName} />
+      <input type="hidden" name="printingId" value={printingId} />
+      <input type="hidden" name="quantity" value={quantity} />
+
+      {error && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-[var(--radius-control)] border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger"
+        >
+          <X className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      )}
+
+      {onBoard && (
+        <fieldset>
+          <legend className="sr-only">
+            Are you looking for this card or letting it go?
+          </legend>
+          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-border bg-elevated p-1">
+            <Segment
+              name="intent"
+              value="want"
+              checked={!showcase}
+              onSelect={() => setShowcase(false)}
+              icon={Search}
+            >
+              I want this
+            </Segment>
+            <Segment
+              name="intent"
+              value="showcase"
+              checked={showcase}
+              onSelect={() => setShowcase(true)}
+              icon={ArrowUpRight}
+            >
+              I have this
+            </Segment>
+          </div>
+        </fieldset>
+      )}
+
+      {/* Stepper and Post share a line, so the two things almost every
+          post needs are side by side under the same thumb. */}
+      <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            disabled={quantity <= 1}
+            aria-label="One fewer"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-border text-text-secondary disabled:opacity-40"
+          >
+            <Minus className="size-4" aria-hidden="true" />
+          </button>
+          <output
+            aria-live="polite"
+            className="min-w-7 text-center font-semibold text-text-primary tabular-nums"
+          >
+            {quantity}
+          </output>
+          <button
+            type="button"
+            onClick={() => setQuantity(Math.min(MAX_QUANTITY, quantity + 1))}
+            disabled={quantity >= MAX_QUANTITY}
+            aria-label="One more"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-border text-text-secondary disabled:opacity-40"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <SubmitButton
+          label={showcase ? "Post as available" : "Post Flare"}
+          size="sm"
+          className="h-9 flex-1 justify-center"
+        />
+      </div>
+
+      {/*
+       * The footer, deliberately last and deliberately one line: what
+       * was tapped, the way to open the rest, and the way out. Every
+       * pixel above this is a pixel between the tap and Post, which is
+       * the distance this whole panel exists to shorten.
+       */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMore((value) => !value)}
+          aria-expanded={more}
+          className="flex shrink-0 items-center gap-1 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`size-4 shrink-0 text-accent transition-transform duration-[var(--duration-base)] ${
+              more ? "rotate-90" : ""
+            }`}
+          />
+          More
+        </button>
+
+        <p className="min-w-0 flex-1 truncate text-right text-xs text-text-muted">
+          {which}
+        </p>
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="-m-1 shrink-0 rounded-full p-1 text-text-muted hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      {/*
+       * Kept mounted once opened, hidden rather than unmounted, so a
+       * note typed and then folded away is still posted.
+       */}
+      <div className={`flex flex-col gap-3 ${more ? "" : "hidden"}`}>
+        {onBoard && (
+          <fieldset className="flex items-center gap-2">
+            <legend className="sr-only">
+              {showcase
+                ? "Will you trade this card away, sell it, or either?"
+                : "Will you trade for this card, buy it, or either?"}
+            </legend>
+            <Chip
+              name="acceptsTrade"
+              checked={acceptsTrade}
+              onToggle={() => setAcceptsTrade(!acceptsTrade)}
+              icon={Handshake}
+            >
+              Trade
+            </Chip>
+            <Chip
+              name="acceptsCash"
+              checked={acceptsCash}
+              onToggle={() => setAcceptsCash(!acceptsCash)}
+              icon={Banknote}
+            >
+              Cash
+            </Chip>
+          </fieldset>
+        )}
+
+        <TextInput
+          name="note"
+          maxLength={MAX_NOTE}
+          placeholder={'Note, e.g. "NM only"'}
+          aria-label="Note"
+        />
+
+        {kind === "flare" && (
+          <TextInput
+            name="deckLabel"
+            maxLength={MAX_DECK_LABEL}
+            placeholder={'Deck name, e.g. "RG Luffy"'}
+            aria-label="Deck name"
+          />
+        )}
+      </div>
+    </form>
+  );
+}
+
 export function AddToListForm({
   code,
   kind,
@@ -250,6 +506,15 @@ export function AddToListForm({
   const [acceptsCash, setAcceptsCash] = useState(false);
 
   /*
+   * The result that just accepted a post, so the confirmation can stay
+   * inside it. Inline only: the two-step flow hands the whole screen
+   * back and puts its banner at the top, where the eye already is.
+   * Posting from the fifth result should not put the only confirmation
+   * off screen.
+   */
+  const [posted, setPosted] = useState<{ key: string; cardName: string } | null>(null);
+
+  /*
    * Picking a card collapses the tall results list into a short form,
    * which yanks everything below it upward while the browser holds its
    * scroll offset — a beta tester reported the page "teleporting" down.
@@ -279,6 +544,12 @@ export function AddToListForm({
   if (state !== clearedFor) {
     setClearedFor(state);
     if (state.status === "added") {
+      if (picked) {
+        setPosted({
+          key: composerKeyFor(picked),
+          cardName: state.cardName || "That card",
+        });
+      }
       setPicked(null);
       setShowcase(false);
       setQuantity(1);
@@ -299,6 +570,12 @@ export function AddToListForm({
   /* Only a Flare on a live board points a direction or names terms. */
   const onBoard = kind === "flare" && target === "room";
 
+  /*
+   * Which composer this build runs. Both are kept: see
+   * src/lib/lists/composer-mode.ts for why, and for how to go back.
+   */
+  const inline = composerMode() === "inline";
+
   return (
     <Card className="flex flex-col gap-4">
       {/* Zero-height scroll anchor: the Card itself may not forward refs. */}
@@ -308,9 +585,45 @@ export function AddToListForm({
         <p className="text-sm text-text-secondary">{copy.hint}</p>
       </div>
 
-      <Outcome state={state} saved={target === "list"} />
+      {!inline && <Outcome state={state} saved={target === "list"} />}
 
-      {!picked ? (
+      {inline ? (
+        /*
+         * The search never goes away. Tapping a result opens the
+         * composer inside that result, so the controls arrive where the
+         * finger already is, and posting does not move it.
+         */
+        <CardSearch
+          imagesEnabled={imagesEnabled}
+          onSelect={(card: CardResult, printing?: CardPrinting) => {
+            setPosted(null);
+            const key = printing ? `${card.id}:${printing.id}` : card.id;
+            /* Tapping the row that is already open closes it. */
+            setPicked((current) =>
+              current && composerKeyFor(current) === key
+                ? null
+                : { card, printingId: printing?.id ?? "" },
+            );
+          }}
+          composerKey={picked ? composerKeyFor(picked) : (posted?.key ?? null)}
+          composer={
+            picked ? (
+              <InlineComposer
+                key={composerKeyFor(picked)}
+                picked={picked}
+                code={code}
+                kind={kind}
+                onBoard={onBoard}
+                formAction={formAction}
+                onClose={() => setPicked(null)}
+                error={state.status === "error" ? state.message : null}
+              />
+            ) : posted ? (
+              <PostedNote cardName={posted.cardName} />
+            ) : null
+          }
+        />
+      ) : !picked ? (
         <CardSearch
           imagesEnabled={imagesEnabled}
           onSelect={(card: CardResult, printing?: CardPrinting) =>
