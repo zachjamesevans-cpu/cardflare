@@ -464,6 +464,14 @@ export function AddToListForm({
    */
   footer?: React.ReactNode;
 }) {
+  /*
+   * Which composer this build runs. Both are kept: see
+   * src/lib/lists/composer-mode.ts for why, and for how to go back.
+   * Read before anything else here, because the scroll behaviour below
+   * depends on it.
+   */
+  const inline = composerMode() === "inline";
+
   const [state, formAction] = useActionState(
     target === "list" ? saveWantAction : addToListAction,
     LIST_IDLE,
@@ -515,19 +523,24 @@ export function AddToListForm({
   const [posted, setPosted] = useState<{ key: string; cardName: string } | null>(null);
 
   /*
-   * Picking a card collapses the tall results list into a short form,
+   * The two-step flow collapses a tall results list into a short form,
    * which yanks everything below it upward while the browser holds its
    * scroll offset — a beta tester reported the page "teleporting" down.
-   * Anchoring the panel back into view on each pick keeps the form
-   * exactly where the eye already was.
+   * Anchoring the panel back into view on each pick keeps that form
+   * where the eye already was.
+   *
+   * The inline composer must never do this. Nothing collapses there:
+   * the tapped row stays exactly where it is and grows downwards, so
+   * scrolling anywhere is the bug rather than the fix. Left running in
+   * both modes it hauled the page up to the top of this card on every
+   * tap, which is the opposite of the whole point.
    */
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (picked) {
-      panel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [picked]);
+    if (inline || !picked) return;
+    panel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [inline, picked]);
 
   /*
    * A successful post hands the screen back to the search. Keeping the
@@ -569,12 +582,6 @@ export function AddToListForm({
 
   /* Only a Flare on a live board points a direction or names terms. */
   const onBoard = kind === "flare" && target === "room";
-
-  /*
-   * Which composer this build runs. Both are kept: see
-   * src/lib/lists/composer-mode.ts for why, and for how to go back.
-   */
-  const inline = composerMode() === "inline";
 
   return (
     <Card className="flex flex-col gap-4">
