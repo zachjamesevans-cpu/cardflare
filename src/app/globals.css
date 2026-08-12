@@ -276,3 +276,35 @@
 @utility slide-open {
   animation: cf-slide-open var(--duration-base) var(--ease-out-soft);
 }
+
+/*
+ * A section unfolding downward from the row that was tapped.
+ *
+ * The founder's report on the nest: opening it "pushes the cards up".
+ * The cause was two height animations fighting — the rail collapsing
+ * to nothing while the stacked view grew, so the eye watched content
+ * being dragged upward at the same time as new content arrived. Now
+ * only the arriving view animates: it grows down from the header, and
+ * whatever it replaces simply stops being there.
+ *
+ * A keyframe rather than a transition on purpose: keyframes restart
+ * when an element comes back from `display: none`, which is exactly
+ * the moment this needs to fire. The global reduced-motion rule
+ * collapses it to nothing.
+ */
+@keyframes cf-unfold {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+@utility unfold-down {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: cf-unfold var(--duration-slow) var(--ease-out-soft);
+}

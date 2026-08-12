@@ -185,6 +185,50 @@ function Chip({
   );
 }
 
+/**
+ * The icon-only chip: a checkbox drawn as a square toggle.
+ *
+ * The founder's call for the inline composer: the trade and cash
+ * switches belong on the surface, not under "More", and the two icons
+ * carry the meaning without words. Sized exactly like the stepper
+ * buttons beside them so the row reads as one family of controls; the
+ * name still posts and a screen reader still gets the words.
+ */
+function IconChip({
+  name,
+  checked,
+  onToggle,
+  icon: Icon,
+  label,
+}: {
+  name: string;
+  checked: boolean;
+  onToggle: () => void;
+  icon: typeof Search;
+  label: string;
+}) {
+  return (
+    <label
+      title={label}
+      className={`flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:outline-none ${
+        checked
+          ? "border-accent bg-accent/15 text-accent"
+          : "border-border text-text-muted hover:text-text-secondary"
+      }`}
+    >
+      <input
+        type="checkbox"
+        name={name}
+        checked={checked}
+        onChange={onToggle}
+        aria-label={label}
+        className="sr-only"
+      />
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+    </label>
+  );
+}
+
 /** Where a selection's composer belongs, in the key CardSearch matches on. */
 function composerKeyFor(picked: { card: CardResult; printingId: string }): string {
   return picked.printingId ? `${picked.card.id}:${picked.printingId}` : picked.card.id;
@@ -294,8 +338,10 @@ function InlineComposer({
         </fieldset>
       )}
 
-      {/* Stepper and Post share a line, so the two things almost every
-          post needs are side by side under the same thumb. */}
+      {/* One line for everything a post decides by tapping: how many,
+          the terms, and Post itself, side by side under the same thumb.
+          The terms used to hide under "More"; the founder pulled them
+          out — no words needed, the two icons carry it. */}
       <div className="flex items-center gap-2">
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -324,10 +370,35 @@ function InlineComposer({
           </button>
         </div>
 
+        {onBoard && (
+          <fieldset className="flex shrink-0 items-center gap-1">
+            <legend className="sr-only">
+              {showcase
+                ? "Will you trade this card away, sell it, or either?"
+                : "Will you trade for this card, buy it, or either?"}
+            </legend>
+            <IconChip
+              name="acceptsTrade"
+              checked={acceptsTrade}
+              onToggle={() => setAcceptsTrade(!acceptsTrade)}
+              icon={Handshake}
+              label="Trade"
+            />
+            <IconChip
+              name="acceptsCash"
+              checked={acceptsCash}
+              onToggle={() => setAcceptsCash(!acceptsCash)}
+              icon={Banknote}
+              label="Cash"
+            />
+          </fieldset>
+        )}
+
         <SubmitButton
-          label={showcase ? "Post as available" : "Post Flare"}
+          label={showcase ? "Post" : "Post Flare"}
+          pendingLabel="Posting…"
           size="sm"
-          className="h-9 flex-1 justify-center"
+          className="h-9 min-w-0 flex-1 justify-center"
         />
       </div>
 
@@ -372,32 +443,6 @@ function InlineComposer({
        * note typed and then folded away is still posted.
        */}
       <div className={`flex flex-col gap-3 ${more ? "" : "hidden"}`}>
-        {onBoard && (
-          <fieldset className="flex items-center gap-2">
-            <legend className="sr-only">
-              {showcase
-                ? "Will you trade this card away, sell it, or either?"
-                : "Will you trade for this card, buy it, or either?"}
-            </legend>
-            <Chip
-              name="acceptsTrade"
-              checked={acceptsTrade}
-              onToggle={() => setAcceptsTrade(!acceptsTrade)}
-              icon={Handshake}
-            >
-              Trade
-            </Chip>
-            <Chip
-              name="acceptsCash"
-              checked={acceptsCash}
-              onToggle={() => setAcceptsCash(!acceptsCash)}
-              icon={Banknote}
-            >
-              Cash
-            </Chip>
-          </fieldset>
-        )}
-
         <TextInput
           name="note"
           maxLength={MAX_NOTE}

@@ -645,33 +645,11 @@ function RoomScreen({
 
               {!groupOpen ? (
                 <View>
-                  {labelled && (
-                    <>
-                      <Text style={styles.folderLabel}>
-                        {`Letting go · ${showcases.length} ${
-                          showcases.length === 1 ? "card" : "cards"
-                        }`}
-                      </Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{
-                          gap: spacing(2),
-                          paddingVertical: spacing(1),
-                          alignItems: "flex-start",
-                        }}
-                      >
-                        {showcases.map(tile)}
-                      </ScrollView>
-                      {orderedRail.length > 0 && (
-                        <Text style={styles.folderLabel}>
-                          {`Looking for · ${orderedRail.length} ${
-                            orderedRail.length === 1 ? "card" : "cards"
-                          }`}
-                        </Text>
-                      )}
-                    </>
-                  )}
+                  {/* One rail, wants first: the founder's revision.
+                      Nearly all of a board is wants, so a labelled
+                      shelf for one showcase cluttered every section
+                      that had one. Cards on offer sit past the divider
+                      at the far end, same as the website. */}
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -682,6 +660,19 @@ function RoomScreen({
                     }}
                   >
                     {orderedRail.map(tile)}
+                    {labelled && (
+                      <>
+                        <View
+                          style={{
+                            width: 1,
+                            alignSelf: "stretch",
+                            backgroundColor: colors.border,
+                            marginHorizontal: spacing(0.5),
+                          }}
+                        />
+                        {showcases.map(tile)}
+                      </>
+                    )}
                   </ScrollView>
                   {/* The founder's ask: the edge fades so the rail visibly
                       continues instead of the last card looking cut off. */}

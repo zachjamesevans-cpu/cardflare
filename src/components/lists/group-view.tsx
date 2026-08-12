@@ -15,8 +15,15 @@ import { ChevronDown } from "lucide-react";
  *
  * A client island around server-rendered children: the rail and the
  * stacked list arrive fully formed (server-action forms intact), and
- * this component only decides which of the two is unfolded, with the
- * same grid-rows slide the roster uses.
+ * this component only decides which of the two is unfolded.
+ *
+ * The unfold animates ONE thing: the arriving view, growing downward
+ * from the header that was tapped. The first version animated both —
+ * the rail collapsing to nothing while the stacked view grew — and the
+ * founder's read was exactly right: two height animations fighting
+ * means the eye watches cards being dragged upward at the same moment
+ * new ones arrive. Whatever is being replaced now simply stops being
+ * there, and the only movement on screen is downward from the tap.
  */
 export function GroupView({
   identity,
@@ -33,11 +40,21 @@ export function GroupView({
 }) {
   const [open, setOpen] = useState(false);
 
+  /*
+   * Whether the section has ever been toggled. Without this the rail
+   * would play its unfold on page load, and a board of ten players
+   * arriving is ten sections animating at nobody's request.
+   */
+  const [touched, setTouched] = useState(false);
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => !current);
+          setTouched(true);
+        }}
         aria-expanded={open}
         className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 text-left"
       >
@@ -53,19 +70,15 @@ export function GroupView({
         </span>
       </button>
 
-      <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-          open ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-        }`}
-      >
+      {/*
+       * `hidden` rather than unmounted, so the server-rendered forms
+       * inside keep their state across a fold and unfold.
+       */}
+      <div className={open ? "hidden" : touched ? "unfold-down" : ""}>
         <div className="overflow-hidden">{rail}</div>
       </div>
 
-      <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
+      <div className={open ? "unfold-down" : "hidden"}>
         <div className="overflow-hidden">{stacked}</div>
       </div>
     </>
