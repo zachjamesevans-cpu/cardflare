@@ -1,49 +1,25 @@
-"use client";
-
-import { useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 /**
- * Wraps a showcased card so it catches the light when touched.
+ * Wraps a showcased card so it always looks like foil.
  *
- * The founder's cue: a card somebody will let go looks like foil. The
- * rest of the board is matte, so the shimmer alone carries the meaning
- * with no copy at all — and it plays on tap or click rather than
- * looping, because a rail of permanently animating cards is a
- * distraction, a battery cost, and less like the real thing. You tilt a
- * card, it catches the light, it settles.
+ * The founder's correction: the sheen is not an effect that plays, it
+ * is what the card IS. A showcase sits on a matte board and shimmers
+ * the whole time, so the meaning reads at a glance without tapping
+ * anything — which is the entire point of putting it at the top of a
+ * player's nest.
  *
- * A tiny client island around server-rendered children: the tile inside
- * (artwork, badges, forms) arrives fully formed, and this only decides
- * whether the sheen is mid-sweep. The wrapper never swallows the tap —
- * the card underneath still zooms, and the buttons still submit.
+ * That makes this a Server Component again. The first cut needed state
+ * to time a one-shot animation; a permanent sheen needs none, so a
+ * board of showcases ships no JavaScript for it at all. The gyroscope
+ * tilt is a different thing in a different place: it belongs to the
+ * full-size card in the zoom dialog, where a phone can be turned.
  */
 export function ShowcaseShine({ children }: { children: ReactNode }) {
-  const [playing, setPlaying] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function play() {
-    if (timer.current) clearTimeout(timer.current);
-    setPlaying(true);
-    // Matches the keyframe duration; the class has to leave for the
-    // animation to be re-triggerable on the next tap.
-    timer.current = setTimeout(() => setPlaying(false), 900);
-  }
-
   return (
-    <span
-      className="holo-sheen contents"
-      onPointerDown={play}
-      /* Decorative: the meaning is carried by the badge and the label
-         in the tile itself, which screen readers already read. */
-      aria-hidden={false}
-    >
-      <span className="relative block rounded-[8px]">
-        {children}
-        <span
-          aria-hidden="true"
-          className={playing ? "holo-sheen-layer holo-playing" : "holo-sheen-layer"}
-        />
-      </span>
+    <span className="relative block rounded-[8px]">
+      {children}
+      <span aria-hidden="true" className="holo-sheen-layer" />
     </span>
   );
 }
