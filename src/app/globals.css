@@ -251,40 +251,29 @@
 }
 
 /*
- * The holofoil sheen on a showcased card.
+ * The holofoil on a showcased card.
  *
  * A showcase is a card somebody will let go, and the founder's cue for
  * that is the thing every player already recognises: foil. The rest of
- * the board is matte, so the shimmer alone says "this one is available"
- * without a word of copy.
+ * the board is matte, so the shimmer alone says "this one is
+ * available" without a word of copy.
  *
- * It plays on tap or click rather than forever. A rail of permanently
- * animating cards is a distraction and a battery cost, and the gesture
- * is the point — you touch the card, it catches the light, the way a
- * real one does when you tilt it.
+ * Always on, never a one-shot. The first cut played the sweep on tap
+ * and the founder was right that it read as a glitch — a foil card is
+ * foil whether or not you are touching it. The tile carries a
+ * permanent rainbow at rest plus a slow drift, and the full-size card
+ * in the zoom dialog takes over from there, following the phone.
  *
  * `mix-blend-mode: color-dodge` over the artwork is what makes it read
  * as light on the surface rather than a coloured film laid on top.
  */
-@keyframes cf-holo-sweep {
+@keyframes cf-holo-drift {
   from {
     background-position: 0% 50%;
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
   }
   to {
     background-position: 200% 50%;
-    opacity: 0;
   }
-}
-
-@utility holo-sheen {
-  position: relative;
 }
 
 @utility holo-sheen-layer {
@@ -292,32 +281,61 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0;
   background: linear-gradient(
     110deg,
-    transparent 20%,
-    rgba(255, 92, 199, 0.55) 32%,
-    rgba(120, 220, 255, 0.55) 42%,
-    rgba(198, 238, 79, 0.55) 52%,
-    rgba(255, 214, 92, 0.55) 62%,
-    transparent 78%
+    transparent 8%,
+    rgba(255, 92, 199, 0.4) 22%,
+    rgba(120, 220, 255, 0.4) 34%,
+    rgba(198, 238, 79, 0.4) 46%,
+    rgba(255, 214, 92, 0.4) 58%,
+    rgba(120, 220, 255, 0.4) 70%,
+    transparent 88%
   );
   background-size: 200% 100%;
   mix-blend-mode: color-dodge;
-}
-
-/* Added by the client island for the length of one sweep. */
-@utility holo-playing {
-  animation: cf-holo-sweep 900ms ease-out;
+  animation: cf-holo-drift 7s linear infinite;
 }
 
 /*
- * Nobody gets a light show they did not ask for. The static tint keeps
- * the "this one is foil" signal without any movement at all.
+ * The full-size card, tilted by hand.
+ *
+ * Same gradient, driven by the device's own orientation instead of a
+ * clock: the sheen slides as the phone turns, the way the light moves
+ * across a real card held in front of you. The angle and position come
+ * from the client island as custom properties, so the paint stays on
+ * the compositor and nothing re-renders per frame.
+ */
+@utility holo-tilt-layer {
+  /* Declared rather than left to var() fallbacks so the resting card is
+     unambiguously centred before a single tilt arrives. */
+  --holo-angle: 110deg;
+  --holo-x: 50%;
+  --holo-y: 50%;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--holo-angle, 110deg),
+    transparent 6%,
+    rgba(255, 92, 199, 0.45) 20%,
+    rgba(120, 220, 255, 0.45) 33%,
+    rgba(198, 238, 79, 0.45) 46%,
+    rgba(255, 214, 92, 0.45) 59%,
+    rgba(120, 220, 255, 0.45) 72%,
+    transparent 90%
+  );
+  background-size: 260% 260%;
+  background-position: var(--holo-x, 50%) var(--holo-y, 50%);
+  mix-blend-mode: color-dodge;
+}
+
+/*
+ * Nobody gets a light show they did not ask for. The rainbow stays —
+ * it is the signal — but it stops moving on its own.
  */
 @media (prefers-reduced-motion: reduce) {
-  .holo-playing {
+  .holo-sheen-layer {
     animation: none;
-    opacity: 0.35;
   }
 }

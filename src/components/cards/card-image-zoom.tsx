@@ -5,6 +5,7 @@ import Image from "next/image";
 import { X } from "lucide-react";
 
 import { CardThumbnail } from "./card-thumbnail";
+import { HoloTilt } from "./holo-tilt";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 
 /**
@@ -58,6 +59,7 @@ export function CardImageZoom({
   lookingFor = null,
   stillNeeds = null,
   thumbClassName,
+  showcase = false,
 }: {
   imageUrl: string | null;
   exactName: string;
@@ -74,6 +76,11 @@ export function CardImageZoom({
   stillNeeds?: number | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
+  /**
+   * A card its owner is offering up. The full-size view gains the
+   * holofoil, tilting with the phone — a real card in your hand.
+   */
+  showcase?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -90,6 +97,14 @@ export function CardImageZoom({
    * of hundred milliseconds, which is a real head start.
    */
   const [warm, setWarm] = useState(false);
+
+  /*
+   * Rendered state for "the dialog is up", alongside the `isOpen` ref
+   * below. The ref exists to settle event ordering and deliberately
+   * does not re-render; the holofoil layer has to mount and unmount, so
+   * it needs a value React can see.
+   */
+  const [showing, setShowing] = useState(false);
   const [sharp, setSharp] = useState(false);
 
   /**
@@ -201,6 +216,7 @@ export function CardImageZoom({
 
     const onClose = () => {
       isOpen.current = false;
+      setShowing(false);
       running.current?.cancel();
       running.current = null;
       backdropRunning.current?.cancel();
@@ -237,6 +253,7 @@ export function CardImageZoom({
     stopAnimation();
     cancelDwell();
     isOpen.current = true;
+    setShowing(true);
     setWarm(true);
     element.showModal();
 
@@ -464,6 +481,10 @@ export function CardImageZoom({
                 }`}
               />
             )}
+
+            {/* Mounted only while the dialog is up, so no listener
+                outlives the card it belongs to. */}
+            {showcase && showing && <HoloTilt active />}
           </div>
         </div>
       </dialog>

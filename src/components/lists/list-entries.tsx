@@ -92,6 +92,7 @@ function Entry({
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
+          showcase={entry.intent === "showcase"}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -379,6 +380,7 @@ function CarouselEntry({
           lookingFor={kind === "flare" ? entry.quantity : null}
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           thumbClassName="w-full"
+          showcase={entry.intent === "showcase"}
         />
         {/*
          * Every signal that used to be its own caption line lives on
