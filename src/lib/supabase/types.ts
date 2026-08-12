@@ -608,7 +608,7 @@ export type NotificationRow = {
   id: string;
   created_at: string;
   player_id: string;
-  kind: "offer-received" | "trade-confirmed" | "early-board";
+  kind: "offer-received" | "trade-confirmed" | "early-board" | "board-open";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */
@@ -680,6 +680,46 @@ type Table<Row, Insert> = {
   Relationships: [];
 };
 
+export type SubscriptionRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  tier: "pro" | "ultra" | "max";
+  player_id: string | null;
+  store_id: string | null;
+  source: "stripe" | "apple";
+  status: "active" | "trialing" | "past_due" | "canceled";
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  apple_original_transaction_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+};
+
+export type SubscriptionInsert = Omit<
+  SubscriptionRow,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "player_id"
+  | "store_id"
+  | "stripe_customer_id"
+  | "stripe_subscription_id"
+  | "apple_original_transaction_id"
+  | "current_period_end"
+  | "cancel_at_period_end"
+> & {
+  id?: string;
+  player_id?: string | null;
+  store_id?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  apple_original_transaction_id?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean;
+  updated_at?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -704,6 +744,7 @@ export type Database = {
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
+      subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       player_collection: Table<PlayerCollectionRow, PlayerCollectionInsert>;
       player_collection_syncs: Table<
