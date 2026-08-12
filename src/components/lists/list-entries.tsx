@@ -95,6 +95,7 @@ function Entry({
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
+          direction={entry.intent}
           terms={acceptsLabel(entry)}
         />
 
@@ -359,6 +360,7 @@ function CarouselEntry({
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
+          direction={entry.intent}
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           terms={acceptsLabel(entry)}
           thumbClassName="w-full"

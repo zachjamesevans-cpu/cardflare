@@ -524,7 +524,8 @@ export function CardSearch({
         </div>
 
         <p id={`${inputId}-hint`} className="text-xs text-text-muted">
-          Misspellings are fine. Card numbers work with or without the dash.
+          Misspellings are fine, and card numbers work with or without the dash. Add a
+          colour, a type or a set to narrow it: &ldquo;luffy leader&rdquo;.
         </p>
       </div>
 
