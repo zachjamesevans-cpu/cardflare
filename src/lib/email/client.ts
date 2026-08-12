@@ -23,6 +23,14 @@ export interface EmailMessage {
   text: string;
   /** Surfaced to clients as the one-click unsubscribe target. */
   listUnsubscribe?: string;
+  /**
+   * Where a reply should go, when that is not the from address.
+   *
+   * The contact form's whole point: the message arrives from CardFlare's
+   * own sender (so it passes SPF and DKIM), and hitting reply reaches
+   * the person who wrote it.
+   */
+  replyTo?: string;
 }
 
 export type SendResult =
@@ -66,6 +74,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
         subject: message.subject,
         html: message.html,
         text: message.text,
+        ...(message.replyTo ? { reply_to: [message.replyTo] } : {}),
         ...(message.listUnsubscribe
           ? { headers: { "List-Unsubscribe": `<${message.listUnsubscribe}>` } }
           : {}),

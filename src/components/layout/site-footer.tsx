@@ -10,6 +10,7 @@ import { SITE } from "@/lib/site";
  * place in one viewport reads as a mistake.
  */
 const FOOTER_LINKS = [
+  { href: "/contact", label: "Contact" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
 ] as const;
@@ -36,12 +37,6 @@ export function SiteFooter() {
               {link.label}
             </Link>
           ))}
-          <a
-            href={`mailto:${SITE.contactEmail}`}
-            className="rounded-[var(--radius-control)] text-sm text-text-secondary transition-colors duration-[var(--duration-base)] hover:text-text-primary"
-          >
-            Contact
-          </a>
         </nav>
       </div>
 
