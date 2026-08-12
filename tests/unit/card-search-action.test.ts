@@ -146,6 +146,93 @@ describe("searchCardsAction", () => {
   });
 });
 
+/**
+ * Keyword narrowing, at the seam where it actually runs.
+ *
+ * The parser has its own tests. These pin the two things only the
+ * action can be responsible for: that the filters reach the catalog,
+ * and that a guess made from prose never costs somebody results.
+ */
+describe("searchCardsAction: narrowing from keywords", () => {
+  it("sends the type to the catalog and searches only the name", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    const result = await searchCardsAction("luffy leader");
+
+    expect(searchCards).toHaveBeenCalledWith("luffy", {
+      setCode: null,
+      cardType: "leader",
+      color: null,
+    });
+    expect(result).toMatchObject({ status: "ok", query: "luffy" });
+  });
+
+  it("sends a colour and a set alongside it", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    await searchCardsAction("red op01 luffy");
+
+    expect(searchCards).toHaveBeenCalledWith("luffy", {
+      setCode: "OP01",
+      cardType: null,
+      color: "red",
+    });
+  });
+
+  /*
+   * The guard. "black" is a colour and also the start of plenty of card
+   * names, so narrowing is a guess — and a guess must never leave
+   * somebody with fewer results than they had before.
+   */
+  it("falls back to the whole query when narrowing finds nothing", async () => {
+    searchCards.mockResolvedValueOnce([]).mockResolvedValueOnce([hit]);
+
+    const result = await searchCardsAction("black maria");
+
+    expect(searchCards).toHaveBeenNthCalledWith(1, "maria", {
+      setCode: null,
+      cardType: null,
+      color: "black",
+    });
+    expect(searchCards).toHaveBeenNthCalledWith(2, "black maria", {
+      setCode: null,
+      cardType: null,
+      color: null,
+    });
+    expect(result).toMatchObject({ status: "ok", query: "black maria" });
+    expect((result as { results: unknown[] }).results).toHaveLength(1);
+  });
+
+  it("does not retry when the narrowed search found something", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    await searchCardsAction("luffy leader");
+
+    expect(searchCards).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a query it never narrowed", async () => {
+    searchCards.mockResolvedValue([]);
+
+    await searchCardsAction("monkey d luffy");
+
+    expect(searchCards).toHaveBeenCalledTimes(1);
+  });
+
+  /* A control the UI sets is a decision; a word in a search box is a
+     guess, so the decision wins. */
+  it("lets an explicit filter beat one read out of the text", async () => {
+    searchCards.mockResolvedValue([hit]);
+
+    await searchCardsAction("luffy leader", { cardType: "character" });
+
+    expect(searchCards).toHaveBeenCalledWith(
+      "luffy",
+      expect.objectContaining({ cardType: "character" }),
+    );
+  });
+});
+
 describe("printingLabel", () => {
   const base = {
     id: "11111111-1111-1111-1111-111111111111",

@@ -56,6 +56,7 @@ export function CardImageZoom({
   caption,
   note = null,
   lookingFor = null,
+  direction = "want",
   stillNeeds = null,
   terms = null,
   thumbClassName,
@@ -69,8 +70,14 @@ export function CardImageZoom({
   caption?: string | null;
   /** The Flare's note, shown in the large view under the number. */
   note?: string | null;
-  /** How many the Flare asks for, said in words in the large view. */
+  /** How many the Flare is for, said in words in the large view. */
   lookingFor?: number | null;
+  /**
+   * Which way the Flare points, because the same number means opposite
+   * things. A player reported opening a card from the "Letting go"
+   * section and being told the owner was looking for it.
+   */
+  direction?: "want" | "showcase";
   /** Copies still unpledged, when hands are already up. */
   stillNeeds?: number | null;
   /**
@@ -407,15 +414,27 @@ export function CardImageZoom({
               </p>
               {/* Said in words here even though the tile draws it as a
                   stack, for anyone who cannot read the layers. Both truths
-                  when hands are up: the ask, and what is still missing. */}
+                  when hands are up: the ask, and what is still missing.
+                  Coverage is a want's problem only — nobody pledges to
+                  take a card off somebody's hands. */}
               {lookingFor != null && (
                 <p className="mt-1 text-sm font-medium text-accent">
-                  Looking for {lookingFor}
-                  {stillNeeds != null &&
-                    stillNeeds !== lookingFor &&
-                    (stillNeeds === 0
-                      ? " · all spoken for"
-                      : ` · still needs ${stillNeeds}`)}
+                  {direction === "showcase" ? (
+                    lookingFor === 1 ? (
+                      "Letting this go"
+                    ) : (
+                      `Letting go of ${lookingFor}`
+                    )
+                  ) : (
+                    <>
+                      Looking for {lookingFor}
+                      {stillNeeds != null &&
+                        stillNeeds !== lookingFor &&
+                        (stillNeeds === 0
+                          ? " · all spoken for"
+                          : ` · still needs ${stillNeeds}`)}
+                    </>
+                  )}
                 </p>
               )}
               {terms && <p className="mt-1 text-sm font-medium text-accent">{terms}</p>}

@@ -96,6 +96,7 @@ export function CardImage({
   note,
   lookingFor,
   stillNeeds,
+  direction = "want",
 }: {
   imageUrl: string | null;
   width: number;
@@ -109,6 +110,11 @@ export function CardImage({
   lookingFor?: number | null;
   /** Copies still unpledged, when hands are already up. */
   stillNeeds?: number | null;
+  /**
+   * Which way the Flare points. A player opening a card from the
+   * "Letting go" section was told the owner was looking for it.
+   */
+  direction?: "want" | "showcase";
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -194,13 +200,17 @@ export function CardImage({
                     truths when hands are up: the ask, and the gap. */}
                 {lookingFor != null ? (
                   <Text style={styles.zoomLooking}>
-                    {`Looking for ${lookingFor}${
-                      stillNeeds != null && stillNeeds !== lookingFor
-                        ? stillNeeds === 0
-                          ? " · all spoken for"
-                          : ` · still needs ${stillNeeds}`
-                        : ""
-                    }`}
+                    {direction === "showcase"
+                      ? lookingFor === 1
+                        ? "Letting this go"
+                        : `Letting go of ${lookingFor}`
+                      : `Looking for ${lookingFor}${
+                          stillNeeds != null && stillNeeds !== lookingFor
+                            ? stillNeeds === 0
+                              ? " · all spoken for"
+                              : ` · still needs ${stillNeeds}`
+                            : ""
+                        }`}
                   </Text>
                 ) : null}
                 {/* The tile has no room for the note; the zoom is where

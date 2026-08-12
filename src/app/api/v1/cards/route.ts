@@ -1,3 +1,4 @@
+import { parseCardQuery } from "@/lib/cards/query";
 import { pickBasePrinting, printingLabel } from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
 
@@ -13,7 +14,18 @@ export async function GET(request: Request): Promise<Response> {
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
   if (query.length < 2) return Response.json({ cards: [] });
 
-  const cards = await searchCards(query);
+  /*
+   * Same keyword narrowing the website's picker does, including the
+   * fallback: if reading "leader" or "red" out of the text finds
+   * nothing, the whole query runs unnarrowed, so the app can never end
+   * up with fewer results than it had before.
+   */
+  const typed = parseCardQuery(query);
+  let cards = await searchCards(typed.text, typed.filters);
+
+  if (cards.length === 0 && typed.narrowed) {
+    cards = await searchCards(query);
+  }
 
   return Response.json({
     cards: cards.map((card) => ({

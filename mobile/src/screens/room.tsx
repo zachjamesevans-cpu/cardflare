@@ -1037,6 +1037,7 @@ function CarouselFlare({
             caption={flare.printingLabel ?? "Any printing"}
             note={flare.note}
             lookingFor={flare.quantity}
+            direction={flare.intent}
             stillNeeds={flare.offers.length > 0 ? remaining : null}
           />
           {/*
@@ -1238,6 +1239,7 @@ function FlareRow({
               caption={flare.printingLabel ?? "Any printing"}
               note={flare.note}
               lookingFor={flare.quantity}
+            direction={flare.intent}
               stillNeeds={
                 flare.offers.length > 0
                   ? pledgeTally(flare.offers, flare.quantity).remaining
