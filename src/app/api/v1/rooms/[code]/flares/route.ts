@@ -8,7 +8,8 @@ import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { addFlare, cancelFlare } from "@/lib/lists/repository";
-import { addEntrySchema } from "@/lib/lists/schema";
+import { announceShowcase } from "@/lib/lists/showcase";
+import { acceptsSchema, addEntrySchema } from "@/lib/lists/schema";
 import { saveWant } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
@@ -45,18 +46,55 @@ export async function POST(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
 
-  const parsed = addEntrySchema.safeParse(await readJsonPayload(request));
+  const payload = await readJsonPayload(request);
+
+  const parsed = addEntrySchema.safeParse(payload);
   if (!parsed.success) return badRequest("cardId and quantity are required");
 
-  const result = await addFlare(resolved.room.id, session.id, parsed.data);
+  /*
+   * Direction and terms, parsed the same way the website's Server Action
+   * parses them so the two surfaces cannot drift. Both are optional: an
+   * older build of the app sends neither and posts a plain want, which
+   * is exactly what it has always posted.
+   */
+  const intent =
+    (payload as { intent?: unknown }).intent === "showcase" ? "showcase" : "want";
+  const acceptsParsed = acceptsSchema.safeParse(payload ?? {});
+  const accepts = acceptsParsed.success
+    ? acceptsParsed.data
+    : { acceptsTrade: true, acceptsCash: false };
+
+  const result = await addFlare(
+    resolved.room.id,
+    session.id,
+    parsed.data,
+    intent,
+    accepts,
+  );
   if (!result.ok) {
     return Response.json({ error: result.reason }, { status: 409 });
   }
 
-  // The first Flares on an early board wake the store's regulars.
-  if (flarePhase === "early") void notifyEarlyBoardFlares(resolved.room.id);
+  // The first Flares on an early board wake the store's regulars. A
+  // showcase is not a hunt, so it does not count towards that.
+  if (flarePhase === "early" && intent === "want") {
+    void notifyEarlyBoardFlares(resolved.room.id);
+  }
 
-  if (session.player_id) {
+  // The payoff for offering a card up: everyone already hunting it is
+  // told. Same helper the website uses, so the two cannot drift.
+  if (intent === "showcase") {
+    void announceShowcase(
+      { eventId: resolved.room.id, playerSessionId: session.id },
+      parsed.data,
+      session.display_name ?? "A player",
+    );
+  }
+
+  /* A card you are letting go is not a want, and saving it as one
+     would follow you to the next store as a hunt for a card you were
+     trying to move. */
+  if (session.player_id && intent === "want") {
     await saveWant(session.player_id, parsed.data);
   }
 

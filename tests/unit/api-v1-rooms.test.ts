@@ -284,11 +284,63 @@ describe("membership guards on writes", () => {
       "event-1",
       "sess-1",
       expect.objectContaining({ deckLabel: "RG Luffy" }),
+      "want",
+      expect.anything(),
     );
     expect(saveWant).toHaveBeenCalledWith(
       "player-1",
       expect.objectContaining({ deckLabel: "RG Luffy" }),
     );
+  });
+
+  /*
+   * Direction and terms over the JSON API.
+   *
+   * The app and the website post through different doors into the same
+   * board, so these pin the app's door to the same answers the Server
+   * Action gives — including what an older build, which sends neither
+   * field, still posts.
+   */
+  it("posts a plain trade-only want when the app sends no direction", async () => {
+    await flares.POST(request("POST", { cardId: FLARE_ID, quantity: 1 }), CODE);
+
+    expect(addFlare.mock.calls[0]![3]).toBe("want");
+    expect(addFlare.mock.calls[0]![4]).toEqual({
+      acceptsTrade: true,
+      acceptsCash: false,
+    });
+  });
+
+  it("posts a showcase with cash terms when the app asks for one", async () => {
+    await flares.POST(
+      request("POST", {
+        cardId: FLARE_ID,
+        quantity: 1,
+        intent: "showcase",
+        acceptsTrade: false,
+        acceptsCash: true,
+      }),
+      CODE,
+    );
+
+    expect(addFlare.mock.calls[0]![3]).toBe("showcase");
+    expect(addFlare.mock.calls[0]![4]).toEqual({
+      acceptsTrade: false,
+      acceptsCash: true,
+    });
+  });
+
+  /* A card you are letting go is not a hunt, and saving it as one would
+     follow you to the next store as a want for a card you were moving. */
+  it("never saves a showcase to the account's want list", async () => {
+    findPlayerSession.mockResolvedValue({ ...SESSION, player_id: "player-1" });
+
+    await flares.POST(
+      request("POST", { cardId: FLARE_ID, quantity: 1, intent: "showcase" }),
+      CODE,
+    );
+
+    expect(saveWant).not.toHaveBeenCalled();
   });
 
   it("an offer notifies through the backbone; a confirm notifies the partner", async () => {

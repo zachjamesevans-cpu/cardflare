@@ -102,6 +102,7 @@ describe("posting to a list requires being in the room", () => {
       SESSION.id,
       expect.anything(),
       "want",
+      expect.anything(),
     );
   });
 });
@@ -125,6 +126,53 @@ describe("showcases", () => {
     await add({ intent: "selling" });
 
     expect(addFlare.mock.calls[0]![3]).toBe("want");
+  });
+});
+
+/**
+ * Trade, cash, or either.
+ *
+ * A Server Action is a public POST endpoint, so the rule that a Flare
+ * must be answerable by something cannot live in the form. These pin it
+ * where it is actually enforced.
+ */
+describe("what the poster will take", () => {
+  const accepts = () => addFlare.mock.calls[0]![4];
+
+  it("defaults to a trade when the form says nothing", async () => {
+    await add();
+
+    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: false });
+  });
+
+  it("takes cash only when that is all that was ticked", async () => {
+    await add({ acceptsCash: "on" });
+
+    expect(accepts()).toEqual({ acceptsTrade: false, acceptsCash: true });
+  });
+
+  it("takes both when both were ticked", async () => {
+    await add({ acceptsTrade: "on", acceptsCash: "on" });
+
+    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: true });
+  });
+
+  /*
+   * The case the database refuses outright. A hand-rolled POST can send
+   * it, and a Flare nobody can answer is worse than a wrong default, so
+   * it falls back to what the board has always meant.
+   */
+  it("falls back to a trade rather than posting a Flare nobody can answer", async () => {
+    await add({ acceptsTrade: "", acceptsCash: "" });
+
+    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: false });
+  });
+
+  it("carries the terms on a showcase too", async () => {
+    await add({ intent: "showcase", acceptsCash: "on" });
+
+    expect(addFlare.mock.calls[0]![3]).toBe("showcase");
+    expect(accepts()).toEqual({ acceptsTrade: false, acceptsCash: true });
   });
 });
 

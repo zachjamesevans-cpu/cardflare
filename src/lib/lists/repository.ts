@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
-import { capFor, type AddEntryInput, type ListKind } from "./schema";
+import { capFor, type Accepts, type AddEntryInput, type ListKind } from "./schema";
 import type { FlareIntent } from "@/lib/supabase/types";
 
 /**
@@ -40,6 +40,10 @@ export interface ListEntry {
    * let it go. Binder entries are always "want"-shaped and ignore it.
    */
   intent: FlareIntent;
+  /** The poster will trade cards for this. */
+  acceptsTrade: boolean;
+  /** The poster will use money for this. Never a price. */
+  acceptsCash: boolean;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -54,7 +58,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, deck_label, intent, created_at, card_id, printing_id, player_session_id";
+  "id, quantity, note, deck_label, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
 
@@ -65,6 +69,8 @@ interface EntryRow {
   /** Flares only; binder selects never ask for either. */
   deck_label?: string | null;
   intent?: FlareIntent;
+  accepts_trade?: boolean;
+  accepts_cash?: boolean;
   created_at: string;
   card_id: string;
   printing_id: string | null;
@@ -225,6 +231,10 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     /* Binder rows never carry one, and a binder entry is a thing you
        have rather than a thing pointing anywhere. */
     intent: row.intent ?? "want",
+    /* A row written before the columns existed was a trade, which is
+       what the board has always meant. */
+    acceptsTrade: row.accepts_trade ?? true,
+    acceptsCash: row.accepts_cash ?? false,
   };
 }
 
@@ -274,6 +284,8 @@ export async function addFlare(
   input: AddEntryInput,
   /** "showcase" posts the card as one the player is offering up. */
   intent: FlareIntent = "want",
+  /** Trade, cash or either. Defaults to what the board has always meant. */
+  accepts: Accepts = { acceptsTrade: true, acceptsCash: false },
 ): Promise<AddResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -293,6 +305,8 @@ export async function addFlare(
         note: input.note,
         deck_label: input.deckLabel,
         intent,
+        accepts_trade: accepts.acceptsTrade,
+        accepts_cash: accepts.acceptsCash,
         status: "open" as const,
         updated_at: new Date().toISOString(),
       },

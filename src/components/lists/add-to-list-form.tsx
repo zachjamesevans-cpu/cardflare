@@ -2,11 +2,23 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, Loader2, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  Banknote,
+  Check,
+  ChevronRight,
+  Handshake,
+  Loader2,
+  Minus,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
+import { CardThumbnail } from "@/components/cards/card-thumbnail";
 import { Button } from "@/components/ui/button";
-import { Checkbox, Select, TextInput } from "@/components/ui/controls";
+import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
 import { saveWantAction } from "@/lib/players/account-actions";
@@ -14,19 +26,35 @@ import {
   LIST_IDLE,
   MAX_DECK_LABEL,
   MAX_NOTE,
+  MAX_QUANTITY,
   type ListKind,
   type ListState,
 } from "@/lib/lists/schema";
-import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/schema";
+import {
+  pickBasePrinting,
+  printingLabel,
+  type CardPrinting,
+  type CardResult,
+} from "@/lib/cards/schema";
 
 /**
  * Adding a card to a Flare list or a Have list.
  *
  * Search first, then confirm. Picking the card is the hard part on a phone at
- * a counter, so it gets the whole screen until it is done; quantity, printing
- * and note only appear once there is something to attach them to.
+ * a counter, so it gets the whole screen until it is done.
  *
- * This is what `CardSearch`'s `onSelect` was built for in Milestone 5.
+ * The confirm step is deliberately short. The founder's screenshot of the
+ * previous version told the story: printing, quantity, note, deck name and a
+ * two-line checkbox, every one of them expanded, with the button that
+ * actually posts pushed below the fold. Almost every Flare is "this card,
+ * one of them, either way" — so that is what the form asks, in one screen,
+ * and the rest folds away behind a disclosure.
+ *
+ * Not the swipe-between-panels the founder floated, and worth saying why:
+ * swiping hides how many steps are left, has no keyboard or screen-reader
+ * equivalent, and fights the page's own vertical scroll on a phone. The
+ * intent behind the idea — stop showing me everything at once — is what
+ * this keeps.
  */
 
 const COPY: Record<ListKind, { title: string; hint: string; submit: string }> = {
@@ -46,7 +74,7 @@ function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending} className="w-full justify-center">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Saving…" : label}
     </Button>
@@ -82,6 +110,89 @@ function Outcome({ state, saved = false }: { state: ListState; saved?: boolean }
               : `${state.cardName || "That card"} added.`}
       </span>
     </p>
+  );
+}
+
+/**
+ * One choice in a segmented control.
+ *
+ * A real radio underneath, visually hidden. Segmented controls built out
+ * of buttons have to reinvent arrow-key movement and announce their own
+ * state; a radio group gets both from the platform, and posts its value
+ * without any of this component's state being involved.
+ */
+function Segment({
+  name,
+  value,
+  checked,
+  onSelect,
+  icon: Icon,
+  children,
+}: {
+  name: string;
+  value: string;
+  checked: boolean;
+  onSelect: () => void;
+  icon: typeof Search;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:outline-none ${
+        checked
+          ? "bg-accent text-accent-contrast"
+          : "text-text-secondary hover:text-text-primary"
+      }`}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onSelect}
+        className="sr-only"
+      />
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      {children}
+    </label>
+  );
+}
+
+/** A togglable pill backed by a real checkbox, so it posts on its own. */
+function Chip({
+  name,
+  checked,
+  onToggle,
+  icon: Icon,
+  children,
+}: {
+  name: string;
+  checked: boolean;
+  onToggle: () => void;
+  icon: typeof Search;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:outline-none ${
+        checked
+          ? "border-accent bg-accent/15 text-text-primary"
+          : "border-border text-text-muted hover:text-text-secondary"
+      }`}
+    >
+      <input
+        type="checkbox"
+        name={name}
+        checked={checked}
+        onChange={onToggle}
+        className="sr-only"
+      />
+      <Icon
+        className={`size-3.5 shrink-0 ${checked ? "text-accent" : ""}`}
+        aria-hidden="true"
+      />
+      {children}
+    </label>
   );
 }
 
@@ -134,11 +245,14 @@ export function AddToListForm({
   const [deckDraft, setDeckDraft] = useState("");
 
   /*
-   * Reset on every posted card rather than kept like the deck name: a
-   * showcase is a one-off statement about one card, and leaving the box
-   * ticked would quietly turn the next hunt into an offer.
+   * Reset on every posted card rather than kept like the deck name: which
+   * way a card points is a statement about that one card, and leaving it
+   * set would quietly turn the next hunt into an offer.
    */
   const [showcase, setShowcase] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [acceptsTrade, setAcceptsTrade] = useState(true);
+  const [acceptsCash, setAcceptsCash] = useState(false);
 
   /*
    * Picking a card collapses the tall results list into a short form,
@@ -172,6 +286,9 @@ export function AddToListForm({
     if (state.status === "added") {
       setPicked(null);
       setShowcase(false);
+      setQuantity(1);
+      setAcceptsTrade(true);
+      setAcceptsCash(false);
     }
   }
 
@@ -183,6 +300,9 @@ export function AddToListForm({
           submit: "Save to my list",
         }
       : COPY[kind];
+
+  /* Only a Flare on a live board points a direction or names terms. */
+  const onBoard = kind === "flare" && target === "room";
 
   return (
     <Card className="flex flex-col gap-4">
@@ -203,60 +323,283 @@ export function AddToListForm({
           }
         />
       ) : (
-        <form
-          action={formAction}
-          className="flex flex-col gap-4"
-          /*
-           * Remounted whenever the picked card changes, so the quantity, note
-           * and printing never carry over from the previous card — React keeps
-           * an uncontrolled form's values across a re-render otherwise.
-           */
+        <PickedCardForm
           key={`${picked.card.id}-${picked.printingId}`}
-        >
-          <input type="hidden" name="code" value={code} />
-          <input type="hidden" name="kind" value={kind} />
-          <input type="hidden" name="cardId" value={picked.card.id} />
-          <input type="hidden" name="cardName" value={picked.card.exactName} />
+          picked={picked}
+          code={code}
+          kind={kind}
+          onBoard={onBoard}
+          imagesEnabled={imagesEnabled}
+          formAction={formAction}
+          onChangeCard={() => setPicked(null)}
+          submitLabel={showcase ? "Post as available" : copy.submit}
+          showcase={showcase}
+          setShowcase={setShowcase}
+          quantity={quantity}
+          setQuantity={setQuantity}
+          acceptsTrade={acceptsTrade}
+          setAcceptsTrade={setAcceptsTrade}
+          acceptsCash={acceptsCash}
+          setAcceptsCash={setAcceptsCash}
+          deckDraft={deckDraft}
+          setDeckDraft={setDeckDraft}
+        />
+      )}
 
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col">
-              <p className="truncate font-semibold text-text-primary">
-                {picked.card.exactName}
-              </p>
-              <p className="font-mono text-xs text-text-muted">
-                {picked.card.canonicalCardNumber}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setPicked(null)}
+      {footer}
+    </Card>
+  );
+}
+
+function PickedCardForm({
+  picked,
+  code,
+  kind,
+  onBoard,
+  imagesEnabled,
+  formAction,
+  onChangeCard,
+  submitLabel,
+  showcase,
+  setShowcase,
+  quantity,
+  setQuantity,
+  acceptsTrade,
+  setAcceptsTrade,
+  acceptsCash,
+  setAcceptsCash,
+  deckDraft,
+  setDeckDraft,
+}: {
+  picked: { card: CardResult; printingId: string };
+  code: string;
+  kind: ListKind;
+  onBoard: boolean;
+  imagesEnabled: boolean;
+  formAction: (formData: FormData) => void;
+  onChangeCard: () => void;
+  submitLabel: string;
+  showcase: boolean;
+  setShowcase: (value: boolean) => void;
+  quantity: number;
+  setQuantity: (value: number) => void;
+  acceptsTrade: boolean;
+  setAcceptsTrade: (value: boolean) => void;
+  acceptsCash: boolean;
+  setAcceptsCash: (value: boolean) => void;
+  deckDraft: string;
+  setDeckDraft: (value: string) => void;
+}) {
+  const { card, printingId } = picked;
+  const anyPrinting = printingId === "";
+
+  /*
+   * The art, at last. The previous form named the card in text and
+   * showed nothing, which on a phone means confirming a purchase from a
+   * product code. The picture is the fastest possible check that the
+   * right card was tapped.
+   */
+  const chosen = printingId
+    ? (card.printings.find((printing) => printing.id === printingId) ?? null)
+    : pickBasePrinting(card.printings, card.exactName);
+
+  const hasPrintingChoice = card.printings.length > 1;
+  const showsDeck = kind === "flare";
+
+  /*
+   * Open from the start when a specific version came through from the
+   * search. That path is the one where the warning under the select
+   * matters, and hiding it would let somebody post a needlessly narrow
+   * request without ever seeing why it was narrow.
+   */
+  const detailsOpen = !anyPrinting;
+
+  const detailsSummary = [
+    hasPrintingChoice ? "printing" : null,
+    "note",
+    showsDeck ? "deck name" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <form action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="code" value={code} />
+      <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="cardId" value={card.id} />
+      <input type="hidden" name="cardName" value={card.exactName} />
+      <input type="hidden" name="quantity" value={quantity} />
+      {/* Carries "any printing" when the disclosure is never opened. */}
+      {!hasPrintingChoice && (
+        <input type="hidden" name="printingId" value={printingId} />
+      )}
+
+      <div className="flex items-center gap-3">
+        <CardThumbnail
+          imageUrl={chosen?.imageUrl ?? null}
+          exactName={card.exactName}
+          cardNumber={card.canonicalCardNumber}
+          enabled={imagesEnabled}
+          anyPrinting={anyPrinting}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="truncate font-semibold text-text-primary">{card.exactName}</p>
+          <p className="font-mono text-xs text-text-muted">
+            {card.canonicalCardNumber}
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onChangeCard}>
+          Change
+        </Button>
+      </div>
+
+      {/*
+       * The question the whole board hangs on, and it used to be the
+       * last control on the form, under three optional fields. Which
+       * way a card points decides whether somebody walks over to offer
+       * or to ask, so it is answered before anything optional.
+       */}
+      {onBoard && (
+        <fieldset>
+          <legend className="sr-only">
+            Are you looking for this card or letting it go?
+          </legend>
+          <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-border bg-elevated p-1">
+            <Segment
+              name="intent"
+              value="want"
+              checked={!showcase}
+              onSelect={() => setShowcase(false)}
+              icon={Search}
             >
-              Change
-            </Button>
+              I want this
+            </Segment>
+            <Segment
+              name="intent"
+              value="showcase"
+              checked={showcase}
+              onSelect={() => setShowcase(true)}
+              icon={ArrowUpRight}
+            >
+              I have this
+            </Segment>
           </div>
+        </fieldset>
+      )}
 
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-text-secondary">How many</span>
+          {/*
+           * A stepper, not a number field. One tap beats summoning a
+           * numeric keyboard to change 1 into 2, and it cannot be left
+           * holding something that is not a number.
+           */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
+              aria-label="One fewer"
+              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-border text-text-secondary disabled:opacity-40"
+            >
+              <Minus className="size-4" aria-hidden="true" />
+            </button>
+            <output
+              aria-live="polite"
+              className="min-w-8 text-center font-semibold text-text-primary tabular-nums"
+            >
+              {quantity}
+            </output>
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.min(MAX_QUANTITY, quantity + 1))}
+              disabled={quantity >= MAX_QUANTITY}
+              aria-label="One more"
+              className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-border text-text-secondary disabled:opacity-40"
+            >
+              <Plus className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        {/*
+         * Whether to bring cards or money is the question somebody has
+         * walking over, and the board could not answer it until now.
+         * Never a price: a flag says something about the person, a
+         * number would make this a marketplace.
+         */}
+        {onBoard && (
+          <fieldset className="flex items-center gap-3">
+            <legend className="sr-only">
+              {showcase
+                ? "Will you trade this card away, sell it, or either?"
+                : "Will you trade for this card, buy it, or either?"}
+            </legend>
+            <span
+              aria-hidden="true"
+              className="text-sm font-medium text-text-secondary"
+            >
+              Trade or cash?
+            </span>
+            <div className="flex items-center gap-2">
+              <Chip
+                name="acceptsTrade"
+                checked={acceptsTrade}
+                /* Never both off. The server enforces it too, but a
+                   control that can post an impossible answer is a
+                   control that lies about what it accepts. */
+                onToggle={() => (acceptsCash ? setAcceptsTrade(!acceptsTrade) : null)}
+                icon={Handshake}
+              >
+                Trade
+              </Chip>
+              <Chip
+                name="acceptsCash"
+                checked={acceptsCash}
+                onToggle={() => (acceptsTrade ? setAcceptsCash(!acceptsCash) : null)}
+                icon={Banknote}
+              >
+                Cash
+              </Chip>
+            </div>
+          </fieldset>
+        )}
+      </div>
+
+      {/*
+       * Everything a Flare does not need. Rendered inside the form
+       * whether open or shut, so a value typed and then folded away is
+       * still posted.
+       */}
+      <details open={detailsOpen} className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-text-secondary [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            className="size-4 shrink-0 transition-transform group-open:rotate-90"
+            aria-hidden="true"
+          />
+          Add {detailsSummary}
+        </summary>
+
+        <div className="flex flex-col gap-4 pt-3">
           {/*
            * "Any printing" is first in the list and the default for a plain
            * row tap — it is what most people mean, and defaulting to a
            * specific art would quietly make every request narrower than
-           * intended. Tapping a version in the search preselects it here,
-           * and the hint under the select is how "any printing" stays
-           * discoverable on exactly that path.
+           * intended.
            */}
-          {picked.card.printings.length > 1 && (
+          {hasPrintingChoice && (
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">Printing</span>
-              <Select name="printingId" defaultValue={picked.printingId}>
+              <Select name="printingId" defaultValue={printingId}>
                 <option value="">Any printing</option>
-                {picked.card.printings.map((printing) => (
+                {card.printings.map((printing) => (
                   <option key={printing.id} value={printing.id}>
-                    {printingLabel(printing, picked.card.exactName) ?? "This printing"}
+                    {printingLabel(printing, card.exactName) ?? "This printing"}
                   </option>
                 ))}
               </Select>
-              {picked.printingId !== "" && (
+              {!anyPrinting && (
                 <span className="text-xs text-text-muted">
                   Asking for this exact version. Switch to &ldquo;Any printing&rdquo;
                   above if any art will do, since more people can answer that.
@@ -265,31 +608,17 @@ export function AddToListForm({
             </label>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-[7rem_1fr]">
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-text-secondary">How many</span>
-              <TextInput
-                name="quantity"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={99}
-                defaultValue={1}
-              />
-            </label>
-
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-text-secondary">
-                Note{" "}
-                <span className="font-normal text-text-muted">
-                  Optional, e.g. &ldquo;NM only&rdquo;
-                </span>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-text-secondary">
+              Note{" "}
+              <span className="font-normal text-text-muted">
+                Optional, e.g. &ldquo;NM only&rdquo;
               </span>
-              <TextInput name="note" maxLength={MAX_NOTE} />
-            </label>
-          </div>
+            </span>
+            <TextInput name="note" maxLength={MAX_NOTE} />
+          </label>
 
-          {kind === "flare" && (
+          {showsDeck && (
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">
                 Building a deck?{" "}
@@ -309,43 +638,10 @@ export function AddToListForm({
               </span>
             </label>
           )}
+        </div>
+      </details>
 
-          {/*
-           * The one control that turns a Flare around. A showcase is
-           * the same post pointed the other way — "I have this" rather
-           * than "I need this" — so it belongs on this form rather than
-           * behind a second one, and the submit label follows it so
-           * nobody posts the opposite of what they meant.
-           */}
-          {kind === "flare" && target === "room" && (
-            <Checkbox
-              id="intent"
-              name="intent"
-              value="showcase"
-              checked={showcase}
-              onChange={(event) => setShowcase(event.target.checked)}
-              label={
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-medium text-text-primary">
-                    I have this one and would let it go
-                  </span>
-                  <span className="text-xs text-text-muted">
-                    Posts it as a showcase: it sits at the top of your cards on the
-                    board with a foil shine, and anyone here already hunting it is told
-                    you have it.
-                  </span>
-                </span>
-              }
-            />
-          )}
-
-          <div>
-            <SubmitButton label={showcase ? "Showcase this card" : copy.submit} />
-          </div>
-        </form>
-      )}
-
-      {footer}
-    </Card>
+      <SubmitButton label={submitLabel} />
+    </form>
   );
 }

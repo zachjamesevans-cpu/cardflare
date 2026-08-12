@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { notifyShowcaseMatch } from "@/lib/notifications/notify";
 
 /**
  * Who in this room is hunting the card somebody just showcased.
@@ -94,4 +95,45 @@ export async function findShowcase(
   }
 
   return data?.id ?? null;
+}
+
+/**
+ * Tells everyone hunting this card that somebody just offered one up.
+ *
+ * Deliberately best-effort and never awaited by the caller: the
+ * showcase is on the board either way, and a notification outage must
+ * not turn a successful post into a visible failure.
+ *
+ * Lives here rather than beside the Server Action because the app posts
+ * showcases through the JSON API, and two copies of "who do we tell"
+ * is exactly the kind of thing that drifts. The poster's name is passed
+ * in rather than read from a cookie, which is what let the two surfaces
+ * share this at all.
+ */
+export async function announceShowcase(
+  room: { eventId: string; playerSessionId: string },
+  entry: { cardId: string; printingId: string | null },
+  showcaserName: string,
+): Promise<void> {
+  try {
+    const hunters = await huntersFor({
+      eventId: room.eventId,
+      cardId: entry.cardId,
+      printingId: entry.printingId,
+      excludeSessionId: room.playerSessionId,
+    });
+    if (hunters.length === 0) return;
+
+    const showcase = await findShowcase(
+      room.eventId,
+      room.playerSessionId,
+      entry.cardId,
+      entry.printingId,
+    );
+    if (!showcase) return;
+
+    await notifyShowcaseMatch(showcase, showcaserName, hunters);
+  } catch (error) {
+    console.error("Could not announce the showcase", error);
+  }
 }

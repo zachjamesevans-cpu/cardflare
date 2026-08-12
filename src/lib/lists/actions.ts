@@ -4,13 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { resolveCode } from "@/lib/events/rooms";
 import { roomPhase, type PublicEvent } from "@/lib/events/schema";
-import {
-  notifyEarlyBoardFlares,
-  notifyShowcaseMatch,
-} from "@/lib/notifications/notify";
+import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { hasFeature } from "@/lib/billing/features";
 import { tierForPlayer } from "@/lib/billing/repository";
-import { findShowcase, huntersFor } from "./showcase";
+import { announceShowcase } from "./showcase";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
@@ -25,7 +22,13 @@ import {
   confirmBinderEntry,
   removeFromBinder,
 } from "./repository";
-import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./schema";
+import {
+  acceptsSchema,
+  addEntrySchema,
+  atCapMessage,
+  kindSchema,
+  type ListState,
+} from "./schema";
 
 /**
  * Posting a Flare, and keeping the binder.
@@ -37,44 +40,6 @@ import { addEntrySchema, atCapMessage, kindSchema, type ListState } from "./sche
  */
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
-
-/**
- * Tells everyone hunting this card that somebody just offered one up.
- *
- * Deliberately best-effort and never awaited by the caller: the
- * showcase is on the board either way, and a notification outage must
- * not turn a successful post into a visible failure.
- */
-async function announceShowcase(
-  room: {
-    eventId: string;
-    playerSessionId: string;
-  },
-  entry: { cardId: string; printingId: string | null },
-): Promise<void> {
-  try {
-    const hunters = await huntersFor({
-      eventId: room.eventId,
-      cardId: entry.cardId,
-      printingId: entry.printingId,
-      excludeSessionId: room.playerSessionId,
-    });
-    if (hunters.length === 0) return;
-
-    const session = await getPlayerSession();
-    const showcase = await findShowcase(
-      room.eventId,
-      room.playerSessionId,
-      entry.cardId,
-      entry.printingId,
-    );
-    if (!showcase) return;
-
-    await notifyShowcaseMatch(showcase, session?.display_name ?? "A player", hunters);
-  } catch (error) {
-    console.error("Could not announce the showcase", error);
-  }
-}
 
 /**
  * Generous, because a player emptying a binder into the app is using the
@@ -173,6 +138,17 @@ export async function addToListAction(
   }
 
   /*
+   * What the poster will take. Unticked checkboxes send nothing at all,
+   * which is why this parses separately with its own defaults rather
+   * than riding inside `addEntrySchema` — and why the schema, not this
+   * caller, is where "neither" is turned back into a trade.
+   */
+  const accepts = acceptsSchema.parse({
+    acceptsTrade: text(formData, "acceptsTrade"),
+    acceptsCash: text(formData, "acceptsCash"),
+  });
+
+  /*
    * A showcase is a Flare pointed the other way: same board, same row,
    * opposite direction. The intent rides in the form because the two
    * are posted from the same control.
@@ -202,6 +178,7 @@ export async function addToListAction(
           room.playerSessionId,
           parsed.data,
           showcase ? "showcase" : "want",
+          accepts,
         )
       : await addToBinder(room.playerSessionId, parsed.data);
 
@@ -231,7 +208,11 @@ export async function addToListAction(
    * the board, and the dedupe makes a repeat post free.
    */
   if (result.ok && kind.data === "flare" && showcase) {
-    void announceShowcase(room, parsed.data);
+    void announceShowcase(
+      room,
+      parsed.data,
+      (await getPlayerSession())?.display_name ?? "A player",
+    );
   }
 
   if (!result.ok) {

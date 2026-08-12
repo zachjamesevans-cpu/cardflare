@@ -511,7 +511,19 @@ function RoomScreen({
            * same as the website: "RG Luffy" typed on each card of the
            * hunt gathers them under one named heading.
            */
-          const { folders, loose } = partitionByDeck(group.flares);
+          /*
+           * Cards pointing the other way come out first and stay out.
+           * A showcase is "I have this", the opposite statement to a
+           * Flare, and reading the two as one list is how somebody
+           * walks over about a card the owner was trying to move.
+           */
+          const showcases = group.flares.filter((f) => f.intent === "showcase");
+          const wants = group.flares.filter((f) => f.intent !== "showcase");
+          const { folders, loose } = partitionByDeck(wants);
+
+          /* Headings only when both directions are in play; labelling a
+             lone hunt "Looking for" is furniture. */
+          const labelled = showcases.length > 0;
 
           const tile = (flare: RoomFlare) => {
             const own = flare.offers.find((o) => o.responderSessionId === youId);
@@ -611,6 +623,33 @@ function RoomScreen({
 
               {!groupOpen ? (
                 <View>
+                  {labelled && (
+                    <>
+                      <Text style={styles.folderLabel}>
+                        {`Letting go · ${showcases.length} ${
+                          showcases.length === 1 ? "card" : "cards"
+                        }`}
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{
+                          gap: spacing(2),
+                          paddingVertical: spacing(1),
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        {showcases.map(tile)}
+                      </ScrollView>
+                      {orderedRail.length > 0 && (
+                        <Text style={styles.folderLabel}>
+                          {`Looking for · ${orderedRail.length} ${
+                            orderedRail.length === 1 ? "card" : "cards"
+                          }`}
+                        </Text>
+                      )}
+                    </>
+                  )}
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -634,6 +673,25 @@ function RoomScreen({
                 </View>
               ) : (
                 <>
+                  {labelled && (
+                    <View style={{ gap: spacing(1) }}>
+                      <Text style={styles.folderLabel}>
+                        {`Letting go · ${showcases.length} ${
+                          showcases.length === 1 ? "card" : "cards"
+                        }`}
+                      </Text>
+                      <View>{rows(showcases)}</View>
+                    </View>
+                  )}
+
+                  {labelled && wants.length > 0 && (
+                    <Text style={styles.folderLabel}>
+                      {`Looking for · ${wants.length} ${
+                        wants.length === 1 ? "card" : "cards"
+                      }`}
+                    </Text>
+                  )}
+
                   {folders.map((folder) => (
                     <View
                       key={folder.label.toLowerCase()}
@@ -755,6 +813,22 @@ function pledgeLineFor(flare: RoomFlare): string | null {
 
 /** The website's partition, in miniature: folders merge case-insensitively
     and keep the spelling of the first card seen; order follows the board. */
+/**
+ * What the poster will take, as the board says it.
+ *
+ * Mirrors `acceptsLabel` in src/lib/lists/schema.ts. Trade-only stays
+ * silent: it is what CardFlare has always meant, and a badge on every
+ * row is furniture rather than information.
+ */
+function acceptsLabel(flare: {
+  acceptsTrade: boolean;
+  acceptsCash: boolean;
+}): string | null {
+  if (flare.acceptsTrade && flare.acceptsCash) return "Trade or cash";
+  if (flare.acceptsCash) return "Cash only";
+  return null;
+}
+
 function partitionByDeck(flares: RoomFlare[]): {
   folders: { label: string; flares: RoomFlare[] }[];
   loose: RoomFlare[];
@@ -1166,6 +1240,15 @@ function FlareRow({
         </View>
 
         {flare.note && <Body>{flare.note}</Body>}
+
+        {/* Direction is said once by the heading above this row, so
+            what is left worth saying per card is the terms, and only
+            when they are not the plain trade the board assumes. */}
+        {acceptsLabel(flare) && (
+          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+            {acceptsLabel(flare)}
+          </Text>
+        )}
 
         {flare.match === "exact" && (
           <Text style={{ color: colors.accent, fontWeight: "700" }}>You have this</Text>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { partitionByIntent } from "@/lib/lists/schema";
+import { acceptsLabel, acceptsSchema, partitionByIntent } from "@/lib/lists/schema";
 import {
   FEATURE_TIERS,
   hasFeature,
@@ -81,5 +81,53 @@ describe("the feature gate", () => {
     for (const tier of [null, "pro", "ultra", "max"] as const) {
       expect(meetsTier(null, tier)).toBe(true);
     }
+  });
+});
+
+/**
+ * What the poster will take, as the board says it.
+ *
+ * Trade-only stays silent on purpose: it is what CardFlare has always
+ * meant, and a badge on every single row is furniture. The label exists
+ * to mark the rows that break that assumption.
+ */
+describe("acceptsLabel", () => {
+  it("says nothing for a plain trade, which is the assumed default", () => {
+    expect(acceptsLabel({ acceptsTrade: true, acceptsCash: false })).toBeNull();
+  });
+
+  it("calls out cash only, because it changes what you bring", () => {
+    expect(acceptsLabel({ acceptsTrade: false, acceptsCash: true })).toBe("Cash only");
+  });
+
+  it("calls out either, because it widens who can answer", () => {
+    expect(acceptsLabel({ acceptsTrade: true, acceptsCash: true })).toBe(
+      "Trade or cash",
+    );
+  });
+});
+
+describe("acceptsSchema", () => {
+  it("reads unticked checkboxes as a plain trade", () => {
+    expect(acceptsSchema.parse({})).toEqual({
+      acceptsTrade: true,
+      acceptsCash: false,
+    });
+  });
+
+  it("reads a ticked checkbox's 'on' as true", () => {
+    expect(acceptsSchema.parse({ acceptsTrade: "on", acceptsCash: "on" })).toEqual({
+      acceptsTrade: true,
+      acceptsCash: true,
+    });
+  });
+
+  /* The shape the database refuses. Rescued rather than rejected: the
+     poster's real mistake is a mis-tap, not a hostile payload. */
+  it("rescues a Flare that would accept nothing", () => {
+    expect(acceptsSchema.parse({ acceptsTrade: "", acceptsCash: "" })).toEqual({
+      acceptsTrade: true,
+      acceptsCash: false,
+    });
   });
 });

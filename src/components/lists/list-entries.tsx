@@ -1,11 +1,13 @@
 import Image from "next/image";
 import {
+  ArrowUpRight,
+  Banknote,
   Flame,
   Folder,
   Hand,
   Layers,
   PackageCheck,
-  Sparkles,
+  Search,
   StickyNote,
   Store,
 } from "lucide-react";
@@ -27,12 +29,12 @@ import { Badge, Card } from "@/components/ui/card";
 import { RemoveEntry } from "@/components/lists/remove-entry";
 import type { ListEntry } from "@/lib/lists/repository";
 import {
+  acceptsLabel,
   groupByPlayer,
   partitionByDeck,
   partitionByIntent,
   type ListKind,
 } from "@/lib/lists/schema";
-import { ShowcaseShine } from "@/components/lists/showcase-shine";
 import type { MatchKind, Offer } from "@/lib/matching/schema";
 
 /**
@@ -92,7 +94,7 @@ function Entry({
           caption={entry.printingLabel ?? "Any printing"}
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
-          showcase={entry.intent === "showcase"}
+          terms={acceptsLabel(entry)}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -138,11 +140,17 @@ function Entry({
            * label is long, and a shrink-proof column wide enough for "You have
            * another printing" crushes the card name into a sliver on a phone.
            */}
-          {entry.intent === "showcase" && (
+          {/*
+           * Direction is said once, by the section this row sits in,
+           * rather than on every row inside it. What is left worth
+           * saying per card is the terms — and only when they are not
+           * the plain trade the board has always assumed.
+           */}
+          {acceptsLabel(entry) && (
             <span className="mt-1">
               <Badge tone="accent">
-                <Sparkles className="size-3.5" aria-hidden="true" />
-                Up for grabs
+                <Banknote className="size-3.5" aria-hidden="true" />
+                {acceptsLabel(entry)}
               </Badge>
             </span>
           )}
@@ -185,25 +193,35 @@ function Entry({
 }
 
 /**
- * The art box, foiled when the card is one somebody will let go.
+ * A labelled run of cards pointing the same way.
  *
- * A plain wrapper for an ordinary Flare, so the overwhelming majority
- * of tiles keep shipping zero JavaScript; the client island only
- * mounts on the cards that actually shimmer.
+ * The founder's correction to the first cut, and the right one: foil
+ * says "rare", not "available", so a texture can never carry the
+ * direction of a trade. Words can. Every card on the board now sits
+ * under a heading that states which way it points, which also means a
+ * tile needs no decoration of its own to be unambiguous.
+ *
+ * Rendered only when a player has both directions in play. Somebody
+ * hunting four cards and offering none — nearly everyone — sees no
+ * headings at all, because there is nothing to disambiguate.
  */
-function ShowcaseArt({
-  showcase,
-  children,
+function DirectionHeading({
+  direction,
+  count,
 }: {
-  showcase: boolean;
-  children: React.ReactNode;
+  direction: "want" | "showcase";
+  count: number;
 }) {
-  if (!showcase) return <div className="relative flex">{children}</div>;
+  const Icon = direction === "showcase" ? ArrowUpRight : Search;
 
   return (
-    <ShowcaseShine>
-      <div className="relative flex">{children}</div>
-    </ShowcaseShine>
+    <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+      <Icon className="size-4 shrink-0 text-accent" aria-hidden="true" />
+      <span>{direction === "showcase" ? "Letting go" : "Looking for"}</span>
+      <span className="font-normal text-text-muted tabular-nums">
+        · {count} {count === 1 ? "card" : "cards"}
+      </span>
+    </p>
   );
 }
 
@@ -350,7 +368,7 @@ function CarouselEntry({
       }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      <ShowcaseArt showcase={entry.intent === "showcase"}>
+      <div className="relative flex">
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
           <div
             key={depth}
@@ -379,8 +397,8 @@ function CarouselEntry({
           note={entry.note}
           lookingFor={kind === "flare" ? entry.quantity : null}
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
+          terms={acceptsLabel(entry)}
           thumbClassName="w-full"
-          showcase={entry.intent === "showcase"}
         />
         {/*
          * Every signal that used to be its own caption line lives on
@@ -423,7 +441,7 @@ function CarouselEntry({
             ×{visible}
           </span>
         )}
-      </ShowcaseArt>
+      </div>
 
       <p className="min-h-[14px] truncate text-[11px] leading-[14px] font-semibold text-text-primary">
         {entry.cardName}
@@ -690,11 +708,25 @@ export function FlareBoard({
           );
         };
 
-        const railEntries = [
-          ...showcases,
-          ...folders.flatMap((folder) => folder.entries),
-          ...loose,
+        /*
+         * Fully pledged hunts park at the far end of whichever rail
+         * they belong to, dimmed but present.
+         */
+        const inTileOrder = (list: ListEntry[]) => [
+          ...list.filter((entry) => !isCovered(entry)),
+          ...list.filter(isCovered),
         ];
+
+        const wantEntries = [...folders.flatMap((folder) => folder.entries), ...loose];
+
+        /*
+         * Headings appear only when a player has cards pointing both
+         * ways. The overwhelming majority are hunting and offering
+         * nothing, and labelling a single list "Looking for" is
+         * furniture — but a lone showcase with no heading would read
+         * as a want, which is the one mistake this must never make.
+         */
+        const labelled = showcases.length > 0;
 
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
@@ -740,16 +772,55 @@ export function FlareBoard({
                 </>
               }
               rail={
-                <Rail labelledBy={headingId}>
-                  {[
-                    ...railEntries.filter((entry) => !isCovered(entry)),
-                    ...railEntries.filter(isCovered),
-                  ].map(renderTile)}
-                  {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
-                </Rail>
+                labelled ? (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-1">
+                      <DirectionHeading direction="showcase" count={showcases.length} />
+                      <Rail ariaLabel="Cards this player is letting go">
+                        {inTileOrder(showcases).map(renderTile)}
+                      </Rail>
+                    </div>
+
+                    {(wantEntries.length > 0 || alsoOpen) && (
+                      <div className="flex flex-col gap-1">
+                        <DirectionHeading direction="want" count={wantEntries.length} />
+                        <Rail ariaLabel="Cards this player is looking for">
+                          {inTileOrder(wantEntries).map(renderTile)}
+                          {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
+                        </Rail>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Rail labelledBy={headingId}>
+                    {inTileOrder(wantEntries).map(renderTile)}
+                    {alsoOpen && <OpenToTradesEntry isYou={isYou} rail />}
+                  </Rail>
+                )
               }
               stacked={
                 <div className="flex flex-col gap-3 pt-1">
+                  {/*
+                   * Cards on offer, which the first cut left out of this
+                   * view entirely — unfolding a player hid the very
+                   * cards they were trying to move.
+                   */}
+                  {showcases.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <DirectionHeading direction="showcase" count={showcases.length} />
+                      <ul
+                        aria-label="Cards this player is letting go"
+                        className="flex flex-col"
+                      >
+                        {showcases.map(renderRow)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {labelled && wantEntries.length > 0 && (
+                    <DirectionHeading direction="want" count={wantEntries.length} />
+                  )}
+
                   {folders.map((folder) => (
                     <div
                       key={folder.label.toLowerCase()}

@@ -421,11 +421,23 @@ export type FlareRow = {
   deck_label: string | null;
   /** Which way the card points: wanted, or offered up. */
   intent: FlareIntent;
+  /** The poster will trade cards. On a showcase, will trade it away. */
+  accepts_trade: boolean;
+  /** The poster will use money. Never a price. */
+  accepts_cash: boolean;
 };
 
 export type FlareInsert = Omit<
   FlareRow,
-  "id" | "created_at" | "updated_at" | "status" | "quantity" | "deck_label" | "intent"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "status"
+  | "quantity"
+  | "deck_label"
+  | "intent"
+  | "accepts_trade"
+  | "accepts_cash"
 > & {
   id?: string;
   created_at?: string;
@@ -434,6 +446,8 @@ export type FlareInsert = Omit<
   quantity?: number;
   deck_label?: string | null;
   intent?: FlareIntent;
+  accepts_trade?: boolean;
+  accepts_cash?: boolean;
 };
 
 /**
