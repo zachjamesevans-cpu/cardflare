@@ -1,14 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import {
   ArrowUpRight,
   Banknote,
   Check,
   ChevronRight,
   Handshake,
-  Loader2,
   Minus,
   Plus,
   Search,
@@ -18,6 +16,7 @@ import {
 import { CardSearch } from "@/components/cards/card-search";
 import { CardThumbnail } from "@/components/cards/card-thumbnail";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
@@ -60,7 +59,7 @@ import {
 const COPY: Record<ListKind, { title: string; hint: string; submit: string }> = {
   flare: {
     title: "Post a Flare",
-    hint: "Everyone in this room can see what you are looking for.",
+    hint: "A card you want, or one you will let go. Everyone in this room sees it.",
     submit: "Post Flare",
   },
   have: {
@@ -69,17 +68,6 @@ const COPY: Record<ListKind, { title: string; hint: string; submit: string }> = 
     submit: "Add to my list",
   },
 };
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" disabled={pending} className="w-full justify-center">
-      {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-      {pending ? "Saving…" : label}
-    </Button>
-  );
-}
 
 function Outcome({ state, saved = false }: { state: ListState; saved?: boolean }) {
   if (state.status === "idle") return null;
@@ -251,7 +239,14 @@ export function AddToListForm({
    */
   const [showcase, setShowcase] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [acceptsTrade, setAcceptsTrade] = useState(true);
+  /*
+   * Both start unlit, the founder's call. Neither chip on is not an
+   * error, it is "did not say" — and the server reads that as the plain
+   * trade the board has always assumed. So the chips are what somebody
+   * reaches for to widen or narrow their terms, not a question they are
+   * made to answer before they can post.
+   */
+  const [acceptsTrade, setAcceptsTrade] = useState(false);
   const [acceptsCash, setAcceptsCash] = useState(false);
 
   /*
@@ -287,7 +282,7 @@ export function AddToListForm({
       setPicked(null);
       setShowcase(false);
       setQuantity(1);
-      setAcceptsTrade(true);
+      setAcceptsTrade(false);
       setAcceptsCash(false);
     }
   }
@@ -390,7 +385,16 @@ function PickedCardForm({
   deckDraft: string;
   setDeckDraft: (value: string) => void;
 }) {
-  const { card, printingId } = picked;
+  const { card } = picked;
+
+  /*
+   * Which version this Flare is for, held here rather than left to the
+   * select's own DOM value. The founder caught the reason: changing the
+   * printing has to change the picture. An uncontrolled select posts the
+   * right id but tells nothing else on the form that it moved, so the
+   * preview kept showing whichever art arrived from the search.
+   */
+  const [printingId, setPrintingId] = useState(picked.printingId);
   const anyPrinting = printingId === "";
 
   /*
@@ -412,7 +416,7 @@ function PickedCardForm({
    * matters, and hiding it would let somebody post a needlessly narrow
    * request without ever seeing why it was narrow.
    */
-  const detailsOpen = !anyPrinting;
+  const detailsOpen = picked.printingId !== "";
 
   const detailsSummary = [
     hasPrintingChoice ? "printing" : null,
@@ -530,39 +534,35 @@ function PickedCardForm({
          * number would make this a marketplace.
          */}
         {onBoard && (
-          <fieldset className="flex items-center gap-3">
+          <fieldset className="flex items-center gap-2">
+            {/*
+             * No visible label: two chips reading "Trade" and "Cash" are
+             * their own question, and the words above them were furniture.
+             * The legend stays for anyone who cannot see the pair, and it
+             * reads against the direction, because the same two chips mean
+             * buying on a want and selling on a showcase.
+             */}
             <legend className="sr-only">
               {showcase
                 ? "Will you trade this card away, sell it, or either?"
                 : "Will you trade for this card, buy it, or either?"}
             </legend>
-            <span
-              aria-hidden="true"
-              className="text-sm font-medium text-text-secondary"
+            <Chip
+              name="acceptsTrade"
+              checked={acceptsTrade}
+              onToggle={() => setAcceptsTrade(!acceptsTrade)}
+              icon={Handshake}
             >
-              Trade or cash?
-            </span>
-            <div className="flex items-center gap-2">
-              <Chip
-                name="acceptsTrade"
-                checked={acceptsTrade}
-                /* Never both off. The server enforces it too, but a
-                   control that can post an impossible answer is a
-                   control that lies about what it accepts. */
-                onToggle={() => (acceptsCash ? setAcceptsTrade(!acceptsTrade) : null)}
-                icon={Handshake}
-              >
-                Trade
-              </Chip>
-              <Chip
-                name="acceptsCash"
-                checked={acceptsCash}
-                onToggle={() => (acceptsTrade ? setAcceptsCash(!acceptsCash) : null)}
-                icon={Banknote}
-              >
-                Cash
-              </Chip>
-            </div>
+              Trade
+            </Chip>
+            <Chip
+              name="acceptsCash"
+              checked={acceptsCash}
+              onToggle={() => setAcceptsCash(!acceptsCash)}
+              icon={Banknote}
+            >
+              Cash
+            </Chip>
           </fieldset>
         )}
       </div>
@@ -591,7 +591,11 @@ function PickedCardForm({
           {hasPrintingChoice && (
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">Printing</span>
-              <Select name="printingId" defaultValue={printingId}>
+              <Select
+                name="printingId"
+                value={printingId}
+                onChange={(event) => setPrintingId(event.target.value)}
+              >
                 <option value="">Any printing</option>
                 {card.printings.map((printing) => (
                   <option key={printing.id} value={printing.id}>
@@ -641,7 +645,7 @@ function PickedCardForm({
         </div>
       </details>
 
-      <SubmitButton label={submitLabel} />
+      <SubmitButton label={submitLabel} className="w-full justify-center" />
     </form>
   );
 }
