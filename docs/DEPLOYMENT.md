@@ -450,6 +450,29 @@ project's use falls outside Hobby.
 a test signup yourself after any deployment and confirm the row lands in
 Supabase.
 
+## Switching the Flare composer
+
+Two ways of posting a Flare are built and both are kept, because which one
+works better is a question about thumbs at a counter:
+
+- **inline** (the default). Tapping a search result opens a compact composer
+  inside that result, so the controls appear where your finger already is and
+  the list never collapses.
+- **confirm**. The earlier two-step flow: tap a card, the results are replaced
+  by a short form.
+
+To go back to the two-step version, add this in Vercel under
+**Settings → Environment Variables**, then redeploy:
+
+```
+NEXT_PUBLIC_FLARE_COMPOSER=confirm
+```
+
+Delete the variable (or set it to anything else) and redeploy to return to the
+inline composer. No code changes either way. Because the name starts with
+`NEXT_PUBLIC_`, it is read at build time, so a redeploy is required for the
+change to take effect.
+
 ## Rollback
 
 Vercel keeps every deployment. **Deployments → ⋯ → Promote to Production** on

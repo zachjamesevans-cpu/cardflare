@@ -249,3 +249,30 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/*
+ * A panel opening in place, under the thing that was just tapped.
+ *
+ * The founder's ask for the Flare composer: posting should not make a
+ * thumb travel. The panel appears attached to the row it belongs to, so
+ * the movement has to read as "this row grew", not "a new thing
+ * appeared somewhere". A short drop plus a fade does that; anything
+ * longer and the finger has already moved on.
+ *
+ * No reduced-motion guard of its own: the global rule near the top of
+ * this file already collapses every animation to nothing.
+ */
+@keyframes cf-slide-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility slide-open {
+  animation: cf-slide-open var(--duration-base) var(--ease-out-soft);
+}
