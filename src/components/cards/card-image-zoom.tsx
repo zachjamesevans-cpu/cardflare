@@ -59,6 +59,7 @@ export function CardImageZoom({
   direction = "want",
   stillNeeds = null,
   terms = null,
+  pledges = [],
   thumbClassName,
 }: {
   imageUrl: string | null;
@@ -88,6 +89,12 @@ export function CardImageZoom({
    * out that they should bring money.
    */
   terms?: string | null;
+  /**
+   * Who has raised a hand, by name. The tile draws coverage as a count;
+   * this is where "checked off by whom?" gets answered — the founder's
+   * ask: tap the card, see "Kaito is bringing 3".
+   */
+  pledges?: { name: string; quantity: number }[];
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
 }) {
@@ -436,6 +443,18 @@ export function CardImageZoom({
                     </>
                   )}
                 </p>
+              )}
+              {pledges.length > 0 && (
+                <ul className="mt-1 flex flex-col">
+                  {pledges.map((pledge, index) => (
+                    <li key={index} className="text-sm text-text-secondary">
+                      <span className="font-medium text-text-primary">
+                        {pledge.name}
+                      </span>{" "}
+                      is bringing {pledge.quantity}
+                    </li>
+                  ))}
+                </ul>
               )}
               {terms && <p className="mt-1 text-sm font-medium text-accent">{terms}</p>}
               {/* The note travels with the card: the carousel tile has no

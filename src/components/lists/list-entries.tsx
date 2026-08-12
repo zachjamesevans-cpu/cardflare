@@ -58,6 +58,7 @@ function Entry({
   match,
   removable,
   counterName,
+  pledges = [],
   children,
 }: {
   entry: ListEntry;
@@ -79,6 +80,8 @@ function Entry({
    * line makes is only "worth asking at the register".
    */
   counterName?: string | null;
+  /** Who has raised a hand, shown by name in the large view. */
+  pledges?: { name: string; quantity: number }[];
   /** Offer controls or the offers themselves, rendered under the card. */
   children?: React.ReactNode;
 }) {
@@ -97,6 +100,7 @@ function Entry({
           lookingFor={kind === "flare" ? entry.quantity : null}
           direction={entry.intent}
           terms={acceptsLabel(entry)}
+          pledges={pledges}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -195,6 +199,27 @@ function Entry({
 }
 
 /**
+ * The seam in a player's rail where the direction turns around.
+ *
+ * The founder's revision of the two-rail layout: almost everything on a
+ * board is a want, so a whole labelled shelf for one or two showcases
+ * cluttered every section that had any. The cards on offer now sit at
+ * the far end of the same rail instead, past this divider — a rule and
+ * the words, turned on their side so they cost twenty pixels instead
+ * of a row.
+ */
+function RailDivider() {
+  return (
+    <li className="flex shrink-0 items-stretch gap-1.5 self-stretch py-0.5 pr-0.5">
+      <span aria-hidden="true" className="w-px bg-border" />
+      <span className="flex items-center text-[10px] font-medium tracking-wide whitespace-nowrap text-accent [writing-mode:vertical-rl]">
+        Letting go
+      </span>
+    </li>
+  );
+}
+
+/**
  * A labelled run of cards pointing the same way.
  *
  * The founder's correction to the first cut, and the right one: foil
@@ -275,6 +300,7 @@ function CarouselEntry({
   match,
   removable,
   pledgeLine = null,
+  pledges = [],
   canOffer = false,
   offered = false,
   ownQuantity = 1,
@@ -290,6 +316,8 @@ function CarouselEntry({
   removable: boolean;
   /** The hunt's coverage, one short line: "Needs 1 more" and kin. */
   pledgeLine?: string | null;
+  /** Who has raised a hand, shown by name in the large view. */
+  pledges?: { name: string; quantity: number }[];
   /** Somebody else's Flare: the pledge control renders. */
   canOffer?: boolean;
   /** The viewer's pledge is already standing: filled button, editable. */
@@ -363,6 +391,7 @@ function CarouselEntry({
           direction={entry.intent}
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           terms={acceptsLabel(entry)}
+          pledges={pledges}
           thumbClassName="w-full"
         />
         {/*
@@ -591,6 +620,13 @@ export function FlareBoard({
                   : "Spoken for"
                 : `Needs ${remaining} more`;
 
+          /* Names travel with the card: the tile draws coverage as a
+             stack, and the zoom is where "by whom?" gets answered. */
+          const pledges = entryOffers.map((offer) => ({
+            name: offer.displayName ?? "A player",
+            quantity: offer.quantity,
+          }));
+
           return (
             <CarouselEntry
               key={entry.id}
@@ -601,6 +637,7 @@ export function FlareBoard({
               match={match}
               removable={isYou}
               pledgeLine={pledgeLine}
+              pledges={pledges}
               canOffer={!isYou}
               offered={Boolean(ownOffer)}
               ownQuantity={ownOffer?.quantity ?? 1}
@@ -636,6 +673,10 @@ export function FlareBoard({
               match={match}
               removable={isYou}
               counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
+              pledges={entryOffers.map((offer) => ({
+                name: offer.displayName ?? "A player",
+                quantity: offer.quantity,
+              }))}
             >
               <PledgeSummary offers={entryOffers} asked={entry.quantity} />
               {isYou && entryOffers.length > 0 && (
@@ -743,29 +784,22 @@ export function FlareBoard({
                 </>
               }
               rail={
-                labelled ? (
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex flex-col gap-1">
-                      <DirectionHeading direction="showcase" count={showcases.length} />
-                      <Rail ariaLabel="Cards this player is letting go">
-                        {inTileOrder(showcases).map(renderTile)}
-                      </Rail>
-                    </div>
-
-                    {wantEntries.length > 0 && (
-                      <div className="flex flex-col gap-1">
-                        <DirectionHeading direction="want" count={wantEntries.length} />
-                        <Rail ariaLabel="Cards this player is looking for">
-                          {inTileOrder(wantEntries).map(renderTile)}
-                        </Rail>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Rail labelledBy={headingId}>
-                    {inTileOrder(wantEntries).map(renderTile)}
-                  </Rail>
-                )
+                /*
+                 * One rail per player, whatever they are doing. Wants
+                 * lead, and anything on offer sits past the divider at
+                 * the far end — the founder's revision: nearly all of a
+                 * board is wants, and a labelled shelf for one showcase
+                 * cluttered every section that had one.
+                 */
+                <Rail labelledBy={headingId}>
+                  {inTileOrder(wantEntries).map(renderTile)}
+                  {showcases.length > 0 && (
+                    <>
+                      <RailDivider />
+                      {inTileOrder(showcases).map(renderTile)}
+                    </>
+                  )}
+                </Rail>
               }
               stacked={
                 <div className="flex flex-col gap-3 pt-1">

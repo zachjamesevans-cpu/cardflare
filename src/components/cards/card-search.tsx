@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronRight, Loader2, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { TextInput } from "@/components/ui/controls";
@@ -378,6 +378,13 @@ export function CardSearch({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
+  /*
+   * Which query the reader explicitly widened. Keyed to the query
+   * rather than held as a flag so typing anything folds the list back
+   * to the short view without an effect having to watch for it.
+   */
+  const [showAllFor, setShowAllFor] = useState<string | null>(null);
+
   /**
    * The last response, and which query produced it.
    *
@@ -410,6 +417,7 @@ export function CardSearch({
     setQuery("");
     setSettled(null);
     setActive(0);
+    setShowAllFor(null);
   }, [resetSignal]);
 
   const trimmed = query.trim();
@@ -423,6 +431,21 @@ export function CardSearch({
 
   const results = status === "ready" && settled ? settled.results : [];
   const term = settled?.query ?? "";
+
+  /*
+   * Three results, until more are asked for.
+   *
+   * The founder's report: searching "luffy" quintupled the page, and a
+   * wall of twenty expanded blocks is not how anybody reads results —
+   * the right card is almost always in the first few, because the
+   * ranking is the feature. Keyboard movement and the aria wiring below
+   * all run against this visible list, so the arrow keys cannot walk
+   * into rows that are not on screen.
+   */
+  const SHORT_LIST = 3;
+  const expanded = showAllFor === term;
+  const visible = expanded ? results : results.slice(0, SHORT_LIST);
+  const hidden = results.length - visible.length;
 
   useEffect(() => {
     if (tooShort) return;
@@ -467,17 +490,17 @@ export function CardSearch({
       setQuery("");
       return;
     }
-    if (results.length === 0) return;
+    if (visible.length === 0) return;
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActive((current) => (current + 1) % results.length);
+      setActive((current) => (current + 1) % visible.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActive((current) => (current - 1 + results.length) % results.length);
+      setActive((current) => (current - 1 + visible.length) % visible.length);
     } else if (event.key === "Enter" && onSelect) {
       event.preventDefault();
-      const card = results[active];
+      const card = visible[active];
       if (card) onSelect(card);
     }
   }
@@ -567,7 +590,7 @@ export function CardSearch({
           aria-label="Card results"
           className="flex flex-col gap-2"
         >
-          {results.map((card, index) => {
+          {visible.map((card, index) => {
             /* "" is the card itself; anything else names one printing. */
             const [keyCard, keyPrinting] = (composerKey ?? "").split(":");
             const mine = composerKey !== null && keyCard === card.id;
@@ -586,6 +609,19 @@ export function CardSearch({
               />
             );
           })}
+
+          {hidden > 0 && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setShowAllFor(term)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-border py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <ChevronDown aria-hidden="true" className="size-4 text-accent" />
+                View {hidden} more {hidden === 1 ? "result" : "results"}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>
