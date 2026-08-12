@@ -80,6 +80,55 @@ export const deckLabelSchema = z
   )
   .transform((value) => value || null);
 
+/* -------------------------------------------------------------------------- */
+/* What the poster will take                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Trade, cash, or either.
+ *
+ * The question somebody actually has when they read a Flare is "do I
+ * bring cards or do I bring money", and until now the board answered it
+ * by assumption. Two independent flags rather than a three-way choice,
+ * because "either is fine" is the common answer and the one that closes
+ * the most trades — an enum would make it a special third case that
+ * every check then has to remember.
+ *
+ * Never a price. See the migration for why that line matters.
+ */
+export const acceptsSchema = z
+  .object({
+    acceptsTrade: z.coerce.boolean().default(false),
+    acceptsCash: z.coerce.boolean().default(false),
+  })
+  /*
+   * A Flare answerable by nothing is not a Flare. The form makes this
+   * hard to reach, but a Server Action is a public endpoint, so the
+   * rule is enforced where it cannot be skipped. Falling back to a
+   * trade rather than rejecting: the poster's real mistake is a
+   * mis-tap, and the app has always meant "trade" by default.
+   */
+  .transform((value) =>
+    value.acceptsTrade || value.acceptsCash ? value : { ...value, acceptsTrade: true },
+  );
+
+export type Accepts = z.infer<typeof acceptsSchema>;
+
+/**
+ * How a card's terms read on the board, or null when there is nothing
+ * worth saying.
+ *
+ * Trade-only is silent on purpose. It is what CardFlare has always
+ * meant and what the overwhelming majority of Flares will be, and a
+ * badge repeated on every row is furniture rather than information.
+ * The badge earns its space only when the terms are not the default.
+ */
+export function acceptsLabel(entry: Accepts): string | null {
+  if (entry.acceptsTrade && entry.acceptsCash) return "Trade or cash";
+  if (entry.acceptsCash) return "Cash only";
+  return null;
+}
+
 export const addEntrySchema = z.object({
   cardId: z.guid("Pick a card from the list."),
   /** Omitted or empty means any printing will do. */

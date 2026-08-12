@@ -39,6 +39,55 @@ function leadArt(hit: CardHit): string | null {
   );
 }
 
+/**
+ * A pill that is either on or off.
+ *
+ * React Native has no checkboxes worth the name, and the board's two
+ * questions — which way does this card point, and what will you take —
+ * are both answered by picking from a small visible set. A pill shows
+ * the choice and the alternatives at the same time, which a switch
+ * does not.
+ */
+function Pill({
+  label,
+  active,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        flex: 1,
+        alignItems: "center",
+        paddingVertical: spacing(2),
+        paddingHorizontal: spacing(3),
+        borderRadius: radius.control,
+        borderWidth: active ? 2 : 1,
+        borderColor: active ? colors.accent : colors.border,
+        backgroundColor: active ? `${colors.accent}22` : colors.elevated,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Text
+        style={{
+          color: active ? colors.textPrimary : colors.textMuted,
+          fontSize: 13,
+          fontWeight: active ? "700" : "500",
+        }}
+      >
+        {label}
+      </Text>
+    </Tap>
+  );
+}
+
 /** The website's search highlight: the matched part of a name lights up. */
 function Highlighted({ text, term }: { text: string; term: string }) {
   const needle = term.trim().toLowerCase();
@@ -111,6 +160,15 @@ export function PostFlareScreen({
   const [note, setNote] = useState("");
 
   /*
+   * Which way the card points, and what the poster will take. Both reset
+   * with every unfold: they are statements about one card, and a stuck
+   * "I have this" would quietly turn the next hunt into an offer.
+   */
+  const [showcase, setShowcase] = useState(false);
+  const [acceptsTrade, setAcceptsTrade] = useState(true);
+  const [acceptsCash, setAcceptsCash] = useState(false);
+
+  /*
    * The deck name survives on purpose — across posts, folds, and even the
    * Flare-tab re-tap. Somebody building an RG Luffy types the name once
    * and posts fourteen cards; each one lands in the same folder on the
@@ -168,6 +226,9 @@ export function PostFlareScreen({
     setPrintingId(null);
     setQuantity(1);
     setNote("");
+    setShowcase(false);
+    setAcceptsTrade(true);
+    setAcceptsCash(false);
     setError(null);
     setPosted(false);
   };
@@ -186,8 +247,15 @@ export function PostFlareScreen({
       };
 
       if (target.kind === "room") {
-        await postFlare(target.code, entry);
+        await postFlare(target.code, {
+          ...entry,
+          intent: showcase ? "showcase" : "want",
+          acceptsTrade,
+          acceptsCash,
+        });
       } else {
+        /* The saved list is a hunt list. A card you are letting go is
+           not a want, so it never lands there. */
         await saveToList(entry);
       }
 
@@ -319,6 +387,47 @@ export function PostFlareScreen({
                */}
               {open && (
                 <>
+                  {/*
+                   * Direction first. It decides whether somebody walks
+                   * over to offer or to ask, so it is answered before
+                   * any of the optional detail.
+                   */}
+                  {target.kind === "room" && (
+                    <>
+                      <Body>Is this a card you want, or one you have?</Body>
+                      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                        <Pill
+                          label="I want this"
+                          active={!showcase}
+                          onPress={() => setShowcase(false)}
+                        />
+                        <Pill
+                          label="I have this"
+                          active={showcase}
+                          onPress={() => setShowcase(true)}
+                        />
+                      </View>
+
+                      <Body>Trade or cash?</Body>
+                      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                        {/* Never both off: a Flare nobody can answer is
+                            not a Flare. The server enforces it too. */}
+                        <Pill
+                          label="Trade"
+                          active={acceptsTrade}
+                          disabled={acceptsTrade && !acceptsCash}
+                          onPress={() => setAcceptsTrade(!acceptsTrade)}
+                        />
+                        <Pill
+                          label="Cash"
+                          active={acceptsCash}
+                          disabled={acceptsCash && !acceptsTrade}
+                          onPress={() => setAcceptsCash(!acceptsCash)}
+                        />
+                      </View>
+                    </>
+                  )}
+
                   <Body>Which printing?</Body>
                   <View style={{ gap: spacing(2) }}>
                     {[

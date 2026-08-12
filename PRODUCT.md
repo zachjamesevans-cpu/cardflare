@@ -31,20 +31,56 @@ explicit approval, not an implementation detail.
 
 Use these terms consistently in code, UI copy, and documentation.
 
-| Term               | Meaning                                                             |
-| ------------------ | ------------------------------------------------------------------- |
-| **Flare**          | A live request for a card                                           |
-| **Flare Match**    | A match between a card request and an available card                |
-| **Event Room**     | A live digital room tied to a physical TCG event                    |
-| **Counter Code**   | A store's permanent join code, printed once and left on the counter |
-| **Walk-in Room**   | The Event Room a Counter Code opens when no event is scheduled      |
-| **Card Show**      | A show with many vendors and one scannable code                     |
-| **Vendor**         | A card-show seller: inventory, a booth, no rooms                    |
-| **Booth**          | Where a vendor sits at one show — what attendees walk to            |
-| **Slab**           | A graded card in a case: PSA, BGS, CGC, with a grade on the label   |
-| **Have List**      | Cards a player has available                                        |
-| **Need List**      | Cards a player is seeking                                           |
-| **Open to trades** | A player who wants no card in particular and will consider anything |
+| Term               | Meaning                                                               |
+| ------------------ | --------------------------------------------------------------------- |
+| **Flare**          | A live request for a card                                             |
+| **Flare Match**    | A match between a card request and an available card                  |
+| **Event Room**     | A live digital room tied to a physical TCG event                      |
+| **Counter Code**   | A store's permanent join code, printed once and left on the counter   |
+| **Walk-in Room**   | The Event Room a Counter Code opens when no event is scheduled        |
+| **Card Show**      | A show with many vendors and one scannable code                       |
+| **Vendor**         | A card-show seller: inventory, a booth, no rooms                      |
+| **Booth**          | Where a vendor sits at one show — what attendees walk to              |
+| **Slab**           | A graded card in a case: PSA, BGS, CGC, with a grade on the label     |
+| **Have List**      | Cards a player has available                                          |
+| **Need List**      | Cards a player is seeking                                             |
+| **Open to trades** | A player who wants no card in particular and will consider anything   |
+| **Showcase**       | A Flare pointed the other way: a card the poster will let go          |
+| **Terms**          | Whether a Flare is answerable with a trade, with cash, or with either |
+
+## Direction, and why the board says it in words
+
+Every Flare points one of two ways: **looking for** a card, or **letting
+one go**. Both are rows on the same board, grouped under the same player,
+because a room's real question is "who do I walk over to, and about what".
+
+The direction is always stated as text under a heading, never as a
+texture. The first attempt marked showcases with a holofoil sheen and it
+was wrong: in TCG culture foil means _rare and special_, not _available_.
+It was removed. A visual flourish can decorate a direction; it can never
+carry one.
+
+Terms are the second half of that question. A player walking over needs
+to know whether to bring cards or money, so a Flare records whether it
+is answerable by a trade, by cash, or by either. Trade-only is the
+assumed default and is deliberately silent on the board.
+
+**Never a price.** A flag says something about the person standing in the
+room; a number turns CardFlare into a marketplace, which is on the
+out-of-scope list above.
+
+## Parked: profiles and standing
+
+Two ideas that belong to a later milestone, recorded so they are not
+reinvented piecemeal:
+
+- **Profiles**, where a player's showcase is a permanent shelf rather
+  than a room-scoped post. This is where foil earns its place, because
+  on a profile "rare and special" is exactly the message.
+- **Standing**, earned from _completed trades_ and never from posting.
+  Rewarding posts fills boards with noise, and a raw trade count is
+  farmable by two friends confirming each other all afternoon, so any
+  such score has to weigh distinct partners, rooms and stores.
 
 ## The core loop
 

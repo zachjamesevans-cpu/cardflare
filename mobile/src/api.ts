@@ -234,6 +234,11 @@ export interface RoomFlare {
   note: string | null;
   /** The named hunt this Flare belongs to. Null = a loose card. */
   deckLabel: string | null;
+  /** Which way the card points: wanted, or offered up. */
+  intent: "want" | "showcase";
+  /** What the poster will take. Trade-only is the board's default. */
+  acceptsTrade: boolean;
+  acceptsCash: boolean;
   match: "exact" | "other-printing" | null;
   counterMayHave: boolean;
   offers: {
@@ -334,6 +339,11 @@ export const postFlare = (
     quantity: number;
     note?: string;
     deckLabel?: string | null;
+    /** "showcase" offers the card up instead of asking for it. */
+    intent?: "want" | "showcase";
+    /** What the poster will take. Omitted means a plain trade. */
+    acceptsTrade?: boolean;
+    acceptsCash?: boolean;
   },
 ) => call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
 
