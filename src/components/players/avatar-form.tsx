@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Image from "next/image";
 import { Camera, Loader2, Trash2 } from "lucide-react";
@@ -43,24 +43,70 @@ export function AvatarForm({
   /** A rejection this component made itself, before anything was sent. */
   const [rejected, setRejected] = useState<string | null>(null);
 
+  /*
+   * The picture that was just chosen, shown from the local file while
+   * the server is still decoding it.
+   *
+   * The founder's report: "doesn't show a preview when added". It did
+   * not, and could not — the only picture on screen came from the
+   * server, so nothing changed until a round trip that involves resizing
+   * a photograph had finished. An object URL costs nothing and shows the
+   * choice the instant it is made.
+   */
+  const [preview, setPreview] = useState<string | null>(null);
+
+  /*
+   * Revoked on unmount rather than on replacement, because the <img>
+   * still needs the previous URL until React has painted the new one.
+   * Held in a ref so the cleanup does not re-run every time the preview
+   * changes and pull the picture out from under the render.
+   */
+  const objectUrls = useRef<string[]>([]);
+  useEffect(
+    () => () => {
+      for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    },
+    [],
+  );
+
+  /** True when the stored picture exists but the browser cannot load it. */
+  const [broken, setBroken] = useState(false);
+
   const message = rejected ?? (state.status === "error" ? state.message : null);
+
+  /*
+   * The preview wins while it exists: after a successful upload the
+   * server's URL and the local file are the same picture, and swapping
+   * one for the other would flash. A failed upload keeps showing what
+   * was chosen, next to the error saying why it did not stick, which is
+   * more use than reverting to the old picture with no explanation.
+   */
+  const shown = preview ?? avatarUrl;
 
   return (
     <div className="flex flex-col items-center gap-3">
       <form ref={form} action={action} className="relative">
-        {avatarUrl ? (
+        {shown && !broken ? (
           /*
-           * Unoptimised on purpose. This is already exactly the size and
-           * format it needs to be — the server re-encoded it to a 512px
-           * WebP square before storing it — so running it through the
-           * optimiser again would cost a round trip to save nothing.
+           * Unoptimised on purpose, and it has to be: the src is either
+           * a blob: URL, which the optimiser cannot fetch at all, or a
+           * picture the server already re-encoded to a 512px WebP square,
+           * so optimising it again would cost a round trip to save
+           * nothing.
            */
           <Image
-            src={avatarUrl}
+            src={shown}
             alt=""
             width={96}
             height={96}
             unoptimized
+            /*
+             * A broken image beside "Picture updated." is the exact
+             * failure the founder saw. Falling back to the initials
+             * keeps the avatar honest, and the line below says the
+             * picture could not be loaded rather than pretending.
+             */
+            onError={() => setBroken(true)}
             className="size-24 rounded-full border border-border object-cover"
           />
         ) : (
@@ -95,6 +141,11 @@ export function AvatarForm({
                 return;
               }
 
+              const url = URL.createObjectURL(file);
+              objectUrls.current.push(url);
+
+              setPreview(url);
+              setBroken(false);
               setRejected(null);
               form.current?.requestSubmit();
             }}
@@ -120,7 +171,20 @@ export function AvatarForm({
           {message}
         </p>
       )}
-      {!message && state.status === "saved" && (
+
+      {/*
+       * A broken picture outranks "Picture updated.". The save really did
+       * happen, so this does not call it a failure — it says what is
+       * actually on screen, which is the initials.
+       */}
+      {!message && broken && (
+        <p role="status" className="text-center text-sm text-warning">
+          Your picture saved, but it could not be loaded here. Showing your initials for
+          now.
+        </p>
+      )}
+
+      {!message && !broken && state.status === "saved" && (
         <p role="status" className="text-center text-sm text-success">
           {state.message}
         </p>
