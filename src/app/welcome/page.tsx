@@ -45,8 +45,14 @@ export default async function WelcomePage() {
           intro: "One password and your account is ready to go.",
           savedBody:
             "Your account is ready. Scan in at any CardFlare store, and the cards you hunt will follow you between rooms.",
-          continueLabel: "Go to your account",
-          continueHref: "/profile",
+          continueLabel: "Choose your username",
+          /*
+           * On to setup, not to the profile. A password is only half of
+           * signing up: the other half is being somebody, and a player
+           * dropped straight into a profile page they have never seen
+           * has no idea their name is still whatever an admin typed.
+           */
+          continueHref: "/welcome/username",
         }
       : {
           intro: "One password and your store is ready to go.",

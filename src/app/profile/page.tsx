@@ -19,7 +19,7 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import { toNextTier } from "@/lib/players/ember-rules";
-import { ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
+import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 
 export const metadata: Metadata = {
@@ -66,6 +66,15 @@ export default async function ProfilePage() {
    * page IS their account, exactly as it was before the rename.
    */
   if (!playerId) redirect("/profile/settings");
+
+  /*
+   * An account that never chose a username is sent to finish that
+   * first. The profile is the page it lands on afterwards, so this is
+   * the natural place to catch somebody who closed the tab halfway
+   * through — a wizard nobody can fall out of is one nobody has to
+   * remember to come back to.
+   */
+  if (await needsSetup(playerId)) redirect("/welcome/username");
 
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");

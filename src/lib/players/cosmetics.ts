@@ -63,34 +63,56 @@ export async function listCosmetics(): Promise<CosmeticRow[]> {
   return data ?? [];
 }
 
-/** The slugs a player has actually bought. Free items are not in here. */
-export async function purchasedSlugs(playerId: string): Promise<Set<string>> {
-  if (!isSupabaseConfigured()) return new Set();
+/**
+ * What a player owns, in the two ways owning happens.
+ *
+ * `purchased` is what they bought. `unlockedAll` is the admin grant, and
+ * it is a flag rather than a set on purpose: it has to cover cosmetics
+ * that do not exist yet. Carried together so no caller can check one and
+ * forget the other.
+ */
+export interface OwnedCosmetics {
+  purchased: Set<string>;
+  unlockedAll: boolean;
+}
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("player_cosmetics")
-    .select("cosmetic_slug")
-    .eq("player_id", playerId);
+export async function ownedCosmetics(playerId: string): Promise<OwnedCosmetics> {
+  const empty: OwnedCosmetics = { purchased: new Set(), unlockedAll: false };
+  if (!isSupabaseConfigured()) return empty;
 
-  if (error) {
-    console.error("Could not read a player's cosmetics", error);
-    return new Set();
+  const admin = getSupabaseAdmin();
+
+  const [rows, player] = await Promise.all([
+    admin.from("player_cosmetics").select("cosmetic_slug").eq("player_id", playerId),
+    admin.from("players").select("cosmetics_unlocked").eq("id", playerId).maybeSingle(),
+  ]);
+
+  if (rows.error) {
+    console.error("Could not read a player's cosmetics", rows.error);
+    return empty;
+  }
+  if (player.error) {
+    console.error("Could not read the unlock-all grant", player.error);
   }
 
-  return new Set((data ?? []).map((row) => row.cosmetic_slug));
+  return {
+    purchased: new Set((rows.data ?? []).map((row) => row.cosmetic_slug)),
+    unlockedAll: player.data?.cosmetics_unlocked ?? false,
+  };
 }
 
 /**
  * Does this player own this slug?
  *
- * The single place the free-is-implicit rule is decided, so equipping,
- * buying and rendering can never disagree about it.
+ * The single place all three ways of owning something are decided —
+ * free, bought, or granted forever — so equipping, buying and rendering
+ * can never disagree about it.
  */
 export function ownsCosmetic(
   item: Pick<CosmeticRow, "slug" | "cost_embers">,
-  purchased: Set<string>,
+  owned: OwnedCosmetics,
 ): boolean {
-  return item.cost_embers === 0 || purchased.has(item.slug);
+  return owned.unlockedAll || item.cost_embers === 0 || owned.purchased.has(item.slug);
 }
 
 /**
@@ -106,9 +128,9 @@ export async function wardrobeFor(
   standing: { earned: number; balance: number },
   equipped: Equipped,
 ): Promise<Wardrobe> {
-  const [catalogue, purchased] = await Promise.all([
+  const [catalogue, owned] = await Promise.all([
     listCosmetics(),
-    purchasedSlugs(playerId),
+    ownedCosmetics(playerId),
   ]);
 
   const equippedFor = (kind: CosmeticKind): string | null =>
@@ -119,8 +141,17 @@ export async function wardrobeFor(
         : equipped.effect;
 
   const items = catalogue.map((row): CosmeticItem => {
-    const owned = ownsCosmetic(row, purchased);
-    const gated = row.requires_earned !== null && standing.earned < row.requires_earned;
+    const has = ownsCosmetic(row, owned);
+    /*
+     * An unlock-all grant clears the lifetime gate too. "Always
+     * unlocked, forever" means exactly that; making somebody who was
+     * handed everything still grind to 500 for Orbit would be a strange
+     * kind of gift.
+     */
+    const gated =
+      !owned.unlockedAll &&
+      row.requires_earned !== null &&
+      standing.earned < row.requires_earned;
 
     return {
       slug: row.slug,
@@ -129,7 +160,7 @@ export async function wardrobeFor(
       description: row.description,
       cost: row.cost_embers,
       requiresEarned: row.requires_earned,
-      owned,
+      owned: has,
       /*
        * A null slot equips the free item of that kind, so the free item
        * has to read as equipped or the shop shows nothing selected on a
@@ -138,7 +169,7 @@ export async function wardrobeFor(
       equipped:
         equippedFor(row.kind) === row.slug ||
         (equippedFor(row.kind) === null && row.cost_embers === 0),
-      affordable: owned || (!gated && standing.balance >= row.cost_embers),
+      affordable: has || (!gated && standing.balance >= row.cost_embers),
       lockedUntil: gated ? row.requires_earned : null,
     };
   });
@@ -187,8 +218,8 @@ export async function buyCosmetic(playerId: string, slug: string): Promise<BuyOu
   }
   if (!item) return { ok: false, reason: "unknown" };
 
-  const purchased = await purchasedSlugs(playerId);
-  if (ownsCosmetic(item, purchased)) {
+  const owned = await ownedCosmetics(playerId);
+  if (ownsCosmetic(item, owned)) {
     // Already theirs. Treat the tap as "equip it", which is what it means.
     const equipped = await equipCosmetic(playerId, item.kind, slug);
     return equipped ? { ok: true, slug } : { ok: false, reason: "unavailable" };
@@ -289,7 +320,7 @@ export async function equipCosmetic(
       .maybeSingle();
 
     if (!item || item.kind !== kind) return false;
-    if (!ownsCosmetic(item, await purchasedSlugs(playerId))) return false;
+    if (!ownsCosmetic(item, await ownedCosmetics(playerId))) return false;
   }
 
   const { error } = await admin

@@ -833,6 +833,58 @@ An invitation carries a name typed months earlier, so `claimPendingPlayerInvite`
 nudges it ("Zach", "Zach2", …) until the index accepts it. Being unable to sign
 in because a stranger shares your first name is not an acceptable outcome.
 
+### Setting up an account
+
+Signing in is not the same as being somebody. `players.onboarded_at` is null
+until a player has chosen a username, and `/profile` bounces them to
+`/welcome/username` until they have — so a wizard nobody can fall out of is
+one nobody has to remember to come back to. Existing accounts were backfilled
+from `created_at` by the migration, so shipping the flow did not ambush the
+pilot with a setup screen for accounts they had been using for weeks.
+
+Two steps: the name, then an optional picture. The account is marked set up at
+the **name**, not after the picture, because the picture is genuinely optional
+— the generated initials are a real avatar — and gating "you are set up" on
+something optional leaves anyone who skipped it permanently owing a step.
+
+The flow keys on `onboarded_at`, never on how the account was created. That is
+the seam that makes invite-only and open registration the same path: opening
+registration is a decision about who may create an account, not a second
+onboarding to build. Public registration itself is still closed — PRODUCT.md
+says invite-only pilot, and that has not changed.
+
+The username field checks availability while it is typed. A courtesy only: the
+unique index decides, two people can type the same name at the same moment, and
+only the database sees both.
+
+### Admin grants
+
+The console can hand a player Embers and a permanent unlock. Both live in
+`src/lib/admin/grants.ts`, both re-establish admin inside the Server Action —
+a Server Action is a public POST endpoint, so hiding a form on a guarded page
+hides nothing, and these write to somebody else's account.
+
+`players.cosmetics_unlocked` is a flag rather than a pile of ownership rows,
+and the founder's words are why: "always unlocked, forever". Granting rows
+would only cover the catalogue as it stands today, so a cosmetic shipped next
+month would appear locked to somebody who was told they had everything. The
+flag also clears the lifetime-earned gates, because making someone who was
+handed everything still grind to 500 for Orbit is a strange kind of gift.
+Turning it off leaves anything actually bought still owned — the flag and the
+purchase rows are separate answers to "do they own this".
+
+An Ember grant goes through `award_embers` like every other movement, so it is
+in the ledger with `reason = 'grant'`. It raises the lifetime badge as well as
+the balance, which is a real cost: an admin gift shows up as trading the player
+did not do. The UI says so above the field rather than leaving it to be
+discovered. There is deliberately no way to take Embers away — `embers_earned`
+is monotonic by design, and an admin "undo" would be the one thing that breaks
+what the badge means. `GRANT_MAX` caps a single grant at 10,000 as a guard
+against a slipped digit, not as a policy about generosity.
+
+Search is backed by a trigram index on `display_name`, because the query is a
+leading-wildcard `ilike` that no b-tree can serve.
+
 ### Two numbers, and why
 
 `players.embers_earned` is a lifetime total that only ever goes up: it is the

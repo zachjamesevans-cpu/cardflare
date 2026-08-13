@@ -104,10 +104,27 @@ describe("avatarSrc", () => {
     expect(src).not.toContain("supabase");
   });
 
-  it("leaves a legacy full URL alone, so old rows still render", () => {
+  /*
+   * The first cut passed legacy URLs through, reasoning that they still
+   * worked where they worked. They did not — those URLs failing is the
+   * entire reason this function exists — and the founder's own row was
+   * one of them, so the fix shipped and their picture still failed:
+   * it tried to load, hit the storage host, and fell back to initials.
+   * Old rows go through the proxy too.
+   */
+  it("rewrites a legacy storage URL through the proxy", () => {
     const legacy =
       "https://example.supabase.co/storage/v1/object/public/avatars/a/1.webp";
-    expect(avatarSrc(legacy)).toBe(legacy);
+    expect(avatarSrc(legacy)).toBe("/api/avatars/a/1.webp");
+  });
+
+  it("refuses a URL that is not this bucket", () => {
+    expect(avatarSrc("https://elsewhere.example/some/picture.webp")).toBeNull();
+  });
+
+  it("refuses a path trying to climb out of the bucket", () => {
+    expect(avatarSrc("../secrets/key.webp")).toBeNull();
+    expect(avatarSrc("/etc/passwd")).toBeNull();
   });
 
   it("has nothing to serve for a player with no picture", () => {

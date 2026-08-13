@@ -48,6 +48,41 @@ export async function awardEmbers(
 }
 
 /**
+ * Hands a player Embers WITHOUT crediting the badge.
+ *
+ * The founder's rule for admin grants: a gift must not show up on
+ * somebody's profile as trading they did not do. So this moves the
+ * spendable balance and writes `earned_delta = 0`, and the lifetime
+ * total keeps meaning one thing.
+ *
+ * Its own function rather than a flag on `awardEmbers`, because the two
+ * have different invariants and a boolean argument is how somebody
+ * eventually passes the wrong one.
+ */
+export async function grantSpendableEmbers(
+  playerId: string,
+  amount: number,
+  ref: string,
+  note?: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured() || amount <= 0) return false;
+
+  const { data, error } = await getSupabaseAdmin().rpc("grant_embers", {
+    target_player: playerId,
+    amount,
+    grant_ref: ref,
+    grant_note: note ?? null,
+  });
+
+  if (error) {
+    console.error("Could not grant Embers", error);
+    return false;
+  }
+
+  return data === true;
+}
+
+/**
  * Takes Embers for a purchase, once, and only if they are there.
  *
  * False means one of: not enough Embers, or this exact purchase already
