@@ -5,6 +5,8 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import {
   addToShowcase,
+  dressAllShowcase,
+  dressShowcaseCard,
   ownProfile,
   removeFromShowcase,
   SHOWCASE_LIMIT,
@@ -100,8 +102,23 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("showcase-add"),
     cardId: z.string().uuid(),
     printingId: z.string().uuid().nullable().optional(),
+    /* The dressing chosen at add time. Unowned slugs resolve to the
+       default server-side, same as the website's add flow. */
+    frame: z.string().max(40).nullable().optional(),
+    holo: z.string().max(40).nullable().optional(),
   }),
   z.object({ action: z.literal("showcase-remove"), entryId: z.string().uuid() }),
+  z.object({
+    action: z.literal("showcase-dress"),
+    entryId: z.string().uuid(),
+    frame: z.string().max(40).nullable(),
+    holo: z.string().max(40).nullable(),
+  }),
+  z.object({
+    action: z.literal("showcase-dress-all"),
+    frame: z.string().max(40).nullable(),
+    holo: z.string().max(40).nullable(),
+  }),
 ]);
 
 export async function POST(request: Request): Promise<Response> {
@@ -142,10 +159,30 @@ export async function POST(request: Request): Promise<Response> {
       player.playerId,
       body.cardId,
       body.printingId ?? null,
+      { frame: body.frame ?? null, holo: body.holo ?? null },
     );
     return outcome.ok
       ? Response.json({ ok: true })
       : Response.json({ error: outcome.reason }, { status: 400 });
+  }
+
+  if (body.action === "showcase-dress") {
+    const done = await dressShowcaseCard(
+      player.playerId,
+      body.entryId,
+      body.frame,
+      body.holo,
+    );
+    return done
+      ? Response.json({ ok: true })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "showcase-dress-all") {
+    const done = await dressAllShowcase(player.playerId, body.frame, body.holo);
+    return done
+      ? Response.json({ ok: true })
+      : Response.json({ error: "unavailable" }, { status: 503 });
   }
 
   const removed = await removeFromShowcase(player.playerId, body.entryId);

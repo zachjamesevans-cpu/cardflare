@@ -285,10 +285,12 @@ export interface RoomState {
     openToTrades: boolean;
     /** Absolute, resolved server-side. Null means the initials. */
     avatarUrl?: string | null;
-    /** The cosmetic frame they bought, drawn around their avatar. */
+    /** The profile border they wear, drawn around their avatar. */
     frame?: string | null;
     /** Lifetime Embers, or null for a guest with no account. */
     embersEarned?: number | null;
+    /** The account behind the session, for the profile popup. */
+    playerId?: string | null;
   }[];
   flares?: RoomFlare[];
 }
@@ -537,12 +539,66 @@ export const buyCosmetic = (slug: string, slot?: EquipSlot) =>
     slot,
   });
 
-export const addToShowcase = (cardId: string, printingId: string | null) =>
+export const addToShowcase = (
+  cardId: string,
+  printingId: string | null,
+  dressing?: { frame: string | null; holo: string | null },
+) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {
     action: "showcase-add",
     cardId,
     printingId,
+    frame: dressing?.frame ?? null,
+    holo: dressing?.holo ?? null,
   });
+
+/** Dresses one showcase card: its own border and holo. */
+export const dressShowcase = (
+  entryId: string,
+  frame: string | null,
+  holo: string | null,
+) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "showcase-dress",
+    entryId,
+    frame,
+    holo,
+  });
+
+/** Apply to all: the pair becomes the default, every override clears. */
+export const dressAllShowcase = (frame: string | null, holo: string | null) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "showcase-dress-all",
+    frame,
+    holo,
+  });
+
+/**
+ * Another player's public face, for the in-room popup and the profile
+ * screen: name, picture, badge, and their shelf with each card's
+ * dressing already resolved. The server never puts a balance in this
+ * shape, so this client could not show one if it tried.
+ */
+export interface PeekProfile {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  embersEarned: number;
+  /** The ring around their picture. */
+  frame: string | null;
+  effect: string | null;
+  showcase: {
+    id: string;
+    name: string;
+    number: string;
+    imageUrl: string | null;
+    frame: string | null;
+    holo: string | null;
+  }[];
+}
+
+export const peekPlayer = (playerId: string) =>
+  call<PeekProfile>("GET", `/api/players/${encodeURIComponent(playerId)}`);
 
 export const removeFromShowcase = (entryId: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {
