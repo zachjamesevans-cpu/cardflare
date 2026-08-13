@@ -395,7 +395,9 @@ function InlineComposer({
         )}
 
         <SubmitButton
-          label={showcase ? "Post" : "Post Flare"}
+          /* One word either way. "Post Flare" and "Post" side by side
+             read as two different buttons for the same act. */
+          label="Post"
           pendingLabel="Posting…"
           size="sm"
           className="h-9 min-w-0 flex-1 justify-center"

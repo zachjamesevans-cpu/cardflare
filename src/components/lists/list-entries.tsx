@@ -27,6 +27,7 @@ import { pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
+import { Rail } from "@/components/lists/rail";
 import { RemoveEntry } from "@/components/lists/remove-entry";
 import type { ListEntry } from "@/lib/lists/repository";
 import {
@@ -489,38 +490,6 @@ function CarouselEntry({
         )}
       </div>
     </li>
-  );
-}
-
-/**
- * A horizontal shelf of carousel entries with a fade on its trailing
- * edge — the founder's ask: the sixth card looked cut off rather than
- * scrollable, so the edge now visibly "continues". Half the item's
- * height, so the fade reads as a hint, not a wall.
- */
-function Rail({
-  children,
-  ariaLabel,
-  labelledBy,
-}: {
-  children: React.ReactNode;
-  ariaLabel?: string;
-  labelledBy?: string;
-}) {
-  return (
-    <div className="relative">
-      <ul
-        aria-label={ariaLabel}
-        aria-labelledby={labelledBy}
-        className="flex items-start gap-2 overflow-x-auto pb-2"
-      >
-        {children}
-      </ul>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 right-0 h-1/2 w-8 bg-gradient-to-l from-surface to-transparent"
-      />
-    </div>
   );
 }
 

@@ -126,6 +126,18 @@ function RoomScreen({
    * the roster taught. Detail is a per-person question, not a mode.
    */
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  /*
+   * Which player's rail has nothing further to scroll, so the trailing
+   * fade can get out of the way. The two widths live in refs rather
+   * than state because they are inputs to that decision, not something
+   * the screen renders — writing them through state would re-render the
+   * whole board on every layout pass.
+   */
+  const [railsAtEnd, setRailsAtEnd] = useState<Record<string, boolean>>({});
+  const railContent = useRef<Record<string, number>>({});
+  const railLayout = useRef<Record<string, number>>({});
+
   const inFlight = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -362,6 +374,34 @@ function RoomScreen({
   const outstanding = wants.filter(
     (want) => !myAsks.has(`${want.cardId}:${want.printingId ?? ""}`),
   );
+
+  /*
+   * Which rails have nothing further to scroll, keyed by player.
+   *
+   * Measured rather than assumed, the same rule the website uses: a
+   * rail that was never long enough to scroll, or has been scrolled to
+   * its end, drops the trailing fade instead of going on promising
+   * cards that are not there.
+   */
+  const setRailEnd = (sessionId: string, atEnd: boolean) =>
+    setRailsAtEnd((current) =>
+      current[sessionId] === atEnd ? current : { ...current, [sessionId]: atEnd },
+    );
+
+  /*
+   * A rail is at its end when there is no room left, or when the offset
+   * has reached it. One point of tolerance, because fractional layout
+   * means the offset rarely lands exactly on the maximum, and a fade
+   * surviving at 0.4px left is the bug this fixes.
+   *
+   * Both halves matter: `onScroll` covers reaching the end, and the
+   * content-and-layout pair covers a rail that was never long enough to
+   * scroll at all, which never fires a scroll event.
+   */
+  const railMeasure = (sessionId: string, content: number, layout: number, offset: number) => {
+    const room = content - layout;
+    setRailEnd(sessionId, room <= 1 || offset >= room - 1);
+  };
 
   /* Being open to trades is a fact about the person, so the board says
      it on their name rather than as a card in their rail. */
@@ -653,6 +693,27 @@ function RoomScreen({
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onScroll={(event) =>
+                      railMeasure(
+                        sessionId,
+                        event.nativeEvent.contentSize.width,
+                        event.nativeEvent.layoutMeasurement.width,
+                        event.nativeEvent.contentOffset.x,
+                      )
+                    }
+                    onLayout={(event) => {
+                      railLayout.current[sessionId] = event.nativeEvent.layout.width;
+                      const content = railContent.current[sessionId];
+                      if (content != null) {
+                        railMeasure(sessionId, content, event.nativeEvent.layout.width, 0);
+                      }
+                    }}
+                    onContentSizeChange={(width) => {
+                      railContent.current[sessionId] = width;
+                      const layout = railLayout.current[sessionId];
+                      if (layout != null) railMeasure(sessionId, width, layout, 0);
+                    }}
                     contentContainerStyle={{
                       gap: spacing(2),
                       paddingVertical: spacing(1),
@@ -674,15 +735,22 @@ function RoomScreen({
                       </>
                     )}
                   </ScrollView>
-                  {/* The founder's ask: the edge fades so the rail visibly
-                      continues instead of the last card looking cut off. */}
-                  <LinearGradient
-                    pointerEvents="none"
-                    colors={[`${colors.surface}00`, colors.surface]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.railFade}
-                  />
+                  {/*
+                   * The edge fades so the rail visibly continues instead
+                   * of the last card looking cut off — and stops fading
+                   * once there is nothing left to continue to, which is
+                   * the founder's correction: a fade that never leaves
+                   * keeps promising cards that are not there.
+                   */}
+                  {!railsAtEnd[sessionId] && (
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={[`${colors.surface}00`, colors.surface]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.railFade}
+                    />
+                  )}
                 </View>
               ) : (
                 <>
