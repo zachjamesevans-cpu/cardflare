@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -70,24 +69,19 @@ export default async function PublicProfilePage({
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           <Card className="flex flex-col items-center gap-4 text-center">
-            {profile.avatarUrl ? (
-              /* Unoptimised: already a 512px WebP square, written by the
-                 server. See AvatarForm for the same reasoning. */
-              <Image
-                src={profile.avatarUrl}
-                alt=""
-                width={96}
-                height={96}
-                unoptimized
-                className="size-24 rounded-full border border-border object-cover"
-              />
-            ) : (
-              <PlayerAvatar
-                displayName={profile.displayName}
-                seed={profile.playerId}
-                className="size-24 text-2xl"
-              />
-            )}
+            {/*
+             * One component for picture, initials and frame alike, so
+             * this page cannot drift from what a room shows. It used to
+             * render its own bare <Image> for the picture case, and a
+             * bought frame never appeared here at all.
+             */}
+            <PlayerAvatar
+              displayName={profile.displayName}
+              seed={profile.playerId}
+              avatarUrl={profile.avatarUrl}
+              frame={worn.frame}
+              className="size-24 text-2xl"
+            />
 
             <div className="flex flex-col items-center gap-2">
               <p className="text-lg font-bold text-text-primary">

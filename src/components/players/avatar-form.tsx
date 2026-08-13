@@ -5,8 +5,9 @@ import { useFormStatus } from "react-dom";
 import Image from "next/image";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 
-import { PlayerAvatar } from "@/components/players/player-avatar";
+import { FRAME_CLASS, PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { clearAvatarAction, setAvatarAction } from "@/lib/players/profile-actions";
 import { checkAvatarFile } from "@/lib/players/profile-image";
 import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
@@ -28,10 +29,18 @@ export function AvatarForm({
   displayName,
   seed,
   avatarUrl,
+  frame = null,
 }: {
   displayName: string;
   seed: string;
   avatarUrl: string | null;
+  /**
+   * The equipped frame, worn here too. The founder bought one, equipped
+   * it, and looked at their own profile first: this component showed a
+   * bare picture, because nothing ever handed it the frame. The place
+   * that sells the borders was the one place guaranteed not to show one.
+   */
+  frame?: string | null;
 }) {
   const [state, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
@@ -88,31 +97,44 @@ export function AvatarForm({
       <form ref={form} action={action} className="relative">
         {shown && !broken ? (
           /*
-           * Unoptimised on purpose, and it has to be: the src is either
-           * a blob: URL, which the optimiser cannot fetch at all, or a
-           * picture the server already re-encoded to a 512px WebP square,
-           * so optimising it again would cost a round trip to save
-           * nothing.
+           * The frame lives on this wrapper, not on the <img>: replaced
+           * elements cannot carry the pseudo-element the animated rings
+           * are drawn with. Same rule as PlayerAvatar.
            */
-          <Image
-            src={shown}
-            alt=""
-            width={96}
-            height={96}
-            unoptimized
-            /*
-             * A broken image beside "Picture updated." is the exact
-             * failure the founder saw. Falling back to the initials
-             * keeps the avatar honest, and the line below says the
-             * picture could not be loaded rather than pretending.
-             */
-            onError={() => setBroken(true)}
-            className="size-24 rounded-full border border-border object-cover"
-          />
+          <span
+            className={cn(
+              "inline-flex size-24 rounded-full",
+              frame ? FRAME_CLASS[frame] : "",
+            )}
+          >
+            {/*
+             * Unoptimised on purpose, and it has to be: the src is either
+             * a blob: URL, which the optimiser cannot fetch at all, or a
+             * picture the server already re-encoded to a 512px square,
+             * so optimising it again would cost a round trip to save
+             * nothing.
+             */}
+            <Image
+              src={shown}
+              alt=""
+              width={96}
+              height={96}
+              unoptimized
+              /*
+               * A broken image beside "Picture updated." is the exact
+               * failure the founder saw. Falling back to the initials
+               * keeps the avatar honest, and the line below says the
+               * picture could not be loaded rather than pretending.
+               */
+              onError={() => setBroken(true)}
+              className="size-full rounded-full border border-border object-cover"
+            />
+          </span>
         ) : (
           <PlayerAvatar
             displayName={displayName}
             seed={seed}
+            frame={frame}
             className="size-24 text-2xl"
           />
         )}
