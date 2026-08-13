@@ -16,27 +16,6 @@ import { embersForTrade, tradeAwardRef } from "./ember-rules";
  * Doing it here in TypeScript would reintroduce both bugs.
  */
 
-/** Lifetime totals for several players at once, for a roster or a board. */
-export async function embersEarnedFor(
-  playerIds: string[],
-): Promise<Map<string, number>> {
-  const totals = new Map<string, number>();
-  if (!isSupabaseConfigured() || playerIds.length === 0) return totals;
-
-  const { data, error } = await getSupabaseAdmin()
-    .from("players")
-    .select("id, embers_earned")
-    .in("id", [...new Set(playerIds)]);
-
-  if (error) {
-    console.error("Could not read Embers for a group of players", error);
-    return totals;
-  }
-
-  for (const row of data ?? []) totals.set(row.id, row.embers_earned);
-  return totals;
-}
-
 /**
  * Hands a player some Embers, once.
  *

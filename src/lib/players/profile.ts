@@ -115,6 +115,49 @@ export async function publicProfile(playerId: string): Promise<PublicProfile | n
   return rest;
 }
 
+/**
+ * What a room needs to know about a player, beside their name.
+ *
+ * One map for both facts because they come from the same row and are
+ * shown in the same place — a picture and a badge next to a name. Two
+ * separate lookups would be two chances for a roster to show one and not
+ * the other.
+ *
+ * Lifetime Embers only. There is deliberately no balance here: this
+ * feeds the most public surface in the product, and the type it returns
+ * has nowhere to put one.
+ */
+export interface RoomIdentity {
+  embersEarned: number;
+  avatarUrl: string | null;
+}
+
+export async function roomIdentitiesFor(
+  playerIds: string[],
+): Promise<Map<string, RoomIdentity>> {
+  const identities = new Map<string, RoomIdentity>();
+  if (!isSupabaseConfigured() || playerIds.length === 0) return identities;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("players")
+    .select("id, embers_earned, avatar_url")
+    .in("id", [...new Set(playerIds)]);
+
+  if (error) {
+    console.error("Could not read player identities for a room", error);
+    return identities;
+  }
+
+  for (const row of data ?? []) {
+    identities.set(row.id, {
+      embersEarned: row.embers_earned,
+      avatarUrl: row.avatar_url,
+    });
+  }
+
+  return identities;
+}
+
 /* -------------------------------------------------------------------- */
 /* The showcase                                                          */
 /* -------------------------------------------------------------------- */
@@ -263,7 +306,10 @@ export async function removeFromShowcase(
 
 export type AvatarOutcome =
   | { ok: true; url: string }
-  | { ok: false; reason: "too-big" | "wrong-type" | "unreadable" | "unavailable" };
+  | {
+      ok: false;
+      reason: "too-big" | "wrong-type" | "unreadable" | "not-public" | "unavailable";
+    };
 
 /**
  * Stores a profile picture.
@@ -326,6 +372,30 @@ export async function setAvatar(
     data: { publicUrl },
   } = admin.storage.from("avatars").getPublicUrl(path);
 
+  /*
+   * Prove the URL actually serves before recording it.
+   *
+   * `getPublicUrl` is pure string concatenation — it never contacts
+   * storage, so it happily returns a perfectly-formed URL for a bucket
+   * that is private, missing, or not serving. That is exactly the shape
+   * of the first bug the founder hit: the upload succeeded, the row was
+   * written, the page said "Picture updated." and rendered a broken
+   * image. A success message over a broken image is the worst outcome
+   * available, because it sends somebody looking in the wrong place.
+   *
+   * One HEAD request costs about a hundred milliseconds on an action
+   * that already spent longer than that decoding a photograph, and it
+   * turns an invisible failure into a sentence naming the cause.
+   */
+  if (!(await servesPublicly(publicUrl))) {
+    /*
+     * Clean up rather than leave an object nobody will ever reference.
+     * The row was never updated, so this path has no other trace.
+     */
+    await admin.storage.from("avatars").remove([path]);
+    return { ok: false, reason: "not-public" };
+  }
+
   const { data: previous, error: readError } = await admin
     .from("players")
     .select("avatar_url")
@@ -352,6 +422,47 @@ export async function setAvatar(
   await deleteAvatarObject(previous?.avatar_url ?? null);
 
   return { ok: true, url: publicUrl };
+}
+
+/**
+ * Can anybody actually fetch this?
+ *
+ * Deliberately fails CLOSED on a network error: a picture we cannot
+ * confirm is servable is one a room full of strangers may not be able to
+ * see either, and the fallback (initials over a colour) is a perfectly
+ * good avatar. Better to refuse the upload than to record a URL that
+ * renders as a broken image on somebody else's phone.
+ */
+async function servesPublicly(url: string): Promise<boolean> {
+  /*
+   * Two attempts, because the first can lose a race with the write that
+   * just happened. One retry is the difference between "storage was a
+   * few hundred milliseconds behind" and "this bucket is private" — and
+   * refusing a good upload over the former would be its own bug.
+   */
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 400));
+
+    try {
+      const response = await fetch(url, {
+        method: "HEAD",
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (response.ok) return true;
+
+      console.error(
+        `Avatar not reachable: ${response.status} for ${url}. If this is 400 or ` +
+          `404, check that storage.buckets has a row with id 'avatars' and ` +
+          `public = true.`,
+      );
+    } catch (error) {
+      console.error("Could not confirm the profile picture is reachable", error);
+    }
+  }
+
+  return false;
 }
 
 /** Removes the picture and goes back to the generated initials. */

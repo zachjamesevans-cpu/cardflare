@@ -141,7 +141,16 @@ export async function setAvatarAction(
             ? "That picture is over 2MB. Pick a smaller one."
             : outcome.reason === "wrong-type"
               ? "Profile pictures need to be a PNG, JPEG or WebP."
-              : GENERIC_ERROR,
+              : /*
+                 * Named rather than folded into the generic error, because
+                 * this one is not the player's fault and not retryable:
+                 * the picture uploaded fine and the storage bucket will
+                 * not serve it. Only an admin can fix it, so the message
+                 * says so instead of inviting a pointless retry.
+                 */
+                outcome.reason === "not-public"
+                ? "Your picture uploaded, but the storage bucket is not serving it publicly. Nothing you can do from here, this one is on us."
+                : GENERIC_ERROR,
     };
   }
 

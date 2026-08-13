@@ -502,7 +502,7 @@ export function FlareBoard({
   matches,
   offers,
   openToTrades = [],
-  embers,
+  identities,
   counterHas,
   counterName,
   early = false,
@@ -518,15 +518,17 @@ export function FlareBoard({
   /** Players in this room who will consider any trade. */
   openToTrades?: { playerSessionId: string; displayName: string }[];
   /**
-   * Lifetime Embers per session, for the badge on a player's header.
+   * Who each session is, beside their name: their picture and their
+   * lifetime Ember badge.
    *
-   * A map keyed by session rather than a field on the entry, because it
-   * is a fact about the person and not about the card — putting it on
-   * every Flare would repeat one number a dozen times down a section and
-   * invite the two to drift apart. Sessions with no account are simply
-   * absent, which is what leaves a guest's header unbadged.
+   * A map keyed by session rather than fields on the entry, because
+   * these are facts about the person and not about the card — putting
+   * them on every Flare would repeat one number a dozen times down a
+   * section and invite the copies to drift apart. Sessions with no
+   * account are simply absent, which leaves a guest with initials and
+   * no badge.
    */
-  embers?: Map<string, number>;
+  identities?: Map<string, { embersEarned: number; avatarUrl: string | null }>;
   /** Cards the room's store has in its synced counter stock. */
   counterHas?: Set<string>;
   /** The store's name, for the "may have it" line. */
@@ -728,6 +730,9 @@ export function FlareBoard({
                   <PlayerAvatar
                     displayName={group.displayName ?? "?"}
                     seed={group.playerSessionId}
+                    avatarUrl={
+                      identities?.get(group.playerSessionId)?.avatarUrl ?? null
+                    }
                     size="sm"
                   />
                   <span
@@ -747,8 +752,10 @@ export function FlareBoard({
                   {/* Lifetime only. The board is the most public
                       surface in the product, and the spendable balance
                       never leaves the owner's own profile. */}
-                  {embers?.has(group.playerSessionId) && (
-                    <EmberBadge earned={embers.get(group.playerSessionId) ?? 0} />
+                  {identities?.has(group.playerSessionId) && (
+                    <EmberBadge
+                      earned={identities.get(group.playerSessionId)?.embersEarned ?? 0}
+                    />
                   )}
                   {alsoOpen && <OpenToTradesTag />}
                 </span>

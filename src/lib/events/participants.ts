@@ -1,6 +1,6 @@
 import "server-only";
 
-import { embersEarnedFor } from "@/lib/players/embers";
+import { roomIdentitiesFor } from "@/lib/players/profile";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -47,6 +47,8 @@ export interface Participant {
    * event loop works without an account and always will.
    */
   playerId: string | null;
+  /** Their chosen picture, or null for the generated initials. */
+  avatarUrl: string | null;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -234,11 +236,11 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
   const nameById = new Map((sessions ?? []).map((s) => [s.id, s.display_name]));
 
   /*
-   * The Ember badges, in one query for the whole room rather than one
-   * per person. Guests are simply absent from this map, which is what
-   * makes the badge null for them further down.
+   * Pictures and Ember badges, in one query for the whole room rather
+   * than one per person. Guests are simply absent from this map, which
+   * is what leaves them with initials and no badge further down.
    */
-  const earned = await embersEarnedFor(
+  const identities = await roomIdentitiesFor(
     (sessions ?? []).map((s) => s.player_id).filter((id): id is string => Boolean(id)),
   );
   const accountBySession = new Map(
@@ -257,8 +259,9 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
         lastSeenAt: row.last_seen_at,
         present: isPresent(row.last_seen_at, now),
         openToTrades: row.open_to_trades,
-        embersEarned: account ? (earned.get(account) ?? 0) : null,
+        embersEarned: account ? (identities.get(account)?.embersEarned ?? 0) : null,
         playerId: account,
+        avatarUrl: account ? (identities.get(account)?.avatarUrl ?? null) : null,
       };
     })
     .sort((a, b) => Number(b.present) - Number(a.present));

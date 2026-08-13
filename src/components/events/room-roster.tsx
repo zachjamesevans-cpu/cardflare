@@ -41,6 +41,7 @@ export function RoomRoster({ participants }: { participants: Participant[] }) {
               <PlayerAvatar
                 displayName={participant.displayName}
                 seed={participant.playerSessionId}
+                avatarUrl={participant.avatarUrl}
                 size="sm"
                 className={participant.present ? undefined : "opacity-50"}
               />
