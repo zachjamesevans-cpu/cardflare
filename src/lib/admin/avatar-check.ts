@@ -1,5 +1,7 @@
 import "server-only";
 
+import sharp from "sharp";
+
 import { avatarSrc, objectPathFrom } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/site";
@@ -123,6 +125,41 @@ export async function avatarDiagnostics(playerId: string): Promise<AvatarCheck> 
       : `${((blob?.size ?? 0) / 1024).toFixed(1)}KB read with the service role.`,
   });
 
+  /*
+   * 4b. The stored bytes are actually an image.
+   *
+   * The step every earlier version of this check was missing. Sizes and
+   * content-type labels were green on every hop while the founder's
+   * phone refused to render, and labels cannot answer the only question
+   * left: are these bytes a picture? The server has sharp, so it
+   * decodes them and says what they really are — format and dimensions
+   * when they decode, the magic bytes when they do not, which names the
+   * true file type of whatever is sitting in the bucket.
+   */
+  let storedBytes: Buffer | null = null;
+
+  if (blob) {
+    storedBytes = Buffer.from(await blob.arrayBuffer());
+    const magic = storedBytes.subarray(0, 12).toString("hex");
+
+    try {
+      const meta = await sharp(storedBytes, { failOn: "error" }).metadata();
+      steps.push({
+        label: "Stored bytes decode",
+        ok: true,
+        detail: `A real ${meta.format} image, ${meta.width}x${meta.height}. Magic bytes ${magic}.`,
+      });
+    } catch (decodeError) {
+      steps.push({
+        label: "Stored bytes decode",
+        ok: false,
+        detail: `NOT a decodable image. Magic bytes ${magic}. ${
+          decodeError instanceof Error ? decodeError.message : ""
+        }`,
+      });
+    }
+  }
+
   /* 5. The public route serves it, fetched exactly as a browser would. */
   const src = avatarSrc(player.avatar_url);
   const url = `${siteUrl()}${src}`;
@@ -134,10 +171,23 @@ export async function avatarDiagnostics(playerId: string): Promise<AvatarCheck> 
     });
 
     const type = response.headers.get("content-type") ?? "none";
+    const served = Buffer.from(await response.arrayBuffer());
+
+    /*
+     * Byte-compared against what storage holds, not just size-compared.
+     * Equal sizes with different content is precisely the failure a
+     * label check waves through.
+     */
+    const identical = storedBytes !== null && served.equals(storedBytes);
+
     steps.push({
       label: "Public route",
-      ok: response.ok && type.startsWith("image/"),
-      detail: `${response.status} with content-type ${type} from ${url}`,
+      ok: response.ok && type.startsWith("image/") && identical,
+      detail: `${response.status}, ${type}, ${(served.length / 1024).toFixed(1)}KB, ${
+        identical
+          ? "byte-identical to the stored object"
+          : "and the bytes DIFFER from the stored object"
+      }. From ${url}`,
     });
   } catch (error) {
     steps.push({

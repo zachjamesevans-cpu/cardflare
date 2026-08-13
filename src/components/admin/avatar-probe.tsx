@@ -69,7 +69,9 @@ function DecodeTest({ label, src }: { label: string; src: string }) {
 export function AvatarProbe({ src }: { src: string }) {
   const [fetched, setFetched] = useState<{ ok: boolean; detail: string } | null>(null);
   const [blobSrc, setBlobSrc] = useState<string | null>(null);
+  const [dataSrc, setDataSrc] = useState<string | null>(null);
   const [decoded, setDecoded] = useState<Verdict>("pending");
+  const [dataDecoded, setDataDecoded] = useState<Verdict>("pending");
 
   useEffect(() => {
     let live = true;
@@ -100,6 +102,22 @@ export function AvatarProbe({ src }: { src: string }) {
 
         objectUrl = URL.createObjectURL(bytes);
         setBlobSrc(objectUrl);
+
+        /*
+         * The same bytes again as a data URL. The two lines disagreeing
+         * is itself a diagnosis: the founder's 1x1 data-URL tests pass
+         * while network-delivered images fail, so if these bytes render
+         * from a data URL but not from the blob URL, the bytes are fine
+         * and blob-URL image rendering on this browser is the villain
+         * (a known Safari private-browsing sore spot). If neither
+         * renders while the 1x1s do, the bytes themselves are bad and
+         * the server-side decode line above will say the same.
+         */
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (live && typeof reader.result === "string") setDataSrc(reader.result);
+        };
+        reader.readAsDataURL(bytes);
       } catch (error) {
         if (live) {
           setFetched({
@@ -173,6 +191,37 @@ export function AvatarProbe({ src }: { src: string }) {
               className="size-10 rounded-full border border-border object-cover"
               onLoad={() => setDecoded("yes")}
               onError={() => setDecoded("no")}
+            />
+          )}
+        </li>
+
+        <li className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span
+            className={`w-32 shrink-0 text-sm font-semibold ${
+              dataDecoded === "pending"
+                ? "text-text-muted"
+                : dataDecoded === "yes"
+                  ? "text-success"
+                  : "text-danger"
+            }`}
+          >
+            {dataDecoded === "pending" ? "…" : dataDecoded === "yes" ? "OK" : "FAILED"}{" "}
+            · Renders as data URL
+          </span>
+          <span className="min-w-0 flex-1 text-xs text-text-muted">
+            The same bytes again, inlined instead of via a blob URL. If this line and
+            the one above disagree, the bytes are fine and the blob URL is the problem.
+          </span>
+          {dataSrc && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={dataSrc}
+              alt=""
+              width={40}
+              height={40}
+              className="size-10 rounded-full border border-border object-cover"
+              onLoad={() => setDataDecoded("yes")}
+              onError={() => setDataDecoded("no")}
             />
           )}
         </li>
