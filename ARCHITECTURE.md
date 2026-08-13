@@ -1023,11 +1023,21 @@ renders when a picture fails to load.
 Uploaded pictures came later, and the argument that used to rule them out —
 storage, moderation, and an arbitrary image in front of strangers — was
 answered by re-encoding rather than by refusing. `setAvatar` decodes to raw
-pixels with sharp, centre-crops to a 512px square and writes a fresh WebP, so
-the bytes served are ones this server produced: whatever was in the original
-file's metadata, trailing data or mislabelled container does not survive the
-round trip. The bucket is public by design (an avatar is shown to a room full
-of strangers) and writes go through the service role only.
+pixels with sharp, centre-crops to a 512px square and writes a fresh **JPEG**,
+so the bytes served are ones this server produced: whatever was in the
+original file's metadata, trailing data or mislabelled container does not
+survive the round trip. Writes go through the service role only.
+
+JPEG rather than WebP is a diagnosis, not a taste. Every avatar this feature
+ever served was WebP and every one failed to render on the founder's phone,
+while every other image on the site loaded — card art included, because
+`/_next/image` negotiates the format per browser and falls back when WebP is
+not wanted, where our route served WebP unconditionally. Some iOS
+configurations (Lockdown Mode most famously) refuse to decode WebP entirely,
+and no server-side check catches that because servers do not decode. The
+admin console's picture system check now includes browser-local decode tests
+for both formats, so this class of failure names itself. Old WebP objects are
+still served with their true content type; re-uploading replaces them.
 
 The object path carries a timestamp. A fixed path would be cached by every CDN
 and browser between the bucket and a phone at a counter, and the player would

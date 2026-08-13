@@ -4,6 +4,7 @@ import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
   AVATAR_SIZE,
+  avatarContentType,
   avatarObjectPath,
   avatarSrc,
   checkAvatarFile,
@@ -67,8 +68,13 @@ describe("checkAvatarFile", () => {
 });
 
 describe("avatarObjectPath", () => {
-  it("files a picture under the player it belongs to", () => {
-    expect(avatarObjectPath("player-1", 1000)).toBe("player-1/1000.webp");
+  /*
+   * JPEG, and the extension is load-bearing: WebP was the one constant
+   * across every failed render of this feature, on a phone that decodes
+   * everything else. See AVATAR_FORMAT.
+   */
+  it("files a picture under the player it belongs to, as JPEG", () => {
+    expect(avatarObjectPath("player-1", 1000)).toBe("player-1/1000.jpg");
   });
 
   /*
@@ -84,6 +90,13 @@ describe("avatarObjectPath", () => {
 
   it("stores a square, at the one size the app renders", () => {
     expect(AVATAR_SIZE).toBe(512);
+  });
+
+  it("serves new objects as JPEG and old objects as the WebP they are", () => {
+    expect(avatarContentType("a/1.jpg")).toBe("image/jpeg");
+    expect(avatarContentType("a/1.webp")).toBe("image/webp");
+    /* Unrecognised falls to the format everything decodes. */
+    expect(avatarContentType("a/strange")).toBe("image/jpeg");
   });
 });
 

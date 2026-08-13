@@ -18,6 +18,21 @@ export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 /** What the stored square is re-encoded to, in pixels. */
 export const AVATAR_SIZE = 512;
 
+/**
+ * Stored as JPEG, and the choice is a diagnosis rather than a taste.
+ *
+ * Every avatar this feature ever served was WebP, and every one of them
+ * failed on the founder's phone while every other image on the site
+ * loaded. The system check finally made the shape visible: row, bucket,
+ * server read and public route all green, and only the browser's render
+ * red. Card art works because Next's optimizer negotiates the format
+ * per browser; our route served WebP unconditionally. Some iOS
+ * configurations (Lockdown Mode most famously) refuse to decode WebP at
+ * all, and no server-side check catches that because servers do not
+ * decode. JPEG is decodable by everything that can show a web page.
+ */
+export const AVATAR_FORMAT = "jpg" as const;
+
 /** Matches the bucket's allowed_mime_types. */
 export const AVATAR_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
@@ -56,7 +71,19 @@ export function checkAvatarFile(file: { size: number; type: string }): AvatarChe
  * phone at a counter, and the player would swear the upload failed.
  */
 export function avatarObjectPath(playerId: string, at = Date.now()): string {
-  return `${playerId}/${at}.webp`;
+  return `${playerId}/${at}.${AVATAR_FORMAT}`;
+}
+
+/**
+ * The content type an object path should be served with.
+ *
+ * By extension, never echoed from the client: everything in the bucket
+ * was written by `setAvatar`, so the extension is a fact this server
+ * created. Old objects are WebP and still served as such; anything
+ * unrecognised falls back to JPEG, the format everything decodes.
+ */
+export function avatarContentType(path: string): string {
+  return path.endsWith(".webp") ? "image/webp" : "image/jpeg";
 }
 
 /**
