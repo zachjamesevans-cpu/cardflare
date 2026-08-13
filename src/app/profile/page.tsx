@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, Settings, Sparkles } from "lucide-react";
+import { ChevronRight, Flame, Settings, Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
-import { CosmeticShop } from "@/components/players/cosmetic-shop";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -200,14 +200,29 @@ export default async function ProfilePage() {
               <ul className="grid grid-cols-3 gap-3">
                 {profile.showcase.map((entry) => (
                   <li key={entry.id} className="flex flex-col gap-1.5">
-                    <CosmeticCard
+                    {/*
+                     * The same viewer as the board, opened from the
+                     * dressed card. One zoom everywhere — the founder's
+                     * unified-language rule.
+                     */}
+                    <CardImageZoom
                       imageUrl={entry.imageUrl}
-                      name={entry.name}
-                      number={entry.number}
-                      imagesEnabled={imagesEnabled}
-                      frame={worn.frame}
-                      holo={worn.holo}
-                      effect={worn.effect}
+                      exactName={entry.name}
+                      cardNumber={entry.number}
+                      enabled={imagesEnabled}
+                      thumbClassName="w-full"
+                      thumb={
+                        <CosmeticCard
+                          imageUrl={entry.imageUrl}
+                          name={entry.name}
+                          number={entry.number}
+                          imagesEnabled={imagesEnabled}
+                          frame={worn.frame}
+                          holo={worn.holo}
+                          effect={worn.effect}
+                          className="w-full"
+                        />
+                      }
                     />
                     <span className="truncate text-xs text-text-secondary">
                       {entry.name}
@@ -232,46 +247,37 @@ export default async function ProfilePage() {
             )}
           </Card>
 
-          <Card className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <p className="font-semibold text-text-primary">What Embers buy</p>
-                <p className="text-sm text-text-secondary">
-                  Frames, holo patterns and effects for the cards on your showcase.
-                </p>
-              </div>
+          {/*
+           * The store lives on its own page now — the founder's call.
+           * Three shelves of merchandise at the bottom of the profile
+           * WERE the profile; this card is the door instead, wearing the
+           * one number a shopper decides with.
+           */}
+          <Link
+            href="/profile/store"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
+          >
+            <span className="flex flex-col gap-1">
+              <span className="font-semibold text-text-primary">Embers store</span>
+              <span className="text-sm text-text-secondary">
+                Frames, holo patterns and effects. Spend what you have earned.
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
               {/*
                * Deliberately NOT an EmberBadge. That component says
                * "earned" in its title and its screen-reader text, and
-               * this is the balance — the one number that must never be
-               * mistaken for the badge.
+               * this is the balance — the one number that must never
+               * be mistaken for the badge.
                */}
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-sm font-semibold text-accent tabular-nums">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-sm font-semibold text-accent tabular-nums">
                 <Flame className="size-4" aria-hidden="true" />
                 {profile.embersBalance.toLocaleString()}
                 <span className="font-medium text-text-muted">to spend</span>
               </span>
-            </div>
-
-            <CosmeticShop
-              title="Frames"
-              blurb="The border around your profile picture and every card on your shelf. Everyone in the room sees it."
-              items={wardrobe.frames}
-              balance={profile.embersBalance}
-            />
-            <CosmeticShop
-              title="Holo patterns"
-              blurb="How the light sits on the artwork."
-              items={wardrobe.holos}
-              balance={profile.embersBalance}
-            />
-            <CosmeticShop
-              title="Effects"
-              blurb="What moves, and how often."
-              items={wardrobe.effects}
-              balance={profile.embersBalance}
-            />
-          </Card>
+              <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
+            </span>
+          </Link>
 
           <TabBarSpacer />
         </div>

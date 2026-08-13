@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 
@@ -73,6 +73,7 @@ export function CardImageZoom({
   terms = null,
   pledges = [],
   thumbClassName,
+  thumb,
 }: {
   imageUrl: string | null;
   exactName: string;
@@ -109,6 +110,14 @@ export function CardImageZoom({
   pledges?: { name: string; quantity: number }[];
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
+  /**
+   * A ready-made thumbnail to open from, replacing the default
+   * CardThumbnail. The showcase renders its cards through CosmeticCard
+   * so they wear what the player bought, and the founder's ask was that
+   * tapping one opens the same viewer with the same animation as
+   * everywhere else — one zoom, whatever the card is dressed in.
+   */
+  thumb?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -342,7 +351,7 @@ export function CardImageZoom({
       .catch(() => {});
   }, [fadeBackdrop, reducedMotion, stopAnimation]);
 
-  const thumbnail = (
+  const thumbnail = thumb ?? (
     <CardThumbnail
       imageUrl={imageUrl}
       exactName={exactName}

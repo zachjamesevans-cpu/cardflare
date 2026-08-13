@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -115,14 +116,25 @@ export default async function PublicProfilePage({
               <ul className="grid grid-cols-3 gap-3">
                 {profile.showcase.map((entry) => (
                   <li key={entry.id} className="flex flex-col gap-1.5">
-                    <CosmeticCard
+                    {/* The board's viewer, opened from the dressed card. */}
+                    <CardImageZoom
                       imageUrl={entry.imageUrl}
-                      name={entry.name}
-                      number={entry.number}
-                      imagesEnabled={imagesEnabled}
-                      frame={worn.frame}
-                      holo={worn.holo}
-                      effect={worn.effect}
+                      exactName={entry.name}
+                      cardNumber={entry.number}
+                      enabled={imagesEnabled}
+                      thumbClassName="w-full"
+                      thumb={
+                        <CosmeticCard
+                          imageUrl={entry.imageUrl}
+                          name={entry.name}
+                          number={entry.number}
+                          imagesEnabled={imagesEnabled}
+                          frame={worn.frame}
+                          holo={worn.holo}
+                          effect={worn.effect}
+                          className="w-full"
+                        />
+                      }
                     />
                     <span className="truncate text-xs text-text-secondary">
                       {entry.name}
