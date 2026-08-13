@@ -66,7 +66,7 @@ export async function areasForUser(userId: string, isAdmin: boolean): Promise<Ar
   }
 
   if (player) {
-    areas.push({ label: `Player · ${player.display_name}`, href: "/account" });
+    areas.push({ label: `Player · ${player.display_name}`, href: "/profile" });
   }
 
   return areas;

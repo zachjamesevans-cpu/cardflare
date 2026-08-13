@@ -89,7 +89,7 @@ export async function requireAdmin(): Promise<User> {
 
   if (viewer.kind === "anonymous") redirect("/login?next=/admin");
   if (viewer.kind === "store") redirect("/store");
-  if (viewer.kind !== "admin") redirect("/account");
+  if (viewer.kind !== "admin") redirect("/profile");
 
   return viewer.user;
 }

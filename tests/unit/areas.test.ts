@@ -63,7 +63,7 @@ describe("areasForUser", () => {
       { label: "Admin console", href: "/admin" },
       { label: "Store · Grand Line Games", href: "/store?as=s1" },
       { label: "Vendor · SlabCity Singles", href: "/store?as=s2" },
-      { label: "Player · Zach", href: "/account" },
+      { label: "Player · Zach", href: "/profile" },
     ]);
   });
 
@@ -72,7 +72,7 @@ describe("areasForUser", () => {
     queue("players", { data: { display_name: "Kaito" }, error: null });
 
     await expect(areasForUser("u2", false)).resolves.toEqual([
-      { label: "Player · Kaito", href: "/account" },
+      { label: "Player · Kaito", href: "/profile" },
     ]);
   });
 

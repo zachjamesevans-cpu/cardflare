@@ -134,7 +134,7 @@ export async function syncCollectionAction(
     return { status: "error", message: GENERIC_ERROR };
   }
 
-  revalidatePath("/account");
+  revalidatePath("/profile/settings");
   return {
     status: "synced",
     outcome: { syncedAt: new Date().toISOString(), ...stats },

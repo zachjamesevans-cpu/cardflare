@@ -1,5 +1,6 @@
 import "server-only";
 
+import { awardTradeEmbers } from "@/lib/players/embers";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { TradeRecord } from "./schema";
 
@@ -80,15 +81,19 @@ export async function confirmTrade(
     if (!offer) return { ok: false, reason: "no-offer" };
   }
 
-  const { error: insertError } = await admin.from("trades").insert({
-    event_id: eventId,
-    flare_id: flareId,
-    requester_session_id: requesterSessionId,
-    holder_session_id: partnerSessionId,
-    card_id: flare.card_id,
-    printing_id: flare.printing_id,
-    quantity: flare.quantity,
-  });
+  const { data: inserted, error: insertError } = await admin
+    .from("trades")
+    .insert({
+      event_id: eventId,
+      flare_id: flareId,
+      requester_session_id: requesterSessionId,
+      holder_session_id: partnerSessionId,
+      card_id: flare.card_id,
+      printing_id: flare.printing_id,
+      quantity: flare.quantity,
+    })
+    .select("id")
+    .maybeSingle();
 
   /*
    * A duplicate is a retry of a confirm whose close never landed — the
@@ -98,6 +103,25 @@ export async function confirmTrade(
   if (insertError && insertError.code !== UNIQUE_VIOLATION) {
     console.error("Could not record the trade", insertError);
     return { ok: false, reason: "unavailable" };
+  }
+
+  /*
+   * The trade's id, which is what the Embers award is keyed to. On a
+   * retry the insert wrote nothing, so it is read back — and it has to
+   * be, or the retry pays nothing on a first attempt that recorded the
+   * trade and then failed to close the Flare.
+   */
+  let tradeId = inserted?.id ?? null;
+
+  if (!tradeId) {
+    const { data: existing, error: readError } = await admin
+      .from("trades")
+      .select("id")
+      .eq("flare_id", flareId)
+      .maybeSingle();
+
+    if (readError) console.error("Could not read back the trade", readError);
+    tradeId = existing?.id ?? null;
   }
 
   const { error: closeError } = await admin
@@ -110,6 +134,21 @@ export async function confirmTrade(
     // The tally exists; the board still shows the Flare. A retry closes it.
     console.error("Could not close the traded Flare", closeError);
     return { ok: false, reason: "unavailable" };
+  }
+
+  /*
+   * The payout, last and unconditionally survivable.
+   *
+   * Only a confirmed trade earns Embers — the founder's rule — and this
+   * is the one place a trade becomes confirmed, so this is the one place
+   * that awards. It is keyed to the trade's id, so a retried confirm
+   * pays nothing the second time, and it throws nothing: the trade is
+   * the product and the Embers are the garnish, so a reward system
+   * having a bad day must never be why somebody at a counter cannot
+   * finish. Guests earn nothing, because there is no account to hold it.
+   */
+  if (tradeId) {
+    await awardTradeEmbers(tradeId, requesterSessionId, partnerSessionId);
   }
 
   return { ok: true };

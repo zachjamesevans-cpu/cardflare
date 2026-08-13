@@ -303,7 +303,7 @@ export async function requestPasswordReset(
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent("/account/password")}`,
+    redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent("/profile/password")}`,
   });
 
   if (error) {

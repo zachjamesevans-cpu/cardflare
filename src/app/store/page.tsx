@@ -57,7 +57,7 @@ export default async function StorePage({
    * an error card for them. Sign-in defaults land here, so this redirect is
    * what actually delivers a player to their account after logging in.
    */
-  if (viewer.kind === "player") redirect("/account");
+  if (viewer.kind === "player") redirect("/profile");
 
   if (viewer.kind === "unaffiliated") {
     return (

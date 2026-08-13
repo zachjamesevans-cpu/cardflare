@@ -548,11 +548,95 @@ export type PlayerRow = {
   created_at: string;
   user_id: string;
   display_name: string;
+  /** Public object URL in the `avatars` bucket, or null for the initials. */
+  avatar_url: string | null;
+  /** Lifetime Embers. Public, monotonic, the badge. */
+  embers_earned: number;
+  /** Unspent Embers. Private, and the only number spending touches. */
+  embers_balance: number;
+  /** Cosmetic slugs. Null means the free default for that slot. */
+  equipped_frame: string | null;
+  equipped_holo: string | null;
+  equipped_effect: string | null;
 };
 
-export type PlayerInsert = Omit<PlayerRow, "id" | "created_at"> & {
+export type PlayerInsert = Omit<
+  PlayerRow,
+  | "id"
+  | "created_at"
+  | "avatar_url"
+  | "embers_earned"
+  | "embers_balance"
+  | "equipped_frame"
+  | "equipped_holo"
+  | "equipped_effect"
+> & {
   id?: string;
   created_at?: string;
+  avatar_url?: string | null;
+  embers_earned?: number;
+  embers_balance?: number;
+  equipped_frame?: string | null;
+  equipped_holo?: string | null;
+  equipped_effect?: string | null;
+};
+
+/** frame, holo and effect: the three slots a profile showcase has. */
+export type CosmeticKind = "frame" | "holo" | "effect";
+
+export type CosmeticRow = {
+  slug: string;
+  kind: CosmeticKind;
+  name: string;
+  description: string;
+  cost_embers: number;
+  /** A lifetime-earned floor, or null for none. */
+  requires_earned: number | null;
+  sort_order: number;
+};
+
+/**
+ * Only PURCHASED cosmetics get a row. A zero-cost item is owned by
+ * everybody with no row at all — see the migration's note; seeding free
+ * items was the bug that left every new player with an empty wardrobe.
+ */
+export type PlayerCosmeticRow = {
+  player_id: string;
+  cosmetic_slug: string;
+  acquired_at: string;
+};
+
+export type EmberReason = "trade" | "purchase" | "grant";
+
+export type EmberLedgerRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  reason: EmberReason;
+  earned_delta: number;
+  balance_delta: number;
+  /** The idempotency key: 'trade:<id>', 'purchase:<player>:<slug>'. */
+  ref: string;
+  note: string | null;
+};
+
+export type PlayerShowcaseRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  card_id: string;
+  printing_id: string | null;
+  position: number;
+};
+
+export type PlayerShowcaseInsert = Omit<
+  PlayerShowcaseRow,
+  "id" | "created_at" | "printing_id" | "position"
+> & {
+  id?: string;
+  created_at?: string;
+  printing_id?: string | null;
+  position?: number;
 };
 
 export type PlayerInviteRow = {
@@ -759,6 +843,13 @@ export type Database = {
       store_singles: Table<StoreSingleRow, StoreSingleInsert>;
       store_singles_syncs: Table<StoreSinglesSyncRow, StoreSinglesSyncInsert>;
       players: Table<PlayerRow, PlayerInsert>;
+      cosmetics: Table<CosmeticRow, CosmeticRow>;
+      player_cosmetics: Table<
+        PlayerCosmeticRow,
+        Omit<PlayerCosmeticRow, "acquired_at"> & { acquired_at?: string }
+      >;
+      ember_ledger: Table<EmberLedgerRow, EmberLedgerRow>;
+      player_showcase: Table<PlayerShowcaseRow, PlayerShowcaseInsert>;
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
@@ -788,6 +879,27 @@ export type Database = {
           filter_color?: string | null;
         };
         Returns: CardSearchRow[];
+      };
+      /* Both return false rather than raising when the movement is
+         refused — a repeated ref, or a balance that cannot cover it. */
+      award_embers: {
+        Args: {
+          target_player: string;
+          amount: number;
+          award_reason: EmberReason;
+          award_ref: string;
+          award_note?: string | null;
+        };
+        Returns: boolean;
+      };
+      spend_embers: {
+        Args: {
+          target_player: string;
+          cost: number;
+          spend_ref: string;
+          spend_note?: string | null;
+        };
+        Returns: boolean;
       };
     };
     Enums: {

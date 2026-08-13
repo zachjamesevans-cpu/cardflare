@@ -1,10 +1,16 @@
 /**
- * Deterministic player avatars.
+ * Deterministic player avatars: the fallback, and the guest's only one.
  *
- * Generated, never uploaded. An upload would mean storage, moderation, and a
- * way to put an arbitrary image in front of strangers in a room — all of that
- * to distinguish six people at a counter, which initials and a colour already
- * do. It also keeps CardFlare's "no images we do not own" position intact.
+ * This file used to say uploads were deliberately out of scope. They are not
+ * any more — the founder asked for profile pictures, `profile.ts` stores them,
+ * and the argument that an upload means storage and moderation was answered by
+ * re-encoding every file server-side rather than by refusing them.
+ *
+ * What survives that decision is this: a generated mark is still what a guest
+ * gets, still what a player who has not chosen a picture gets, and still what
+ * a room renders when a picture fails to load. Six people at a counter are
+ * told apart by initials and a colour perfectly well, so nothing here is a
+ * placeholder waiting to be replaced.
  *
  * Pure and free of server-only imports, so the same avatar renders wherever it
  * is needed and the whole thing is directly testable.

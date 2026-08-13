@@ -317,7 +317,7 @@ describe("requestPasswordReset", () => {
     const [, options] = resetPasswordForEmail.mock.calls[0];
 
     expect(options.redirectTo).toContain("/auth/callback");
-    expect(decodeURIComponent(options.redirectTo)).toContain("next=/account/password");
+    expect(decodeURIComponent(options.redirectTo)).toContain("next=/profile/password");
   });
 
   /* The same oracle rule as sign-in: an unknown address looks identical. */

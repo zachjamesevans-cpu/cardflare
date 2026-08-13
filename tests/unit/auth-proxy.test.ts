@@ -124,7 +124,12 @@ describe("proxy matcher", () => {
    * nobody's benefit.
    */
   it("covers every signed-in area", () => {
-    for (const path of ["/store/:path*", "/admin/:path*", "/account/:path*"]) {
+    for (const path of [
+      "/store/:path*",
+      "/admin/:path*",
+      "/account/:path*",
+      "/profile/:path*",
+    ]) {
       expect(config.matcher).toContain(path);
     }
   });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { embersEarnedFor } from "@/lib/players/embers";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -28,6 +29,24 @@ export interface Participant {
    * over, which is the opposite of "this person is carrying a $200 alt art".
    */
   openToTrades: boolean;
+  /**
+   * Lifetime Embers, or null for a guest.
+   *
+   * The public half of the two-number rule: this is the badge, it only
+   * goes up, and it says how much trading somebody has actually done.
+   * Null rather than zero for a guest on purpose — a guest has not
+   * earned nothing, they have no account for a total to belong to, and
+   * a zero beside their name would read as a judgement.
+   */
+  embersEarned: number | null;
+  /**
+   * The account behind the session, or null for a guest.
+   *
+   * Present so a name in the room can link to a profile. A guest has
+   * nothing to link to, which is not a gap to fill — the whole flash
+   * event loop works without an account and always will.
+   */
+  playerId: string | null;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -201,7 +220,7 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
   // return an error object at runtime.
   const { data: sessions, error: sessionError } = await getSupabaseAdmin()
     .from("player_sessions")
-    .select("id, display_name")
+    .select("id, display_name, player_id")
     .in(
       "id",
       rows.map((row) => row.player_session_id),
@@ -213,17 +232,35 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
   }
 
   const nameById = new Map((sessions ?? []).map((s) => [s.id, s.display_name]));
+
+  /*
+   * The Ember badges, in one query for the whole room rather than one
+   * per person. Guests are simply absent from this map, which is what
+   * makes the badge null for them further down.
+   */
+  const earned = await embersEarnedFor(
+    (sessions ?? []).map((s) => s.player_id).filter((id): id is string => Boolean(id)),
+  );
+  const accountBySession = new Map(
+    (sessions ?? []).map((s) => [s.id, s.player_id as string | null]),
+  );
+
   const now = Date.now();
 
   return rows
-    .map((row) => ({
-      playerSessionId: row.player_session_id,
-      displayName: nameById.get(row.player_session_id) ?? "Player",
-      joinedAt: row.joined_at,
-      lastSeenAt: row.last_seen_at,
-      present: isPresent(row.last_seen_at, now),
-      openToTrades: row.open_to_trades,
-    }))
+    .map((row) => {
+      const account = accountBySession.get(row.player_session_id) ?? null;
+      return {
+        playerSessionId: row.player_session_id,
+        displayName: nameById.get(row.player_session_id) ?? "Player",
+        joinedAt: row.joined_at,
+        lastSeenAt: row.last_seen_at,
+        present: isPresent(row.last_seen_at, now),
+        openToTrades: row.open_to_trades,
+        embersEarned: account ? (earned.get(account) ?? 0) : null,
+        playerId: account,
+      };
+    })
     .sort((a, b) => Number(b.present) - Number(a.present));
 }
 

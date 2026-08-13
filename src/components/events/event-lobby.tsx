@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowLeftRight, ChevronDown, Users } from "lucide-react";
 
+import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { leaveEventAction } from "@/lib/events/join-event-actions";
@@ -84,13 +86,39 @@ export function EventLobby({
                   />
 
                   <span className="min-w-0 flex-1 truncate text-text-secondary">
-                    <span
-                      className={participant.present ? "text-text-primary" : undefined}
-                    >
-                      {participant.displayName}
-                    </span>
+                    {/* A name links to a profile only when there is one
+                        behind it. A guest is not a broken link, they are
+                        somebody who does not need an account to trade. */}
+                    {participant.playerId ? (
+                      <Link
+                        href={`/p/${participant.playerId}`}
+                        className={`underline-offset-4 hover:underline ${
+                          participant.present ? "text-text-primary" : ""
+                        }`}
+                      >
+                        {participant.displayName}
+                      </Link>
+                    ) : (
+                      <span
+                        className={
+                          participant.present ? "text-text-primary" : undefined
+                        }
+                      >
+                        {participant.displayName}
+                      </span>
+                    )}
                     {isYou && <span className="text-text-muted"> · you</span>}
                   </span>
+
+                  {/*
+                   * The badge, beside the name it belongs to. Lifetime
+                   * only — the spendable balance is nobody else's
+                   * business, and `Participant` carries no field for it.
+                   * Guests have null rather than zero and get nothing.
+                   */}
+                  {participant.embersEarned !== null && (
+                    <EmberBadge earned={participant.embersEarned} />
+                  )}
 
                   {/*
                    * Repeated from the board on purpose. This list answers

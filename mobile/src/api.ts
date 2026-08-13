@@ -430,3 +430,96 @@ export const getNotifications = () =>
 
 export const markRead = (ids: string[]) =>
   call<{ ok: true }>("POST", "/api/v1/notifications", { ids });
+
+/* ------------------------------------------------------------------ */
+/* Profile, Embers and the wardrobe                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The tab that used to be Account.
+ *
+ * Two Ember numbers, exactly as the website carries them. `embersEarned`
+ * is the lifetime badge and is public; `embersBalance` is what is left
+ * to spend and is private, which is why it is optional here — a profile
+ * fetched for somebody else comes back without it, because the server
+ * builds those from a type that has no field for it.
+ */
+export interface ShowcaseCard {
+  id: string;
+  cardId: string;
+  printingId: string | null;
+  name: string;
+  number: string;
+  imageUrl: string | null;
+  position: number;
+}
+
+/** Cosmetic slugs. Resolved server-side, so a slot is never null here. */
+export interface Equipped {
+  frame: string | null;
+  holo: string | null;
+  effect: string | null;
+}
+
+export interface CosmeticItem {
+  slug: string;
+  kind: "frame" | "holo" | "effect";
+  name: string;
+  description: string;
+  cost: number;
+  requiresEarned: number | null;
+  owned: boolean;
+  equipped: boolean;
+  affordable: boolean;
+  lockedUntil: number | null;
+}
+
+export interface Profile {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  embersEarned: number;
+  /**
+   * Private. The founder's two-number rule: this is what is left to
+   * spend, it never appears on anybody else's screen, and the server
+   * only ever puts it on the authenticated player's own profile.
+   */
+  embersBalance: number;
+  tier: string;
+  nextTier: { name: string; needed: number } | null;
+  equipped: Equipped;
+  showcase: ShowcaseCard[];
+  showcaseLimit: number;
+}
+
+export interface Wardrobe {
+  frames: CosmeticItem[];
+  holos: CosmeticItem[];
+  effects: CosmeticItem[];
+}
+
+export const getProfile = () =>
+  call<{ profile: Profile; wardrobe: Wardrobe }>("GET", "/api/v1/profile");
+
+export const renameProfile = (displayName: string) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
+
+/** Buys it if it is not yours, wears it if it is. One tap either way. */
+export const buyCosmetic = (slug: string) =>
+  call<{ ok: true; slug: string }>("POST", "/api/v1/profile", {
+    action: "buy",
+    slug,
+  });
+
+export const addToShowcase = (cardId: string, printingId: string | null) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "showcase-add",
+    cardId,
+    printingId,
+  });
+
+export const removeFromShowcase = (entryId: string) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "showcase-remove",
+    entryId,
+  });

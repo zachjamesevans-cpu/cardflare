@@ -87,6 +87,22 @@ export default async function EventPage({
       displayName: participant.displayName,
     }));
 
+  /*
+   * Ember badges for the board, keyed by session. Derived from the
+   * participant list that is already in hand rather than queried again —
+   * it is the same set of people, and a second query would be a second
+   * chance for the two lists to disagree. Guests carry null and are left
+   * out, so their header simply has no badge.
+   */
+  const emberBadges = new Map(
+    participants
+      .filter((participant) => participant.embersEarned !== null)
+      .map((participant) => [
+        participant.playerSessionId,
+        participant.embersEarned as number,
+      ]),
+  );
+
   const boardHasEntries = flares.length > 0 || openPlayers.length > 0;
 
   return (
@@ -146,6 +162,7 @@ export default async function EventPage({
               matches={new Map()}
               offers={new Map()}
               openToTrades={openPlayers}
+              embers={emberBadges}
               counterHas={counterHas}
               counterName={store?.name}
             />

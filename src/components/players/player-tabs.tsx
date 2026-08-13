@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
  * The founder's parity call: somebody who uses the app on Wednesday and
  * the site on Thursday should not have to learn two products. Same five
  * destinations, same order, same centre mark — Join, Room, Flare,
- * Inbox, Account — so a thumb that knows one knows the other.
+ * Inbox, Profile — so a thumb that knows one knows the other.
  *
  * Fixed to the bottom on every width. On a laptop that is unusual for a
  * website and deliberate here: this is the signed-in player surface, the
@@ -28,7 +28,7 @@ const TABS = [
   { href: "/room", label: "Room", icon: Users },
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },
-  { href: "/account", label: "Account", icon: UserCircle2 },
+  { href: "/profile", label: "Profile", icon: UserCircle2 },
 ] as const;
 
 export function PlayerTabs({ unread = 0 }: { unread?: number }) {

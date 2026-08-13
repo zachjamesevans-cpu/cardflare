@@ -46,7 +46,7 @@ export default async function WelcomePage() {
           savedBody:
             "Your account is ready. Scan in at any CardFlare store, and the cards you hunt will follow you between rooms.",
           continueLabel: "Go to your account",
-          continueHref: "/account",
+          continueHref: "/profile",
         }
       : {
           intro: "One password and your store is ready to go.",
