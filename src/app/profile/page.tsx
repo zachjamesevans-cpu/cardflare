@@ -131,6 +131,7 @@ export default async function ProfilePage() {
                  under somebody who removes their picture and puts it back. */
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
+              frame={worn.frame}
             />
 
             <DisplayNameForm displayName={profile.displayName} />

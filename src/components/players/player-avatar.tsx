@@ -103,21 +103,33 @@ export function PlayerAvatar({
 
   if (avatarUrl && !broken) {
     return (
-      <Image
-        aria-hidden="true"
-        src={avatarUrl}
-        alt=""
-        width={PIXELS[size]}
-        height={PIXELS[size]}
-        /*
-         * Unoptimised: the server already re-encoded this to a 512px
-         * WebP square before storing it, so the optimiser would cost a
-         * round trip to save nothing.
-         */
-        unoptimized
-        onError={() => setBroken(true)}
-        className={cn(box, "border-border object-cover")}
-      />
+      /*
+       * The frame classes sit on a wrapper, never on the <img> itself.
+       * The first cut put them on the image, and the three travelling
+       * frames (Prism, Molten, Galaxy) never rendered on anyone with a
+       * picture: they are drawn with an ::after pseudo-element, and
+       * replaced elements like <img> cannot have pseudo-elements, so
+       * browsers dropped the ring without a word. The static box-shadow
+       * rings happened to survive, which made the failure look like it
+       * depended on WHICH frame was bought. One wrapper for every frame
+       * and the geometry is the same for all of them.
+       */
+      <span aria-hidden="true" className={cn(box, "border-border")}>
+        <Image
+          src={avatarUrl}
+          alt=""
+          width={PIXELS[size]}
+          height={PIXELS[size]}
+          /*
+           * Unoptimised: the server already re-encoded this to a 512px
+           * square before storing it, so the optimiser would cost a
+           * round trip to save nothing.
+           */
+          unoptimized
+          onError={() => setBroken(true)}
+          className="size-full rounded-full object-cover"
+        />
+      </span>
     );
   }
 
