@@ -74,14 +74,50 @@ export function avatarObjectPath(playerId: string, at = Date.now()): string {
  * to be public for a picture to show up, so "is the bucket public" stops
  * being a thing anybody has to know.
  *
- * Rows written before this change hold a full URL. They are passed
- * through untouched rather than migrated: the old URLs still work where
- * they work, and every upload from here on writes a path.
+ * Rows written before this change hold a full storage URL, and those are
+ * REWRITTEN rather than passed through. The first cut passed them
+ * through, reasoning that "the old URLs still work where they work" —
+ * which was wrong on its face, because those URLs not working is the
+ * entire reason this function exists. The founder's own row was one of
+ * them, so the fix shipped and their picture still failed: it tried to
+ * load, hit the storage host, and fell back to initials. Anything that
+ * looks like this bucket goes through the proxy, whenever it was
+ * written.
  */
 export function avatarSrc(stored: string | null | undefined): string | null {
   if (!stored) return null;
-  if (stored.startsWith("http://") || stored.startsWith("https://")) return stored;
+
+  const path = objectPathFrom(stored);
+  if (!path) return null;
 
   /* Each segment separately: encodeURIComponent would eat the slash. */
-  return `/api/avatars/${stored.split("/").map(encodeURIComponent).join("/")}`;
+  return `/api/avatars/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * The object path behind whatever is in the column.
+ *
+ * Two shapes exist: a bare path (everything written since the proxy
+ * landed) and a full public storage URL (everything written before).
+ * Both have to resolve, and anything that is neither resolves to null
+ * rather than being served — a hand-edited row must not be able to aim
+ * the proxy somewhere else.
+ *
+ * Exported because deleting an old picture needs the same answer, and
+ * two functions parsing the same column two ways is how they drift.
+ */
+export function objectPathFrom(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+
+  if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    const marker = "/storage/v1/object/public/avatars/";
+    const at = stored.indexOf(marker);
+    if (at === -1) return null;
+
+    const path = decodeURIComponent(stored.slice(at + marker.length));
+    return path && !path.includes("..") && !path.startsWith("/") ? path : null;
+  }
+
+  if (stored.includes("..") || stored.startsWith("/")) return null;
+  return stored;
 }

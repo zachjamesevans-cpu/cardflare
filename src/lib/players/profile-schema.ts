@@ -44,3 +44,14 @@ export const BUY_REFUSALS: Record<string, string> = {
   "too-expensive": "Not enough Embers yet. Confirm a few more trades.",
   unavailable: "Something went wrong. Please try again in a moment.",
 };
+
+/**
+ * The setup wizard's one state.
+ *
+ * Here rather than beside its action because a "use server" module may
+ * export only async functions — a const would fail the build.
+ */
+export type SetupState =
+  { status: "idle" } | { status: "error"; message: string; displayName: string };
+
+export const SETUP_IDLE: SetupState = { status: "idle" };

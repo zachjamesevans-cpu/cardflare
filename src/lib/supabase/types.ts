@@ -558,6 +558,15 @@ export type PlayerRow = {
   equipped_frame: string | null;
   equipped_holo: string | null;
   equipped_effect: string | null;
+  /**
+   * Admin grant: owns every cosmetic, including ones added later.
+   *
+   * A flag rather than a pile of ownership rows, because "unlocked
+   * forever" has to cover a catalogue that grows.
+   */
+  cosmetics_unlocked: boolean;
+  /** When setup finished. Null means a username was never chosen. */
+  onboarded_at: string | null;
 };
 
 export type PlayerInsert = Omit<
@@ -570,6 +579,8 @@ export type PlayerInsert = Omit<
   | "equipped_frame"
   | "equipped_holo"
   | "equipped_effect"
+  | "cosmetics_unlocked"
+  | "onboarded_at"
 > & {
   id?: string;
   created_at?: string;
@@ -579,6 +590,8 @@ export type PlayerInsert = Omit<
   equipped_frame?: string | null;
   equipped_holo?: string | null;
   equipped_effect?: string | null;
+  cosmetics_unlocked?: boolean;
+  onboarded_at?: string | null;
 };
 
 /** frame, holo and effect: the three slots a profile showcase has. */
@@ -889,6 +902,16 @@ export type Database = {
           award_reason: EmberReason;
           award_ref: string;
           award_note?: string | null;
+        };
+        Returns: boolean;
+      };
+      /* Balance only, never the badge: an admin gift is not a trade. */
+      grant_embers: {
+        Args: {
+          target_player: string;
+          amount: number;
+          grant_ref: string;
+          grant_note?: string | null;
         };
         Returns: boolean;
       };

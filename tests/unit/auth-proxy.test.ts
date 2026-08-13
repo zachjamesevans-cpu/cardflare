@@ -145,7 +145,7 @@ describe("proxy matcher", () => {
    * signing them out of the page whose whole job is to sign them up.
    */
   it("covers the setup screen an invitation lands on", () => {
-    expect(config.matcher).toContain("/welcome");
+    expect(config.matcher).toContain("/welcome/:path*");
   });
 
   it("leaves the public pages alone", () => {

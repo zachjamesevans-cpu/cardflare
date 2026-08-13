@@ -12,6 +12,7 @@ import {
   AVATAR_SIZE,
   avatarObjectPath,
   avatarSrc,
+  objectPathFrom,
 } from "./profile-image";
 
 /**
@@ -454,28 +455,57 @@ export async function clearAvatar(playerId: string): Promise<boolean> {
 /**
  * Deletes the stored object behind an avatar row.
  *
- * Rows written now hold the object path directly. Rows written before
- * that hold a full public URL, so the path is recovered from it — both
- * shapes have to be deletable or the old objects would pile up forever.
- * Anything that is neither is ignored, so a hand-edited row cannot aim
- * this at some other object.
+ * Both column shapes are handled by `objectPathFrom` — a bare path for
+ * rows written since the proxy landed, a full public URL for older ones.
+ * Shared with `avatarSrc` deliberately: two functions parsing the same
+ * column two ways is how they end up disagreeing about which object a
+ * row points at.
  */
 async function deleteAvatarObject(stored: string | null): Promise<void> {
-  if (!stored) return;
-
-  let path = stored;
-
-  if (stored.startsWith("http://") || stored.startsWith("https://")) {
-    const marker = "/storage/v1/object/public/avatars/";
-    const at = stored.indexOf(marker);
-    if (at === -1) return;
-    path = decodeURIComponent(stored.slice(at + marker.length));
-  }
-
-  if (!path || path.includes("..") || path.startsWith("/")) return;
+  const path = objectPathFrom(stored);
+  if (!path) return;
 
   const { error } = await getSupabaseAdmin().storage.from("avatars").remove([path]);
   if (error) console.error("Could not delete the old profile picture", error);
+}
+
+/**
+ * Records that a player has finished setting themselves up.
+ *
+ * Idempotent by `is null`: running it twice must not rewrite the date,
+ * because "when did they sign up" is a question the column answers and a
+ * second write would lose the answer.
+ */
+export async function markOnboarded(playerId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { error } = await getSupabaseAdmin()
+    .from("players")
+    .update({ onboarded_at: new Date().toISOString() })
+    .eq("id", playerId)
+    .is("onboarded_at", null);
+
+  if (error) console.error("Could not mark the player as set up", error);
+}
+
+/** Has this player chosen a username yet? */
+export async function needsSetup(playerId: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("players")
+    .select("onboarded_at")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not check whether setup is owed", error);
+    /* Say no. Trapping somebody in a wizard because of a failed read is
+       far worse than letting them use an account they already set up. */
+    return false;
+  }
+
+  return data ? data.onboarded_at === null : false;
 }
 
 export type RenameOutcome = "renamed" | "taken" | "failed";

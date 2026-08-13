@@ -95,6 +95,6 @@ export const config = {
     "/account/:path*",
     "/profile/:path*",
     "/login",
-    "/welcome",
+    "/welcome/:path*",
   ],
 };
