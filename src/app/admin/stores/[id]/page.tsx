@@ -275,6 +275,22 @@ async function LiveRoom({
       displayName: participant.displayName,
     }));
 
+  /*
+   * Ember badges for the board, keyed by session. Derived from the
+   * participant list that is already in hand rather than queried again —
+   * it is the same set of people, and a second query would be a second
+   * chance for the two lists to disagree. Guests carry null and are left
+   * out, so their header simply has no badge.
+   */
+  const emberBadges = new Map(
+    participants
+      .filter((participant) => participant.embersEarned !== null)
+      .map((participant) => [
+        participant.playerSessionId,
+        participant.embersEarned as number,
+      ]),
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -300,6 +316,7 @@ async function LiveRoom({
         matches={new Map()}
         offers={new Map()}
         openToTrades={openPlayers}
+        embers={emberBadges}
       />
     </div>
   );

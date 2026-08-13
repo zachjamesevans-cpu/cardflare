@@ -198,7 +198,7 @@ verifying it, so it can be forged, and this result gates the admin console.
 | ---------- | ----------------------------------------------------------------- |
 | `/admin`   | Accounts listed in `admin_users`                                  |
 | `/store`   | Accounts with a row in `store_members`                            |
-| `/account` | Anyone signed in                                                  |
+| `/profile` | Anyone signed in                                                  |
 | `/login`   | Anyone, but nothing is ever sent to an address without an account |
 
 ### Sessions, and why there is a proxy
@@ -224,8 +224,12 @@ cookies survive. It writes them to the request too — the render behind it read
 that copy, and without it the very render the refresh exists to serve would
 still query as an expired user.
 
-The matcher covers only `/store`, `/admin`, `/account`, `/login` and
-`/welcome`. `getUser`
+The matcher covers only `/store`, `/admin`, `/account`, `/profile`, `/login`
+and `/welcome`. `/account` is kept alongside `/profile` because both old paths
+still resolve: `/account` permanently redirects to the profile, and
+`/account/password` to `/profile/password`, which matters because password
+reset emails already in somebody's inbox point at the old path and an email
+cannot be edited after it is sent. `getUser`
 is a round trip to the auth server, and the pages where speed matters most —
 the landing page, and `/e/CODE` reached by scanning printed paper on shop wifi
 — have no session at all.
@@ -795,6 +799,97 @@ store. The nudge asks; it never edits the binder itself.
 a store reads after a night. Totals only, never who traded what with whom:
 the store hosts the room, it does not read it.
 
+**A confirmed trade is the only thing that earns Embers.** See below.
+
+## Profiles and Embers
+
+Only a confirmed trade earns anything. Not posting, not pledging, not turning
+up. The one act the whole product exists to cause is the only one that pays.
+
+### Two numbers, and why
+
+`players.embers_earned` is a lifetime total that only ever goes up: it is the
+badge, it is public, and it says how much trading somebody has actually done.
+`players.embers_balance` is what is left to spend, it is private, and buying
+something takes from it alone.
+
+A number that can go down is a bad status signal; a status number you cannot
+spend is a bad shop. Two numbers is how both stay honest — the founder's call,
+and the split is structural rather than conventional: `publicProfile` returns
+a type with no balance field in it, so a page that renders somebody else's
+profile could not leak it if it tried.
+
+Embers are deliberately not purchasable, giftable or transferable. The moment
+they can be bought the badge stops meaning "this person trades".
+
+### Movements go through two SQL functions, never an UPDATE
+
+`award_embers` and `spend_embers` are `security definer` and do the ledger row
+and the balance in one statement. Both were probed on real PostgreSQL 16, and
+both fixes below came out of that probe rather than out of review:
+
+- **Spending is idempotent inside the UPDATE's WHERE clause**, not in a check
+  before it. The first cut checked the ledger, then updated; two taps on Buy
+  raced, the second blocked on the row lock, and when it woke the UPDATE had
+  already succeeded while the ledger insert silently conflicted. The balance
+  came off twice for one purchase. `and not exists (select 1 from
+ember_ledger where ref = spend_ref)` inside the same statement is
+  re-evaluated after the lock releases, so the second attempt matches nothing.
+- **`ref` is the idempotency key.** Confirming a trade is retry-safe by
+  design, so the award is keyed `trade:<trade_id>:<player_id>` — per player,
+  because a confirmed trade pays both sides and each needs its own row.
+
+### Free cosmetics have no ownership row
+
+`cost_embers = 0` means everybody owns it, forever, including whoever signs up
+tonight. The first cut seeded a row per free item per player, and the probe
+caught what that misses: a migration runs once, so a player created afterwards
+started with an empty wardrobe and nothing to equip. A null `equipped_*`
+column reads as the free default for the same reason — nothing to backfill,
+nothing to drift.
+
+### Anti-farming, and that it is a proposal
+
+A trade with somebody new pays 10; a repeat partner pays 2; a trade with
+nobody named pays 3. The taper is NOT something the founder asked for — it is
+in `ember-rules.ts` because without it two friends can sit at a table tapping
+confirm at each other until the badge means nothing, and the badge is the
+entire point of `embers_earned`. Two rather than zero because regulars trading
+with regulars is a real night at a store. Setting `EMBERS_REPEAT_PARTNER` to
+`EMBERS_NEW_PARTNER` turns it off.
+
+"Have we traded before" is asked through sessions rather than accounts,
+because `trades` records who was in the room and a room identity is per-device
+and per-event. A failed lookup falls back to the _smaller_ award: paying the
+new-partner rate on an error would make "break the history query" the way to
+farm the badge.
+
+### The payout cannot break a trade
+
+`awardTradeEmbers` runs last inside `confirmTrade`, logs its failures and
+throws nothing. The trade is the product; the Embers are the garnish, and a
+reward system having a bad day must never be why somebody at a counter cannot
+finish. Guests earn nothing, because there is no account to hold it — a guest
+session expires in thirty days and would take the badge with it.
+
+### The wardrobe
+
+Twelve items in three slots: frames, holo patterns and animated effects, all
+scoped to `.cf-showcase`, which only a profile showcase renders. The foil work
+removed from the Flare board lives here now, and that containment is the
+point: a shimmer on the board says "rare" when the board needs to say
+"available"; on a profile there is nothing to confuse it with.
+
+Class names are written out one per slug in both `globals.css` and
+`cosmetic-card.tsx`. Tailwind cannot see a class assembled at runtime, and
+neither can a person grepping for where a style is used; an unknown slug falls
+through to a plain card, which is the right failure.
+
+The app's version is an approximation and says so in its own doc comment:
+React Native has no blend modes, so `mobile/src/cosmetic-card.tsx` layers
+translucent gradients instead. Frames and motion timings are exact; the foil
+is quieter.
+
 ## Card shows
 
 The second kind of operator, and the third length in the code namespace. A
@@ -833,11 +928,22 @@ that silently mislists someone's stock is worse than an evening of tapping.
 
 ### Avatars
 
-Initials over one of six hues, both derived from the session id. Generated,
-never uploaded: an upload means storage, moderation, and a way to put an
-arbitrary image in front of strangers in a room — all to distinguish six people
-at a counter, which initials and a colour already do. It also keeps the "no
-images we do not own" position intact.
+Initials over one of six hues, both derived from the session id. This is what
+a guest gets, what a player who has not chosen a picture gets, and what
+renders when a picture fails to load.
+
+Uploaded pictures came later, and the argument that used to rule them out —
+storage, moderation, and an arbitrary image in front of strangers — was
+answered by re-encoding rather than by refusing. `setAvatar` decodes to raw
+pixels with sharp, centre-crops to a 512px square and writes a fresh WebP, so
+the bytes served are ones this server produced: whatever was in the original
+file's metadata, trailing data or mislabelled container does not survive the
+round trip. The bucket is public by design (an avatar is shown to a room full
+of strangers) and writes go through the service role only.
+
+The object path carries a timestamp. A fixed path would be cached by every CDN
+and browser between the bucket and a phone at a counter, and the player would
+swear the upload failed.
 
 The hues are tokens in `globals.css`, and `design-tokens.test.ts` asserts each
 one clears WCAG AA on every surface and that there are exactly as many as the

@@ -25,6 +25,7 @@ import { GroupView } from "@/components/lists/group-view";
 import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
+import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
@@ -501,6 +502,7 @@ export function FlareBoard({
   matches,
   offers,
   openToTrades = [],
+  embers,
   counterHas,
   counterName,
   early = false,
@@ -515,6 +517,16 @@ export function FlareBoard({
   offers: Map<string, Offer[]>;
   /** Players in this room who will consider any trade. */
   openToTrades?: { playerSessionId: string; displayName: string }[];
+  /**
+   * Lifetime Embers per session, for the badge on a player's header.
+   *
+   * A map keyed by session rather than a field on the entry, because it
+   * is a fact about the person and not about the card — putting it on
+   * every Flare would repeat one number a dozen times down a section and
+   * invite the two to drift apart. Sessions with no account are simply
+   * absent, which is what leaves a guest's header unbadged.
+   */
+  embers?: Map<string, number>;
   /** Cards the room's store has in its synced counter stock. */
   counterHas?: Set<string>;
   /** The store's name, for the "may have it" line. */
@@ -732,6 +744,12 @@ export function FlareBoard({
                    * person, and as a row it cost this player's whole
                    * section to say one short sentence.
                    */}
+                  {/* Lifetime only. The board is the most public
+                      surface in the product, and the spendable balance
+                      never leaves the owner's own profile. */}
+                  {embers?.has(group.playerSessionId) && (
+                    <EmberBadge earned={embers.get(group.playerSessionId) ?? 0} />
+                  )}
                   {alsoOpen && <OpenToTradesTag />}
                 </span>
               }

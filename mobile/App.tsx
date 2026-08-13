@@ -22,13 +22,14 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { AccountScreen } from "./src/screens/account";
+import { ProfileScreen } from "./src/screens/profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { PostFlareScreen } from "./src/screens/post-flare";
 import { RoomTab } from "./src/screens/room";
 import { ScanScreen } from "./src/screens/scan";
+import { SettingsScreen } from "./src/screens/settings";
 import { SignInScreen } from "./src/screens/sign-in";
 import { colors } from "./src/theme";
 
@@ -37,9 +38,14 @@ import { colors } from "./src/theme";
  * rooms as cardflare.gg — plus the one thing a website cannot do: tell
  * you about an offer while your phone is locked.
  *
- * Four tabs: Join (the front door — scan or type a code), Room (where
- * you are right now; remembers the last room), Inbox, Account. Scanning,
- * posting and signing in ride on top as stack screens.
+ * Five tabs: Join (the front door — scan or type a code), Room (where
+ * you are right now; remembers the last room), Flare, Inbox, Profile.
+ * Scanning, posting, signing in and settings ride on top as stack
+ * screens.
+ *
+ * Profile replaced Account, which is the founder's call: an account page
+ * is housekeeping and nobody visits housekeeping twice. Everything that
+ * tab used to hold is one tap away behind the cog on the profile.
  */
 
 Notifications.setNotificationHandler({
@@ -56,13 +62,14 @@ export type TabParams = {
   Room: undefined;
   Flare: undefined;
   Inbox: undefined;
-  Account: undefined;
+  Profile: undefined;
 };
 
 export type StackParams = {
   Tabs: { screen?: keyof TabParams } | undefined;
   SignIn: undefined;
   Scan: undefined;
+  Settings: undefined;
   PostFlare: { code: string };
 };
 
@@ -85,7 +92,7 @@ const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>
   Join: "qr-code",
   Room: "people",
   Inbox: "notifications",
-  Account: "person-circle",
+  Profile: "person-circle",
 };
 
 /*
@@ -198,7 +205,7 @@ function Tabs() {
         options={{ title: "Your Flares", tabBarLabel: "Flare" }}
       />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Notifications" }} />
-      <Tab.Screen name="Account" component={AccountScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -237,6 +244,11 @@ export default function App() {
             />
           )}
         </Stack.Screen>
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ title: "Settings", headerBackTitle: "Profile" }}
+        />
         <Stack.Screen
           name="PostFlare"
           // The back button names where it goes, not the screen's internal

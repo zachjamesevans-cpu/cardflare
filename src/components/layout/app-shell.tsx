@@ -65,7 +65,7 @@ export function AppShell({
              * signed-in areas need.
              */}
             <Link
-              href="/account"
+              href="/profile/settings"
               className="hidden truncate text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline md:block"
             >
               {email}

@@ -89,5 +89,12 @@ export const config = {
    * nothing is lost by skipping them: the next visit to a matched route
    * renews as normal.
    */
-  matcher: ["/store/:path*", "/admin/:path*", "/account/:path*", "/login", "/welcome"],
+  matcher: [
+    "/store/:path*",
+    "/admin/:path*",
+    "/account/:path*",
+    "/profile/:path*",
+    "/login",
+    "/welcome",
+  ],
 };
