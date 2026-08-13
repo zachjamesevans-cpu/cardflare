@@ -3,12 +3,14 @@ import Link from "next/link";
 import { ArrowLeft, UserRound } from "lucide-react";
 
 import { AdminPlayerRow } from "@/components/admin/admin-player-row";
+import { AvatarProbe } from "@/components/admin/avatar-probe";
 import { InvitePlayerForm } from "@/components/admin/invite-player-form";
 import { PlayerSearch } from "@/components/admin/player-search";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { avatarDiagnostics } from "@/lib/admin/avatar-check";
 import { searchPlayers } from "@/lib/admin/grants";
-import { listPlayersForAdmin } from "@/lib/players/accounts";
+import { listPlayersForAdmin, playerForUser } from "@/lib/players/accounts";
 
 export const metadata: Metadata = {
   title: "Players",
@@ -31,9 +33,13 @@ export default async function AdminPlayersPage({
 }) {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
-  await requireAdmin();
+  const user = await requireAdmin();
 
   const query = (await searchParams).q ?? "";
+
+  /* The admin's own player, for the picture check at the bottom. */
+  const self = await playerForUser(user.id);
+  const check = self ? await avatarDiagnostics(self.id) : null;
 
   /*
    * Two lists, and they answer different questions. `listPlayersForAdmin`
@@ -150,6 +156,59 @@ export default async function AdminPlayersPage({
             </ul>
           </Card>
         )}
+      </section>
+
+      {/*
+       * The picture pipeline, tested link by link against the admin's
+       * own account. Lives here because this is where the founder
+       * already is when something about a player looks wrong, and
+       * because four blind rounds of "same exact issue" earned the
+       * system a way to name its own broken layer.
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="avatar-check-heading">
+        <div className="flex flex-col gap-1.5">
+          <h3 id="avatar-check-heading" className="text-lg font-bold text-text-primary">
+            Picture system check
+          </h3>
+          <p className="text-sm text-text-secondary">
+            Tests your own profile picture through every layer it passes: the database
+            row, the storage bucket, the serving route, and finally this very browser.
+            The first red line is the broken one.
+          </p>
+        </div>
+
+        <Card className="flex flex-col gap-3">
+          {check ? (
+            <>
+              <ul className="flex flex-col gap-2">
+                {check.steps.map((step) => (
+                  <li
+                    key={step.label}
+                    className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
+                  >
+                    <span
+                      className={`w-32 shrink-0 text-sm font-semibold ${
+                        step.ok ? "text-success" : "text-danger"
+                      }`}
+                    >
+                      {step.ok ? "OK" : "FAILED"} · {step.label}
+                    </span>
+                    <span className="min-w-0 flex-1 text-xs break-all text-text-muted">
+                      {step.detail}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {check.src && <AvatarProbe src={check.src} />}
+            </>
+          ) : (
+            <p className="text-sm text-text-muted">
+              Your admin account has no player attached, so there is no picture to
+              check.
+            </p>
+          )}
+        </Card>
       </section>
     </div>
   );
