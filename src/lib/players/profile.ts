@@ -439,9 +439,27 @@ export async function setAvatar(
   const admin = getSupabaseAdmin();
   const path = avatarObjectPath(playerId);
 
+  /*
+   * Uploaded as a Blob, never as a bare Buffer, and this line is the
+   * whole bug that took six rounds to corner. The system check finally
+   * decoded what the bucket actually held: bytes beginning
+   * efbfbd-efbfbd-efbfbd — the UTF-8 replacement character, repeated.
+   * That is the fingerprint of binary data coerced through a text
+   * string: somewhere in the deployed runtime's fetch, a Buffer body
+   * was read as UTF-8 and every non-text byte became "\\uFFFD", leaving
+   * a plausibly-sized, correctly-labelled object that no browser could
+   * ever decode. A Blob carries its binary nature in its type; nothing
+   * in any fetch implementation coerces one through text.
+   *
+   * The readback below stays even so. If any runtime ever mangles a
+   * Blob too, the write refuses instead of recording garbage.
+   */
   const { error: uploadError } = await admin.storage
     .from("avatars")
-    .upload(path, encoded, { contentType: "image/jpeg", upsert: true });
+    .upload(path, new Blob([new Uint8Array(encoded)], { type: "image/jpeg" }), {
+      contentType: "image/jpeg",
+      upsert: true,
+    });
 
   if (uploadError) {
     console.error("Could not store the profile picture", uploadError);
