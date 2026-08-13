@@ -1,3 +1,4 @@
+import { avatarContentType } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -63,15 +64,18 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  return new Response(await data.arrayBuffer(), {
+  const bytes = await data.arrayBuffer();
+
+  return new Response(bytes, {
     headers: {
       /*
-       * Fixed, never echoed from the object. Everything in this bucket
-       * was written by `setAvatar`, which re-encodes to WebP — so this
-       * is a statement of fact, and it cannot be turned into a way to
-       * serve something else's content type.
+       * From the extension, never echoed from the client. Everything in
+       * this bucket was written by `setAvatar` — JPEG now, WebP for
+       * objects uploaded before the format change — so the extension is
+       * a fact this server created, not a claim anyone can smuggle in.
        */
-      "content-type": "image/webp",
+      "content-type": avatarContentType(path.join("/")),
+      "content-length": String(bytes.byteLength),
       "cache-control": CACHE,
     },
   });

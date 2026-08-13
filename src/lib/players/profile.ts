@@ -424,7 +424,12 @@ export async function setAvatar(
     encoded = await sharp(Buffer.from(await file.arrayBuffer()), { failOn: "error" })
       .rotate()
       .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
-      .webp({ quality: 82 })
+      /*
+       * JPEG, not WebP, and it is load-bearing: WebP was the one
+       * constant across every failed render of this feature. See the
+       * note on AVATAR_FORMAT.
+       */
+      .jpeg({ quality: 82 })
       .toBuffer();
   } catch (error) {
     console.error("Could not decode the uploaded picture", error);
@@ -436,7 +441,7 @@ export async function setAvatar(
 
   const { error: uploadError } = await admin.storage
     .from("avatars")
-    .upload(path, encoded, { contentType: "image/webp", upsert: true });
+    .upload(path, encoded, { contentType: "image/jpeg", upsert: true });
 
   if (uploadError) {
     console.error("Could not store the profile picture", uploadError);
