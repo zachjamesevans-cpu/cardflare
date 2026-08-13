@@ -7,10 +7,12 @@ import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { playerForUser } from "./accounts";
-import { buyCosmetic } from "./cosmetics";
+import { buyCosmetic, type EquipSlot } from "./cosmetics";
 import {
   addToShowcase,
   clearAvatar,
+  dressAllShowcase,
+  dressShowcaseCard,
   removeFromShowcase,
   setAvatar,
   setDisplayName,
@@ -190,7 +192,22 @@ export async function buyCosmeticAction(
   const name = text(formData, "name") || "That item";
   if (!slug) return { status: "error", message: GENERIC_ERROR };
 
-  const outcome = await buyCosmetic(playerId, slug);
+  /*
+   * Which slot the tap came from. Checked against the four real slots
+   * rather than trusted: this is a public POST endpoint, and an
+   * unrecognised value falls back to the kind's own slot inside
+   * `buyCosmetic` instead of writing anywhere surprising.
+   */
+  const slotValue = text(formData, "slot");
+  const slot: EquipSlot | undefined =
+    slotValue === "avatarFrame" ||
+    slotValue === "cardFrame" ||
+    slotValue === "holo" ||
+    slotValue === "effect"
+      ? slotValue
+      : undefined;
+
+  const outcome = await buyCosmetic(playerId, slug, slot);
 
   if (!outcome.ok) {
     return { status: "error", message: BUY_REFUSALS[outcome.reason] ?? GENERIC_ERROR };
@@ -207,8 +224,61 @@ export async function addShowcaseAction(formData: FormData): Promise<void> {
   const cardId = text(formData, "cardId");
   if (!cardId) return;
 
-  await addToShowcase(playerId, cardId, text(formData, "printingId") || null);
+  await addToShowcase(playerId, cardId, text(formData, "printingId") || null, {
+    /*
+     * The dressing chosen in the add step. Empty means "the default",
+     * and anything not owned resolves to null inside `addToShowcase` -
+     * the card still goes up, wearing the default, instead of the add
+     * failing over an ornament.
+     */
+    frame: text(formData, "frame") || null,
+    holo: text(formData, "holo") || null,
+  });
   revalidateProfile();
+}
+
+/** Dresses one showcase card, from the editor behind tapping it. */
+export async function dressShowcaseAction(
+  _previous: ShopState,
+  formData: FormData,
+): Promise<ShopState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const entryId = text(formData, "entryId");
+  if (!entryId) return { status: "error", message: GENERIC_ERROR };
+
+  const done = await dressShowcaseCard(
+    playerId,
+    entryId,
+    text(formData, "frame") || null,
+    text(formData, "holo") || null,
+  );
+
+  if (!done) return { status: "error", message: GENERIC_ERROR };
+
+  revalidateProfile();
+  return { status: "equipped", name: "This card" };
+}
+
+/** The editor's Apply to all: default changed, overrides cleared. */
+export async function dressAllShowcaseAction(
+  _previous: ShopState,
+  formData: FormData,
+): Promise<ShopState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const done = await dressAllShowcase(
+    playerId,
+    text(formData, "frame") || null,
+    text(formData, "holo") || null,
+  );
+
+  if (!done) return { status: "error", message: GENERIC_ERROR };
+
+  revalidateProfile();
+  return { status: "equipped", name: "Every card" };
 }
 
 export async function removeShowcaseAction(formData: FormData): Promise<void> {

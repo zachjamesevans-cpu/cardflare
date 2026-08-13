@@ -50,10 +50,18 @@ interface PeekProfile {
   displayName: string;
   avatarUrl: string | null;
   embersEarned: number;
+  /** The ring around their picture: the avatar frame slot. */
   frame: string | null;
-  holo: string | null;
   effect: string | null;
-  showcase: { id: string; name: string; number: string; imageUrl: string | null }[];
+  /** Dressing arrives resolved per card; null never means "look it up". */
+  showcase: {
+    id: string;
+    name: string;
+    number: string;
+    imageUrl: string | null;
+    frame: string | null;
+    holo: string | null;
+  }[];
 }
 
 /** The mini profile shows exactly this many showcase slots, always. */
@@ -352,8 +360,8 @@ export function PlayerPeek({
                           name={entry.name}
                           number={entry.number}
                           imagesEnabled={imagesEnabled}
-                          frame={worn.frame}
-                          holo={worn.holo}
+                          frame={entry.frame}
+                          holo={entry.holo}
                           effect={worn.effect}
                           className="w-full"
                         />

@@ -6,9 +6,10 @@ import { Check, Flame, Loader2, Lock } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
+import { FRAME_CLASS } from "@/components/players/player-avatar";
 import { Rail } from "@/components/lists/rail";
 import { buyCosmeticAction } from "@/lib/players/profile-actions";
-import type { CosmeticItem } from "@/lib/players/cosmetics";
+import type { CosmeticItem, EquipSlot } from "@/lib/players/cosmetics";
 import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
 
 /**
@@ -39,12 +40,19 @@ export function CosmeticShop({
   blurb,
   items,
   balance,
+  slot,
 }: {
   title: string;
   blurb: string;
   items: CosmeticItem[];
   /** The private number. Only ever rendered on the owner's own profile. */
   balance: number;
+  /**
+   * Where a tap equips the item. Frames appear in two sections now -
+   * profile borders and card borders - and the slot is what tells the
+   * same Frost Edge apart in each.
+   */
+  slot: EquipSlot;
 }) {
   const [state, action] = useActionState<ShopState, FormData>(
     buyCosmeticAction,
@@ -64,7 +72,9 @@ export function CosmeticShop({
             <form action={action}>
               <input type="hidden" name="slug" value={item.slug} />
               <input type="hidden" name="name" value={item.name} />
+              <input type="hidden" name="slot" value={slot} />
               <Tile
+                slot={slot}
                 item={item}
                 /*
                  * Affordability is recomputed here rather than trusted
@@ -101,7 +111,15 @@ export function CosmeticShop({
  * itself carries the three facts a buyer acts on — what it looks like,
  * what it costs, and whether it is theirs.
  */
-function Tile({ item, affordable }: { item: CosmeticItem; affordable: boolean }) {
+function Tile({
+  item,
+  affordable,
+  slot,
+}: {
+  item: CosmeticItem;
+  affordable: boolean;
+  slot: EquipSlot;
+}) {
   const { pending } = useFormStatus();
   const locked = item.lockedUntil !== null && !item.owned;
 
@@ -125,20 +143,34 @@ function Tile({ item, affordable }: { item: CosmeticItem; affordable: boolean })
         )}
       >
         {/*
-         * The placeholder card, wearing only what this tile sells. The
-         * other two slots stay at their defaults so a frame tile is not
-         * accidentally also modelling the holo you happen to own.
+         * The preview wears only what this tile sells, on the surface
+         * it would actually be worn on: profile borders ring a circle
+         * (that is a picture, not a card), everything else dresses the
+         * placeholder card. The other slots stay at their defaults so a
+         * frame tile is not also modelling the holo you happen to own.
          */}
-        <CosmeticCard
-          imageUrl={null}
-          name={item.name}
-          number=""
-          imagesEnabled={false}
-          frame={item.kind === "frame" ? item.slug : null}
-          holo={item.kind === "holo" ? item.slug : null}
-          effect={item.kind === "effect" ? item.slug : null}
-          className="w-full"
-        />
+        {slot === "avatarFrame" ? (
+          <span className="flex aspect-[60/84] w-full items-center justify-center rounded-[6px] border border-border bg-elevated">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "inline-block size-8 rounded-full border border-border bg-canvas",
+                FRAME_CLASS[item.slug],
+              )}
+            />
+          </span>
+        ) : (
+          <CosmeticCard
+            imageUrl={null}
+            name={item.name}
+            number=""
+            imagesEnabled={false}
+            frame={item.kind === "frame" ? item.slug : null}
+            holo={item.kind === "holo" ? item.slug : null}
+            effect={item.kind === "effect" ? item.slug : null}
+            className="w-full"
+          />
+        )}
 
         {pending && (
           <span className="absolute inset-0 z-10 flex items-center justify-center rounded-[6px] bg-canvas/70">

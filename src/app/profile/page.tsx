@@ -4,10 +4,9 @@ import Link from "next/link";
 import { ChevronRight, Flame, Settings, Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
-import { CosmeticCard } from "@/components/players/cosmetic-card";
+import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -17,7 +16,7 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
-import { resolveEquipped } from "@/lib/players/cosmetics";
+import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 
@@ -78,11 +77,28 @@ export default async function ProfilePage() {
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
 
-  /* The wardrobe itself now loads on /profile/store, where the shop is. */
-  const [worn, areas] = await Promise.all([
+  /*
+   * The wardrobe is back on this page even though the shop moved out:
+   * the dressing pickers (add flow and per-card editor) offer what is
+   * OWNED, and ownership lives in the same read the shop uses.
+   */
+  const [worn, wardrobe, areas] = await Promise.all([
     resolveEquipped(profile.equipped),
+    wardrobeFor(
+      playerId,
+      { earned: profile.embersEarned, balance: profile.embersBalance },
+      profile.equipped,
+    ),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
   ]);
+
+  /* What the dressing rooms may offer: owned only, free items included. */
+  const ownedFrames = wardrobe.cardFrames
+    .filter((item) => item.owned)
+    .map(({ slug, name }) => ({ slug, name }));
+  const ownedHolos = wardrobe.holos
+    .filter((item) => item.owned)
+    .map(({ slug, name }) => ({ slug, name }));
 
   const imagesEnabled = cardImagesEnabled();
 
@@ -127,7 +143,7 @@ export default async function ProfilePage() {
                  under somebody who removes their picture and puts it back. */
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
-              frame={worn.frame}
+              frame={worn.avatarFrame}
             />
 
             <DisplayNameForm displayName={profile.displayName} />
@@ -202,24 +218,23 @@ export default async function ProfilePage() {
               <Rail ariaLabel="Your showcase">
                 {profile.showcase.map((entry) => (
                   <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                    <CardImageZoom
+                    {/*
+                     * On the owner's own shelf a tap opens the dressing
+                     * room, not the plain viewer - the founder's spec.
+                     * Everyone else still gets the zoom, on the public
+                     * page and in the room popup.
+                     */}
+                    <ShowcaseEditor
+                      entryId={entry.id}
+                      name={entry.name}
+                      number={entry.number}
                       imageUrl={entry.imageUrl}
-                      exactName={entry.name}
-                      cardNumber={entry.number}
-                      enabled={imagesEnabled}
-                      thumbClassName="w-full"
-                      thumb={
-                        <CosmeticCard
-                          imageUrl={entry.imageUrl}
-                          name={entry.name}
-                          number={entry.number}
-                          imagesEnabled={imagesEnabled}
-                          frame={worn.frame}
-                          holo={worn.holo}
-                          effect={worn.effect}
-                          className="w-full"
-                        />
-                      }
+                      imagesEnabled={imagesEnabled}
+                      frame={entry.frame ?? worn.frame}
+                      holo={entry.holo ?? worn.holo}
+                      effect={worn.effect}
+                      frames={ownedFrames}
+                      holos={ownedHolos}
                     />
                     <span className="truncate text-[11px] text-text-secondary">
                       {entry.name}
@@ -239,7 +254,14 @@ export default async function ProfilePage() {
             )}
 
             {profile.showcase.length < SHOWCASE_LIMIT ? (
-              <AddShowcaseForm imagesEnabled={imagesEnabled} />
+              <AddShowcaseForm
+                imagesEnabled={imagesEnabled}
+                frames={ownedFrames}
+                holos={ownedHolos}
+                defaultFrame={worn.frame}
+                defaultHolo={worn.holo}
+                effect={worn.effect}
+              />
             ) : (
               <p className="text-sm text-text-muted">
                 Your shelf is full. Remove one to make room.

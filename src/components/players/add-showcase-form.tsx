@@ -4,18 +4,24 @@ import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
+import { CosmeticCard } from "@/components/players/cosmetic-card";
+import {
+  DressingPicker,
+  type DressingOption,
+} from "@/components/players/dressing-picker";
 import { Button } from "@/components/ui/button";
 import { addShowcaseAction } from "@/lib/players/profile-actions";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
 
 /**
- * Putting a card on the shelf.
+ * Putting a card on the shelf, dressed before it ever shows.
  *
- * The same search the Flare composer uses, doing a different job: a
- * showcase is "this is what I am proud of", not "I will let this go".
- * Nothing here creates a Flare, nobody can pledge on the result, and it
- * outlives the event — which is why it lives on the profile rather than
- * on a board.
+ * Two steps now, the founder's spec: find the card, then choose which
+ * border and holo it wears — previewed on the card's own art with the
+ * same carousel pickers the per-card editor uses — and only then does it
+ * land on the shelf. The picks start at the profile's defaults, so
+ * somebody who does not care taps straight through Add and gets exactly
+ * what they got before.
  *
  * Tapping a specific printing puts that artwork up. Tapping the row
  * itself puts the card up with no printing chosen, which renders as the
@@ -26,25 +32,39 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * none of them, so a permanently open search would be the loudest thing
  * on a page that is mostly for looking at.
  */
-export function AddShowcaseForm({ imagesEnabled }: { imagesEnabled: boolean }) {
+export function AddShowcaseForm({
+  imagesEnabled,
+  frames,
+  holos,
+  defaultFrame,
+  defaultHolo,
+  effect,
+}: {
+  imagesEnabled: boolean;
+  /** Owned dressing options, the free items included. */
+  frames: DressingOption[];
+  holos: DressingOption[];
+  /** The profile defaults, where the picker starts. */
+  defaultFrame: string | null;
+  defaultHolo: string | null;
+  /** Profile-wide, worn in previews so they stay honest. */
+  effect: string | null;
+}) {
   const [open, setOpen] = useState(false);
+
+  /** The card chosen in step one, waiting to be dressed. */
+  const [chosen, setChosen] = useState<{
+    card: CardResult;
+    printing: CardPrinting | null;
+  } | null>(null);
+
+  const [picked, setPicked] = useState({ frame: defaultFrame, holo: defaultHolo });
+
   const form = useRef<HTMLFormElement>(null);
-  const cardId = useRef<HTMLInputElement>(null);
-  const printingId = useRef<HTMLInputElement>(null);
 
-  const submit = (card: CardResult, printing?: CardPrinting) => {
-    if (!cardId.current || !printingId.current) return;
-
-    cardId.current.value = card.id;
-    printingId.current.value = printing?.id ?? "";
-    form.current?.requestSubmit();
-
-    /*
-     * Closed on submit rather than left open with a "added" message.
-     * The shelf is right above this and repaints with the new card on
-     * it, which says the same thing more convincingly than any toast.
-     */
-    setOpen(false);
+  const reset = () => {
+    setChosen(null);
+    setPicked({ frame: defaultFrame, holo: defaultHolo });
   };
 
   if (!open) {
@@ -60,26 +80,96 @@ export function AddShowcaseForm({ imagesEnabled }: { imagesEnabled: boolean }) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-text-secondary">
-          Search for a card to show off
+          {chosen ? "Dress it before it goes up" : "Search for a card to show off"}
         </p>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+        >
           <X className="size-4" aria-hidden="true" />
-          <span className="sr-only">Close the search</span>
+          <span className="sr-only">Close</span>
         </Button>
       </div>
 
       {/*
-       * The form carries only hidden inputs; the search fills them in and
-       * submits. Keeping it a real form means the whole thing still works
-       * as a plain POST, and the Server Action re-derives the player from
+       * The form carries only hidden inputs; the steps fill them in.
+       * Keeping it a real form means the whole thing still works as a
+       * plain POST, and the Server Action re-derives the player from
        * the session rather than trusting anything in here.
        */}
-      <form ref={form} action={addShowcaseAction} className="hidden">
-        <input ref={cardId} type="hidden" name="cardId" />
-        <input ref={printingId} type="hidden" name="printingId" />
+      <form
+        ref={form}
+        action={addShowcaseAction}
+        className="hidden"
+        onSubmit={() => {
+          /*
+           * Closed on submit rather than left open with an "added"
+           * message. The shelf is right above this and repaints with
+           * the new card on it, which says the same thing more
+           * convincingly than any toast.
+           */
+          reset();
+          setOpen(false);
+        }}
+      >
+        <input type="hidden" name="cardId" value={chosen?.card.id ?? ""} />
+        <input type="hidden" name="printingId" value={chosen?.printing?.id ?? ""} />
+        <input type="hidden" name="frame" value={picked.frame ?? ""} />
+        <input type="hidden" name="holo" value={picked.holo ?? ""} />
       </form>
 
-      <CardSearch imagesEnabled={imagesEnabled} onSelect={submit} autoFocus />
+      {!chosen ? (
+        <CardSearch
+          imagesEnabled={imagesEnabled}
+          onSelect={(card, printing) => setChosen({ card, printing: printing ?? null })}
+          autoFocus
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {/* The card as it will land, wearing the picks live. */}
+          <CosmeticCard
+            imageUrl={chosen.printing?.imageUrl ?? null}
+            name={chosen.card.exactName}
+            number={chosen.card.canonicalCardNumber}
+            imagesEnabled={imagesEnabled}
+            frame={picked.frame}
+            holo={picked.holo}
+            effect={effect}
+            className="mx-auto w-40"
+          />
+
+          <DressingPicker
+            imageUrl={chosen.printing?.imageUrl ?? null}
+            name={chosen.card.exactName}
+            number={chosen.card.canonicalCardNumber}
+            imagesEnabled={imagesEnabled}
+            frames={frames}
+            holos={holos}
+            frame={picked.frame}
+            holo={picked.holo}
+            effect={effect}
+            onPick={setPicked}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => form.current?.requestSubmit()}
+            >
+              Add to showcase
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={reset}>
+              Pick a different card
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -81,7 +81,7 @@ export default async function PublicProfilePage({
               displayName={profile.displayName}
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
-              frame={worn.frame}
+              frame={worn.avatarFrame}
               className="size-24 text-2xl"
             />
 
@@ -130,8 +130,8 @@ export default async function PublicProfilePage({
                           name={entry.name}
                           number={entry.number}
                           imagesEnabled={imagesEnabled}
-                          frame={worn.frame}
-                          holo={worn.holo}
+                          frame={entry.frame ?? worn.frame}
+                          holo={entry.holo ?? worn.holo}
                           effect={worn.effect}
                           className="w-full"
                         />

@@ -96,22 +96,32 @@ export default async function EmberStorePage() {
 
           <Card className="flex flex-col gap-6">
             <CosmeticShop
-              title="Frames"
-              blurb="The border around your profile picture and every card on your shelf. Everyone in the room sees it."
-              items={wardrobe.frames}
+              title="Profile borders"
+              blurb="The ring around your profile picture, in every room you join. Separate from your cards. Buying a border once unlocks it for both."
+              items={wardrobe.avatarFrames}
               balance={profile.embersBalance}
+              slot="avatarFrame"
+            />
+            <CosmeticShop
+              title="Card borders"
+              blurb="The border your showcase cards wear unless you dress one differently. Tap a card on your profile to dress it on its own."
+              items={wardrobe.cardFrames}
+              balance={profile.embersBalance}
+              slot="cardFrame"
             />
             <CosmeticShop
               title="Holo patterns"
-              blurb="How the light sits on the artwork."
+              blurb="How the light sits on the artwork. This is the default; each card can wear its own."
               items={wardrobe.holos}
               balance={profile.embersBalance}
+              slot="holo"
             />
             <CosmeticShop
               title="Effects"
-              blurb="What moves, and how often."
+              blurb="What moves, and how often. Worn by every card on your shelf."
               items={wardrobe.effects}
               balance={profile.embersBalance}
+              slot="effect"
             />
           </Card>
 

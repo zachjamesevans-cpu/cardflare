@@ -145,6 +145,7 @@ export function ProfileScreen() {
         </View>
 
         <View style={{ alignItems: "center", gap: spacing(2) }}>
+          {/* The ring is the AVATAR frame slot, separate from cards. */}
           {profile.avatarUrl ? (
             <Image
               source={{ uri: profile.avatarUrl }}
@@ -152,8 +153,9 @@ export function ProfileScreen() {
                 width: 96,
                 height: 96,
                 borderRadius: 48,
-                borderWidth: 1,
-                borderColor: colors.border,
+                borderWidth: FRAME_COLOR[profile.equipped.avatarFrame ?? ""] ? 3 : 1,
+                borderColor:
+                  FRAME_COLOR[profile.equipped.avatarFrame ?? ""] ?? colors.border,
               }}
             />
           ) : (
@@ -236,8 +238,8 @@ export function ProfileScreen() {
                 <CosmeticCard
                   imageUrl={entry.imageUrl}
                   width={92}
-                  frame={profile.equipped.frame}
-                  holo={profile.equipped.holo}
+                  frame={entry.frame ?? profile.equipped.frame}
+                  holo={entry.holo ?? profile.equipped.holo}
                   effect={profile.equipped.effect}
                 />
                 <Text
@@ -283,18 +285,37 @@ export function ProfileScreen() {
         <Card>
           <Title>What Embers buy</Title>
           <Body>
-            Frames wrap your profile picture and your showcased cards, and everyone in
-            the room sees them. Holo patterns and effects dress the cards.
+            Profile borders wrap your picture in every room. Card borders and holos
+            are the defaults your showcase wears; dressing one card on its own is a
+            website thing for now.
           </Body>
 
           <Slot
-            heading="Frames"
-            items={wardrobe.frames}
+            heading="Profile borders"
+            items={wardrobe.avatarFrames}
             balance={profile.embersBalance}
             busy={busy}
             ring
             onPick={(item) =>
-              void act(item.slug, () => buyCosmetic(item.slug), `${item.name} equipped.`)
+              void act(
+                item.slug,
+                () => buyCosmetic(item.slug, "avatarFrame"),
+                `${item.name} equipped.`,
+              )
+            }
+          />
+          <Slot
+            heading="Card borders"
+            items={wardrobe.cardFrames}
+            balance={profile.embersBalance}
+            busy={busy}
+            ring
+            onPick={(item) =>
+              void act(
+                item.slug,
+                () => buyCosmetic(item.slug, "cardFrame"),
+                `${item.name} equipped.`,
+              )
             }
           />
           <Slot
@@ -303,7 +324,11 @@ export function ProfileScreen() {
             balance={profile.embersBalance}
             busy={busy}
             onPick={(item) =>
-              void act(item.slug, () => buyCosmetic(item.slug), `${item.name} equipped.`)
+              void act(
+                item.slug,
+                () => buyCosmetic(item.slug, "holo"),
+                `${item.name} equipped.`,
+              )
             }
           />
           <Slot
@@ -312,7 +337,11 @@ export function ProfileScreen() {
             balance={profile.embersBalance}
             busy={busy}
             onPick={(item) =>
-              void act(item.slug, () => buyCosmetic(item.slug), `${item.name} equipped.`)
+              void act(
+                item.slug,
+                () => buyCosmetic(item.slug, "effect"),
+                `${item.name} equipped.`,
+              )
             }
           />
         </Card>

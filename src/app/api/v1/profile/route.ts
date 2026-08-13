@@ -86,7 +86,16 @@ export async function GET(request: Request): Promise<Response> {
  */
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), displayName: z.string() }),
-  z.object({ action: z.literal("buy"), slug: z.string().max(40) }),
+  z.object({
+    action: z.literal("buy"),
+    slug: z.string().max(40),
+    /*
+     * Which slot a frame lands in, since the profile/card border split.
+     * Optional: an app that predates the split omits it and gets the
+     * card slot, which is what the old single slot became.
+     */
+    slot: z.enum(["avatarFrame", "cardFrame", "holo", "effect"]).optional(),
+  }),
   z.object({
     action: z.literal("showcase-add"),
     cardId: z.string().uuid(),
@@ -122,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (body.action === "buy") {
-    const outcome = await buyCosmetic(player.playerId, body.slug);
+    const outcome = await buyCosmetic(player.playerId, body.slug, body.slot);
     return outcome.ok
       ? Response.json({ ok: true, slug: outcome.slug })
       : Response.json({ error: outcome.reason }, { status: 400 });
