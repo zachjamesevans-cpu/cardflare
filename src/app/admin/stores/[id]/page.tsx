@@ -292,6 +292,7 @@ async function LiveRoom({
           embersEarned: participant.embersEarned as number,
           avatarUrl: participant.avatarUrl,
           frame: participant.frame,
+          playerId: participant.playerId,
         },
       ]),
   );

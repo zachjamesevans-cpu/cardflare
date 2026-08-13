@@ -56,6 +56,9 @@ interface PeekProfile {
   showcase: { id: string; name: string; number: string; imageUrl: string | null }[];
 }
 
+/** The mini profile shows exactly this many showcase slots, always. */
+const PEEK_SHELF = 5;
+
 export function PlayerPeek({
   playerId,
   displayName,
@@ -65,6 +68,8 @@ export function PlayerPeek({
   isYou = false,
   dimmed = false,
   imagesEnabled,
+  className,
+  nameClassName,
 }: {
   playerId: string;
   displayName: string;
@@ -75,6 +80,10 @@ export function PlayerPeek({
   /** Away players read as away on the trigger, same as before. */
   dimmed?: boolean;
   imagesEnabled: boolean;
+  /** Extra classes for the trigger, so each surface controls its layout. */
+  className?: string;
+  /** Extra classes for the name, e.g. the board header's bolder face. */
+  nameClassName?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -236,7 +245,10 @@ export function PlayerPeek({
         ref={opener}
         type="button"
         onClick={open}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] text-left transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className={cn(
+          "flex min-w-0 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] text-left transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+          className,
+        )}
       >
         <PlayerAvatar
           displayName={displayName}
@@ -251,11 +263,12 @@ export function PlayerPeek({
             className={cn(
               "underline-offset-4 hover:underline",
               !dimmed && "text-text-primary",
+              nameClassName,
             )}
           >
             {displayName}
           </span>
-          {isYou && <span className="text-text-muted"> · you</span>}
+          {isYou && <span className="font-normal text-text-muted"> · you</span>}
         </span>
       </button>
 
@@ -313,8 +326,16 @@ export function PlayerPeek({
             ) : worn.showcase.length === 0 ? (
               <p className="text-sm text-text-muted">Nothing on their shelf yet.</p>
             ) : (
-              <ul className="grid grid-cols-3 gap-2">
-                {worn.showcase.map((entry) => (
+              /*
+               * Exactly five slots, always — the founder's spec for the
+               * mini profile. Five cards fit one row at the carousel's
+               * own card width; the full shelf lives on the full
+               * profile, which is what the button below is for. A
+               * shorter shelf keeps its empty slots drawn, so five
+               * cards and two cards occupy the same, evenly spaced row.
+               */
+              <ul className="grid grid-cols-5 gap-2">
+                {worn.showcase.slice(0, PEEK_SHELF).map((entry) => (
                   <li key={entry.id}>
                     {/* The board's viewer again, opened from the dressed
                         card — the same tap does the same thing here as
@@ -338,6 +359,13 @@ export function PlayerPeek({
                         />
                       }
                     />
+                  </li>
+                ))}
+                {Array.from({
+                  length: Math.max(0, PEEK_SHELF - worn.showcase.length),
+                }).map((_, index) => (
+                  <li key={`empty-${index}`} aria-hidden="true">
+                    <span className="block aspect-[60/84] w-full rounded-[6px] border border-dashed border-border" />
                   </li>
                 ))}
               </ul>

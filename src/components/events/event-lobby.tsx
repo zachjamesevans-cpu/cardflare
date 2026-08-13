@@ -98,6 +98,7 @@ export function EventLobby({
                       isYou={isYou}
                       dimmed={!participant.present}
                       imagesEnabled={imagesEnabled}
+                      className="flex-1"
                     />
                   ) : (
                     <>
