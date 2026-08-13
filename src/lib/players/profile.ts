@@ -449,6 +449,32 @@ export async function setAvatar(
   }
 
   /*
+   * Read back and byte-compare before recording anything.
+   *
+   * This write went five rounds looking healthy while the founder's
+   * phone showed initials, because every check compared labels and
+   * sizes and nothing ever proved the bucket holds the bytes sharp
+   * produced. Now the write proves itself: download what just landed
+   * and compare it to what was sent. A mismatch deletes the object and
+   * refuses loudly, instead of recording a row that renders as a broken
+   * circle on somebody's phone.
+   */
+  const { data: readBack, error: verifyError } = await admin.storage
+    .from("avatars")
+    .download(path);
+
+  const landed = readBack ? Buffer.from(await readBack.arrayBuffer()) : null;
+
+  if (verifyError || !landed || !landed.equals(encoded)) {
+    console.error(
+      `Avatar readback mismatch for ${path}: sent ${encoded.length} bytes, ` +
+        `read ${landed?.length ?? "none"} back${verifyError ? ` (${verifyError.message})` : ""}.`,
+    );
+    await admin.storage.from("avatars").remove([path]);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  /*
    * The object PATH is what gets stored, not a public URL.
    *
    * The previous cut stored `getPublicUrl(path)` and pointed an `<img>`
