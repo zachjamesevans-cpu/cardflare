@@ -15,11 +15,18 @@ import { CardThumbnail } from "@/components/cards/card-thumbnail";
  *      leave a plain card, not a broken one.
  */
 
-const FRAME_CLASS: Record<string, string> = {
+/** Exported for the test that keeps this map, the avatar map, the CSS
+    and the catalogue migrations agreeing on the set of frame slugs. */
+export const FRAME_CLASS: Record<string, string> = {
   plain: "",
   "ember-edge": "cf-frame-ember-edge",
   "lime-edge": "cf-frame-lime-edge",
   "prism-edge": "cf-frame-prism-edge",
+  "frost-edge": "cf-frame-frost-edge",
+  "rose-edge": "cf-frame-rose-edge",
+  "gilded-edge": "cf-frame-gilded-edge",
+  "molten-edge": "cf-frame-molten-edge",
+  "galaxy-edge": "cf-frame-galaxy-edge",
 };
 
 const HOLO_CLASS: Record<string, string> = {

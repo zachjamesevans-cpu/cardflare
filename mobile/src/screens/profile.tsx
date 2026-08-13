@@ -20,6 +20,7 @@ import {
   type Wardrobe,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { FRAME_COLOR } from "../player-avatar";
 import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -281,13 +282,17 @@ export function ProfileScreen() {
       {wardrobe && (
         <Card>
           <Title>What Embers buy</Title>
-          <Body>Frames, holo patterns and effects for the cards on your shelf.</Body>
+          <Body>
+            Frames wrap your profile picture and your showcased cards, and everyone in
+            the room sees them. Holo patterns and effects dress the cards.
+          </Body>
 
           <Slot
             heading="Frames"
             items={wardrobe.frames}
             balance={profile.embersBalance}
             busy={busy}
+            ring
             onPick={(item) =>
               void act(item.slug, () => buyCosmetic(item.slug), `${item.name} equipped.`)
             }
@@ -413,12 +418,15 @@ function Slot({
   items,
   balance,
   busy,
+  ring = false,
   onPick,
 }: {
   heading: string;
   items: CosmeticItem[];
   balance: number;
   busy: string | null;
+  /** Frames only: show the ring each one buys, on a stand-in circle. */
+  ring?: boolean;
   onPick: (item: CosmeticItem) => void;
 }) {
   return (
@@ -446,6 +454,18 @@ function Slot({
                 opacity: affordable ? 1 : 0.55,
               }}
             >
+              {ring && (
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    borderWidth: FRAME_COLOR[item.slug] ? 2 : 1,
+                    borderColor: FRAME_COLOR[item.slug] ?? colors.border,
+                    backgroundColor: colors.canvas,
+                  }}
+                />
+              )}
               <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
                 {item.name}
               </Text>

@@ -26,9 +26,14 @@ const FRAME_COLOR: Record<string, string | null> = {
   plain: null,
   "ember-edge": "#ff8a3d",
   "lime-edge": colors.accent,
-  /* Prism cannot be a travelling gradient on a border, so it takes the
-     middle stop of the web gradient and holds still. */
+  /* The travellers cannot be travelling gradients on a border, so each
+     takes the strongest stop of its web gradient and holds still. */
   "prism-edge": "#8c3cff",
+  "frost-edge": "#6ec3ff",
+  "rose-edge": "#ff6fb5",
+  "gilded-edge": "#f0c24b",
+  "molten-edge": "#ff5a1f",
+  "galaxy-edge": "#6d4aff",
 };
 
 /** The stops each holo washes over the artwork, at the alpha RN can do. */

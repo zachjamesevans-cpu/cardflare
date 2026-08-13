@@ -7,6 +7,7 @@ import { Check, Flame, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { buyCosmeticAction } from "@/lib/players/profile-actions";
 import type { CosmeticItem } from "@/lib/players/cosmetics";
+import { FRAME_CLASS } from "@/components/players/player-avatar";
 import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
 
 /**
@@ -105,6 +106,25 @@ function Tile({ item, affordable }: { item: CosmeticItem; affordable: boolean })
               "cursor-not-allowed border-border bg-elevated/50 opacity-60",
       )}
     >
+      {item.kind === "frame" && (
+        /*
+         * The border itself, worn by a stand-in circle. Words undersell
+         * a cosmetic whose entire product is how it looks; this is the
+         * same class the real avatar wears, so the tile can never show
+         * something the room will not. The margin reserves the 4px the
+         * ring throws outside the circle, since a box-shadow and an
+         * ::after take no layout space of their own.
+         */
+        <span aria-hidden="true" className="pb-1">
+          <span
+            className={cn(
+              "m-1 inline-block size-8 rounded-full border border-border bg-canvas",
+              FRAME_CLASS[item.slug],
+            )}
+          />
+        </span>
+      )}
+
       <span className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
         {pending ? (
           <Loader2

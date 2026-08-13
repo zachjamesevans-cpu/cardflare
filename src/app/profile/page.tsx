@@ -254,7 +254,7 @@ export default async function ProfilePage() {
 
             <CosmeticShop
               title="Frames"
-              blurb="The border around every card on your shelf."
+              blurb="The border around your profile picture and every card on your shelf. Everyone in the room sees it."
               items={wardrobe.frames}
               balance={profile.embersBalance}
             />

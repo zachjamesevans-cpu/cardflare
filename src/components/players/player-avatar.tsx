@@ -29,12 +29,23 @@ const PIXELS: Record<"sm" | "md", number> = { sm: 32, md: 40 };
  * are: Tailwind cannot see a class assembled at runtime, and an unknown
  * slug falls through to no frame, which is the right failure for a
  * cosmetic that was removed from the catalogue.
+ *
+ * Exported so the shop can draw the same ring on its tiles: a border is
+ * the one cosmetic whose whole pitch is how it looks, and a tile that
+ * describes it in words is selling it short. The unit test in
+ * tests/unit/cosmetic-frames.test.ts holds this map, the card map, the
+ * CSS and the catalogue migrations to the same set of slugs.
  */
-const FRAME_CLASS: Record<string, string> = {
+export const FRAME_CLASS: Record<string, string> = {
   plain: "",
   "ember-edge": "cf-avatar-frame-ember-edge",
   "lime-edge": "cf-avatar-frame-lime-edge",
   "prism-edge": "cf-avatar-frame-prism-edge",
+  "frost-edge": "cf-avatar-frame-frost-edge",
+  "rose-edge": "cf-avatar-frame-rose-edge",
+  "gilded-edge": "cf-avatar-frame-gilded-edge",
+  "molten-edge": "cf-avatar-frame-molten-edge",
+  "galaxy-edge": "cf-avatar-frame-galaxy-edge",
 };
 
 /**
