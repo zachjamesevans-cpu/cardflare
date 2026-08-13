@@ -500,8 +500,6 @@ export interface Profile {
    * only ever puts it on the authenticated player's own profile.
    */
   embersBalance: number;
-  tier: string;
-  nextTier: { name: string; needed: number } | null;
   equipped: Equipped;
   showcase: ShowcaseCard[];
   showcaseLimit: number;

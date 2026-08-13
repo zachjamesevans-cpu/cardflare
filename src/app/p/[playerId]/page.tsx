@@ -93,7 +93,7 @@ export default async function PublicProfilePage({
               <p className="text-lg font-bold text-text-primary">
                 {profile.displayName}
               </p>
-              <EmberBadge earned={profile.embersEarned} size="md" showTier />
+              <EmberBadge earned={profile.embersEarned} size="md" />
               <p className="text-sm text-text-muted">
                 Earned by confirming trades, and nothing else.
               </p>

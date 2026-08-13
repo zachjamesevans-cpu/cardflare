@@ -177,7 +177,7 @@ export function ProfileScreen() {
           )}
 
           <Title>{profile.displayName}</Title>
-          <EmberChip earned={profile.embersEarned} tier={profile.tier} />
+          <EmberChip earned={profile.embersEarned} />
         </View>
 
         {/*
@@ -217,9 +217,6 @@ export function ProfileScreen() {
           />
         </View>
 
-        {profile.nextTier && (
-          <Muted>{`${profile.nextTier.needed.toLocaleString()} more to ${profile.nextTier.name}.`}</Muted>
-        )}
       </Card>
 
       <Card>
@@ -340,7 +337,9 @@ function initials(displayName: string): string {
   return picked.map((word) => [...word][0] ?? "").join("").toUpperCase();
 }
 
-function EmberChip({ earned, tier }: { earned: number; tier: string }) {
+/* The number and the word "Embers", nothing else. Tier names read as a
+   second currency, which is how the founder read them. */
+function EmberChip({ earned }: { earned: number }) {
   return (
     <View
       style={{
@@ -356,7 +355,7 @@ function EmberChip({ earned, tier }: { earned: number; tier: string }) {
     >
       <Ionicons name="flame" size={14} color={colors.accent} />
       <Text style={{ color: colors.accent, fontWeight: "700" }}>
-        {`${earned.toLocaleString()} · ${tier}`}
+        {`${earned.toLocaleString()} Embers`}
       </Text>
     </View>
   );

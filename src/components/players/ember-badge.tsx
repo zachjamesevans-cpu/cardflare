@@ -1,7 +1,6 @@
 import { Flame } from "lucide-react";
 
 import { cn } from "@/lib/cn";
-import { emberTier } from "@/lib/players/ember-rules";
 
 /**
  * A player's lifetime Embers, wherever their name appears.
@@ -15,21 +14,21 @@ import { emberTier } from "@/lib/players/ember-rules";
  * Two sizes. `sm` is the one that rides beside a name in a roster or on
  * the Flare board, where it has to read at a glance and take almost no
  * width; `md` is the profile's own.
+ *
+ * The number and the word "Embers", nothing else. An earlier version
+ * appended a tier name ("Spark", "Kindling") and the founder read it as
+ * a second currency the product had not agreed on — which is exactly how
+ * anyone else would read it. One currency, one word.
  */
 export function EmberBadge({
   earned,
   size = "sm",
-  showTier = false,
   className,
 }: {
   earned: number;
   size?: "sm" | "md";
-  /** Spells out the tier name. Worth the width on a profile, not in a list. */
-  showTier?: boolean;
   className?: string;
 }) {
-  const tier = emberTier(earned);
-
   return (
     <span
       className={cn(
@@ -39,12 +38,11 @@ export function EmberBadge({
       )}
       /* The number alone is a mystery out of context; the title says
          what it counts. Assistive technology gets the same sentence. */
-      title={`${earned.toLocaleString()} Embers earned · ${tier}`}
+      title={`${earned.toLocaleString()} Embers earned`}
     >
       <Flame aria-hidden="true" className={size === "sm" ? "size-3" : "size-4"} />
       {earned.toLocaleString()}
-      {showTier && <span className="font-medium opacity-80">· {tier}</span>}
-      <span className="sr-only"> Embers earned, {tier}</span>
+      <span className="sr-only"> Embers earned</span>
     </span>
   );
 }

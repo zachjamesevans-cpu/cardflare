@@ -1,8 +1,6 @@
 import "server-only";
 
 import { grantSpendableEmbers } from "@/lib/players/embers";
-import { emberTier } from "@/lib/players/ember-rules";
-import type { EmberTier } from "@/lib/players/ember-rules";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -22,7 +20,6 @@ export interface AdminPlayer {
   avatarUrl: string | null;
   embersEarned: number;
   embersBalance: number;
-  tier: EmberTier;
   cosmeticsUnlocked: boolean;
   /** How many cosmetics they actually bought, ignoring free and granted. */
   purchasedCount: number;
@@ -95,7 +92,6 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
     avatarUrl: avatarSrc(row.avatar_url),
     embersEarned: row.embers_earned,
     embersBalance: row.embers_balance,
-    tier: emberTier(row.embers_earned),
     cosmeticsUnlocked: row.cosmetics_unlocked,
     purchasedCount: counts.get(row.id) ?? 0,
     onboardedAt: row.onboarded_at,
