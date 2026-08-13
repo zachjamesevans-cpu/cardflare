@@ -554,10 +554,18 @@ export type PlayerRow = {
   embers_earned: number;
   /** Unspent Embers. Private, and the only number spending touches. */
   embers_balance: number;
-  /** Cosmetic slugs. Null means the free default for that slot. */
+  /**
+   * Cosmetic slugs. Null means the free default for that slot.
+   *
+   * `equipped_frame` and `equipped_holo` are the DEFAULTS showcase cards
+   * wear; a player_showcase row with its own slug overrides them for
+   * that card. `equipped_avatar_frame` dresses the profile picture and
+   * nothing else — the founder's split.
+   */
   equipped_frame: string | null;
   equipped_holo: string | null;
   equipped_effect: string | null;
+  equipped_avatar_frame: string | null;
   /**
    * Admin grant: owns every cosmetic, including ones added later.
    *
@@ -579,6 +587,7 @@ export type PlayerInsert = Omit<
   | "equipped_frame"
   | "equipped_holo"
   | "equipped_effect"
+  | "equipped_avatar_frame"
   | "cosmetics_unlocked"
   | "onboarded_at"
 > & {
@@ -590,6 +599,7 @@ export type PlayerInsert = Omit<
   equipped_frame?: string | null;
   equipped_holo?: string | null;
   equipped_effect?: string | null;
+  equipped_avatar_frame?: string | null;
   cosmetics_unlocked?: boolean;
   onboarded_at?: string | null;
 };
@@ -640,16 +650,21 @@ export type PlayerShowcaseRow = {
   card_id: string;
   printing_id: string | null;
   position: number;
+  /** This card's own dressing, or null to wear the profile's default. */
+  frame_slug: string | null;
+  holo_slug: string | null;
 };
 
 export type PlayerShowcaseInsert = Omit<
   PlayerShowcaseRow,
-  "id" | "created_at" | "printing_id" | "position"
+  "id" | "created_at" | "printing_id" | "position" | "frame_slug" | "holo_slug"
 > & {
   id?: string;
   created_at?: string;
   printing_id?: string | null;
   position?: number;
+  frame_slug?: string | null;
+  holo_slug?: string | null;
 };
 
 export type PlayerInviteRow = {

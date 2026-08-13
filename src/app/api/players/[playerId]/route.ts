@@ -40,14 +40,18 @@ export async function GET(
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
     embersEarned: profile.embersEarned,
-    frame: worn.frame,
-    holo: worn.holo,
+    /* The ring around the picture: the avatar slot, since the split. */
+    frame: worn.avatarFrame,
     effect: worn.effect,
+    /* Per-card dressing, resolved here so the client never needs the
+       null-means-default rule. */
     showcase: profile.showcase.map((entry) => ({
       id: entry.id,
       name: entry.name,
       number: entry.number,
       imageUrl: entry.imageUrl,
+      frame: entry.frame ?? worn.frame,
+      holo: entry.holo ?? worn.holo,
     })),
   });
 }

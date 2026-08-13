@@ -467,14 +467,23 @@ export interface ShowcaseCard {
   number: string;
   imageUrl: string | null;
   position: number;
+  /** This card's own dressing, or null to wear the profile's default. */
+  frame: string | null;
+  holo: string | null;
 }
 
 /** Cosmetic slugs. Resolved server-side, so a slot is never null here. */
 export interface Equipped {
+  /** Around the profile picture, separate from the cards. */
+  avatarFrame: string | null;
+  /** The DEFAULTS showcase cards wear; a card can override for itself. */
   frame: string | null;
   holo: string | null;
   effect: string | null;
 }
+
+/** Where a bought frame lands: on the picture, or as the card default. */
+export type EquipSlot = "avatarFrame" | "cardFrame" | "holo" | "effect";
 
 export interface CosmeticItem {
   slug: string;
@@ -506,7 +515,10 @@ export interface Profile {
 }
 
 export interface Wardrobe {
-  frames: CosmeticItem[];
+  /** Frames marked equipped against the profile-picture slot. */
+  avatarFrames: CosmeticItem[];
+  /** The same frames, marked against the card default slot. */
+  cardFrames: CosmeticItem[];
   holos: CosmeticItem[];
   effects: CosmeticItem[];
 }
@@ -518,10 +530,11 @@ export const renameProfile = (displayName: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
 
 /** Buys it if it is not yours, wears it if it is. One tap either way. */
-export const buyCosmetic = (slug: string) =>
+export const buyCosmetic = (slug: string, slot?: EquipSlot) =>
   call<{ ok: true; slug: string }>("POST", "/api/v1/profile", {
     action: "buy",
     slug,
+    slot,
   });
 
 export const addToShowcase = (cardId: string, printingId: string | null) =>

@@ -953,8 +953,29 @@ session expires in thirty days and would take the badge with it.
 
 ### The wardrobe
 
-Twelve items in three slots: frames, holo patterns and animated effects, all
-scoped to `.cf-showcase`, which only a profile showcase renders. The foil work
+One catalogue, four equip slots. Buying a cosmetic once owns it everywhere it
+can be worn; the slots only say where:
+
+- `players.equipped_avatar_frame` rings the profile picture, in every room.
+- `players.equipped_frame` and `players.equipped_holo` are the DEFAULTS
+  showcase cards wear.
+- `player_showcase.frame_slug` / `holo_slug` dress ONE card, overriding the
+  defaults; null means "wear the default", which is why nothing needed
+  backfilling when the columns arrived.
+- `players.equipped_effect` is worn by every card; there is no per-card
+  effect.
+
+"Apply to all" in the card editor writes the chosen pair into the defaults
+and nulls every override — a default the whole shelf inherits again, rather
+than nine frozen copies. The store equips defaults; the per-card editor (tap
+a card on your own profile) and the add-a-card flow write overrides. Every
+dressing write re-validates ownership server-side (`wearableOrNull`): an
+unowned slug resolves to null instead of failing the write, so a crafted
+POST cannot wear the Galaxy Holo and a legitimate add never fails over an
+ornament.
+
+The catalogue items themselves are frames, holo patterns and animated
+effects, all scoped to `.cf-showcase`, which only a profile showcase renders. The foil work
 removed from the Flare board lives here now, and that containment is the
 point: a shimmer on the board says "rare" when the board needs to say
 "available"; on a profile there is nothing to confuse it with.

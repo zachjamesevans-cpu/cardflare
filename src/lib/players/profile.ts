@@ -3,7 +3,7 @@ import "server-only";
 import sharp from "sharp";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { freeSlugFor, type Equipped } from "./cosmetics";
+import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
@@ -34,6 +34,9 @@ export interface ShowcaseCard {
   number: string;
   imageUrl: string | null;
   position: number;
+  /** This card's own dressing, or null to wear the profile's default. */
+  frame: string | null;
+  holo: string | null;
 }
 
 export interface PublicProfile {
@@ -86,6 +89,7 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
     embersEarned: player.embers_earned,
     embersBalance: player.embers_balance,
     equipped: {
+      avatarFrame: player.equipped_avatar_frame,
       frame: player.equipped_frame,
       holo: player.equipped_holo,
       effect: player.equipped_effect,
@@ -210,7 +214,7 @@ export async function roomIdentitiesFor(
 
   const { data, error } = await getSupabaseAdmin()
     .from("players")
-    .select("id, embers_earned, avatar_url, equipped_frame")
+    .select("id, embers_earned, avatar_url, equipped_avatar_frame")
     .in("id", [...new Set(playerIds)]);
 
   if (error) {
@@ -220,8 +224,10 @@ export async function roomIdentitiesFor(
 
   /*
    * The free frame, looked up once for the whole room rather than per
-   * person. A null `equipped_frame` means "the free one", and resolving
-   * it here keeps that rule in the same file as the rest of it.
+   * person. A null slot means "the free one", and resolving it here
+   * keeps that rule in the same file as the rest of it. This is the
+   * AVATAR frame slot: rooms only ever draw the ring around a person,
+   * and the founder split that choice from the card borders.
    */
   const freeFrame = await freeSlugFor("frame");
 
@@ -229,7 +235,7 @@ export async function roomIdentitiesFor(
     identities.set(row.id, {
       embersEarned: row.embers_earned,
       avatarUrl: avatarSrc(row.avatar_url),
-      frame: row.equipped_frame ?? freeFrame,
+      frame: row.equipped_avatar_frame ?? freeFrame,
     });
   }
 
@@ -254,7 +260,7 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
 
   const { data, error } = await admin
     .from("player_showcase")
-    .select("id, card_id, printing_id, position")
+    .select("id, card_id, printing_id, position, frame_slug, holo_slug")
     .eq("player_id", playerId)
     .order("position")
     .limit(SHOWCASE_LIMIT);
@@ -303,6 +309,8 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
       /* Raw as stored; `isRenderableImageUrl` is the gate, at render. */
       imageUrl: row.printing_id ? (artById.get(row.printing_id) ?? null) : null,
       position: row.position,
+      frame: row.frame_slug,
+      holo: row.holo_slug,
     };
   });
 }
@@ -319,10 +327,36 @@ export type ShowcaseOutcome =
  * pushing the first one off: nothing a player put there should vanish
  * because of something they did somewhere else.
  */
+/**
+ * A slug this player may actually wear: in the catalogue, the right
+ * kind, and owned (bought, free, or granted). Anything else resolves to
+ * null — the card falls back to the profile default rather than the
+ * write failing, and a crafted POST cannot dress a card in something
+ * unbought.
+ */
+async function wearableOrNull(
+  playerId: string,
+  slug: string | null,
+  kind: "frame" | "holo",
+): Promise<string | null> {
+  if (!slug) return null;
+
+  const { data: item } = await getSupabaseAdmin()
+    .from("cosmetics")
+    .select("slug, kind, cost_embers")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (!item || item.kind !== kind) return null;
+  return ownsCosmetic(item, await ownedCosmetics(playerId)) ? slug : null;
+}
+
 export async function addToShowcase(
   playerId: string,
   cardId: string,
   printingId: string | null,
+  /** The dressing chosen at add time, before the card ever shows. */
+  dressing?: { frame: string | null; holo: string | null },
 ): Promise<ShowcaseOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -340,11 +374,18 @@ export async function addToShowcase(
 
   if ((count ?? 0) >= SHOWCASE_LIMIT) return { ok: false, reason: "full" };
 
+  const [frame, holo] = await Promise.all([
+    wearableOrNull(playerId, dressing?.frame ?? null, "frame"),
+    wearableOrNull(playerId, dressing?.holo ?? null, "holo"),
+  ]);
+
   const { error } = await admin.from("player_showcase").insert({
     player_id: playerId,
     card_id: cardId,
     printing_id: printingId,
     position: count ?? 0,
+    frame_slug: frame,
+    holo_slug: holo,
   });
 
   if (error) {
@@ -355,6 +396,86 @@ export async function addToShowcase(
   }
 
   return { ok: true };
+}
+
+/**
+ * Dresses one showcase card: its own frame and holo, explicitly.
+ *
+ * Scoped to the owner in the WHERE clause, so an entry id fished out of
+ * someone else's page updates nothing. Both slots are written every
+ * time — the editor always knows the full pair it is showing, and a
+ * partial write is how two surfaces end up disagreeing about one card.
+ */
+export async function dressShowcaseCard(
+  playerId: string,
+  entryId: string,
+  frame: string | null,
+  holo: string | null,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const [wearableFrame, wearableHolo] = await Promise.all([
+    wearableOrNull(playerId, frame, "frame"),
+    wearableOrNull(playerId, holo, "holo"),
+  ]);
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_showcase")
+    .update({ frame_slug: wearableFrame, holo_slug: wearableHolo })
+    .eq("id", entryId)
+    .eq("player_id", playerId);
+
+  if (error) {
+    console.error("Could not dress the showcase card", error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * The "Apply to all" button: this dressing becomes the profile default,
+ * and every card's own override is cleared so all of them inherit it.
+ *
+ * Clearing the overrides rather than stamping the slugs onto every row
+ * is the difference between "make them all match now" and "freeze them
+ * all forever": after this, changing the default in the store changes
+ * the whole shelf again, which is what a default is for.
+ */
+export async function dressAllShowcase(
+  playerId: string,
+  frame: string | null,
+  holo: string | null,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const admin = getSupabaseAdmin();
+
+  const [wearableFrame, wearableHolo] = await Promise.all([
+    wearableOrNull(playerId, frame, "frame"),
+    wearableOrNull(playerId, holo, "holo"),
+  ]);
+
+  const [defaults, overrides] = await Promise.all([
+    admin
+      .from("players")
+      .update({ equipped_frame: wearableFrame, equipped_holo: wearableHolo })
+      .eq("id", playerId),
+    admin
+      .from("player_showcase")
+      .update({ frame_slug: null, holo_slug: null })
+      .eq("player_id", playerId),
+  ]);
+
+  if (defaults.error || overrides.error) {
+    console.error(
+      "Could not apply the dressing to all cards",
+      defaults.error ?? overrides.error,
+    );
+    return false;
+  }
+
+  return true;
 }
 
 /** Takes a card off the shelf. Scoped to the owner, so it cannot clear another's. */

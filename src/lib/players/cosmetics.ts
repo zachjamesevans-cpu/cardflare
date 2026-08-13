@@ -33,16 +33,39 @@ export interface CosmeticItem {
 }
 
 export interface Wardrobe {
-  frames: CosmeticItem[];
+  /** Frames, marked equipped against the PROFILE PICTURE slot. */
+  avatarFrames: CosmeticItem[];
+  /** The same frames, marked equipped against the card DEFAULT slot. */
+  cardFrames: CosmeticItem[];
   holos: CosmeticItem[];
   effects: CosmeticItem[];
 }
 
-/** What is equipped right now. Null in a slot means the free default. */
+/**
+ * What is equipped right now. Null in a slot means the free default.
+ *
+ * Four slots since the founder split borders: `avatarFrame` dresses the
+ * profile picture, `frame` and `holo` are the DEFAULTS showcase cards
+ * inherit (a card can override both for itself), and `effect` is worn
+ * by every card.
+ */
 export interface Equipped {
+  avatarFrame: string | null;
   frame: string | null;
   holo: string | null;
   effect: string | null;
+}
+
+/**
+ * Where a cosmetic is worn. Two slots take frames, so the kind alone
+ * cannot say which column an equip writes — the shop section does.
+ */
+export type EquipSlot = "avatarFrame" | "cardFrame" | "holo" | "effect";
+
+/** The catalogue kind a slot accepts. */
+export function kindForSlot(slot: EquipSlot): CosmeticKind {
+  if (slot === "avatarFrame" || slot === "cardFrame") return "frame";
+  return slot;
 }
 
 /** The whole catalogue, ordered the way it should be shown. */
@@ -133,51 +156,51 @@ export async function wardrobeFor(
     ownedCosmetics(playerId),
   ]);
 
-  const equippedFor = (kind: CosmeticKind): string | null =>
-    kind === "frame"
-      ? equipped.frame
-      : kind === "holo"
-        ? equipped.holo
-        : equipped.effect;
+  const itemsFor = (kind: CosmeticKind, worn: string | null): CosmeticItem[] =>
+    catalogue
+      .filter((row) => row.kind === kind)
+      .map((row): CosmeticItem => {
+        const has = ownsCosmetic(row, owned);
+        /*
+         * An unlock-all grant clears the lifetime gate too. "Always
+         * unlocked, forever" means exactly that; making somebody who was
+         * handed everything still grind to 500 for Orbit would be a
+         * strange kind of gift.
+         */
+        const gated =
+          !owned.unlockedAll &&
+          row.requires_earned !== null &&
+          standing.earned < row.requires_earned;
 
-  const items = catalogue.map((row): CosmeticItem => {
-    const has = ownsCosmetic(row, owned);
-    /*
-     * An unlock-all grant clears the lifetime gate too. "Always
-     * unlocked, forever" means exactly that; making somebody who was
-     * handed everything still grind to 500 for Orbit would be a strange
-     * kind of gift.
-     */
-    const gated =
-      !owned.unlockedAll &&
-      row.requires_earned !== null &&
-      standing.earned < row.requires_earned;
+        return {
+          slug: row.slug,
+          kind: row.kind,
+          name: row.name,
+          description: row.description,
+          cost: row.cost_embers,
+          requiresEarned: row.requires_earned,
+          owned: has,
+          /*
+           * A null slot equips the free item of that kind, so the free
+           * item has to read as equipped or the shop shows nothing
+           * selected on a brand new profile.
+           */
+          equipped: worn === row.slug || (worn === null && row.cost_embers === 0),
+          affordable: has || (!gated && standing.balance >= row.cost_embers),
+          lockedUntil: gated ? row.requires_earned : null,
+        };
+      });
 
-    return {
-      slug: row.slug,
-      kind: row.kind,
-      name: row.name,
-      description: row.description,
-      cost: row.cost_embers,
-      requiresEarned: row.requires_earned,
-      owned: has,
-      /*
-       * A null slot equips the free item of that kind, so the free item
-       * has to read as equipped or the shop shows nothing selected on a
-       * brand new profile.
-       */
-      equipped:
-        equippedFor(row.kind) === row.slug ||
-        (equippedFor(row.kind) === null && row.cost_embers === 0),
-      affordable: has || (!gated && standing.balance >= row.cost_embers),
-      lockedUntil: gated ? row.requires_earned : null,
-    };
-  });
-
+  /*
+   * Frames are listed twice — once per slot they can be worn in. Same
+   * items, same ownership, different "Equipped" mark, which is exactly
+   * what the two shop sections need. One purchase covers both.
+   */
   return {
-    frames: items.filter((item) => item.kind === "frame"),
-    holos: items.filter((item) => item.kind === "holo"),
-    effects: items.filter((item) => item.kind === "effect"),
+    avatarFrames: itemsFor("frame", equipped.avatarFrame),
+    cardFrames: itemsFor("frame", equipped.frame),
+    holos: itemsFor("holo", equipped.holo),
+    effects: itemsFor("effect", equipped.effect),
   };
 }
 
@@ -201,7 +224,17 @@ export type BuyOutcome =
  * through to grant the row it failed to grant last time. The other order
  * would hand out the goods and then fail to charge.
  */
-export async function buyCosmetic(playerId: string, slug: string): Promise<BuyOutcome> {
+export async function buyCosmetic(
+  playerId: string,
+  slug: string,
+  /**
+   * Which slot the tap came from. A frame bought in the Profile borders
+   * section goes straight onto the picture; the same frame bought under
+   * Card borders becomes the card default. Defaults to the kind's own
+   * slot so callers that predate the split (the app) keep working.
+   */
+  slot?: EquipSlot,
+): Promise<BuyOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
   const admin = getSupabaseAdmin();
@@ -218,10 +251,13 @@ export async function buyCosmetic(playerId: string, slug: string): Promise<BuyOu
   }
   if (!item) return { ok: false, reason: "unknown" };
 
+  const target: EquipSlot = slot ?? (item.kind === "frame" ? "cardFrame" : item.kind);
+  if (kindForSlot(target) !== item.kind) return { ok: false, reason: "unknown" };
+
   const owned = await ownedCosmetics(playerId);
   if (ownsCosmetic(item, owned)) {
     // Already theirs. Treat the tap as "equip it", which is what it means.
-    const equipped = await equipCosmetic(playerId, item.kind, slug);
+    const equipped = await equipCosmetic(playerId, target, slug);
     return equipped ? { ok: true, slug } : { ok: false, reason: "unavailable" };
   }
 
@@ -279,25 +315,26 @@ export async function buyCosmetic(playerId: string, slug: string): Promise<BuyOu
     return { ok: false, reason: "unavailable" };
   }
 
-  const equipped = await equipCosmetic(playerId, item.kind, slug);
+  const equipped = await equipCosmetic(playerId, target, slug);
   return equipped ? { ok: true, slug } : { ok: false, reason: "unavailable" };
 }
 
 /**
- * The players column each kind of cosmetic is worn in.
+ * The players column each slot writes.
  *
- * Written out as three literal objects rather than one computed key,
- * because a computed key widens the update to a string index signature
- * and supabase-js then cannot tell it from an arbitrary column write.
+ * Written out as literal objects rather than one computed key, because a
+ * computed key widens the update to a string index signature and
+ * supabase-js then cannot tell it from an arbitrary column write.
  */
-function slotUpdate(kind: CosmeticKind, slug: string | null) {
-  if (kind === "frame") return { equipped_frame: slug };
-  if (kind === "holo") return { equipped_holo: slug };
+function slotUpdate(slot: EquipSlot, slug: string | null) {
+  if (slot === "avatarFrame") return { equipped_avatar_frame: slug };
+  if (slot === "cardFrame") return { equipped_frame: slug };
+  if (slot === "holo") return { equipped_holo: slug };
   return { equipped_effect: slug };
 }
 
 /**
- * Wears a cosmetic the player already owns.
+ * Wears a cosmetic the player already owns, in one slot.
  *
  * Ownership is re-checked here rather than trusted from the caller: this
  * is reachable from a Server Action, and "equip" with an arbitrary slug
@@ -305,7 +342,7 @@ function slotUpdate(kind: CosmeticKind, slug: string | null) {
  */
 export async function equipCosmetic(
   playerId: string,
-  kind: CosmeticKind,
+  slot: EquipSlot,
   slug: string | null,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
@@ -319,13 +356,13 @@ export async function equipCosmetic(
       .eq("slug", slug)
       .maybeSingle();
 
-    if (!item || item.kind !== kind) return false;
+    if (!item || item.kind !== kindForSlot(slot)) return false;
     if (!ownsCosmetic(item, await ownedCosmetics(playerId))) return false;
   }
 
   const { error } = await admin
     .from("players")
-    .update(slotUpdate(kind, slug))
+    .update(slotUpdate(slot, slug))
     .eq("id", playerId);
 
   if (error) {
@@ -363,6 +400,7 @@ export async function resolveEquipped(equipped: Equipped): Promise<Equipped> {
     catalogue.find((row) => row.kind === kind && row.cost_embers === 0)?.slug ?? null;
 
   return {
+    avatarFrame: equipped.avatarFrame ?? freeOf("frame"),
     frame: equipped.frame ?? freeOf("frame"),
     holo: equipped.holo ?? freeOf("holo"),
     effect: equipped.effect ?? freeOf("effect"),
