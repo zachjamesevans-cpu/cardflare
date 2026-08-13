@@ -16,14 +16,21 @@ import { colors } from "./theme";
  * avatar's size and a roster stays on its grid.
  */
 
-/** Mirrors FRAME_CLASS in the website's player-avatar.tsx. */
-const FRAME_COLOR: Record<string, string | null> = {
+/** Mirrors FRAME_CLASS in the website's player-avatar.tsx. Exported so
+    the shop tiles can show the ring a frame buys before it is bought. */
+export const FRAME_COLOR: Record<string, string | null> = {
   plain: null,
   "ember-edge": "#ff8a3d",
   "lime-edge": colors.accent,
   /* No travelling gradient here, for the same reason the showcase cards
-     hold still: React Native has no animated gradient border. */
+     hold still: React Native has no animated gradient border. The three
+     travellers each take the strongest stop of their web gradient. */
   "prism-edge": "#8c3cff",
+  "frost-edge": "#6ec3ff",
+  "rose-edge": "#ff6fb5",
+  "gilded-edge": "#f0c24b",
+  "molten-edge": "#ff5a1f",
+  "galaxy-edge": "#6d4aff",
 };
 
 /** Six hues, matching --color-avatar-N in the website's globals.css. */

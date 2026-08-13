@@ -83,6 +83,12 @@
   --color-ember-deep: #c2410c;
   --color-galaxy: #6d4aff;
   --color-galaxy-deep: #1a0b3d;
+  --color-frost: #6ec3ff;
+  --color-frost-deep: #1d6fa8;
+  --color-rose: #ff6fb5;
+  --color-rose-deep: #b8367d;
+  --color-gold: #f0c24b;
+  --color-gold-deep: #a8781d;
 }
 
 @layer base {
@@ -406,7 +412,12 @@
  */
 .cf-frame-ember-edge::before,
 .cf-frame-lime-edge::before,
-.cf-frame-prism-edge::before {
+.cf-frame-prism-edge::before,
+.cf-frame-frost-edge::before,
+.cf-frame-rose-edge::before,
+.cf-frame-gilded-edge::before,
+.cf-frame-molten-edge::before,
+.cf-frame-galaxy-edge::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -455,6 +466,76 @@
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   animation: cf-prism-travel 6s linear infinite;
+}
+
+.cf-frame-frost-edge::before {
+  box-shadow:
+    inset 0 0 0 2px var(--color-frost),
+    inset 0 0 12px -2px var(--color-frost-deep);
+}
+
+.cf-frame-rose-edge::before {
+  box-shadow:
+    inset 0 0 0 2px var(--color-rose),
+    inset 0 0 12px -2px var(--color-rose-deep);
+}
+
+.cf-frame-gilded-edge::before {
+  box-shadow:
+    inset 0 0 0 2px var(--color-gold),
+    inset 0 0 12px -2px var(--color-gold-deep);
+}
+
+/*
+ * Molten Edge: the Prism treatment in the Embers' own colours. Same
+ * masked-ring trick, hotter palette, a touch quicker.
+ */
+.cf-frame-molten-edge::before {
+  padding: 2px;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 61, 0, 0.9),
+    rgba(255, 138, 61, 0.9),
+    rgba(255, 210, 61, 0.9),
+    rgba(194, 65, 12, 0.9),
+    rgba(255, 61, 0, 0.9)
+  );
+  background-size: 300% 100%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cf-prism-travel 5s linear infinite;
+}
+
+/*
+ * Galaxy Edge: the Galaxy Holo's palette on a ring, with a pass of
+ * near-white for the stars. Slow, because deep space does not hurry.
+ */
+.cf-frame-galaxy-edge::before {
+  padding: 2px;
+  background: linear-gradient(
+    115deg,
+    rgba(58, 36, 128, 0.95),
+    rgba(109, 74, 255, 0.95),
+    rgba(255, 0, 170, 0.85),
+    rgba(238, 238, 255, 0.9),
+    rgba(58, 36, 128, 0.95)
+  );
+  background-size: 300% 100%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cf-prism-travel 9s linear infinite;
 }
 
 @keyframes cf-prism-travel {
@@ -829,6 +910,24 @@
     0 0 0 4px var(--color-accent);
 }
 
+.cf-avatar-frame-frost-edge {
+  box-shadow:
+    0 0 0 2px var(--color-canvas),
+    0 0 0 4px var(--color-frost);
+}
+
+.cf-avatar-frame-rose-edge {
+  box-shadow:
+    0 0 0 2px var(--color-canvas),
+    0 0 0 4px var(--color-rose);
+}
+
+.cf-avatar-frame-gilded-edge {
+  box-shadow:
+    0 0 0 2px var(--color-canvas),
+    0 0 0 4px var(--color-gold);
+}
+
 /*
  * Prism Edge travels, so it needs a real element to paint into. The
  * `-4px` inset puts the ring outside the avatar, and the mask leaves
@@ -864,4 +963,53 @@
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   animation: cf-prism-travel 6s linear infinite;
+}
+
+/* Molten and Galaxy travel too, so they take the same masked ring. */
+.cf-avatar-frame-molten-edge,
+.cf-avatar-frame-galaxy-edge {
+  position: relative;
+}
+
+.cf-avatar-frame-molten-edge::after,
+.cf-avatar-frame-galaxy-edge::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  padding: 2px;
+  pointer-events: none;
+  background-size: 300% 100%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.cf-avatar-frame-molten-edge::after {
+  background-image: linear-gradient(
+    115deg,
+    rgba(255, 61, 0, 0.95),
+    rgba(255, 138, 61, 0.95),
+    rgba(255, 210, 61, 0.95),
+    rgba(194, 65, 12, 0.95),
+    rgba(255, 61, 0, 0.95)
+  );
+  animation: cf-prism-travel 5s linear infinite;
+}
+
+.cf-avatar-frame-galaxy-edge::after {
+  background-image: linear-gradient(
+    115deg,
+    rgba(58, 36, 128, 0.95),
+    rgba(109, 74, 255, 0.95),
+    rgba(255, 0, 170, 0.85),
+    rgba(238, 238, 255, 0.9),
+    rgba(58, 36, 128, 0.95)
+  );
+  animation: cf-prism-travel 9s linear infinite;
 }
