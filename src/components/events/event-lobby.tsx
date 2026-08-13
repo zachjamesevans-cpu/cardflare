@@ -82,6 +82,7 @@ export function EventLobby({
                     displayName={participant.displayName}
                     seed={participant.playerSessionId}
                     avatarUrl={participant.avatarUrl}
+                    frame={participant.frame}
                     size="sm"
                     className={participant.present ? undefined : "opacity-50"}
                   />

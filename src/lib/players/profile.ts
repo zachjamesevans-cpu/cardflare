@@ -5,12 +5,13 @@ import sharp from "sharp";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { emberTier } from "./ember-rules";
 import type { EmberTier } from "./ember-rules";
-import type { Equipped } from "./cosmetics";
+import { freeSlugFor, type Equipped } from "./cosmetics";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
   AVATAR_SIZE,
   avatarObjectPath,
+  avatarSrc,
 } from "./profile-image";
 
 /**
@@ -39,6 +40,7 @@ export interface ShowcaseCard {
 export interface PublicProfile {
   playerId: string;
   displayName: string;
+  /** Ready to put in an `<img>`. Null means the generated initials. */
   avatarUrl: string | null;
   /** Lifetime. The badge. */
   embersEarned: number;
@@ -75,7 +77,13 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
   return {
     playerId: player.id,
     displayName: player.display_name,
-    avatarUrl: player.avatar_url,
+    /*
+     * Resolved to a src here rather than at every render point. What is
+     * in the column is an object path (or, for older rows, a full URL);
+     * what a component needs is something it can put in an `<img>`, and
+     * one conversion in one place is what stops the two diverging.
+     */
+    avatarUrl: avatarSrc(player.avatar_url),
     embersEarned: player.embers_earned,
     embersBalance: player.embers_balance,
     tier: emberTier(player.embers_earned),
@@ -130,6 +138,12 @@ export async function publicProfile(playerId: string): Promise<PublicProfile | n
 export interface RoomIdentity {
   embersEarned: number;
   avatarUrl: string | null;
+  /**
+   * The frame slug they are wearing, already resolved through the
+   * catalogue so a null column reads as the free default rather than
+   * making every renderer know the free-is-implicit rule.
+   */
+  frame: string | null;
 }
 
 export async function roomIdentitiesFor(
@@ -140,7 +154,7 @@ export async function roomIdentitiesFor(
 
   const { data, error } = await getSupabaseAdmin()
     .from("players")
-    .select("id, embers_earned, avatar_url")
+    .select("id, embers_earned, avatar_url, equipped_frame")
     .in("id", [...new Set(playerIds)]);
 
   if (error) {
@@ -148,10 +162,18 @@ export async function roomIdentitiesFor(
     return identities;
   }
 
+  /*
+   * The free frame, looked up once for the whole room rather than per
+   * person. A null `equipped_frame` means "the free one", and resolving
+   * it here keeps that rule in the same file as the rest of it.
+   */
+  const freeFrame = await freeSlugFor("frame");
+
   for (const row of data ?? []) {
     identities.set(row.id, {
       embersEarned: row.embers_earned,
-      avatarUrl: row.avatar_url,
+      avatarUrl: avatarSrc(row.avatar_url),
+      frame: row.equipped_frame ?? freeFrame,
     });
   }
 
@@ -305,11 +327,8 @@ export async function removeFromShowcase(
 /* -------------------------------------------------------------------- */
 
 export type AvatarOutcome =
-  | { ok: true; url: string }
-  | {
-      ok: false;
-      reason: "too-big" | "wrong-type" | "unreadable" | "not-public" | "unavailable";
-    };
+  | { ok: true; path: string }
+  | { ok: false; reason: "too-big" | "wrong-type" | "unreadable" | "unavailable" };
 
 /**
  * Stores a profile picture.
@@ -368,34 +387,16 @@ export async function setAvatar(
     return { ok: false, reason: "unavailable" };
   }
 
-  const {
-    data: { publicUrl },
-  } = admin.storage.from("avatars").getPublicUrl(path);
-
   /*
-   * Prove the URL actually serves before recording it.
+   * The object PATH is what gets stored, not a public URL.
    *
-   * `getPublicUrl` is pure string concatenation — it never contacts
-   * storage, so it happily returns a perfectly-formed URL for a bucket
-   * that is private, missing, or not serving. That is exactly the shape
-   * of the first bug the founder hit: the upload succeeded, the row was
-   * written, the page said "Picture updated." and rendered a broken
-   * image. A success message over a broken image is the worst outcome
-   * available, because it sends somebody looking in the wrong place.
-   *
-   * One HEAD request costs about a hundred milliseconds on an action
-   * that already spent longer than that decoding a photograph, and it
-   * turns an invisible failure into a sentence naming the cause.
+   * The previous cut stored `getPublicUrl(path)` and pointed an `<img>`
+   * at the storage host. That is what the founder saw fail: the server
+   * could fetch the URL and their phone could not. Storing a path and
+   * serving through `/api/avatars/...` means the browser only ever talks
+   * to CardFlare, and it takes "is the bucket public" out of the
+   * equation entirely — this row is now correct either way.
    */
-  if (!(await servesPublicly(publicUrl))) {
-    /*
-     * Clean up rather than leave an object nobody will ever reference.
-     * The row was never updated, so this path has no other trace.
-     */
-    await admin.storage.from("avatars").remove([path]);
-    return { ok: false, reason: "not-public" };
-  }
-
   const { data: previous, error: readError } = await admin
     .from("players")
     .select("avatar_url")
@@ -406,7 +407,7 @@ export async function setAvatar(
 
   const { error } = await admin
     .from("players")
-    .update({ avatar_url: publicUrl })
+    .update({ avatar_url: path })
     .eq("id", playerId);
 
   if (error) {
@@ -421,48 +422,7 @@ export async function setAvatar(
    */
   await deleteAvatarObject(previous?.avatar_url ?? null);
 
-  return { ok: true, url: publicUrl };
-}
-
-/**
- * Can anybody actually fetch this?
- *
- * Deliberately fails CLOSED on a network error: a picture we cannot
- * confirm is servable is one a room full of strangers may not be able to
- * see either, and the fallback (initials over a colour) is a perfectly
- * good avatar. Better to refuse the upload than to record a URL that
- * renders as a broken image on somebody else's phone.
- */
-async function servesPublicly(url: string): Promise<boolean> {
-  /*
-   * Two attempts, because the first can lose a race with the write that
-   * just happened. One retry is the difference between "storage was a
-   * few hundred milliseconds behind" and "this bucket is private" — and
-   * refusing a good upload over the former would be its own bug.
-   */
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 400));
-
-    try {
-      const response = await fetch(url, {
-        method: "HEAD",
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (response.ok) return true;
-
-      console.error(
-        `Avatar not reachable: ${response.status} for ${url}. If this is 400 or ` +
-          `404, check that storage.buckets has a row with id 'avatars' and ` +
-          `public = true.`,
-      );
-    } catch (error) {
-      console.error("Could not confirm the profile picture is reachable", error);
-    }
-  }
-
-  return false;
+  return { ok: true, path };
 }
 
 /** Removes the picture and goes back to the generated initials. */
@@ -492,43 +452,125 @@ export async function clearAvatar(playerId: string): Promise<boolean> {
 }
 
 /**
- * Deletes the stored object behind an avatar URL.
+ * Deletes the stored object behind an avatar row.
  *
- * Parsed back out of the public URL rather than kept in its own column:
- * one source of truth for where the picture is, and no way for the two
- * to drift. Anything that does not look like this bucket's public URL is
- * ignored, so a hand-edited row cannot aim this at another bucket.
+ * Rows written now hold the object path directly. Rows written before
+ * that hold a full public URL, so the path is recovered from it — both
+ * shapes have to be deletable or the old objects would pile up forever.
+ * Anything that is neither is ignored, so a hand-edited row cannot aim
+ * this at some other object.
  */
-async function deleteAvatarObject(publicUrl: string | null): Promise<void> {
-  if (!publicUrl) return;
+async function deleteAvatarObject(stored: string | null): Promise<void> {
+  if (!stored) return;
 
-  const marker = "/storage/v1/object/public/avatars/";
-  const at = publicUrl.indexOf(marker);
-  if (at === -1) return;
+  let path = stored;
 
-  const path = decodeURIComponent(publicUrl.slice(at + marker.length));
-  if (!path || path.includes("..")) return;
+  if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    const marker = "/storage/v1/object/public/avatars/";
+    const at = stored.indexOf(marker);
+    if (at === -1) return;
+    path = decodeURIComponent(stored.slice(at + marker.length));
+  }
+
+  if (!path || path.includes("..") || path.startsWith("/")) return;
 
   const { error } = await getSupabaseAdmin().storage.from("avatars").remove([path]);
   if (error) console.error("Could not delete the old profile picture", error);
 }
 
-/** Renames the account. The display name a room shows comes from here. */
+export type RenameOutcome = "renamed" | "taken" | "failed";
+
+/** Postgres unique violation: somebody already has that name. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Renames the account, if the name is free.
+ *
+ * Availability is decided by the unique index, not by a SELECT before
+ * the UPDATE. Two people can type the same name into two phones at the
+ * same counter, and a check-then-write loses that race every time — the
+ * index is the only thing that cannot.
+ *
+ * The name is also written through to every session the account owns.
+ * Rooms render `player_sessions.display_name`, and a copy that is never
+ * refreshed is a copy that drifts: rename yourself mid-event and the
+ * board would keep showing whatever you were called when you walked in.
+ * Write-through rather than a join in every name lookup because there
+ * are five of those and one of these.
+ */
 export async function setDisplayName(
   playerId: string,
   displayName: string,
-): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
+): Promise<RenameOutcome> {
+  if (!isSupabaseConfigured()) return "failed";
 
-  const { error } = await getSupabaseAdmin()
+  const admin = getSupabaseAdmin();
+  const name = displayName.trim();
+
+  const { error } = await admin
     .from("players")
-    .update({ display_name: displayName })
+    .update({ display_name: name })
     .eq("id", playerId);
 
   if (error) {
+    if (error.code === UNIQUE_VIOLATION) return "taken";
     console.error("Could not rename the player", error);
-    return false;
+    return "failed";
   }
 
-  return true;
+  await syncSessionNames(playerId, name);
+  return "renamed";
+}
+
+/**
+ * Points every room identity this account owns at the account's name.
+ *
+ * Failure is logged and swallowed: the rename itself already succeeded,
+ * and a stale name in one room is not worth telling somebody their
+ * rename did not work when it did.
+ */
+export async function syncSessionNames(
+  playerId: string,
+  displayName: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .update({ display_name: displayName })
+    .eq("player_id", playerId);
+
+  if (error) console.error("Could not sync the name onto the player's sessions", error);
+}
+
+/**
+ * Is this name free, ignoring case?
+ *
+ * A courtesy for the UI, never the gate — see `setDisplayName`. The
+ * `ilike` is an exact comparison with no wildcards in it: the pattern is
+ * escaped, so a name containing `%` matches only itself.
+ */
+export async function isDisplayNameFree(
+  displayName: string,
+  exceptPlayerId?: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+
+  const pattern = displayName.trim().replace(/([%_\\])/g, "\\$1");
+
+  let query = getSupabaseAdmin()
+    .from("players")
+    .select("id")
+    .ilike("display_name", pattern);
+  if (exceptPlayerId) query = query.neq("id", exceptPlayerId);
+
+  const { data, error } = await query.limit(1);
+
+  if (error) {
+    console.error("Could not check whether a name is free", error);
+    // Say yes and let the index decide; a false "taken" blocks a valid name.
+    return true;
+  }
+
+  return (data ?? []).length === 0;
 }

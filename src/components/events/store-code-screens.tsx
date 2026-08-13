@@ -47,11 +47,14 @@ export function StoreLobby({
   storeName,
   code,
   knownAs,
+  accountName,
   earlyBoard,
 }: {
   storeName: string;
   code: string;
   knownAs?: string | null;
+  /** A signed-in account's name, which wins over the session's. */
+  accountName?: string | null;
   earlyBoard?: EarlyBoard | null;
 }) {
   return (
@@ -70,7 +73,11 @@ export function StoreLobby({
       {earlyBoard && <EarlyBoardCard board={earlyBoard} />}
 
       <Card>
-        <JoinEventForm code={code} knownAs={knownAs ?? undefined} />
+        <JoinEventForm
+          code={code}
+          knownAs={knownAs ?? undefined}
+          accountName={accountName ?? undefined}
+        />
       </Card>
     </>
   );

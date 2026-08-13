@@ -5,6 +5,7 @@ import {
   AVATAR_MIME_TYPES,
   AVATAR_SIZE,
   avatarObjectPath,
+  avatarSrc,
   checkAvatarFile,
 } from "@/lib/players/profile-image";
 
@@ -83,5 +84,39 @@ describe("avatarObjectPath", () => {
 
   it("stores a square, at the one size the app renders", () => {
     expect(AVATAR_SIZE).toBe(512);
+  });
+});
+
+describe("avatarSrc", () => {
+  /*
+   * The founder's phone could not fetch the Supabase URL the server
+   * could. Serving from CardFlare's own origin is the fix, and this is
+   * the function that decides it — so the important assertion is simply
+   * that a stored path never comes back pointing at another host.
+   */
+  it("serves a stored path from CardFlare's own domain", () => {
+    expect(avatarSrc("player-1/1000.webp")).toBe("/api/avatars/player-1/1000.webp");
+  });
+
+  it("never points at the storage host for a path", () => {
+    const src = avatarSrc("abc/123.webp");
+    expect(src?.startsWith("/api/avatars/")).toBe(true);
+    expect(src).not.toContain("supabase");
+  });
+
+  it("leaves a legacy full URL alone, so old rows still render", () => {
+    const legacy =
+      "https://example.supabase.co/storage/v1/object/public/avatars/a/1.webp";
+    expect(avatarSrc(legacy)).toBe(legacy);
+  });
+
+  it("has nothing to serve for a player with no picture", () => {
+    expect(avatarSrc(null)).toBeNull();
+    expect(avatarSrc(undefined)).toBeNull();
+    expect(avatarSrc("")).toBeNull();
+  });
+
+  it("encodes each segment without eating the separator", () => {
+    expect(avatarSrc("a b/c d.webp")).toBe("/api/avatars/a%20b/c%20d.webp");
   });
 });

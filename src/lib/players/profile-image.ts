@@ -58,3 +58,30 @@ export function checkAvatarFile(file: { size: number; type: string }): AvatarChe
 export function avatarObjectPath(playerId: string, at = Date.now()): string {
   return `${playerId}/${at}.webp`;
 }
+
+/**
+ * Where the browser fetches an avatar from.
+ *
+ * CardFlare's own domain, never the storage host directly, and that is a
+ * correction rather than a preference. The first cut pointed an `<img>`
+ * straight at the Supabase public URL; the server could fetch it and the
+ * founder's phone could not, which is the same shape as the bug that
+ * already forced this app's writes into a header — something between a
+ * phone on real-world wifi and a third-party host eats the request.
+ *
+ * Serving from `/api/avatars/...` means the browser only ever talks to
+ * the origin it already has open. It also means the bucket does not have
+ * to be public for a picture to show up, so "is the bucket public" stops
+ * being a thing anybody has to know.
+ *
+ * Rows written before this change hold a full URL. They are passed
+ * through untouched rather than migrated: the old URLs still work where
+ * they work, and every upload from here on writes a path.
+ */
+export function avatarSrc(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  if (stored.startsWith("http://") || stored.startsWith("https://")) return stored;
+
+  /* Each segment separately: encodeURIComponent would eat the slash. */
+  return `/api/avatars/${stored.split("/").map(encodeURIComponent).join("/")}`;
+}

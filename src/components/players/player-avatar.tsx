@@ -23,6 +23,21 @@ const HUE_CLASS: Record<number, string> = {
 const PIXELS: Record<"sm" | "md", number> = { sm: 32, md: 40 };
 
 /**
+ * The frame a player bought, drawn around them.
+ *
+ * Written out one class per slug for the same reason the card frames
+ * are: Tailwind cannot see a class assembled at runtime, and an unknown
+ * slug falls through to no frame, which is the right failure for a
+ * cosmetic that was removed from the catalogue.
+ */
+const FRAME_CLASS: Record<string, string> = {
+  plain: "",
+  "ember-edge": "cf-avatar-frame-ember-edge",
+  "lime-edge": "cf-avatar-frame-lime-edge",
+  "prism-edge": "cf-avatar-frame-prism-edge",
+};
+
+/**
  * A player's avatar: their picture if they have chosen one, otherwise
  * their initials over a colour derived from their session.
  *
@@ -46,6 +61,7 @@ export function PlayerAvatar({
   displayName,
   seed,
   avatarUrl = null,
+  frame = null,
   size = "md",
   className,
 }: {
@@ -54,6 +70,14 @@ export function PlayerAvatar({
   seed: string;
   /** A stored profile picture, or null for the generated mark. */
   avatarUrl?: string | null;
+  /**
+   * The cosmetic frame slug they have equipped, or null for none.
+   *
+   * Drawn on the initials as well as on a picture: somebody who spent
+   * 600 Embers on the Prism Edge should be wearing it whether or not
+   * they have uploaded a photograph.
+   */
+  frame?: string | null;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -62,6 +86,7 @@ export function PlayerAvatar({
   const box = cn(
     "inline-flex shrink-0 items-center justify-center rounded-full border",
     size === "sm" ? "size-8 text-xs" : "size-10 text-sm",
+    frame ? FRAME_CLASS[frame] : "",
     className,
   );
 

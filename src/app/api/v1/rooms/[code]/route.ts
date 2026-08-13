@@ -27,6 +27,7 @@ import { joinAsPlayerSchema } from "@/lib/players/schema";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { counterAvailability } from "@/lib/singles/repository";
+import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,20 @@ export const dynamic = "force-dynamic";
  */
 
 type Params = { params: Promise<{ code: string }> };
+
+/**
+ * Avatar paths are relative on the website and useless to a phone, which
+ * has no origin to resolve them against. Absolutised here, at the one
+ * seam where the audience stops being a browser.
+ */
+function absoluteAvatars<T extends { avatarUrl: string | null }>(rows: T[]): T[] {
+  const base = siteUrl();
+  return rows.map((row) =>
+    row.avatarUrl?.startsWith("/")
+      ? { ...row, avatarUrl: `${base}${row.avatarUrl}` }
+      : row,
+  );
+}
 
 function normalized(raw: string): string | null {
   const code = normalizeJoinCode(decodeURIComponent(raw));
@@ -53,6 +68,14 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     return Response.json({ error: "not-found" }, { status: 404 });
   }
 
+  /*
+   * Resolved once for every branch below. Each of them can be the screen
+   * that used to ask a signed-in player to pick a name, and verifying a
+   * bearer token is a round trip to the auth server — not something to
+   * do twice in one response.
+   */
+  const account = await apiPlayer(request);
+
   // Shows and quiet/lobby states are real answers, not errors. A lobby is
   // a joinable one — the POST below opens the walk-in room, exactly as the
   // website's lobby form does — so it carries the store's name for the
@@ -60,6 +83,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   if (resolved.outcome !== "room") {
     return Response.json({
       state: resolved.outcome,
+      account: account ? { displayName: account.displayName } : null,
       ...("store" in resolved && resolved.store
         ? { store: { name: resolved.store.name } }
         : {}),
@@ -96,7 +120,15 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   };
 
   if (!session || !participation || (phase !== "live" && phase !== "early")) {
-    return Response.json({ ...base, joined: false });
+    /*
+     * The account travels with the not-joined answer too. This is the
+     * exact screen that used to ask a signed-in player to pick a name.
+     */
+    return Response.json({
+      ...base,
+      joined: false,
+      account: account ? { displayName: account.displayName } : null,
+    });
   }
 
   const [participants, flares, binder, offers] = await Promise.all([
@@ -130,7 +162,13 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     ...base,
     joined: true,
     you: { sessionId: session.id, displayName: session.display_name },
-    participants,
+    /*
+     * Present when a bearer token is on the request. The app's join
+     * screen uses it to stop asking for a name: a signed-in player joins
+     * as themselves, and the name lives in profile settings.
+     */
+    account: account ? { displayName: account.displayName } : null,
+    participants: absoluteAvatars(participants),
     flares: flares.map((entry) => ({
       ...entry,
       match: entry.playerSessionId === session.id ? null : matchFor(entry, held),
@@ -182,18 +220,26 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   let freshToken: string | null = null;
   const submitted = (parsed.data.displayName ?? "").trim();
 
+  /*
+   * A signed-in player joins as themselves, the same rule the website
+   * follows. Their name is unique and lives in profile settings, so a
+   * name sent up from a join screen is ignored rather than argued with.
+   */
+  const account = await apiPlayer(request);
+  const wanted = account?.displayName ?? submitted;
+
   if (session) {
     // Renamed in place, never replaced — a new session would abandon the
     // binder and every membership hanging off the old one.
-    if (submitted && submitted !== session.display_name) {
-      const name = joinAsPlayerSchema.safeParse({ displayName: submitted });
+    if (wanted && wanted !== session.display_name) {
+      const name = joinAsPlayerSchema.safeParse({ displayName: wanted });
       if (!name.success) return badRequest("That display name will not work.");
 
       await renamePlayerSession(session.id, name.data.displayName);
       session = { ...session, display_name: name.data.displayName };
     }
   } else {
-    const name = joinAsPlayerSchema.safeParse({ displayName: submitted });
+    const name = joinAsPlayerSchema.safeParse({ displayName: wanted });
     if (!name.success) return badRequest("A display name is required to join.");
 
     freshToken = createSessionToken();
@@ -212,12 +258,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   // A bearer-authenticated app user claims the session, exactly as the
   // website links a signed-in viewer. Guests join with nothing extra.
   let accountPlayerId = session.player_id;
-  if (session.player_id === null) {
-    const player = await apiPlayer(request);
-    if (player) {
-      await linkSessionToPlayer(session.id, player.playerId);
-      accountPlayerId = player.playerId;
-    }
+  if (!accountPlayerId && account) {
+    await linkSessionToPlayer(session.id, account.playerId);
+    accountPlayerId = account.playerId;
   }
 
   // Same rule as the website's join: a signed-in join saves the store as

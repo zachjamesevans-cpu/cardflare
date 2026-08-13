@@ -795,3 +795,73 @@
     rotate: 360deg;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Frames, on a person rather than a card                                      */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The founder's ask: a frame bought with Embers has to be visible in the
+ * room, not only on the profile. A showcase is somewhere you go; a room
+ * is where the people are, and a thing you earned that nobody sees you
+ * wearing is not really a reward.
+ *
+ * Separate classes from the card frames rather than a shared set,
+ * because the geometry is genuinely different: a card frame is an inset
+ * ring on a rectangle sized in points, and this is a ring OUTSIDE a
+ * circle whose diameter changes with the size prop. Sharing one rule
+ * would mean neither fitting properly.
+ *
+ * Drawn with `box-shadow` in the two static cases, so the ring costs no
+ * extra element and never changes the avatar's layout size — a roster of
+ * twelve people has to stay on its grid whatever anybody is wearing.
+ */
+
+.cf-avatar-frame-ember-edge {
+  box-shadow:
+    0 0 0 2px var(--color-canvas),
+    0 0 0 4px var(--color-ember);
+}
+
+.cf-avatar-frame-lime-edge {
+  box-shadow:
+    0 0 0 2px var(--color-canvas),
+    0 0 0 4px var(--color-accent);
+}
+
+/*
+ * Prism Edge travels, so it needs a real element to paint into. The
+ * `-4px` inset puts the ring outside the avatar, and the mask leaves
+ * only the 2px band — the same trick the card frame uses, on a circle.
+ */
+.cf-avatar-frame-prism-edge {
+  position: relative;
+}
+
+.cf-avatar-frame-prism-edge::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  padding: 2px;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    rgba(0, 200, 255, 0.95),
+    rgba(255, 0, 170, 0.95),
+    rgba(140, 60, 255, 0.95),
+    rgba(120, 255, 60, 0.95),
+    rgba(255, 200, 0, 0.95),
+    rgba(0, 200, 255, 0.95)
+  );
+  background-size: 300% 100%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cf-prism-travel 6s linear infinite;
+}

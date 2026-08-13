@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
+import { accountIdentity } from "./account-identity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -49,7 +51,17 @@ export async function joinAsPlayer(
   formData: FormData,
 ): Promise<JoinPlayerState> {
   const submitted = text(formData, "displayName");
-  const parsed = joinAsPlayerSchema.safeParse({ displayName: submitted });
+
+  /*
+   * A signed-in player is not a guest, even here. This is the guest
+   * front door and stays one, but somebody who has an account and lands
+   * on it should get their own name rather than a second identity under
+   * whatever they type — the account's name is unique and theirs.
+   */
+  const account = await accountIdentity(await getViewer());
+  const parsed = joinAsPlayerSchema.safeParse({
+    displayName: account?.displayName ?? submitted,
+  });
 
   if (!parsed.success) {
     const issue = parsed.error.issues.find((i) => i.path[0] === "displayName");

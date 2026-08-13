@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 
@@ -40,10 +41,20 @@ function SubmitButton({ label }: { label: string }) {
 export function JoinEventForm({
   code,
   knownAs,
+  accountName,
 }: {
   code: string;
   /** Set when the browser already has a player session. */
   knownAs?: string;
+  /**
+   * Set when a signed-in account is present, and then it wins.
+   *
+   * The founder's report: signing in still dropped them into a room as a
+   * guest under whatever name the form had. An account's name is unique
+   * and lives in profile settings, so a room is not the place to change
+   * it — the field becomes a statement of who you are.
+   */
+  accountName?: string;
 }) {
   const [state, formAction] = useActionState<JoinPlayerState, FormData>(
     joinEventAction,
@@ -53,6 +64,37 @@ export function JoinEventForm({
   const error = state.status === "error" ? state.message : undefined;
   const submitted = state.status === "error" ? state.displayName : "";
   const returning = Boolean(knownAs);
+
+  if (accountName) {
+    return (
+      <form action={formAction} noValidate className="flex flex-col gap-4">
+        <input type="hidden" name="code" value={code} />
+
+        <div className="flex flex-col gap-1.5 rounded-[var(--radius-control)] border border-border bg-elevated p-4">
+          <span className="text-sm text-text-muted">Joining as</span>
+          <span className="text-lg font-semibold text-text-primary">{accountName}</span>
+          <span className="text-sm text-text-secondary">
+            Your name, picture and Embers come with you.{" "}
+            <Link
+              href="/profile"
+              className="underline underline-offset-4 hover:text-text-primary"
+            >
+              Change your name in your profile
+            </Link>
+            .
+          </span>
+        </div>
+
+        {error && (
+          <p role="status" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+
+        <SubmitButton label="Join this room" />
+      </form>
+    );
+  }
 
   return (
     <form

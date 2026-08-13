@@ -82,12 +82,18 @@ export async function claimPendingPlayerInvite(user: User): Promise<void> {
   }
   if (!invite) return;
 
-  const { error: playerError } = await admin
-    .from("players")
-    .upsert(
-      { user_id: user.id, display_name: invite.display_name },
-      { onConflict: "user_id", ignoreDuplicates: true },
-    );
+  /*
+   * Names are unique now, and an invitation carries whatever the admin
+   * typed months ago. If somebody has taken it since, the account still
+   * has to be created — being unable to sign in because a stranger
+   * shares your first name is not an acceptable outcome — so the name is
+   * nudged until it fits and the player can rename themselves after.
+   */
+  const playerError = await createPlayerWithFreeName(
+    admin,
+    user.id,
+    invite.display_name,
+  );
 
   if (playerError) {
     // Leave the invite open so the next sign-in retries.
@@ -99,6 +105,48 @@ export async function claimPendingPlayerInvite(user: User): Promise<void> {
     .from("player_invites")
     .update({ accepted_at: new Date().toISOString(), accepted_by: user.id })
     .eq("id", invite.id);
+}
+
+/**
+ * Creates the players row, working around a name somebody else has.
+ *
+ * Tries the invited name first, then "Name2", "Name3" and so on. The
+ * unique index is what decides, not a lookup beforehand: two invitations
+ * to the same name can be claimed at the same moment, and only the index
+ * sees both. Ten attempts is far more than a pilot will ever need and
+ * still terminates.
+ *
+ * Returns the error to report, or null on success.
+ */
+async function createPlayerWithFreeName(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  wanted: string,
+): Promise<{ message: string } | null> {
+  for (let attempt = 1; attempt <= 10; attempt += 1) {
+    const suffix = attempt === 1 ? "" : String(attempt);
+    const name = wanted.trim().slice(0, 40 - suffix.length) + suffix;
+
+    const { error } = await admin
+      .from("players")
+      .upsert(
+        { user_id: userId, display_name: name },
+        { onConflict: "user_id", ignoreDuplicates: true },
+      );
+
+    if (!error) return null;
+    if (error.code !== UNIQUE_VIOLATION) return error;
+
+    /*
+     * A unique violation on `user_id` means the row already exists,
+     * which is success for an idempotent claim. Only a name collision
+     * is worth another attempt, and the two are told apart by which
+     * constraint fired.
+     */
+    if (!error.message.includes("display_name")) return null;
+  }
+
+  return { message: `Could not find a free name near "${wanted}"` };
 }
 
 /** The persistent player behind an auth user, if they have one. */

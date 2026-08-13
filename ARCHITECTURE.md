@@ -806,6 +806,33 @@ the store hosts the room, it does not read it.
 Only a confirmed trade earns anything. Not posting, not pledging, not turning
 up. The one act the whole product exists to cause is the only one that pays.
 
+### One account, one name
+
+`players.display_name` is unique, case-insensitively, enforced by a unique
+index on `lower(display_name)`. Guests are deliberately exempt: a guest's name
+lives on `player_sessions`, expires with it, and only has to tell six people at
+a counter apart for one evening.
+
+Availability is decided by the index, never by a SELECT before the UPDATE — two
+people can type the same name into two phones at the same counter, and
+check-then-write loses that race every time. `setDisplayName` returns `taken`
+on a `23505` and the UI says so.
+
+The name is written through to every `player_sessions` row the account owns.
+Rooms render the session's name, and a copy that is never refreshed drifts:
+rename yourself mid-event and the board would keep showing whatever you were
+called when you walked in. Write-through rather than a join in every name
+lookup, because there are five of those and one of these.
+
+A signed-in player joins a room **as their account**, and the submitted name is
+ignored rather than merely pre-filled. That was the founder's report — signing
+in still dropped them in as a guest — and pre-filling was exactly the bug: the
+form was the source of truth and the account was not consulted.
+
+An invitation carries a name typed months earlier, so `claimPendingPlayerInvite`
+nudges it ("Zach", "Zach2", …) until the index accepts it. Being unable to sign
+in because a stranger shares your first name is not an acceptable outcome.
+
 ### Two numbers, and why
 
 `players.embers_earned` is a lifetime total that only ever goes up: it is the
@@ -890,6 +917,15 @@ React Native has no blend modes, so `mobile/src/cosmetic-card.tsx` layers
 translucent gradients instead. Frames and motion timings are exact; the foil
 is quieter.
 
+**Frames are worn in rooms, not only on profiles.** A thing you earned that
+nobody sees you wearing is not really a reward, so the equipped frame rings the
+avatar in the roster, the lobby and the Flare board — on the initials as well
+as on a picture, because somebody who spent 600 Embers should be wearing it
+whether or not they uploaded a photograph. Avatar frames are their own class
+set (`.cf-avatar-frame-*`) rather than shared with the card frames: one is an
+inset ring on a rectangle, the other a ring outside a circle whose diameter
+changes with the size prop, and sharing one rule would fit neither.
+
 ## Card shows
 
 The second kind of operator, and the third length in the code namespace. A
@@ -944,6 +980,18 @@ of strangers) and writes go through the service role only.
 The object path carries a timestamp. A fixed path would be cached by every CDN
 and browser between the bucket and a phone at a counter, and the player would
 swear the upload failed.
+
+**Avatars are served from CardFlare's own domain, never the storage host.**
+`players.avatar_url` holds the object path, and `/api/avatars/<path>` streams
+it with a service-role read and a one-year immutable cache. This is a
+correction, not a preference: the first cut pointed an `<img>` straight at the
+Supabase public URL, the server could fetch it and the founder's phone could
+not. That is the same failure that already forced the app's writes into a
+header — something between a real phone and a third-party host eats the
+request. Serving from the origin the browser already has open removes the
+whole class, and it takes "is the bucket public" out of the equation: the
+picture renders either way. Rows written before the change hold a full URL and
+are passed through untouched.
 
 The hues are tokens in `globals.css`, and `design-tokens.test.ts` asserts each
 one clears WCAG AA on every surface and that there are exactly as many as the

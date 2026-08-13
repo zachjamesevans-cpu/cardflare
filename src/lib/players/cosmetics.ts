@@ -306,6 +306,19 @@ export async function equipCosmetic(
 }
 
 /**
+ * The free item of one kind, which is what a null slot means.
+ *
+ * Read from the catalogue rather than hard-coded, so renaming or
+ * replacing a free item is a data change and not a code change.
+ */
+export async function freeSlugFor(kind: CosmeticKind): Promise<string | null> {
+  const catalogue = await listCosmetics();
+  return (
+    catalogue.find((row) => row.kind === kind && row.cost_embers === 0)?.slug ?? null
+  );
+}
+
+/**
  * What a profile is actually wearing, resolved for rendering.
  *
  * Null becomes the free item of that kind rather than nothing, so a
