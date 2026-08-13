@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 /**
@@ -15,15 +15,16 @@ import { ChevronDown } from "lucide-react";
  *
  * A client island around server-rendered children: the rail and the
  * stacked list arrive fully formed (server-action forms intact), and
- * this component only decides which of the two is unfolded.
+ * this component only decides which of the two is on screen.
  *
- * The unfold animates ONE thing: the arriving view, growing downward
- * from the header that was tapped. The first version animated both —
- * the rail collapsing to nothing while the stacked view grew — and the
- * founder's read was exactly right: two height animations fighting
- * means the eye watches cards being dragged upward at the same moment
- * new ones arrive. Whatever is being replaced now simply stops being
- * there, and the only movement on screen is downward from the tap.
+ * It behaves as a drawer, and that took two corrections to get right.
+ * The first version animated both views at once — the rail collapsing
+ * while the stacked view grew — which read as the cards being shoved
+ * upward. The second animated only the arriving view, which opened
+ * correctly and then teleported shut, because the outgoing view was
+ * simply removed. So the close is now its own phase: the drawer tucks
+ * itself in, and only once it has gone does the rail come back, with
+ * the same downward motion that opened it.
  */
 export function GroupView({
   identity,
@@ -40,22 +41,47 @@ export function GroupView({
 }) {
   const [open, setOpen] = useState(false);
 
+  /** The stacked view is on its way out but still on screen. */
+  const [closing, setClosing] = useState(false);
+
   /*
-   * Whether the section has ever been toggled. Without this the rail
-   * would play its unfold on page load, and a board of ten players
-   * arriving is ten sections animating at nobody's request.
+   * How tall the rail is, remembered while it is on screen.
+   *
+   * This is what stops the drawer bouncing. Without it the section
+   * passes through zero height on the way in and on the way out, so
+   * everything below jumps up by the rail's height and back down
+   * again — measured at 154px. Holding the drawer at the height the
+   * rail occupies means the page only ever moves in one direction.
    */
-  const [touched, setTouched] = useState(false);
+  const railBox = useRef<HTMLDivElement>(null);
+  const [railHeight, setRailHeight] = useState<number | null>(null);
+
+  /*
+   * Re-measured whenever the rail is on screen, because cards come and
+   * go as Flares are posted and pledged. The guard on the value having
+   * actually changed is what makes this safe to run after every render:
+   * a second pass finds the same number and stops.
+   */
+  useEffect(() => {
+    if (open || !railBox.current) return;
+    const measured = railBox.current.offsetHeight;
+    if (measured > 0 && measured !== railHeight) setRailHeight(measured);
+  }, [open, railHeight]);
+
+  /* What the chevron and assistive technology should say. A press to
+     close reads as closed immediately, even though the drawer is still
+     visibly retracting. */
+  const expanded = open && !closing;
 
   return (
     <>
       <button
         type="button"
         onClick={() => {
-          setOpen((current) => !current);
-          setTouched(true);
+          if (open) setClosing(true);
+          else setOpen(true);
         }}
-        aria-expanded={open}
+        aria-expanded={expanded}
         className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 text-left"
       >
         {identity}
@@ -64,23 +90,54 @@ export function GroupView({
           <ChevronDown
             aria-hidden="true"
             className={`size-4 text-text-muted transition-transform duration-300 ${
-              open ? "rotate-180" : ""
+              expanded ? "rotate-180" : ""
             }`}
           />
         </span>
       </button>
 
       {/*
-       * `hidden` rather than unmounted, so the server-rendered forms
-       * inside keep their state across a fold and unfold.
+       * The rail never animates. It is the resting state, not a thing
+       * that opens — and animating it back in was the last bounce:
+       * measured, the page dropped 154px below where it settles while
+       * the rail grew from nothing. The drawer already holds that space
+       * open, so the rail simply takes it over.
        */}
-      <div className={open ? "hidden" : touched ? "unfold-down" : ""}>
-        <div className="overflow-hidden">{rail}</div>
-      </div>
+      {!open && (
+        <div ref={railBox}>
+          <div className="overflow-hidden">{rail}</div>
+        </div>
+      )}
 
-      <div className={open ? "unfold-down" : "hidden"}>
-        <div className="overflow-hidden">{stacked}</div>
-      </div>
+      {open && (
+        <div
+          className={closing ? "fold-up" : "unfold-down"}
+          /*
+           * Held at the rail's height in BOTH directions, so the page
+           * never passes through a state shorter than the one it rests
+           * in. Opening grows from the rail's height rather than from
+           * zero, closing lands on it, and the handover changes nothing.
+           */
+          style={railHeight ? { minHeight: railHeight } : undefined}
+          /*
+           * The handover. The drawer is only swapped for the rail once
+           * it has finished retracting, which is what makes the two
+           * motions read as one gesture rather than a cut.
+           *
+           * Guarded on the phase because the opening animation lands
+           * here too, and on the target because a card inside the
+           * stacked view finishing its own animation must not close
+           * the section somebody just opened.
+           */
+          onAnimationEnd={(event) => {
+            if (!closing || event.target !== event.currentTarget) return;
+            setClosing(false);
+            setOpen(false);
+          }}
+        >
+          <div className="overflow-hidden">{stacked}</div>
+        </div>
+      )}
     </>
   );
 }
