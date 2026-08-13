@@ -9,6 +9,7 @@ import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
+import { Rail } from "@/components/lists/rail";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { resolveEquipped } from "@/lib/players/cosmetics";
@@ -113,10 +114,10 @@ export default async function PublicProfilePage({
             {profile.showcase.length === 0 ? (
               <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
             ) : (
-              <ul className="grid grid-cols-3 gap-3">
+              /* The board's carousel: same Rail, same card width. */
+              <Rail ariaLabel="Showcase">
                 {profile.showcase.map((entry) => (
-                  <li key={entry.id} className="flex flex-col gap-1.5">
-                    {/* The board's viewer, opened from the dressed card. */}
+                  <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
                     <CardImageZoom
                       imageUrl={entry.imageUrl}
                       exactName={entry.name}
@@ -136,12 +137,12 @@ export default async function PublicProfilePage({
                         />
                       }
                     />
-                    <span className="truncate text-xs text-text-secondary">
+                    <span className="truncate text-[11px] text-text-secondary">
                       {entry.name}
                     </span>
                   </li>
                 ))}
-              </ul>
+              </Rail>
             )}
           </Card>
 

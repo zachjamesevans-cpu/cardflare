@@ -11,13 +11,13 @@ import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Rail } from "@/components/lists/rail";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
-import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
+import { resolveEquipped } from "@/lib/players/cosmetics";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 
@@ -78,12 +78,8 @@ export default async function ProfilePage() {
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
 
-  const [wardrobe, worn, areas] = await Promise.all([
-    wardrobeFor(
-      playerId,
-      { earned: profile.embersEarned, balance: profile.embersBalance },
-      profile.equipped,
-    ),
+  /* The wardrobe itself now loads on /profile/store, where the shop is. */
+  const [worn, areas] = await Promise.all([
     resolveEquipped(profile.equipped),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
   ]);
@@ -197,14 +193,15 @@ export default async function ProfilePage() {
                 between events.
               </p>
             ) : (
-              <ul className="grid grid-cols-3 gap-3">
+              /*
+               * The board's carousel, exactly: same Rail, same card
+               * width, same edge fade. The founder's unified-language
+               * rule again — a shelf of cards is a shelf of cards,
+               * whichever page it is on.
+               */
+              <Rail ariaLabel="Your showcase">
                 {profile.showcase.map((entry) => (
-                  <li key={entry.id} className="flex flex-col gap-1.5">
-                    {/*
-                     * The same viewer as the board, opened from the
-                     * dressed card. One zoom everywhere — the founder's
-                     * unified-language rule.
-                     */}
+                  <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
                     <CardImageZoom
                       imageUrl={entry.imageUrl}
                       exactName={entry.name}
@@ -224,18 +221,21 @@ export default async function ProfilePage() {
                         />
                       }
                     />
-                    <span className="truncate text-xs text-text-secondary">
+                    <span className="truncate text-[11px] text-text-secondary">
                       {entry.name}
                     </span>
                     <form action={removeShowcaseAction}>
                       <input type="hidden" name="entryId" value={entry.id} />
-                      <Button type="submit" variant="ghost" size="sm">
+                      <button
+                        type="submit"
+                        className="cursor-pointer text-[11px] text-text-muted underline underline-offset-2 transition-colors hover:text-text-secondary"
+                      >
                         Remove
-                      </Button>
+                      </button>
                     </form>
                   </li>
                 ))}
-              </ul>
+              </Rail>
             )}
 
             {profile.showcase.length < SHOWCASE_LIMIT ? (

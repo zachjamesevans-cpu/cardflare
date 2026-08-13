@@ -27,6 +27,7 @@ import { pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { PlayerPeek } from "@/components/players/player-peek";
 import { Badge, Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { RemoveEntry } from "@/components/lists/remove-entry";
@@ -530,7 +531,13 @@ export function FlareBoard({
    */
   identities?: Map<
     string,
-    { embersEarned: number; avatarUrl: string | null; frame: string | null }
+    {
+      embersEarned: number;
+      avatarUrl: string | null;
+      frame: string | null;
+      /** The account behind the session, for the profile popup. */
+      playerId: string | null;
+    }
   >;
   /** Cards the room's store has in its synced counter stock. */
   counterHas?: Set<string>;
@@ -729,25 +736,46 @@ export function FlareBoard({
              */}
             <GroupView
               identity={
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <PlayerAvatar
-                    displayName={group.displayName ?? "?"}
-                    seed={group.playerSessionId}
-                    avatarUrl={
-                      identities?.get(group.playerSessionId)?.avatarUrl ?? null
-                    }
-                    frame={identities?.get(group.playerSessionId)?.frame ?? null}
-                    size="sm"
-                  />
-                  <span
-                    id={headingId}
-                    className="truncate font-semibold text-text-primary"
-                  >
-                    {group.displayName ?? "A player"}
-                    {isYou && (
-                      <span className="font-normal text-text-muted"> · you</span>
-                    )}
-                  </span>
+                <span id={headingId} className="flex min-w-0 items-center gap-2.5">
+                  {/*
+                   * An account opens the profile popup right here on the
+                   * board — the founder's ask: finding somebody's name
+                   * under "who's here" was the only way in, and the
+                   * board is where their name actually comes up. Guests
+                   * stay plain: no profile, no dead button.
+                   */}
+                  {identities?.get(group.playerSessionId)?.playerId ? (
+                    <PlayerPeek
+                      playerId={identities.get(group.playerSessionId)!.playerId!}
+                      displayName={group.displayName ?? "A player"}
+                      seed={group.playerSessionId}
+                      avatarUrl={
+                        identities.get(group.playerSessionId)?.avatarUrl ?? null
+                      }
+                      frame={identities.get(group.playerSessionId)?.frame ?? null}
+                      isYou={isYou}
+                      imagesEnabled={imagesEnabled}
+                      nameClassName="font-semibold"
+                    />
+                  ) : (
+                    <>
+                      <PlayerAvatar
+                        displayName={group.displayName ?? "?"}
+                        seed={group.playerSessionId}
+                        avatarUrl={
+                          identities?.get(group.playerSessionId)?.avatarUrl ?? null
+                        }
+                        frame={identities?.get(group.playerSessionId)?.frame ?? null}
+                        size="sm"
+                      />
+                      <span className="truncate font-semibold text-text-primary">
+                        {group.displayName ?? "A player"}
+                        {isYou && (
+                          <span className="font-normal text-text-muted"> · you</span>
+                        )}
+                      </span>
+                    </>
+                  )}
                   {/*
                    * On the name, not in the list. It is a fact about the
                    * person, and as a row it cost this player's whole

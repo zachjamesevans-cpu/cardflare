@@ -75,26 +75,36 @@ export function GroupView({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          if (open) setClosing(true);
-          else setOpen(true);
-        }}
-        aria-expanded={expanded}
-        className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 text-left"
-      >
+      {/*
+       * The identity lives BESIDE the toggle now, not inside it. It used
+       * to sit within the expand button, which made the player's name
+       * part of "unfold this section" — and the founder's ask is that
+       * tapping a person opens their profile popup, which means the
+       * identity block has to be able to carry its own button. A button
+       * inside a button is invalid HTML, so the header splits: the
+       * person on the left, and everything else remains the toggle.
+       */}
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
         {identity}
-        <span className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (open) setClosing(true);
+            else setOpen(true);
+          }}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Show fewer of their cards" : "Show all their cards"}
+          className="flex min-w-0 flex-1 items-center justify-end gap-2 text-left"
+        >
           {meta}
           <ChevronDown
             aria-hidden="true"
-            className={`size-4 text-text-muted transition-transform duration-300 ${
+            className={`size-4 shrink-0 text-text-muted transition-transform duration-300 ${
               expanded ? "rotate-180" : ""
             }`}
           />
-        </span>
-      </button>
+        </button>
+      </div>
 
       {/*
        * The rail never animates. It is the resting state, not a thing

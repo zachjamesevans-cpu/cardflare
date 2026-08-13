@@ -420,14 +420,17 @@ export function CardImageZoom({
           close();
         }}
         /*
-         * Clicking the backdrop closes. The dialog element fills the viewport
-         * when modal, so a click landing on it rather than on the panel is a
-         * click on the backdrop.
+         * ANY click closes — on the backdrop, on the card, on the text.
+         * It used to require a click outside the panel, and the founder's
+         * correction is right about how this actually gets used: the
+         * card is most of the screen, a tap lands where the eye is, and
+         * hunting for the margin around a photo is fiddly at a counter.
+         * There is nothing interactive inside the panel to protect (the
+         * X button just runs the same close), so the whole surface can
+         * be the dismissal. The app's zoom already worked this way.
          */
-        onClick={(event) => {
-          if (event.target === dialog.current) close();
-        }}
-        className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]"
+        onClick={() => close()}
+        className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] cursor-zoom-out overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]"
       >
         <div
           ref={panel}
