@@ -18,7 +18,6 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
-import { toNextTier } from "@/lib/players/ember-rules";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 
@@ -89,7 +88,6 @@ export default async function ProfilePage() {
     areasForUser(viewer.user.id, viewer.kind === "admin"),
   ]);
 
-  const next = toNextTier(profile.embersEarned);
   const imagesEnabled = cardImagesEnabled();
 
   const currentArea = areas.some((area) => area.href === "/profile")
@@ -146,7 +144,7 @@ export default async function ProfilePage() {
                   Earned by confirming trades, and nothing else.
                 </p>
               </div>
-              <EmberBadge earned={profile.embersEarned} size="md" showTier />
+              <EmberBadge earned={profile.embersEarned} size="md" />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -175,12 +173,6 @@ export default async function ProfilePage() {
                 </p>
               </div>
             </div>
-
-            {next && (
-              <p className="text-sm text-text-secondary">
-                {next.needed.toLocaleString()} more to {next.name}.
-              </p>
-            )}
           </Card>
 
           <Card className="flex flex-col gap-4">

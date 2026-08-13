@@ -3,8 +3,6 @@ import "server-only";
 import sharp from "sharp";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { emberTier } from "./ember-rules";
-import type { EmberTier } from "./ember-rules";
 import { freeSlugFor, type Equipped } from "./cosmetics";
 import {
   AVATAR_MAX_BYTES,
@@ -45,7 +43,6 @@ export interface PublicProfile {
   avatarUrl: string | null;
   /** Lifetime. The badge. */
   embersEarned: number;
-  tier: EmberTier;
   equipped: Equipped;
   showcase: ShowcaseCard[];
   joinedAt: string;
@@ -79,15 +76,15 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
     playerId: player.id,
     displayName: player.display_name,
     /*
-     * Resolved to a src here rather than at every render point. What is
-     * in the column is an object path (or, for older rows, a full URL);
-     * what a component needs is something it can put in an `<img>`, and
-     * one conversion in one place is what stops the two diverging.
+     * Resolved to a src here rather than at every render point, and
+     * VERIFIED against storage — see `verifiedAvatar`. This is the page
+     * where a row pointing at a missing object turns into "your picture
+     * saved but could not be loaded", which is the worst state the
+     * profile has: a message with nothing anybody can do about it.
      */
-    avatarUrl: avatarSrc(player.avatar_url),
+    avatarUrl: await verifiedAvatar(playerId, player.avatar_url),
     embersEarned: player.embers_earned,
     embersBalance: player.embers_balance,
-    tier: emberTier(player.embers_earned),
     equipped: {
       frame: player.equipped_frame,
       holo: player.equipped_holo,
@@ -101,6 +98,64 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
 /** The signed-in player's own profile, balance included. */
 export async function ownProfile(playerId: string): Promise<OwnProfile | null> {
   return loadProfile(playerId);
+}
+
+/**
+ * The avatar src, only if the object actually exists.
+ *
+ * A row can point at nothing: earlier rounds of this feature deleted
+ * objects on some failure paths while the row kept its value, and a
+ * stale row is a picture that "tries to load for a second" and then
+ * falls back — the founder's exact report, twice. Rather than trusting
+ * the column, this asks storage whether the object is there, and when it
+ * is not it CLEARS the row: the profile then honestly shows initials
+ * and a fresh upload starts clean, instead of a warning nobody can act
+ * on rendering forever.
+ *
+ * One `list` call scoped to the player's own folder, on the own-profile
+ * read only. Room rosters skip it — dozens of rows per render, and a
+ * broken image there already falls back to initials silently.
+ */
+async function verifiedAvatar(
+  playerId: string,
+  stored: string | null,
+): Promise<string | null> {
+  if (!stored) return null;
+
+  const path = objectPathFrom(stored);
+  if (!path) return null;
+
+  const slash = path.lastIndexOf("/");
+  const folder = slash === -1 ? "" : path.slice(0, slash);
+  const filename = slash === -1 ? path : path.slice(slash + 1);
+
+  const { data, error } = await getSupabaseAdmin()
+    .storage.from("avatars")
+    .list(folder, { search: filename });
+
+  if (error) {
+    /*
+     * Cannot tell, so do not judge: return the src and let the client's
+     * own fallback handle a failure. Clearing a good row over a storage
+     * blip would delete somebody's picture for nothing.
+     */
+    console.error("Could not verify the profile picture exists", error);
+    return avatarSrc(stored);
+  }
+
+  const exists = (data ?? []).some((object) => object.name === filename);
+  if (exists) return avatarSrc(stored);
+
+  console.error(
+    `Avatar row for player ${playerId} points at a missing object (${path}); clearing it.`,
+  );
+
+  await getSupabaseAdmin()
+    .from("players")
+    .update({ avatar_url: null })
+    .eq("id", playerId);
+
+  return null;
 }
 
 /**

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
-import { toNextTier } from "@/lib/players/ember-rules";
 import {
   addToShowcase,
   ownProfile,
@@ -69,8 +68,6 @@ export async function GET(request: Request): Promise<Response> {
         : profile.avatarUrl,
       embersEarned: profile.embersEarned,
       embersBalance: profile.embersBalance,
-      tier: profile.tier,
-      nextTier: toNextTier(profile.embersEarned),
       equipped: worn,
       showcase: profile.showcase,
       showcaseLimit: SHOWCASE_LIMIT,
