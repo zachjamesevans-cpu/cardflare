@@ -13,6 +13,7 @@ import {
 } from "@/lib/players/profile";
 import { buyCosmetic } from "@/lib/players/cosmetics";
 import { displayNameSchema } from "@/lib/players/profile-schema";
+import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,14 @@ export async function GET(request: Request): Promise<Response> {
     profile: {
       playerId: profile.playerId,
       displayName: profile.displayName,
-      avatarUrl: profile.avatarUrl,
+      /*
+       * Absolute, because a native client has no origin to resolve
+       * "/api/avatars/..." against. The website gets the relative form
+       * from the same lib call; only the envelope differs.
+       */
+      avatarUrl: profile.avatarUrl?.startsWith("/")
+        ? `${siteUrl()}${profile.avatarUrl}`
+        : profile.avatarUrl,
       embersEarned: profile.embersEarned,
       embersBalance: profile.embersBalance,
       tier: profile.tier,
@@ -105,8 +113,13 @@ export async function POST(request: Request): Promise<Response> {
       return badRequest(name.error.issues[0]?.message ?? "That name will not work.");
     }
 
-    const saved = await setDisplayName(player.playerId, name.data.displayName);
-    return saved
+    const outcome = await setDisplayName(player.playerId, name.data.displayName);
+
+    if (outcome === "taken") {
+      return badRequest("Somebody already goes by that. Pick another one.");
+    }
+
+    return outcome === "renamed"
       ? Response.json({ ok: true })
       : Response.json({ error: "unavailable" }, { status: 503 });
   }

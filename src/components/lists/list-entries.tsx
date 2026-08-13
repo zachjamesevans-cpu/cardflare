@@ -528,7 +528,10 @@ export function FlareBoard({
    * account are simply absent, which leaves a guest with initials and
    * no badge.
    */
-  identities?: Map<string, { embersEarned: number; avatarUrl: string | null }>;
+  identities?: Map<
+    string,
+    { embersEarned: number; avatarUrl: string | null; frame: string | null }
+  >;
   /** Cards the room's store has in its synced counter stock. */
   counterHas?: Set<string>;
   /** The store's name, for the "may have it" line. */
@@ -733,6 +736,7 @@ export function FlareBoard({
                     avatarUrl={
                       identities?.get(group.playerSessionId)?.avatarUrl ?? null
                     }
+                    frame={identities?.get(group.playerSessionId)?.frame ?? null}
                     size="sm"
                   />
                   <span

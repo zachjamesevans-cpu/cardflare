@@ -269,11 +269,26 @@ export interface RoomState {
     early: boolean;
   };
   you?: { sessionId: string; displayName: string };
+  /**
+   * The signed-in account, when there is one.
+   *
+   * Present so the join screen can stop asking for a name: a signed-in
+   * player joins as themselves, and the name is changed in profile
+   * settings because it has to be unique. Null for a guest, whose name
+   * is theirs to type and is never stored beyond the session.
+   */
+  account?: { displayName: string } | null;
   participants?: {
     playerSessionId: string;
     displayName: string | null;
     present: boolean;
     openToTrades: boolean;
+    /** Absolute, resolved server-side. Null means the initials. */
+    avatarUrl?: string | null;
+    /** The cosmetic frame they bought, drawn around their avatar. */
+    frame?: string | null;
+    /** Lifetime Embers, or null for a guest with no account. */
+    embersEarned?: number | null;
   }[];
   flares?: RoomFlare[];
 }

@@ -71,10 +71,25 @@ export async function renameProfileAction(
     };
   }
 
-  const saved = await setDisplayName(playerId, parsed.data.displayName);
-  if (!saved) return { status: "error", message: GENERIC_ERROR };
+  const outcome = await setDisplayName(playerId, parsed.data.displayName);
 
+  if (outcome === "taken") {
+    return {
+      status: "error",
+      message: "Somebody already goes by that. Pick another one.",
+    };
+  }
+  if (outcome === "failed") return { status: "error", message: GENERIC_ERROR };
+
+  /*
+   * The rooms too, not just the profile. The name was written through to
+   * every session this account owns, so any board they are on is now
+   * showing something different from what is cached.
+   */
   revalidateProfile();
+  revalidatePath("/room");
+  revalidatePath("/flare");
+
   return { status: "saved", message: "Name updated." };
 }
 
@@ -141,16 +156,7 @@ export async function setAvatarAction(
             ? "That picture is over 2MB. Pick a smaller one."
             : outcome.reason === "wrong-type"
               ? "Profile pictures need to be a PNG, JPEG or WebP."
-              : /*
-                 * Named rather than folded into the generic error, because
-                 * this one is not the player's fault and not retryable:
-                 * the picture uploaded fine and the storage bucket will
-                 * not serve it. Only an admin can fix it, so the message
-                 * says so instead of inviting a pointless retry.
-                 */
-                outcome.reason === "not-public"
-                ? "Your picture uploaded, but the storage bucket is not serving it publicly. Nothing you can do from here, this one is on us."
-                : GENERIC_ERROR,
+              : GENERIC_ERROR,
     };
   }
 

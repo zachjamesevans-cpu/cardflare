@@ -46,6 +46,24 @@ vi.mock("@/lib/players/repository", () => ({
   deletePlayerSession: (...args: unknown[]) => deletePlayerSession(...args),
 }));
 
+/*
+ * A signed-in account now overrides whatever name the form submits, so
+ * these tests have to say which viewer they are exercising. Anonymous
+ * by default: every case below is the guest path, which is the one that
+ * still reads a name out of the form.
+ */
+const accountIdentity = vi.fn(
+  async () => null as { playerId: string; displayName: string } | null,
+);
+
+vi.mock("@/lib/players/account-identity", () => ({
+  accountIdentity: (...a: unknown[]) => accountIdentity(...(a as [])),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getViewer: async () => ({ kind: "anonymous" }) as const,
+}));
+
 vi.mock("@/lib/players/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/players/session")>();
   return {

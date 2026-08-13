@@ -49,6 +49,8 @@ export interface Participant {
   playerId: string | null;
   /** Their chosen picture, or null for the generated initials. */
   avatarUrl: string | null;
+  /** The cosmetic frame they bought, drawn around their avatar. */
+  frame: string | null;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -262,6 +264,7 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
         embersEarned: account ? (identities.get(account)?.embersEarned ?? 0) : null,
         playerId: account,
         avatarUrl: account ? (identities.get(account)?.avatarUrl ?? null) : null,
+        frame: account ? (identities.get(account)?.frame ?? null) : null,
       };
     })
     .sort((a, b) => Number(b.present) - Number(a.present));

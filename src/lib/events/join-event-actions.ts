@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 
 import { text } from "@/lib/form-value";
 import { getViewer } from "@/lib/auth/session";
-import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { linkSessionToPlayer } from "@/lib/players/accounts";
+import { accountIdentity } from "@/lib/players/account-identity";
 import { saveLocal } from "@/lib/players/locals";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -103,10 +104,51 @@ export async function joinEventAction(
     return invalid("This room is not open right now.", submitted);
   }
 
+  /*
+   * A signed-in player joins as themselves, full stop.
+   *
+   * The founder's report was that signing in still dropped them into a
+   * room as a guest with whatever name the form had lying around. It
+   * did: the name came from the form, and nothing consulted the
+   * account. Now the account's name wins over anything submitted — a
+   * name is a property of the account, changed in profile settings and
+   * nowhere else, because it has to be unique and a room is not the
+   * place to negotiate that.
+   *
+   * Guests are untouched. Nothing below this line knows the difference
+   * until it has to.
+   */
+  const account = await accountIdentity(await getViewer());
+
   let session = await getPlayerSession();
   let freshToken: string | null = null;
 
-  if (session) {
+  if (account) {
+    if (session) {
+      /* Their room identity follows the account, renamed in place: the
+         binder, Flares and membership all hang off the session id. */
+      if (session.display_name !== account.displayName) {
+        try {
+          await renamePlayerSession(session.id, account.displayName);
+          session = { ...session, display_name: account.displayName };
+        } catch (error) {
+          console.error("Could not put the account's name on the session", error);
+          return invalid(GENERIC_ERROR, submitted);
+        }
+      }
+    } else {
+      freshToken = createSessionToken();
+      try {
+        session = await createPlayerSession(
+          account.displayName,
+          hashSessionToken(freshToken),
+        );
+      } catch (error) {
+        console.error("Could not create the player session", error);
+        return invalid(GENERIC_ERROR, submitted);
+      }
+    }
+  } else if (session) {
     /*
      * A returning player can edit the name the form filled in for them.
      *
@@ -169,24 +211,16 @@ export async function joinEventAction(
   }
 
   /*
-   * If a signed-in account is present, the session becomes theirs — that is
-   * the whole difference an account makes at the door. Guests join exactly
-   * as before; nothing above this line knows accounts exist.
+   * The session becomes the account's — the whole difference an account
+   * makes at the door. Resolved above rather than here now, because the
+   * name had to come from it before the session was even created.
    */
   let accountPlayerId = session.player_id;
-  if (session.player_id === null) {
-    const viewer = await getViewer();
-    const playerId =
-      viewer.kind === "player"
-        ? viewer.playerId
-        : viewer.kind === "anonymous"
-          ? null
-          : ((await playerForUser(viewer.user.id))?.id ?? null);
-
-    if (playerId) {
-      await linkSessionToPlayer(session.id, playerId);
-      accountPlayerId = playerId;
-    }
+  /* Falsy rather than `=== null`: "has no account" is the question, and
+     a row that arrives without the column at all is still an answer. */
+  if (!accountPlayerId && account) {
+    await linkSessionToPlayer(session.id, account.playerId);
+    accountPlayerId = account.playerId;
   }
 
   // A signed-in join is what makes a store a local — saved silently here,

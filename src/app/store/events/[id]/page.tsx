@@ -103,6 +103,7 @@ export default async function EventPage({
         {
           embersEarned: participant.embersEarned as number,
           avatarUrl: participant.avatarUrl,
+          frame: participant.frame,
         },
       ]),
   );

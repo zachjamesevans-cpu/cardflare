@@ -57,6 +57,34 @@ vi.mock("@/lib/players/repository", () => ({
   renamePlayerSession: (...a: unknown[]) => renamePlayerSession(...a),
 }));
 
+/*
+ * A signed-in account now overrides whatever name the form submits, so
+ * these tests have to say which viewer they are exercising. Anonymous
+ * by default: every case below is the guest path, which is the one that
+ * still reads a name out of the form.
+ */
+const accountIdentity = vi.fn(
+  async () => null as { playerId: string; displayName: string } | null,
+);
+
+vi.mock("@/lib/players/account-identity", () => ({
+  accountIdentity: (...a: unknown[]) => accountIdentity(...(a as [])),
+}));
+
+const linkSessionToPlayer = vi.fn(async () => {});
+vi.mock("@/lib/players/accounts", () => ({
+  linkSessionToPlayer: (...a: unknown[]) => linkSessionToPlayer(...(a as [])),
+}));
+
+const saveLocal = vi.fn(async () => {});
+vi.mock("@/lib/players/locals", () => ({
+  saveLocal: (...a: unknown[]) => saveLocal(...(a as [])),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getViewer: async () => ({ kind: "anonymous" }) as const,
+}));
+
 vi.mock("@/lib/players/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/players/session")>();
   return {
@@ -103,6 +131,9 @@ beforeEach(() => {
   getPlayerSession.mockReset().mockResolvedValue(null);
   setPlayerCookie.mockReset().mockResolvedValue(undefined);
   isSupabaseConfigured.mockReset().mockReturnValue(true);
+  accountIdentity.mockReset().mockResolvedValue(null);
+  linkSessionToPlayer.mockReset();
+  saveLocal.mockReset();
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -328,5 +359,86 @@ describe("leaveEventAction", () => {
     await leaveEventAction(formData({ code: "!!!!" }));
 
     expect(leaveEvent).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * The founder's report: "even when I'm signed into my account, it's not
+ * auto filling my username from my profile. It's kinda just still
+ * signing me in as a guest."
+ *
+ * The rule that fixes it is that the account's name wins over anything
+ * the form carries — not that the form is pre-filled, which is what the
+ * old behaviour amounted to.
+ */
+describe("joinEventAction — a signed-in player", () => {
+  const ACCOUNT = { playerId: "player-1", displayName: "Chunc" };
+
+  it("joins under the account's name, not the one in the form", async () => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+
+    await captureRedirect(() => join(formData({ displayName: "Somebody Else" })));
+
+    expect(createPlayerSession).toHaveBeenCalledWith("Chunc", expect.any(String));
+  });
+
+  it("joins under the account's name when the form carries none at all", async () => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+
+    await captureRedirect(() => join(formData()));
+
+    expect(createPlayerSession).toHaveBeenCalledWith("Chunc", expect.any(String));
+  });
+
+  /*
+   * Renamed in place rather than replaced: the binder, the Flares and
+   * every room membership hang off the session id.
+   */
+  it("renames an existing guest session onto the account's name", async () => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+    getPlayerSession.mockResolvedValue({
+      id: "session-old",
+      display_name: "Guest Name",
+      player_id: null,
+    });
+
+    await captureRedirect(() => join(formData({ displayName: "Ignored" })));
+
+    expect(renamePlayerSession).toHaveBeenCalledWith("session-old", "Chunc");
+    expect(createPlayerSession).not.toHaveBeenCalled();
+  });
+
+  it("leaves a session that already matches alone", async () => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+    getPlayerSession.mockResolvedValue({
+      id: "session-old",
+      display_name: "Chunc",
+      player_id: "player-1",
+    });
+
+    await captureRedirect(() => join(formData()));
+
+    expect(renamePlayerSession).not.toHaveBeenCalled();
+  });
+
+  it("claims the session for the account", async () => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+
+    await captureRedirect(() => join(formData()));
+
+    expect(linkSessionToPlayer).toHaveBeenCalledWith("session-new", "player-1");
+  });
+
+  /* Guests are untouched by all of the above. */
+  it("still reads the form for a guest", async () => {
+    accountIdentity.mockResolvedValue(null);
+
+    await captureRedirect(() => join(formData({ displayName: "Just Passing" })));
+
+    expect(createPlayerSession).toHaveBeenCalledWith(
+      "Just Passing",
+      expect.any(String),
+    );
+    expect(linkSessionToPlayer).not.toHaveBeenCalled();
   });
 });

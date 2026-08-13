@@ -46,6 +46,7 @@ import {
   Tap,
   Title,
 } from "../ui";
+import { PlayerAvatar } from "../player-avatar";
 import { colors, radius, spacing } from "../theme";
 import { WantRow } from "../want-row";
 
@@ -234,12 +235,16 @@ function RoomScreen({
             with you.
           </Body>
           <ErrorLine message={error} />
-          <Input
-            value={name}
-            onChangeText={setName}
-            placeholder="Display name"
-            autoCapitalize="words"
-          />
+          {state.account ? (
+            <JoiningAs name={state.account.displayName} />
+          ) : (
+            <Input
+              value={name}
+              onChangeText={setName}
+              placeholder="Display name"
+              autoCapitalize="words"
+            />
+          )}
           <Button
             label={busy ? "Joining…" : "Join"}
             onPress={() => void join()}
@@ -337,14 +342,22 @@ function RoomScreen({
             <Body>This room is not open right now.</Body>
           ) : (
             <>
-              <Body>Pick a name people in the room will recognise.</Body>
+              <Body>
+                {state.account
+                  ? "You are signed in, so the room will know you."
+                  : "Pick a name people in the room will recognise."}
+              </Body>
               <ErrorLine message={error} />
-              <Input
-                value={name}
-                onChangeText={setName}
-                placeholder="Display name"
-                autoCapitalize="words"
-              />
+              {state.account ? (
+                <JoiningAs name={state.account.displayName} />
+              ) : (
+                <Input
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Display name"
+                  autoCapitalize="words"
+                />
+              )}
               <Button
                 label={busy ? "Joining…" : "Join the room"}
                 onPress={() => void join()}
@@ -831,15 +844,24 @@ function RoomScreen({
                 .sort((a, b) => Number(b.present) - Number(a.present))
                 .map((p) => (
                   <View key={p.playerSessionId} style={styles.person}>
-                    <View
-                      style={[
-                        styles.dot,
-                        { backgroundColor: p.present ? colors.accent : colors.border },
-                      ]}
+                    {/* The picture and the frame they bought, so a thing
+                        earned is worn where the people actually are. */}
+                    <PlayerAvatar
+                      displayName={p.displayName ?? "A player"}
+                      seed={p.playerSessionId}
+                      avatarUrl={p.avatarUrl ?? null}
+                      frame={p.frame ?? null}
+                      dimmed={!p.present}
                     />
-                    <Text style={{ color: colors.textSecondary }} numberOfLines={1}>
+                    <Text
+                      style={{ color: colors.textSecondary, flex: 1 }}
+                      numberOfLines={1}
+                    >
                       {p.displayName ?? "A player"}
                       {p.playerSessionId === youId ? " (you)" : ""}
+                      {typeof p.embersEarned === "number"
+                        ? ` · ${p.embersEarned.toLocaleString()} Embers`
+                        : ""}
                       {p.openToTrades ? " · open to trades" : ""}
                     </Text>
                   </View>
@@ -1657,3 +1679,35 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
 });
+
+/**
+ * Who a signed-in player is joining as.
+ *
+ * Not an input, deliberately. The founder's report was that signing in
+ * still dropped them into a room as a guest under whatever the form had;
+ * an account's name is unique and belongs to the account, so a room is
+ * not the place to change it. Profile settings is.
+ */
+function JoiningAs({ name }: { name: string }) {
+  return (
+    <View
+      style={{
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.elevated,
+        padding: spacing(3),
+        gap: spacing(1),
+      }}
+    >
+      <Text style={{ color: colors.textMuted, fontSize: 13 }}>Joining as</Text>
+      <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "700" }}>
+        {name}
+      </Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+        Your name, picture and Embers come with you. Change your name on the Profile
+        tab.
+      </Text>
+    </View>
+  );
+}

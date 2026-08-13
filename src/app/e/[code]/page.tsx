@@ -31,6 +31,7 @@ import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
+import { accountIdentity } from "@/lib/players/account-identity";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { saveLocal } from "@/lib/players/locals";
 import { collectionAvailability } from "@/lib/players/collection";
@@ -135,6 +136,13 @@ export default async function JoinByCodePage({
 
   const resolved = await resolveCode(normalized);
   if (resolved.outcome === "not-found") notFound();
+
+  /*
+   * A signed-in player joins as themselves rather than filling in a name.
+   * Resolved once here because both doors into a room — the walk-in lobby
+   * and the open board — ask the same question.
+   */
+  const accountName = (await accountIdentity(await getViewer()))?.displayName;
 
   /*
    * A card show: search-only, sessionless on purpose. An attendee in a
@@ -254,6 +262,7 @@ export default async function JoinByCodePage({
           storeName={resolved.store.name}
           code={normalized}
           knownAs={waiting?.display_name}
+          accountName={accountName}
           earlyBoard={resolved.earlyBoard}
         />
       </Shell>
@@ -424,6 +433,7 @@ export default async function JoinByCodePage({
         {
           embersEarned: participant.embersEarned as number,
           avatarUrl: participant.avatarUrl,
+          frame: participant.frame,
         },
       ]),
   );
@@ -604,7 +614,11 @@ export default async function JoinByCodePage({
         </>
       ) : (
         <Card>
-          <JoinEventForm code={normalized} knownAs={session?.display_name} />
+          <JoinEventForm
+            code={normalized}
+            knownAs={session?.display_name}
+            accountName={accountName}
+          />
         </Card>
       )}
     </Shell>
