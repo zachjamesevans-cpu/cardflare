@@ -24,8 +24,20 @@ import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 
 /** Long enough to read as a movement, short enough not to be in the way. */
 const OPEN_MS = 220;
-const CLOSE_MS = 140;
+
+/*
+ * The close is the open, reversed. It used to run in 140ms, and with an
+ * ease-out that front-loads most of the movement it was over before the
+ * eye caught it — the founder reported the card as having no closing
+ * animation at all, and tracing the panel's transform showed one that
+ * was technically running and practically invisible. Same duration now,
+ * and the easing is the literal mirror of the opening curve: reversing
+ * cubic-bezier(x1,y1,x2,y2) gives cubic-bezier(1-x2,1-y2,1-x1,1-y1), so
+ * the card leaves slowly and lands fast, exactly as it arrived.
+ */
+const CLOSE_MS = OPEN_MS;
 const EASE = "cubic-bezier(0.2, 0, 0, 1)";
+const EASE_REVERSE = "cubic-bezier(1, 0, 0.8, 1)";
 
 /** How long a pointer must rest on a thumbnail before it counts as intent. */
 const DWELL_MS = 120;
@@ -307,7 +319,7 @@ export function CardImageZoom({
 
     fadeBackdrop(element, [BACKDROP_DIM, BACKDROP_CLEAR], {
       duration: CLOSE_MS,
-      easing: EASE,
+      easing: EASE_REVERSE,
       fill: "forwards",
     });
 
@@ -316,7 +328,7 @@ export function CardImageZoom({
         { transform: "translate(0, 0) scale(1)", opacity: 1 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0 },
       ],
-      { duration: CLOSE_MS, easing: EASE, fill: "forwards" },
+      { duration: CLOSE_MS, easing: EASE_REVERSE, fill: "forwards" },
     );
 
     running.current = animation;

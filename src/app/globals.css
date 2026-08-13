@@ -303,8 +303,38 @@
   }
 }
 
+/*
+ * And the way back in. A drawer that opens downward has to close the
+ * same way, or the section reads as teleporting shut — the founder's
+ * report on the first cut, where the outgoing view was simply removed.
+ *
+ * Its own keyframe rather than `animation-direction: reverse`, because
+ * the element has to be told to hold at zero height when it finishes:
+ * `forwards` on this pair is what stops the drawer springing back open
+ * for the frame between the animation ending and React unmounting it.
+ */
+@keyframes cf-fold {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
 @utility unfold-down {
   display: grid;
   grid-template-rows: 1fr;
-  animation: cf-unfold var(--duration-slow) var(--ease-out-soft);
+  animation: cf-unfold var(--duration-base) var(--ease-out-soft);
+}
+
+@utility fold-up {
+  display: grid;
+  grid-template-rows: 0fr;
+  /* The mirror of the opening curve, so the drawer leaves the way it
+     arrived: reversing cubic-bezier(x1,y1,x2,y2) is
+     cubic-bezier(1-x2,1-y2,1-x1,1-y1). */
+  animation: cf-fold var(--duration-base) cubic-bezier(0.64, 0, 0.78, 0) forwards;
 }
