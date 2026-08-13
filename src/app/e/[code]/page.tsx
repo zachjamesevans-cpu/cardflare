@@ -591,6 +591,7 @@ export default async function JoinByCodePage({
             code={normalized}
             participants={participants}
             youId={session.id}
+            imagesEnabled={images}
           />
 
           {/*

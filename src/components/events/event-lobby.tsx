@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ArrowLeftRight, ChevronDown, Users } from "lucide-react";
 
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { PlayerPeek } from "@/components/players/player-peek";
 import { Badge, Card } from "@/components/ui/card";
 import { leaveEventAction } from "@/lib/events/join-event-actions";
 import type { Participant } from "@/lib/events/participants";
@@ -28,11 +28,14 @@ export function EventLobby({
   code,
   participants,
   youId,
+  imagesEnabled,
 }: {
   code: string;
   participants: Participant[];
   /** The viewer's own session, so their row can be marked. */
   youId: string;
+  /** For the card images inside a profile popup's showcase. */
+  imagesEnabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const present = participants.filter((participant) => participant.present).length;
@@ -78,39 +81,47 @@ export function EventLobby({
                   key={participant.playerSessionId}
                   className="flex items-center gap-3 rounded-[var(--radius-control)] px-1 py-1.5"
                 >
-                  <PlayerAvatar
-                    displayName={participant.displayName}
-                    seed={participant.playerSessionId}
-                    avatarUrl={participant.avatarUrl}
-                    frame={participant.frame}
-                    size="sm"
-                    className={participant.present ? undefined : "opacity-50"}
-                  />
+                  {/*
+                   * An account opens the profile popup, right here in the
+                   * room — the founder's ask: looking somebody up must
+                   * not navigate away from the table. A guest is not a
+                   * dead button, they are somebody who does not need an
+                   * account to trade, so their row stays plain text.
+                   */}
+                  {participant.playerId ? (
+                    <PlayerPeek
+                      playerId={participant.playerId}
+                      displayName={participant.displayName}
+                      seed={participant.playerSessionId}
+                      avatarUrl={participant.avatarUrl}
+                      frame={participant.frame}
+                      isYou={isYou}
+                      dimmed={!participant.present}
+                      imagesEnabled={imagesEnabled}
+                    />
+                  ) : (
+                    <>
+                      <PlayerAvatar
+                        displayName={participant.displayName}
+                        seed={participant.playerSessionId}
+                        avatarUrl={participant.avatarUrl}
+                        frame={participant.frame}
+                        size="sm"
+                        className={participant.present ? undefined : "opacity-50"}
+                      />
 
-                  <span className="min-w-0 flex-1 truncate text-text-secondary">
-                    {/* A name links to a profile only when there is one
-                        behind it. A guest is not a broken link, they are
-                        somebody who does not need an account to trade. */}
-                    {participant.playerId ? (
-                      <Link
-                        href={`/p/${participant.playerId}`}
-                        className={`underline-offset-4 hover:underline ${
-                          participant.present ? "text-text-primary" : ""
-                        }`}
-                      >
-                        {participant.displayName}
-                      </Link>
-                    ) : (
-                      <span
-                        className={
-                          participant.present ? "text-text-primary" : undefined
-                        }
-                      >
-                        {participant.displayName}
+                      <span className="min-w-0 flex-1 truncate text-text-secondary">
+                        <span
+                          className={
+                            participant.present ? "text-text-primary" : undefined
+                          }
+                        >
+                          {participant.displayName}
+                        </span>
+                        {isYou && <span className="text-text-muted"> · you</span>}
                       </span>
-                    )}
-                    {isYou && <span className="text-text-muted"> · you</span>}
-                  </span>
+                    </>
+                  )}
 
                   {/*
                    * The badge, beside the name it belongs to. Lifetime
