@@ -47,6 +47,7 @@ import {
   Title,
 } from "../ui";
 import { PlayerAvatar } from "../player-avatar";
+import { PlayerPeekModal } from "../player-peek";
 import { colors, radius, spacing } from "../theme";
 import { WantRow } from "../want-row";
 
@@ -372,6 +373,14 @@ function RoomScreen({
 
   const youId = state.you!.sessionId;
   const participants = state.participants ?? [];
+
+  /* The profile popup: which account is being looked at, or null. */
+  const [peek, setPeek] = useState<string | null>(null);
+
+  /* The account behind each session, for tapping a board header. */
+  const playerBySession = new Map(
+    participants.map((p) => [p.playerSessionId, p.playerId ?? null]),
+  );
   const flares = state.flares ?? [];
   const youOpen = participants.some(
     (p) => p.playerSessionId === youId && p.openToTrades,
@@ -669,7 +678,17 @@ function RoomScreen({
                     flexShrink: 1,
                   }}
                 >
-                  <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                  {/* An account's name opens their popup; the rest of
+                      the header still folds the section. Nested taps:
+                      the inner one wins, which is exactly the split the
+                      website's header makes. */}
+                  {playerBySession.get(sessionId) ? (
+                    <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
+                      <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                    </Tap>
+                  ) : (
+                    <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
+                  )}
                   {openIds.has(sessionId) && (
                     <Text
                       style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}
@@ -842,34 +861,65 @@ function RoomScreen({
             <View style={styles.lobby}>
               {[...participants]
                 .sort((a, b) => Number(b.present) - Number(a.present))
-                .map((p) => (
-                  <View key={p.playerSessionId} style={styles.person}>
-                    {/* The picture and the frame they bought, so a thing
-                        earned is worn where the people actually are. */}
-                    <PlayerAvatar
-                      displayName={p.displayName ?? "A player"}
-                      seed={p.playerSessionId}
-                      avatarUrl={p.avatarUrl ?? null}
-                      frame={p.frame ?? null}
-                      dimmed={!p.present}
-                    />
-                    <Text
-                      style={{ color: colors.textSecondary, flex: 1 }}
-                      numberOfLines={1}
+                .map((p) => {
+                  const row = (
+                    <>
+                      {/* The picture and the border they bought, so a
+                          thing earned is worn where the people are. */}
+                      <PlayerAvatar
+                        displayName={p.displayName ?? "A player"}
+                        seed={p.playerSessionId}
+                        avatarUrl={p.avatarUrl ?? null}
+                        frame={p.frame ?? null}
+                        dimmed={!p.present}
+                      />
+                      <Text
+                        style={{ color: colors.textSecondary, flex: 1 }}
+                        numberOfLines={1}
+                      >
+                        {p.displayName ?? "A player"}
+                        {p.playerSessionId === youId ? " (you)" : ""}
+                        {typeof p.embersEarned === "number"
+                          ? ` · ${p.embersEarned.toLocaleString()} Embers`
+                          : ""}
+                        {p.openToTrades ? " · open to trades" : ""}
+                      </Text>
+                    </>
+                  );
+
+                  /*
+                   * An account opens the profile popup right here, the
+                   * website's behaviour. A guest is not a dead button,
+                   * they are somebody who does not need an account to
+                   * trade, so their row stays plain.
+                   */
+                  return p.playerId ? (
+                    <Tap
+                      key={p.playerSessionId}
+                      onPress={() => setPeek(p.playerId!)}
+                      style={styles.person}
                     >
-                      {p.displayName ?? "A player"}
-                      {p.playerSessionId === youId ? " (you)" : ""}
-                      {typeof p.embersEarned === "number"
-                        ? ` · ${p.embersEarned.toLocaleString()} Embers`
-                        : ""}
-                      {p.openToTrades ? " · open to trades" : ""}
-                    </Text>
-                  </View>
-                ))}
+                      {row}
+                    </Tap>
+                  ) : (
+                    <View key={p.playerSessionId} style={styles.person}>
+                      {row}
+                    </View>
+                  );
+                })}
             </View>
           )}
         </Card>
       </ScrollView>
+
+      <PlayerPeekModal
+        playerId={peek}
+        onClose={() => setPeek(null)}
+        onViewProfile={(playerId) => {
+          setPeek(null);
+          navigation.navigate("PlayerProfile", { playerId });
+        }}
+      />
 
       {/* The action bar: the two things a thumb reaches for in a room. */}
       <View style={styles.actionBar}>

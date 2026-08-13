@@ -22,6 +22,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { ProfileScreen } from "./src/screens/profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
@@ -71,6 +72,8 @@ export type StackParams = {
   Scan: undefined;
   Settings: undefined;
   PostFlare: { code: string };
+  /** Somebody else's profile, from the room popup's View full profile. */
+  PlayerProfile: { playerId: string };
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -248,6 +251,11 @@ export default function App() {
           name="Settings"
           component={SettingsScreen}
           options={{ title: "Settings", headerBackTitle: "Profile" }}
+        />
+        <Stack.Screen
+          name="PlayerProfile"
+          component={PlayerProfileScreen}
+          options={{ title: "Player", headerBackTitle: "Back" }}
         />
         <Stack.Screen
           name="PostFlare"

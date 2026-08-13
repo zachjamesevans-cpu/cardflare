@@ -1,7 +1,9 @@
+import { apiPlayer } from "@/lib/api/auth";
 import { getViewer } from "@/lib/auth/session";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { publicProfile } from "@/lib/players/profile";
 import { getPlayerSession } from "@/lib/players/session";
+import { siteUrl } from "@/lib/site";
 
 /**
  * A player's public face, as JSON — what the room's profile popup shows.
@@ -12,19 +14,24 @@ import { getPlayerSession } from "@/lib/players/session";
  * founder's two-number rule enforced by the type, not by this route
  * remembering to omit it.
  *
- * Who may ask: anybody standing in a room. That means a signed-in
- * account OR a guest session cookie — the same people who can already
- * see this player's name, badge and frame on the roster. No session at
- * all gets a 401, so the route is not an open directory of players.
+ * Who may ask: anybody standing in a room. On the website that means a
+ * signed-in account OR a guest session cookie; from the app it means a
+ * bearer token — the same people who can already see this player's
+ * name, badge and frame on the roster. No credentials at all gets a
+ * 401, so the route is not an open directory of players.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ playerId: string }> },
 ) {
   const { playerId } = await params;
 
   const viewer = await getViewer();
-  if (viewer.kind === "anonymous" && !(await getPlayerSession())) {
+  if (
+    viewer.kind === "anonymous" &&
+    !(await getPlayerSession()) &&
+    !(await apiPlayer(request))
+  ) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
 
@@ -38,7 +45,11 @@ export async function GET(
   return Response.json({
     playerId: profile.playerId,
     displayName: profile.displayName,
-    avatarUrl: profile.avatarUrl,
+    /* Absolute, because the app has no origin to resolve "/api/..."
+       against; the website resolves it against itself either way. */
+    avatarUrl: profile.avatarUrl?.startsWith("/")
+      ? `${siteUrl()}${profile.avatarUrl}`
+      : profile.avatarUrl,
     embersEarned: profile.embersEarned,
     /* The ring around the picture: the avatar slot, since the split. */
     frame: worn.avatarFrame,

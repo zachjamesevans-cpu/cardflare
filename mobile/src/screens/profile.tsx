@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
   addToShowcase,
   buyCosmetic,
+  dressAllShowcase,
+  dressShowcase,
   getProfile,
   removeFromShowcase,
   renameProfile,
@@ -17,9 +19,11 @@ import {
   type CardHit,
   type CosmeticItem,
   type Profile,
+  type ShowcaseCard,
   type Wardrobe,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { FRAME_COLOR } from "../player-avatar";
 import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
@@ -49,6 +53,9 @@ export function ProfileScreen() {
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  /* The card whose dressing room is open, or null. */
+  const [dressing, setDressing] = useState<ShowcaseCard | null>(null);
 
   const load = useCallback(async () => {
     const token = await storedAccessToken();
@@ -109,6 +116,14 @@ export function ProfileScreen() {
       </ScrollView>
     );
   }
+
+  /* What the dressing rooms may offer: owned only, free items included. */
+  const ownedFrames: DressingOption[] = (wardrobe?.cardFrames ?? [])
+    .filter((item) => item.owned)
+    .map(({ slug, name }) => ({ slug, name }));
+  const ownedHolos: DressingOption[] = (wardrobe?.holos ?? [])
+    .filter((item) => item.owned)
+    .map(({ slug, name }) => ({ slug, name }));
 
   const act = async (key: string, run: () => Promise<unknown>, said: string) => {
     setBusy(key);
@@ -235,13 +250,17 @@ export function ProfileScreen() {
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(3) }}>
             {profile.showcase.map((entry) => (
               <View key={entry.id} style={{ gap: spacing(1), width: 92 }}>
-                <CosmeticCard
-                  imageUrl={entry.imageUrl}
-                  width={92}
-                  frame={entry.frame ?? profile.equipped.frame}
-                  holo={entry.holo ?? profile.equipped.holo}
-                  effect={profile.equipped.effect}
-                />
+                {/* Tapping a card opens its dressing room, the
+                    website's behaviour on your own shelf. */}
+                <Tap onPress={() => setDressing(entry)}>
+                  <CosmeticCard
+                    imageUrl={entry.imageUrl}
+                    width={92}
+                    frame={entry.frame ?? profile.equipped.frame}
+                    holo={entry.holo ?? profile.equipped.holo}
+                    effect={profile.equipped.effect}
+                  />
+                </Tap>
                 <Text
                   numberOfLines={1}
                   style={{ color: colors.textSecondary, fontSize: 12 }}
@@ -268,10 +287,15 @@ export function ProfileScreen() {
         {profile.showcase.length < profile.showcaseLimit ? (
           <AddToShowcase
             busy={busy === "showcase-add"}
-            onPick={(cardId, printingId) =>
+            frames={ownedFrames}
+            holos={ownedHolos}
+            defaultFrame={profile.equipped.frame}
+            defaultHolo={profile.equipped.holo}
+            effect={profile.equipped.effect}
+            onPick={(cardId, printingId, picks) =>
               void act(
                 "showcase-add",
-                () => addToShowcase(cardId, printingId),
+                () => addToShowcase(cardId, printingId, picks),
                 "On the shelf.",
               )
             }
@@ -348,6 +372,25 @@ export function ProfileScreen() {
       )}
 
       {message && <Muted>{message}</Muted>}
+
+      <DressModal
+        entry={dressing}
+        defaults={profile.equipped}
+        frames={ownedFrames}
+        holos={ownedHolos}
+        onClose={() => setDressing(null)}
+        onDress={(entryId, frame, holo) =>
+          void act(entryId, () => dressShowcase(entryId, frame, holo), "Saved.")
+        }
+        onDressAll={(frame, holo) =>
+          void act(
+            "dress-all",
+            () => dressAllShowcase(frame, holo),
+            "Every card updated.",
+          )
+        }
+        effect={profile.equipped.effect}
+      />
 
       <Button
         label="Sign out"
@@ -570,14 +613,37 @@ function NameField({
  */
 function AddToShowcase({
   busy,
+  frames,
+  holos,
+  defaultFrame,
+  defaultHolo,
+  effect,
   onPick,
 }: {
   busy: boolean;
-  onPick: (cardId: string, printingId: string | null) => void;
+  frames: DressingOption[];
+  holos: DressingOption[];
+  defaultFrame: string | null;
+  defaultHolo: string | null;
+  effect: string | null;
+  onPick: (
+    cardId: string,
+    printingId: string | null,
+    dressing: { frame: string | null; holo: string | null },
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
+
+  /* The card chosen in step one, waiting to be dressed before it goes
+     up - the founder's spec, same two steps as the website. */
+  const [pending, setPending] = useState<{
+    cardId: string;
+    printingId: string | null;
+    imageUrl: string | null;
+  } | null>(null);
+  const [picked, setPicked] = useState({ frame: defaultFrame, holo: defaultHolo });
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -602,6 +668,54 @@ function AddToShowcase({
     );
   }
 
+  if (pending) {
+    return (
+      <View style={{ gap: spacing(3) }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+          Dress it before it goes up
+        </Text>
+
+        {/* The card as it will land, wearing the picks live. */}
+        <View style={{ alignItems: "center" }}>
+          <CosmeticCard
+            imageUrl={pending.imageUrl}
+            width={160}
+            frame={picked.frame}
+            holo={picked.holo}
+            effect={effect}
+          />
+        </View>
+
+        <DressingPicker
+          imageUrl={pending.imageUrl}
+          frames={frames}
+          holos={holos}
+          frame={picked.frame}
+          holo={picked.holo}
+          effect={effect}
+          onPick={setPicked}
+        />
+
+        <Button
+          label="Add to showcase"
+          busy={busy}
+          onPress={() => {
+            onPick(pending.cardId, pending.printingId, picked);
+            setPending(null);
+            setOpen(false);
+            setQuery("");
+            setHits([]);
+          }}
+        />
+        <Button
+          label="Pick a different card"
+          variant="secondary"
+          onPress={() => setPending(null)}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={{ gap: spacing(2) }}>
       <Input
@@ -620,10 +734,14 @@ function AddToShowcase({
             /* The base printing, the website's rule. A card with no
                provider art goes up with no printing at all, which
                renders as the honest empty frame. */
-            onPick(hit.id, hit.basePrintingId);
-            setOpen(false);
-            setQuery("");
-            setHits([]);
+            setPicked({ frame: defaultFrame, holo: defaultHolo });
+            setPending({
+              cardId: hit.id,
+              printingId: hit.basePrintingId,
+              imageUrl:
+                hit.printings.find((printing) => printing.id === hit.basePrintingId)
+                  ?.imageUrl ?? null,
+            });
           }}
           style={{
             borderRadius: radius.control,
@@ -644,5 +762,120 @@ function AddToShowcase({
 
       <Button label="Cancel" variant="secondary" onPress={() => setOpen(false)} />
     </View>
+  );
+}
+
+
+/**
+ * One card's dressing room - the website's editor, in a Modal.
+ *
+ * Every pick saves immediately, shop-style; Apply to all is the real
+ * button, because it changes the rest of the shelf too. The preview
+ * updates locally the instant a tile is tapped, and the reload behind
+ * the save keeps the shelf underneath honest.
+ */
+function DressModal({
+  entry,
+  defaults,
+  frames,
+  holos,
+  effect,
+  onClose,
+  onDress,
+  onDressAll,
+}: {
+  entry: ShowcaseCard | null;
+  defaults: { frame: string | null; holo: string | null };
+  frames: DressingOption[];
+  holos: DressingOption[];
+  effect: string | null;
+  onClose: () => void;
+  onDress: (entryId: string, frame: string | null, holo: string | null) => void;
+  onDressAll: (frame: string | null, holo: string | null) => void;
+}) {
+  const [picked, setPicked] = useState<{ frame: string | null; holo: string | null }>({
+    frame: null,
+    holo: null,
+  });
+
+  /* Reset the picks whenever a different card's room opens. */
+  useEffect(() => {
+    if (entry) {
+      setPicked({
+        frame: entry.frame ?? defaults.frame,
+        holo: entry.holo ?? defaults.holo,
+      });
+    }
+  }, [entry, defaults.frame, defaults.holo]);
+
+  if (!entry) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.75)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing(4),
+        }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            alignSelf: "stretch",
+            borderRadius: radius.panel,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            padding: spacing(4),
+            gap: spacing(3),
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+          >
+            {entry.name}
+          </Text>
+
+          <View style={{ alignItems: "center" }}>
+            <CosmeticCard
+              imageUrl={entry.imageUrl}
+              width={150}
+              frame={picked.frame}
+              holo={picked.holo}
+              effect={effect}
+            />
+          </View>
+
+          <DressingPicker
+            imageUrl={entry.imageUrl}
+            frames={frames}
+            holos={holos}
+            frame={picked.frame}
+            holo={picked.holo}
+            effect={effect}
+            onPick={(next) => {
+              setPicked(next);
+              onDress(entry.id, next.frame, next.holo);
+            }}
+          />
+
+          <Button
+            label="Apply to all cards"
+            variant="secondary"
+            onPress={() => onDressAll(picked.frame, picked.holo)}
+          />
+          <Muted>
+            Every card on your shelf wears this border and holo, and new cards will
+            too.
+          </Muted>
+          <Button label="Done" onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
