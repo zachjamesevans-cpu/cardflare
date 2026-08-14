@@ -31,6 +31,7 @@ import { PostFlareScreen } from "./src/screens/post-flare";
 import { RoomTab } from "./src/screens/room";
 import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
+import { StoreScreen } from "./src/screens/store";
 import { SignInScreen } from "./src/screens/sign-in";
 import { colors } from "./src/theme";
 
@@ -71,6 +72,8 @@ export type StackParams = {
   SignIn: undefined;
   Scan: undefined;
   Settings: undefined;
+  /** The Embers store, the website's /profile/store. */
+  Store: undefined;
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
@@ -251,6 +254,11 @@ export default function App() {
           name="Settings"
           component={SettingsScreen}
           options={{ title: "Settings", headerBackTitle: "Profile" }}
+        />
+        <Stack.Screen
+          name="Store"
+          component={StoreScreen}
+          options={{ title: "Embers store", headerBackTitle: "Profile" }}
         />
         <Stack.Screen
           name="PlayerProfile"

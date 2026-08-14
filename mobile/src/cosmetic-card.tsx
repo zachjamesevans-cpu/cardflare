@@ -36,27 +36,35 @@ const FRAME_COLOR: Record<string, string | null> = {
   "galaxy-edge": "#6d4aff",
 };
 
-/** The stops each holo washes over the artwork, at the alpha RN can do. */
+/*
+ * The stops follow the REBUILT web foil (globals.css): Classic's
+ * spectral columns, Prism's pastel bands, Galaxy's nebula. Still an
+ * approximation - no blend modes here - but the same palette family,
+ * so a card dressed on one client reads as the same card on the other.
+ */
 const HOLO_STOPS: Record<string, string[]> = {
   "none-holo": [],
   "classic-holo": [
-    "rgba(0,200,255,0.30)",
-    "rgba(255,0,170,0.30)",
-    "rgba(140,60,255,0.30)",
-    "rgba(120,255,60,0.30)",
-    "rgba(255,200,0,0.30)",
+    "rgba(154,64,224,0.30)",
+    "rgba(64,105,229,0.30)",
+    "rgba(43,180,168,0.30)",
+    "rgba(96,190,66,0.30)",
+    "rgba(235,205,60,0.30)",
+    "rgba(227,60,60,0.30)",
   ],
   "prism-holo": [
-    "rgba(0,220,255,0.34)",
-    "rgba(255,0,170,0.34)",
-    "rgba(140,60,255,0.34)",
-    "rgba(0,220,255,0.34)",
+    "rgba(240,150,145,0.32)",
+    "rgba(120,190,250,0.32)",
+    "rgba(250,190,120,0.32)",
+    "rgba(110,240,190,0.32)",
+    "rgba(245,140,225,0.32)",
+    "rgba(120,235,240,0.32)",
   ],
   "galaxy-holo": [
-    "rgba(26,11,61,0.72)",
-    "rgba(109,74,255,0.5)",
-    "rgba(255,0,170,0.35)",
-    "rgba(9,4,24,0.75)",
+    "rgba(30,15,70,0.80)",
+    "rgba(100,55,215,0.55)",
+    "rgba(210,35,150,0.45)",
+    "rgba(12,6,32,0.85)",
   ],
 };
 

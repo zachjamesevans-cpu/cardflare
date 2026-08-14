@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
-import { colors } from "./theme";
+import { avatarHues, colors } from "./theme";
 
 /**
  * A player's avatar in the app: their picture, or their initials.
@@ -11,30 +11,27 @@ import { colors } from "./theme";
  * have chosen one, a phone on shop wifi may fail to fetch one, and none
  * of those should leave a hole where somebody's face goes.
  *
- * The frame is the one bought with Embers. A ring drawn outside the
- * circle rather than a border on it, so equipping one never changes the
- * avatar's size and a roster stays on its grid.
+ * The ring is the website's exact geometry, not a coloured border: a
+ * 2px band of the frame's colour, then a 2px gap of canvas, then the
+ * face. The web draws it with box-shadows; here it is two nested
+ * circles, and the sizes work out identically. The travelling web
+ * frames (Prism, Molten, Galaxy) hold still at their strongest stop,
+ * because React Native has no animated gradient borders.
  */
 
 /** Mirrors FRAME_CLASS in the website's player-avatar.tsx. Exported so
     the shop tiles can show the ring a frame buys before it is bought. */
 export const FRAME_COLOR: Record<string, string | null> = {
   plain: null,
-  "ember-edge": "#ff8a3d",
+  "ember-edge": colors.ember,
   "lime-edge": colors.accent,
-  /* No travelling gradient here, for the same reason the showcase cards
-     hold still: React Native has no animated gradient border. The three
-     travellers each take the strongest stop of their web gradient. */
   "prism-edge": "#8c3cff",
-  "frost-edge": "#6ec3ff",
-  "rose-edge": "#ff6fb5",
-  "gilded-edge": "#f0c24b",
+  "frost-edge": colors.frost,
+  "rose-edge": colors.rose,
+  "gilded-edge": colors.gold,
   "molten-edge": "#ff5a1f",
-  "galaxy-edge": "#6d4aff",
+  "galaxy-edge": colors.galaxy,
 };
-
-/** Six hues, matching --color-avatar-N in the website's globals.css. */
-const HUES = ["#8fd3ff", "#a8e6a1", "#ffc98f", "#d9b3ff", "#ffadad", "#7fe3d4"];
 
 /** FNV-1a, the same stable hash the website uses to pick a hue. */
 function hue(seed: string): string {
@@ -43,7 +40,7 @@ function hue(seed: string): string {
     result ^= seed.charCodeAt(i);
     result = Math.imul(result, 0x01000193);
   }
-  return HUES[(result >>> 0) % HUES.length];
+  return avatarHues[(result >>> 0) % avatarHues.length];
 }
 
 function initials(displayName: string): string {
@@ -75,21 +72,20 @@ export function PlayerAvatar({
 }) {
   const [broken, setBroken] = useState(false);
 
-  const ring = frame ? FRAME_COLOR[frame] : null;
+  const ring = frame ? (FRAME_COLOR[frame] ?? null) : null;
 
-  return (
+  const face = (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: size / 2,
-        borderWidth: ring ? 2 : 1,
-        borderColor: ring ?? colors.border,
+        borderWidth: 1,
+        borderColor: colors.border,
         backgroundColor: colors.elevated,
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
-        opacity: dimmed ? 0.5 : 1,
       }}
     >
       {avatarUrl && !broken ? (
@@ -110,6 +106,31 @@ export function PlayerAvatar({
           {initials(displayName)}
         </Text>
       )}
+    </View>
+  );
+
+  if (!ring) {
+    return <View style={{ opacity: dimmed ? 0.5 : 1 }}>{face}</View>;
+  }
+
+  /* Ring, gap, face: 2px band + 2px canvas, the web's box-shadow made
+     of nested circles. The outer circle is size + 8, matching the web's
+     two 2px shadows on each side. */
+  return (
+    <View
+      style={{
+        width: size + 8,
+        height: size + 8,
+        borderRadius: (size + 8) / 2,
+        borderWidth: 2,
+        borderColor: ring,
+        backgroundColor: colors.canvas,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: dimmed ? 0.5 : 1,
+      }}
+    >
+      {face}
     </View>
   );
 }
