@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
+import { getFoilKit, travellingFrame } from "./foil";
 import { avatarHues, colors } from "./theme";
 
 /**
@@ -14,9 +15,10 @@ import { avatarHues, colors } from "./theme";
  * The ring is the website's exact geometry, not a coloured border: a
  * 2px band of the frame's colour, then a 2px gap of canvas, then the
  * face. The web draws it with box-shadows; here it is two nested
- * circles, and the sizes work out identically. The travelling web
- * frames (Prism, Molten, Galaxy) hold still at their strongest stop,
- * because React Native has no animated gradient borders.
+ * circles, and the sizes work out identically. The travelling frames
+ * (Prism, Molten, Galaxy) travel here too: a Skia gradient band slides
+ * around the ring at the web's own periods, over a static base colour
+ * that stands in wherever Skia is not in the binary.
  */
 
 /** Mirrors FRAME_CLASS in the website's player-avatar.tsx. Exported so
@@ -73,6 +75,7 @@ export function PlayerAvatar({
   const [broken, setBroken] = useState(false);
 
   const ring = frame ? (FRAME_COLOR[frame] ?? null) : null;
+  const kit = frame && travellingFrame(frame) ? getFoilKit() : null;
 
   const face = (
     <View
@@ -131,6 +134,23 @@ export function PlayerAvatar({
       }}
     >
       {face}
+      {kit !== null && frame !== null && (
+        <View
+          pointerEvents="none"
+          /* Absolute children measure from inside the 2px border; the
+             negative offsets put the canvas back over the border-box so
+             the animated band lands exactly on the static ring. */
+          style={{
+            position: "absolute",
+            top: -2,
+            left: -2,
+            width: size + 8,
+            height: size + 8,
+          }}
+        >
+          <kit.AvatarRing size={size + 8} slug={frame} />
+        </View>
+      )}
     </View>
   );
 }

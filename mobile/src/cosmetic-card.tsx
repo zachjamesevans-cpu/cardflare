@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
-import { getSkiaFoil } from "./foil";
+import { getFoilKit, travellingFrame } from "./foil";
 import { colors } from "./theme";
 
 /**
@@ -84,12 +84,12 @@ export function CosmeticCard({
 
   const border = frame ? FRAME_COLOR[frame] : null;
   const stops = holo ? (HOLO_STOPS[holo] ?? []) : [];
-  /* Skia is loaded on the first card that wants foil, never at app
+  /* Skia is loaded on the first card that wants it, never at app
      launch - see foil.tsx for why that ordering is load-bearing. */
   const wantsFoil =
     imageUrl !== null &&
     (holo === "classic-holo" || holo === "prism-holo" || holo === "galaxy-holo");
-  const SkiaFoil = wantsFoil ? getSkiaFoil() : null;
+  const kit = wantsFoil || travellingFrame(frame) || effect === "orbit" ? getFoilKit() : null;
 
   return (
     <View
@@ -111,8 +111,8 @@ export function CosmeticCard({
         />
       ) : null}
 
-      {SkiaFoil !== null && imageUrl !== null ? (
-        <SkiaFoil
+      {kit !== null && wantsFoil && imageUrl !== null ? (
+        <kit.Foil
           imageUrl={imageUrl}
           width={width}
           height={height}
@@ -130,9 +130,20 @@ export function CosmeticCard({
         )
       )}
 
+      {/* The travelling frames move exactly as on the web; the static
+          border underneath stays as the Skia-less fallback. */}
+      {kit !== null && frame !== null && travellingFrame(frame) && (
+        <kit.FrameRing width={width} height={height} slug={frame} radius={5} />
+      )}
+
       {effect === "shimmer" && <Shimmer width={width} height={height} />}
       {effect === "pulse" && <Pulse />}
-      {effect === "orbit" && <Orbit />}
+      {effect === "orbit" &&
+        (kit !== null ? (
+          <kit.OrbitRing width={width} height={height} color={colors.accent} radius={5} />
+        ) : (
+          <Orbit />
+        ))}
     </View>
   );
 }
