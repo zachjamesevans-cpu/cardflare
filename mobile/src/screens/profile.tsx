@@ -13,6 +13,7 @@ import {
   describeError,
   dressAllShowcase,
   dressShowcase,
+  getFollowing,
   getProfile,
   removeFromShowcase,
   renameProfile,
@@ -22,6 +23,7 @@ import {
   uploadAvatar,
   type CardHit,
   type CosmeticItem,
+  type FollowedPlayer,
   type Profile,
   type ShowcaseCard,
   type Wardrobe,
@@ -71,6 +73,9 @@ export function ProfileScreen() {
   /* The card whose dressing room is open, or null. */
   const [dressing, setDressing] = useState<ShowcaseCard | null>(null);
 
+  /* Who you follow - fetched with the profile, shown as People. */
+  const [following, setFollowing] = useState<FollowedPlayer[]>([]);
+
   const load = useCallback(async () => {
     const token = await storedAccessToken();
     if (!token) {
@@ -84,6 +89,9 @@ export function ProfileScreen() {
       setWardrobe(result.wardrobe);
       setNeedsSetup(result.needsSetup);
       setLoadFailed(null);
+      getFollowing()
+        .then((people) => setFollowing(people.following))
+        .catch(() => {});
     } catch (caught) {
       setProfile(null);
       setLoadFailed(describeError(caught));
@@ -353,6 +361,59 @@ export function ProfileScreen() {
           />
         </View>
 
+      </Card>
+
+      <Card>
+        <Title>People</Title>
+        <Body>
+          Players you follow. When they follow you back, you are Trade partners.
+          Follow people from their profile popup in a room.
+        </Body>
+
+        {following.length === 0 ? (
+          <Muted>
+            Nobody yet. The next time somebody impresses you at a table, tap
+            their name.
+          </Muted>
+        ) : (
+          <View>
+            {following.map((person, index) => (
+              <Tap
+                key={person.playerId}
+                onPress={() =>
+                  navigation.navigate("PlayerProfile", { playerId: person.playerId })
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(3),
+                  paddingVertical: spacing(2.5),
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: colors.border,
+                }}
+              >
+                <PlayerAvatar
+                  displayName={person.displayName}
+                  seed={person.playerId}
+                  avatarUrl={person.avatarUrl}
+                  frame={person.frame}
+                  size={32}
+                />
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
+                >
+                  {person.displayName}
+                </Text>
+                {person.partners && (
+                  <Text style={{ color: colors.accent, fontSize: 12 }}>
+                    Trade partners
+                  </Text>
+                )}
+              </Tap>
+            ))}
+          </View>
+        )}
       </Card>
 
       <Card>

@@ -6,6 +6,7 @@ import type { StackParams } from "../../App";
 import { peekPlayer, type PeekProfile } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { EmberBadge } from "../ember-badge";
+import { FollowButton } from "../follow-button";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap, Title } from "../ui";
@@ -92,6 +93,7 @@ export function PlayerProfileScreen() {
           <Title>{profile.displayName}</Title>
           {/* Centered directly under the name, inside the block. */}
           <EmberBadge earned={profile.embersEarned} size="md" />
+          <FollowButton playerId={profile.playerId} initial={profile.follow} />
         </View>
 
         <View style={{ gap: spacing(2) }}>

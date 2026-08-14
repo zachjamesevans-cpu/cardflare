@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
+import { FollowButton, type FollowStateJson } from "@/components/players/follow-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -47,6 +48,8 @@ const BACKDROP_DIM: Keyframe = {
 };
 
 interface PeekProfile {
+  /** Viewer-relative; null for guests and yourself, hiding the button. */
+  follow: FollowStateJson | null;
   displayName: string;
   avatarUrl: string | null;
   /** Their cover banner, blurred behind this popup's header. */
@@ -339,6 +342,16 @@ export function PlayerPeek({
               <X className="size-5" aria-hidden="true" />
             </button>
           </div>
+
+          {/* Option C's button: follow, following, or Trade partners.
+              Hidden for guests and for yourself - the server sends null. */}
+          {worn?.follow && !isYou && (
+            <FollowButton
+              playerId={playerId}
+              initial={worn.follow}
+              className="self-start"
+            />
+          )}
 
           <div className="flex flex-col gap-2">
             <p className="text-sm font-semibold text-text-primary">Showcase</p>

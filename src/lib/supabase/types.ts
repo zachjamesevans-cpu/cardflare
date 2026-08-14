@@ -612,6 +612,21 @@ export type PlayerInsert = Omit<
   tier?: string;
 };
 
+/**
+ * One player following another. The founder's option C: one-way edges,
+ * and a mutual pair reads as Trade partners. Rows are the count; no
+ * count is exposed anywhere yet by design.
+ */
+export type PlayerFollowRow = {
+  follower_id: string;
+  followed_id: string;
+  created_at: string;
+};
+
+export type PlayerFollowInsert = Omit<PlayerFollowRow, "created_at"> & {
+  created_at?: string;
+};
+
 /** frame, holo and effect: the three slots a profile showcase has. */
 export type CosmeticKind = "frame" | "holo" | "effect";
 
@@ -879,6 +894,7 @@ export type Database = {
       store_singles: Table<StoreSingleRow, StoreSingleInsert>;
       store_singles_syncs: Table<StoreSinglesSyncRow, StoreSinglesSyncInsert>;
       players: Table<PlayerRow, PlayerInsert>;
+      player_follows: Table<PlayerFollowRow, PlayerFollowInsert>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
       player_cosmetics: Table<
         PlayerCosmeticRow,
