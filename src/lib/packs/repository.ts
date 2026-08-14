@@ -96,10 +96,14 @@ export async function buyPackWithEmbers(
   const series = seriesOrNull(seriesId);
   if (!series || !isSupabaseConfigured()) return "failed";
 
+  /* A UNIQUE ref per purchase: the ledger's ref index treats a repeat
+     as already-paid, which is right for one-off cosmetics and dead
+     wrong for consumables - the founder's second pack was refused as
+     "not enough Embers" by exactly this. */
   const paid = await spendEmbers(
     playerId,
     series.priceEmbers,
-    `pack:${series.id}`,
+    `pack:${series.id}:${crypto.randomUUID()}`,
     `${series.name} pack`,
   );
   if (!paid) return "cannot-afford";

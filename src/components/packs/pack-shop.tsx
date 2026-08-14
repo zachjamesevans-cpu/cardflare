@@ -2,23 +2,23 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { HelpCircle, Loader2, X } from "lucide-react";
 
 import { FRAME_CLASS } from "@/components/players/cosmetic-card";
 import { cn } from "@/lib/cn";
 
 /**
- * The pack corner of the Embers store, and the opening table.
+ * The pack corner of the Embers store, and the full-screen opening.
  *
- * One component owns the whole loop - see the sealed pack, read the
- * odds, buy with Embers, tear one open, watch three pulls flip in -
- * because the loop IS the feature: the founder's brief is a nod to
- * real TCGs, where the pack on the wall and the pack in your hands are
- * the same object.
+ * The founder's staging: opening dims everything, the pack fills the
+ * screen, tearing it reveals a carousel of face-down cards - and the
+ * LAST card is always the rarest of the three, because that is how a
+ * real pack is riffled. Tap flips a card; holding a finger on one
+ * glows in its rarity's colour. Odds live behind a small "?" that
+ * fades a popup in, every item with its own exact percent.
  *
- * Contents are drawn server-side at the moment of opening; this
- * component never knows what is inside a sealed pack because nothing
- * does.
+ * Contents are drawn server-side at the moment of opening; nothing
+ * here knows what is in a sealed pack because nothing does.
  */
 
 export interface SeriesJson {
@@ -28,6 +28,7 @@ export interface SeriesJson {
   priceEmbers: number;
   slots: number;
   odds: { rarity: string; slugs: string[]; percent: number }[];
+  oddsDetail?: { rarity: string; items: { slug: string; percent: number }[] }[];
 }
 
 export interface SealedJson {
@@ -43,13 +44,37 @@ interface Pull {
   embersInstead: number;
 }
 
-const RARITY_COLOR: Record<string, string> = {
+const RARITY_TEXT: Record<string, string> = {
   common: "text-text-secondary",
   uncommon: "text-success",
   rare: "text-frost",
   epic: "text-rose",
   legendary: "text-gold",
 };
+
+/** Rarity to glow colour, for the held-finger halo. */
+const RARITY_GLOW: Record<string, string> = {
+  common: "rgba(160,175,190,0.55)",
+  uncommon: "rgba(123,216,138,0.6)",
+  rare: "rgba(110,195,255,0.65)",
+  epic: "rgba(255,111,181,0.65)",
+  legendary: "rgba(240,194,75,0.75)",
+};
+
+const RARITY_RANK: Record<string, number> = {
+  common: 0,
+  uncommon: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
+};
+
+/** Rarest LAST: the pack's crescendo. Stable for equal rarities. */
+function riffled(pulls: Pull[]): Pull[] {
+  return [...pulls].sort(
+    (a, b) => (RARITY_RANK[a.rarity] ?? 0) - (RARITY_RANK[b.rarity] ?? 0),
+  );
+}
 
 /** The sealed wrapper, foil and crimp. */
 export function PackArt({
@@ -95,17 +120,21 @@ export function PackShop({
   names: Record<string, string>;
 }) {
   const [packs, setPacks] = useState(sealed);
-  const [busy, setBusy] = useState<"buy" | "open" | null>(null);
+  const [busy, setBusy] = useState<"buy" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [pulls, setPulls] = useState<Pull[] | null>(null);
+  const [oddsOpen, setOddsOpen] = useState(false);
+  /* Full-screen opening: "sealed" shows the pack, then the carousel. */
+  const [opening, setOpening] = useState<null | {
+    stage: "sealed" | "tearing" | "revealed";
+    pulls: Pull[];
+  }>(null);
 
   const post = async (payload: unknown) => {
-    const response = await fetch("/api/v1/packs", {
+    return fetch("/api/v1/packs", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return response;
   };
 
   const buy = async () => {
@@ -131,25 +160,23 @@ export function PackShop({
     }
   };
 
-  const open = async () => {
+  const tear = async () => {
     const next = packs.find((pack) => pack.series === series.id);
-    if (!next) return;
-    setBusy("open");
-    setMessage(null);
-    setPulls(null);
+    if (!next || !opening || opening.stage !== "sealed") return;
+    setOpening({ stage: "tearing", pulls: [] });
     try {
       const response = await post({ action: "open", packId: next.id });
       if (!response.ok) {
+        setOpening(null);
         setMessage("That pack could not be opened. Try again in a moment.");
         return;
       }
       const body = (await response.json()) as { pulls: Pull[]; packs: SealedJson[] };
       setPacks(body.packs);
-      setPulls(body.pulls);
+      setOpening({ stage: "revealed", pulls: riffled(body.pulls) });
     } catch {
+      setOpening(null);
       setMessage("That pack could not be opened. Try again in a moment.");
-    } finally {
-      setBusy(null);
     }
   };
 
@@ -180,95 +207,225 @@ export function PackShop({
             {mine > 0 && (
               <button
                 type="button"
-                onClick={() => void open()}
-                disabled={busy !== null}
-                className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong disabled:opacity-60"
+                onClick={() => setOpening({ stage: "sealed", pulls: [] })}
+                className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
               >
-                {busy === "open" && <Loader2 className="size-4 animate-spin" />}
                 Open one · {mine} sealed
               </button>
             )}
+
+            {/* The odds live behind a quiet "?", not a dropdown. */}
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="What can be inside, and the exact odds"
+                aria-expanded={oddsOpen}
+                onClick={() => setOddsOpen((current) => !current)}
+                className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <HelpCircle className="size-4" aria-hidden="true" />
+              </button>
+
+              <div
+                className={cn(
+                  "absolute top-10 left-0 z-10 w-72 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-xl transition-opacity duration-200",
+                  oddsOpen ? "opacity-100" : "pointer-events-none opacity-0",
+                )}
+              >
+                <p className="mb-2 text-sm font-semibold text-text-primary">
+                  Exact odds, per slot
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {(series.oddsDetail ?? []).map((tier) => (
+                    <li key={tier.rarity} className="text-xs">
+                      <p
+                        className={cn(
+                          "font-semibold capitalize",
+                          RARITY_TEXT[tier.rarity] ?? "text-text-secondary",
+                        )}
+                      >
+                        {tier.rarity}
+                      </p>
+                      {tier.items.map((item) => (
+                        <p
+                          key={item.slug}
+                          className="flex justify-between text-text-secondary"
+                        >
+                          <span>{names[item.slug] ?? item.slug}</span>
+                          <span className="text-text-muted tabular-nums">
+                            {item.percent}%
+                          </span>
+                        </p>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-text-muted">
+                  Three slots per pack, each rolled independently. No slot can repeat
+                  another in the same pack.
+                </p>
+              </div>
+            </div>
           </div>
 
           {message && <p className="text-sm text-text-secondary">{message}</p>}
-
-          <details className="group">
-            <summary className="flex cursor-pointer items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
-              <ChevronDown
-                className="size-4 transition-transform group-open:rotate-180"
-                aria-hidden="true"
-              />
-              What can be inside, and the exact odds
-            </summary>
-            <ul className="mt-2 flex flex-col gap-1.5 border-l border-border pl-4">
-              {series.odds.map((tier) => (
-                <li key={tier.rarity} className="text-sm">
-                  <span
-                    className={cn(
-                      "font-semibold capitalize",
-                      RARITY_COLOR[tier.rarity] ?? "text-text-secondary",
-                    )}
-                  >
-                    {tier.rarity}
-                  </span>{" "}
-                  <span className="text-text-muted tabular-nums">
-                    {tier.percent}% per slot
-                  </span>
-                  <span className="text-text-secondary">
-                    {" "}
-                    · {tier.slugs.map((slug) => names[slug] ?? slug).join(", ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
         </div>
       </div>
 
-      {pulls && (
-        <div className="flex flex-col gap-2">
-          <p className="font-semibold text-text-primary">Your pulls</p>
-          <div className="flex flex-wrap gap-3">
-            {pulls.map((pull, index) => (
-              <div
-                key={`${pull.slug}-${index}`}
-                className="cf-pack-pull flex w-28 flex-col items-center gap-1.5 rounded-[var(--radius-control)] border border-border bg-elevated p-3 text-center"
-                style={{ animationDelay: `${index * 0.35}s` }}
-              >
-                <div
-                  className={cn(
-                    "relative h-20 w-14 overflow-hidden rounded-md border border-border bg-surface",
-                    FRAME_CLASS[pull.slug] ?? "",
-                  )}
-                >
-                  {pull.slug.endsWith("-holo") && (
-                    <div className={cn("cf-holo", `cf-holo-${pull.slug}`)} />
-                  )}
-                </div>
-                <p className="text-xs font-semibold text-text-primary">
-                  {names[pull.slug] ?? pull.slug}
-                </p>
-                <p
-                  className={cn(
-                    "text-[11px] capitalize",
-                    RARITY_COLOR[pull.rarity] ?? "text-text-muted",
-                  )}
-                >
-                  {pull.rarity}
-                </p>
-                {pull.duplicate && (
-                  <p className="text-[11px] text-text-muted">
-                    Already yours: +{pull.embersInstead} Embers
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-text-muted">
-            Everything you pulled is in your wardrobe now, ready to equip.
-          </p>
-        </div>
+      {opening && (
+        <PackOpening
+          series={series}
+          stage={opening.stage}
+          pulls={opening.pulls}
+          names={names}
+          onTear={() => void tear()}
+          onClose={() => setOpening(null)}
+        />
       )}
     </div>
+  );
+}
+
+/** The full-screen ceremony: dim, pack, tear, carousel. */
+function PackOpening({
+  series,
+  stage,
+  pulls,
+  names,
+  onTear,
+  onClose,
+}: {
+  series: SeriesJson;
+  stage: "sealed" | "tearing" | "revealed";
+  pulls: Pull[];
+  names: Record<string, string>;
+  onTear: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-black/90 p-6">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-5 right-5 cursor-pointer rounded-full p-2 text-text-muted hover:text-text-primary"
+      >
+        <X className="size-6" aria-hidden="true" />
+      </button>
+
+      {stage !== "revealed" ? (
+        <>
+          <button
+            type="button"
+            onClick={onTear}
+            disabled={stage === "tearing"}
+            className={cn(
+              "cursor-pointer transition-transform duration-300",
+              stage === "tearing" ? "animate-pulse" : "hover:scale-105",
+            )}
+          >
+            <PackArt
+              name={series.name}
+              setNumber={series.setNumber}
+              className="h-[26rem] w-72"
+            />
+          </button>
+          <p className="text-sm text-text-secondary">
+            {stage === "tearing" ? "Tearing…" : "Tap the pack to tear it open"}
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="flex w-full snap-x snap-mandatory gap-6 overflow-x-auto px-[10vw] py-4">
+            {pulls.map((pull, index) => (
+              <FlipCard
+                key={`${pull.slug}-${index}`}
+                pull={pull}
+                name={names[pull.slug] ?? pull.slug}
+                last={index === pulls.length - 1}
+              />
+            ))}
+          </div>
+          <p className="text-sm text-text-secondary">
+            Tap a card to flip it. Hold to see its rarity. The last one is your best
+            pull.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-[var(--radius-control)] border border-border bg-elevated px-5 py-2 text-sm font-semibold text-text-primary hover:border-border-strong"
+          >
+            Done
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function FlipCard({ pull, name, last }: { pull: Pull; name: string; last: boolean }) {
+  const [flipped, setFlipped] = useState(false);
+  const [held, setHeld] = useState(false);
+
+  const glow = RARITY_GLOW[pull.rarity] ?? RARITY_GLOW.common;
+
+  return (
+    <button
+      type="button"
+      onClick={() => setFlipped(true)}
+      onPointerDown={() => setHeld(true)}
+      onPointerUp={() => setHeld(false)}
+      onPointerLeave={() => setHeld(false)}
+      className="shrink-0 cursor-pointer snap-center [perspective:1000px]"
+      aria-label={flipped ? name : "A face-down pull. Tap to flip."}
+    >
+      <div
+        className="relative h-80 w-56 transition-transform duration-500 [transform-style:preserve-3d]"
+        style={{
+          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          filter: held ? `drop-shadow(0 0 24px ${glow})` : undefined,
+        }}
+      >
+        {/* The back: the set's wrapper art, face down. */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border-strong bg-[linear-gradient(160deg,#1a2030,#0e1116_55%,#1c1430)] [backface-visibility:hidden]">
+          <Image
+            src="/brand/cardflare-mark.png"
+            alt=""
+            width={64}
+            height={80}
+            className="h-24 w-auto opacity-80"
+          />
+          {last && <p className="text-xs text-text-muted">Your best pull waits here</p>}
+        </div>
+
+        {/* The front: the cosmetic, worn by a blank card. */}
+        <div className="absolute inset-0 flex [transform:rotateY(180deg)] flex-col items-center justify-center gap-3 rounded-xl border border-border bg-elevated p-4 [backface-visibility:hidden]">
+          <div
+            className={cn(
+              "relative h-40 w-28 overflow-hidden rounded-lg border border-border bg-surface",
+              FRAME_CLASS[pull.slug] ?? "",
+            )}
+          >
+            {pull.slug.endsWith("-holo") && (
+              <div className={cn("cf-holo", `cf-holo-${pull.slug}`)} />
+            )}
+          </div>
+          <p className="font-semibold text-text-primary">{name}</p>
+          <p
+            className={cn(
+              "text-sm capitalize",
+              RARITY_TEXT[pull.rarity] ?? "text-text-muted",
+            )}
+          >
+            {pull.rarity}
+          </p>
+          {pull.duplicate && (
+            <p className="text-xs text-text-muted">
+              Already yours: +{pull.embersInstead} Embers
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
   );
 }

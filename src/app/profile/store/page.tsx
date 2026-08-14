@@ -6,7 +6,7 @@ import { ArrowLeft, Flame } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
 import { PackShop } from "@/components/packs/pack-shop";
-import { SERIES, oddsByRarity } from "@/lib/packs";
+import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
 import { listSealedPacks } from "@/lib/packs/repository";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
@@ -116,6 +116,7 @@ export default async function EmberStorePage() {
                   priceEmbers: series.priceEmbers,
                   slots: series.slots,
                   odds: oddsByRarity(series),
+                  oddsDetail: oddsPerItem(series),
                 }}
                 sealed={sealed}
                 names={Object.fromEntries(
