@@ -1,7 +1,6 @@
 import { Users } from "lucide-react";
 
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
-import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
 import type { Participant } from "@/lib/events/participants";
@@ -51,9 +50,6 @@ export function RoomRoster({ participants }: { participants: Participant[] }) {
                   {participant.displayName}
                 </span>
               </span>
-              {participant.embersEarned !== null && (
-                <EmberBadge earned={participant.embersEarned} />
-              )}
               {participant.openToTrades && <OpenToTradesTag />}
               {!participant.present && (
                 <span className="shrink-0 text-xs text-text-muted">away</span>

@@ -297,7 +297,9 @@ export function PlayerPeek({
           className="flex max-h-[88dvh] flex-col gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-border bg-surface p-5 text-text-primary"
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
+            {/* Top-aligned, per the founder: name and badge sit level
+                with the top of the picture's circle. */}
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <PlayerAvatar
                 displayName={displayName}
                 seed={seed}
@@ -305,7 +307,7 @@ export function PlayerPeek({
                 frame={worn?.frame ?? frame}
                 className="size-14 text-lg"
               />
-              <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                 <p className="truncate font-semibold">{displayName}</p>
                 {worn && <EmberBadge earned={worn.embersEarned} />}
               </div>

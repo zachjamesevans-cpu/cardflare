@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -17,6 +19,7 @@ import {
   searchCards,
   signOut,
   storedAccessToken,
+  uploadAvatar,
   type CardHit,
   type CosmeticItem,
   type Profile,
@@ -101,17 +104,80 @@ export function ProfileScreen() {
     }, [load]),
   );
 
-  const act = async (key: string, run: () => Promise<unknown>, said: string) => {
+  /**
+   * Pick, shrink, convert, send. Everything lands as a JPEG well under
+   * 200KB regardless of what the camera roll held - the founder's brief:
+   * it must work first time and it must not be a server load.
+   */
+  const changePicture = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage("CardFlare needs photo access to change your picture.");
+      return;
+    }
+
+    const chosen = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+    if (chosen.canceled || chosen.assets.length === 0) return;
+
+    setBusy("avatar");
+    setMessage("Preparing picture…");
+    try {
+      /* Resize to the stored size and re-encode as JPEG, walking the
+         quality down until it is comfortably small. Base64 length is a
+         fine proxy: 200000 characters is roughly 150KB of image. */
+      let quality = 0.8;
+      let encoded: string | null = null;
+      while (quality >= 0.2) {
+        const out = await manipulateAsync(
+          chosen.assets[0].uri,
+          [{ resize: { width: 512 } }],
+          { compress: quality, format: SaveFormat.JPEG, base64: true },
+        );
+        encoded = out.base64 ?? null;
+        if (encoded && encoded.length <= 200_000) break;
+        quality -= 0.15;
+      }
+      if (!encoded) {
+        setMessage("That picture could not be read. Try a different one.");
+        return;
+      }
+
+      await uploadAvatar(encoded, (sent, total) =>
+        setMessage(`Uploading picture… ${sent} of ${total}`),
+      );
+      await load();
+      setMessage("Picture updated.");
+    } catch (caught) {
+      setMessage(
+        `The picture did not go through (${describeError(caught)}). Try again.`,
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const act = async (
+    key: string,
+    run: () => Promise<unknown>,
+    said: string,
+  ): Promise<boolean> => {
     setBusy(key);
     setMessage(null);
     try {
       await run();
       await load();
       setMessage(said);
+      return true;
     } catch (caught) {
       setMessage(
         `That did not go through (${describeError(caught)}). Try again in a moment.`,
       );
+      return false;
     } finally {
       setBusy(null);
     }
@@ -230,16 +296,18 @@ export function ProfileScreen() {
         </View>
 
         {/*
-         * Said out loud rather than shown as a disabled camera button.
-         * Uploading a picture needs a multipart request, and this app's
-         * writes deliberately ride in a header because bodies do not
-         * survive the founder's network. A button that fails is worse
-         * than a sentence that is true.
+         * A real upload now, not a pointer at the website: the picture
+         * is resized and re-compressed to a small JPEG on the phone,
+         * then rides the header transport in chunks. The button
+         * narrates each stage because a dozen small requests on shop
+         * wifi takes a visible moment.
          */}
-        <Muted>
-          Change your picture at cardflare.gg on your profile page. It shows up here
-          straight away.
-        </Muted>
+        <Button
+          label={busy === "avatar" ? (message ?? "Uploading picture…") : "Change picture"}
+          variant="secondary"
+          disabled={busy === "avatar"}
+          onPress={() => void changePicture()}
+        />
 
         <NameField
           current={profile.displayName}
@@ -411,11 +479,7 @@ export function ProfileScreen() {
           void act(entryId, () => dressShowcase(entryId, frame, holo), "Saved.")
         }
         onDressAll={(frame, holo) =>
-          void act(
-            "dress-all",
-            () => dressAllShowcase(frame, holo),
-            "Every card updated.",
-          )
+          act("dress-all", () => dressAllShowcase(frame, holo), "Every card updated.")
         }
         effect={profile.equipped.effect}
       />
@@ -713,12 +777,18 @@ function DressModal({
   effect: string | null;
   onClose: () => void;
   onDress: (entryId: string, frame: string | null, holo: string | null) => void;
-  onDressAll: (frame: string | null, holo: string | null) => void;
+  /** Resolves true when the write landed, so the button can say so. */
+  onDressAll: (frame: string | null, holo: string | null) => Promise<boolean>;
 }) {
   const [picked, setPicked] = useState<{ frame: string | null; holo: string | null }>({
     frame: null,
     holo: null,
   });
+  /* The Apply button narrates its own work: busy while saving, Saved!
+     after, back to rest when the picks change. The founder's ask. */
+  const [applyState, setApplyState] = useState<"idle" | "busy" | "saved" | "failed">(
+    "idle",
+  );
 
   /* Reset the picks whenever a different card's room opens. */
   useEffect(() => {
@@ -727,6 +797,7 @@ function DressModal({
         frame: entry.frame ?? defaults.frame,
         holo: entry.holo ?? defaults.holo,
       });
+      setApplyState("idle");
     }
   }, [entry, defaults.frame, defaults.holo]);
 
@@ -782,14 +853,29 @@ function DressModal({
             effect={effect}
             onPick={(next) => {
               setPicked(next);
+              setApplyState("idle");
               onDress(entry.id, next.frame, next.holo);
             }}
           />
 
           <Button
-            label="Apply to all cards"
+            label={
+              applyState === "busy"
+                ? "Applying…"
+                : applyState === "saved"
+                  ? "Saved!"
+                  : applyState === "failed"
+                    ? "Did not save. Try again."
+                    : "Apply to all cards"
+            }
             variant="secondary"
-            onPress={() => onDressAll(picked.frame, picked.holo)}
+            disabled={applyState === "busy"}
+            onPress={() => {
+              setApplyState("busy");
+              void onDressAll(picked.frame, picked.holo).then((landed) =>
+                setApplyState(landed ? "saved" : "failed"),
+              );
+            }}
           />
           <Muted>
             Every card on your shelf wears this border and holo, and new cards will

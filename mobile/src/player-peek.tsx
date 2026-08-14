@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   Text,
@@ -43,16 +44,34 @@ export function PlayerPeekModal({
 
   const [profile, setProfile] = useState<PeekProfile | null>(null);
   const [failed, setFailed] = useState(false);
+  /* True once the shelf's images are warm in the cache. Showing cards
+     before that means art and foil popping in one by one, which reads
+     as broken - the founder's word was "disorienting". */
+  const [shelfReady, setShelfReady] = useState(false);
 
   useEffect(() => {
     setProfile(null);
     setFailed(false);
+    setShelfReady(false);
     if (!playerId) return;
 
     let live = true;
     peekPlayer(playerId)
-      .then((result) => {
-        if (live) setProfile(result);
+      .then(async (result) => {
+        if (!live) return;
+        setProfile(result);
+
+        /* Prefetch the five shelf images, but never wait forever: after
+           four seconds the shelf shows with whatever has arrived. */
+        const warm = Promise.all(
+          result.showcase
+            .slice(0, PEEK_SHELF)
+            .map((entry) =>
+              entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
+            ),
+        );
+        await Promise.race([warm, new Promise((done) => setTimeout(done, 4000))]);
+        if (live) setShelfReady(true);
       })
       .catch(() => {
         if (live) setFailed(true);
@@ -110,8 +129,10 @@ export function PlayerPeekModal({
             <ActivityIndicator color={colors.accent} />
           ) : (
             <>
+              {/* Top-aligned, per the founder: the name line and the badge
+                  sit level with the top of the picture's circle. */}
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+                style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}
               >
                 <PlayerAvatar
                   displayName={profile.displayName}
@@ -120,10 +141,23 @@ export function PlayerPeekModal({
                   frame={profile.frame}
                   size={56}
                 />
-                <View style={{ flex: 1, gap: spacing(1) }}>
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: spacing(2),
+                  }}
+                >
                   <Text
                     numberOfLines={1}
-                    style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: "700",
+                      fontSize: 16,
+                      flexShrink: 1,
+                    }}
                   >
                     {profile.displayName}
                   </Text>
@@ -142,6 +176,20 @@ export function PlayerPeekModal({
                   <Text style={{ color: colors.textMuted, fontSize: 13 }}>
                     Nothing on their shelf yet.
                   </Text>
+                ) : !shelfReady ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(2),
+                      height: Math.round((slotWidth * 84) / 60),
+                    }}
+                  >
+                    <ActivityIndicator color={colors.accent} size="small" />
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                      Loading their showcase…
+                    </Text>
+                  </View>
                 ) : (
                   <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
                     {shelf.map((entry) => (

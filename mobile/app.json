@@ -28,6 +28,12 @@
     },
     "plugins": [
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "CardFlare uses your photo library only when you choose a new profile picture."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "CardFlare uses the camera only to scan the QR code on a store's counter."

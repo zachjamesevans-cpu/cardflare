@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -313,7 +314,7 @@ export function ShowcaseEditor({
           <form action={allAction} className="border-t border-border pt-3">
             <input type="hidden" name="frame" value={picked.frame ?? ""} />
             <input type="hidden" name="holo" value={picked.holo ?? ""} />
-            <ApplyAll />
+            <ApplyAll saved={allState.status === "equipped"} />
           </form>
 
           <Status state={allState.status !== "idle" ? allState : state} />
@@ -324,14 +325,19 @@ export function ShowcaseEditor({
 }
 
 /** Its own component so useFormStatus reports on the right form. */
-function ApplyAll() {
+function ApplyAll({ saved }: { saved: boolean }) {
+  /* The button narrates its own work - the founder's ask: press it and
+     it says Applying, then Saved, right where the thumb already is. */
+  const { pending } = useFormStatus();
+
   return (
     <div className="flex flex-col gap-1">
       <button
         type="submit"
-        className="cursor-pointer rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
+        disabled={pending}
+        className="cursor-pointer rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong disabled:opacity-70"
       >
-        Apply to all cards
+        {pending ? "Applying…" : saved ? "Saved!" : "Apply to all cards"}
       </button>
       <p className="text-xs text-text-muted">
         Every card on your shelf wears this border and holo, and new cards will too.

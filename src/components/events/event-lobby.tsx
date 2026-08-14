@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ArrowLeftRight, ChevronDown, Users } from "lucide-react";
 
-import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerPeek } from "@/components/players/player-peek";
 import { Badge, Card } from "@/components/ui/card";
@@ -124,15 +123,9 @@ export function EventLobby({
                     </>
                   )}
 
-                  {/*
-                   * The badge, beside the name it belongs to. Lifetime
-                   * only — the spendable balance is nobody else's
-                   * business, and `Participant` carries no field for it.
-                   * Guests have null rather than zero and get nothing.
-                   */}
-                  {participant.embersEarned !== null && (
-                    <EmberBadge earned={participant.embersEarned} />
-                  )}
+                  {/* No Ember badge here - the founder's call: in the
+                      room itself, Embers only show inside a player's
+                      popup or full profile, never on the roster. */}
 
                   {/*
                    * Repeated from the board on purpose. This list answers

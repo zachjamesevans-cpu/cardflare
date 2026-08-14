@@ -48,7 +48,6 @@ import {
   Tap,
   Title,
 } from "../ui";
-import { EmberBadge } from "../ember-badge";
 import { OpenToTradesTag } from "../open-to-trades-tag";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
@@ -722,9 +721,6 @@ function RoomScreen({
                         <Title>
                           {mine ? "Your Flares" : (group.name ?? "A player")}
                         </Title>
-                        {typeof person?.embersEarned === "number" && (
-                          <EmberBadge earned={person.embersEarned} />
-                        )}
                       </View>
                     );
                     return playerBySession.get(sessionId) ? (
@@ -972,9 +968,6 @@ function RoomScreen({
                           <Text style={{ color: colors.textMuted }}>{" · you"}</Text>
                         ) : null}
                       </Text>
-                      {typeof p.embersEarned === "number" && (
-                        <EmberBadge earned={p.embersEarned} />
-                      )}
                       {p.openToTrades && <OpenToTradesTag />}
                       {!p.present && (
                         <Text style={{ color: colors.textMuted, fontSize: 12 }}>

@@ -1,6 +1,6 @@
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { peekPlayer, type PeekProfile } from "../api";
@@ -23,12 +23,23 @@ export function PlayerProfileScreen() {
 
   const [profile, setProfile] = useState<PeekProfile | null>(null);
   const [failed, setFailed] = useState(false);
+  /* Cards render together once their art is warm, not one by one. */
+  const [shelfReady, setShelfReady] = useState(false);
 
   useEffect(() => {
     let live = true;
     peekPlayer(playerId)
-      .then((result) => {
-        if (live) setProfile(result);
+      .then(async (result) => {
+        if (!live) return;
+        setProfile(result);
+
+        const warm = Promise.all(
+          result.showcase.map((entry) =>
+            entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
+          ),
+        );
+        await Promise.race([warm, new Promise((done) => setTimeout(done, 4000))]);
+        if (live) setShelfReady(true);
       })
       .catch(() => {
         if (live) setFailed(true);
@@ -82,6 +93,11 @@ export function PlayerProfileScreen() {
 
         {profile.showcase.length === 0 ? (
           <Muted>Nothing on the shelf yet.</Muted>
+        ) : !shelfReady ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <ActivityIndicator color={colors.accent} size="small" />
+            <Muted>Loading showcase…</Muted>
+          </View>
         ) : (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(3) }}>
             {profile.showcase.map((entry) => (
