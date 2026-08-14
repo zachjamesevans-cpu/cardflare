@@ -1,0 +1,130 @@
+import {
+  Image,
+  Modal,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+
+import { CosmeticCard } from "./cosmetic-card";
+import { colors, spacing } from "./theme";
+
+/** What the zoom shows: a showcase entry and the dressing it wears. */
+export type ZoomedCard = {
+  name: string;
+  imageUrl: string | null;
+  frame: string | null;
+  holo: string | null;
+  effect: string | null;
+};
+
+/**
+ * A showcase card, full screen — the same tap-to-open, tap-anywhere-
+ * to-close contract as every other card viewer in the product. The
+ * card keeps its dressing at size: foil, frame and effect all render
+ * through the same CosmeticCard the thumbnail used, so what zooms is
+ * exactly what was tapped.
+ */
+export function ShowcaseZoom({
+  card,
+  onClose,
+}: {
+  /** Null when closed. */
+  card: ZoomedCard | null;
+  onClose: () => void;
+}) {
+  const window = useWindowDimensions();
+  const width = Math.min(window.width - spacing(12), 340);
+
+  return (
+    <Modal
+      visible={card !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.85)",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing(3),
+          padding: spacing(4),
+        }}
+      >
+        {card && (
+          <>
+            <CosmeticCard
+              imageUrl={card.imageUrl}
+              width={width}
+              frame={card.frame}
+              holo={card.holo}
+              effect={card.effect}
+            />
+            <Text style={{ color: colors.textSecondary, fontSize: 15 }}>
+              {card.name}
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+              Tap anywhere to close
+            </Text>
+          </>
+        )}
+      </Pressable>
+    </Modal>
+  );
+}
+
+/**
+ * The cover banner a profile block wears, or the quiet default. Shared
+ * by the full profile and the popup so "has no cover yet" looks the
+ * same everywhere: the plain elevated block, never a broken image.
+ */
+export function CoverBanner({
+  coverUrl,
+  height,
+  blur = 0,
+}: {
+  coverUrl: string | null;
+  height: number;
+  blur?: number;
+}) {
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        overflow: "hidden",
+        backgroundColor: colors.elevated,
+      }}
+      pointerEvents="none"
+    >
+      {coverUrl ? (
+        <Image
+          source={{ uri: coverUrl }}
+          blurRadius={blur}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
+        />
+      ) : null}
+      {/* A quiet darkening so light covers never wash out the text. */}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.25)",
+        }}
+      />
+    </View>
+  );
+}

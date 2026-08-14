@@ -266,6 +266,19 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
       >
         <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
 
+        {/* The founder's balance note: dodge brightens, so the art
+            under a foil starts a touch darker and the sum reads right.
+            Galaxy skips it - its multiply vignette already darkens. */}
+        {holo !== "galaxy-holo" && (
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            color={holo === "prism-holo" ? "rgba(0,0,0,0.16)" : "rgba(0,0,0,0.10)"}
+          />
+        )}
+
         {holo === "classic-holo" && (
           <>
             {/* Spectral columns, dodged, drifting at the web's 11s. */}

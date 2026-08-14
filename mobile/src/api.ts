@@ -586,6 +586,8 @@ export interface Profile {
    * only ever puts it on the authenticated player's own profile.
    */
   embersBalance: number;
+  /** The banner behind the picture, or null for the plain block. */
+  coverUrl: string | null;
   equipped: Equipped;
   showcase: ShowcaseCard[];
   showcaseLimit: number;
@@ -668,6 +670,8 @@ export interface PeekProfile {
   playerId: string;
   displayName: string;
   avatarUrl: string | null;
+  /** Their cover banner, blurred behind the popup header. */
+  coverUrl: string | null;
   embersEarned: number;
   /** The ring around their picture. */
   frame: string | null;
@@ -698,6 +702,7 @@ export const peekPlayer = (playerId: string) =>
 export async function uploadAvatar(
   base64: string,
   onProgress?: (sent: number, total: number) => void,
+  kind: "avatar" | "cover" = "avatar",
 ): Promise<void> {
   const CHUNK = 6000;
   const total = Math.ceil(base64.length / CHUNK);
@@ -720,6 +725,7 @@ export async function uploadAvatar(
     action: "commit",
     uploadId,
     count: total,
+    kind,
   });
 }
 

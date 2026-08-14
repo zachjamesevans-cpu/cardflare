@@ -17,6 +17,8 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 export interface AdminPlayer {
   id: string;
   displayName: string;
+  /** Membership tier: free, pro, ultra or max. */
+  tier: string;
   avatarUrl: string | null;
   embersEarned: number;
   embersBalance: number;
@@ -47,7 +49,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
   let request = admin
     .from("players")
     .select(
-      "id, display_name, avatar_url, embers_earned, embers_balance, cosmetics_unlocked, onboarded_at, created_at",
+      "id, display_name, avatar_url, embers_earned, embers_balance, cosmetics_unlocked, onboarded_at, created_at, tier",
     )
     .order("created_at", { ascending: false })
     .limit(SEARCH_LIMIT);
@@ -89,6 +91,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
   return rows.map((row) => ({
     id: row.id,
     displayName: row.display_name,
+    tier: row.tier,
     avatarUrl: avatarSrc(row.avatar_url),
     embersEarned: row.embers_earned,
     embersBalance: row.embers_balance,

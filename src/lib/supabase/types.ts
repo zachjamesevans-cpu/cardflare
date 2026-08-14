@@ -550,6 +550,8 @@ export type PlayerRow = {
   display_name: string;
   /** Public object URL in the `avatars` bucket, or null for the initials. */
   avatar_url: string | null;
+  /** Cover banner object path in the same bucket, or null for none. */
+  cover_image: string | null;
   /** Lifetime Embers. Public, monotonic, the badge. */
   embers_earned: number;
   /** Unspent Embers. Private, and the only number spending touches. */
@@ -575,6 +577,8 @@ export type PlayerRow = {
   cosmetics_unlocked: boolean;
   /** When setup finished. Null means a username was never chosen. */
   onboarded_at: string | null;
+  /** Membership tier: free, pro, ultra or max. Admin-set for now. */
+  tier: string;
 };
 
 export type PlayerInsert = Omit<
@@ -582,6 +586,8 @@ export type PlayerInsert = Omit<
   | "id"
   | "created_at"
   | "avatar_url"
+  | "cover_image"
+  | "tier"
   | "embers_earned"
   | "embers_balance"
   | "equipped_frame"
@@ -594,6 +600,7 @@ export type PlayerInsert = Omit<
   id?: string;
   created_at?: string;
   avatar_url?: string | null;
+  cover_image?: string | null;
   embers_earned?: number;
   embers_balance?: number;
   equipped_frame?: string | null;
@@ -602,6 +609,7 @@ export type PlayerInsert = Omit<
   equipped_avatar_frame?: string | null;
   cosmetics_unlocked?: boolean;
   onboarded_at?: string | null;
+  tier?: string;
 };
 
 /** frame, holo and effect: the three slots a profile showcase has. */

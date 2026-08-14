@@ -70,7 +70,23 @@ export default async function PublicProfilePage({
         description="What this player has traded for, and what they are showing off."
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Card className="flex flex-col items-center gap-4 text-center">
+          <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
+            {/*
+             * The cover banner, behind the picture - the founder's
+             * profile block: banner, picture overlapping it, name,
+             * badge, shelf, all in one rounded card.
+             */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-28 overflow-hidden bg-elevated"
+            >
+              {profile.coverUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.coverUrl} alt="" className="size-full object-cover" />
+              )}
+              <div className="absolute inset-0 bg-black/25" />
+            </div>
+
             {/*
              * One component for picture, initials and frame alike, so
              * this page cannot drift from what a room shows. It used to
@@ -82,7 +98,7 @@ export default async function PublicProfilePage({
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
               frame={worn.avatarFrame}
-              className="size-24 text-2xl"
+              className="relative mt-14 size-24 text-2xl"
             />
 
             <div className="flex flex-col items-center gap-2">
@@ -94,56 +110,55 @@ export default async function PublicProfilePage({
                 Earned by confirming trades, and nothing else.
               </p>
             </div>
-          </Card>
-
-          <Card className="flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <Sparkles
-                className="mt-0.5 size-5 shrink-0 text-accent"
-                aria-hidden="true"
-              />
-              <div className="flex flex-col gap-1">
-                <p className="font-semibold text-text-primary">Showcase</p>
-                <p className="text-sm text-text-secondary">
-                  Cards this player is proud of. Not a trade list, so there is nothing
-                  to pledge on here.
-                </p>
+            <div className="flex w-full flex-col gap-4 text-left">
+              <div className="flex items-start gap-3">
+                <Sparkles
+                  className="mt-0.5 size-5 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
+                <div className="flex flex-col gap-1">
+                  <p className="font-semibold text-text-primary">Showcase</p>
+                  <p className="text-sm text-text-secondary">
+                    Cards this player is proud of. Not a trade list, so there is nothing
+                    to pledge on here.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {profile.showcase.length === 0 ? (
-              <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
-            ) : (
-              /* The board's carousel: same Rail, same card width. */
-              <Rail ariaLabel="Showcase">
-                {profile.showcase.map((entry) => (
-                  <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                    <CardImageZoom
-                      imageUrl={entry.imageUrl}
-                      exactName={entry.name}
-                      cardNumber={entry.number}
-                      enabled={imagesEnabled}
-                      thumbClassName="w-full"
-                      thumb={
-                        <CosmeticCard
-                          imageUrl={entry.imageUrl}
-                          name={entry.name}
-                          number={entry.number}
-                          imagesEnabled={imagesEnabled}
-                          frame={entry.frame ?? worn.frame}
-                          holo={entry.holo ?? worn.holo}
-                          effect={worn.effect}
-                          className="w-full"
-                        />
-                      }
-                    />
-                    <span className="truncate text-[11px] text-text-secondary">
-                      {entry.name}
-                    </span>
-                  </li>
-                ))}
-              </Rail>
-            )}
+              {profile.showcase.length === 0 ? (
+                <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
+              ) : (
+                /* The board's carousel: same Rail, same card width. */
+                <Rail ariaLabel="Showcase">
+                  {profile.showcase.map((entry) => (
+                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                      <CardImageZoom
+                        imageUrl={entry.imageUrl}
+                        exactName={entry.name}
+                        cardNumber={entry.number}
+                        enabled={imagesEnabled}
+                        thumbClassName="w-full"
+                        thumb={
+                          <CosmeticCard
+                            imageUrl={entry.imageUrl}
+                            name={entry.name}
+                            number={entry.number}
+                            imagesEnabled={imagesEnabled}
+                            frame={entry.frame ?? worn.frame}
+                            holo={entry.holo ?? worn.holo}
+                            effect={worn.effect}
+                            className="w-full"
+                          />
+                        }
+                      />
+                      <span className="truncate text-[11px] text-text-secondary">
+                        {entry.name}
+                      </span>
+                    </li>
+                  ))}
+                </Rail>
+              )}
+            </div>
           </Card>
 
           <TabBarSpacer />

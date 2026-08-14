@@ -13,6 +13,7 @@ import { peekPlayer, type PeekProfile } from "./api";
 import { CosmeticCard } from "./cosmetic-card";
 import { EmberBadge } from "./ember-badge";
 import { PlayerAvatar } from "./player-avatar";
+import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "./showcase-zoom";
 import { Button } from "./ui";
 import { colors, radius, spacing } from "./theme";
 
@@ -44,6 +45,7 @@ export function PlayerPeekModal({
 
   const [profile, setProfile] = useState<PeekProfile | null>(null);
   const [failed, setFailed] = useState(false);
+  const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
   /* True once the shelf's images are warm in the cache. Showing cards
      before that means art and foil popping in one by one, which reads
      as broken - the founder's word was "disorienting". */
@@ -118,9 +120,15 @@ export function PlayerPeekModal({
             borderColor: colors.border,
             backgroundColor: colors.surface,
             padding: spacing(4),
+            paddingTop: spacing(5),
             gap: spacing(3),
+            overflow: "hidden",
           }}
         >
+          {/* Their cover, blurred: the quick look reads as THEIR page. */}
+          {profile?.coverUrl ? (
+            <CoverBanner coverUrl={profile.coverUrl} height={86} blur={14} />
+          ) : null}
           {failed ? (
             <Text style={{ color: colors.textMuted }}>
               Could not load their profile right now. Try again in a moment.
@@ -193,14 +201,26 @@ export function PlayerPeekModal({
                 ) : (
                   <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
                     {shelf.map((entry) => (
-                      <CosmeticCard
+                      <Pressable
                         key={entry.id}
-                        imageUrl={entry.imageUrl}
-                        width={slotWidth}
-                        frame={entry.frame}
-                        holo={entry.holo}
-                        effect={profile.effect}
-                      />
+                        onPress={() =>
+                          setZoomed({
+                            name: entry.name,
+                            imageUrl: entry.imageUrl,
+                            frame: entry.frame,
+                            holo: entry.holo,
+                            effect: profile.effect,
+                          })
+                        }
+                      >
+                        <CosmeticCard
+                          imageUrl={entry.imageUrl}
+                          width={slotWidth}
+                          frame={entry.frame}
+                          holo={entry.holo}
+                          effect={profile.effect}
+                        />
+                      </Pressable>
                     ))}
                     {Array.from({ length: emptySlots }).map((_, index) => (
                       <View
@@ -228,6 +248,8 @@ export function PlayerPeekModal({
           )}
         </Pressable>
       </Pressable>
+
+      <ShowcaseZoom card={zoomed} onClose={() => setZoomed(null)} />
     </Modal>
   );
 }

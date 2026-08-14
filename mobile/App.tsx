@@ -1,9 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import {
-  DarkTheme,
-  NavigationContainer,
-  type Theme,
-} from "@react-navigation/native";
+import { DarkTheme, NavigationContainer, type Theme } from "@react-navigation/native";
 import {
   createBottomTabNavigator,
   type BottomTabBarButtonProps,
@@ -20,6 +16,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -83,6 +80,41 @@ export type StackParams = {
 
 const Tab = createBottomTabNavigator<TabParams>();
 const Stack = createNativeStackNavigator<StackParams>();
+
+/* What each screen's back button says - the headerBackTitle map, kept
+   because the button itself is ours now (see HeaderBack). */
+const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
+  SignIn: "Back",
+  Scan: "Back",
+  Settings: "Profile",
+  Store: "Profile",
+  PlayerProfile: "Back",
+  PostFlare: "Room",
+};
+
+/**
+ * Our own back button, replacing the native header's.
+ *
+ * The native one stopped answering taps on this screens/new-architecture
+ * combination while the back GESTURE kept working - the tap lands in
+ * native code this app cannot see. Drawing the button ourselves puts
+ * the tap in JavaScript where it demonstrably works, with the same
+ * chevron-and-label look iOS renders.
+ */
+function HeaderBack({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={`Back to ${label}`}
+      style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}
+    >
+      <Ionicons name="chevron-back" size={26} color={colors.accent} />
+      <Text style={{ color: colors.accent, fontSize: 16 }}>{label}</Text>
+    </Pressable>
+  );
+}
 
 const theme: Theme = {
   ...DarkTheme,
@@ -266,10 +298,12 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
             CardFlare hit a problem while starting
           </Text>
           <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>
-            This is not supposed to happen. A screenshot of this screen is the
-            fastest way to get it fixed.
+            This is not supposed to happen. A screenshot of this screen is the fastest
+            way to get it fixed.
           </Text>
-          <Text style={{ color: colors.textMuted, fontFamily: "Courier", fontSize: 12 }}>
+          <Text
+            style={{ color: colors.textMuted, fontFamily: "Courier", fontSize: 12 }}
+          >
             {String(this.state.error)}
           </Text>
         </ScrollView>
@@ -283,63 +317,72 @@ export default function App() {
   return (
     <StartupGuard>
       <NavigationContainer theme={theme}>
-      <StatusBar style="light" />
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.textPrimary,
-          headerTitleStyle: { fontWeight: "700" },
-          // Swipe back from anywhere on the screen, not just the left
-          // edge — the whole surface is the back gesture, like Instagram.
-          gestureEnabled: true,
-          fullScreenGestureEnabled: true,
-        }}
-      >
-        <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-        <Stack.Screen
-          name="SignIn"
-          options={{ title: "Sign in", headerBackTitle: "Back" }}
+        <StatusBar style="light" />
+        <Stack.Navigator
+          screenOptions={({ navigation, route }) => ({
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+            headerTitleStyle: { fontWeight: "700" },
+            // Swipe back from anywhere on the screen, not just the left
+            // edge — the whole surface is the back gesture, like Instagram.
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+            headerLeft: ({ canGoBack }) =>
+              canGoBack ? (
+                <HeaderBack
+                  label={BACK_LABELS[route.name as keyof StackParams] ?? "Back"}
+                  onPress={() => navigation.goBack()}
+                />
+              ) : (
+                <View />
+              ),
+          })}
         >
-          {({ navigation }) => (
-            <SignInScreen onSignedIn={() => navigation.goBack()} />
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="Scan"
-          options={{ title: "Scan", headerBackTitle: "Back" }}
-        >
-          {({ navigation }) => (
-            <ScanScreen
-              onCode={() => navigation.navigate("Tabs", { screen: "Room" })}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{ title: "Settings", headerBackTitle: "Profile" }}
-        />
-        <Stack.Screen
-          name="Store"
-          component={StoreScreen}
-          options={{ title: "Embers store", headerBackTitle: "Profile" }}
-        />
-        <Stack.Screen
-          name="PlayerProfile"
-          component={PlayerProfileScreen}
-          options={{ title: "Player", headerBackTitle: "Back" }}
-        />
-        <Stack.Screen
-          name="PostFlare"
-          // The back button names where it goes, not the screen's internal
-          // name — "Tabs" meant nothing to anyone at a counter.
-          options={{ title: "Post a Flare", headerBackTitle: "Room" }}
-        >
-          {({ route }) => (
-            <PostFlareScreen target={{ kind: "room", code: route.params.code }} />
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
+          <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="SignIn"
+            options={{ title: "Sign in", headerBackTitle: "Back" }}
+          >
+            {({ navigation }) => (
+              <SignInScreen onSignedIn={() => navigation.goBack()} />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Scan"
+            options={{ title: "Scan", headerBackTitle: "Back" }}
+          >
+            {({ navigation }) => (
+              <ScanScreen
+                onCode={() => navigation.navigate("Tabs", { screen: "Room" })}
+              />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{ title: "Settings", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="Store"
+            component={StoreScreen}
+            options={{ title: "Embers store", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="PlayerProfile"
+            component={PlayerProfileScreen}
+            options={{ title: "Player", headerBackTitle: "Back" }}
+          />
+          <Stack.Screen
+            name="PostFlare"
+            // The back button names where it goes, not the screen's internal
+            // name — "Tabs" meant nothing to anyone at a counter.
+            options={{ title: "Post a Flare", headerBackTitle: "Room" }}
+          >
+            {({ route }) => (
+              <PostFlareScreen target={{ kind: "room", code: route.params.code }} />
+            )}
+          </Stack.Screen>
+        </Stack.Navigator>
       </NavigationContainer>
     </StartupGuard>
   );

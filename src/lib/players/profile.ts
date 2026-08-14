@@ -10,6 +10,9 @@ import {
   AVATAR_SIZE,
   avatarObjectPath,
   avatarSrc,
+  coverObjectPath,
+  COVER_HEIGHT,
+  COVER_WIDTH,
   objectPathFrom,
 } from "./profile-image";
 
@@ -44,6 +47,8 @@ export interface PublicProfile {
   displayName: string;
   /** Ready to put in an `<img>`. Null means the generated initials. */
   avatarUrl: string | null;
+  /** The banner behind the picture, ready for an `<img>`. */
+  coverUrl: string | null;
   /** Lifetime. The badge. */
   embersEarned: number;
   equipped: Equipped;
@@ -86,6 +91,7 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
      * profile has: a message with nothing anybody can do about it.
      */
     avatarUrl: await verifiedAvatar(playerId, player.avatar_url),
+    coverUrl: avatarSrc(player.cover_image),
     embersEarned: player.embers_earned,
     embersBalance: player.embers_balance,
     equipped: {
@@ -647,6 +653,78 @@ export async function setAvatar(
    * the upload after a delete leaves a player with no picture at all.
    */
   await deleteAvatarObject(previous?.avatar_url ?? null);
+
+  return { ok: true, path };
+}
+
+/**
+ * Stores a cover banner: the avatar pipeline, wide.
+ *
+ * Same decode discipline (failOn error), same JPEG-only rule, same
+ * Blob-not-Buffer upload, same store-the-path decision. The crop to
+ * 1200x450 is what makes "rounded edges, cropped automatically" true:
+ * whatever shape arrives, the stored object is exactly the banner box.
+ */
+export async function setCover(
+  playerId: string,
+  file: { arrayBuffer(): Promise<ArrayBuffer>; size: number; type: string },
+): Promise<AvatarOutcome> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  if (file.size > AVATAR_MAX_BYTES) return { ok: false, reason: "too-big" };
+  if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { ok: false, reason: "wrong-type" };
+  }
+
+  let encoded: Buffer;
+  try {
+    encoded = await sharp(Buffer.from(await file.arrayBuffer()), { failOn: "error" })
+      .rotate()
+      .resize(COVER_WIDTH, COVER_HEIGHT, { fit: "cover", position: "centre" })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+  } catch (error) {
+    console.error("Could not decode the uploaded cover", error);
+    return { ok: false, reason: "unreadable" };
+  }
+
+  const admin = getSupabaseAdmin();
+  const path = coverObjectPath(playerId);
+
+  const { error: uploadError } = await admin.storage
+    .from("avatars")
+    .upload(path, new Blob([new Uint8Array(encoded)], { type: "image/jpeg" }), {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    console.error("Could not store the cover", uploadError);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  const { data: previous } = await admin
+    .from("players")
+    .select("cover_image")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  const { error } = await admin
+    .from("players")
+    .update({ cover_image: path })
+    .eq("id", playerId);
+
+  if (error) {
+    console.error("Could not record the cover", error);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  const old = objectPathFrom(previous?.cover_image ?? null);
+  if (old)
+    await admin.storage
+      .from("avatars")
+      .remove([old])
+      .catch(() => {});
 
   return { ok: true, path };
 }

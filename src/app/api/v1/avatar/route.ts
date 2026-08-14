@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { AVATAR_MAX_BYTES } from "@/lib/players/profile-image";
-import { setAvatar } from "@/lib/players/profile";
+import { setAvatar, setCover } from "@/lib/players/profile";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +55,9 @@ const schema = z.discriminatedUnion("action", [
     action: z.literal("commit"),
     uploadId,
     count: z.number().int().min(1).max(CHUNK_MAX_COUNT),
+    /* What the assembled picture becomes: the square profile picture,
+       or the wide cover banner behind it. Same transport either way. */
+    kind: z.enum(["avatar", "cover"]).default("avatar"),
   }),
 ]);
 
@@ -118,7 +121,8 @@ export async function POST(request: Request): Promise<Response> {
       return badRequest("That picture is over 2MB.");
     }
 
-    const outcome = await setAvatar(player.playerId, {
+    const store = body.kind === "cover" ? setCover : setAvatar;
+    const outcome = await store(player.playerId, {
       arrayBuffer: async () =>
         bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
       size: bytes.length,
