@@ -8,20 +8,18 @@ Apple Developer Program (paid), which the founder has.
 EAS builds the app in Expo's cloud and hands Apple the signing. No Xcode
 knowledge needed; the whole flow runs from this folder on a Mac.
 
-One-time setup:
+One-time setup is already done: the folder is linked to EAS project
+`db32fc46-52f1-443f-9960-c9b17a2f7f4e` (the id lives in app.json under
+`extra.eas.projectId`, where push registration also reads it). Run every
+`eas` command as `npx eas-cli@latest ...` rather than installing the CLI
+globally; a global install needs permissions the Mac's npm does not have.
+
+To put a build on TestFlight:
 
 ```
-npm install -g eas-cli
-eas login          # an Expo account; free, create one at expo.dev if needed
 cd mobile
-eas init           # links this folder to an EAS project (writes projectId into app.json)
-```
-
-Then, to put a build on TestFlight:
-
-```
-eas build --platform ios --profile production
-eas submit --platform ios --latest
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --latest
 ```
 
 The first `eas build` asks to sign in with the Apple ID on the developer
@@ -53,12 +51,24 @@ developer team; pick the Apple Developer account in the signing prompt.
 Fine for quick personal testing; TestFlight is the path that scales to
 other people's phones.
 
+Apple's export-compliance question is answered permanently in app.json
+(`ITSAppUsesNonExemptEncryption: false` - the app uses only standard
+HTTPS), so neither `eas build` nor App Store Connect asks it again.
+
 ## Things that only exist in real builds
 
 - Push notifications. Expo Go cannot receive CardFlare's push token;
   a built app can, once the APNs key exists (created during the first
-  `eas build`).
+  `eas build`). Registration passes the EAS projectId explicitly -
+  without it, `getExpoPushTokenAsync` throws in standalone builds and
+  push dies silently.
 - The custom splash screen and app icon.
+
+The holofoil is NOT on this list: `@shopify/react-native-skia` ships
+inside Expo Go for this SDK, so the blend-mode foil in `src/foil.tsx`
+renders in Expo Go, dev-client builds, and TestFlight alike. If a
+binary is ever built without Skia, cosmetic-card.tsx falls back to the
+old translucent-gradient wash instead of crashing.
 
 ## Version numbers
 

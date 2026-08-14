@@ -2,24 +2,22 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
+import { SkiaFoil } from "./foil";
 import { colors } from "./theme";
 
 /**
  * A showcased card, wearing what the player bought.
  *
- * Worth being plain about what this is: an approximation of the
- * website's treatment, not the same thing. The web version leans on CSS
- * blend modes — `overlay` for the body of a rainbow and `color-dodge`
- * for the specular pass — and React Native has no blend modes at all.
- * What is here instead is layered translucent gradients, which reads as
- * a sheen rather than as true foil.
+ * The holo is real foil now: foil.tsx redraws the art on a Skia canvas
+ * and runs the website's blend-mode recipe over it — color-dodge
+ * spectra, screen washes, hard-light speculars. Skia ships in Expo Go
+ * and in every dev-client/TestFlight build, so this is the normal path.
+ * The translucent-gradient wash below survives as the fallback for a
+ * binary without Skia, and for the shop's art-less preview tiles where
+ * there is no image to dodge against.
  *
- * So the app is deliberately a little quieter than the site on the same
- * card. The alternative was a native module or a WebView per card, and
- * neither is worth it for ornament on nine cards.
- *
- * What IS exact: the frames, which are borders and translate perfectly,
- * and the motion, which is the same rhythm at the same durations.
+ * The frames are borders and translate exactly; the effects run the
+ * same rhythm at the same durations as the web keyframes.
  */
 
 const FRAME_COLOR: Record<string, string | null> = {
@@ -86,6 +84,10 @@ export function CosmeticCard({
 
   const border = frame ? FRAME_COLOR[frame] : null;
   const stops = holo ? (HOLO_STOPS[holo] ?? []) : [];
+  const skiaFoil =
+    SkiaFoil !== null &&
+    imageUrl !== null &&
+    (holo === "classic-holo" || holo === "prism-holo" || holo === "galaxy-holo");
 
   return (
     <View
@@ -107,14 +109,23 @@ export function CosmeticCard({
         />
       ) : null}
 
-      {stops.length > 1 && (
-        <LinearGradient
-          colors={stops as [string, string, ...string[]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ position: "absolute", inset: 0 }}
-          pointerEvents="none"
+      {skiaFoil && SkiaFoil !== null && imageUrl !== null ? (
+        <SkiaFoil
+          imageUrl={imageUrl}
+          width={width}
+          height={height}
+          holo={holo as "classic-holo" | "prism-holo" | "galaxy-holo"}
         />
+      ) : (
+        stops.length > 1 && (
+          <LinearGradient
+            colors={stops as [string, string, ...string[]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ position: "absolute", inset: 0 }}
+            pointerEvents="none"
+          />
+        )
       )}
 
       {effect === "shimmer" && <Shimmer width={width} height={height} />}

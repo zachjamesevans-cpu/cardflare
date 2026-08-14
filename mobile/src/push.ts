@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
@@ -31,7 +32,15 @@ export async function registerForPush(): Promise<void> {
       });
     }
 
-    const token = await Notifications.getExpoPushTokenAsync();
+    /* Expo Go can infer the project; a standalone (TestFlight/dev-client)
+       build cannot, and getExpoPushTokenAsync THROWS without a projectId
+       there — which this function's catch would then swallow, leaving
+       push silently dead in exactly the builds that ship. */
+    const projectId: string | undefined =
+      Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    const token = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
 
     await registerDevice(
       Platform.OS === "ios" ? "ios" : "android",
