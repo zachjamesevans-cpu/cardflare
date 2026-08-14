@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Linking, Text, View } from "react-native";
 
 import { signIn } from "../api";
-import { authConfigured } from "../config";
+import { API_BASE, authConfigured } from "../config";
 import { registerForPush } from "../push";
 import { Body, Button, Card, ErrorLine, Input, Title } from "../ui";
-import { spacing } from "../theme";
+import { colors, spacing } from "../theme";
 
 /**
  * Password sign-in against the same accounts as the website. Optional by
@@ -65,6 +65,18 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         />
 
         <Button label={busy ? "Signing in…" : "Sign in"} onPress={submit} busy={busy} />
+
+        {/* The website's reset flow, because that is where email lands. */}
+        <Text
+          onPress={() => void Linking.openURL(`${API_BASE}/login/reset`)}
+          style={{
+            color: colors.textMuted,
+            fontSize: 13,
+            textDecorationLine: "underline",
+          }}
+        >
+          Forgot your password?
+        </Text>
       </Card>
     </View>
   );

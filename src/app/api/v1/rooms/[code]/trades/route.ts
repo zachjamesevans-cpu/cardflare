@@ -7,7 +7,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { notifyTradeConfirmed } from "@/lib/notifications/notify";
 import { clearWantForFlare } from "@/lib/players/wants";
-import { confirmTrade } from "@/lib/trades/repository";
+import { confirmTrade, listMyTrades } from "@/lib/trades/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,34 @@ const confirmSchema = z.object({
   /** Present when the trade closes an offer; absent for a walk-up trade. */
   partnerSessionId: z.guid().optional(),
 });
+
+/**
+ * The viewer's own trades tonight — the app's Traded tonight section.
+ * Same privacy shape as the website: only the session's own trades,
+ * with partner names where a session is still attached.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ code: string }> },
+): Promise<Response> {
+  const code = normalizeJoinCode(decodeURIComponent((await params).code));
+  if (!isValidJoinCode(code)) {
+    return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  const session = await apiSession(request);
+  if (!session) return unauthorized();
+
+  const resolved = await resolveCode(code);
+  if (resolved.outcome !== "room") {
+    return Response.json({ error: "not-open" }, { status: 409 });
+  }
+
+  const participation = await findParticipation(resolved.room.id, session.id);
+  if (!participation) return unauthorized();
+
+  return Response.json({ trades: await listMyTrades(resolved.room.id, session.id) });
+}
 
 /**
  * "We traded", from the app. `confirmTrade` re-checks ownership and the

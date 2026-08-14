@@ -7,6 +7,8 @@ import {
   addToShowcase,
   dressAllShowcase,
   dressShowcaseCard,
+  markOnboarded,
+  needsSetup,
   ownProfile,
   removeFromShowcase,
   SHOWCASE_LIMIT,
@@ -75,6 +77,9 @@ export async function GET(request: Request): Promise<Response> {
       showcaseLimit: SHOWCASE_LIMIT,
     },
     wardrobe,
+    /* An account that never chose a username finishes that first - the
+       same wizard the website runs at /welcome/username. */
+    needsSetup: await needsSetup(player.playerId),
   });
 }
 
@@ -88,6 +93,7 @@ export async function GET(request: Request): Promise<Response> {
  */
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), displayName: z.string() }),
+  z.object({ action: z.literal("choose-username"), displayName: z.string() }),
   z.object({
     action: z.literal("buy"),
     slug: z.string().max(40),
@@ -129,6 +135,27 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest("Unrecognised profile action");
 
   const body = parsed.data;
+
+  if (body.action === "choose-username") {
+    const name = displayNameSchema.safeParse({ displayName: body.displayName });
+    if (!name.success) {
+      return badRequest(name.error.issues[0]?.message ?? "That name will not work.");
+    }
+
+    const outcome = await setDisplayName(player.playerId, name.data.displayName);
+
+    if (outcome === "taken") {
+      return badRequest("Somebody already goes by that. Pick another one.");
+    }
+    if (outcome !== "renamed") {
+      return Response.json({ error: "unavailable" }, { status: 503 });
+    }
+
+    /* The name is the gate, same as the website: setup counts as done
+       the moment one is chosen. */
+    await markOnboarded(player.playerId);
+    return Response.json({ ok: true });
+  }
 
   if (body.action === "rename") {
     const name = displayNameSchema.safeParse({ displayName: body.displayName });

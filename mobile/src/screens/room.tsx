@@ -17,6 +17,8 @@ import {
 import type { StackParams } from "../../App";
 import {
   ApiError,
+  getTrades,
+  type TradeRecord,
   confirmTrade,
   dropWant,
   getMe,
@@ -144,6 +146,9 @@ function RoomScreen({
 
   const inFlight = useRef(false);
 
+  /* The viewer's own trades tonight, the web's private list. */
+  const [trades, setTrades] = useState<TradeRecord[]>([]);
+
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -160,6 +165,14 @@ function RoomScreen({
           setWants((await getMe()).wants);
         } catch {
           setWants([]);
+        }
+      }
+
+      if (fresh.joined) {
+        try {
+          setTrades((await getTrades(code)).trades);
+        } catch {
+          /* The list is garnish; the room must not fail over it. */
         }
       }
     } catch (caught) {
@@ -853,6 +866,53 @@ function RoomScreen({
         {/* The lobby, parked at the foot of the page: the names are
             reference material, and their counts now live on the door
             card at the top. Same fold, same chevron, further down. */}
+        {trades.length > 0 && (
+          <Card>
+            <Title>Traded tonight</Title>
+            <Body>
+              Only you can see this list. The store sees tonight's totals, never who
+              traded what.
+            </Body>
+            <View>
+              {trades.map((trade) => (
+                <View
+                  key={trade.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: spacing(1.5),
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    paddingVertical: spacing(2),
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="check-circle-outline"
+                    size={15}
+                    color={colors.accent}
+                  />
+                  <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                    {trade.cardName}
+                  </Text>
+                  {trade.quantity > 1 && (
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                      {`×${trade.quantity}`}
+                    </Text>
+                  )}
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                    {trade.youWere === "requester"
+                      ? trade.partnerName
+                        ? `from ${trade.partnerName}`
+                        : "found in the room"
+                      : `to ${trade.partnerName ?? "a player"}`}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
+
         <Card>
           <Tap
             onPress={() => {
@@ -1204,6 +1264,11 @@ function CarouselFlare({
             lookingFor={flare.quantity}
             direction={flare.intent}
             stillNeeds={flare.offers.length > 0 ? remaining : null}
+            pledges={flare.offers.map((offer) => ({
+              name: offer.displayName ?? "A player",
+              quantity: offer.quantity,
+            }))}
+            terms={acceptsLabel(flare)}
           />
           {/*
            * Every signal that used to be its own caption line lives on

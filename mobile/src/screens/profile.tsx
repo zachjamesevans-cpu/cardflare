@@ -7,6 +7,7 @@ import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import {
   addToShowcase,
+  chooseUsername,
   dressAllShowcase,
   dressShowcase,
   getProfile,
@@ -51,6 +52,9 @@ export function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [checked, setChecked] = useState(false);
+  /* A fresh account finishes choosing a name before anything else -
+     the website's /welcome/username, in place. */
+  const [needsSetup, setNeedsSetup] = useState(false);
   /* A token exists but the profile fetch failed: say so, never pretend
      the player is signed out. That lie cost a confused founder an hour. */
   const [loadFailed, setLoadFailed] = useState(false);
@@ -71,6 +75,7 @@ export function ProfileScreen() {
       const result = await getProfile();
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
+      setNeedsSetup(result.needsSetup);
       setLoadFailed(false);
     } catch {
       setProfile(null);
@@ -93,6 +98,20 @@ export function ProfileScreen() {
     }, [load]),
   );
 
+  const act = async (key: string, run: () => Promise<unknown>, said: string) => {
+    setBusy(key);
+    setMessage(null);
+    try {
+      await run();
+      await load();
+      setMessage(said);
+    } catch {
+      setMessage("That did not go through. Try again in a moment.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (!checked) {
     return (
       <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
@@ -111,6 +130,25 @@ export function ProfileScreen() {
             try again.
           </Body>
           <Button label="Try again" onPress={() => void load()} />
+        </Card>
+      </ScrollView>
+    );
+  }
+
+  if (profile && needsSetup) {
+    return (
+      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+        <Card>
+          <Title>Pick your name</Title>
+          <Body>This is the name people see when you walk into a room.</Body>
+          <NameField
+            current={profile.displayName}
+            busy={busy === "setup"}
+            onSave={(name) =>
+              act("setup", () => chooseUsername(name), "Welcome to CardFlare.")
+            }
+          />
+          {message && <Muted>{message}</Muted>}
         </Card>
       </ScrollView>
     );
@@ -144,20 +182,6 @@ export function ProfileScreen() {
   const ownedHolos: DressingOption[] = (wardrobe?.holos ?? [])
     .filter((item) => item.owned)
     .map(({ slug, name }) => ({ slug, name }));
-
-  const act = async (key: string, run: () => Promise<unknown>, said: string) => {
-    setBusy(key);
-    setMessage(null);
-    try {
-      await run();
-      await load();
-      setMessage(said);
-    } catch {
-      setMessage("That did not go through. Try again in a moment.");
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
