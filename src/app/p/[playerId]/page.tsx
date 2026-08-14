@@ -6,13 +6,16 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
+import { FollowButton } from "@/components/players/follow-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
+import { followState } from "@/lib/players/follows";
 import { publicProfile } from "@/lib/players/profile";
 
 export const metadata: Metadata = {
@@ -60,6 +63,14 @@ export default async function PublicProfilePage({
 
   const worn = await resolveEquipped(profile.equipped);
   const imagesEnabled = cardImagesEnabled();
+
+  /* The viewer's side of the follow relationship. Null hides the
+     button: operators without a player account, and your own page. */
+  const me =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const follow = me && me !== playerId ? await followState(me, playerId) : null;
 
   return (
     <>
@@ -109,6 +120,7 @@ export default async function PublicProfilePage({
               <p className="text-sm text-text-muted">
                 Earned by confirming trades, and nothing else.
               </p>
+              {follow && <FollowButton playerId={playerId} initial={follow} />}
             </div>
             <div className="flex w-full flex-col gap-4 text-left">
               <div className="flex items-start gap-3">

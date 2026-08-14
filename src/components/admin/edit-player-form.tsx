@@ -99,6 +99,11 @@ export function EditPlayerTier({ playerId, tier }: { playerId: string; tier: str
       <select
         id={`tier-${playerId}`}
         name="tier"
+        /* Keyed to the value: React 19 resets uncontrolled fields when
+           a form action completes, which snapped this back to the old
+           tier while the write succeeded. A fresh tier remounts the
+           select at the truth instead. */
+        key={tier}
         defaultValue={tier}
         className="rounded-[var(--radius-control)] border border-border bg-surface px-2 py-1 text-sm text-text-primary"
       >

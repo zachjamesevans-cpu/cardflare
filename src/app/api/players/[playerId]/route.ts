@@ -1,9 +1,22 @@
 import { apiPlayer } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
+import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { publicProfile } from "@/lib/players/profile";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
+
+/** The signed-in PLAYER behind a request, from cookie or bearer alike. */
+async function viewerPlayerId(request: Request): Promise<string | null> {
+  const viewer = await getViewer();
+  if (viewer.kind === "player") return viewer.playerId;
+  if (viewer.kind !== "anonymous") {
+    return (await playerForUser(viewer.user.id))?.id ?? null;
+  }
+  return (await apiPlayer(request))?.playerId ?? null;
+}
 
 /**
  * A player's public face, as JSON — what the room's profile popup shows.
@@ -42,7 +55,14 @@ export async function GET(
 
   const worn = await resolveEquipped(profile.equipped);
 
+  /* Viewer-relative: whether YOU follow them and they follow you. Only
+     a signed-in player has a side of that relationship; a guest gets
+     nulls and the clients hide the button. */
+  const me = await viewerPlayerId(request);
+  const follow = me ? await followState(me, playerId) : null;
+
   return Response.json({
+    follow: me && me !== playerId ? follow : null,
     playerId: profile.playerId,
     displayName: profile.displayName,
     /* Absolute, because the app has no origin to resolve "/api/..."
@@ -68,4 +88,41 @@ export async function GET(
       holo: entry.holo ?? worn.holo,
     })),
   });
+}
+
+/**
+ * Follow or unfollow, from the popup or the full profile.
+ *
+ * Accounts only - a guest session can look but has no identity to
+ * follow FROM. The response returns the new state so the button can
+ * settle without a second read.
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ playerId: string }> },
+) {
+  const { playerId } = await params;
+
+  const me = await viewerPlayerId(request);
+  if (!me) return Response.json({ error: "Sign in to follow." }, { status: 401 });
+  if (me === playerId) {
+    return Response.json({ error: "That is you." }, { status: 400 });
+  }
+
+  const body = (await readJsonPayload(request)) as { action?: string } | null;
+  const action = body?.action;
+  if (action !== "follow" && action !== "unfollow") {
+    return Response.json({ error: "Unrecognised follow action" }, { status: 400 });
+  }
+
+  const done =
+    action === "follow"
+      ? await followPlayer(me, playerId)
+      : await unfollowPlayer(me, playerId);
+
+  if (!done) {
+    return Response.json({ error: "That did not go through." }, { status: 500 });
+  }
+
+  return Response.json({ follow: await followState(me, playerId) });
 }

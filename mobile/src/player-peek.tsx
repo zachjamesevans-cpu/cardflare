@@ -12,6 +12,7 @@ import {
 import { peekPlayer, type PeekProfile } from "./api";
 import { CosmeticCard } from "./cosmetic-card";
 import { EmberBadge } from "./ember-badge";
+import { FollowButton } from "./follow-button";
 import { PlayerAvatar } from "./player-avatar";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "./showcase-zoom";
 import { Button } from "./ui";
@@ -172,6 +173,10 @@ export function PlayerPeekModal({
                   <EmberBadge earned={profile.embersEarned} />
                 </View>
               </View>
+
+              {/* Option C's button; the server sends null for guests
+                  and for yourself, hiding it. */}
+              <FollowButton playerId={profile.playerId} initial={profile.follow} />
 
               <View style={{ gap: spacing(1.5) }}>
                 <Text

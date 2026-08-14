@@ -672,6 +672,8 @@ export interface PeekProfile {
   avatarUrl: string | null;
   /** Their cover banner, blurred behind the popup header. */
   coverUrl: string | null;
+  /** The viewer's side of the relationship; null hides the button. */
+  follow: FollowState | null;
   embersEarned: number;
   /** The ring around their picture. */
   frame: string | null;
@@ -685,6 +687,32 @@ export interface PeekProfile {
     holo: string | null;
   }[];
 }
+
+export interface FollowState {
+  following: boolean;
+  followsYou: boolean;
+  partners: boolean;
+}
+
+/** Follow or unfollow; returns the settled state for the button. */
+export const toggleFollow = (playerId: string, following: boolean) =>
+  call<{ follow: FollowState }>(
+    "POST",
+    `/api/players/${encodeURIComponent(playerId)}`,
+    { action: following ? "unfollow" : "follow" },
+  );
+
+export interface FollowedPlayer {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  partners: boolean;
+}
+
+/** Who you follow - the Profile tab's People list. */
+export const getFollowing = () =>
+  call<{ following: FollowedPlayer[] }>("GET", "/api/v1/following");
 
 export const peekPlayer = (playerId: string) =>
   call<PeekProfile>("GET", `/api/players/${encodeURIComponent(playerId)}`);

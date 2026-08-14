@@ -7,6 +7,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
+import { PlayerAvatar } from "@/components/players/player-avatar";
+import { listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
@@ -77,6 +79,8 @@ export default async function ProfilePage() {
 
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
+
+  const following = await listFollowing(playerId);
 
   /*
    * The wardrobe is back on this page even though the shop moved out:
@@ -316,6 +320,52 @@ export default async function ProfilePage() {
               <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
             </span>
           </Link>
+
+          <Card className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">People</p>
+              <p className="text-sm text-text-secondary">
+                Players you follow. When they follow you back, you are Trade partners.
+                Follow people from their profile popup in a room, or from their profile
+                page.
+              </p>
+            </div>
+
+            {following.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                Nobody yet. The next time somebody impresses you at a table, tap their
+                name.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {following.map((person) => (
+                  <li
+                    key={person.playerId}
+                    className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0"
+                  >
+                    <PlayerAvatar
+                      displayName={person.displayName}
+                      seed={person.playerId}
+                      avatarUrl={person.avatarUrl}
+                      frame={person.frame}
+                      size="sm"
+                    />
+                    <Link
+                      href={`/p/${person.playerId}`}
+                      className="min-w-0 flex-1 truncate font-semibold text-text-primary underline-offset-4 hover:underline"
+                    >
+                      {person.displayName}
+                    </Link>
+                    {person.partners && (
+                      <span className="shrink-0 text-xs text-accent">
+                        Trade partners
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
           <TabBarSpacer />
         </div>
