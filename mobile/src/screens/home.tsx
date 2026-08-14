@@ -96,7 +96,7 @@ export function HomeScreen() {
       });
       return `Next: ${local.nextEventName} · ${day}`;
     }
-    return [local.city, local.region].filter(Boolean).join(", ") || "Saved";
+    return "Tap to see what's happening";
   };
 
   return (
@@ -135,70 +135,84 @@ export function HomeScreen() {
             Saved automatically when you join signed in. Tap one to walk in, no
             QR needed.
           </Muted>
-          {locals.map((local) => (
-            <View
-              key={local.storeId}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing(2),
-              }}
-            >
-              <Tap onPress={() => void enter(local.code)} style={{ flex: 1, gap: 2 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {local.name}
-                </Text>
-                <Text
+          {/* Divided rows, RSVP inside its own row - the web's list,
+              exactly. The button carries the count so the tap never
+              posts more than it said. */}
+          <View>
+            {locals.map((local, index) => (
+              <View
+                key={local.storeId}
+                style={{
+                  gap: spacing(2),
+                  paddingVertical: spacing(3),
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: colors.border,
+                }}
+              >
+                <View
                   style={{
-                    color: local.liveNow ? colors.accent : colors.textMuted,
-                    fontSize: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
                   }}
                 >
-                  {nextLine(local)}
-                </Text>
-              </Tap>
-              <Tap
-                onPress={() => {
-                  setMe((current) =>
-                    current
-                      ? {
-                          ...current,
-                          locals: current.locals.filter(
-                            (entry) => entry.storeId !== local.storeId,
-                          ),
-                        }
-                      : current,
-                  );
-                  void removeLocal(local.storeId).catch(() => {});
-                }}
-                hitSlop={8}
-              >
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>Remove</Text>
-              </Tap>
-            </View>
-          ))}
-          {locals.some((local) => local.earlyOpen && local.nextEventCode) &&
-            locals
-              .filter((local) => local.earlyOpen && local.nextEventCode)
-              .map((local) => (
-                <Button
-                  key={`rsvp-${local.storeId}`}
-                  /* The button says everything the tap does: an RSVP
-                     posts the whole list, and a silent broadcast is not
-                     a thing this product does. */
-                  label={
-                    rsvping === local.storeId
-                      ? "Joining the board…"
-                      : me && me.wants.length > 0
-                        ? `I'll be there with my ${me.wants.length} ${
-                            me.wants.length === 1 ? "Flare" : "Flares"
-                          }: ${local.nextEventName ?? local.name}`
-                        : `I'll be there: ${local.nextEventName ?? local.name}`
-                  }
-                  onPress={() => void rsvp(local)}
-                  busy={rsvping === local.storeId}
-                />
-              ))}
+                  <Tap
+                    onPress={() => void enter(local.code)}
+                    style={{ flex: 1, gap: 2 }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                      {local.name}
+                    </Text>
+                    <Text
+                      style={{
+                        color: local.liveNow ? colors.accent : colors.textMuted,
+                        fontSize: 12,
+                      }}
+                    >
+                      {nextLine(local)}
+                    </Text>
+                  </Tap>
+                  <Tap
+                    onPress={() => {
+                      setMe((current) =>
+                        current
+                          ? {
+                              ...current,
+                              locals: current.locals.filter(
+                                (entry) => entry.storeId !== local.storeId,
+                              ),
+                            }
+                          : current,
+                      );
+                      void removeLocal(local.storeId).catch(() => {});
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                      Remove
+                    </Text>
+                  </Tap>
+                </View>
+
+                {local.earlyOpen && local.nextEventCode && (
+                  <Button
+                    label={
+                      rsvping === local.storeId
+                        ? "Joining the board…"
+                        : me && me.wants.length > 0
+                          ? `I'll be there. Post my ${me.wants.length} ${
+                              me.wants.length === 1 ? "Flare" : "Flares"
+                            }`
+                          : "I'll be there"
+                    }
+                    variant="secondary"
+                    onPress={() => void rsvp(local)}
+                    busy={rsvping === local.storeId}
+                  />
+                )}
+              </View>
+            ))}
+          </View>
         </Card>
       )}
 
