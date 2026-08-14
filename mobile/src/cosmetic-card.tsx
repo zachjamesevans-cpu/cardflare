@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
-import { SkiaFoil } from "./foil";
+import { getSkiaFoil } from "./foil";
 import { colors } from "./theme";
 
 /**
@@ -84,10 +84,12 @@ export function CosmeticCard({
 
   const border = frame ? FRAME_COLOR[frame] : null;
   const stops = holo ? (HOLO_STOPS[holo] ?? []) : [];
-  const skiaFoil =
-    SkiaFoil !== null &&
+  /* Skia is loaded on the first card that wants foil, never at app
+     launch - see foil.tsx for why that ordering is load-bearing. */
+  const wantsFoil =
     imageUrl !== null &&
     (holo === "classic-holo" || holo === "prism-holo" || holo === "galaxy-holo");
+  const SkiaFoil = wantsFoil ? getSkiaFoil() : null;
 
   return (
     <View
@@ -109,7 +111,7 @@ export function CosmeticCard({
         />
       ) : null}
 
-      {skiaFoil && SkiaFoil !== null && imageUrl !== null ? (
+      {SkiaFoil !== null && imageUrl !== null ? (
         <SkiaFoil
           imageUrl={imageUrl}
           width={width}
