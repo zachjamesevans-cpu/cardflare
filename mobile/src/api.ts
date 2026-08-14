@@ -685,6 +685,44 @@ export interface PeekProfile {
 export const peekPlayer = (playerId: string) =>
   call<PeekProfile>("GET", `/api/players/${encodeURIComponent(playerId)}`);
 
+/**
+ * A new profile picture, sent the only way this network allows.
+ *
+ * The image is already a small JPEG by the time it gets here (the
+ * screen resizes and compresses before calling). It still cannot ride
+ * in a body, so it goes as numbered base64 chunks inside the same
+ * header every other write uses, and the server stitches them back
+ * together. Sequential on purpose: a phone on shop wifi does better
+ * with one small request at a time than with twelve in flight.
+ */
+export async function uploadAvatar(
+  base64: string,
+  onProgress?: (sent: number, total: number) => void,
+): Promise<void> {
+  const CHUNK = 6000;
+  const total = Math.ceil(base64.length / CHUNK);
+
+  const { uploadId } = await call<{ uploadId: string }>("POST", "/api/v1/avatar", {
+    action: "begin",
+  });
+
+  for (let index = 0; index < total; index += 1) {
+    await call<{ ok: true }>("POST", "/api/v1/avatar", {
+      action: "chunk",
+      uploadId,
+      index,
+      data: base64.slice(index * CHUNK, (index + 1) * CHUNK),
+    });
+    onProgress?.(index + 1, total);
+  }
+
+  await call<{ ok: true }>("POST", "/api/v1/avatar", {
+    action: "commit",
+    uploadId,
+    count: total,
+  });
+}
+
 export const removeFromShowcase = (entryId: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {
     action: "showcase-remove",

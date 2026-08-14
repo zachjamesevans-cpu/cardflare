@@ -25,7 +25,6 @@ import { GroupView } from "@/components/lists/group-view";
 import { QuickPledge } from "@/components/matching/quick-pledge";
 import { pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
-import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerPeek } from "@/components/players/player-peek";
 import { Badge, Card } from "@/components/ui/card";
@@ -781,14 +780,8 @@ export function FlareBoard({
                    * person, and as a row it cost this player's whole
                    * section to say one short sentence.
                    */}
-                  {/* Lifetime only. The board is the most public
-                      surface in the product, and the spendable balance
-                      never leaves the owner's own profile. */}
-                  {identities?.has(group.playerSessionId) && (
-                    <EmberBadge
-                      earned={identities.get(group.playerSessionId)?.embersEarned ?? 0}
-                    />
-                  )}
+                  {/* No Ember badge on board headers - in the room,
+                      Embers live inside the popup and profile only. */}
                   {alsoOpen && <OpenToTradesTag />}
                 </span>
               }

@@ -41,35 +41,35 @@ export type FoilProps = {
    gaps that let the art through untouched (dodge by black is a no-op),
    exactly the trick the CSS version leans on. */
 const CLASSIC_COLUMNS = [
-  "rgba(154,64,224,0.80)",
+  "rgba(154,64,224,0.65)",
   "rgba(0,0,0,1)",
-  "rgba(64,105,229,0.80)",
+  "rgba(64,105,229,0.65)",
   "rgba(0,0,0,1)",
-  "rgba(43,180,168,0.80)",
+  "rgba(43,180,168,0.65)",
   "rgba(0,0,0,1)",
-  "rgba(96,190,66,0.80)",
+  "rgba(96,190,66,0.65)",
   "rgba(0,0,0,1)",
-  "rgba(235,205,60,0.80)",
+  "rgba(235,205,60,0.65)",
   "rgba(0,0,0,1)",
-  "rgba(227,60,60,0.80)",
+  "rgba(227,60,60,0.65)",
 ];
 
 const PRISM_A = [
-  "rgba(240,150,145,0.70)",
+  "rgba(240,150,145,0.45)",
   "rgba(0,0,0,1)",
-  "rgba(120,190,250,0.70)",
+  "rgba(120,190,250,0.45)",
   "rgba(0,0,0,1)",
-  "rgba(250,190,120,0.70)",
+  "rgba(250,190,120,0.45)",
   "rgba(0,0,0,1)",
-  "rgba(110,240,190,0.70)",
+  "rgba(110,240,190,0.45)",
 ];
 
 const PRISM_B = [
-  "rgba(120,235,240,0.45)",
+  "rgba(120,235,240,0.28)",
   "rgba(0,0,0,1)",
-  "rgba(245,140,225,0.45)",
+  "rgba(245,140,225,0.28)",
   "rgba(0,0,0,1)",
-  "rgba(120,190,250,0.45)",
+  "rgba(120,190,250,0.28)",
 ];
 
 const GALAXY_STREAKS = [
@@ -284,9 +284,9 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
                 start={vec(0, 0)}
                 end={vec(w, h)}
                 colors={[
-                  "rgba(255,255,255,0.14)",
-                  "rgba(255,255,255,0.02)",
                   "rgba(255,255,255,0.10)",
+                  "rgba(255,255,255,0.02)",
+                  "rgba(255,255,255,0.07)",
                 ]}
               />
             </Rect>
@@ -297,7 +297,7 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
                 end={sweepEnd}
                 colors={[
                   "rgba(255,255,255,0)",
-                  "rgba(255,255,255,0.22)",
+                  "rgba(255,255,255,0.18)",
                   "rgba(255,255,255,0)",
                 ]}
                 positions={[0.38, 0.5, 0.62]}
@@ -334,9 +334,9 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
                 start={vec(0, h)}
                 end={vec(w, 0)}
                 colors={[
-                  "rgba(240,150,145,0.16)",
-                  "rgba(120,190,250,0.16)",
-                  "rgba(245,140,225,0.16)",
+                  "rgba(240,150,145,0.10)",
+                  "rgba(120,190,250,0.10)",
+                  "rgba(245,140,225,0.10)",
                 ]}
               />
             </Rect>
