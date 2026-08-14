@@ -721,6 +721,7 @@ export interface PackSeries {
   priceEmbers: number;
   slots: number;
   odds: { rarity: string; slugs: string[]; percent: number }[];
+  oddsDetail?: { rarity: string; items: { slug: string; percent: number }[] }[];
 }
 
 export interface SealedPack {

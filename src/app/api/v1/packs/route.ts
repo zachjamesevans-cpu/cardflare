@@ -4,7 +4,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { SERIES, oddsByRarity } from "@/lib/packs";
+import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
 import { buyPackWithEmbers, listSealedPacks, openPack } from "@/lib/packs/repository";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,7 @@ export async function GET(request: Request): Promise<Response> {
       priceEmbers: series.priceEmbers,
       slots: series.slots,
       odds: oddsByRarity(series),
+      oddsDetail: oddsPerItem(series),
     })),
     packs: await listSealedPacks(me),
   });

@@ -269,8 +269,73 @@ export function ProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Card style={{ overflow: "hidden" }}>
-        <CoverBanner coverUrl={profile.coverUrl} height={104} />
+      {/* Your own profile block, PIXEL-IDENTICAL to what View full
+          profile shows anyone else - same cover, same seam crossing the
+          picture's middle, same centered name and badge, same shelf.
+          The founder's rule: what you see is what they see. */}
+      <Card style={{ paddingTop: 110 + spacing(2), overflow: "hidden" }}>
+        <CoverBanner coverUrl={profile.coverUrl} height={110} />
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 96,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            borderTopWidth: 1,
+            borderColor: colors.borderStrong,
+          }}
+        />
+
+        <View
+          style={{
+            alignItems: "center",
+            gap: spacing(2),
+            marginTop: 96 - 48 - (110 + spacing(2)),
+          }}
+        >
+          <PlayerAvatar
+            displayName={profile.displayName}
+            seed={profile.playerId}
+            avatarUrl={profile.avatarUrl}
+            frame={profile.equipped.avatarFrame}
+            size={96}
+          />
+          <Title>{profile.displayName}</Title>
+          <EmberBadge earned={profile.embersEarned} size="md" />
+        </View>
+
+        <View style={{ gap: spacing(2) }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
+            Showcase
+          </Text>
+          {profile.showcase.length === 0 ? (
+            <Muted>Nothing on the shelf yet.</Muted>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                {profile.showcase.map((entry) => (
+                  <Tap key={entry.id} onPress={() => setDressing(entry)}>
+                    <CosmeticCard
+                      imageUrl={entry.imageUrl}
+                      width={56}
+                      frame={entry.frame ?? profile.equipped.frame}
+                      holo={entry.holo ?? profile.equipped.holo}
+                      effect={profile.equipped.effect}
+                    />
+                  </Tap>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      </Card>
+
+      <Card>
         <View
           style={{
             flexDirection: "row",
@@ -280,7 +345,7 @@ export function ProfileScreen() {
         >
           <View style={{ flex: 1, gap: spacing(1) }}>
             <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-              You
+              Edit your profile
             </Text>
             <Muted>Your picture and name travel with you between stores.</Muted>
           </View>
@@ -291,21 +356,6 @@ export function ProfileScreen() {
           >
             <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
           </Tap>
-        </View>
-
-        <View style={{ alignItems: "center", gap: spacing(2) }}>
-          {/* The ring is the AVATAR frame slot, separate from cards -
-              the same component every roster row uses. */}
-          <PlayerAvatar
-            displayName={profile.displayName}
-            seed={profile.playerId}
-            avatarUrl={profile.avatarUrl}
-            frame={profile.equipped.avatarFrame}
-            size={96}
-          />
-
-          <Title>{profile.displayName}</Title>
-          <EmberBadge earned={profile.embersEarned} size="md" />
         </View>
 
         {/*

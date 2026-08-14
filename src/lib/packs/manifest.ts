@@ -71,6 +71,23 @@ export function drawPack(series: SeriesManifest, rolls: number[]): PoolEntry[] {
   return picked;
 }
 
+/** Every item with its own exact per-slot percent, grouped by rarity
+    with the rarest tier last - the order the popup prints. */
+export function oddsPerItem(
+  series: SeriesManifest,
+): { rarity: Rarity; items: { slug: string; percent: number }[] }[] {
+  return RARITY_ORDER.flatMap((rarity) => {
+    const entries = series.pool.filter((entry) => entry.rarity === rarity);
+    if (entries.length === 0) return [];
+    return [
+      {
+        rarity,
+        items: entries.map((entry) => ({ slug: entry.slug, percent: entry.weight })),
+      },
+    ];
+  });
+}
+
 /** The store's "what can be inside" table: rarity, names, percents. */
 export function oddsByRarity(
   series: SeriesManifest,
