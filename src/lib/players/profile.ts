@@ -789,6 +789,12 @@ export async function markOnboarded(playerId: string): Promise<void> {
     .is("onboarded_at", null);
 
   if (error) console.error("Could not mark the player as set up", error);
+
+  /* The welcome gift: one sealed Origin pack, exactly once. Granted at
+     the end of setup so the first thing a finished profile owns is
+     something to open. */
+  const { grantSignupPackOnce } = await import("@/lib/packs/repository");
+  await grantSignupPackOnce(playerId);
 }
 
 /** Has this player chosen a username yet? */

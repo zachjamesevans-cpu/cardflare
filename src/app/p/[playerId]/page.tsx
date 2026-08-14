@@ -98,6 +98,14 @@ export default async function PublicProfilePage({
               <div className="absolute inset-0 bg-black/25" />
             </div>
 
+            {/* The content layer: rounded top edge with a highlight
+                border and lifted shadow crossing the picture's middle,
+                so the cover reads as a layer physically behind. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
+            />
+
             {/*
              * One component for picture, initials and frame alike, so
              * this page cannot drift from what a room shows. It used to
@@ -109,10 +117,10 @@ export default async function PublicProfilePage({
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
               frame={worn.avatarFrame}
-              className="relative mt-14 size-24 text-2xl"
+              className="relative mt-12 size-24 text-2xl"
             />
 
-            <div className="flex flex-col items-center gap-2">
+            <div className="relative flex flex-col items-center gap-2">
               <p className="text-lg font-bold text-text-primary">
                 {profile.displayName}
               </p>
@@ -122,7 +130,7 @@ export default async function PublicProfilePage({
               </p>
               {follow && <FollowButton playerId={playerId} initial={follow} />}
             </div>
-            <div className="flex w-full flex-col gap-4 text-left">
+            <div className="relative flex w-full flex-col gap-4 text-left">
               <div className="flex items-start gap-3">
                 <Sparkles
                   className="mt-0.5 size-5 shrink-0 text-accent"

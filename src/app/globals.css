@@ -1108,3 +1108,71 @@
   );
   animation: cf-prism-travel 9s linear infinite;
 }
+
+/* -------------------------------------------------------------------------- */
+/* CardFlare packs                                                             */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The sealed pack: a foil wrapper, not a card. The classic holo layer
+ * does the shining; the crimped ends are what say "sealed" - the same
+ * visual grammar as every booster on a store's wall.
+ */
+.cf-pack {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: linear-gradient(160deg, #1a2030, #0e1116 55%, #1c1430);
+  border: 1px solid var(--color-border-strong);
+}
+
+.cf-pack::before,
+.cf-pack::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.14) 0 3px,
+    rgba(255, 255, 255, 0.03) 3px 6px
+  );
+}
+
+.cf-pack::before {
+  top: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cf-pack::after {
+  bottom: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* A pulled cosmetic flips in, one after another. */
+@keyframes cf-pack-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.7) rotate(-4deg);
+  }
+  60% {
+    transform: translateY(-4px) scale(1.05) rotate(1deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.cf-pack-pull {
+  opacity: 0;
+  animation: cf-pack-reveal 0.55s var(--ease-out-soft, ease-out) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-pack-pull {
+    animation: none;
+    opacity: 1;
+  }
+}

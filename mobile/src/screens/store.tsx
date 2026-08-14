@@ -10,13 +10,17 @@ import {
 
 import {
   buyCosmetic,
+  getPacks,
   getProfile,
   type CosmeticItem,
   type EquipSlot,
   type Profile,
   type Wardrobe,
+  type PackSeries,
+  type SealedPack,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { PackShopSection } from "../pack-shop";
 import { FRAME_COLOR } from "../player-avatar";
 import { Body, Card, Muted, Tap, Title } from "../ui";
 import { colors, spacing } from "../theme";
@@ -31,6 +35,8 @@ import { colors, spacing } from "../theme";
  * No confirmation step, because Embers cannot be bought with money.
  */
 export function StoreScreen() {
+  const [packSeries, setPackSeries] = useState<PackSeries[]>([]);
+  const [sealed, setSealed] = useState<SealedPack[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,6 +47,12 @@ export function StoreScreen() {
       const result = await getProfile();
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
+      getPacks()
+        .then((packs) => {
+          setPackSeries(packs.series);
+          setSealed(packs.packs);
+        })
+        .catch(() => {});
     } catch {
       setMessage("Could not load the store. Pull back and try again.");
     }
@@ -110,6 +122,30 @@ export function StoreScreen() {
         </Text>
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>to spend</Text>
       </View>
+
+      <Card>
+        <Title>CardFlare packs</Title>
+        <Muted>
+          Sealed packs of cosmetics, opened like the real thing. Every new
+          account starts with one on the house.
+        </Muted>
+        {packSeries.map((series) => (
+          <PackShopSection
+            key={series.id}
+            series={series}
+            sealed={sealed}
+            names={Object.fromEntries(
+              [
+                ...wardrobe.avatarFrames,
+                ...wardrobe.cardFrames,
+                ...wardrobe.holos,
+                ...wardrobe.effects,
+              ].map((item) => [item.slug, item.name]),
+            )}
+            onChanged={() => void load()}
+          />
+        ))}
+      </Card>
 
       <Card>
         <Shelf

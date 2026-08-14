@@ -5,6 +5,9 @@ import { ArrowLeft, Flame } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
+import { PackShop } from "@/components/packs/pack-shop";
+import { SERIES, oddsByRarity } from "@/lib/packs";
+import { listSealedPacks } from "@/lib/packs/repository";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
 import { areasForUser } from "@/lib/auth/areas";
@@ -46,6 +49,7 @@ export default async function EmberStorePage() {
   if (await needsSetup(playerId)) redirect("/welcome/username");
 
   const profile = await ownProfile(playerId);
+  const sealed = await listSealedPacks(playerId);
   if (!profile) redirect("/profile/settings");
 
   const [wardrobe, areas] = await Promise.all([
@@ -93,6 +97,38 @@ export default async function EmberStorePage() {
               <span className="font-medium text-text-muted">to spend</span>
             </span>
           </div>
+
+          <Card className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="font-semibold text-text-primary">CardFlare packs</h2>
+              <p className="text-sm text-text-secondary">
+                Sealed packs of cosmetics, opened like the real thing. Every new account
+                starts with one on the house.
+              </p>
+            </div>
+            {Object.values(SERIES).map((series) => (
+              <PackShop
+                key={series.id}
+                series={{
+                  id: series.id,
+                  name: series.name,
+                  setNumber: series.setNumber,
+                  priceEmbers: series.priceEmbers,
+                  slots: series.slots,
+                  odds: oddsByRarity(series),
+                }}
+                sealed={sealed}
+                names={Object.fromEntries(
+                  [
+                    ...wardrobe.avatarFrames,
+                    ...wardrobe.cardFrames,
+                    ...wardrobe.holos,
+                    ...wardrobe.effects,
+                  ].map((item) => [item.slug, item.name]),
+                )}
+              />
+            ))}
+          </Card>
 
           <Card className="flex flex-col gap-6">
             <CosmeticShop
