@@ -96,11 +96,13 @@ const theme: Theme = {
   },
 };
 
+/* Outline weights, because the website's dock draws line icons - the
+   filled set read as a different product sitting on the same colours. */
 const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>> = {
-  Join: "qr-code",
-  Room: "people",
-  Inbox: "notifications",
-  Profile: "person-circle",
+  Join: "qr-code-outline",
+  Room: "people-outline",
+  Inbox: "notifications-outline",
+  Profile: "person-circle-outline",
 };
 
 /*
@@ -108,11 +110,18 @@ const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>
  * byte-for-byte from public/brand, sized by height as the brand rules
  * require. Dimmed when inactive the same way the icon tabs are.
  */
-function MarkIcon({ focused }: { focused: boolean }) {
+function MarkIcon({ focused, size }: { focused: boolean; size: number }) {
+  /* The same box every Ionicons tab gets, sized by height per the brand
+     rules - at 34px the mark leaned into its own label and ate it. */
   return (
     <Image
       source={require("./assets/cardflare-mark.png")}
-      style={{ height: 34, width: 34, resizeMode: "contain", opacity: focused ? 1 : 0.55 }}
+      style={{
+        height: size,
+        width: size,
+        resizeMode: "contain",
+        opacity: focused ? 1 : 0.55,
+      }}
     />
   );
 }
@@ -198,12 +207,19 @@ function Tabs() {
           return icon ? (
             <Ionicons name={icon} color={color} size={size} />
           ) : (
-            <MarkIcon focused={focused} />
+            <MarkIcon focused={focused} size={size} />
           );
         },
       })}
     >
-      <Tab.Screen name="Join" component={HomeScreen} options={{ title: "CardFlare" }} />
+      {/* The dock says Join, the header says CardFlare - the website's
+          split exactly: its dock label is Join under a QR icon while the
+          page banner carries the product name. */}
+      <Tab.Screen
+        name="Join"
+        component={HomeScreen}
+        options={{ title: "CardFlare", tabBarLabel: "Join" }}
+      />
       <Tab.Screen name="Room" component={RoomTab} />
       {/* The tab keeps the product's name; the header says what the
           hub holds now: your standing list, not just the post form. */}
@@ -212,7 +228,11 @@ function Tabs() {
         component={HubScreen}
         options={{ title: "Your Flares", tabBarLabel: "Flare" }}
       />
-      <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Notifications" }} />
+      <Tab.Screen
+        name="Inbox"
+        component={InboxScreen}
+        options={{ title: "Notifications", tabBarLabel: "Inbox" }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
