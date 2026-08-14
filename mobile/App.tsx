@@ -13,11 +13,13 @@ import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 
-import { useRef } from "react";
+import { Component, useRef, type ReactNode } from "react";
 import {
   Animated,
   Image,
   Pressable,
+  ScrollView,
+  Text,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -216,9 +218,51 @@ function Tabs() {
   );
 }
 
+/**
+ * The last line of defence at startup.
+ *
+ * A release build has no red error screen: if anything throws while the
+ * first frame is being built, the native splash simply never goes away
+ * and the app reads as dead. This boundary sits above everything, so a
+ * startup failure renders as a screen that names the error instead - a
+ * tester can screenshot it, and the splash still hides because content
+ * (this content) appeared.
+ */
+class StartupGuard extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <ScrollView
+          style={{ flex: 1, backgroundColor: colors.canvas }}
+          contentContainerStyle={{ padding: 24, paddingTop: 96, gap: 12 }}
+        >
+          <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
+            CardFlare hit a problem while starting
+          </Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>
+            This is not supposed to happen. A screenshot of this screen is the
+            fastest way to get it fixed.
+          </Text>
+          <Text style={{ color: colors.textMuted, fontFamily: "Courier", fontSize: 12 }}>
+            {String(this.state.error)}
+          </Text>
+        </ScrollView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <NavigationContainer theme={theme}>
+    <StartupGuard>
+      <NavigationContainer theme={theme}>
       <StatusBar style="light" />
       <Stack.Navigator
         screenOptions={{
@@ -276,6 +320,7 @@ export default function App() {
           )}
         </Stack.Screen>
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </StartupGuard>
   );
 }

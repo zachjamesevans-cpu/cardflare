@@ -2,7 +2,14 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
-import { ApiError, postFlare, saveToList, searchCards, type CardHit } from "../api";
+import {
+  ApiError,
+  describeError,
+  postFlare,
+  saveToList,
+  searchCards,
+  type CardHit,
+} from "../api";
 import {
   Body,
   Button,
@@ -279,8 +286,8 @@ export function PostFlareScreen({
             ? "You have hit the Flare cap for this room."
             : "Your list is full. Remove something on the Account tab first."
           : target.kind === "room"
-            ? "Could not post the Flare. Try again."
-            : "Could not save it. Try again.",
+            ? `Could not post the Flare (${describeError(caught)}). Try again.`
+            : `Could not save it (${describeError(caught)}). Try again.`,
       );
       setBusy(false);
     }

@@ -144,6 +144,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A failure, named for a screen. Generic "could not load" messages cost
+ * days of blind debugging; every error surface appends this instead, so
+ * a screenshot of the failure IS the diagnosis: "timeout" and
+ * "unauthorized (401)" point at different bugs from the same couch.
+ */
+export function describeError(caught: unknown): string {
+  if (caught instanceof ApiError) {
+    if (caught.status === 0) return caught.code;
+    return `${caught.code} ${caught.status}`;
+  }
+  return caught instanceof Error ? caught.message : "unknown";
+}
+
 async function call<T>(
   method: string,
   path: string,
@@ -154,7 +168,19 @@ async function call<T>(
   const headers: Record<string, string> = {};
 
   const access = await storedAccessToken();
-  if (access) headers.authorization = `Bearer ${access}`;
+  if (access) {
+    headers.authorization = `Bearer ${access}`;
+    /*
+     * The same token again, in a custom header. Everything the app sends
+     * that demonstrably survives the founder's network rides in x-*
+     * headers (x-session-token, x-cf-payload); Authorization is the one
+     * header class middleboxes love to strip. The server accepts either
+     * and prefers Authorization, so on a sane network this is redundant
+     * and on a hostile one it is the difference between signed in and
+     * silently 401ed.
+     */
+    headers["x-cf-access-token"] = access;
+  }
 
   const session = await storedSessionToken();
   if (session) headers["x-session-token"] = session;

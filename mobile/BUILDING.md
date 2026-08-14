@@ -66,9 +66,19 @@ HTTPS), so neither `eas build` nor App Store Connect asks it again.
 
 The holofoil is NOT on this list: `@shopify/react-native-skia` ships
 inside Expo Go for this SDK, so the blend-mode foil in `src/foil.tsx`
-renders in Expo Go, dev-client builds, and TestFlight alike. If a
-binary is ever built without Skia, cosmetic-card.tsx falls back to the
-old translucent-gradient wash instead of crashing.
+renders in Expo Go and TestFlight alike. If a binary is ever built
+without Skia, cosmetic-card.tsx falls back to the old
+translucent-gradient wash instead of crashing.
+
+## Deliberately absent: expo-dev-client
+
+This project does not use development builds; the workflow is Expo Go
+for day-to-day and TestFlight for real installs. `expo-dev-client` was
+briefly a dependency and compiled its native launcher into the store
+binary, where it sat in the launch path of builds that never wanted
+it. Keep it out unless the team actually adopts development builds,
+and if it returns, restore the `development` profile in eas.json with
+`"developmentClient": true` alongside it.
 
 ## Version numbers
 
