@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
-import { API_BASE, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config";
+import { API_BASE } from "./config";
 
 /**
  * The whole client for cardflare.gg's `/api/v1`.
@@ -48,56 +48,87 @@ export async function signOut(): Promise<void> {
 
 type AuthResult = { ok: true } | { ok: false; message: string };
 
-export async function signIn(email: string, password: string): Promise<AuthResult> {
+/*
+ * Auth goes through cardflare.gg, never straight to Supabase, and the
+ * reason is the app's foundational field fact: on some networks (the
+ * founder's, for one) every request with a BODY dies in transit. Every
+ * other write already rides in the x-cf-payload header to our own
+ * server; these two were the last direct Supabase calls left, and a
+ * body Supabase never receives is a sign-in that fails with no story.
+ * The server relays the grant to Supabase from its side of the network,
+ * where bodies survive. Sent bodyless with the header, like everything.
+ */
+async function authRequest(payload: unknown): Promise<{
+  status: number;
+  accessToken: string | null;
+  refreshToken: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
-      },
-    );
+    const response = await fetch(`${API_BASE}/api/v1/auth`, {
+      method: "POST",
+      headers: { "x-cf-payload": encodeURIComponent(JSON.stringify(payload)) },
+      signal: controller.signal,
+    });
 
-    const body = await response.json().catch(() => ({}));
+    const body = (await response.json().catch(() => ({}))) as {
+      accessToken?: string;
+      refreshToken?: string;
+    };
 
-    if (!response.ok || !body.access_token) {
-      // The same non-oracle answer for every failure, like the website.
-      return {
-        ok: false,
-        message: "That email address and password do not match an account.",
-      };
-    }
-
-    await storeAuth(body.access_token, body.refresh_token ?? "");
-    return { ok: true };
+    return {
+      status: response.status,
+      accessToken: body.accessToken ?? null,
+      refreshToken: body.refreshToken ?? "",
+    };
   } catch {
-    return { ok: false, message: "Could not reach CardFlare. Try again." };
+    return { status: 0, accessToken: null, refreshToken: "" };
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+export async function signIn(email: string, password: string): Promise<AuthResult> {
+  const result = await authRequest({
+    action: "sign-in",
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (result.accessToken) {
+    await storeAuth(result.accessToken, result.refreshToken);
+    return { ok: true };
+  }
+
+  if (result.status === 401) {
+    // The same non-oracle answer for every failure, like the website.
+    return {
+      ok: false,
+      message: "That email address and password do not match an account.",
+    };
+  }
+
+  if (result.status === 429) {
+    return {
+      ok: false,
+      message: "That is a lot of attempts. Try again in a little while.",
+    };
+  }
+
+  return { ok: false, message: "Could not reach CardFlare. Try again." };
 }
 
 async function refreshAccessToken(): Promise<boolean> {
   const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
   if (!refresh) return false;
 
-  try {
-    const response = await fetch(
-      `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-        body: JSON.stringify({ refresh_token: refresh }),
-      },
-    );
+  const result = await authRequest({ action: "refresh", refreshToken: refresh });
+  if (!result.accessToken) return false;
 
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || !body.access_token) return false;
-
-    await storeAuth(body.access_token, body.refresh_token ?? refresh);
-    return true;
-  } catch {
-    return false;
-  }
+  await storeAuth(result.accessToken, result.refreshToken || refresh);
+  return true;
 }
 
 /* ------------------------------------------------------------------ */

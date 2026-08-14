@@ -51,6 +51,9 @@ export function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [checked, setChecked] = useState(false);
+  /* A token exists but the profile fetch failed: say so, never pretend
+     the player is signed out. That lie cost a confused founder an hour. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -68,8 +71,10 @@ export function ProfileScreen() {
       const result = await getProfile();
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
+      setLoadFailed(false);
     } catch {
       setProfile(null);
+      setLoadFailed(true);
     } finally {
       setChecked(true);
     }
@@ -92,6 +97,21 @@ export function ProfileScreen() {
     return (
       <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
         <Muted>Loading…</Muted>
+      </ScrollView>
+    );
+  }
+
+  if (!profile && loadFailed) {
+    return (
+      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+        <Card>
+          <Title>Signed in, but your profile could not load</Title>
+          <Body>
+            The connection to cardflare.gg did not go through. Check your signal and
+            try again.
+          </Body>
+          <Button label="Try again" onPress={() => void load()} />
+        </Card>
       </ScrollView>
     );
   }
