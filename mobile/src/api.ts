@@ -714,6 +714,44 @@ export interface FollowedPlayer {
 export const getFollowing = () =>
   call<{ following: FollowedPlayer[] }>("GET", "/api/v1/following");
 
+export interface PackSeries {
+  id: string;
+  name: string;
+  setNumber: number;
+  priceEmbers: number;
+  slots: number;
+  odds: { rarity: string; slugs: string[]; percent: number }[];
+}
+
+export interface SealedPack {
+  id: string;
+  series: string;
+  source: string;
+}
+
+export interface PackPull {
+  slug: string;
+  rarity: string;
+  duplicate: boolean;
+  embersInstead: number;
+}
+
+export const getPacks = () =>
+  call<{ series: PackSeries[]; packs: SealedPack[] }>("GET", "/api/v1/packs");
+
+export const buyPack = (series: string) =>
+  call<{ ok: true; packs: SealedPack[] }>("POST", "/api/v1/packs", {
+    action: "buy",
+    series,
+  });
+
+export const openPack = (packId: string) =>
+  call<{ series: string; pulls: PackPull[]; packs: SealedPack[] }>(
+    "POST",
+    "/api/v1/packs",
+    { action: "open", packId },
+  );
+
 export const peekPlayer = (playerId: string) =>
   call<PeekProfile>("GET", `/api/players/${encodeURIComponent(playerId)}`);
 

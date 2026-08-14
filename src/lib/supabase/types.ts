@@ -617,6 +617,25 @@ export type PlayerInsert = Omit<
  * and a mutual pair reads as Trade partners. Rows are the count; no
  * count is exposed anywhere yet by design.
  */
+/** One sealed or opened pack. Contents are never stored - drawn at opening. */
+export type PlayerPackRow = {
+  id: string;
+  player_id: string;
+  series: string;
+  source: string;
+  created_at: string;
+  opened_at: string | null;
+};
+
+export type PlayerPackInsert = Omit<
+  PlayerPackRow,
+  "id" | "created_at" | "opened_at"
+> & {
+  id?: string;
+  created_at?: string;
+  opened_at?: string | null;
+};
+
 export type PlayerFollowRow = {
   follower_id: string;
   followed_id: string;
@@ -895,6 +914,7 @@ export type Database = {
       store_singles_syncs: Table<StoreSinglesSyncRow, StoreSinglesSyncInsert>;
       players: Table<PlayerRow, PlayerInsert>;
       player_follows: Table<PlayerFollowRow, PlayerFollowInsert>;
+      player_packs: Table<PlayerPackRow, PlayerPackInsert>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
       player_cosmetics: Table<
         PlayerCosmeticRow,
