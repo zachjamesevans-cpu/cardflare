@@ -97,6 +97,8 @@ export function CardImage({
   lookingFor,
   stillNeeds,
   direction = "want",
+  pledges = [],
+  terms = null,
 }: {
   imageUrl: string | null;
   width: number;
@@ -115,6 +117,10 @@ export function CardImage({
    * "Letting go" section was told the owner was looking for it.
    */
   direction?: "want" | "showcase";
+  /** Who has raised a hand, by name - "Kaito is bringing 3". */
+  pledges?: { name: string; quantity: number }[];
+  /** Trade, cash or either, when it is not the assumed plain trade. */
+  terms?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -213,6 +219,20 @@ export function CardImage({
                         }`}
                   </Text>
                 ) : null}
+                {/* Who is bringing what - the founder's ask: tap the
+                    card, see "Kaito is bringing 3". */}
+                {pledges.map((pledge, index) => (
+                  <Text
+                    key={index}
+                    style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                      {pledge.name}
+                    </Text>
+                    {` is bringing ${pledge.quantity}`}
+                  </Text>
+                ))}
+                {terms ? <Text style={styles.zoomLooking}>{terms}</Text> : null}
                 {/* The tile has no room for the note; the zoom is where
                     it gets read. */}
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}

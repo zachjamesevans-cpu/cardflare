@@ -460,6 +460,24 @@ export const searchCards = (query: string) =>
     `/api/v1/cards?q=${encodeURIComponent(query)}`,
   );
 
+/** One trade, as the room renders it for one viewer - the web's shape. */
+export interface TradeRecord {
+  id: string;
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  quantity: number;
+  youWere: "requester" | "holder";
+  partnerName: string | null;
+  confirmedAt: string;
+}
+
+export const getTrades = (code: string) =>
+  call<{ trades: TradeRecord[] }>(
+    "GET",
+    `/api/v1/rooms/${encodeURIComponent(code)}/trades`,
+  );
+
 export const registerDevice = (platform: "ios" | "android", pushToken: string) =>
   call<{ ok: true }>("POST", "/api/v1/devices", { platform, pushToken });
 
@@ -557,7 +575,17 @@ export interface Wardrobe {
 }
 
 export const getProfile = () =>
-  call<{ profile: Profile; wardrobe: Wardrobe }>("GET", "/api/v1/profile");
+  call<{ profile: Profile; wardrobe: Wardrobe; needsSetup: boolean }>(
+    "GET",
+    "/api/v1/profile",
+  );
+
+/** Step one of account setup: the name, which marks setup done. */
+export const chooseUsername = (displayName: string) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "choose-username",
+    displayName,
+  });
 
 export const renameProfile = (displayName: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
