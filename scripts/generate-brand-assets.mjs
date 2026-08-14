@@ -92,6 +92,60 @@ async function main() {
     await markInSquare(180, 20, ICON_BACKDROP),
   );
 
+  /* ---- The Expo app (mobile/assets) ------------------------------------
+     The same mark, in the shapes the app build needs. These files began
+     life as Expo's template placeholders; everything below overwrites
+     them with derivatives of the approved master, so the home screen,
+     the splash and the Android launcher all wear the real brand. */
+
+  // App Store icon: 1024, opaque, and stripped of its alpha channel —
+  // Apple rejects icons that keep one.
+  await write(
+    resolve(ROOT, "mobile/assets/icon.png"),
+    await sharp(await markInSquare(1024, 120, ICON_BACKDROP))
+      .removeAlpha()
+      .png(png)
+      .toBuffer(),
+  );
+
+  // Splash mark: the trimmed artwork on transparency, sized by height as
+  // the brand rules ask. app.json's imageWidth then scales it down; the
+  // dark backdrop behind it comes from the splash config, not the file.
+  await write(
+    resolve(ROOT, "mobile/assets/splash-icon.png"),
+    await trimmedMark().resize({ height: 512 }).png(png).toBuffer(),
+  );
+
+  // Android adaptive icon. The launcher masks to the middle ~66% circle,
+  // so the foreground keeps the mark well inside that safe zone.
+  const androidForeground = await markInSquare(1024, 272, null);
+  await write(
+    resolve(ROOT, "mobile/assets/android-icon-foreground.png"),
+    androidForeground,
+  );
+
+  await write(
+    resolve(ROOT, "mobile/assets/android-icon-background.png"),
+    await sharp({
+      create: { width: 1024, height: 1024, channels: 3, background: ICON_BACKDROP },
+    })
+      .png(png)
+      .toBuffer(),
+  );
+
+  // Themed-icon variant: Android tints it, so only the silhouette
+  // matters — white wherever the mark has ink, transparent elsewhere.
+  const monoMask = await sharp(androidForeground).extractChannel(3).png().toBuffer();
+  await write(
+    resolve(ROOT, "mobile/assets/android-icon-monochrome.png"),
+    await sharp({
+      create: { width: 1024, height: 1024, channels: 3, background: "#ffffff" },
+    })
+      .joinChannel(monoMask)
+      .png(png)
+      .toBuffer(),
+  );
+
   console.log("\nDone.");
 }
 

@@ -11,20 +11,22 @@
  * recipe as globals.css over it.
  *
  * The require is guarded because the one place Skia can be missing is a
- * binary built without it. There the export is null and the caller
+ * binary built without it. There the getter returns null and the caller
  * falls back to the gradient wash - quieter, never broken.
+ *
+ * The require is also DEFERRED, and that is a launch-safety decision,
+ * not style: importing Skia runs NativeSkiaModule.install() - a
+ * synchronous native JSI install - the moment the module loads. At
+ * module scope that puts a native unknown inside the window where the
+ * splash screen is still up, and a failure there is an app that never
+ * draws its first frame. Requiring on first foil render instead means
+ * Skia loads after the app is visibly alive, where any failure is one
+ * quiet card instead of a dead launch.
  *
  * Static on purpose. Skia v2 animates through Reanimated, which is a
  * dependency this app does not carry, and a foil that holds still is
  * exactly what the web version looks like between pointer movements.
  */
-
-let Skia: typeof import("@shopify/react-native-skia") | null = null;
-try {
-  Skia = require("@shopify/react-native-skia");
-} catch {
-  Skia = null;
-}
 
 export type FoilProps = {
   imageUrl: string;
@@ -94,7 +96,7 @@ const STARS = [
 const evenly = (count: number) =>
   Array.from({ length: count }, (_, i) => i / (count - 1));
 
-function makeFoil(S: NonNullable<typeof Skia>) {
+function makeFoil(S: typeof import("@shopify/react-native-skia")) {
   const {
     Canvas,
     Image: SkiaImage,
@@ -243,5 +245,23 @@ function makeFoil(S: NonNullable<typeof Skia>) {
   };
 }
 
-/** Null when the Skia native module is not in this binary. */
-export const SkiaFoil = Skia ? makeFoil(Skia) : null;
+type FoilComponent = ReturnType<typeof makeFoil>;
+
+/* undefined = not tried yet; null = tried and Skia is not usable. */
+let cached: FoilComponent | null | undefined;
+
+/**
+ * The foil component, or null when Skia is not in this binary. The
+ * first call pays the require and the native install; every later call
+ * returns the same component, so React sees a stable identity.
+ */
+export function getSkiaFoil(): FoilComponent | null {
+  if (cached === undefined) {
+    try {
+      cached = makeFoil(require("@shopify/react-native-skia"));
+    } catch {
+      cached = null;
+    }
+  }
+  return cached;
+}
