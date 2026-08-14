@@ -8,6 +8,7 @@ import type { StackParams } from "../../App";
 import {
   addToShowcase,
   chooseUsername,
+  describeError,
   dressAllShowcase,
   dressShowcase,
   getProfile,
@@ -55,9 +56,11 @@ export function ProfileScreen() {
   /* A fresh account finishes choosing a name before anything else -
      the website's /welcome/username, in place. */
   const [needsSetup, setNeedsSetup] = useState(false);
-  /* A token exists but the profile fetch failed: say so, never pretend
-     the player is signed out. That lie cost a confused founder an hour. */
-  const [loadFailed, setLoadFailed] = useState(false);
+  /* A token exists but the profile fetch failed: say so WITH the error's
+     name, never pretend the player is signed out. The generic version of
+     this screen cost days of blind debugging; the named version makes a
+     screenshot of the failure the diagnosis. Null = no failure. */
+  const [loadFailed, setLoadFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -76,10 +79,10 @@ export function ProfileScreen() {
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
       setNeedsSetup(result.needsSetup);
-      setLoadFailed(false);
-    } catch {
+      setLoadFailed(null);
+    } catch (caught) {
       setProfile(null);
-      setLoadFailed(true);
+      setLoadFailed(describeError(caught));
     } finally {
       setChecked(true);
     }
@@ -105,8 +108,10 @@ export function ProfileScreen() {
       await run();
       await load();
       setMessage(said);
-    } catch {
-      setMessage("That did not go through. Try again in a moment.");
+    } catch (caught) {
+      setMessage(
+        `That did not go through (${describeError(caught)}). Try again in a moment.`,
+      );
     } finally {
       setBusy(null);
     }
@@ -129,6 +134,7 @@ export function ProfileScreen() {
             The connection to cardflare.gg did not go through. Check your signal and
             try again.
           </Body>
+          <Muted>What the server said: {loadFailed}</Muted>
           <Button label="Try again" onPress={() => void load()} />
         </Card>
       </ScrollView>

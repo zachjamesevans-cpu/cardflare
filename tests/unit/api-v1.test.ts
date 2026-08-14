@@ -138,6 +138,28 @@ describe("authentication", () => {
 
     expect((await me.GET(request("GET"))).status).toBe(401);
   });
+
+  it("accepts the token from x-cf-access-token when Authorization is stripped", async () => {
+    /* The app sends both; some networks eat the Authorization header the
+       same way they eat request bodies, and the custom header survives. */
+    const stripped = new Request("https://cardflare.gg/api/v1/x", {
+      method: "GET",
+      headers: { "x-cf-access-token": "jwt-1" },
+    });
+
+    expect((await me.GET(stripped)).status).toBe(200);
+    expect(getUser).toHaveBeenCalledWith("jwt-1");
+  });
+
+  it("prefers the Authorization header when both arrive", async () => {
+    const both = new Request("https://cardflare.gg/api/v1/x", {
+      method: "GET",
+      headers: { authorization: "Bearer jwt-real", "x-cf-access-token": "jwt-other" },
+    });
+
+    expect((await me.GET(both)).status).toBe(200);
+    expect(getUser).toHaveBeenCalledWith("jwt-real");
+  });
 });
 
 describe("GET /api/v1/me", () => {

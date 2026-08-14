@@ -27,10 +27,20 @@ export interface ApiPlayer {
 
 function bearerToken(request: Request): string | null {
   const header = request.headers.get("authorization");
-  if (!header) return null;
+  if (header) {
+    const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+    if (match) return match[1];
+  }
 
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1] : null;
+  /*
+   * Fallback for networks that strip the Authorization header. The app
+   * already moved every payload into `x-cf-payload` because request
+   * bodies vanish on some networks (the founder's, for one); the same
+   * middleboxes are known to eat Authorization while custom x-* headers
+   * pass. Same token, same server-side verification - only the envelope
+   * differs, exactly like the payload header.
+   */
+  return request.headers.get("x-cf-access-token");
 }
 
 /** The signed-in player behind this request, or null. Never throws. */
