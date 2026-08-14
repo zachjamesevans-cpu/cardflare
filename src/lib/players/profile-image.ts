@@ -19,6 +19,19 @@ export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const AVATAR_SIZE = 512;
 
 /**
+ * The cover banner behind the picture: wide, short, and re-encoded to
+ * exactly this box so every profile block lines up. Same 2MB send
+ * ceiling as the avatar; the stored file lands around 100KB.
+ */
+export const COVER_WIDTH = 1200;
+export const COVER_HEIGHT = 450;
+
+/** The object path a cover is stored at, beside the avatars. */
+export function coverObjectPath(playerId: string, at = Date.now()): string {
+  return `covers/${playerId}/${at}.${AVATAR_FORMAT}`;
+}
+
+/**
  * Stored as JPEG, and the choice is a diagnosis rather than a taste.
  *
  * Every avatar this feature ever served was WebP, and every one of them

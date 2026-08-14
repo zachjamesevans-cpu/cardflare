@@ -256,8 +256,11 @@ export function CardImage({
   );
 }
 
-export function Card({ children }: PropsWithChildren) {
-  return <View style={styles.card}>{children}</View>;
+export function Card({
+  children,
+  style,
+}: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
+  return <View style={[styles.card, style]}>{children}</View>;
 }
 
 export function Title({ children }: PropsWithChildren) {

@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, ChevronDown, Flame, Loader2, Sparkles } from "lucide-react";
 
-import { EditPlayerName } from "@/components/admin/edit-player-form";
+import { EditPlayerName, EditPlayerTier } from "@/components/admin/edit-player-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export function AdminPlayerRow({
   cosmeticsUnlocked,
   purchasedCount,
   setupOwed,
+  tier,
 }: {
   playerId: string;
   displayName: string;
@@ -43,6 +44,8 @@ export function AdminPlayerRow({
   cosmeticsUnlocked: boolean;
   purchasedCount: number;
   setupOwed: boolean;
+  /** Membership tier: free, pro, ultra or max. */
+  tier: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -106,6 +109,8 @@ export function AdminPlayerRow({
             </p>
             <EditPlayerName playerId={playerId} displayName={displayName} />
           </div>
+
+          <EditPlayerTier playerId={playerId} tier={tier} />
 
           <form action={grant} className="flex flex-col gap-2">
             <input type="hidden" name="playerId" value={playerId} />

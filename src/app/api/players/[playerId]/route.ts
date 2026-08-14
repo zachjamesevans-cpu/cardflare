@@ -50,6 +50,9 @@ export async function GET(
     avatarUrl: profile.avatarUrl?.startsWith("/")
       ? `${siteUrl()}${profile.avatarUrl}`
       : profile.avatarUrl,
+    coverUrl: profile.coverUrl?.startsWith("/")
+      ? `${siteUrl()}${profile.coverUrl}`
+      : profile.coverUrl,
     embersEarned: profile.embersEarned,
     /* The ring around the picture: the avatar slot, since the split. */
     frame: worn.avatarFrame,

@@ -30,6 +30,7 @@ import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
+import { CoverBanner } from "../showcase-zoom";
 import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -109,7 +110,7 @@ export function ProfileScreen() {
    * 200KB regardless of what the camera roll held - the founder's brief:
    * it must work first time and it must not be a server load.
    */
-  const changePicture = async () => {
+  const changePicture = async (kind: "avatar" | "cover" = "avatar") => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setMessage("CardFlare needs photo access to change your picture.");
@@ -119,12 +120,13 @@ export function ProfileScreen() {
     const chosen = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [1, 1],
+      /* The crop the server will make anyway, offered up front. */
+      aspect: kind === "cover" ? [8, 3] : [1, 1],
       quality: 1,
     });
     if (chosen.canceled || chosen.assets.length === 0) return;
 
-    setBusy("avatar");
+    setBusy(kind);
     setMessage("Preparing picture…");
     try {
       /* Resize to the stored size and re-encode as JPEG, walking the
@@ -135,11 +137,11 @@ export function ProfileScreen() {
       while (quality >= 0.2) {
         const out = await manipulateAsync(
           chosen.assets[0].uri,
-          [{ resize: { width: 512 } }],
+          [{ resize: { width: kind === "cover" ? 1200 : 512 } }],
           { compress: quality, format: SaveFormat.JPEG, base64: true },
         );
         encoded = out.base64 ?? null;
-        if (encoded && encoded.length <= 200_000) break;
+        if (encoded && encoded.length <= (kind === "cover" ? 300_000 : 200_000)) break;
         quality -= 0.15;
       }
       if (!encoded) {
@@ -147,11 +149,13 @@ export function ProfileScreen() {
         return;
       }
 
-      await uploadAvatar(encoded, (sent, total) =>
-        setMessage(`Uploading picture… ${sent} of ${total}`),
+      await uploadAvatar(
+        encoded,
+        (sent, total) => setMessage(`Uploading picture… ${sent} of ${total}`),
+        kind,
       );
       await load();
-      setMessage("Picture updated.");
+      setMessage(kind === "cover" ? "Cover updated." : "Picture updated.");
     } catch (caught) {
       setMessage(
         `The picture did not go through (${describeError(caught)}). Try again.`,
@@ -257,7 +261,8 @@ export function ProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Card>
+      <Card style={{ overflow: "hidden" }}>
+        <CoverBanner coverUrl={profile.coverUrl} height={104} />
         <View
           style={{
             flexDirection: "row",
@@ -302,12 +307,26 @@ export function ProfileScreen() {
          * narrates each stage because a dozen small requests on shop
          * wifi takes a visible moment.
          */}
-        <Button
-          label={busy === "avatar" ? (message ?? "Uploading picture…") : "Change picture"}
-          variant="secondary"
-          disabled={busy === "avatar"}
-          onPress={() => void changePicture()}
-        />
+        <View style={{ flexDirection: "row", gap: spacing(2) }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={
+                busy === "avatar" ? (message ?? "Uploading…") : "Change picture"
+              }
+              variant="secondary"
+              disabled={busy === "avatar" || busy === "cover"}
+              onPress={() => void changePicture("avatar")}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={busy === "cover" ? (message ?? "Uploading…") : "Change cover"}
+              variant="secondary"
+              disabled={busy === "avatar" || busy === "cover"}
+              onPress={() => void changePicture("cover")}
+            />
+          </View>
+        </View>
 
         <NameField
           current={profile.displayName}

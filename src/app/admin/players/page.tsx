@@ -133,6 +133,7 @@ export default async function AdminPlayersPage({
                   cosmeticsUnlocked={player.cosmeticsUnlocked}
                   purchasedCount={player.purchasedCount}
                   setupOwed={!player.onboardedAt}
+                  tier={player.tier}
                 />
               ))}
               {/* Invitations are not search results: they have no

@@ -7,15 +7,22 @@ import { peekPlayer, type PeekProfile } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
-import { Body, Card, Muted, Title } from "../ui";
+import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
+import { Body, Card, Muted, Tap, Title } from "../ui";
 import { colors, spacing } from "../theme";
+
+/** The trade-room carousel's tile width; the profile shelf matches it. */
+const SHELF_TILE = 56;
+const COVER_HEIGHT = 110;
 
 /**
  * Somebody else's profile, the full page — where the popup's "View full
- * profile" lands. The same public shape the website's /p page shows:
- * picture wearing their border, name, lifetime Embers, and the whole
- * shelf with each card in its own dressing. The server builds this from
- * a type with no balance field, so this screen could not leak one.
+ * profile" lands. One block, the founder's layout: their cover banner
+ * across the top with the picture overlapping it, the name with the
+ * badge directly under it, and the whole shelf as a carousel-sized rail
+ * inside the same block. Tapping a card opens the standard full view.
+ * The server builds this from a type with no balance field, so this
+ * screen could not leak one.
  */
 export function PlayerProfileScreen() {
   const route = useRoute<RouteProp<StackParams, "PlayerProfile">>();
@@ -25,6 +32,7 @@ export function PlayerProfileScreen() {
   const [failed, setFailed] = useState(false);
   /* Cards render together once their art is warm, not one by one. */
   const [shelfReady, setShelfReady] = useState(false);
+  const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -69,8 +77,11 @@ export function PlayerProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Card>
-        <View style={{ alignItems: "center", gap: spacing(2) }}>
+      {/* The profile block: cover, picture, name, badge, shelf. */}
+      <Card style={{ paddingTop: COVER_HEIGHT + spacing(2), overflow: "hidden" }}>
+        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} />
+
+        <View style={{ alignItems: "center", gap: spacing(2), marginTop: -spacing(14) }}>
           <PlayerAvatar
             displayName={profile.displayName}
             seed={profile.playerId}
@@ -79,47 +90,56 @@ export function PlayerProfileScreen() {
             size={96}
           />
           <Title>{profile.displayName}</Title>
+          {/* Centered directly under the name, inside the block. */}
           <EmberBadge earned={profile.embersEarned} size="md" />
-          <Muted>Earned by confirming trades, and nothing else.</Muted>
+        </View>
+
+        <View style={{ gap: spacing(2) }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
+            Showcase
+          </Text>
+
+          {profile.showcase.length === 0 ? (
+            <Muted>Nothing on the shelf yet.</Muted>
+          ) : !shelfReady ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <ActivityIndicator color={colors.accent} size="small" />
+              <Muted>Loading showcase…</Muted>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                {profile.showcase.map((entry) => (
+                  <Tap
+                    key={entry.id}
+                    onPress={() =>
+                      setZoomed({
+                        name: entry.name,
+                        imageUrl: entry.imageUrl,
+                        frame: entry.frame,
+                        holo: entry.holo,
+                        effect: profile.effect,
+                      })
+                    }
+                  >
+                    <CosmeticCard
+                      imageUrl={entry.imageUrl}
+                      width={SHELF_TILE}
+                      frame={entry.frame}
+                      holo={entry.holo}
+                      effect={profile.effect}
+                    />
+                  </Tap>
+                ))}
+              </View>
+            </ScrollView>
+          )}
         </View>
       </Card>
 
-      <Card>
-        <Title>Showcase</Title>
-        <Body>
-          Cards this player is proud of. Not a trade list, so there is nothing to
-          pledge on here.
-        </Body>
-
-        {profile.showcase.length === 0 ? (
-          <Muted>Nothing on the shelf yet.</Muted>
-        ) : !shelfReady ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-            <ActivityIndicator color={colors.accent} size="small" />
-            <Muted>Loading showcase…</Muted>
-          </View>
-        ) : (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(3) }}>
-            {profile.showcase.map((entry) => (
-              <View key={entry.id} style={{ gap: spacing(1), width: 92 }}>
-                <CosmeticCard
-                  imageUrl={entry.imageUrl}
-                  width={92}
-                  frame={entry.frame}
-                  holo={entry.holo}
-                  effect={profile.effect}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textSecondary, fontSize: 12 }}
-                >
-                  {entry.name}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
+      <ShowcaseZoom card={zoomed} onClose={() => setZoomed(null)} />
     </ScrollView>
   );
 }

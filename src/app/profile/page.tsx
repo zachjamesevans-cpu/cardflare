@@ -6,6 +6,7 @@ import { ChevronRight, Flame, Settings, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
+import { CoverForm } from "@/components/players/cover-form";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
@@ -117,8 +118,19 @@ export default async function ProfilePage() {
         currentArea={currentArea}
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Card className="flex flex-col gap-5">
-            <div className="flex items-start justify-between gap-3">
+          <Card className="relative flex flex-col gap-5 overflow-hidden">
+            {/* The cover banner behind your picture - the profile block. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-24 overflow-hidden bg-elevated"
+            >
+              {profile.coverUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.coverUrl} alt="" className="size-full object-cover" />
+              )}
+              <div className="absolute inset-0 bg-black/25" />
+            </div>
+            <div className="relative flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <p className="font-semibold text-text-primary">You</p>
                 <p className="text-sm text-text-secondary">
@@ -137,16 +149,20 @@ export default async function ProfilePage() {
               </Link>
             </div>
 
-            <AvatarForm
-              displayName={profile.displayName}
-              /* Stable per player, so the fallback colour never changes
+            <div className="relative">
+              <AvatarForm
+                displayName={profile.displayName}
+                /* Stable per player, so the fallback colour never changes
                  under somebody who removes their picture and puts it back. */
-              seed={profile.playerId}
-              avatarUrl={profile.avatarUrl}
-              frame={worn.avatarFrame}
-            />
+                seed={profile.playerId}
+                avatarUrl={profile.avatarUrl}
+                frame={worn.avatarFrame}
+              />
+            </div>
 
             <DisplayNameForm displayName={profile.displayName} />
+
+            <CoverForm coverUrl={profile.coverUrl} />
           </Card>
 
           <Card className="flex flex-col gap-4">

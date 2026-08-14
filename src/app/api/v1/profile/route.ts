@@ -70,6 +70,9 @@ export async function GET(request: Request): Promise<Response> {
       avatarUrl: profile.avatarUrl?.startsWith("/")
         ? `${siteUrl()}${profile.avatarUrl}`
         : profile.avatarUrl,
+      coverUrl: profile.coverUrl?.startsWith("/")
+        ? `${siteUrl()}${profile.coverUrl}`
+        : profile.coverUrl,
       embersEarned: profile.embersEarned,
       embersBalance: profile.embersBalance,
       equipped: worn,

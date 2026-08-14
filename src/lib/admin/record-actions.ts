@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
+import { isTier } from "@/lib/tiers";
 import {
   isStoreMember,
   updatePlayerName,
+  updatePlayerTier,
   updateSignInEmail,
   updateStoreRecord,
   userIdForPlayer,
@@ -168,4 +170,31 @@ export async function updateSignInEmailAction(
     status: "saved",
     message: `They sign in with ${parsed.data.email} from now on.`,
   };
+}
+
+/** Moves a player between tiers, from the console's player row. */
+export async function setPlayerTierAction(
+  _previous: RecordEditState,
+  formData: FormData,
+): Promise<RecordEditState> {
+  if (!(await isAdmin())) return REFUSED;
+
+  const playerId = text(formData, "playerId");
+  const tier = text(formData, "tier");
+
+  if (!playerId || !isTier(tier)) {
+    return { status: "error", message: "Pick a real tier." };
+  }
+
+  const result = await updatePlayerTier(playerId, tier);
+  if (!result.ok) {
+    return {
+      status: "error",
+      message:
+        result.reason === "not-found" ? "That player no longer exists." : GENERIC_ERROR,
+    };
+  }
+
+  revalidatePath("/admin/players");
+  return { status: "saved", message: `Tier set to ${tier}.` };
 }

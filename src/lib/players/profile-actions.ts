@@ -15,6 +15,7 @@ import {
   dressShowcaseCard,
   removeFromShowcase,
   setAvatar,
+  setCover,
   setDisplayName,
 } from "./profile";
 import { AVATAR_MAX_BYTES, AVATAR_MIME_TYPES } from "./profile-image";
@@ -164,6 +165,55 @@ export async function setAvatarAction(
 
   revalidateProfile();
   return { status: "saved", message: "Picture updated." };
+}
+
+/** The cover banner: same rules and rate as the picture, its own field. */
+export async function setCoverAction(
+  _previous: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const rate = checkRateLimit(
+    `avatar:${await clientKey()}`,
+    AVATAR_MAX,
+    AVATAR_WINDOW_MS,
+  );
+  if (!rate.allowed) {
+    return {
+      status: "error",
+      message: "That is a lot of new pictures. Try again in a little while.",
+    };
+  }
+
+  const file = formData.get("cover");
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "error", message: "Pick a picture to upload." };
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return {
+      status: "error",
+      message: "That picture is over 2MB. Pick a smaller one.",
+    };
+  }
+  if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { status: "error", message: "Covers need to be a PNG, JPEG or WebP." };
+  }
+
+  const outcome = await setCover(playerId, file);
+  if (!outcome.ok) {
+    return {
+      status: "error",
+      message:
+        outcome.reason === "unreadable"
+          ? "That file could not be read as a picture. Try another one."
+          : GENERIC_ERROR,
+    };
+  }
+
+  revalidateProfile();
+  return { status: "saved", message: "Cover updated." };
 }
 
 export async function clearAvatarAction(): Promise<void> {

@@ -185,3 +185,26 @@ export async function isStoreMember(storeId: string, userId: string): Promise<bo
 
   return Boolean(data);
 }
+
+/** Moves a player between membership tiers. Admin console only. */
+export async function updatePlayerTier(
+  playerId: string,
+  tier: string,
+): Promise<{ ok: true } | { ok: false; reason: "not-found" | "failed" }> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from("players")
+    .update({ tier })
+    .eq("id", playerId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not update the player's tier", error);
+    return { ok: false, reason: "failed" };
+  }
+  if (!data) return { ok: false, reason: "not-found" };
+
+  return { ok: true };
+}

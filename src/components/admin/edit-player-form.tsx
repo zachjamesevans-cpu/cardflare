@@ -6,8 +6,9 @@ import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
-import { updatePlayerAction } from "@/lib/admin/record-actions";
+import { setPlayerTierAction, updatePlayerAction } from "@/lib/admin/record-actions";
 import { RECORD_EDIT_IDLE } from "@/lib/admin/record-schema";
+import { TIERS } from "@/lib/tiers";
 
 /**
  * Renaming a player from the console.
@@ -76,6 +77,40 @@ export function EditPlayerName({
           <X className="size-3.5" aria-hidden="true" />
           {state.message}
         </p>
+      )}
+    </form>
+  );
+}
+
+/**
+ * The membership tier, switched from the row. A select and a save:
+ * tiers are an admin fact for now (no billing attached), so the control
+ * is deliberately as plain as the rename beside it.
+ */
+export function EditPlayerTier({ playerId, tier }: { playerId: string; tier: string }) {
+  const [state, formAction] = useActionState(setPlayerTierAction, RECORD_EDIT_IDLE);
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="playerId" value={playerId} />
+      <label className="text-xs text-text-muted" htmlFor={`tier-${playerId}`}>
+        Tier
+      </label>
+      <select
+        id={`tier-${playerId}`}
+        name="tier"
+        defaultValue={tier}
+        className="rounded-[var(--radius-control)] border border-border bg-surface px-2 py-1 text-sm text-text-primary"
+      >
+        {TIERS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <SaveButton />
+      {state.status !== "idle" && (
+        <span className="text-xs text-text-secondary">{state.message}</span>
       )}
     </form>
   );

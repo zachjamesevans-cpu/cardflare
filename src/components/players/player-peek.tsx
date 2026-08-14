@@ -49,6 +49,8 @@ const BACKDROP_DIM: Keyframe = {
 interface PeekProfile {
   displayName: string;
   avatarUrl: string | null;
+  /** Their cover banner, blurred behind this popup's header. */
+  coverUrl: string | null;
   embersEarned: number;
   /** The ring around their picture: the avatar frame slot. */
   frame: string | null;
@@ -294,9 +296,24 @@ export function PlayerPeek({
       >
         <div
           ref={panel}
-          className="flex max-h-[88dvh] flex-col gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-border bg-surface p-5 text-text-primary"
+          className="relative flex max-h-[88dvh] flex-col gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-border bg-surface p-5 text-text-primary"
         >
-          <div className="flex items-start justify-between gap-3">
+          {/* Their cover, blurred - the quick look reads as THEIR page. */}
+          {worn?.coverUrl && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-24 overflow-hidden"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={worn.coverUrl}
+                alt=""
+                className="size-full scale-110 object-cover blur-md"
+              />
+              <div className="absolute inset-0 bg-black/35" />
+            </div>
+          )}
+          <div className="relative flex items-start justify-between gap-3">
             {/* Top-aligned, per the founder: name and badge sit level
                 with the top of the picture's circle. */}
             <div className="flex min-w-0 flex-1 items-start gap-3">
