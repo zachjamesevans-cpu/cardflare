@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
+import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
@@ -122,11 +123,14 @@ export default async function ProfilePage() {
         currentArea={currentArea}
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Card className="relative flex flex-col gap-5 overflow-hidden">
-            {/* The cover banner behind your picture - the profile block. */}
+          {/* Your own profile block, PIXEL-IDENTICAL to /p/<you>: the
+              whole point of this tab is knowing exactly what others
+              see. No text rides on the banner - the founder cut it as
+              redundant. */}
+          <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
             <div
               aria-hidden="true"
-              className="absolute inset-x-0 top-0 h-24 overflow-hidden bg-elevated"
+              className="absolute inset-x-0 top-0 h-28 overflow-hidden bg-elevated"
             >
               {profile.coverUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -134,14 +138,72 @@ export default async function ProfilePage() {
               )}
               <div className="absolute inset-0 bg-black/25" />
             </div>
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <p className="font-semibold text-text-primary">You</p>
-                <p className="text-sm text-text-secondary">
-                  Your picture and name travel with you between stores.
-                </p>
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
+            />
+
+            <PlayerAvatar
+              displayName={profile.displayName}
+              seed={profile.playerId}
+              avatarUrl={profile.avatarUrl}
+              frame={worn.avatarFrame}
+              className="relative mt-12 size-24 text-2xl"
+            />
+            <div className="relative flex flex-col items-center gap-2">
+              <p className="text-lg font-bold text-text-primary">
+                {profile.displayName}
+              </p>
+              <EmberBadge earned={profile.embersEarned} size="md" />
+              <p className="text-sm text-text-muted">
+                Earned by confirming trades, and nothing else.
+              </p>
+            </div>
+
+            <div className="relative flex w-full flex-col gap-4 text-left">
+              <div className="flex items-start gap-3">
+                <Sparkles
+                  className="mt-0.5 size-5 shrink-0 text-accent"
+                  aria-hidden="true"
+                />
+                <div className="flex flex-col gap-1">
+                  <p className="font-semibold text-text-primary">Showcase</p>
+                  <p className="text-sm text-text-secondary">
+                    Cards this player is proud of. Not a trade list, so there is nothing
+                    to pledge on here.
+                  </p>
+                </div>
               </div>
 
+              {profile.showcase.length === 0 ? (
+                <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
+              ) : (
+                <Rail ariaLabel="Showcase">
+                  {profile.showcase.map((entry) => (
+                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                      <CosmeticCard
+                        imageUrl={entry.imageUrl}
+                        name={entry.name}
+                        number={entry.number}
+                        imagesEnabled={imagesEnabled}
+                        frame={entry.frame ?? worn.frame}
+                        holo={entry.holo ?? worn.holo}
+                        effect={worn.effect}
+                        className="w-full"
+                      />
+                      <span className="truncate text-[11px] text-text-secondary">
+                        {entry.name}
+                      </span>
+                    </li>
+                  ))}
+                </Rail>
+              )}
+            </div>
+          </Card>
+
+          <Card className="flex flex-col gap-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-semibold text-text-primary">Edit your profile</p>
               {/* The cog. Everything the account page used to be. */}
               <Link
                 href="/profile/settings"
@@ -153,16 +215,12 @@ export default async function ProfilePage() {
               </Link>
             </div>
 
-            <div className="relative">
-              <AvatarForm
-                displayName={profile.displayName}
-                /* Stable per player, so the fallback colour never changes
-                 under somebody who removes their picture and puts it back. */
-                seed={profile.playerId}
-                avatarUrl={profile.avatarUrl}
-                frame={worn.avatarFrame}
-              />
-            </div>
+            <AvatarForm
+              displayName={profile.displayName}
+              seed={profile.playerId}
+              avatarUrl={profile.avatarUrl}
+              frame={worn.avatarFrame}
+            />
 
             <DisplayNameForm displayName={profile.displayName} />
 

@@ -347,7 +347,6 @@ export function ProfileScreen() {
             <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
               Edit your profile
             </Text>
-            <Muted>Your picture and name travel with you between stores.</Muted>
           </View>
           {/* The cog. Everything the Account tab used to be. */}
           <Tap
