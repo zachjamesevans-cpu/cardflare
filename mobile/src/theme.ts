@@ -12,13 +12,34 @@ export const colors = {
   borderStrong: "#3a4553",
   accent: "#c6ee4f",
   accentHover: "#d3fa5f",
+  accentMuted: "#8ba635",
   accentContrast: "#0e1116",
   textPrimary: "#f2f5f7",
   textSecondary: "#b3becc",
   textMuted: "#8593a4",
-  danger: "#ff6b6b",
+  success: "#6ee7a8",
+  warning: "#fbc85a",
+  danger: "#ff8f8f",
+  /* Cosmetics — the colours Embers buy, same block as the web tokens. */
+  ember: "#ff8a3d",
+  emberDeep: "#c2410c",
+  galaxy: "#6d4aff",
+  galaxyDeep: "#1a0b3d",
+  frost: "#6ec3ff",
+  rose: "#ff6fb5",
+  gold: "#f0c24b",
 } as const;
 
-export const radius = { control: 10, panel: 16 } as const;
+/** Six hues for initials avatars, matching --color-avatar-N. */
+export const avatarHues = [
+  "#8fd3ff",
+  "#a8e6a1",
+  "#ffc98f",
+  "#d9b3ff",
+  "#ffadad",
+  "#7fe3d4",
+] as const;
+
+export const radius = { control: 10, card: 16, panel: 20 } as const;
 
 export const spacing = (n: number) => n * 4;

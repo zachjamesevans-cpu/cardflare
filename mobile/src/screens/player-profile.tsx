@@ -5,6 +5,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { peekPlayer, type PeekProfile } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { Body, Card, Muted, Title } from "../ui";
 import { colors, spacing } from "../theme";
@@ -67,9 +68,7 @@ export function PlayerProfileScreen() {
             size={96}
           />
           <Title>{profile.displayName}</Title>
-          <Text style={{ color: colors.accent, fontWeight: "700" }}>
-            {`${profile.embersEarned.toLocaleString()} Embers`}
-          </Text>
+          <EmberBadge earned={profile.embersEarned} size="md" />
           <Muted>Earned by confirming trades, and nothing else.</Muted>
         </View>
       </Card>

@@ -7,7 +7,6 @@ import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import {
   addToShowcase,
-  buyCosmetic,
   dressAllShowcase,
   dressShowcase,
   getProfile,
@@ -24,7 +23,8 @@ import {
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
-import { FRAME_COLOR } from "../player-avatar";
+import { EmberBadge } from "../ember-badge";
+import { PlayerAvatar } from "../player-avatar";
 import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -169,7 +169,12 @@ export function ProfileScreen() {
             justifyContent: "space-between",
           }}
         >
-          <Muted>Your profile</Muted>
+          <View style={{ flex: 1, gap: spacing(1) }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
+              You
+            </Text>
+            <Muted>Your picture and name travel with you between stores.</Muted>
+          </View>
           {/* The cog. Everything the Account tab used to be. */}
           <Tap
             onPress={() => navigation.navigate("Settings")}
@@ -180,42 +185,18 @@ export function ProfileScreen() {
         </View>
 
         <View style={{ alignItems: "center", gap: spacing(2) }}>
-          {/* The ring is the AVATAR frame slot, separate from cards. */}
-          {profile.avatarUrl ? (
-            <Image
-              source={{ uri: profile.avatarUrl }}
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 48,
-                borderWidth: FRAME_COLOR[profile.equipped.avatarFrame ?? ""] ? 3 : 1,
-                borderColor:
-                  FRAME_COLOR[profile.equipped.avatarFrame ?? ""] ?? colors.border,
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 48,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.elevated,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text
-                style={{ color: colors.textSecondary, fontSize: 30, fontWeight: "700" }}
-              >
-                {initials(profile.displayName)}
-              </Text>
-            </View>
-          )}
+          {/* The ring is the AVATAR frame slot, separate from cards -
+              the same component every roster row uses. */}
+          <PlayerAvatar
+            displayName={profile.displayName}
+            seed={profile.playerId}
+            avatarUrl={profile.avatarUrl}
+            frame={profile.equipped.avatarFrame}
+            size={96}
+          />
 
           <Title>{profile.displayName}</Title>
-          <EmberChip earned={profile.embersEarned} />
+          <EmberBadge earned={profile.embersEarned} size="md" />
         </View>
 
         {/*
@@ -245,12 +226,12 @@ export function ProfileScreen() {
           <Stat
             label="Earned, all time"
             value={profile.embersEarned}
-            note="Public. This is your badge."
+            note="Public. This is the number on your badge, and it never goes down."
           />
           <Stat
             label="Left to spend"
             value={profile.embersBalance}
-            note="Private. Only you see this."
+            note="Private. Nobody else sees this, only you."
             accent
           />
         </View>
@@ -260,22 +241,30 @@ export function ProfileScreen() {
       <Card>
         <Title>Your showcase</Title>
         <Body>
-          Cards you are proud of, wearing whatever you have unlocked. Not a trade
-          list, so nobody can pledge on these.
+          Up to nine cards you are proud of, wearing whatever you have unlocked.
+          This is not a trade list, and nobody can pledge on it.
         </Body>
 
         {profile.showcase.length === 0 ? (
-          <Muted>Nothing on the shelf yet. Search below and it stays here.</Muted>
+          <Muted>
+            Nothing on the shelf yet. Search for a card below and it stays here
+            between events.
+          </Muted>
         ) : (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(3) }}>
+          /* The board's carousel: same card width, horizontal shelf. */
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
+          >
             {profile.showcase.map((entry) => (
-              <View key={entry.id} style={{ gap: spacing(1), width: 92 }}>
+              <View key={entry.id} style={{ gap: spacing(1), width: 56 }}>
                 {/* Tapping a card opens its dressing room, the
                     website's behaviour on your own shelf. */}
                 <Tap onPress={() => setDressing(entry)}>
                   <CosmeticCard
                     imageUrl={entry.imageUrl}
-                    width={92}
+                    width={56}
                     frame={entry.frame ?? profile.equipped.frame}
                     holo={entry.holo ?? profile.equipped.holo}
                     effect={profile.equipped.effect}
@@ -283,14 +272,12 @@ export function ProfileScreen() {
                 </Tap>
                 <Text
                   numberOfLines={1}
-                  style={{ color: colors.textSecondary, fontSize: 12 }}
+                  style={{ color: colors.textSecondary, fontSize: 11 }}
                 >
                   {entry.name}
                 </Text>
-                <Button
-                  label="Remove"
-                  variant="secondary"
-                  busy={busy === entry.id}
+                <Tap
+                  disabled={busy === entry.id}
                   onPress={() =>
                     void act(
                       entry.id,
@@ -298,10 +285,20 @@ export function ProfileScreen() {
                       "Taken off the shelf.",
                     )
                   }
-                />
+                >
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      textDecorationLine: "underline",
+                    }}
+                  >
+                    Remove
+                  </Text>
+                </Tap>
               </View>
             ))}
-          </View>
+          </ScrollView>
         )}
 
         {profile.showcase.length < profile.showcaseLimit ? (
@@ -325,71 +322,52 @@ export function ProfileScreen() {
         )}
       </Card>
 
-      {wardrobe && (
-        <Card>
-          <Title>What Embers buy</Title>
-          <Body>
-            Profile borders wrap your picture in every room. Card borders and holos
-            are the defaults your showcase wears; dressing one card on its own is a
-            website thing for now.
-          </Body>
-
-          <Slot
-            heading="Profile borders"
-            items={wardrobe.avatarFrames}
-            balance={profile.embersBalance}
-            busy={busy}
-            ring
-            onPick={(item) =>
-              void act(
-                item.slug,
-                () => buyCosmetic(item.slug, "avatarFrame"),
-                `${item.name} equipped.`,
-              )
-            }
-          />
-          <Slot
-            heading="Card borders"
-            items={wardrobe.cardFrames}
-            balance={profile.embersBalance}
-            busy={busy}
-            ring
-            onPick={(item) =>
-              void act(
-                item.slug,
-                () => buyCosmetic(item.slug, "cardFrame"),
-                `${item.name} equipped.`,
-              )
-            }
-          />
-          <Slot
-            heading="Holo patterns"
-            items={wardrobe.holos}
-            balance={profile.embersBalance}
-            busy={busy}
-            onPick={(item) =>
-              void act(
-                item.slug,
-                () => buyCosmetic(item.slug, "holo"),
-                `${item.name} equipped.`,
-              )
-            }
-          />
-          <Slot
-            heading="Effects"
-            items={wardrobe.effects}
-            balance={profile.embersBalance}
-            busy={busy}
-            onPick={(item) =>
-              void act(
-                item.slug,
-                () => buyCosmetic(item.slug, "effect"),
-                `${item.name} equipped.`,
-              )
-            }
-          />
-        </Card>
-      )}
+      {/*
+       * The store lives on its own screen now, same as the website:
+       * this card is the door, wearing the one number a shopper
+       * decides with.
+       */}
+      <Tap
+        onPress={() => navigation.navigate("Store")}
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderWidth: 1,
+          borderRadius: radius.card,
+          padding: spacing(4),
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(2),
+        }}
+      >
+        <View style={{ flex: 1, gap: spacing(1) }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
+            Embers store
+          </Text>
+          <Muted>Frames, holo patterns and effects. Spend what you have earned.</Muted>
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(1.5),
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            paddingHorizontal: spacing(3),
+            paddingVertical: spacing(1),
+          }}
+        >
+          <Ionicons name="flame" size={13} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
+            {profile.embersBalance.toLocaleString()}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>to spend</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Tap>
 
       {message && <Muted>{message}</Muted>}
 
@@ -434,30 +412,6 @@ function initials(displayName: string): string {
   return picked.map((word) => [...word][0] ?? "").join("").toUpperCase();
 }
 
-/* The number and the word "Embers", nothing else. Tier names read as a
-   second currency, which is how the founder read them. */
-function EmberChip({ earned }: { earned: number }) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing(1.5),
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.accent,
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1),
-      }}
-    >
-      <Ionicons name="flame" size={14} color={colors.accent} />
-      <Text style={{ color: colors.accent, fontWeight: "700" }}>
-        {`${earned.toLocaleString()} Embers`}
-      </Text>
-    </View>
-  );
-}
-
 function Stat({
   label,
   value,
@@ -481,7 +435,14 @@ function Stat({
         gap: spacing(1),
       }}
     >
-      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+      <Text
+        style={{
+          color: colors.textMuted,
+          fontSize: 11,
+          fontWeight: "600",
+          letterSpacing: 0.6,
+        }}
+      >
         {label.toUpperCase()}
       </Text>
       <Text
@@ -494,95 +455,6 @@ function Stat({
         {value.toLocaleString()}
       </Text>
       <Text style={{ color: colors.textMuted, fontSize: 11 }}>{note}</Text>
-    </View>
-  );
-}
-
-/**
- * One row of the shop.
- *
- * Everything shows, owned or not, priced or locked. A shop that hides
- * what you cannot afford leaves a new player with three free items and
- * no reason to trade again, which is the opposite of the point.
- */
-function Slot({
-  heading,
-  items,
-  balance,
-  busy,
-  ring = false,
-  onPick,
-}: {
-  heading: string;
-  items: CosmeticItem[];
-  balance: number;
-  busy: string | null;
-  /** Frames only: show the ring each one buys, on a stand-in circle. */
-  ring?: boolean;
-  onPick: (item: CosmeticItem) => void;
-}) {
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>{heading}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-        {items.map((item) => {
-          const locked = item.lockedUntil !== null && !item.owned;
-          const affordable = item.owned || (!locked && balance >= item.cost);
-
-          return (
-            <Tap
-              key={item.slug}
-              disabled={item.equipped || !affordable || busy !== null}
-              onPress={() => onPick(item)}
-              style={{
-                flexBasis: "48%",
-                flexGrow: 1,
-                borderRadius: radius.control,
-                borderWidth: 1,
-                borderColor: item.equipped ? colors.accent : colors.border,
-                backgroundColor: colors.elevated,
-                padding: spacing(3),
-                gap: spacing(1),
-                opacity: affordable ? 1 : 0.55,
-              }}
-            >
-              {ring && (
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    borderWidth: FRAME_COLOR[item.slug] ? 2 : 1,
-                    borderColor: FRAME_COLOR[item.slug] ?? colors.border,
-                    backgroundColor: colors.canvas,
-                  }}
-                />
-              )}
-              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                {item.name}
-              </Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                {item.description}
-              </Text>
-              <Text
-                style={{
-                  color: item.equipped ? colors.accent : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: "600",
-                }}
-              >
-                {item.equipped
-                  ? "Equipped"
-                  : item.owned
-                    ? "Tap to wear"
-                    : locked
-                      ? `Needs ${item.lockedUntil?.toLocaleString()} earned`
-                      : `${item.cost.toLocaleString()} Embers`}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -846,7 +718,7 @@ function DressModal({
           onPress={() => {}}
           style={{
             alignSelf: "stretch",
-            borderRadius: radius.panel,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.surface,

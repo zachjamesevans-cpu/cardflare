@@ -46,6 +46,8 @@ import {
   Tap,
   Title,
 } from "../ui";
+import { EmberBadge } from "../ember-badge";
+import { OpenToTradesTag } from "../open-to-trades-tag";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
 import { colors, radius, spacing } from "../theme";
@@ -678,24 +680,46 @@ function RoomScreen({
                     flexShrink: 1,
                   }}
                 >
-                  {/* An account's name opens their popup; the rest of
-                      the header still folds the section. Nested taps:
-                      the inner one wins, which is exactly the split the
-                      website's header makes. */}
-                  {playerBySession.get(sessionId) ? (
-                    <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
-                      <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
-                    </Tap>
-                  ) : (
-                    <Title>{mine ? "Your Flares" : (group.name ?? "A player")}</Title>
-                  )}
-                  {openIds.has(sessionId) && (
-                    <Text
-                      style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}
-                    >
-                      {"\u21c4 Open to trades"}
-                    </Text>
-                  )}
+                  {/* An account's identity opens their popup; the rest
+                      of the header still folds the section. Same split
+                      as the website's board header. */}
+                  {(() => {
+                    const person = participants.find(
+                      (p) => p.playerSessionId === sessionId,
+                    );
+                    const identity = (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: spacing(2),
+                          flexShrink: 1,
+                        }}
+                      >
+                        <PlayerAvatar
+                          displayName={group.name ?? "A player"}
+                          seed={sessionId}
+                          avatarUrl={person?.avatarUrl ?? null}
+                          frame={person?.frame ?? null}
+                          size={26}
+                        />
+                        <Title>
+                          {mine ? "Your Flares" : (group.name ?? "A player")}
+                        </Title>
+                        {typeof person?.embersEarned === "number" && (
+                          <EmberBadge earned={person.embersEarned} />
+                        )}
+                      </View>
+                    );
+                    return playerBySession.get(sessionId) ? (
+                      <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
+                        {identity}
+                      </Tap>
+                    ) : (
+                      identity
+                    );
+                  })()}
+                  {openIds.has(sessionId) && <OpenToTradesTag />}
                 </View>
                 <View
                   style={{
@@ -874,16 +898,26 @@ function RoomScreen({
                         dimmed={!p.present}
                       />
                       <Text
-                        style={{ color: colors.textSecondary, flex: 1 }}
+                        style={{
+                          color: p.present ? colors.textPrimary : colors.textSecondary,
+                          flexShrink: 1,
+                        }}
                         numberOfLines={1}
                       >
                         {p.displayName ?? "A player"}
-                        {p.playerSessionId === youId ? " (you)" : ""}
-                        {typeof p.embersEarned === "number"
-                          ? ` · ${p.embersEarned.toLocaleString()} Embers`
-                          : ""}
-                        {p.openToTrades ? " · open to trades" : ""}
+                        {p.playerSessionId === youId ? (
+                          <Text style={{ color: colors.textMuted }}>{" · you"}</Text>
+                        ) : null}
                       </Text>
+                      {typeof p.embersEarned === "number" && (
+                        <EmberBadge earned={p.embersEarned} />
+                      )}
+                      {p.openToTrades && <OpenToTradesTag />}
+                      {!p.present && (
+                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                          away
+                        </Text>
+                      )}
                     </>
                   );
 

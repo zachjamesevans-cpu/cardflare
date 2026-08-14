@@ -10,6 +10,7 @@ import {
 
 import { peekPlayer, type PeekProfile } from "./api";
 import { CosmeticCard } from "./cosmetic-card";
+import { EmberBadge } from "./ember-badge";
 import { PlayerAvatar } from "./player-avatar";
 import { Button } from "./ui";
 import { colors, radius, spacing } from "./theme";
@@ -93,7 +94,7 @@ export function PlayerPeekModal({
           onPress={() => {}}
           style={{
             width: panelWidth,
-            borderRadius: radius.panel,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.surface,
@@ -126,9 +127,7 @@ export function PlayerPeekModal({
                   >
                     {profile.displayName}
                   </Text>
-                  <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 12 }}>
-                    {`${profile.embersEarned.toLocaleString()} Embers`}
-                  </Text>
+                  <EmberBadge earned={profile.embersEarned} />
                 </View>
               </View>
 
