@@ -12,7 +12,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "gg.cardflare.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "CardFlare uses the camera only to scan the QR code on a store's counter."
+        "NSCameraUsageDescription": "CardFlare uses the camera only to scan the QR code on a store's counter.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -45,6 +46,9 @@
       ]
     ],
     "extra": {
+      "eas": {
+        "projectId": "db32fc46-52f1-443f-9960-c9b17a2f7f4e"
+      },
       "apiBase": "https://cardflare.gg",
       "supabaseUrl": "https://wfpxjqumrkyqcingazsp.supabase.co",
       "supabaseAnonKey": "sb_publishable_MQMJPdpf-icI6YSEd5a6bA_1FOHvwi2"
