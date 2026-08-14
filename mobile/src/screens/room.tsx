@@ -149,6 +149,12 @@ function RoomScreen({
   /* The viewer's own trades tonight, the web's private list. */
   const [trades, setTrades] = useState<TradeRecord[]>([]);
 
+  /* The profile popup: which account is being looked at, or null.
+     Declared HERE, above every early return - a hook that first runs
+     only after the room loads is a hook React counts as new, and the
+     screen dies at exactly the moment a room comes up. */
+  const [peek, setPeek] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -388,9 +394,6 @@ function RoomScreen({
 
   const youId = state.you!.sessionId;
   const participants = state.participants ?? [];
-
-  /* The profile popup: which account is being looked at, or null. */
-  const [peek, setPeek] = useState<string | null>(null);
 
   /* The account behind each session, for tapping a board header. */
   const playerBySession = new Map(
