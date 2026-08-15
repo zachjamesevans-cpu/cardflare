@@ -434,24 +434,33 @@
 
 /*
  * The WORN ring: the same art as the tile scaffold, drawn around a real
- * avatar. Geometry is proportional rather than fixed, so one rule hugs
- * a 32px roster face and a 96px profile picture alike. The band mask is
- * in percentages for the same reason - a 7px band that flatters the
- * profile would swallow a roster row.
+ * avatar. The geometry copies the ORIGINAL avatar frames exactly - a
+ * 2px gap and a 3px band, fixed pixels at every size (the old frames
+ * were box-shadow 0 0 0 2px canvas, 0 0 0 4px colour) - after a
+ * percentage band swallowed the picture at profile size. The founder:
+ * "the avatar borders are WAY too thick... back to what they were."
  */
 .cfx-ring-avatar {
   position: absolute;
-  inset: -11%;
+  inset: -5px;
   border-radius: 9999px;
   pointer-events: none;
 }
 .cfx-ring-avatar .cfx-ring-band {
   inset: 0;
-  -webkit-mask: radial-gradient(farthest-side, transparent 80%, #000 82%);
-  mask: radial-gradient(farthest-side, transparent 80%, #000 82%);
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3px),
+    #000 calc(100% - 2px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 3px),
+    #000 calc(100% - 2px)
+  );
 }
 .cfx-ring-avatar .cfx-ring-fx {
-  inset: -9%;
+  inset: -6px;
 }
 
 /* The WORN aura: the same particles, orbiting a real avatar. Sits a
