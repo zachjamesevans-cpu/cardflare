@@ -80,6 +80,13 @@ export default async function LoginPage(props: PageProps<"/login">) {
 
         <PasswordSignInForm next={next} />
 
+        <p className="text-center text-sm text-text-muted">
+          New to CardFlare?{" "}
+          <Link href="/signup" className="text-accent hover:underline">
+            Create an account
+          </Link>
+        </p>
+
         {/*
          * The emailed link is still here, and still matters: it is how someone
          * who has never set a password gets in the first time, and how anyone

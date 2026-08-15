@@ -90,6 +90,40 @@ async function authRequest(payload: unknown): Promise<{
   }
 }
 
+/**
+ * Open sign-up: one call creates the account AND signs it in. The
+ * server runs both so the phone never makes two round trips over
+ * networks that have eaten this app's requests before.
+ */
+export async function signUp(email: string, password: string): Promise<AuthResult> {
+  const result = await authRequest({
+    action: "sign-up",
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (result.accessToken) {
+    await storeAuth(result.accessToken, result.refreshToken);
+    return { ok: true };
+  }
+
+  if (result.status === 409) {
+    return {
+      ok: false,
+      message: "That address already has an account. Sign in instead.",
+    };
+  }
+
+  if (result.status === 429) {
+    return {
+      ok: false,
+      message: "That is a lot of new accounts. Try again in a little while.",
+    };
+  }
+
+  return { ok: false, message: "Could not create the account. Try again." };
+}
+
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   const result = await authRequest({
     action: "sign-in",
@@ -801,3 +835,13 @@ export const removeFromShowcase = (entryId: string) =>
     action: "showcase-remove",
     entryId,
   });
+
+/** The games question: choices with mine ticked, and the replace-write. */
+export const getGames = () =>
+  call<{ choices: { slug: string; label: string }[]; mine: string[] }>(
+    "GET",
+    "/api/v1/games",
+  );
+
+export const setGames = (games: string[]) =>
+  call<{ ok: true; mine: string[] }>("POST", "/api/v1/games", { games });

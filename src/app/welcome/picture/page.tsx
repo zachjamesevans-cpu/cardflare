@@ -57,7 +57,7 @@ export default async function SetupPicturePage() {
             Add a picture
           </h1>
           <p className="text-text-secondary">
-            Step 2 of 2, and you can skip it. Your initials work fine.
+            Step 2 of 3, and you can skip it. Your initials work fine.
           </p>
         </div>
 
@@ -69,8 +69,8 @@ export default async function SetupPicturePage() {
           />
 
           <div className="flex flex-col gap-3">
-            <ButtonLink href="/profile" className="w-full justify-center">
-              Done
+            <ButtonLink href="/welcome/games" className="w-full justify-center">
+              Next: your games
             </ButtonLink>
 
             {/*
