@@ -21,6 +21,8 @@ const saveWant = vi.fn();
 const offerTrade = vi.fn();
 const confirmTrade = vi.fn();
 const notifyOfferReceived = vi.fn();
+const notifyRoomFlare = vi.fn();
+const notifyEarlyBoardFlares = vi.fn();
 const notifyTradeConfirmed = vi.fn();
 const clearWantForFlare = vi.fn();
 const linkSessionToPlayer = vi.fn();
@@ -67,6 +69,8 @@ vi.mock("@/lib/trades/repository", () => ({
 vi.mock("@/lib/notifications/notify", () => ({
   notifyOfferReceived: (...a: unknown[]) => notifyOfferReceived(...a),
   notifyTradeConfirmed: (...a: unknown[]) => notifyTradeConfirmed(...a),
+  notifyRoomFlare: (...a: unknown[]) => notifyRoomFlare(...a),
+  notifyEarlyBoardFlares: (...a: unknown[]) => notifyEarlyBoardFlares(...a),
 }));
 vi.mock("@/lib/players/wants", () => ({
   saveWant: (...a: unknown[]) => saveWant(...a),

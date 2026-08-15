@@ -38,12 +38,15 @@ export function Tap({
   disabled = false,
   hitSlop,
   style,
+  accessibilityLabel,
   children,
 }: PropsWithChildren<{
   onPress?: () => void;
   disabled?: boolean;
   hitSlop?: number;
   style?: StyleProp<ViewStyle>;
+  /** For taps whose only content is a glyph - a "?" names nothing. */
+  accessibilityLabel?: string;
 }>) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -56,6 +59,8 @@ export function Tap({
       }}
       disabled={disabled}
       hitSlop={hitSlop}
+      accessibilityRole={accessibilityLabel ? "button" : undefined}
+      accessibilityLabel={accessibilityLabel}
       onPressIn={() => {
         Animated.spring(scale, {
           toValue: 0.95,
@@ -314,6 +319,68 @@ export function Button({
         {label}
       </Text>
     </Tap>
+  );
+}
+
+/**
+ * A Button that works out its own pending state from the work it starts.
+ *
+ * The founder's report: "when clicking 'post all'... it kinda just
+ * stalls there. The button should give you immediate feedback... so
+ * people don't feel they have to click it multiple times." Every button
+ * that reaches the network needed the same three lines of state, and
+ * three lines copied nine times is three lines forgotten on the tenth.
+ *
+ * Hand it an async onPress: it disables, shows the spinner and the
+ * pending label until the promise settles, and refuses re-entry while
+ * in flight. Unmount-safe, because a room can navigate away mid-post.
+ */
+export function AsyncButton({
+  label,
+  pendingLabel,
+  onPress,
+  disabled = false,
+  variant = "primary",
+}: {
+  label: string;
+  /** What it says while working. "Posting…" beats a bare spinner. */
+  pendingLabel: string;
+  onPress: () => Promise<unknown>;
+  disabled?: boolean;
+  variant?: "primary" | "secondary";
+}) {
+  const [busy, setBusy] = useState(false);
+  const alive = useRef(true);
+  const running = useRef(false);
+
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
+
+  return (
+    <Button
+      label={busy ? pendingLabel : label}
+      busy={busy}
+      disabled={disabled}
+      variant={variant}
+      onPress={() => {
+        if (running.current) return;
+        running.current = true;
+        setBusy(true);
+        void Promise.resolve(onPress())
+          .catch(() => {
+            // The screen's own error line is the truthful report; a
+            // button must not be the thing that swallows a page.
+          })
+          .finally(() => {
+            running.current = false;
+            if (alive.current) setBusy(false);
+          });
+      }}
+    />
   );
 }
 

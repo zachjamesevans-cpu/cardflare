@@ -33,7 +33,7 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner } from "../showcase-zoom";
-import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 /**
@@ -213,7 +213,11 @@ export function ProfileScreen() {
             try again.
           </Body>
           <Muted>What the server said: {loadFailed}</Muted>
-          <Button label="Try again" onPress={() => void load()} />
+          <AsyncButton
+            label="Try again"
+            pendingLabel="Retrying…"
+            onPress={() => load()}
+          />
         </Card>
       </ScrollView>
     );
@@ -613,11 +617,12 @@ export function ProfileScreen() {
         effect={profile.equipped.effect}
       />
 
-      <Button
+      <AsyncButton
         label="Sign out"
+        pendingLabel="Signing out…"
         variant="secondary"
         onPress={() => {
-          void signOut().then(() => {
+          return signOut().then(() => {
             setProfile(null);
             setWardrobe(null);
           });

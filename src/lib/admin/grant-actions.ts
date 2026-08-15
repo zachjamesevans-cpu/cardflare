@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
+import { sendTestNotice } from "@/lib/notifications/notify";
 import { grantEmbers, setCosmeticsUnlocked } from "./grants";
 import {
   grantEmbersSchema,
+  testNoticeSchema,
   unlockCosmeticsSchema,
   type GrantState,
 } from "./grant-schema";
@@ -63,6 +65,41 @@ export async function grantEmbersAction(
   return {
     status: "granted",
     message: `${parsed.data.amount.toLocaleString()} Embers granted.`,
+  };
+}
+
+/**
+ * Fires one sample notification at a player, down the real rails.
+ *
+ * The only way to prove push works end to end without waiting for a
+ * stranger to do something on a Friday night. Admin-only for the
+ * obvious reason: this puts text on somebody else's lock screen.
+ */
+export async function sendTestNoticeAction(
+  _previous: GrantState,
+  formData: FormData,
+): Promise<GrantState> {
+  if (!(await isAdmin())) return REFUSED;
+
+  const parsed = testNoticeSchema.safeParse({
+    playerId: text(formData, "playerId"),
+    kind: text(formData, "kind"),
+  });
+
+  if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
+
+  const sent = await sendTestNotice(parsed.data.playerId, parsed.data.kind);
+
+  if (!sent.recorded) return { status: "error", message: GENERIC_ERROR };
+
+  revalidatePath("/admin/players");
+
+  return {
+    status: "granted",
+    message:
+      sent.devices === 0
+        ? "In the inbox. No phone is registered for this account yet, so nothing was pushed."
+        : `Sent to ${sent.devices} ${sent.devices === 1 ? "device" : "devices"} and the inbox.`,
   };
 }
 

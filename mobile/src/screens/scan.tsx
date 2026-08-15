@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native";
 
 import { rememberRoom } from "../api";
 
-import { Body, Button, Card, Title } from "../ui";
+import { AsyncButton, Body, Card, Title } from "../ui";
 import { colors, spacing } from "../theme";
 
 /**
@@ -25,7 +25,11 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
           <Body>
             The camera is only used to read the code on the store&rsquo;s counter.
           </Body>
-          <Button label="Allow camera" onPress={() => void requestPermission()} />
+          <AsyncButton
+          label="Allow camera"
+          pendingLabel="Asking…"
+          onPress={() => requestPermission()}
+        />
         </Card>
       </View>
     );

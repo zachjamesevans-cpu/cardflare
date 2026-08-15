@@ -2,6 +2,7 @@ import { Handshake, MapPin } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 import { MAX_OFFER_MESSAGE, pledgeTally, type Offer } from "@/lib/matching/schema";
 import { confirmTradeAction } from "@/lib/trades/actions";
@@ -56,9 +57,12 @@ export function OfferPanel({
         <form action={withdrawOfferAction} className="shrink-0">
           <input type="hidden" name="code" value={code} />
           <input type="hidden" name="flareId" value={flareId} />
-          <Button type="submit" variant="ghost" size="sm">
-            Withdraw
-          </Button>
+          <SubmitButton
+            label="Withdraw"
+            pendingLabel="Withdrawing…"
+            variant="ghost"
+            size="sm"
+          />
         </form>
       </div>
     );
@@ -110,9 +114,12 @@ export function OfferPanel({
             />
           </label>
         )}
-        <Button type="submit" size="sm" className="shrink-0">
-          Offer
-        </Button>
+        <SubmitButton
+          label="Offer"
+          pendingLabel="Offering…"
+          size="sm"
+          className="shrink-0"
+        />
       </form>
     </details>
   );

@@ -1,6 +1,6 @@
 import { PackageCheck } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card } from "@/components/ui/card";
 import { confirmBinderAction } from "@/lib/lists/actions";
 
@@ -40,7 +40,7 @@ export function ConfirmBinder({ code, count }: { code: string; count: number }) 
 
       <form action={confirmBinderAction} className="shrink-0">
         <input type="hidden" name="code" value={code} />
-        <Button type="submit">Yes, all of them</Button>
+        <SubmitButton label="Yes, all of them" pendingLabel="Confirming…" />
       </form>
     </Card>
   );

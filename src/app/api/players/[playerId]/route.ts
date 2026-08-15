@@ -4,6 +4,7 @@ import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
+import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
@@ -122,6 +123,12 @@ export async function POST(
 
   if (!done) {
     return Response.json({ error: "That did not go through." }, { status: 500 });
+  }
+
+  // Being followed is worth knowing about. Fire and forget: the edge is
+  // already written, and the dedupe key makes a refollow free.
+  if (action === "follow") {
+    void notifyNewFollower(me, playerId);
   }
 
   return Response.json({ follow: await followState(me, playerId) });

@@ -87,7 +87,13 @@ async function flareContext(flareId: string): Promise<{
  */
 async function record(entry: {
   playerId: string;
-  kind: "offer-received" | "trade-confirmed" | "early-board" | "board-open";
+  kind:
+    | "offer-received"
+    | "trade-confirmed"
+    | "early-board"
+    | "board-open"
+    | "new-follower"
+    | "room-flare";
   title: string;
   body: string | null;
   url: string;
@@ -362,16 +368,8 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
       if (id) {
         await deliverByPush(saver.player_id, title, body, path);
 
-        const { data: player } = await admin
-          .from("players")
-          .select("user_id")
-          .eq("id", saver.player_id)
-          .maybeSingle();
-        if (player) {
-          const { data: user } = await admin.auth.admin.getUserById(player.user_id);
-          const email = user?.user?.email ?? null;
-          if (email) await deliverByEmail(id, email, title, body, path);
-        }
+        const email = await playerEmail(saver.player_id);
+        if (email) await deliverByEmail(id, email, title, body, path);
       }
     }
   } catch (error) {
@@ -518,6 +516,223 @@ export async function notifyBoardOpen(eventId: string): Promise<void> {
     }
   } catch (error) {
     console.error("Could not ring the board-open doorbell", error);
+  }
+}
+
+/**
+ * The kinds a test can imitate, with the wording each one really uses.
+ *
+ * Push notifications are the one part of the product that cannot be
+ * checked by looking at a screen: the phone has to be locked, the app
+ * has to be closed, and somebody else has to do something. This lets an
+ * admin fire a real notification down the real rails at their own
+ * account, so the plumbing can be proved before a Friday night.
+ */
+export const TEST_NOTICES = {
+  "offer-received": {
+    title: "CHUNC has your Charizard",
+    body: "They said: “I have the reverse holo, meet at table 4”",
+  },
+  "trade-confirmed": {
+    title: "Trade confirmed: Charizard",
+    body: "CHUNC marked your trade done. Good trade.",
+  },
+  "board-open": {
+    title: "The board is open: Friday Locals at Card Cavern",
+    body: "You are hunting 5 cards. RSVP and they go up for Friday.",
+  },
+  "early-board": {
+    title: "The Friday Locals board is open at Card Cavern",
+    body: "12 cards are already wanted for Friday, and you own 3 of them. Bring the binder.",
+  },
+  "new-follower": {
+    title: "CHUNC followed you",
+    body: "Follow back and you are Trade partners.",
+  },
+  "room-flare": {
+    title: "CHUNC is hunting Umbreon VMAX",
+    body: "It just went up in your room. Check your binder.",
+  },
+} as const;
+
+export type TestNoticeKind = keyof typeof TEST_NOTICES;
+
+/**
+ * Fires one sample notification at a player, through the real path.
+ *
+ * Recorded in the inbox and pushed to their phones exactly as the live
+ * event would be, so a failure here is a failure that would have
+ * happened for real. The dedupe key carries a fresh id, because the
+ * whole point is being able to press it twice.
+ *
+ * Returns how many devices were reached, which is the number that
+ * actually answers "why did my phone not buzz".
+ */
+export async function sendTestNotice(
+  playerId: string,
+  kind: TestNoticeKind,
+): Promise<{ recorded: boolean; devices: number }> {
+  if (!isSupabaseConfigured()) return { recorded: false, devices: 0 };
+
+  const sample = TEST_NOTICES[kind];
+  const path = "/profile";
+
+  const { count } = await getSupabaseAdmin()
+    .from("player_devices")
+    .select("id", { count: "exact", head: true })
+    .eq("player_id", playerId);
+
+  const id = await record({
+    playerId,
+    kind,
+    title: sample.title,
+    body: sample.body,
+    url: path,
+    dedupeKey: `test:${kind}:${playerId}:${crypto.randomUUID()}`,
+  });
+
+  if (id) await deliverByPush(playerId, sample.title, sample.body, path);
+
+  return { recorded: id !== null, devices: count ?? 0 };
+}
+
+/** A player's email, for the delivery lanes that use one. */
+async function playerEmail(playerId: string): Promise<string | null> {
+  const admin = getSupabaseAdmin();
+  const { data: player } = await admin
+    .from("players")
+    .select("user_id")
+    .eq("id", playerId)
+    .maybeSingle();
+  if (!player) return null;
+  const { data: user } = await admin.auth.admin.getUserById(player.user_id);
+  return user?.user?.email ?? null;
+}
+
+/**
+ * Somebody followed you.
+ *
+ * The social half of the product shipped silent: follows existed, and
+ * nobody was ever told one had happened. Push and inbox only, no email
+ * - a follow is a nice-to-know, and an inbox full of them would teach
+ * players to ignore the lane that carries offers.
+ *
+ * The dedupe key is the pair, so unfollow-and-refollow does not become
+ * a way to poke somebody repeatedly.
+ */
+export async function notifyNewFollower(
+  followerId: string,
+  followedId: string,
+): Promise<void> {
+  if (!isSupabaseConfigured() || followerId === followedId) return;
+
+  try {
+    const { data: follower } = await getSupabaseAdmin()
+      .from("players")
+      .select("display_name")
+      .eq("id", followerId)
+      .maybeSingle();
+
+    const name = follower?.display_name ?? "A player";
+    const title = `${name} followed you`;
+    const body = "Follow back and you are Trade partners.";
+    const path = `/p/${followerId}`;
+
+    const id = await record({
+      playerId: followedId,
+      kind: "new-follower",
+      title,
+      body,
+      url: path,
+      dedupeKey: `follow:${followerId}:${followedId}`,
+    });
+
+    if (id) await deliverByPush(followedId, title, body, path);
+  } catch (error) {
+    console.error("Could not announce the new follower", error);
+  }
+}
+
+/**
+ * Somebody posted a Flare in a room you are standing in.
+ *
+ * The board updates the moment a card goes up, and nobody at a counter
+ * is watching a board. This is the nudge that turns a posted card into
+ * a conversation before either player leaves.
+ *
+ * Sent to every signed-in player in the room except the poster, push
+ * and inbox only - a room can fill quickly, and email at that rate is
+ * how a sender gets marked as spam. Never throws: the Flare is already
+ * on the board.
+ */
+export async function notifyRoomFlare(
+  eventId: string,
+  posterSessionId: string,
+  posterName: string,
+  cardId: string,
+  intent: "want" | "showcase",
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+
+    /* The card's name is read here rather than passed in, so the app's
+       route and the website's action cannot word the same event
+       differently - and so no caller can put text of its own in a push. */
+    const [{ data: event }, { data: participants }, { data: card }] = await Promise.all(
+      [
+        admin.from("events").select("join_code").eq("id", eventId).maybeSingle(),
+        admin
+          .from("event_participants")
+          .select("player_session_id")
+          .eq("event_id", eventId),
+        admin.from("cards").select("exact_name").eq("id", cardId).maybeSingle(),
+      ],
+    );
+
+    if (!event?.join_code) return;
+    const cardName = card?.exact_name ?? "a card";
+
+    const sessionIds = (participants ?? [])
+      .map((row) => row.player_session_id)
+      .filter((id) => id !== posterSessionId);
+    if (sessionIds.length === 0) return;
+
+    const { data: sessions } = await admin
+      .from("player_sessions")
+      .select("player_id")
+      .in("id", sessionIds);
+
+    const recipients = new Set(
+      (sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : [])),
+    );
+    if (recipients.size === 0) return;
+
+    const title =
+      intent === "showcase"
+        ? `${posterName} is letting go of ${cardName}`
+        : `${posterName} is hunting ${cardName}`;
+    const body =
+      intent === "showcase"
+        ? "It just went up in your room. Have a look before it goes."
+        : "It just went up in your room. Check your binder.";
+    const path = `/e/${event.join_code}`;
+
+    for (const playerId of recipients) {
+      const id = await record({
+        playerId,
+        kind: "room-flare",
+        title,
+        body,
+        url: path,
+        dedupeKey: `room-flare:${eventId}:${posterSessionId}:${cardId}:${playerId}`,
+      });
+
+      if (id) await deliverByPush(playerId, title, body, path);
+    }
+  } catch (error) {
+    console.error("Could not tell the room about the Flare", error);
   }
 }
 

@@ -186,49 +186,67 @@ export function PackShopSection({
 
   return (
     <View style={{ gap: spacing(3) }}>
+      {/*
+       * Art and copy sit side by side; every CONTROL lives in one bar
+       * underneath, spanning the whole panel. The founder's note on the
+       * first cut was that it read as uneven, and it did: the buttons
+       * were penned into the narrow column beside a tall pack, so Buy
+       * was squeezed, Open ran to a different width, and the "?" circle
+       * floated at a third height. One row, equal columns, one height.
+       */}
       <View style={{ flexDirection: "row", gap: spacing(4) }}>
         <PackArt name={series.name} setNumber={series.setNumber} />
 
-        <View style={{ flex: 1, gap: spacing(2) }}>
+        <View style={{ flex: 1, justifyContent: "center", gap: spacing(2) }}>
           <Muted>
             {series.slots} cosmetics per pack, drawn the moment you open it.
             Duplicates come back as Embers, so no pull is ever nothing.
           </Muted>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
-                disabled={busy}
-                onPress={buy}
-              />
-            </View>
-            {/* The odds, behind a quiet "?". */}
-            <Tap
-              onPress={() => setOddsOpen(true)}
-              hitSlop={8}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: colors.textMuted, fontWeight: "700" }}>?</Text>
-            </Tap>
-          </View>
-          {mine > 0 && (
+          <Muted>
+            {mine > 0
+              ? `${mine} sealed, waiting to be torn open.`
+              : "None sealed right now."}
+          </Muted>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing(2) }}>
+        <View style={{ flex: 1 }}>
+          <Button
+            label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
+            busy={busy}
+            onPress={buy}
+          />
+        </View>
+        {mine > 0 && (
+          <View style={{ flex: 1 }}>
             <Button
-              label={`Open one · ${mine} sealed`}
+              label="Open one"
               variant="secondary"
               onPress={() => setOpening({ stage: "sealed", pulls: [] })}
             />
-          )}
-          {message && <Muted>{message}</Muted>}
-        </View>
+          </View>
+        )}
+        {/* The odds, behind a quiet "?" - square, so it matches the
+            buttons' height instead of hovering at its own. */}
+        <Tap
+          onPress={() => setOddsOpen(true)}
+          hitSlop={8}
+          accessibilityLabel="What can be inside, and the exact odds"
+          style={{
+            width: 44,
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: colors.textMuted, fontWeight: "700" }}>?</Text>
+        </Tap>
       </View>
+
+      {message && <Muted>{message}</Muted>}
 
       {/* Odds popup, faded in. */}
       <Modal visible={oddsOpen} transparent animationType="fade" onRequestClose={() => setOddsOpen(false)}>

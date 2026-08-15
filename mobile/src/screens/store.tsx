@@ -20,6 +20,7 @@ import {
   type SealedPack,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
 import { FRAME_COLOR } from "../player-avatar";
 import { Body, Card, Muted, Tap, Title } from "../ui";
@@ -134,14 +135,12 @@ export function StoreScreen() {
             key={series.id}
             series={series}
             sealed={sealed}
-            names={Object.fromEntries(
-              [
-                ...wardrobe.avatarFrames,
-                ...wardrobe.cardFrames,
-                ...wardrobe.holos,
-                ...wardrobe.effects,
-              ].map((item) => [item.slug, item.name]),
-            )}
+            names={packItemLabels([
+              ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
+              ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
+              ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
+              ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
+            ])}
             onChanged={() => void load()}
           />
         ))}

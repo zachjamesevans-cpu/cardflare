@@ -184,93 +184,107 @@ export function PackShop({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start gap-5">
+      {/*
+       * Art and copy side by side; every CONTROL in one bar underneath,
+       * spanning the panel. The founder's note on the first cut was that
+       * it read as uneven, and it did: the buttons were penned into the
+       * narrow column beside a tall pack, so Buy was squeezed, Open ran
+       * to a different width, and the "?" floated at a third height.
+       * One row, equal columns, one height - matching the app exactly.
+       */}
+      <div className="flex flex-wrap items-stretch gap-5">
         <PackArt name={series.name} setNumber={series.setNumber} />
 
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
           <p className="text-sm text-text-secondary">
             {series.slots} cosmetics per pack, drawn the moment you open it. Duplicates
             come back as Embers, so no pull is ever nothing.
           </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => void buy()}
-              disabled={busy !== null}
-              className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition-colors hover:border-accent disabled:opacity-60"
-            >
-              {busy === "buy" && <Loader2 className="size-4 animate-spin" />}
-              Buy a pack · {series.priceEmbers} Embers
-            </button>
-
-            {mine > 0 && (
-              <button
-                type="button"
-                onClick={() => setOpening({ stage: "sealed", pulls: [] })}
-                className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
-              >
-                Open one · {mine} sealed
-              </button>
-            )}
-
-            {/* The odds live behind a quiet "?", not a dropdown. */}
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="What can be inside, and the exact odds"
-                aria-expanded={oddsOpen}
-                onClick={() => setOddsOpen((current) => !current)}
-                className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
-              >
-                <HelpCircle className="size-4" aria-hidden="true" />
-              </button>
-
-              <div
-                className={cn(
-                  "absolute top-10 left-0 z-10 w-72 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-xl transition-opacity duration-200",
-                  oddsOpen ? "opacity-100" : "pointer-events-none opacity-0",
-                )}
-              >
-                <p className="mb-2 text-sm font-semibold text-text-primary">
-                  Exact odds, per slot
-                </p>
-                <ul className="flex flex-col gap-2">
-                  {(series.oddsDetail ?? []).map((tier) => (
-                    <li key={tier.rarity} className="text-xs">
-                      <p
-                        className={cn(
-                          "font-semibold capitalize",
-                          RARITY_TEXT[tier.rarity] ?? "text-text-secondary",
-                        )}
-                      >
-                        {tier.rarity}
-                      </p>
-                      {tier.items.map((item) => (
-                        <p
-                          key={item.slug}
-                          className="flex justify-between text-text-secondary"
-                        >
-                          <span>{names[item.slug] ?? item.slug}</span>
-                          <span className="text-text-muted tabular-nums">
-                            {item.percent}%
-                          </span>
-                        </p>
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[11px] text-text-muted">
-                  Three slots per pack, each rolled independently. No slot can repeat
-                  another in the same pack.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {message && <p className="text-sm text-text-secondary">{message}</p>}
+          <p className="text-sm text-text-muted">
+            {mine > 0
+              ? `${mine} sealed, waiting to be torn open.`
+              : "None sealed right now."}
+          </p>
         </div>
       </div>
+
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => void buy()}
+          disabled={busy !== null}
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent disabled:opacity-60"
+        >
+          {busy === "buy" && <Loader2 className="size-4 animate-spin" />}
+          {busy === "buy" ? "Buying…" : `Buy · ${series.priceEmbers} Embers`}
+        </button>
+
+        {mine > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpening({ stage: "sealed", pulls: [] })}
+            className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
+          >
+            Open one
+          </button>
+        )}
+
+        {/* The odds live behind a quiet "?", square so it shares the
+            buttons' height instead of hovering at its own. */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            aria-label="What can be inside, and the exact odds"
+            aria-expanded={oddsOpen}
+            onClick={() => setOddsOpen((current) => !current)}
+            className="flex h-full w-11 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            <HelpCircle className="size-4" aria-hidden="true" />
+          </button>
+
+          <div
+            className={cn(
+              "absolute top-[calc(100%+0.5rem)] right-0 z-10 w-72 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-xl transition-opacity duration-200",
+              oddsOpen ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            <p className="mb-2 text-sm font-semibold text-text-primary">
+              Exact odds, per slot
+            </p>
+            <ul className="flex flex-col gap-2">
+              {(series.oddsDetail ?? []).map((tier) => (
+                <li key={tier.rarity} className="text-xs">
+                  <p
+                    className={cn(
+                      "font-semibold capitalize",
+                      RARITY_TEXT[tier.rarity] ?? "text-text-secondary",
+                    )}
+                  >
+                    {tier.rarity}
+                  </p>
+                  {tier.items.map((item) => (
+                    <p
+                      key={item.slug}
+                      className="flex justify-between text-text-secondary"
+                    >
+                      <span>{names[item.slug] ?? item.slug}</span>
+                      <span className="text-text-muted tabular-nums">
+                        {item.percent}%
+                      </span>
+                    </p>
+                  ))}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-text-muted">
+              Three slots per pack, each rolled independently. No slot can repeat
+              another in the same pack.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {message && <p className="text-sm text-text-secondary">{message}</p>}
 
       {opening && (
         <PackOpening
