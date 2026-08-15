@@ -31,6 +31,7 @@ import { RoomTab } from "./src/screens/room";
 import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { StoreScreen } from "./src/screens/store";
+import { CustomizeScreen } from "./src/screens/customize";
 import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, hasSeenWelcome } from "./src/screens/welcome";
 import { storedAccessToken } from "./src/api";
@@ -84,6 +85,8 @@ export type StackParams = {
   Settings: undefined;
   /** The Embers store, the website's /profile/store. */
   Store: undefined;
+  /** Getting dressed, the website's /profile/customize. */
+  Customize: undefined;
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
@@ -99,6 +102,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Scan: "Back",
   Settings: "Profile",
   Store: "Profile",
+  Customize: "Profile",
   PlayerProfile: "Back",
   PostFlare: "Room",
 };
@@ -436,6 +440,11 @@ export default function App() {
             name="Store"
             component={StoreScreen}
             options={{ title: "Embers store", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="Customize"
+            component={CustomizeScreen}
+            options={{ title: "Customize", headerBackTitle: "Profile" }}
           />
           <Stack.Screen
             name="PlayerProfile"
