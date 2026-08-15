@@ -85,8 +85,9 @@ export type StackParams = {
   Settings: undefined;
   /** The Embers store, the website's /profile/store. */
   Store: undefined;
-  /** Getting dressed, the website's /profile/customize. */
-  Customize: undefined;
+  /** Getting dressed, the website's /profile/customize. Two wands, two
+      menus: profile cosmetics or showcase cosmetics. */
+  Customize: { area?: "profile" | "showcase" } | undefined;
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
@@ -443,9 +444,10 @@ export default function App() {
           />
           <Stack.Screen
             name="Customize"
-            component={CustomizeScreen}
             options={{ title: "Customize", headerBackTitle: "Profile" }}
-          />
+          >
+            {({ route }) => <CustomizeScreen area={route.params?.area ?? "profile"} />}
+          </Stack.Screen>
           <Stack.Screen
             name="PlayerProfile"
             component={PlayerProfileScreen}

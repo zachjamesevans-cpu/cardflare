@@ -22,7 +22,6 @@ import {
   backgroundClass,
   WornCardShell,
   WornNameRow,
-  WornRing,
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
@@ -127,15 +126,14 @@ export default async function PublicProfilePage({
              */}
             <WornSceneLayer worn={dressed} />
 
-            <WornRing slug={dressed.ring} className="relative mt-12">
-              <PlayerAvatar
-                displayName={profile.displayName}
-                seed={profile.playerId}
-                avatarUrl={profile.avatarUrl}
-                frame={worn.avatarFrame}
-                className="size-24 text-2xl"
-              />
-            </WornRing>
+            <PlayerAvatar
+              displayName={profile.displayName}
+              seed={profile.playerId}
+              avatarUrl={profile.avatarUrl}
+              frame={worn.avatarFrame}
+              ring={dressed.ring}
+              className="relative mt-12 size-24 text-2xl"
+            />
 
             <div className="relative flex flex-col items-center gap-2">
               <WornNameRow

@@ -30,6 +30,7 @@ export function AvatarForm({
   seed,
   avatarUrl,
   frame = null,
+  ring = null,
 }: {
   displayName: string;
   seed: string;
@@ -41,6 +42,8 @@ export function AvatarForm({
    * that sells the borders was the one place guaranteed not to show one.
    */
   frame?: string | null;
+  /** The catalogue ring, worn over the frame - same story, second slot. */
+  ring?: string | null;
 }) {
   const [state, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
@@ -103,10 +106,16 @@ export function AvatarForm({
            */
           <span
             className={cn(
-              "inline-flex size-24 rounded-full",
-              frame ? FRAME_CLASS[frame] : "",
+              "relative inline-flex size-24 rounded-full",
+              !ring && frame ? FRAME_CLASS[frame] : "",
             )}
           >
+            {ring && (
+              <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
+                <span className="cfx-ring-fx" />
+                <span className="cfx-ring-band" />
+              </span>
+            )}
             {/*
              * Unoptimised on purpose, and it has to be: the src is either
              * a blob: URL, which the optimiser cannot fetch at all, or a
@@ -135,6 +144,7 @@ export function AvatarForm({
             displayName={displayName}
             seed={seed}
             frame={frame}
+            ring={ring}
             className="size-24 text-2xl"
           />
         )}

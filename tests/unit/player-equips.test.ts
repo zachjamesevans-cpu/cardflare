@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { EQUIP_KINDS, isEquipKind } from "@/lib/players/equips";
+import { EQUIP_AREAS, EQUIP_KINDS, equipArea, isEquipKind } from "@/lib/players/equips";
 
 /**
  * The equip slots exist twice: once in code (EQUIP_KINDS drives the
@@ -40,5 +40,19 @@ describe("EQUIP_KINDS match the player_equips migration", () => {
     for (const kind of EQUIP_KINDS) expect(isEquipKind(kind)).toBe(true);
     expect(isEquipKind("hat")).toBe(false);
     expect(isEquipKind("")).toBe(false);
+  });
+});
+
+describe("the two wands cover the whole wardrobe between them", () => {
+  it("profile + showcase partition EQUIP_KINDS: no gaps, no overlap", () => {
+    const together = [...EQUIP_AREAS.profile, ...EQUIP_AREAS.showcase];
+    expect([...together].sort()).toEqual([...EQUIP_KINDS].sort());
+    expect(new Set(together).size).toBe(together.length);
+  });
+
+  it("an unknown or missing area falls back to profile", () => {
+    expect(equipArea(undefined)).toBe("profile");
+    expect(equipArea("showcase")).toBe("showcase");
+    expect(equipArea("nonsense")).toBe("profile");
   });
 });

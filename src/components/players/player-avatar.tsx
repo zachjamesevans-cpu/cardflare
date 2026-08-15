@@ -73,6 +73,7 @@ export function PlayerAvatar({
   seed,
   avatarUrl = null,
   frame = null,
+  ring = null,
   size = "md",
   className,
 }: {
@@ -89,17 +90,35 @@ export function PlayerAvatar({
    * they have uploaded a photograph.
    */
   frame?: string | null;
+  /**
+   * The catalogue ring slug they wear (the new profile borders). Worn
+   * INSTEAD of the old frame when both are set: two rings around one
+   * picture is clutter, and the newer choice is the one they made last.
+   * Passing it here rather than wrapping the avatar externally is what
+   * keeps every surface in step - the founder wore a new ring and the
+   * roster kept showing the old frame, because the two were drawn by
+   * different code.
+   */
+  ring?: string | null;
   size?: "sm" | "md";
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
 
   const box = cn(
-    "inline-flex shrink-0 items-center justify-center rounded-full border",
+    "relative inline-flex shrink-0 items-center justify-center rounded-full border",
     size === "sm" ? "size-8 text-xs" : "size-10 text-sm",
-    frame ? FRAME_CLASS[frame] : "",
+    !ring && frame ? FRAME_CLASS[frame] : "",
     className,
   );
+
+  /* The worn catalogue ring, proportional to whatever size this is. */
+  const wornRing = ring ? (
+    <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
+      <span className="cfx-ring-fx" />
+      <span className="cfx-ring-band" />
+    </span>
+  ) : null;
 
   if (avatarUrl && !broken) {
     return (
@@ -129,6 +148,7 @@ export function PlayerAvatar({
           onError={() => setBroken(true)}
           className="size-full rounded-full object-cover"
         />
+        {wornRing}
       </span>
     );
   }
@@ -139,6 +159,7 @@ export function PlayerAvatar({
       className={cn(box, "font-semibold", HUE_CLASS[avatarHue(seed)])}
     >
       {initials(displayName)}
+      {wornRing}
     </span>
   );
 }

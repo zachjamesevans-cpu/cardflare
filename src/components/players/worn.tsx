@@ -14,36 +14,12 @@ import type { EquipKind } from "@/lib/players/equips";
 
 export type Worn = Partial<Record<EquipKind, string | null>>;
 
-/** A ring around a profile picture. */
-export function WornRing({
-  slug,
-  children,
-  className,
-}: {
-  slug: string | null | undefined;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <span className={cn("relative inline-grid place-items-center", className)}>
-      {slug && (
-        /* Deliberately NOT .cfx-ring - that scaffold is the fixed-size
-           tile; here the ring hugs whatever it is wrapped around. */
-        <span
-          className={cn(
-            "pointer-events-none absolute inset-[-10px] rounded-full",
-            `cfa-${slug}`,
-          )}
-          aria-hidden="true"
-        >
-          <span className="cfx-ring-fx" />
-          <span className="cfx-ring-band" />
-        </span>
-      )}
-      {children}
-    </span>
-  );
-}
+/*
+ * No ring component here: the worn ring is drawn by PlayerAvatar itself
+ * (its `ring` prop), because the ring must follow a player everywhere
+ * their face shows - rosters, popups, boards - and every one of those
+ * already renders PlayerAvatar.
+ */
 
 /** The name row: nameplate style, badge beside, title under. */
 export function WornNameRow({

@@ -534,6 +534,8 @@ export function FlareBoard({
       embersEarned: number;
       avatarUrl: string | null;
       frame: string | null;
+      /** The catalogue ring, worn over the frame when both are set. */
+      ring: string | null;
       /** The account behind the session, for the profile popup. */
       playerId: string | null;
     }
@@ -752,6 +754,7 @@ export function FlareBoard({
                         identities.get(group.playerSessionId)?.avatarUrl ?? null
                       }
                       frame={identities.get(group.playerSessionId)?.frame ?? null}
+                      ring={identities.get(group.playerSessionId)?.ring ?? null}
                       isYou={isYou}
                       imagesEnabled={imagesEnabled}
                       nameClassName="font-semibold"
@@ -765,6 +768,7 @@ export function FlareBoard({
                           identities?.get(group.playerSessionId)?.avatarUrl ?? null
                         }
                         frame={identities?.get(group.playerSessionId)?.frame ?? null}
+                        ring={identities?.get(group.playerSessionId)?.ring ?? null}
                         size="sm"
                       />
                       <span className="truncate font-semibold text-text-primary">

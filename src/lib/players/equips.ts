@@ -33,6 +33,47 @@ export function isEquipKind(value: string): value is EquipKind {
   return (EQUIP_KINDS as readonly string[]).includes(value);
 }
 
+/**
+ * The customize menu, split in two so neither wand opens a wall: the
+ * founder's call. Profile is everything worn on YOU; showcase is
+ * everything worn on your cards and the shelf they sit on. The unit
+ * test holds the two halves to exactly EQUIP_KINDS, no gaps, no overlap.
+ */
+export const EQUIP_AREAS = {
+  profile: ["ring", "nameplate", "title", "badge", "scene"],
+  showcase: ["border", "pattern", "animation", "background"],
+} as const satisfies Record<string, readonly EquipKind[]>;
+
+export type EquipArea = keyof typeof EQUIP_AREAS;
+
+export function equipArea(value: string | undefined): EquipArea {
+  return value === "showcase" ? "showcase" : "profile";
+}
+
+/**
+ * The worn ring for a batch of players, for rooms and rosters: one
+ * query for the whole room, same economics as roomIdentitiesFor.
+ */
+export async function ringsFor(playerIds: string[]): Promise<Map<string, string>> {
+  const rings = new Map<string, string>();
+  const ids = [...new Set(playerIds)];
+  if (!isSupabaseConfigured() || ids.length === 0) return rings;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_equips")
+    .select("player_id, cosmetic_slug")
+    .eq("kind", "ring")
+    .in("player_id", ids);
+
+  if (error) {
+    console.error("Could not read worn rings", error);
+    return rings;
+  }
+
+  for (const row of data ?? []) rings.set(row.player_id, row.cosmetic_slug);
+  return rings;
+}
+
 /** What is worn right now, one slug or null per category. */
 export async function getEquips(
   playerId: string,

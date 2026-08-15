@@ -24,6 +24,28 @@ import { colors, radius, spacing } from "../theme";
  * animation yet. The per-category native art pass is next.
  */
 
+/** The two wands' menus, mirroring the website's EQUIP_AREAS split. */
+const AREA_KINDS: Record<
+  "profile" | "showcase",
+  readonly CustomizeKind[]
+> = {
+  profile: ["ring", "nameplate", "title", "badge", "scene"],
+  showcase: ["border", "pattern", "animation", "background"],
+};
+
+const AREA_COPY = {
+  profile: {
+    title: "Customize profile",
+    blurb:
+      "Everything worn on you: your border, name style, title, badge and page effect. Changes land the moment you tap them.",
+  },
+  showcase: {
+    title: "Customize showcase",
+    blurb:
+      "Everything worn on your cards: borders, foils, motion and the shelf behind them. Changes land the moment you tap them.",
+  },
+} as const;
+
 const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
   ring: { title: "Profile borders", blurb: "Drawn around your profile picture." },
   border: { title: "Card borders", blurb: "Around every card in your showcase." },
@@ -64,7 +86,7 @@ function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
   );
 }
 
-export function CustomizeScreen() {
+export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   const [sections, setSections] = useState<CustomizeSection[] | null>(null);
   /* The worn slug per kind, flipped locally the moment a tile is
      tapped so the tick never waits on the network — same optimistic
@@ -114,12 +136,9 @@ export function CustomizeScreen() {
     >
       <View style={{ gap: spacing(1) }}>
         <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "700" }}>
-          Customize
+          {AREA_COPY[area].title}
         </Text>
-        <Muted>
-          Everything you own, wearable from one place. Changes land on your profile
-          the moment you tap them.
-        </Muted>
+        <Muted>{AREA_COPY[area].blurb}</Muted>
       </View>
 
       {/* The honest note. No fake previews. */}
@@ -144,7 +163,9 @@ export function CustomizeScreen() {
 
       {message && <Muted>{message}</Muted>}
 
-      {sections.map((section) => (
+      {sections
+        .filter((section) => AREA_KINDS[area].includes(section.kind))
+        .map((section) => (
         <Card key={section.kind} style={{ gap: spacing(3) }}>
           <View style={{ gap: spacing(0.5) }}>
             <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
