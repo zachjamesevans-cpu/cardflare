@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarSrc } from "./profile-image";
+import { ringsFor } from "./equips";
 
 /**
  * Follows: the founder's option C.
@@ -94,6 +95,8 @@ export interface FollowedPlayer {
   displayName: string;
   avatarUrl: string | null;
   frame: string | null;
+  /** The catalogue ring, worn over the frame when both are set. */
+  ring: string | null;
   /** They follow back: Trade partners. */
   partners: boolean;
 }
@@ -118,7 +121,7 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
 
   const ids = edges.map((edge) => edge.followed_id);
 
-  const [{ data: rows }, { data: backEdges }] = await Promise.all([
+  const [{ data: rows }, { data: backEdges }, rings] = await Promise.all([
     admin
       .from("players")
       .select("id, display_name, avatar_url, equipped_avatar_frame")
@@ -128,6 +131,7 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
       .select("follower_id")
       .eq("followed_id", playerId)
       .in("follower_id", ids),
+    ringsFor(ids),
   ]);
 
   const back = new Set((backEdges ?? []).map((edge) => edge.follower_id));
@@ -142,6 +146,7 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
         displayName: row.display_name,
         avatarUrl: avatarSrc(row.avatar_url),
         frame: row.equipped_avatar_frame,
+        ring: rings.get(row.id) ?? null,
         partners: back.has(row.id),
       },
     ];

@@ -3,6 +3,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
+import { getEquips } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
@@ -54,7 +55,10 @@ export async function GET(
     return Response.json({ error: "No such player." }, { status: 404 });
   }
 
-  const worn = await resolveEquipped(profile.equipped);
+  const [worn, dressed] = await Promise.all([
+    resolveEquipped(profile.equipped),
+    getEquips(playerId),
+  ]);
 
   /* Viewer-relative: whether YOU follow them and they follow you. Only
      a signed-in player has a side of that relationship; a guest gets
@@ -77,6 +81,8 @@ export async function GET(
     embersEarned: profile.embersEarned,
     /* The ring around the picture: the avatar slot, since the split. */
     frame: worn.avatarFrame,
+    /* The catalogue ring, worn over the frame when both are set. */
+    ring: dressed.ring,
     effect: worn.effect,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */

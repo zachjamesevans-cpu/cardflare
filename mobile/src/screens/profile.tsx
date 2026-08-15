@@ -295,6 +295,30 @@ export function ProfileScreen() {
           }}
         />
 
+        {/*
+         * The wand: the one door to dressing your profile, riding the
+         * corner of the block it changes - same spot as the website.
+         */}
+        <Tap
+          onPress={() => navigation.navigate("Customize", { area: "profile" })}
+          accessibilityLabel="Customize your profile"
+          style={{
+            position: "absolute",
+            top: spacing(3),
+            right: spacing(3),
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
+        </Tap>
+
         <View
           style={{
             alignItems: "center",
@@ -338,49 +362,6 @@ export function ProfileScreen() {
           )}
         </View>
       </Card>
-
-      {/*
-       * The dressing room door, same spot as the website: right under
-       * the profile block. Wearing lives on the Customize screen now;
-       * the store only sells.
-       */}
-      <Tap
-        onPress={() => navigation.navigate("Customize")}
-        style={{
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderWidth: 1,
-          borderRadius: radius.card,
-          padding: spacing(4),
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: spacing(2),
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing(3),
-          }}
-        >
-          <Ionicons name="color-wand" size={20} color={colors.accent} />
-          <View style={{ flex: 1, gap: spacing(1) }}>
-            <Text
-              style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
-            >
-              Customize
-            </Text>
-            <Muted>
-              Borders, name styles, effects and more. Tap anything you own to wear
-              it.
-            </Muted>
-          </View>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      </Tap>
 
       <Card>
         <View
@@ -513,7 +494,37 @@ export function ProfileScreen() {
       </Card>
 
       <Card>
-        <Title>Your showcase</Title>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: spacing(2),
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Title>Your showcase</Title>
+          </View>
+          {/* The showcase's own wand: card borders, foils, motion and
+              the shelf background, in a menu of their own so neither
+              wand opens a wall. */}
+          <Tap
+            onPress={() => navigation.navigate("Customize", { area: "showcase" })}
+            accessibilityLabel="Customize your showcase"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.elevated,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
+          </Tap>
+        </View>
         <Body>
           Up to nine cards you are proud of, wearing whatever you have unlocked.
           This is not a trade list, and nobody can pledge on it.

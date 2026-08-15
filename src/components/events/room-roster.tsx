@@ -42,6 +42,7 @@ export function RoomRoster({ participants }: { participants: Participant[] }) {
                 seed={participant.playerSessionId}
                 avatarUrl={participant.avatarUrl}
                 frame={participant.frame}
+                ring={participant.ring}
                 size="sm"
                 className={participant.present ? undefined : "opacity-50"}
               />

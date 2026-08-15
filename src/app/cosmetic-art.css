@@ -407,6 +407,28 @@
   background: radial-gradient(circle at 35% 30%, #232c37, #10151c 70%);
 }
 
+/*
+ * The WORN ring: the same art as the tile scaffold, drawn around a real
+ * avatar. Geometry is proportional rather than fixed, so one rule hugs
+ * a 32px roster face and a 96px profile picture alike. The band mask is
+ * in percentages for the same reason - a 7px band that flatters the
+ * profile would swallow a roster row.
+ */
+.cfx-ring-avatar {
+  position: absolute;
+  inset: -11%;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.cfx-ring-avatar .cfx-ring-band {
+  inset: 0;
+  -webkit-mask: radial-gradient(farthest-side, transparent 80%, #000 82%);
+  mask: radial-gradient(farthest-side, transparent 80%, #000 82%);
+}
+.cfx-ring-avatar .cfx-ring-fx {
+  inset: -9%;
+}
+
 /* A card preview: the fancy edge is the padding, the face sits on it. */
 .cfx-card {
   position: relative;

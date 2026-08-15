@@ -28,7 +28,6 @@ import {
   backgroundClass,
   WornCardShell,
   WornNameRow,
-  WornRing,
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
@@ -157,15 +156,28 @@ export default async function ProfilePage() {
             />
             <WornSceneLayer worn={dressed} />
 
-            <WornRing slug={dressed.ring} className="relative mt-12">
-              <PlayerAvatar
-                displayName={profile.displayName}
-                seed={profile.playerId}
-                avatarUrl={profile.avatarUrl}
-                frame={worn.avatarFrame}
-                className="size-24 text-2xl"
-              />
-            </WornRing>
+            {/*
+             * The wand: the one door to getting dressed, riding the
+             * corner of the block it changes - the founder's call after
+             * a full-width door card felt like a second edit section.
+             */}
+            <Link
+              href="/profile/customize"
+              title="Customize"
+              className="absolute top-3 right-3 z-10 flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              <Wand2 className="size-5" aria-hidden="true" />
+              <span className="sr-only">Customize your profile</span>
+            </Link>
+
+            <PlayerAvatar
+              displayName={profile.displayName}
+              seed={profile.playerId}
+              avatarUrl={profile.avatarUrl}
+              frame={worn.avatarFrame}
+              ring={dressed.ring}
+              className="relative mt-12 size-24 text-2xl"
+            />
             <div className="relative flex flex-col items-center gap-2">
               <WornNameRow
                 name={profile.displayName}
@@ -228,32 +240,6 @@ export default async function ProfilePage() {
             </div>
           </Card>
 
-          {/*
-           * The dressing room door. The founder's ask, near verbatim:
-           * "why do I have to go into the store to change my profile
-           * border?... simplify the edit process". Wearing lives at
-           * /profile/customize now; the store only sells.
-           */}
-          <Link
-            href="/profile/customize"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
-          >
-            <span className="flex items-center gap-3">
-              <Wand2 className="size-5 shrink-0 text-accent" aria-hidden="true" />
-              <span className="flex flex-col gap-1">
-                <span className="font-semibold text-text-primary">Customize</span>
-                <span className="text-sm text-text-secondary">
-                  Borders, name styles, effects and more. Tap anything you own to wear
-                  it.
-                </span>
-              </span>
-            </span>
-            <ChevronRight
-              className="size-4 shrink-0 text-text-muted"
-              aria-hidden="true"
-            />
-          </Link>
-
           <Card className="flex flex-col gap-5">
             <div className="flex items-start justify-between gap-3">
               <p className="font-semibold text-text-primary">Edit your profile</p>
@@ -273,6 +259,7 @@ export default async function ProfilePage() {
               seed={profile.playerId}
               avatarUrl={profile.avatarUrl}
               frame={worn.avatarFrame}
+              ring={dressed.ring}
             />
 
             <DisplayNameForm displayName={profile.displayName} />
@@ -325,13 +312,24 @@ export default async function ProfilePage() {
                 className="mt-0.5 size-5 shrink-0 text-accent"
                 aria-hidden="true"
               />
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="font-semibold text-text-primary">Your showcase</p>
                 <p className="text-sm text-text-secondary">
                   Up to nine cards you are proud of, wearing whatever you have unlocked.
                   This is not a trade list, and nobody can pledge on it.
                 </p>
               </div>
+              {/* The showcase's own wand: card borders, foils, motion
+                  and the shelf background, in a menu of their own so
+                  neither wand opens a wall. */}
+              <Link
+                href="/profile/customize?area=showcase"
+                title="Customize showcase"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <Wand2 className="size-5" aria-hidden="true" />
+                <span className="sr-only">Customize your showcase</span>
+              </Link>
             </div>
 
             {profile.showcase.length === 0 ? (
@@ -346,42 +344,57 @@ export default async function ProfilePage() {
                * rule again — a shelf of cards is a shelf of cards,
                * whichever page it is on.
                */
-              <Rail ariaLabel="Your showcase">
-                {profile.showcase.map((entry) => (
-                  <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                    {/*
-                     * On the owner's own shelf a tap opens the dressing
-                     * room, not the plain viewer - the founder's spec.
-                     * Everyone else still gets the zoom, on the public
-                     * page and in the room popup.
-                     */}
-                    <ShowcaseEditor
-                      entryId={entry.id}
-                      name={entry.name}
-                      number={entry.number}
-                      imageUrl={entry.imageUrl}
-                      imagesEnabled={imagesEnabled}
-                      frame={entry.frame ?? worn.frame}
-                      holo={entry.holo ?? worn.holo}
-                      effect={worn.effect}
-                      frames={ownedFrames}
-                      holos={ownedHolos}
-                    />
-                    <span className="truncate text-[11px] text-text-secondary">
-                      {entry.name}
-                    </span>
-                    <form action={removeShowcaseAction}>
-                      <input type="hidden" name="entryId" value={entry.id} />
-                      <button
-                        type="submit"
-                        className="cursor-pointer text-[11px] text-text-muted underline underline-offset-2 transition-colors hover:text-text-secondary"
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </Rail>
+              /*
+               * Wearing exactly what the top block wears - the founder
+               * equipped a border up top and this section kept showing
+               * the bare cards, because only one of the two shelves had
+               * been taught about the new categories.
+               */
+              <div
+                className={cn(
+                  shelfBg && "rounded-[var(--radius-control)] p-2",
+                  shelfBg,
+                )}
+              >
+                <Rail ariaLabel="Your showcase">
+                  {profile.showcase.map((entry) => (
+                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                      {/*
+                       * On the owner's own shelf a tap opens the dressing
+                       * room, not the plain viewer - the founder's spec.
+                       * Everyone else still gets the zoom, on the public
+                       * page and in the room popup.
+                       */}
+                      <WornCardShell worn={dressed} className="w-full">
+                        <ShowcaseEditor
+                          entryId={entry.id}
+                          name={entry.name}
+                          number={entry.number}
+                          imageUrl={entry.imageUrl}
+                          imagesEnabled={imagesEnabled}
+                          frame={entry.frame ?? worn.frame}
+                          holo={entry.holo ?? worn.holo}
+                          effect={worn.effect}
+                          frames={ownedFrames}
+                          holos={ownedHolos}
+                        />
+                      </WornCardShell>
+                      <span className="truncate text-[11px] text-text-secondary">
+                        {entry.name}
+                      </span>
+                      <form action={removeShowcaseAction}>
+                        <input type="hidden" name="entryId" value={entry.id} />
+                        <button
+                          type="submit"
+                          className="cursor-pointer text-[11px] text-text-muted underline underline-offset-2 transition-colors hover:text-text-secondary"
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </Rail>
+              </div>
             )}
 
             {profile.showcase.length < SHOWCASE_LIMIT ? (
@@ -459,6 +472,7 @@ export default async function ProfilePage() {
                       seed={person.playerId}
                       avatarUrl={person.avatarUrl}
                       frame={person.frame}
+                      ring={person.ring}
                       size="sm"
                     />
                     <Link

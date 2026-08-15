@@ -57,6 +57,8 @@ interface PeekProfile {
   embersEarned: number;
   /** The ring around their picture: the avatar frame slot. */
   frame: string | null;
+  /** The catalogue ring, worn over the frame when both are set. */
+  ring: string | null;
   effect: string | null;
   /** Dressing arrives resolved per card; null never means "look it up". */
   showcase: {
@@ -78,6 +80,7 @@ export function PlayerPeek({
   seed,
   avatarUrl,
   frame,
+  ring = null,
   isYou = false,
   dimmed = false,
   imagesEnabled,
@@ -89,6 +92,8 @@ export function PlayerPeek({
   seed: string;
   avatarUrl: string | null;
   frame: string | null;
+  /** The catalogue ring, worn over the frame when both are set. */
+  ring?: string | null;
   isYou?: boolean;
   /** Away players read as away on the trigger, same as before. */
   dimmed?: boolean;
@@ -268,6 +273,7 @@ export function PlayerPeek({
           seed={seed}
           avatarUrl={avatarUrl}
           frame={frame}
+          ring={ring}
           size="sm"
           className={dimmed ? "opacity-50" : undefined}
         />
@@ -325,6 +331,7 @@ export function PlayerPeek({
                 seed={seed}
                 avatarUrl={worn?.avatarUrl ?? avatarUrl}
                 frame={worn?.frame ?? frame}
+                ring={worn ? worn.ring : ring}
                 className="size-14 text-lg"
               />
               <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
