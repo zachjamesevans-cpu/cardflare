@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The catalogue's art: one class per draft cosmetic, keyed by slug. */
+@import "./cosmetic-art.css";
 
 /*
  * CardFlare design tokens.

@@ -1,0 +1,2634 @@
+/*
+ * The catalogue's art: one class per cosmetic, keyed by slug.
+ *
+ * Every draft cosmetic in the database owns a `.cfa-<slug>` rule in this
+ * file, drawn with the same care (and many of the same optics) as the
+ * shipped holofoils in globals.css. The admin console's preview grid is
+ * the first consumer; when an item goes live these exact classes dress
+ * the real profile, so the preview IS the cosmetic, not a mock of one.
+ *
+ * Structure:
+ *   .cfx-*   scaffolds — the shapes previews are drawn on (ring, card,
+ *            panel, name). Never keyed by slug, so the completeness test
+ *            can hold the .cfa- namespace to "every class is a slug".
+ *   .cfa-*   the cosmetics themselves, one per slug.
+ *
+ * tests/unit/cosmetic-art.test.ts walks the migrations and refuses any
+ * draft slug without a .cfa- rule here, and any .cfa- rule without a
+ * slug — art and catalogue cannot drift.
+ */
+
+/* ---------------------------------------------------------------- */
+/* Particles: tiny inline SVGs, tiled and animated by the scaffolds. */
+/* ---------------------------------------------------------------- */
+
+:root {
+  --cfa-p-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='2.4' fill='%23ffb45e'/%3E%3Ccircle cx='12' cy='12' r='1.1' fill='%23ffe9b0'/%3E%3C/svg%3E");
+  --cfa-p-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 23l1.8 7.2 7.2 1.8-7.2 1.8L32 41l-1.8-7.2L23 32l7.2-1.8z' fill='%23eef4ff' fill-opacity='.92'/%3E%3C/svg%3E");
+  --cfa-p-dot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%23ffffff' fill-opacity='.85'/%3E%3C/svg%3E");
+  --cfa-p-petal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 23c4 4.5 6 7 6 10a6 6 0 1 1-12 0c0-3 2-5.5 6-10z' fill='%23f7b6cf' fill-opacity='.9' transform='rotate(24 32 32)'/%3E%3C/svg%3E");
+  --cfa-p-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 40s-7-4.6-7-9.6c0-2.9 2-4.4 4-4.4 1.3 0 2.4.7 3 1.7.6-1 1.7-1.7 3-1.7 2 0 4 1.5 4 4.4 0 5-7 9.6-7 9.6z' fill='%23ff8fb3' fill-opacity='.9'/%3E%3C/svg%3E");
+  --cfa-p-flake: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23dcecff' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M32 24v16M24 32h16M26.3 26.3l11.4 11.4M37.7 26.3L26.3 37.7'/%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M34 20l-8 13h5l-1 11 9-15h-5z' fill='%23ffe36e' fill-opacity='.95'/%3E%3C/svg%3E");
+  --cfa-p-bubble: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='7' fill='none' stroke='%23bfe8ff' stroke-opacity='.75' stroke-width='1.4'/%3E%3Ccircle cx='29.5' cy='29.5' r='1.6' fill='%23eaf7ff' fill-opacity='.8'/%3E%3C/svg%3E");
+  --cfa-p-card: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='27' y='24' width='10' height='15' rx='2' fill='%232a3442' stroke='%237c8aa0' stroke-width='1.2' transform='rotate(12 32 32)'/%3E%3C/svg%3E");
+  --cfa-p-shard: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpolygon points='29,23 36,26 35,40 27,36' fill='%23a9d5ff' fill-opacity='.35' stroke='%23e6f3ff' stroke-opacity='.6' stroke-width='.8'/%3E%3C/svg%3E");
+  --cfa-p-rain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M34 20L30 44' stroke='%239cc4e8' stroke-opacity='.55' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  --cfa-p-streak: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M44 4L16 32' stroke='%23ffffff' stroke-opacity='.85' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='15' cy='33' r='2.4' fill='%23fff'/%3E%3C/svg%3E");
+  --cfa-p-crack: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23000000' stroke-opacity='.55' stroke-width='1.4' fill='none'%3E%3Cpath d='M8 2l6 14-9 10 12 8-4 14M40 0l-6 12 10 12-8 9 12 14M62 22l-12 6 4 12-14 4'/%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-crackglow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23ff7a2f' stroke-opacity='.85' stroke-width='1.6' fill='none'%3E%3Cpath d='M8 2l6 14-9 10 12 8-4 14M40 0l-6 12 10 12-8 9 12 14M62 22l-12 6 4 12-14 4'/%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-circuit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cg stroke='%236ee7a8' stroke-opacity='.5' stroke-width='1.2' fill='none'%3E%3Cpath d='M4 8h14v12h12M30 4v10h12M8 44V30h10M40 44V34h-8'/%3E%3C/g%3E%3Cg fill='%236ee7a8' fill-opacity='.75'%3E%3Ccircle cx='18' cy='8' r='1.8'/%3E%3Ccircle cx='30' cy='20' r='1.8'/%3E%3Ccircle cx='42' cy='14' r='1.8'/%3E%3Ccircle cx='18' cy='30' r='1.8'/%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-hatch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='%23111721' stroke-width='2'%3E%3Cpath d='M-2 6h28M-2 14h28M-2 22h28'/%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-filigree: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 16c6-10 10-10 14 0s8 10 14 0' fill='none' stroke='%23f0c24b' stroke-opacity='.8' stroke-width='1.4'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='%23f0c24b'/%3E%3C/svg%3E");
+  --cfa-p-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 32'%3E%3Cpath d='M14 1l12 7v14l-12 7L2 22V8z' fill='none' stroke='%2371e0ff' stroke-opacity='.5' stroke-width='1.3'/%3E%3C/svg%3E");
+  --cfa-p-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 96'%3E%3Cg font-family='monospace' font-size='10' fill='%237ef29a'%3E%3Ctext x='3' y='12' fill-opacity='.9'%3E1%3C/text%3E%3Ctext x='3' y='30' fill-opacity='.6'%3E0%3C/text%3E%3Ctext x='3' y='48' fill-opacity='.8'%3E1%3C/text%3E%3Ctext x='3' y='66' fill-opacity='.4'%3E0%3C/text%3E%3Ctext x='3' y='84' fill-opacity='.7'%3E1%3C/text%3E%3C/g%3E%3C/svg%3E");
+  --cfa-p-crown: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 24'%3E%3Cpath d='M4 19L2 6l7 5 7-9 7 9 7-5-2 13z' fill='%23f0c24b'/%3E%3Crect x='4' y='19' width='24' height='3' rx='1' fill='%23d9a92f'/%3E%3C/svg%3E");
+  --cfa-p-pixel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='28' y='28' width='8' height='8' fill='%23c6ee4f' fill-opacity='.9'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------ */
+/* Shared motion. Names never collide with globals.css.    */
+/* ------------------------------------------------------ */
+
+@keyframes cfa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cfa-spin-steps {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cfa-rise {
+  from {
+    background-position:
+      0 220px,
+      60px 380px;
+  }
+  to {
+    background-position:
+      0 -220px,
+      60px -160px;
+  }
+}
+@keyframes cfa-fall {
+  from {
+    background-position:
+      0 -220px,
+      70px -380px;
+  }
+  to {
+    background-position:
+      0 220px,
+      70px 160px;
+  }
+}
+@keyframes cfa-drift {
+  from {
+    background-position:
+      0 160px,
+      90px 320px;
+  }
+  to {
+    background-position:
+      -140px -160px,
+      -30px -80px;
+  }
+}
+@keyframes cfa-pan {
+  to {
+    background-position: 200% 50%;
+  }
+}
+@keyframes cfa-pan-y {
+  to {
+    background-position: 50% -200%;
+  }
+}
+@keyframes cfa-sheen {
+  0%,
+  55% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  85%,
+  100% {
+    transform: translateX(230%) skewX(-18deg);
+  }
+}
+@keyframes cfa-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes cfa-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+@keyframes cfa-float {
+  0%,
+  100% {
+    transform: translateY(4%);
+  }
+  50% {
+    transform: translateY(-4%);
+  }
+}
+@keyframes cfa-tilt {
+  0%,
+  100% {
+    transform: rotate3d(1, 1, 0, 7deg);
+  }
+  25% {
+    transform: rotate3d(-1, 1, 0, 7deg);
+  }
+  50% {
+    transform: rotate3d(-1, -1, 0, 7deg);
+  }
+  75% {
+    transform: rotate3d(1, -1, 0, 7deg);
+  }
+}
+@keyframes cfa-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.35;
+  }
+  10% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 0.6;
+  }
+  40% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0.25;
+  }
+  74% {
+    opacity: 1;
+  }
+}
+@keyframes cfa-glitch {
+  0%,
+  86%,
+  100% {
+    transform: translate(0, 0);
+    clip-path: inset(0 0 0 0);
+  }
+  88% {
+    transform: translate(-3px, 1px);
+    clip-path: inset(12% 0 58% 0);
+  }
+  90% {
+    transform: translate(3px, -1px);
+    clip-path: inset(62% 0 8% 0);
+  }
+  92% {
+    transform: translate(-2px, 2px);
+    clip-path: inset(30% 0 34% 0);
+  }
+  94% {
+    transform: translate(0, 0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes cfa-scan {
+  from {
+    transform: translateY(-120%);
+  }
+  to {
+    transform: translateY(1300%);
+  }
+}
+@keyframes cfa-flash {
+  0%,
+  87%,
+  93%,
+  100% {
+    opacity: 0;
+  }
+  89%,
+  91% {
+    opacity: 0.85;
+  }
+}
+@keyframes cfa-shock {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.9;
+  }
+  55% {
+    opacity: 0.25;
+  }
+  70%,
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+@keyframes cfa-ripple {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+@keyframes cfa-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes cfa-hue {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+@keyframes cfa-jitter {
+  0%,
+  92%,
+  100% {
+    transform: translate(0, 0);
+  }
+  94% {
+    transform: translate(2px, -1px);
+  }
+  96% {
+    transform: translate(-2px, 1px);
+  }
+  98% {
+    transform: translate(1px, 1px);
+  }
+}
+@keyframes cfa-streakthrough {
+  0%,
+  78% {
+    transform: translate(-140%, 40%) rotate(-8deg);
+    opacity: 0;
+  }
+  80% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    transform: translate(160%, -40%) rotate(-8deg);
+    opacity: 0;
+  }
+}
+@keyframes cfa-popin {
+  0%,
+  15% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  28% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  34%,
+  82% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes cfa-dealin {
+  0%,
+  10% {
+    transform: translateY(120%) rotate(6deg);
+    opacity: 0;
+  }
+  30%,
+  80% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cfa-wander {
+  0%,
+  100% {
+    background-position: 18% 30%;
+  }
+  33% {
+    background-position: 78% 40%;
+  }
+  66% {
+    background-position: 45% 75%;
+  }
+}
+@keyframes cfa-burst {
+  0%,
+  74%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  80% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  92% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+/* ------------------------------------------------------ */
+/* Scaffolds: what each kind of preview is drawn on.       */
+/* ------------------------------------------------------ */
+
+/* A profile-border preview: ring band + particle halo + dark core. */
+.cfx-ring {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+}
+.cfx-ring-band {
+  position: absolute;
+  inset: 6px;
+  border-radius: 9999px;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 7px),
+    #000 calc(100% - 6px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 7px),
+    #000 calc(100% - 6px)
+  );
+  overflow: hidden;
+}
+.cfx-ring-band::before {
+  content: "";
+  position: absolute;
+  inset: -22%;
+  background: var(--cfa-band, #3a4553);
+}
+.cfx-ring-fx {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+.cfx-ring-core {
+  position: absolute;
+  inset: 14px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #232c37, #10151c 70%);
+}
+
+/* A card preview: the fancy edge is the padding, the face sits on it. */
+.cfx-card {
+  position: relative;
+  aspect-ratio: 63 / 88;
+  width: 100%;
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--cfa-edge, #2a323d);
+  overflow: hidden;
+}
+.cfx-card-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 9px;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 45% at 30% 28%, #2c3a4d 0%, transparent 70%),
+    radial-gradient(50% 40% at 72% 62%, #3d3350 0%, transparent 75%),
+    radial-gradient(70% 55% at 55% 85%, #22303c 0%, transparent 70%), #171d26;
+}
+/* The face's stand-in "card art", so holos have something to sit on. */
+.cfx-card-face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(transparent 62%, rgba(10, 13, 18, 0.85) 78%),
+    radial-gradient(24% 18% at 62% 30%, rgba(240, 194, 75, 0.5), transparent 70%);
+}
+/* The per-slug holo/effect layer. */
+.cfx-card-fx {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  pointer-events: none;
+}
+
+/* A wide panel: showcase backgrounds and profile scenes. */
+.cfx-panel {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #10151c;
+  border: 1px solid #2a323d;
+}
+.cfx-panel-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+/* The mini profile a scene plays behind. */
+.cfx-panel-profile {
+  position: absolute;
+  inset: auto 12% 14% 12%;
+  height: 46%;
+  border-radius: 10px;
+  background: rgba(21, 26, 33, 0.88);
+  border: 1px solid #2a323d;
+}
+.cfx-panel-profile::before {
+  content: "";
+  position: absolute;
+  top: -16px;
+  left: calc(50% - 16px);
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #35414f, #171d26 75%);
+  border: 2px solid #3a4553;
+}
+.cfx-panel-profile::after {
+  content: "";
+  position: absolute;
+  inset: 45% 22% 24% 22%;
+  background:
+    linear-gradient(#3a4553 2px, transparent 2px) 0 0 / 100% 10px,
+    linear-gradient(#2f3844 2px, transparent 2px) 15% 100% / 70% 10px;
+  opacity: 0.7;
+}
+
+/* Name, title and badge previews: the founder's own handle. */
+.cfx-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+.cfx-title-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #3a4553;
+  color: #b3becc;
+  background: #1d242d;
+}
+.cfx-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0e1116;
+  background: #8593a4;
+}
+
+/* ================================================================ */
+/* PROFILE BORDERS (ring-*): 25                                     */
+/* ================================================================ */
+
+/* Inferno: flame licking around the picture, sparks off the top. */
+.cfa-ring-inferno {
+  --cfa-band: conic-gradient(
+    #7a1d05,
+    #e8531f,
+    #ffb03a,
+    #ffe08a,
+    #ff8c2e,
+    #c22f0b,
+    #7a1d05
+  );
+}
+.cfa-ring-inferno .cfx-ring-band::before {
+  animation: cfa-spin 3.6s linear infinite;
+}
+.cfa-ring-inferno .cfx-ring-band {
+  filter: drop-shadow(0 0 7px rgba(255, 122, 47, 0.8));
+}
+.cfa-ring-inferno .cfx-ring-fx {
+  background-image: var(--cfa-p-spark), var(--cfa-p-spark);
+  background-size:
+    9px 9px,
+    6px 6px;
+  animation: cfa-rise 5s linear infinite;
+  opacity: 0.9;
+  -webkit-mask: radial-gradient(farthest-side, transparent 55%, #000 72%);
+  mask: radial-gradient(farthest-side, transparent 55%, #000 72%);
+}
+
+/* Frozen: hard crystalline facets, cold light. */
+.cfa-ring-frozen {
+  --cfa-band: conic-gradient(
+    #bfe4ff 0 8%,
+    #6db7e8 8% 16%,
+    #eaf7ff 16% 22%,
+    #8ecdf2 22% 34%,
+    #cfeaff 34% 42%,
+    #5da5dd 42% 55%,
+    #eaf7ff 55% 62%,
+    #9ed4f4 62% 76%,
+    #6db7e8 76% 88%,
+    #bfe4ff 88% 100%
+  );
+}
+.cfa-ring-frozen .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.7));
+}
+.cfa-ring-frozen .cfx-ring-band::before {
+  animation: cfa-spin 26s linear infinite;
+}
+
+/* Electric: violet band, bolts jumping around it. */
+.cfa-ring-electric {
+  --cfa-band: conic-gradient(#241b52, #4f46e5, #a5b4fc, #4f46e5, #241b52);
+}
+.cfa-ring-electric .cfx-ring-band::before {
+  animation: cfa-spin 5s linear infinite;
+}
+.cfa-ring-electric .cfx-ring-fx {
+  background-image: var(--cfa-p-bolt);
+  background-size: 30px 30px;
+  animation: cfa-flicker 1.7s steps(1) infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent 58%, #000 74%);
+  mask: radial-gradient(farthest-side, transparent 58%, #000 74%);
+}
+.cfa-ring-electric .cfx-ring-band {
+  filter: drop-shadow(0 0 7px rgba(129, 140, 248, 0.85));
+}
+
+/* Galaxy: a nebula turning very slowly, stars in the halo. */
+.cfa-ring-galaxy {
+  --cfa-band: conic-gradient(
+    #191036,
+    #4c2a85,
+    #7b5cd6,
+    #2b3f8f,
+    #171d4c,
+    #5b2a7a,
+    #191036
+  );
+}
+.cfa-ring-galaxy .cfx-ring-band::before {
+  animation: cfa-spin 18s linear infinite;
+}
+.cfa-ring-galaxy .cfx-ring-fx {
+  background-image: var(--cfa-p-dot), var(--cfa-p-star);
+  background-size:
+    7px 7px,
+    26px 26px;
+  animation: cfa-twinkle 3.2s ease-in-out infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 70%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 70%);
+}
+.cfa-ring-galaxy .cfx-ring-band {
+  filter: drop-shadow(0 0 8px rgba(123, 92, 214, 0.7));
+}
+
+/* Gold Foil: milled metal bands, the slow turn under a shop light. */
+.cfa-ring-gold-foil {
+  --cfa-band: conic-gradient(
+    #8a6414 0 6%,
+    #f0c24b 10%,
+    #fff3c4 14%,
+    #f0c24b 18%,
+    #8a6414 26%,
+    #c9992e 38%,
+    #fff3c4 44%,
+    #f0c24b 52%,
+    #8a6414 62%,
+    #f0c24b 72%,
+    #fff3c4 78%,
+    #c9992e 88%,
+    #8a6414 100%
+  );
+}
+.cfa-ring-gold-foil .cfx-ring-band::before {
+  animation: cfa-spin 9s linear infinite;
+}
+.cfa-ring-gold-foil .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(240, 194, 75, 0.65));
+}
+
+/* Rainbow Foil: the whole spectrum, moving. */
+.cfa-ring-rainbow-foil {
+  --cfa-band: conic-gradient(
+    #ff5e5e,
+    #ffb44d,
+    #f4e04d,
+    #6ee7a8,
+    #5eb9ff,
+    #9b8cff,
+    #ff7ad9,
+    #ff5e5e
+  );
+}
+.cfa-ring-rainbow-foil .cfx-ring-band::before {
+  animation: cfa-spin 6s linear infinite;
+}
+.cfa-ring-rainbow-foil .cfx-ring-band {
+  filter: saturate(1.2) drop-shadow(0 0 7px rgba(255, 255, 255, 0.35));
+}
+
+/* Manga: inked speed lines, black and white only. */
+.cfa-ring-manga {
+  --cfa-band: repeating-conic-gradient(
+    #0b0d11 0deg 7deg,
+    #f4f6f8 7deg 10deg,
+    #0b0d11 10deg 18deg,
+    #f4f6f8 18deg 20deg
+  );
+}
+.cfa-ring-manga .cfx-ring-band::before {
+  animation: cfa-spin 14s linear infinite;
+}
+
+/* Pixel: chunky 8-bit segments, turning in steps like a sprite. */
+.cfa-ring-pixel {
+  --cfa-band: repeating-conic-gradient(
+    #c6ee4f 0deg 30deg,
+    #5eb9ff 30deg 60deg,
+    #ff7ad9 60deg 90deg,
+    #f4e04d 90deg 120deg
+  );
+}
+.cfa-ring-pixel .cfx-ring-band::before {
+  animation: cfa-spin 8s steps(12) infinite;
+}
+
+/* Glitch: cyan and magenta halves that keep slipping. */
+.cfa-ring-glitch {
+  --cfa-band: conic-gradient(
+    #29e6e6 0 32%,
+    #ef3ef0 32% 55%,
+    #29e6e6 55% 71%,
+    #f4f6f8 71% 74%,
+    #ef3ef0 74% 100%
+  );
+}
+.cfa-ring-glitch .cfx-ring-band {
+  animation: cfa-jitter 2.4s steps(1) infinite;
+}
+.cfa-ring-glitch .cfx-ring-band::before {
+  animation: cfa-spin 7s linear infinite;
+}
+
+/* Vaporwave: pink and cyan, glowing like a sign. */
+.cfa-ring-vaporwave {
+  --cfa-band: conic-gradient(#ff71ce, #01cdfe, #b967ff, #ff71ce);
+}
+.cfa-ring-vaporwave .cfx-ring-band::before {
+  animation: cfa-spin 11s linear infinite;
+}
+.cfa-ring-vaporwave .cfx-ring-band {
+  filter: drop-shadow(0 0 5px #ff71ce) drop-shadow(0 0 9px rgba(1, 205, 254, 0.6));
+}
+
+/* Aurora: green and blue, drifting the way the sky does. */
+.cfa-ring-aurora {
+  --cfa-band: conic-gradient(
+    #0e3b2e,
+    #2fbf8f,
+    #7ee8c7,
+    #2b6cb0,
+    #14324f,
+    #2fbf8f,
+    #0e3b2e
+  );
+}
+.cfa-ring-aurora .cfx-ring-band::before {
+  animation: cfa-spin 16s ease-in-out infinite;
+}
+.cfa-ring-aurora .cfx-ring-band {
+  filter: blur(0.4px) drop-shadow(0 0 7px rgba(96, 220, 180, 0.55));
+}
+
+/* Ember: the brand's warmth, tiny sparks floating upward. */
+.cfa-ring-ember {
+  --cfa-band: conic-gradient(#5a1d05, #b2400e, #ff7a2f, #b2400e, #5a1d05);
+}
+.cfa-ring-ember .cfx-ring-band::before {
+  animation: cfa-spin 12s linear infinite;
+}
+.cfa-ring-ember .cfx-ring-fx {
+  background-image: var(--cfa-p-spark), var(--cfa-p-spark);
+  background-size:
+    7px 7px,
+    5px 5px;
+  animation: cfa-rise 6.5s linear infinite;
+  opacity: 0.85;
+  -webkit-mask: radial-gradient(farthest-side, transparent 55%, #000 75%);
+  mask: radial-gradient(farthest-side, transparent 55%, #000 75%);
+}
+
+/* Smoke: barely moving, soft-edged, no light of its own. */
+.cfa-ring-smoke {
+  --cfa-band: conic-gradient(
+    #23272e,
+    #4b5563,
+    #6b7280,
+    #374151,
+    #23272e,
+    #4b5563,
+    #23272e
+  );
+}
+.cfa-ring-smoke .cfx-ring-band {
+  filter: blur(1.6px);
+}
+.cfa-ring-smoke .cfx-ring-band::before {
+  animation: cfa-spin 22s linear infinite;
+}
+
+/* Water: rippling blue, a highlight passing like light on a pool. */
+.cfa-ring-water {
+  --cfa-band: conic-gradient(
+    #0b3a5c,
+    #2b7bb8,
+    #9fd8f5,
+    #2b7bb8,
+    #0b3a5c,
+    #1d5f92,
+    #0b3a5c
+  );
+}
+.cfa-ring-water .cfx-ring-band::before {
+  animation: cfa-spin 8s ease-in-out infinite;
+}
+.cfa-ring-water .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(80, 170, 230, 0.6));
+}
+
+/* Sakura: soft pink, petals drifting down around the picture. */
+.cfa-ring-sakura {
+  --cfa-band: conic-gradient(#f9c9dd, #f39ec2, #fde7f0, #f39ec2, #f9c9dd);
+}
+.cfa-ring-sakura .cfx-ring-band::before {
+  animation: cfa-spin 20s linear infinite;
+}
+.cfa-ring-sakura .cfx-ring-fx {
+  background-image: var(--cfa-p-petal), var(--cfa-p-petal);
+  background-size:
+    30px 30px,
+    44px 44px;
+  animation: cfa-fall 7s linear infinite;
+  opacity: 0.9;
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
+}
+
+/* Heart: warm rose, small hearts floating up. */
+.cfa-ring-heart {
+  --cfa-band: conic-gradient(#8f2447, #e05587, #ffb1cd, #e05587, #8f2447);
+}
+.cfa-ring-heart .cfx-ring-band::before {
+  animation: cfa-spin 13s linear infinite;
+}
+.cfa-ring-heart .cfx-ring-fx {
+  background-image: var(--cfa-p-heart), var(--cfa-p-heart);
+  background-size:
+    30px 30px,
+    44px 44px;
+  animation: cfa-rise 7.5s linear infinite;
+  opacity: 0.85;
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
+}
+
+/* Crown: quiet gilding, the crown itself sitting above. */
+.cfa-ring-crown {
+  --cfa-band: conic-gradient(#8a6414, #d9a92f, #fff3c4, #d9a92f, #8a6414);
+}
+.cfa-ring-crown .cfx-ring-band::before {
+  animation: cfa-spin 15s linear infinite;
+}
+.cfa-ring-crown .cfx-ring-fx {
+  background-image: var(--cfa-p-crown);
+  background-repeat: no-repeat;
+  background-position: 50% 0;
+  background-size: 24px 18px;
+  filter: drop-shadow(0 1px 3px rgba(240, 194, 75, 0.6));
+}
+
+/* Starfield: near-black band, stars orbiting through it. */
+.cfa-ring-starfield {
+  --cfa-band: conic-gradient(#0a0f1e, #17223e, #0a0f1e, #131c33, #0a0f1e);
+}
+.cfa-ring-starfield .cfx-ring-fx {
+  inset: 0;
+  background-image: var(--cfa-p-dot), var(--cfa-p-star);
+  background-size:
+    9px 9px,
+    30px 30px;
+  animation: cfa-spin 14s linear infinite;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 18px),
+    #000 calc(100% - 14px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 18px),
+    #000 calc(100% - 14px)
+  );
+}
+
+/* Meteor: a single comet lapping the ring, trail behind it. */
+.cfa-ring-meteor {
+  --cfa-band: conic-gradient(
+    #0c1226 0 58%,
+    #24365e 72%,
+    #9db8ff 84%,
+    #eef4ff 91%,
+    #0c1226 97%
+  );
+}
+.cfa-ring-meteor .cfx-ring-band::before {
+  animation: cfa-spin 2.6s linear infinite;
+}
+.cfa-ring-meteor .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(157, 184, 255, 0.7));
+}
+
+/* Diamond: white facets that catch the light in blocks. */
+.cfa-ring-diamond {
+  --cfa-band: conic-gradient(
+    #f8fbff 0 9%,
+    #b9c7d8 9% 15%,
+    #ffffff 15% 21%,
+    #d7e2ee 21% 33%,
+    #f2f7fc 33% 40%,
+    #aebccd 40% 52%,
+    #ffffff 52% 58%,
+    #d7e2ee 58% 73%,
+    #b9c7d8 73% 85%,
+    #f8fbff 85% 100%
+  );
+}
+.cfa-ring-diamond .cfx-ring-band::before {
+  animation: cfa-spin 10s linear infinite;
+}
+.cfa-ring-diamond .cfx-ring-fx {
+  background-image: var(--cfa-p-star);
+  background-size: 26px 26px;
+  animation: cfa-twinkle 2.1s ease-in-out infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent 58%, #000 74%);
+  mask: radial-gradient(farthest-side, transparent 58%, #000 74%);
+}
+
+/* Black Flame: fire with the light taken out of it. */
+.cfa-ring-black-flame {
+  --cfa-band: conic-gradient(
+    #05060a,
+    #1d1030,
+    #4a1d6e,
+    #241238,
+    #05060a,
+    #33124d,
+    #05060a
+  );
+}
+.cfa-ring-black-flame .cfx-ring-band::before {
+  animation: cfa-spin 4.4s linear infinite;
+}
+.cfa-ring-black-flame .cfx-ring-band {
+  filter: drop-shadow(0 0 7px rgba(90, 40, 140, 0.75));
+}
+
+/* White Flame: cold and bright. */
+.cfa-ring-white-flame {
+  --cfa-band: conic-gradient(
+    #dfe9f2,
+    #ffffff,
+    #bcd6ea,
+    #ffffff,
+    #dfe9f2,
+    #eef6fc,
+    #dfe9f2
+  );
+}
+.cfa-ring-white-flame .cfx-ring-band::before {
+  animation: cfa-spin 4.4s linear infinite;
+}
+.cfa-ring-white-flame .cfx-ring-band {
+  filter: drop-shadow(0 0 8px rgba(235, 245, 255, 0.85));
+}
+
+/* Retro Arcade: cabinet colours in chunky segments. */
+.cfa-ring-retro-arcade {
+  --cfa-band: repeating-conic-gradient(
+    #ff3355 0deg 24deg,
+    #ffb400 24deg 48deg,
+    #21d07c 48deg 72deg,
+    #2ba9ff 72deg 96deg,
+    #b967ff 96deg 120deg
+  );
+}
+.cfa-ring-retro-arcade .cfx-ring-band::before {
+  animation: cfa-spin 9s steps(15) infinite;
+}
+.cfa-ring-retro-arcade .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(43, 169, 255, 0.5));
+}
+
+/* CRT: phosphor green with a scanline drifting down the halo. */
+.cfa-ring-crt {
+  --cfa-band: conic-gradient(#07120b, #124a26, #2fbf6b, #124a26, #07120b);
+}
+.cfa-ring-crt .cfx-ring-band::before {
+  animation: cfa-spin 17s linear infinite;
+}
+.cfa-ring-crt .cfx-ring-fx {
+  background: repeating-linear-gradient(
+    transparent 0 3px,
+    rgba(47, 191, 107, 0.16) 3px 4px
+  );
+  border-radius: 9999px;
+  animation: cfa-pulse 2.8s ease-in-out infinite;
+}
+
+/* Prestige: lime meeting gold, the flagship glow. */
+.cfa-ring-prestige {
+  --cfa-band: conic-gradient(
+    #c6ee4f,
+    #f0c24b,
+    #fff3c4,
+    #c6ee4f,
+    #8ba635,
+    #f0c24b,
+    #c6ee4f
+  );
+}
+.cfa-ring-prestige .cfx-ring-band::before {
+  animation: cfa-spin 7s linear infinite;
+}
+.cfa-ring-prestige .cfx-ring-band {
+  filter: drop-shadow(0 0 6px rgba(198, 238, 79, 0.75))
+    drop-shadow(0 0 12px rgba(240, 194, 75, 0.45));
+}
+.cfa-ring-prestige .cfx-ring-fx {
+  background-image: var(--cfa-p-star);
+  background-size: 28px 28px;
+  animation: cfa-twinkle 2.6s ease-in-out infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent 56%, #000 74%);
+  mask: radial-gradient(farthest-side, transparent 56%, #000 74%);
+}
+
+/* ================================================================ */
+/* CARD BORDERS (border-*): 43                                      */
+/* The edge is the card's padding; textures and gradients live on   */
+/* the .cfx-card itself, glows in its box-shadow.                   */
+/* ================================================================ */
+
+.cfa-border-classic-black {
+  --cfa-edge: linear-gradient(160deg, #1a1d23, #05070b 55%, #14171d);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.cfa-border-white-pearl {
+  --cfa-edge: linear-gradient(
+    140deg,
+    #f6f4ef,
+    #e7e2d8 25%,
+    #fdfcfa 40%,
+    #d9e4ea 60%,
+    #f2ece2 78%,
+    #fbfaf7
+  );
+  box-shadow: 0 0 10px rgba(240, 238, 230, 0.25);
+}
+.cfa-border-silver {
+  --cfa-edge: linear-gradient(
+    155deg,
+    #4e5762,
+    #c8d2dc 22%,
+    #8d99a6 38%,
+    #e8eef4 52%,
+    #7c8894 70%,
+    #b7c2cd
+  );
+}
+.cfa-border-gold {
+  --cfa-edge: linear-gradient(
+    155deg,
+    #6d500f,
+    #f0c24b 24%,
+    #a97e1c 40%,
+    #fff3c4 54%,
+    #c9992e 72%,
+    #8a6414
+  );
+  box-shadow: 0 0 10px rgba(240, 194, 75, 0.35);
+}
+.cfa-border-rose-gold {
+  --cfa-edge: linear-gradient(
+    155deg,
+    #8a4f42,
+    #eda893 24%,
+    #c97b64 40%,
+    #ffd9c9 54%,
+    #d98d74 72%,
+    #a35a48
+  );
+}
+.cfa-border-platinum {
+  --cfa-edge: linear-gradient(
+    155deg,
+    #7d8790,
+    #e9edf0 24%,
+    #b7bfc6 40%,
+    #f8fafb 54%,
+    #a5aeb6 72%,
+    #ced5da
+  );
+  box-shadow: 0 0 8px rgba(220, 228, 234, 0.3);
+}
+.cfa-border-bronze {
+  --cfa-edge: linear-gradient(
+    155deg,
+    #4e2f14,
+    #b07a3c 24%,
+    #7c521f 40%,
+    #d29a55 54%,
+    #8f5f28 72%,
+    #5f3b18
+  );
+}
+.cfa-border-emerald {
+  --cfa-edge: linear-gradient(
+    150deg,
+    #06301f,
+    #178a56 30%,
+    #0b4a2e 48%,
+    #4fdf9c 62%,
+    #0e5c39 80%,
+    #06301f
+  );
+  box-shadow: 0 0 11px rgba(46, 190, 122, 0.4);
+}
+.cfa-border-ruby {
+  --cfa-edge: linear-gradient(
+    150deg,
+    #3d0812,
+    #b3122e 30%,
+    #5e0b1c 48%,
+    #ff5b74 62%,
+    #7c0f24 80%,
+    #3d0812
+  );
+  box-shadow: 0 0 11px rgba(220, 50, 80, 0.4);
+}
+.cfa-border-sapphire {
+  --cfa-edge: linear-gradient(
+    150deg,
+    #071a42,
+    #1748b8 30%,
+    #0b2a68 48%,
+    #5b8bff 62%,
+    #0f3684 80%,
+    #071a42
+  );
+  box-shadow: 0 0 11px rgba(70, 120, 255, 0.4);
+}
+.cfa-border-amethyst {
+  --cfa-edge: linear-gradient(
+    150deg,
+    #2a0d42,
+    #7a2fb8 30%,
+    #451a68 48%,
+    #bb6fff 62%,
+    #571f84 80%,
+    #2a0d42
+  );
+  box-shadow: 0 0 11px rgba(150, 80, 220, 0.4);
+}
+.cfa-border-obsidian {
+  --cfa-edge: linear-gradient(
+    150deg,
+    #000000,
+    #1c1f2a 30%,
+    #05060a 48%,
+    #3a4358 60%,
+    #05060a 74%,
+    #000000
+  );
+  box-shadow: inset 0 0 0 1px rgba(140, 160, 190, 0.18);
+}
+.cfa-border-ice {
+  --cfa-edge:
+    radial-gradient(60% 45% at 0% 0%, rgba(234, 247, 255, 0.9), transparent 70%),
+    radial-gradient(55% 40% at 100% 100%, rgba(214, 238, 252, 0.85), transparent 70%),
+    linear-gradient(150deg, #9ed4f4, #5da5dd 45%, #cfeaff);
+  box-shadow: 0 0 10px rgba(140, 200, 255, 0.4);
+}
+.cfa-border-fire {
+  --cfa-edge: linear-gradient(0deg, #ffe08a, #ff9a3a 30%, #e8531f 60%, #7a1d05);
+  background-size: 100% 220%;
+  animation: cfa-pan-y 2.6s linear infinite alternate;
+  box-shadow: 0 0 12px rgba(255, 122, 47, 0.55);
+}
+.cfa-border-lightning {
+  --cfa-edge: linear-gradient(150deg, #241b52, #4f46e5 50%, #241b52);
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.6);
+}
+.cfa-border-lightning::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--cfa-p-bolt);
+  background-size: 14px 14px;
+  -webkit-mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  mask-composite: exclude;
+  padding: 4px;
+  animation: cfa-flicker 1.9s steps(1) infinite;
+}
+.cfa-border-toxic {
+  --cfa-edge: linear-gradient(150deg, #123307, #46b81c 45%, #a4f53a 60%, #123307);
+  box-shadow: 0 0 12px rgba(120, 220, 60, 0.55);
+  animation: cfa-pulse 2.2s ease-in-out infinite;
+}
+.cfa-border-neon-cyan {
+  --cfa-edge: linear-gradient(150deg, #063a44, #22d3ee 50%, #063a44);
+  box-shadow:
+    0 0 7px rgba(34, 211, 238, 0.8),
+    0 0 18px rgba(34, 211, 238, 0.35);
+}
+.cfa-border-neon-pink {
+  --cfa-edge: linear-gradient(150deg, #4a0a33, #f472b6 50%, #4a0a33);
+  box-shadow:
+    0 0 7px rgba(244, 114, 182, 0.8),
+    0 0 18px rgba(244, 114, 182, 0.35);
+}
+.cfa-border-neon-orange {
+  --cfa-edge: linear-gradient(150deg, #4a2205, #fb923c 50%, #4a2205);
+  box-shadow:
+    0 0 7px rgba(251, 146, 60, 0.8),
+    0 0 18px rgba(251, 146, 60, 0.35);
+}
+.cfa-border-neon-purple {
+  --cfa-edge: linear-gradient(150deg, #2c0a4a, #a855f7 50%, #2c0a4a);
+  box-shadow:
+    0 0 7px rgba(168, 85, 247, 0.8),
+    0 0 18px rgba(168, 85, 247, 0.35);
+}
+.cfa-border-rainbow {
+  --cfa-edge: linear-gradient(
+    120deg,
+    #ff5e5e,
+    #ffb44d,
+    #f4e04d,
+    #6ee7a8,
+    #5eb9ff,
+    #9b8cff,
+    #ff7ad9,
+    #ff5e5e
+  );
+  background-size: 300% 100%;
+  animation: cfa-pan 5s linear infinite;
+}
+.cfa-border-aurora {
+  --cfa-edge: linear-gradient(
+    110deg,
+    #0e3b2e,
+    #2fbf8f 30%,
+    #7ee8c7 45%,
+    #2b6cb0 65%,
+    #14324f 85%,
+    #0e3b2e
+  );
+  background-size: 260% 100%;
+  animation: cfa-pan 9s ease-in-out infinite alternate;
+  box-shadow: 0 0 10px rgba(96, 220, 180, 0.35);
+}
+.cfa-border-galaxy {
+  --cfa-edge:
+    radial-gradient(40% 55% at 30% 20%, rgba(123, 92, 214, 0.8), transparent 70%),
+    radial-gradient(45% 55% at 75% 80%, rgba(43, 63, 143, 0.9), transparent 70%),
+    linear-gradient(150deg, #191036, #171d4c);
+  box-shadow: 0 0 12px rgba(123, 92, 214, 0.4);
+}
+.cfa-border-galaxy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--cfa-p-dot);
+  background-size: 11px 11px;
+  -webkit-mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  mask-composite: exclude;
+  padding: 4px;
+  animation: cfa-twinkle 3s ease-in-out infinite;
+}
+.cfa-border-manga {
+  --cfa-edge: var(--cfa-p-hatch) 0 0 / 7px 7px, linear-gradient(#f4f6f8, #f4f6f8);
+  box-shadow: inset 0 0 0 1px #0b0d11;
+}
+.cfa-border-pixel {
+  --cfa-edge: repeating-linear-gradient(
+    90deg,
+    #c6ee4f 0 8px,
+    #5eb9ff 8px 16px,
+    #ff7ad9 16px 24px,
+    #f4e04d 24px 32px
+  );
+}
+.cfa-border-glitch {
+  --cfa-edge: linear-gradient(150deg, #29e6e6, #0b0d11 45%, #ef3ef0);
+  animation: cfa-jitter 2.2s steps(1) infinite;
+  box-shadow:
+    -2px 0 0 rgba(41, 230, 230, 0.5),
+    2px 0 0 rgba(239, 62, 240, 0.5);
+}
+.cfa-border-carbon-fiber {
+  --cfa-edge:
+    repeating-linear-gradient(45deg, #14181f 0 3px, #232a35 3px 6px),
+    repeating-linear-gradient(-45deg, #10141a 0 3px, #1c222c 3px 6px);
+  background-blend-mode: overlay;
+}
+.cfa-border-chrome {
+  --cfa-edge: linear-gradient(
+    90deg,
+    #6a7683,
+    #f2f7fb 12%,
+    #8d99a6 28%,
+    #ffffff 46%,
+    #79858f 64%,
+    #e8eef4 82%,
+    #6a7683
+  );
+  background-size: 220% 100%;
+  animation: cfa-pan 7s ease-in-out infinite alternate;
+}
+.cfa-border-holographic-chrome {
+  --cfa-edge: linear-gradient(
+    90deg,
+    #b9c7d8,
+    #ffd1e8 15%,
+    #d1fff1 32%,
+    #ffffff 48%,
+    #cfd8ff 64%,
+    #ffe9c9 80%,
+    #b9c7d8
+  );
+  background-size: 220% 100%;
+  animation:
+    cfa-pan 6s ease-in-out infinite alternate,
+    cfa-hue 12s linear infinite;
+}
+.cfa-border-cracked-stone {
+  --cfa-edge:
+    var(--cfa-p-crack) 0 0 / 26px 26px,
+    linear-gradient(150deg, #7d8790, #4e5762 55%, #6a747e);
+}
+.cfa-border-lava-cracks {
+  --cfa-edge:
+    var(--cfa-p-crackglow) 0 0 / 26px 26px,
+    linear-gradient(150deg, #241512, #120a08 60%, #2a1410);
+  box-shadow: 0 0 12px rgba(255, 122, 47, 0.4);
+  animation: cfa-pulse 2.8s ease-in-out infinite;
+}
+.cfa-border-frosted-glass {
+  --cfa-edge:
+    radial-gradient(80% 60% at 20% 10%, rgba(255, 255, 255, 0.5), transparent 60%),
+    linear-gradient(150deg, rgba(214, 238, 252, 0.5), rgba(150, 180, 205, 0.35));
+  box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.35);
+}
+.cfa-border-circuit-board {
+  --cfa-edge:
+    var(--cfa-p-circuit) 0 0 / 22px 22px, linear-gradient(150deg, #04140c, #0a2416);
+  box-shadow: 0 0 9px rgba(110, 231, 168, 0.3);
+}
+.cfa-border-starfield {
+  --cfa-edge:
+    var(--cfa-p-dot) 0 0 / 12px 12px, var(--cfa-p-star) 5px 7px / 18px 18px,
+    linear-gradient(150deg, #0a0f1e, #131c33);
+}
+.cfa-border-treasure-map {
+  --cfa-edge:
+    radial-gradient(30% 30% at 15% 20%, rgba(120, 84, 40, 0.35), transparent 70%),
+    radial-gradient(26% 30% at 85% 75%, rgba(120, 84, 40, 0.3), transparent 70%),
+    linear-gradient(150deg, #d9c39a, #c4a877 55%, #cbb287);
+  box-shadow: inset 0 0 0 1px rgba(92, 64, 27, 0.55);
+}
+.cfa-border-gold-filigree {
+  --cfa-edge:
+    var(--cfa-p-filigree) 0 50% / 16px 16px,
+    linear-gradient(150deg, #3d2c07, #6d500f 55%, #4a3608);
+  box-shadow: 0 0 9px rgba(240, 194, 75, 0.3);
+}
+.cfa-border-comic-panel {
+  --cfa-edge: linear-gradient(#0b0d11, #0b0d11);
+  box-shadow:
+    inset 0 0 0 1.5px #f4f6f8,
+    0 3px 0 rgba(11, 13, 17, 0.8);
+}
+.cfa-border-vhs {
+  --cfa-edge: repeating-linear-gradient(
+    0deg,
+    #131720 0 5px,
+    #1e2430 5px 6px,
+    #2a1f38 6px 7px,
+    #131720 7px 12px
+  );
+  box-shadow:
+    -2px 0 0 rgba(41, 230, 230, 0.35),
+    2px 0 0 rgba(239, 62, 240, 0.35);
+  animation: cfa-jitter 3.4s steps(1) infinite;
+}
+.cfa-border-crt-arcade {
+  --cfa-edge: repeating-linear-gradient(0deg, #07120b 0 3px, #124a26 3px 4px);
+  box-shadow:
+    0 0 9px rgba(47, 191, 107, 0.5),
+    inset 0 0 5px rgba(47, 191, 107, 0.4);
+  animation: cfa-pulse 3.2s ease-in-out infinite;
+}
+.cfa-border-black-flame {
+  --cfa-edge: linear-gradient(0deg, #33124d, #1d1030 40%, #05060a);
+  background-size: 100% 220%;
+  animation: cfa-pan-y 3s linear infinite alternate;
+  box-shadow: 0 0 12px rgba(90, 40, 140, 0.6);
+}
+.cfa-border-white-flame {
+  --cfa-edge: linear-gradient(0deg, #ffffff, #bcd6ea 45%, #6b87a0);
+  background-size: 100% 220%;
+  animation: cfa-pan-y 3s linear infinite alternate;
+  box-shadow: 0 0 12px rgba(235, 245, 255, 0.7);
+}
+.cfa-border-cosmic-flame {
+  --cfa-edge: linear-gradient(0deg, #ff7ad9, #7b5cd6 35%, #2b3f8f 65%, #191036);
+  background-size: 100% 220%;
+  animation: cfa-pan-y 3.4s linear infinite alternate;
+  box-shadow: 0 0 12px rgba(123, 92, 214, 0.6);
+}
+.cfa-border-milestone {
+  --cfa-edge: linear-gradient(
+    120deg,
+    #c6ee4f,
+    #f0c24b 30%,
+    #ff7ad9 55%,
+    #5eb9ff 80%,
+    #c6ee4f
+  );
+  background-size: 300% 100%;
+  animation:
+    cfa-pan 6s linear infinite,
+    cfa-hue 14s linear infinite;
+  box-shadow: 0 0 12px rgba(198, 238, 79, 0.5);
+}
+
+/* ================================================================ */
+/* HOLO PATTERNS (pattern-*): 35                                    */
+/* Drawn on .cfx-card-fx over the stand-in art, blended the same    */
+/* way the shipped foils are: the art must survive the foil.        */
+/* ================================================================ */
+
+.cfa-pattern-classic-rainbow .cfx-card-fx {
+  background: repeating-linear-gradient(
+    115deg,
+    #ff5e5e 0 7px,
+    #f4e04d 7px 14px,
+    #6ee7a8 14px 21px,
+    #5eb9ff 21px 28px,
+    #9b8cff 28px 35px,
+    #ff7ad9 35px 42px
+  );
+  background-size: 240% 240%;
+  mix-blend-mode: color-dodge;
+  opacity: 0.5;
+  animation: cfa-pan 6s linear infinite;
+}
+.cfa-pattern-prism .cfx-card-fx {
+  background:
+    repeating-linear-gradient(
+      60deg,
+      transparent 0 6px,
+      rgba(255, 94, 94, 0.5) 6px 9px,
+      rgba(110, 231, 168, 0.5) 9px 12px,
+      rgba(94, 185, 255, 0.5) 12px 15px,
+      transparent 15px 21px
+    ),
+    repeating-linear-gradient(
+      -60deg,
+      transparent 0 6px,
+      rgba(255, 122, 217, 0.5) 6px 9px,
+      rgba(244, 224, 77, 0.5) 9px 12px,
+      rgba(155, 140, 255, 0.5) 12px 15px,
+      transparent 15px 21px
+    );
+  mix-blend-mode: screen;
+  opacity: 0.65;
+  animation: cfa-pan 8s linear infinite;
+  background-size:
+    200% 200%,
+    200% 200%;
+}
+.cfa-pattern-galaxy .cfx-card-fx {
+  background:
+    var(--cfa-p-dot) 0 0 / 14px 14px,
+    radial-gradient(45% 40% at 30% 25%, rgba(123, 92, 214, 0.65), transparent 70%),
+    radial-gradient(50% 45% at 72% 70%, rgba(43, 63, 143, 0.7), transparent 72%),
+    radial-gradient(30% 26% at 60% 40%, rgba(255, 122, 217, 0.35), transparent 70%);
+  mix-blend-mode: screen;
+  animation: cfa-twinkle 3.4s ease-in-out infinite;
+}
+.cfa-pattern-starburst .cfx-card-fx {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 46%,
+    rgba(255, 255, 255, 0.35) 0deg 4deg,
+    transparent 4deg 14deg
+  );
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  animation: cfa-pulse 3s ease-in-out infinite;
+}
+.cfa-pattern-cracked-ice .cfx-card-fx {
+  background:
+    var(--cfa-p-shard) 0 0 / 40px 40px,
+    var(--cfa-p-shard) 20px 14px / 58px 58px,
+    linear-gradient(120deg, rgba(190, 226, 255, 0.25), rgba(255, 255, 255, 0.08));
+  mix-blend-mode: screen;
+  animation: cfa-twinkle 2.8s ease-in-out infinite;
+}
+.cfa-pattern-confetti .cfx-card-fx {
+  background-image:
+    radial-gradient(circle 2px at 12% 18%, #ff5e5e 98%, transparent),
+    radial-gradient(circle 2px at 34% 66%, #f4e04d 98%, transparent),
+    radial-gradient(circle 2px at 58% 30%, #6ee7a8 98%, transparent),
+    radial-gradient(circle 2px at 76% 74%, #5eb9ff 98%, transparent),
+    radial-gradient(circle 2px at 88% 22%, #ff7ad9 98%, transparent),
+    radial-gradient(circle 2px at 22% 86%, #9b8cff 98%, transparent);
+  background-size: 90px 90px;
+  mix-blend-mode: screen;
+  animation: cfa-fall 8s linear infinite;
+}
+.cfa-pattern-glitter .cfx-card-fx {
+  background:
+    var(--cfa-p-dot) 0 0 / 8px 8px,
+    var(--cfa-p-dot) 3px 5px / 13px 13px;
+  mix-blend-mode: overlay;
+  opacity: 0.8;
+  animation: cfa-twinkle 1.6s steps(2) infinite;
+}
+.cfa-pattern-diamond .cfx-card-fx {
+  background: repeating-conic-gradient(
+    from 30deg,
+    rgba(255, 255, 255, 0.42) 0deg 25deg,
+    rgba(190, 210, 235, 0.12) 25deg 50deg,
+    rgba(255, 255, 255, 0.3) 50deg 90deg
+  );
+  background-size: 46px 46px;
+  mix-blend-mode: overlay;
+  animation: cfa-pulse 2.6s ease-in-out infinite;
+}
+.cfa-pattern-spiral .cfx-card-fx {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(155, 140, 255, 0.4) 0deg 12deg,
+    rgba(94, 185, 255, 0.15) 12deg 24deg
+  );
+  mix-blend-mode: screen;
+  animation: cfa-hue 10s linear infinite;
+}
+.cfa-pattern-waves .cfx-card-fx {
+  background: repeating-linear-gradient(
+    100deg,
+    rgba(94, 185, 255, 0.35) 0 9px,
+    rgba(110, 231, 168, 0.25) 9px 18px,
+    rgba(155, 140, 255, 0.3) 18px 27px
+  );
+  background-size: 240% 100%;
+  mix-blend-mode: screen;
+  animation: cfa-pan 7s ease-in-out infinite alternate;
+}
+.cfa-pattern-lightning .cfx-card-fx {
+  background: var(--cfa-p-bolt) 0 0 / 44px 44px;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  animation: cfa-flicker 2.1s steps(1) infinite;
+}
+.cfa-pattern-flame .cfx-card-fx {
+  background: linear-gradient(
+    0deg,
+    rgba(232, 83, 31, 0.55),
+    rgba(255, 176, 58, 0.35) 45%,
+    transparent 75%
+  );
+  background-size: 100% 220%;
+  mix-blend-mode: screen;
+  animation: cfa-pan-y 2.8s linear infinite alternate;
+}
+.cfa-pattern-digital-grid .cfx-card-fx {
+  background:
+    linear-gradient(rgba(34, 211, 238, 0.4) 1px, transparent 1px) 0 0 / 100% 11px,
+    linear-gradient(90deg, rgba(34, 211, 238, 0.4) 1px, transparent 1px) 0 0 / 11px 100%;
+  mix-blend-mode: screen;
+  animation: cfa-pan-y 6s linear infinite;
+}
+.cfa-pattern-matrix-rain .cfx-card-fx {
+  background:
+    var(--cfa-p-glyph) 0 0 / 14px 84px,
+    var(--cfa-p-glyph) 7px 30px / 14px 110px;
+  mix-blend-mode: screen;
+  opacity: 0.75;
+  animation: cfa-fall 4s linear infinite;
+}
+.cfa-pattern-pixel-sparkle .cfx-card-fx {
+  background:
+    var(--cfa-p-pixel) 0 0 / 30px 30px,
+    var(--cfa-p-pixel) 15px 15px / 46px 46px;
+  mix-blend-mode: screen;
+  animation: cfa-twinkle 1.2s steps(2) infinite;
+}
+.cfa-pattern-manga-screentone .cfx-card-fx {
+  background: radial-gradient(circle 1.3px, rgba(244, 246, 248, 0.75) 98%, transparent)
+    0 0 / 6px 6px;
+  mix-blend-mode: overlay;
+  filter: grayscale(1);
+}
+.cfa-pattern-aurora .cfx-card-fx {
+  background: linear-gradient(
+    110deg,
+    rgba(47, 191, 143, 0.45),
+    rgba(126, 232, 199, 0.3) 35%,
+    rgba(43, 108, 176, 0.45) 70%,
+    rgba(47, 191, 143, 0.35)
+  );
+  background-size: 260% 100%;
+  mix-blend-mode: screen;
+  filter: blur(1px);
+  animation: cfa-pan 8s ease-in-out infinite alternate;
+}
+.cfa-pattern-cosmic-dust .cfx-card-fx {
+  background:
+    var(--cfa-p-dot) 0 0 / 18px 18px,
+    var(--cfa-p-dot) 8px 12px / 26px 26px;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: cfa-drift 12s linear infinite;
+}
+.cfa-pattern-meteor-shower .cfx-card-fx {
+  background:
+    var(--cfa-p-streak) 0 0 / 80px 80px,
+    var(--cfa-p-streak) 44px 30px / 116px 116px;
+  mix-blend-mode: screen;
+  opacity: 0.65;
+  animation: cfa-fall 3.2s linear infinite;
+}
+.cfa-pattern-bubbles .cfx-card-fx {
+  background:
+    var(--cfa-p-bubble) 0 0 / 38px 38px,
+    var(--cfa-p-bubble) 20px 26px / 56px 56px;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  animation: cfa-rise 7s linear infinite;
+}
+.cfa-pattern-hearts .cfx-card-fx {
+  background:
+    var(--cfa-p-heart) 0 0 / 40px 40px,
+    var(--cfa-p-heart) 22px 26px / 58px 58px;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: cfa-drift 9s linear infinite;
+}
+.cfa-pattern-sakura-petals .cfx-card-fx {
+  background:
+    var(--cfa-p-petal) 0 0 / 42px 42px,
+    var(--cfa-p-petal) 22px 26px / 60px 60px;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  animation: cfa-fall 7s linear infinite;
+}
+.cfa-pattern-snowflakes .cfx-card-fx {
+  background:
+    var(--cfa-p-flake) 0 0 / 40px 40px,
+    var(--cfa-p-flake) 22px 26px / 58px 58px;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: cfa-fall 8s linear infinite;
+}
+.cfa-pattern-gold-flecks .cfx-card-fx {
+  background:
+    radial-gradient(circle 1.6px at 20% 30%, #f0c24b 98%, transparent) 0 0 / 34px 34px,
+    radial-gradient(circle 1.2px at 70% 65%, #fff3c4 98%, transparent) 7px 9px / 26px
+      26px;
+  mix-blend-mode: screen;
+  animation: cfa-twinkle 2.2s ease-in-out infinite;
+}
+.cfa-pattern-silver-flecks .cfx-card-fx {
+  background:
+    radial-gradient(circle 1.6px at 20% 30%, #c8d2dc 98%, transparent) 0 0 / 34px 34px,
+    radial-gradient(circle 1.2px at 70% 65%, #f2f7fb 98%, transparent) 7px 9px / 26px
+      26px;
+  mix-blend-mode: screen;
+  animation: cfa-twinkle 2.2s ease-in-out infinite;
+}
+.cfa-pattern-oil-slick .cfx-card-fx {
+  background:
+    radial-gradient(60% 50% at 30% 30%, rgba(255, 122, 217, 0.4), transparent 70%),
+    radial-gradient(55% 45% at 70% 60%, rgba(110, 231, 168, 0.4), transparent 70%),
+    radial-gradient(50% 55% at 45% 80%, rgba(94, 185, 255, 0.4), transparent 70%);
+  mix-blend-mode: screen;
+  animation: cfa-hue 8s linear infinite;
+}
+.cfa-pattern-vhs-rainbow .cfx-card-fx {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 94, 94, 0.35) 0 4px,
+    rgba(244, 224, 77, 0.3) 4px 8px,
+    rgba(110, 231, 168, 0.3) 8px 12px,
+    rgba(94, 185, 255, 0.35) 12px 16px
+  );
+  mix-blend-mode: screen;
+  animation: cfa-jitter 2.6s steps(1) infinite;
+}
+.cfa-pattern-checkerboard .cfx-card-fx {
+  background: repeating-conic-gradient(
+    rgba(255, 255, 255, 0.3) 0deg 90deg,
+    transparent 90deg 180deg
+  );
+  background-size: 18px 18px;
+  mix-blend-mode: overlay;
+  animation: cfa-pan 9s linear infinite;
+}
+.cfa-pattern-honeycomb .cfx-card-fx {
+  background:
+    var(--cfa-p-hex) 0 0 / 22px 25px,
+    var(--cfa-p-hex) 11px 12.5px / 22px 25px;
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  filter: hue-rotate(45deg);
+}
+.cfa-pattern-hex-grid .cfx-card-fx {
+  background:
+    var(--cfa-p-hex) 0 0 / 26px 30px,
+    var(--cfa-p-hex) 13px 15px / 26px 30px;
+  mix-blend-mode: screen;
+  animation: cfa-pulse 2.6s ease-in-out infinite;
+}
+.cfa-pattern-star-shapes .cfx-card-fx {
+  background:
+    var(--cfa-p-star) 0 0 / 40px 40px,
+    var(--cfa-p-star) 22px 26px / 58px 58px;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  animation: cfa-twinkle 2.4s ease-in-out infinite;
+}
+/* The mark itself, exactly as supplied — never redrawn, only tiled. */
+.cfa-pattern-cardflare-flame .cfx-card-fx {
+  background: url("/brand/cardflare-mark.png") 50% 50% / 34px auto repeat;
+  mix-blend-mode: screen;
+  opacity: 0.28;
+  animation: cfa-pulse 3.2s ease-in-out infinite;
+}
+.cfa-pattern-cardflare-logos .cfx-card-fx {
+  background:
+    url("/brand/cardflare-mark.png") 0 0 / 16px auto repeat,
+    url("/brand/cardflare-mark.png") 12px 14px / 24px auto repeat;
+  mix-blend-mode: screen;
+  opacity: 0.22;
+}
+.cfa-pattern-secret-rare .cfx-card-fx {
+  background: repeating-linear-gradient(
+    55deg,
+    transparent 0 14px,
+    rgba(255, 94, 94, 0.55) 14px 17px,
+    rgba(244, 224, 77, 0.55) 17px 20px,
+    rgba(110, 231, 168, 0.55) 20px 23px,
+    rgba(94, 185, 255, 0.55) 23px 26px,
+    rgba(255, 122, 217, 0.55) 26px 29px,
+    transparent 29px 46px
+  );
+  background-size: 300% 300%;
+  mix-blend-mode: screen;
+  animation: cfa-pan 5s linear infinite;
+}
+.cfa-pattern-manga-monochrome .cfx-card-fx {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(244, 246, 248, 0.5) 46%,
+    rgba(244, 246, 248, 0.15) 52%,
+    transparent 68%
+  );
+  background-size: 260% 100%;
+  mix-blend-mode: screen;
+  filter: grayscale(1);
+  animation: cfa-pan 4.4s ease-in-out infinite;
+}
+
+/* ================================================================ */
+/* CARD ANIMATIONS (anim-*): 31                                     */
+/* Motion on the card itself or an overlay riding it. The ones     */
+/* triggered by events in real life (scroll, tilt, profile open)    */
+/* loop their moment here so the console can judge the look.        */
+/* ================================================================ */
+
+.cfa-anim-still {
+  /* The baseline: deliberately nothing. */
+  --cfa-edge: #2a323d;
+}
+.cfa-anim-shimmer .cfx-card-fx {
+  overflow: hidden;
+}
+.cfa-anim-shimmer .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 62%
+  );
+  animation: cfa-sheen 3.4s ease-in-out infinite;
+}
+.cfa-anim-pulse {
+  animation: cfa-pulse 2.4s ease-in-out infinite;
+  box-shadow: 0 0 14px rgba(198, 238, 79, 0.4);
+}
+.cfa-anim-orbit .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle 3px at 50% 0%, #c6ee4f 98%, transparent),
+    radial-gradient(circle 6px at 50% 0%, rgba(198, 238, 79, 0.35) 98%, transparent);
+  animation: cfa-spin 3.2s linear infinite;
+}
+.cfa-anim-float {
+  animation: cfa-float 5s ease-in-out infinite;
+}
+.cfa-anim-tilt {
+  animation: cfa-tilt 7s ease-in-out infinite;
+}
+.cfa-anim-sparkle .cfx-card-fx {
+  background:
+    var(--cfa-p-star) 0 0 / 42px 42px,
+    var(--cfa-p-star) 22px 26px / 62px 62px;
+  animation: cfa-twinkle 1.9s ease-in-out infinite;
+  opacity: 0.75;
+}
+.cfa-anim-ember-sparks .cfx-card-fx {
+  background:
+    var(--cfa-p-spark) 0 0 / 28px 28px,
+    var(--cfa-p-spark) 15px 20px / 44px 44px;
+  animation: cfa-rise 4.6s linear infinite;
+  opacity: 0.85;
+}
+.cfa-anim-flame-edge {
+  --cfa-edge: linear-gradient(0deg, #ffb03a, #e8531f 45%, #7a1d05);
+  background-size: 100% 220%;
+  animation:
+    cfa-pan-y 2.4s linear infinite alternate,
+    cfa-flicker 3.1s steps(1) infinite;
+  box-shadow: 0 0 13px rgba(255, 122, 47, 0.6);
+}
+.cfa-anim-electric-arcs .cfx-card-fx {
+  background: var(--cfa-p-bolt) 0 0 / 36px 36px;
+  -webkit-mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  mask-composite: exclude;
+  padding: 7px;
+  animation: cfa-flicker 1.6s steps(1) infinite;
+}
+.cfa-anim-snowfall .cfx-card-fx {
+  background:
+    var(--cfa-p-flake) 0 0 / 36px 36px,
+    var(--cfa-p-flake) 20px 24px / 54px 54px;
+  animation: cfa-fall 7.5s linear infinite;
+  opacity: 0.7;
+}
+.cfa-anim-rain .cfx-card-fx {
+  background:
+    var(--cfa-p-rain) 0 0 / 22px 32px,
+    var(--cfa-p-rain) 12px 16px / 32px 46px;
+  animation: cfa-fall 1.6s linear infinite;
+  opacity: 0.7;
+}
+.cfa-anim-sakura-petals .cfx-card-fx {
+  background:
+    var(--cfa-p-petal) 0 0 / 40px 40px,
+    var(--cfa-p-petal) 22px 26px / 58px 58px;
+  animation: cfa-fall 6.4s linear infinite;
+  opacity: 0.8;
+}
+.cfa-anim-cosmic-particles .cfx-card-fx {
+  background:
+    var(--cfa-p-dot) 0 0 / 16px 16px,
+    var(--cfa-p-star) 9px 12px / 56px 56px;
+  animation: cfa-drift 11s linear infinite;
+  opacity: 0.65;
+}
+.cfa-anim-floating-stars .cfx-card-fx {
+  background:
+    var(--cfa-p-star) 0 0 / 44px 44px,
+    var(--cfa-p-star) 24px 30px / 66px 66px;
+  animation: cfa-rise 9s linear infinite;
+  opacity: 0.7;
+}
+.cfa-anim-pixel-particles .cfx-card-fx {
+  background:
+    var(--cfa-p-pixel) 0 0 / 34px 34px,
+    var(--cfa-p-pixel) 18px 22px / 52px 52px;
+  animation: cfa-rise 5.5s steps(14) infinite;
+  opacity: 0.8;
+}
+.cfa-anim-glitch-flicker {
+  animation: cfa-glitch 3.6s steps(1) infinite;
+}
+.cfa-anim-scanline .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 8%;
+  background: linear-gradient(
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.02)
+  );
+  animation: cfa-scan 3s linear infinite;
+}
+.cfa-anim-light-sweep .cfx-card-fx {
+  overflow: hidden;
+}
+.cfa-anim-light-sweep .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 58%
+  );
+  animation: cfa-sheen 2.6s ease-in-out infinite;
+}
+.cfa-anim-spotlight-sweep .cfx-card-fx {
+  background: radial-gradient(
+    38% 30% at 30% 30%,
+    rgba(255, 255, 255, 0.28),
+    transparent 70%
+  );
+  background-size: 200% 200%;
+  animation: cfa-wander 6s ease-in-out infinite;
+}
+.cfa-anim-holo-flare .cfx-card-fx {
+  overflow: hidden;
+}
+.cfa-anim-holo-flare .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(255, 94, 94, 0.3) 42%,
+    rgba(244, 224, 77, 0.35) 47%,
+    rgba(110, 231, 168, 0.35) 52%,
+    rgba(94, 185, 255, 0.3) 57%,
+    transparent 66%
+  );
+  animation: cfa-sheen 3.8s ease-in-out infinite;
+}
+.cfa-anim-ripple .cfx-card-fx::before,
+.cfa-anim-ripple .cfx-card-fx::after {
+  content: "";
+  position: absolute;
+  inset: 30%;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(94, 185, 255, 0.6);
+  animation: cfa-ripple 2.6s ease-out infinite;
+}
+.cfa-anim-ripple .cfx-card-fx::after {
+  animation-delay: 1.3s;
+}
+.cfa-anim-heart-particles .cfx-card-fx {
+  background:
+    var(--cfa-p-heart) 0 0 / 40px 40px,
+    var(--cfa-p-heart) 22px 26px / 58px 58px;
+  animation: cfa-rise 6s linear infinite;
+  opacity: 0.75;
+}
+.cfa-anim-smoke .cfx-card-fx {
+  background:
+    radial-gradient(30% 22% at 30% 100%, rgba(120, 130, 145, 0.5), transparent 70%),
+    radial-gradient(26% 20% at 62% 100%, rgba(90, 100, 115, 0.45), transparent 70%);
+  background-size: 100% 220%;
+  filter: blur(3px);
+  animation: cfa-pan-y 5s linear infinite;
+}
+.cfa-anim-aura {
+  animation: cfa-breathe 3.4s ease-in-out infinite;
+  box-shadow:
+    0 0 12px rgba(198, 238, 79, 0.45),
+    0 0 26px rgba(198, 238, 79, 0.2);
+}
+.cfa-anim-shockwave .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 9999px;
+  border: 2px solid rgba(198, 238, 79, 0.7);
+  animation: cfa-shock 3s ease-out infinite;
+}
+.cfa-anim-meteor-streak .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  top: 12%;
+  left: 8%;
+  width: 45%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #eef4ff);
+  box-shadow: 0 0 6px rgba(238, 244, 255, 0.8);
+  animation: cfa-streakthrough 4.2s ease-in infinite;
+}
+.cfa-anim-breathe {
+  animation: cfa-breathe 4.6s ease-in-out infinite;
+}
+/* Fires on scroll-into-view in the product; the moment loops here. */
+.cfa-anim-scroll-shine .cfx-card-fx {
+  overflow: hidden;
+}
+.cfa-anim-scroll-shine .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    rgba(198, 238, 79, 0.3) 50%,
+    transparent 60%
+  );
+  animation: cfa-sheen 4.6s ease-in-out infinite;
+}
+/* Follows the phone's tilt in the product; the sweep loops here. */
+.cfa-anim-tilt-shine {
+  animation: cfa-tilt 8s ease-in-out infinite;
+}
+.cfa-anim-tilt-shine .cfx-card-fx {
+  background: linear-gradient(
+    120deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 65%
+  );
+  background-size: 240% 240%;
+  animation: cfa-pan 8s ease-in-out infinite alternate;
+}
+/* A rare burst when somebody opens your profile; loops here. */
+.cfa-anim-flare-burst .cfx-card-fx::before {
+  content: "";
+  position: absolute;
+  inset: 15%;
+  background: repeating-conic-gradient(
+    rgba(198, 238, 79, 0.75) 0deg 6deg,
+    transparent 6deg 30deg
+  );
+  border-radius: 9999px;
+  filter: blur(0.5px);
+  animation: cfa-burst 4.4s ease-out infinite;
+}
+
+/* ================================================================ */
+/* SHOWCASE BACKGROUNDS (bg-*): 30                                  */
+/* Full panels. Quiet enough that cards sit ON them, not IN them.   */
+/* ================================================================ */
+
+.cfa-bg-plain-charcoal {
+  background: linear-gradient(180deg, #12161d, #0e1116);
+}
+.cfa-bg-cardflare-lime {
+  background:
+    radial-gradient(70% 90% at 50% 110%, rgba(198, 238, 79, 0.28), transparent 70%),
+    #0e1116;
+}
+.cfa-bg-night-sky {
+  background:
+    var(--cfa-p-dot) 0 0 / 52px 52px,
+    var(--cfa-p-star) 30px 20px / 60px 60px,
+    linear-gradient(180deg, #0a0f1e, #10182e 70%, #131c33);
+}
+.cfa-bg-galaxy {
+  background:
+    var(--cfa-p-dot) 0 0 / 34px 34px,
+    radial-gradient(50% 60% at 28% 30%, rgba(123, 92, 214, 0.5), transparent 70%),
+    radial-gradient(55% 65% at 74% 68%, rgba(43, 63, 143, 0.55), transparent 72%),
+    radial-gradient(28% 30% at 58% 40%, rgba(255, 122, 217, 0.22), transparent 70%),
+    #0b0820;
+}
+.cfa-bg-sunset {
+  background: linear-gradient(
+    180deg,
+    #2b1e4e 0%,
+    #7c2d6b 38%,
+    #d4574e 62%,
+    #f0a04b 82%,
+    #f7ce68 100%
+  );
+}
+.cfa-bg-pixel-city {
+  background:
+    linear-gradient(0deg, #0b0d16 0 26%, transparent 26%),
+    repeating-linear-gradient(
+      90deg,
+      #141a2c 0 18px,
+      #0e1322 18px 34px,
+      #182036 34px 52px,
+      #0e1322 52px 70px
+    ),
+    linear-gradient(180deg, #171d3a, #0b0d16);
+  background-blend-mode: normal, multiply, normal;
+}
+.cfa-bg-pixel-night-sky {
+  background:
+    var(--cfa-p-pixel) 0 0 / 52px 52px,
+    var(--cfa-p-pixel) 26px 32px / 84px 84px,
+    linear-gradient(180deg, #0a0f1e, #131c33);
+}
+.cfa-bg-lgs-table {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 56px),
+    linear-gradient(180deg, #4a3320, #3a2717 60%, #2c1d10);
+}
+.cfa-bg-tournament-hall {
+  background:
+    radial-gradient(60% 30% at 50% 0%, rgba(244, 246, 248, 0.2), transparent 70%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 26px,
+      rgba(58, 69, 83, 0.5) 26px 30px
+    ),
+    linear-gradient(180deg, #1c222c, #10151c);
+}
+.cfa-bg-card-shop-shelves {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #b2402e 0 9px,
+      #2b6cb0 9px 18px,
+      #d9a92f 18px 27px,
+      #178a56 27px 36px,
+      #7a3fa0 36px 45px
+    ),
+    repeating-linear-gradient(0deg, transparent 0 22px, #0b0d11 22px 30px), #171d26;
+  background-blend-mode: multiply, normal;
+  opacity: 0.95;
+}
+.cfa-bg-binder-page {
+  background:
+    linear-gradient(90deg, #0b0d11 4px, transparent 4px) -2px 0 / 33.4% 100%,
+    linear-gradient(0deg, #0b0d11 4px, transparent 4px) 0 -2px / 100% 33.4%,
+    radial-gradient(120% 90% at 50% 20%, #2c3743, #1b232d 80%);
+}
+.cfa-bg-playmat {
+  background:
+    radial-gradient(80% 80% at 50% 45%, rgba(43, 108, 176, 0.25), transparent 75%),
+    #10233c;
+  box-shadow: inset 0 0 0 3px rgba(94, 185, 255, 0.25);
+}
+.cfa-bg-manga-panels {
+  background:
+    linear-gradient(#f4f6f8, #f4f6f8) 4% 8% / 42% 38% no-repeat,
+    linear-gradient(#f4f6f8, #f4f6f8) 54% 8% / 42% 56% no-repeat,
+    linear-gradient(#f4f6f8, #f4f6f8) 4% 92% / 42% 44% no-repeat,
+    linear-gradient(#e6e9ec, #e6e9ec) 54% 92% / 42% 26% no-repeat,
+    #0b0d11;
+}
+.cfa-bg-wanted-posters {
+  background:
+    linear-gradient(#d9c39a, #c4a877) 12% 20% / 24% 52% no-repeat,
+    linear-gradient(#cbb287, #b89d6e) 50% 65% / 22% 48% no-repeat,
+    linear-gradient(#e0cda6, #cbb287) 86% 30% / 24% 56% no-repeat,
+    linear-gradient(160deg, #3a2717, #241708);
+}
+.cfa-bg-treasure-room {
+  background:
+    radial-gradient(circle 3px at 22% 78%, #fff3c4 98%, transparent) 0 0 / 90px 70px,
+    radial-gradient(circle 2px at 68% 84%, #f0c24b 98%, transparent) 20px 10px / 70px
+      60px,
+    radial-gradient(70% 55% at 50% 100%, rgba(240, 194, 75, 0.3), transparent 70%),
+    linear-gradient(180deg, #16100a, #241708);
+}
+.cfa-bg-pirate-deck {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 26px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 90px),
+    linear-gradient(180deg, #4a3320, #33220f);
+}
+.cfa-bg-neon-city {
+  background:
+    linear-gradient(rgba(255, 113, 206, 0.85), rgba(255, 113, 206, 0.85)) 16% 34% / 14%
+      20% no-repeat,
+    linear-gradient(rgba(1, 205, 254, 0.85), rgba(1, 205, 254, 0.85)) 44% 52% / 10% 30%
+      no-repeat,
+    linear-gradient(rgba(198, 238, 79, 0.8), rgba(198, 238, 79, 0.8)) 74% 40% / 12% 24%
+      no-repeat,
+    linear-gradient(0deg, #0b0d16 0 22%, transparent 22%),
+    linear-gradient(180deg, #131028, #0b0d16);
+  filter: saturate(1.15);
+}
+.cfa-bg-vaporwave-grid {
+  background:
+    radial-gradient(circle 26px at 50% 34%, #ff9a3a 97%, transparent),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 113, 206, 0.5) 0 1.5px,
+      transparent 1.5px 14px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 113, 206, 0.35) 0 1.5px,
+      transparent 1.5px 22px
+    ),
+    linear-gradient(180deg, #2a1052 0 52%, #1c0b38 52%);
+}
+.cfa-bg-arcade {
+  background:
+    linear-gradient(rgba(43, 169, 255, 0.5), rgba(43, 169, 255, 0.08)) 14% 80% / 16% 52%
+      no-repeat,
+    linear-gradient(rgba(255, 51, 85, 0.5), rgba(255, 51, 85, 0.08)) 46% 80% / 16% 60%
+      no-repeat,
+    linear-gradient(rgba(185, 103, 255, 0.5), rgba(185, 103, 255, 0.08)) 78% 80% / 16%
+      56% no-repeat,
+    #0a0c12;
+}
+.cfa-bg-fire {
+  background: linear-gradient(0deg, #ffb03a, #e8531f 40%, #7a1d05 75%, #2a0c02);
+  background-size: 100% 200%;
+  animation: cfa-pan-y 3s linear infinite alternate;
+}
+.cfa-bg-ice {
+  background:
+    var(--cfa-p-shard) 0 0 / 80px 80px,
+    linear-gradient(160deg, #cfeaff, #8ecdf2 45%, #5da5dd);
+}
+.cfa-bg-lightning-storm {
+  background:
+    radial-gradient(50% 35% at 30% 20%, rgba(90, 105, 130, 0.55), transparent 70%),
+    radial-gradient(55% 40% at 75% 26%, rgba(70, 85, 110, 0.5), transparent 72%),
+    linear-gradient(180deg, #141a26, #0b0e16);
+}
+.cfa-bg-lightning-storm::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(235, 240, 255, 0.85);
+  animation: cfa-flash 5s steps(1) infinite;
+}
+.cfa-bg-sakura-garden {
+  background:
+    var(--cfa-p-petal) 0 0 / 56px 56px,
+    var(--cfa-p-petal) 30px 36px / 84px 84px,
+    linear-gradient(180deg, #2b1a2a, #1d1220);
+}
+.cfa-bg-underwater {
+  background:
+    var(--cfa-p-bubble) 0 0 / 64px 64px,
+    linear-gradient(
+      115deg,
+      transparent 20%,
+      rgba(191, 232, 255, 0.14) 26%,
+      transparent 34%,
+      transparent 52%,
+      rgba(191, 232, 255, 0.1) 60%,
+      transparent 68%
+    ),
+    linear-gradient(180deg, #0e4a63, #072435 70%, #041722);
+}
+.cfa-bg-cloudscape {
+  background:
+    radial-gradient(38% 26% at 26% 66%, rgba(244, 248, 252, 0.9), transparent 70%),
+    radial-gradient(44% 30% at 66% 74%, rgba(226, 236, 246, 0.85), transparent 72%),
+    radial-gradient(30% 20% at 84% 52%, rgba(244, 248, 252, 0.7), transparent 70%),
+    linear-gradient(180deg, #7db4e0, #a8cdea 60%, #cfe4f4);
+}
+.cfa-bg-space {
+  background:
+    var(--cfa-p-dot) 0 0 / 64px 64px,
+    var(--cfa-p-dot) 32px 40px / 100px 100px,
+    #05060a;
+}
+.cfa-bg-black-void {
+  background: #05060a;
+}
+.cfa-bg-gold-luxury {
+  background:
+    linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(240, 194, 75, 0.16) 46%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, #12100a, #05060a);
+  box-shadow: inset 0 0 0 2px rgba(240, 194, 75, 0.4);
+}
+.cfa-bg-holographic-foil {
+  background: linear-gradient(
+    115deg,
+    #ff5e5e,
+    #ffb44d 18%,
+    #f4e04d 34%,
+    #6ee7a8 50%,
+    #5eb9ff 66%,
+    #9b8cff 82%,
+    #ff7ad9
+  );
+  background-size: 300% 100%;
+  animation: cfa-pan 7s linear infinite;
+  filter: saturate(0.85) brightness(0.8);
+}
+.cfa-bg-cardflare-pattern {
+  background:
+    url("/brand/cardflare-mark.png") 0 0 / 44px auto repeat,
+    #10151c;
+  background-blend-mode: luminosity, normal;
+}
+
+/* ================================================================ */
+/* PROFILE EFFECTS (scene-*): 19                                    */
+/* Played over the mini profile in .cfx-panel-fx.                   */
+/* ================================================================ */
+
+.cfa-scene-falling-embers .cfx-panel-fx {
+  background-image: var(--cfa-p-spark), var(--cfa-p-spark);
+  background-size:
+    44px 44px,
+    68px 68px;
+  animation: cfa-fall 6s linear infinite;
+  opacity: 0.8;
+}
+.cfa-scene-shooting-stars .cfx-panel-fx::before {
+  content: "";
+  position: absolute;
+  top: 16%;
+  left: 6%;
+  width: 32%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #eef4ff);
+  box-shadow: 0 0 7px rgba(238, 244, 255, 0.85);
+  animation: cfa-streakthrough 3.6s ease-in infinite;
+}
+.cfa-scene-shooting-stars .cfx-panel-fx {
+  background: var(--cfa-p-dot) 0 0 / 44px 44px;
+  opacity: 0.9;
+}
+.cfa-scene-snow .cfx-panel-fx {
+  background-image: var(--cfa-p-flake), var(--cfa-p-flake);
+  background-size:
+    44px 44px,
+    68px 68px;
+  animation: cfa-fall 8s linear infinite;
+  opacity: 0.75;
+}
+.cfa-scene-rain .cfx-panel-fx {
+  background-image: var(--cfa-p-rain), var(--cfa-p-rain);
+  background-size:
+    24px 36px,
+    36px 54px;
+  animation: cfa-fall 1.4s linear infinite;
+  opacity: 0.7;
+}
+.cfa-scene-sakura-petals .cfx-panel-fx {
+  background-image: var(--cfa-p-petal), var(--cfa-p-petal);
+  background-size:
+    46px 46px,
+    70px 70px;
+  animation: cfa-fall 6.6s linear infinite;
+  opacity: 0.85;
+}
+.cfa-scene-floating-holo-shards .cfx-panel-fx {
+  background-image: var(--cfa-p-shard), var(--cfa-p-shard);
+  background-size:
+    48px 48px,
+    76px 76px;
+  animation: cfa-drift 10s linear infinite;
+  opacity: 0.8;
+}
+.cfa-scene-drifting-cards .cfx-panel-fx {
+  background-image: var(--cfa-p-card), var(--cfa-p-card);
+  background-size:
+    56px 56px,
+    88px 88px;
+  animation: cfa-drift 13s linear infinite;
+  opacity: 0.7;
+}
+.cfa-scene-flame-wisps .cfx-panel-fx {
+  background:
+    radial-gradient(22% 30% at 24% 100%, rgba(232, 83, 31, 0.55), transparent 70%),
+    radial-gradient(18% 26% at 56% 100%, rgba(255, 154, 58, 0.45), transparent 70%),
+    radial-gradient(20% 28% at 84% 100%, rgba(232, 83, 31, 0.5), transparent 70%);
+  background-size: 100% 200%;
+  filter: blur(2px);
+  animation: cfa-pan-y 4.4s linear infinite;
+}
+.cfa-scene-lightning-flashes .cfx-panel-fx {
+  background: rgba(235, 240, 255, 0.9);
+  opacity: 0;
+  animation: cfa-flash 4.2s steps(1) infinite;
+}
+.cfa-scene-pixel-stars .cfx-panel-fx {
+  background-image: var(--cfa-p-pixel), var(--cfa-p-pixel);
+  background-size:
+    44px 44px,
+    72px 72px;
+  animation: cfa-twinkle 1.4s steps(2) infinite;
+  opacity: 0.8;
+}
+.cfa-scene-aurora .cfx-panel-fx {
+  background: linear-gradient(
+    100deg,
+    rgba(47, 191, 143, 0.5),
+    rgba(126, 232, 199, 0.32) 30%,
+    rgba(43, 108, 176, 0.45) 65%,
+    rgba(47, 191, 143, 0.4)
+  );
+  background-size: 260% 100%;
+  height: 44%;
+  filter: blur(5px);
+  animation: cfa-pan 9s ease-in-out infinite alternate;
+}
+.cfa-scene-galaxy-particles .cfx-panel-fx {
+  background-image: var(--cfa-p-dot), var(--cfa-p-star);
+  background-size:
+    28px 28px,
+    72px 72px;
+  animation: cfa-drift 14s linear infinite;
+  opacity: 0.7;
+}
+.cfa-scene-manga-speed-lines .cfx-panel-fx {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 45%,
+    rgba(244, 246, 248, 0.16) 0deg 2deg,
+    transparent 2deg 9deg
+  );
+}
+.cfa-scene-spotlight .cfx-panel-fx {
+  background: radial-gradient(
+    30% 42% at 30% 40%,
+    rgba(255, 255, 255, 0.22),
+    transparent 70%
+  );
+  background-size: 200% 200%;
+  animation: cfa-wander 7s ease-in-out infinite;
+}
+.cfa-scene-parallax .cfx-panel-fx {
+  background:
+    var(--cfa-p-dot) 0 0 / 30px 30px,
+    var(--cfa-p-dot) 15px 20px / 60px 60px;
+  animation: cfa-drift 9s linear infinite alternate;
+  opacity: 0.6;
+}
+.cfa-scene-flare-entrance .cfx-panel-fx::before {
+  content: "";
+  position: absolute;
+  top: 30%;
+  left: 0;
+  width: 40%;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, #c6ee4f);
+  box-shadow: 0 0 9px rgba(198, 238, 79, 0.8);
+  animation: cfa-streakthrough 3.4s ease-in-out infinite;
+}
+.cfa-scene-avatar-entrance .cfx-panel-profile::before {
+  animation: cfa-popin 3.2s ease-out infinite;
+}
+.cfa-scene-showcase-entrance .cfx-panel-fx {
+  background-image: var(--cfa-p-card), var(--cfa-p-card), var(--cfa-p-card);
+  background-repeat: no-repeat;
+  background-position:
+    32% 58%,
+    50% 56%,
+    68% 58%;
+  background-size:
+    64px 64px,
+    64px 64px,
+    64px 64px;
+  animation: cfa-dealin 3s ease-out infinite;
+}
+.cfa-scene-veteran-shine .cfx-panel-fx {
+  background: linear-gradient(
+    110deg,
+    transparent 36%,
+    rgba(240, 194, 75, 0.35) 48%,
+    rgba(255, 243, 196, 0.25) 52%,
+    transparent 64%
+  );
+  background-size: 260% 100%;
+  animation: cfa-pan 4.8s ease-in-out infinite;
+}
+
+/* ================================================================ */
+/* NAME STYLES (name-*): 13. Drawn on the .cfx-name "CHUNC".        */
+/* ================================================================ */
+
+.cfa-name-ember-name.cfx-name {
+  color: #ff9a3a;
+  text-shadow: 0 0 12px rgba(255, 122, 47, 0.55);
+}
+.cfa-name-lime-name.cfx-name {
+  color: #c6ee4f;
+  text-shadow: 0 0 12px rgba(198, 238, 79, 0.5);
+}
+.cfa-name-frost-name.cfx-name {
+  color: #9ed4f4;
+  text-shadow: 0 0 12px rgba(140, 200, 255, 0.55);
+}
+.cfa-name-rose-name.cfx-name {
+  color: #f39ec2;
+  text-shadow: 0 0 12px rgba(240, 130, 180, 0.5);
+}
+.cfa-name-gradient-name.cfx-name {
+  background: linear-gradient(100deg, #c6ee4f, #5eb9ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cfa-name-holographic-name.cfx-name {
+  background: linear-gradient(
+    100deg,
+    #ff5e5e,
+    #ffb44d,
+    #f4e04d,
+    #6ee7a8,
+    #5eb9ff,
+    #9b8cff,
+    #ff7ad9
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cfa-pan 5s linear infinite;
+}
+.cfa-name-gold-name.cfx-name {
+  background: linear-gradient(180deg, #fff3c4 10%, #f0c24b 45%, #8a6414 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 4px rgba(240, 194, 75, 0.45));
+}
+.cfa-name-shimmer-name.cfx-name {
+  background: linear-gradient(100deg, #b3becc 40%, #ffffff 50%, #b3becc 60%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cfa-pan 3.2s ease-in-out infinite;
+}
+.cfa-name-pixel-font.cfx-name {
+  font-family: "Courier New", ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  color: #c6ee4f;
+  text-shadow:
+    2px 2px 0 #0e1116,
+    3px 3px 0 #5eb9ff;
+}
+.cfa-name-manga-font.cfx-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  color: #f4f6f8;
+  -webkit-text-stroke: 1px #0b0d11;
+  text-shadow: 3px 3px 0 rgba(11, 13, 17, 0.9);
+}
+.cfa-name-glitch-name.cfx-name {
+  color: #f2f5f7;
+  animation: cfa-jitter 2.2s steps(1) infinite;
+  text-shadow:
+    -2px 0 0 rgba(41, 230, 230, 0.75),
+    2px 0 0 rgba(239, 62, 240, 0.75);
+}
+.cfa-name-flame-name.cfx-name {
+  background: linear-gradient(0deg, #e8531f 15%, #ffb03a 55%, #ffe08a 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 -2px 6px rgba(255, 122, 47, 0.5));
+  animation: cfa-flicker 3.4s steps(1) infinite;
+}
+.cfa-name-ice-name.cfx-name {
+  background: linear-gradient(180deg, #ffffff 20%, #9ed4f4 60%, #5da5dd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 5px rgba(140, 200, 255, 0.55));
+}
+
+/* ================================================================ */
+/* TITLES (title-*): 5. The line under a username.                  */
+/* ================================================================ */
+
+.cfa-title-custom-tagline.cfx-title-chip {
+  font-style: italic;
+  color: #8593a4;
+}
+.cfa-title-trade-milestone.cfx-title-chip {
+  border-color: rgba(198, 238, 79, 0.5);
+  color: #c6ee4f;
+  font-variant-numeric: tabular-nums;
+}
+.cfa-title-collector.cfx-title-chip {
+  border-color: rgba(155, 140, 255, 0.5);
+  color: #b7aaff;
+}
+.cfa-title-closer.cfx-title-chip {
+  border-color: rgba(240, 194, 75, 0.5);
+  color: #f0c24b;
+}
+.cfa-title-regular.cfx-title-chip {
+  border-color: rgba(94, 185, 255, 0.5);
+  color: #7cc4ff;
+}
+
+/* ================================================================ */
+/* BADGES (badge-*): 9. The mark beside a username.                 */
+/* ================================================================ */
+
+.cfa-badge-founder.cfx-badge {
+  background: linear-gradient(140deg, #c6ee4f, #f0c24b);
+  box-shadow: 0 0 8px rgba(198, 238, 79, 0.5);
+}
+.cfa-badge-beta-tester.cfx-badge {
+  background: linear-gradient(140deg, #9b8cff, #5eb9ff);
+}
+.cfa-badge-vendor.cfx-badge {
+  background: linear-gradient(140deg, #ffb44d, #e8834a);
+}
+.cfa-badge-lgs-staff.cfx-badge {
+  background: linear-gradient(140deg, #6ee7a8, #2fbf8f);
+}
+.cfa-badge-tournament-organizer.cfx-badge {
+  background: linear-gradient(140deg, #f472b6, #b967ff);
+}
+.cfa-badge-early-adopter.cfx-badge {
+  background: linear-gradient(140deg, #f7ce68, #f0a04b);
+}
+.cfa-badge-100-trades.cfx-badge {
+  background: linear-gradient(140deg, #d29a55, #8f5f28);
+  color: #fff6e8;
+}
+.cfa-badge-500-trades.cfx-badge {
+  background: linear-gradient(140deg, #e9edf0, #8d99a6);
+}
+.cfa-badge-1000-trades.cfx-badge {
+  background: linear-gradient(140deg, #fff3c4, #f0c24b);
+  box-shadow: 0 0 8px rgba(240, 194, 75, 0.55);
+}
