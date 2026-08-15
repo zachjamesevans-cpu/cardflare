@@ -118,7 +118,7 @@ export async function claimPendingPlayerInvite(user: User): Promise<void> {
  *
  * Returns the error to report, or null on success.
  */
-async function createPlayerWithFreeName(
+export async function createPlayerWithFreeName(
   admin: ReturnType<typeof getSupabaseAdmin>,
   userId: string,
   wanted: string,

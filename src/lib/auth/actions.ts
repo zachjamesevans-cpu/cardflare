@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { openSignup } from "@/lib/auth/signup";
+import { signupSchema } from "@/lib/auth/signup-schema";
 import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { clientKey } from "@/lib/request-context";
@@ -182,6 +184,71 @@ async function provisionIfInvited(email: string): Promise<void> {
  * session cookies, and Server Actions can. Nothing about this can happen in a
  * Server Component.
  */
+/**
+ * Open sign-up, the website's copy of the app's front door.
+ *
+ * Creates the account, creates the player, signs the browser in and
+ * lands on the username step - one submit, no confirmation email, no
+ * invite. The TestFlight link is the invitation on the phone; on the
+ * web, finding the page is. Rate-limited harder than sign-in because
+ * every success writes rows.
+ */
+export async function signUpWithPassword(
+  _previous: PasswordSignInState,
+  formData: FormData,
+): Promise<PasswordSignInState> {
+  const email = text(formData, "email");
+  const parsed = signupSchema.safeParse({
+    email,
+    password: text(formData, "password"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Please check the fields.",
+      fieldErrors: {},
+      email,
+    };
+  }
+
+  const failure = (message: string): PasswordSignInState => ({
+    status: "error",
+    message,
+    fieldErrors: {},
+    email: parsed.data.email,
+  });
+
+  const rate = checkRateLimit(`open-signup:${await clientKey()}`, 5, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    return failure("That is a lot of new accounts. Try again in a little while.");
+  }
+
+  if (!isSupabaseConfigured()) return failure(GENERIC_ERROR);
+
+  const outcome = await openSignup(parsed.data.email, parsed.data.password);
+  if (!outcome.ok) {
+    return failure(
+      outcome.reason === "already-registered"
+        ? "That address already has an account. Sign in instead."
+        : GENERIC_ERROR,
+    );
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    // The account exists; the sign-in page will take it from here.
+    redirect("/login");
+  }
+
+  redirect("/welcome/username");
+}
+
 export async function signInWithPassword(
   _previous: PasswordSignInState,
   formData: FormData,

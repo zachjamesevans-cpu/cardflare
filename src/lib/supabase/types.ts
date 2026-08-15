@@ -653,6 +653,16 @@ export type PlayerFollowInsert = Omit<PlayerFollowRow, "created_at"> & {
 /** frame, holo and effect: the three slots a profile showcase has. */
 export type CosmeticKind = "frame" | "holo" | "effect";
 
+export type PlayerGameRow = {
+  player_id: string;
+  game: "one-piece" | "riftbound" | "lorcana" | "mtg" | "pokemon";
+  created_at: string;
+};
+
+export type PlayerGameInsert = Omit<PlayerGameRow, "created_at"> & {
+  created_at?: string;
+};
+
 export type PackSeriesRow = {
   slug: string;
   name: string;
@@ -968,6 +978,7 @@ export type Database = {
       player_packs: Table<PlayerPackRow, PlayerPackInsert>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
       pack_series: Table<PackSeriesRow, PackSeriesInsert>;
+      player_games: Table<PlayerGameRow, PlayerGameInsert>;
       pack_series_items: Table<PackSeriesItemRow, PackSeriesItemInsert>;
       player_cosmetics: Table<
         PlayerCosmeticRow,

@@ -9,7 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 
-import { Component, useRef, type ReactNode } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Image,
@@ -32,6 +32,8 @@ import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { StoreScreen } from "./src/screens/store";
 import { SignInScreen } from "./src/screens/sign-in";
+import { WelcomeScreen, hasSeenWelcome } from "./src/screens/welcome";
+import { storedAccessToken } from "./src/api";
 import { firstBootError } from "./src/boot-errors";
 import { colors } from "./src/theme";
 
@@ -348,6 +350,40 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
 }
 
 export default function App() {
+  /*
+   * The front door. A fresh install (no session, welcome never seen)
+   * gets the splash and the whole sign-up before the tabs; everyone
+   * else goes straight in. "checking" renders a canvas-coloured view
+   * so the decision never flashes the wrong screen - and because
+   * CONTENT appears immediately, the native splash still hides even
+   * if storage is slow.
+   */
+  const [gate, setGate] = useState<"checking" | "welcome" | "open">("checking");
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [seen, token] = await Promise.all([hasSeenWelcome(), storedAccessToken()]);
+      if (live) setGate(token || seen ? "open" : "welcome");
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (gate === "checking") {
+    return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
+  }
+
+  if (gate === "welcome") {
+    return (
+      <StartupGuard>
+        <StatusBar style="light" />
+        <WelcomeScreen onDone={() => setGate("open")} />
+      </StartupGuard>
+    );
+  }
+
   return (
     <StartupGuard>
       <NavigationContainer theme={theme}>

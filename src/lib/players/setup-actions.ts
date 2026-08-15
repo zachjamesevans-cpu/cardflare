@@ -80,7 +80,7 @@ export async function chooseUsernameAction(
  * was chosen, and the initials are already a perfectly good avatar.
  */
 export async function skipPictureAction(): Promise<void> {
-  redirect("/profile");
+  redirect("/welcome/games");
 }
 
 /**

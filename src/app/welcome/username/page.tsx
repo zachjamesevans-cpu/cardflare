@@ -60,7 +60,7 @@ export default async function ChooseUsernamePage() {
             Pick your name
           </h1>
           <p className="text-text-secondary">
-            Step 1 of 2. This is the name people see when you walk into a room.
+            Step 1 of 3. This is the name people see when you walk into a room.
           </p>
         </div>
 

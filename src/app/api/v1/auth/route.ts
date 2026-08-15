@@ -4,6 +4,7 @@ import { badRequest } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
+import { openSignup } from "@/lib/auth/signup";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,11 @@ const schema = z.discriminatedUnion("action", [
     password: z.string().min(1).max(200),
   }),
   z.object({
+    action: z.literal("sign-up"),
+    email: z.string().trim().toLowerCase().email().max(200),
+    password: z.string().min(8).max(200),
+  }),
+  z.object({
     action: z.literal("refresh"),
     refreshToken: z.string().min(1).max(2000),
   }),
@@ -44,6 +50,12 @@ const schema = z.discriminatedUnion("action", [
 
 const SIGN_IN_MAX = 10;
 const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
+
+/* Creating accounts is rarer than signing in, and each one writes rows.
+   Tighter on purpose; a launch-night store full of new players is still
+   nowhere near five per phone per hour. */
+const SIGN_UP_MAX = 5;
+const SIGN_UP_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(request: Request): Promise<Response> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,6 +66,31 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest("Unrecognised auth action");
 
   const body = parsed.data;
+
+  /*
+   * Sign-up runs first and then FALLS THROUGH to the password grant:
+   * the app makes one call and comes back signed in, which is one
+   * fewer round over networks that have eaten this app's requests
+   * before. The TestFlight link is the invitation - the founder's
+   * call - so no invite is checked.
+   */
+  if (body.action === "sign-up") {
+    const rate = checkRateLimit(
+      `app-sign-up:${await clientKey()}`,
+      SIGN_UP_MAX,
+      SIGN_UP_WINDOW_MS,
+    );
+    if (!rate.allowed) {
+      return Response.json({ error: "rate-limited" }, { status: 429 });
+    }
+
+    const outcome = await openSignup(body.email, body.password);
+    if (!outcome.ok) {
+      return outcome.reason === "already-registered"
+        ? Response.json({ error: "already-registered" }, { status: 409 })
+        : Response.json({ error: "signup-failed" }, { status: 500 });
+    }
+  }
 
   if (body.action === "sign-in") {
     const rate = checkRateLimit(
@@ -67,14 +104,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const grant =
-    body.action === "sign-in"
+    body.action === "refresh"
       ? {
-          type: "password",
-          payload: { email: body.email, password: body.password },
-        }
-      : {
           type: "refresh_token",
           payload: { refresh_token: body.refreshToken },
+        }
+      : {
+          type: "password",
+          payload: { email: body.email, password: body.password },
         };
 
   try {
