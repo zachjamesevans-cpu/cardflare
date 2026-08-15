@@ -28,6 +28,14 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "CardFlare uses your photo library only when you choose a new profile picture."
