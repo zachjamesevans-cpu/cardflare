@@ -36,6 +36,19 @@ export function CosmeticArt({
     );
   }
 
+  /* An aura is particles around a core and NO band - the preview must
+     not show a circle the cosmetic will not draw. */
+  if (kind === "aura") {
+    return (
+      <div className={cn("grid place-items-center", className)}>
+        <div className={cn("cfx-aura", art)}>
+          <span className="cfx-ring-core" aria-hidden="true" />
+          <span className="cfx-aura-fx" aria-hidden="true" />
+        </div>
+      </div>
+    );
+  }
+
   if (kind === "border" || kind === "animation" || kind === "pattern") {
     return (
       <div className={cn("mx-auto w-24", className)}>

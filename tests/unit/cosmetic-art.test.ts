@@ -21,6 +21,7 @@ const sql = readdirSync(migrationsDir)
 
 const CATALOG_KINDS = [
   "ring",
+  "aura",
   "border",
   "pattern",
   "animation",

@@ -132,6 +132,7 @@ export default async function PublicProfilePage({
               avatarUrl={profile.avatarUrl}
               frame={worn.avatarFrame}
               ring={dressed.ring}
+              aura={dressed.aura}
               className="relative mt-12 size-24 text-2xl"
             />
 

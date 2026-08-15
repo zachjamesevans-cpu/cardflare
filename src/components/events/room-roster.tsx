@@ -43,6 +43,7 @@ export function RoomRoster({ participants }: { participants: Participant[] }) {
                 avatarUrl={participant.avatarUrl}
                 frame={participant.frame}
                 ring={participant.ring}
+                aura={participant.aura}
                 size="sm"
                 className={participant.present ? undefined : "opacity-50"}
               />

@@ -94,7 +94,14 @@ export function GroupView({
           }}
           aria-expanded={expanded}
           aria-label={expanded ? "Show fewer of their cards" : "Show all their cards"}
-          className="flex min-w-0 flex-1 items-center justify-end gap-2 text-left"
+          /*
+           * shrink-0 + ml-auto, NOT flex-1: this button must never be
+           * crushed. Squeezed on a phone it used to wrap its badge into
+           * a tall oval that painted over the name beside it; refusing
+           * to shrink makes the header wrap it onto its own line
+           * instead, and ml-auto keeps it right-aligned there.
+           */
+          className="ml-auto flex shrink-0 items-center gap-2 text-left"
         >
           {meta}
           <ChevronDown

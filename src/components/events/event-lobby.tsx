@@ -96,6 +96,7 @@ export function EventLobby({
                       avatarUrl={participant.avatarUrl}
                       frame={participant.frame}
                       ring={participant.ring}
+                      aura={participant.aura}
                       isYou={isYou}
                       dimmed={!participant.present}
                       imagesEnabled={imagesEnabled}
@@ -109,6 +110,7 @@ export function EventLobby({
                         avatarUrl={participant.avatarUrl}
                         frame={participant.frame}
                         ring={participant.ring}
+                        aura={participant.aura}
                         size="sm"
                         className={participant.present ? undefined : "opacity-50"}
                       />

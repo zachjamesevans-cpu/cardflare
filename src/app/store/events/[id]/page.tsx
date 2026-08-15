@@ -105,6 +105,7 @@ export default async function EventPage({
           avatarUrl: participant.avatarUrl,
           frame: participant.frame,
           ring: participant.ring,
+          aura: participant.aura,
           playerId: participant.playerId,
         },
       ]),

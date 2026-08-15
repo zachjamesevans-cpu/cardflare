@@ -83,6 +83,8 @@ export async function GET(
     frame: worn.avatarFrame,
     /* The catalogue ring, worn over the frame when both are set. */
     ring: dressed.ring,
+    /* The avatar effect floating around the picture. */
+    aura: dressed.aura,
     effect: worn.effect,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */

@@ -17,6 +17,7 @@ import type { CosmeticRow } from "@/lib/supabase/types";
 
 export const EQUIP_KINDS = [
   "ring",
+  "aura",
   "border",
   "pattern",
   "animation",
@@ -40,7 +41,7 @@ export function isEquipKind(value: string): value is EquipKind {
  * test holds the two halves to exactly EQUIP_KINDS, no gaps, no overlap.
  */
 export const EQUIP_AREAS = {
-  profile: ["ring", "nameplate", "title", "badge", "scene"],
+  profile: ["ring", "aura", "nameplate", "title", "badge", "scene"],
   showcase: ["border", "pattern", "animation", "background"],
 } as const satisfies Record<string, readonly EquipKind[]>;
 
@@ -50,28 +51,42 @@ export function equipArea(value: string | undefined): EquipArea {
   return value === "showcase" ? "showcase" : "profile";
 }
 
+/** What a picture wears: the border band and the floating animation. */
+export interface AvatarWear {
+  ring: string | null;
+  aura: string | null;
+}
+
 /**
- * The worn ring for a batch of players, for rooms and rosters: one
- * query for the whole room, same economics as roomIdentitiesFor.
+ * The worn ring and aura for a batch of players, for rooms and
+ * rosters: one query for the whole room, same economics as
+ * roomIdentitiesFor.
  */
-export async function ringsFor(playerIds: string[]): Promise<Map<string, string>> {
-  const rings = new Map<string, string>();
+export async function avatarWearFor(
+  playerIds: string[],
+): Promise<Map<string, AvatarWear>> {
+  const wear = new Map<string, AvatarWear>();
   const ids = [...new Set(playerIds)];
-  if (!isSupabaseConfigured() || ids.length === 0) return rings;
+  if (!isSupabaseConfigured() || ids.length === 0) return wear;
 
   const { data, error } = await getSupabaseAdmin()
     .from("player_equips")
-    .select("player_id, cosmetic_slug")
-    .eq("kind", "ring")
+    .select("player_id, kind, cosmetic_slug")
+    .in("kind", ["ring", "aura"])
     .in("player_id", ids);
 
   if (error) {
-    console.error("Could not read worn rings", error);
-    return rings;
+    console.error("Could not read worn rings and auras", error);
+    return wear;
   }
 
-  for (const row of data ?? []) rings.set(row.player_id, row.cosmetic_slug);
-  return rings;
+  for (const row of data ?? []) {
+    const entry = wear.get(row.player_id) ?? { ring: null, aura: null };
+    if (row.kind === "ring") entry.ring = row.cosmetic_slug;
+    if (row.kind === "aura") entry.aura = row.cosmetic_slug;
+    wear.set(row.player_id, entry);
+  }
+  return wear;
 }
 
 /** What is worn right now, one slug or null per category. */

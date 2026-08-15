@@ -536,6 +536,8 @@ export function FlareBoard({
       frame: string | null;
       /** The catalogue ring, worn over the frame when both are set. */
       ring: string | null;
+      /** The avatar effect floating around the picture. */
+      aura: string | null;
       /** The account behind the session, for the profile popup. */
       playerId: string | null;
     }
@@ -755,6 +757,7 @@ export function FlareBoard({
                       }
                       frame={identities.get(group.playerSessionId)?.frame ?? null}
                       ring={identities.get(group.playerSessionId)?.ring ?? null}
+                      aura={identities.get(group.playerSessionId)?.aura ?? null}
                       isYou={isYou}
                       imagesEnabled={imagesEnabled}
                       nameClassName="font-semibold"
@@ -769,6 +772,7 @@ export function FlareBoard({
                         }
                         frame={identities?.get(group.playerSessionId)?.frame ?? null}
                         ring={identities?.get(group.playerSessionId)?.ring ?? null}
+                        aura={identities?.get(group.playerSessionId)?.aura ?? null}
                         size="sm"
                       />
                       <span className="truncate font-semibold text-text-primary">
@@ -796,11 +800,11 @@ export function FlareBoard({
                    * board this is the line that decides who to walk over to.
                    */}
                   {answerable > 0 && (
-                    <Badge>
+                    <Badge className="whitespace-nowrap">
                       You have {answerable} of {group.entries.length}
                     </Badge>
                   )}
-                  <span className="text-sm text-text-muted tabular-nums">
+                  <span className="text-sm whitespace-nowrap text-text-muted tabular-nums">
                     {group.entries.length}{" "}
                     {group.entries.length === 1 ? "card" : "cards"}
                   </span>
