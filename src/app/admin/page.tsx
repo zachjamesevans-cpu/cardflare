@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   CalendarDays,
   Flame,
+  Package,
   Radio,
   Store as StoreIcon,
   Tent,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
+import { catalogForConsole } from "@/lib/admin/catalog";
 import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
@@ -111,6 +113,11 @@ export default async function AdminPage() {
   const { players: playerAccounts } = await listPlayersForAdmin();
   const playerCount = playerAccounts.length;
 
+  /* The catalogue at a glance: what is on sale, and what is waiting. */
+  const catalogue = await catalogForConsole();
+  const liveCosmetics = catalogue.filter((item) => item.status === "live").length;
+  const draftCosmetics = catalogue.length - liveCosmetics;
+
   const gameStores = stores.filter((store) => store.kind === "lgs").length;
   const vendors = stores.length - gameStores;
   const upcomingShows = runningShows.length;
@@ -175,6 +182,13 @@ export default async function AdminPage() {
             label="Players"
             value={playerCount}
             detail="Invite-only accounts"
+          />
+          <AreaLink
+            href="/admin/packs"
+            icon={Package}
+            label="Packs and cosmetics"
+            value={liveCosmetics}
+            detail={`${draftCosmetics} more behind the scenes`}
           />
         </div>
       </section>

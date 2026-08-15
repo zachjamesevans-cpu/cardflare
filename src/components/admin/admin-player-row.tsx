@@ -2,7 +2,15 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Bell, Check, ChevronDown, Flame, Loader2, Sparkles } from "lucide-react";
+import {
+  Bell,
+  Check,
+  ChevronDown,
+  Flame,
+  KeyRound,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 
 import { EditPlayerName, EditPlayerTier } from "@/components/admin/edit-player-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -41,6 +49,7 @@ export function AdminPlayerRow({
   embersEarned,
   embersBalance,
   cosmeticsUnlocked,
+  cosmeticsUnlockedDraft,
   purchasedCount,
   setupOwed,
   tier,
@@ -52,6 +61,8 @@ export function AdminPlayerRow({
   embersEarned: number;
   embersBalance: number;
   cosmeticsUnlocked: boolean;
+  /** Also holds the draft catalogue: the founder's own grant. */
+  cosmeticsUnlockedDraft: boolean;
   purchasedCount: number;
   setupOwed: boolean;
   /** Membership tier: free, pro, ultra or max. */
@@ -67,14 +78,19 @@ export function AdminPlayerRow({
     unlockCosmeticsAction,
     GRANT_IDLE,
   );
+  const [unlockAllState, unlockAll] = useActionState<GrantState, FormData>(
+    unlockCosmeticsAction,
+    GRANT_IDLE,
+  );
   const [testState, test] = useActionState<GrantState, FormData>(
     sendTestNoticeAction,
     GRANT_IDLE,
   );
 
   const said =
-    [grantState, unlockState, testState].find((state) => state.status !== "idle") ??
-    GRANT_IDLE;
+    [grantState, unlockState, unlockAllState, testState].find(
+      (state) => state.status !== "idle",
+    ) ?? GRANT_IDLE;
 
   return (
     <li className="flex flex-col border-t border-border first:border-t-0">
@@ -166,8 +182,12 @@ export function AdminPlayerRow({
             </p>
           </form>
 
+          {/* Two grants, never one. The ordinary switch covers the shop;
+              the second reaches the catalogue that is meant to stay
+              behind the scenes, so it says so in its own name. */}
           <form action={unlock} className="flex flex-wrap items-center gap-3">
             <input type="hidden" name="playerId" value={playerId} />
+            <input type="hidden" name="scope" value="live" />
             <input
               type="hidden"
               name="unlocked"
@@ -176,8 +196,24 @@ export function AdminPlayerRow({
             <UnlockButton unlocked={cosmeticsUnlocked} />
             <p className="min-w-0 flex-1 basis-48 text-xs text-text-muted">
               {cosmeticsUnlocked
-                ? "Owns every frame, holo and effect, including ones added later."
-                : "Grants every frame, holo and effect, forever, including ones added later."}
+                ? "Owns every live cosmetic, including ones added later."
+                : "Grants every live cosmetic, forever, including ones added later."}
+            </p>
+          </form>
+
+          <form action={unlockAll} className="flex flex-wrap items-center gap-3">
+            <input type="hidden" name="playerId" value={playerId} />
+            <input type="hidden" name="scope" value="everything" />
+            <input
+              type="hidden"
+              name="unlocked"
+              value={cosmeticsUnlockedDraft ? "false" : "true"}
+            />
+            <UnlockEverythingButton unlocked={cosmeticsUnlockedDraft} />
+            <p className="min-w-0 flex-1 basis-48 text-xs text-text-muted">
+              {cosmeticsUnlockedDraft
+                ? "Also owns the behind-the-scenes catalogue. Nobody else should have this."
+                : "Also grants the behind-the-scenes catalogue, unreleased cosmetics included. For your own account only."}
             </p>
           </form>
 
@@ -229,6 +265,21 @@ function GrantButton() {
   );
 }
 
+function UnlockEverythingButton({ unlocked }: { unlocked: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <KeyRound className="size-3.5" aria-hidden="true" />
+      )}
+      {unlocked ? "Remove unlock everything" : "Unlock everything (ADMIN)"}
+    </Button>
+  );
+}
+
 function TestNoticeButton() {
   const { pending } = useFormStatus();
 
@@ -254,7 +305,7 @@ function UnlockButton({ unlocked }: { unlocked: boolean }) {
       ) : (
         <Sparkles className="size-3.5" aria-hidden="true" />
       )}
-      {unlocked ? "Remove unlock all" : "Unlock all cosmetics"}
+      {unlocked ? "Remove unlock" : "Unlock all live cosmetics"}
     </Button>
   );
 }

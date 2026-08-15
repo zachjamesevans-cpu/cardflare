@@ -68,15 +68,26 @@ export function kindForSlot(slot: EquipSlot): CosmeticKind {
   return slot;
 }
 
-/** The whole catalogue, ordered the way it should be shown. */
-export async function listCosmetics(): Promise<CosmeticRow[]> {
+/**
+ * The catalogue, ordered the way it should be shown.
+ *
+ * LIVE ONLY by default, and every player-facing path goes through here:
+ * the store, the wardrobe, the room popup, the app. A draft cosmetic
+ * exists for the admin console and nowhere else, so the filter belongs
+ * at the read rather than at each of the dozen screens downstream.
+ *
+ * `includeDraft` is for the console alone, and every caller passing it
+ * has already checked for admin.
+ */
+export async function listCosmetics({
+  includeDraft = false,
+}: { includeDraft?: boolean } = {}): Promise<CosmeticRow[]> {
   if (!isSupabaseConfigured()) return [];
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("cosmetics")
-    .select("*")
-    .order("kind")
-    .order("sort_order");
+  let query = getSupabaseAdmin().from("cosmetics").select("*");
+  if (!includeDraft) query = query.eq("status", "live");
+
+  const { data, error } = await query.order("kind").order("sort_order");
 
   if (error) {
     console.error("Could not read the cosmetics catalogue", error);
@@ -96,18 +107,29 @@ export async function listCosmetics(): Promise<CosmeticRow[]> {
  */
 export interface OwnedCosmetics {
   purchased: Set<string>;
+  /** The admin grant over every LIVE cosmetic. */
   unlockedAll: boolean;
+  /** The admin grant that also covers the draft catalog. Founder only. */
+  unlockedDraft: boolean;
 }
 
 export async function ownedCosmetics(playerId: string): Promise<OwnedCosmetics> {
-  const empty: OwnedCosmetics = { purchased: new Set(), unlockedAll: false };
+  const empty: OwnedCosmetics = {
+    purchased: new Set(),
+    unlockedAll: false,
+    unlockedDraft: false,
+  };
   if (!isSupabaseConfigured()) return empty;
 
   const admin = getSupabaseAdmin();
 
   const [rows, player] = await Promise.all([
     admin.from("player_cosmetics").select("cosmetic_slug").eq("player_id", playerId),
-    admin.from("players").select("cosmetics_unlocked").eq("id", playerId).maybeSingle(),
+    admin
+      .from("players")
+      .select("cosmetics_unlocked, cosmetics_unlocked_draft")
+      .eq("id", playerId)
+      .maybeSingle(),
   ]);
 
   if (rows.error) {
@@ -121,6 +143,7 @@ export async function ownedCosmetics(playerId: string): Promise<OwnedCosmetics> 
   return {
     purchased: new Set((rows.data ?? []).map((row) => row.cosmetic_slug)),
     unlockedAll: player.data?.cosmetics_unlocked ?? false,
+    unlockedDraft: player.data?.cosmetics_unlocked_draft ?? false,
   };
 }
 
@@ -132,9 +155,17 @@ export async function ownedCosmetics(playerId: string): Promise<OwnedCosmetics> 
  * can never disagree about it.
  */
 export function ownsCosmetic(
-  item: Pick<CosmeticRow, "slug" | "cost_embers">,
+  item: Pick<CosmeticRow, "slug" | "cost_embers" | "status">,
   owned: OwnedCosmetics,
 ): boolean {
+  /* A draft is not for sale and not covered by the ordinary unlock-all
+     grant, however generous it is. Exactly one thing reaches it: the
+     admin grant that says so by name. Checked FIRST so no later clause
+     can hand a behind-the-scenes cosmetic to somebody by accident -
+     cost_embers is 0 on every draft row, and that alone would otherwise
+     read as "free". */
+  if (item.status === "draft") return owned.unlockedDraft;
+
   return owned.unlockedAll || item.cost_embers === 0 || owned.purchased.has(item.slug);
 }
 
@@ -239,10 +270,14 @@ export async function buyCosmetic(
 
   const admin = getSupabaseAdmin();
 
+  /* Draft cosmetics are not for sale at any price - filtered here as
+     well as in the listing, because a slug typed into a POST never went
+     through the listing. */
   const { data: item, error } = await admin
     .from("cosmetics")
     .select("*")
     .eq("slug", slug)
+    .eq("status", "live")
     .maybeSingle();
 
   if (error) {
@@ -352,7 +387,7 @@ export async function equipCosmetic(
   if (slug !== null) {
     const { data: item } = await admin
       .from("cosmetics")
-      .select("slug, kind, cost_embers")
+      .select("slug, kind, cost_embers, status")
       .eq("slug", slug)
       .maybeSingle();
 

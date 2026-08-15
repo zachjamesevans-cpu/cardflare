@@ -34,6 +34,8 @@ export const grantEmbersSchema = z.object({
 export const unlockCosmeticsSchema = z.object({
   playerId: z.guid(),
   unlocked: z.enum(["true", "false"]).transform((value) => value === "true"),
+  /** "live" grants the shop. "everything" also reaches the draft catalogue. */
+  scope: z.enum(["live", "everything"]).default("live"),
 });
 
 /** The sample notifications the console can fire at a player. */
