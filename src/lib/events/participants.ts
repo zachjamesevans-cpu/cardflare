@@ -53,6 +53,8 @@ export interface Participant {
   frame: string | null;
   /** The catalogue ring, worn over the frame when both are set. */
   ring: string | null;
+  /** The avatar effect floating around the picture. */
+  aura: string | null;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -268,6 +270,7 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
         avatarUrl: account ? (identities.get(account)?.avatarUrl ?? null) : null,
         frame: account ? (identities.get(account)?.frame ?? null) : null,
         ring: account ? (identities.get(account)?.ring ?? null) : null,
+        aura: account ? (identities.get(account)?.aura ?? null) : null,
       };
     })
     .sort((a, b) => Number(b.present) - Number(a.present));

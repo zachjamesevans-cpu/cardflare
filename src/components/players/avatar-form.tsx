@@ -31,6 +31,7 @@ export function AvatarForm({
   avatarUrl,
   frame = null,
   ring = null,
+  aura = null,
 }: {
   displayName: string;
   seed: string;
@@ -44,6 +45,8 @@ export function AvatarForm({
   frame?: string | null;
   /** The catalogue ring, worn over the frame - same story, second slot. */
   ring?: string | null;
+  /** The avatar effect floating around the picture, mixable with any ring. */
+  aura?: string | null;
 }) {
   const [state, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
@@ -116,6 +119,11 @@ export function AvatarForm({
                 <span className="cfx-ring-band" />
               </span>
             )}
+            {aura && (
+              <span className={cn("cfx-aura-avatar", `cfa-${aura}`)} aria-hidden="true">
+                <span className="cfx-aura-fx" />
+              </span>
+            )}
             {/*
              * Unoptimised on purpose, and it has to be: the src is either
              * a blob: URL, which the optimiser cannot fetch at all, or a
@@ -145,6 +153,7 @@ export function AvatarForm({
             seed={seed}
             frame={frame}
             ring={ring}
+            aura={aura}
             className="size-24 text-2xl"
           />
         )}

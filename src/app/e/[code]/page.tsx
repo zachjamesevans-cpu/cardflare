@@ -435,6 +435,7 @@ export default async function JoinByCodePage({
           avatarUrl: participant.avatarUrl,
           frame: participant.frame,
           ring: participant.ring,
+          aura: participant.aura,
           playerId: participant.playerId,
         },
       ]),

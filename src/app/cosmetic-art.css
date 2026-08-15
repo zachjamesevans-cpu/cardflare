@@ -408,6 +408,31 @@
 }
 
 /*
+ * An avatar-effect preview: particles around a dark core, NO band -
+ * auras are the animations the founder split out of profile borders,
+ * so the preview must not show a circle it will not draw.
+ */
+.cfx-aura {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+}
+.cfx-aura .cfx-ring-core {
+  inset: 16px;
+}
+.cfx-aura-fx {
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background-repeat: repeat;
+  -webkit-mask: radial-gradient(farthest-side, transparent 42%, #000 62%);
+  mask: radial-gradient(farthest-side, transparent 42%, #000 62%);
+}
+
+/*
  * The WORN ring: the same art as the tile scaffold, drawn around a real
  * avatar. Geometry is proportional rather than fixed, so one rule hugs
  * a 32px roster face and a 96px profile picture alike. The band mask is
@@ -427,6 +452,20 @@
 }
 .cfx-ring-avatar .cfx-ring-fx {
   inset: -9%;
+}
+
+/* The WORN aura: the same particles, orbiting a real avatar. Sits a
+   little wider than the ring layer so the two mix without colliding. */
+.cfx-aura-avatar {
+  position: absolute;
+  inset: -18%;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+.cfx-aura-avatar .cfx-aura-fx {
+  inset: 0;
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 70%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 70%);
 }
 
 /* A card preview: the fancy edge is the padding, the face sits on it. */
@@ -772,16 +811,6 @@
 .cfa-ring-ember .cfx-ring-band::before {
   animation: cfa-spin 12s linear infinite;
 }
-.cfa-ring-ember .cfx-ring-fx {
-  background-image: var(--cfa-p-spark), var(--cfa-p-spark);
-  background-size:
-    7px 7px,
-    5px 5px;
-  animation: cfa-rise 6.5s linear infinite;
-  opacity: 0.85;
-  -webkit-mask: radial-gradient(farthest-side, transparent 55%, #000 75%);
-  mask: radial-gradient(farthest-side, transparent 55%, #000 75%);
-}
 
 /* Smoke: barely moving, soft-edged, no light of its own. */
 .cfa-ring-smoke {
@@ -828,16 +857,6 @@
 .cfa-ring-sakura .cfx-ring-band::before {
   animation: cfa-spin 20s linear infinite;
 }
-.cfa-ring-sakura .cfx-ring-fx {
-  background-image: var(--cfa-p-petal), var(--cfa-p-petal);
-  background-size:
-    30px 30px,
-    44px 44px;
-  animation: cfa-fall 7s linear infinite;
-  opacity: 0.9;
-  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
-  mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
-}
 
 /* Heart: warm rose, small hearts floating up. */
 .cfa-ring-heart {
@@ -845,16 +864,6 @@
 }
 .cfa-ring-heart .cfx-ring-band::before {
   animation: cfa-spin 13s linear infinite;
-}
-.cfa-ring-heart .cfx-ring-fx {
-  background-image: var(--cfa-p-heart), var(--cfa-p-heart);
-  background-size:
-    30px 30px,
-    44px 44px;
-  animation: cfa-rise 7.5s linear infinite;
-  opacity: 0.85;
-  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
-  mask: radial-gradient(farthest-side, transparent 52%, #000 72%);
 }
 
 /* Crown: quiet gilding, the crown itself sitting above. */
@@ -875,24 +884,6 @@
 /* Starfield: near-black band, stars orbiting through it. */
 .cfa-ring-starfield {
   --cfa-band: conic-gradient(#0a0f1e, #17223e, #0a0f1e, #131c33, #0a0f1e);
-}
-.cfa-ring-starfield .cfx-ring-fx {
-  inset: 0;
-  background-image: var(--cfa-p-dot), var(--cfa-p-star);
-  background-size:
-    9px 9px,
-    30px 30px;
-  animation: cfa-spin 14s linear infinite;
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 18px),
-    #000 calc(100% - 14px)
-  );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 18px),
-    #000 calc(100% - 14px)
-  );
 }
 
 /* Meteor: a single comet lapping the ring, trail behind it. */
@@ -1034,6 +1025,93 @@
   animation: cfa-twinkle 2.6s ease-in-out infinite;
   -webkit-mask: radial-gradient(farthest-side, transparent 56%, #000 74%);
   mask: radial-gradient(farthest-side, transparent 56%, #000 74%);
+}
+
+/* ================================================================ */
+/* AVATAR EFFECTS (aura-*): 8                                       */
+/* The animations split out of profile borders - the founder: they  */
+/* are not borders, and you should be able to mix and match. Each   */
+/* is only a particle field on .cfx-aura-fx; no band, ever.         */
+/* ================================================================ */
+
+/* Hearts: the one the founder asked for by name. */
+.cfa-aura-hearts .cfx-aura-fx {
+  background-image: var(--cfa-p-heart), var(--cfa-p-heart);
+  background-size:
+    30px 30px,
+    44px 44px;
+  animation: cfa-rise 7.5s linear infinite;
+  opacity: 0.85;
+}
+
+/* Sakura: petals drifting sideways and down. */
+.cfa-aura-sakura .cfx-aura-fx {
+  background-image: var(--cfa-p-petal), var(--cfa-p-petal);
+  background-size:
+    32px 32px,
+    46px 46px;
+  animation: cfa-drift 9s linear infinite;
+  opacity: 0.85;
+}
+
+/* Sparks: tiny embers rising, quick and warm. */
+.cfa-aura-sparks .cfx-aura-fx {
+  background-image: var(--cfa-p-spark), var(--cfa-p-spark);
+  background-size:
+    22px 22px,
+    34px 34px;
+  animation: cfa-rise 5s linear infinite;
+  opacity: 0.9;
+}
+
+/* Stars: a slow orbit, twinkling. */
+.cfa-aura-stars .cfx-aura-fx {
+  background-image: var(--cfa-p-star), var(--cfa-p-dot);
+  background-size:
+    36px 36px,
+    26px 26px;
+  animation: cfa-twinkle 2.8s ease-in-out infinite;
+  opacity: 0.9;
+}
+
+/* Snow: flakes falling, quiet and slow. */
+.cfa-aura-snow .cfx-aura-fx {
+  background-image: var(--cfa-p-flake), var(--cfa-p-flake);
+  background-size:
+    30px 30px,
+    44px 44px;
+  animation: cfa-fall 8s linear infinite;
+  opacity: 0.85;
+}
+
+/* Bubbles: wobbling upward. */
+.cfa-aura-bubbles .cfx-aura-fx {
+  background-image: var(--cfa-p-bubble), var(--cfa-p-bubble);
+  background-size:
+    30px 30px,
+    46px 46px;
+  animation: cfa-rise 8.5s linear infinite;
+  opacity: 0.8;
+}
+
+/* Static: little arcs jumping now and then. */
+.cfa-aura-static .cfx-aura-fx {
+  background-image: var(--cfa-p-bolt), var(--cfa-p-bolt);
+  background-size:
+    28px 28px,
+    40px 40px;
+  animation: cfa-flicker 1.6s steps(2, jump-none) infinite;
+  opacity: 0.85;
+}
+
+/* Holo Shards: foil pieces catching the light. */
+.cfa-aura-holo-shards .cfx-aura-fx {
+  background-image: var(--cfa-p-shard), var(--cfa-p-shard);
+  background-size:
+    32px 32px,
+    48px 48px;
+  animation: cfa-drift 10s linear infinite;
+  opacity: 0.85;
 }
 
 /* ================================================================ */

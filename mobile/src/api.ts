@@ -852,6 +852,7 @@ export const setGames = (games: string[]) =>
 
 export type CustomizeKind =
   | "ring"
+  | "aura"
   | "border"
   | "pattern"
   | "animation"

@@ -25,6 +25,7 @@ const OWN_WORD: Record<string, string[]> = {
   effect: ["Effect", "Animation"],
   // the catalogue
   ring: ["Ring", "Edge", "Border"],
+  aura: ["Aura", "Effect", "Animation"],
   border: ["Border", "Edge", "Frame"],
   pattern: ["Pattern", "Holo", "Foil"],
   animation: ["Animation", "Effect"],

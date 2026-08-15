@@ -74,6 +74,7 @@ export function PlayerAvatar({
   avatarUrl = null,
   frame = null,
   ring = null,
+  aura = null,
   size = "md",
   className,
 }: {
@@ -100,6 +101,12 @@ export function PlayerAvatar({
    * different code.
    */
   ring?: string | null;
+  /**
+   * The avatar effect: the animation floating around the picture,
+   * split out of the borders at the founder's ask so the two mix and
+   * match. Rides with any ring or frame.
+   */
+  aura?: string | null;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -112,13 +119,23 @@ export function PlayerAvatar({
     className,
   );
 
-  /* The worn catalogue ring, proportional to whatever size this is. */
-  const wornRing = ring ? (
-    <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
-      <span className="cfx-ring-fx" />
-      <span className="cfx-ring-band" />
-    </span>
-  ) : null;
+  /* The worn catalogue ring and aura, proportional to whatever size
+     this is. Two independent layers - mix and match. */
+  const wornRing = (
+    <>
+      {ring && (
+        <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
+          <span className="cfx-ring-fx" />
+          <span className="cfx-ring-band" />
+        </span>
+      )}
+      {aura && (
+        <span className={cn("cfx-aura-avatar", `cfa-${aura}`)} aria-hidden="true">
+          <span className="cfx-aura-fx" />
+        </span>
+      )}
+    </>
+  );
 
   if (avatarUrl && !broken) {
     return (

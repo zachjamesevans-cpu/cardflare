@@ -660,6 +660,7 @@ export type CosmeticKind =
   | "holo"
   | "effect"
   | "ring"
+  | "aura"
   | "border"
   | "pattern"
   | "animation"
@@ -674,6 +675,7 @@ export type PlayerEquipRow = {
   player_id: string;
   kind:
     | "ring"
+    | "aura"
     | "border"
     | "pattern"
     | "animation"

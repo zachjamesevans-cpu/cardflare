@@ -25,11 +25,8 @@ import { colors, radius, spacing } from "../theme";
  */
 
 /** The two wands' menus, mirroring the website's EQUIP_AREAS split. */
-const AREA_KINDS: Record<
-  "profile" | "showcase",
-  readonly CustomizeKind[]
-> = {
-  profile: ["ring", "nameplate", "title", "badge", "scene"],
+const AREA_KINDS: Record<"profile" | "showcase", readonly CustomizeKind[]> = {
+  profile: ["ring", "aura", "nameplate", "title", "badge", "scene"],
   showcase: ["border", "pattern", "animation", "background"],
 };
 
@@ -48,6 +45,10 @@ const AREA_COPY = {
 
 const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
   ring: { title: "Profile borders", blurb: "Drawn around your profile picture." },
+  aura: {
+    title: "Avatar effects",
+    blurb: "Animations floating around your picture. Mix with any border.",
+  },
   border: { title: "Card borders", blurb: "Around every card in your showcase." },
   pattern: { title: "Holo patterns", blurb: "The foil across your cards." },
   animation: { title: "Card animations", blurb: "How your showcase cards move." },

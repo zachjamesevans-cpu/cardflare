@@ -190,6 +190,7 @@ export default async function ProfilePage() {
                 avatarUrl={profile.avatarUrl}
                 frame={worn.avatarFrame}
                 ring={dressed.ring}
+                aura={dressed.aura}
               />
             </div>
             <div className="relative flex flex-col items-center gap-2">
@@ -406,6 +407,7 @@ export default async function ProfilePage() {
                       avatarUrl={person.avatarUrl}
                       frame={person.frame}
                       ring={person.ring}
+                      aura={person.aura}
                       size="sm"
                     />
                     <Link

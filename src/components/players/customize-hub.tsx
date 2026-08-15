@@ -22,6 +22,10 @@ import { cn } from "@/lib/cn";
 
 const SECTION_COPY: Record<EquipKind, { title: string; blurb: string }> = {
   ring: { title: "Profile borders", blurb: "Drawn around your profile picture." },
+  aura: {
+    title: "Avatar effects",
+    blurb: "Animations floating around your picture. Mix with any border.",
+  },
   border: { title: "Card borders", blurb: "Around every card in your showcase." },
   pattern: { title: "Holo patterns", blurb: "The foil across your cards." },
   animation: { title: "Card animations", blurb: "How your showcase cards move." },

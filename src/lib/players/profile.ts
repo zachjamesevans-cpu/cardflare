@@ -4,7 +4,7 @@ import sharp from "sharp";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
-import { ringsFor } from "./equips";
+import { avatarWearFor } from "./equips";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
@@ -217,6 +217,8 @@ export interface RoomIdentity {
    * the ring over the frame when both are set.
    */
   ring: string | null;
+  /** The avatar effect floating around the picture, mixable with any ring. */
+  aura: string | null;
 }
 
 export async function roomIdentitiesFor(
@@ -225,12 +227,12 @@ export async function roomIdentitiesFor(
   const identities = new Map<string, RoomIdentity>();
   if (!isSupabaseConfigured() || playerIds.length === 0) return identities;
 
-  const [{ data, error }, rings] = await Promise.all([
+  const [{ data, error }, wear] = await Promise.all([
     getSupabaseAdmin()
       .from("players")
       .select("id, embers_earned, avatar_url, equipped_avatar_frame")
       .in("id", [...new Set(playerIds)]),
-    ringsFor(playerIds),
+    avatarWearFor(playerIds),
   ]);
 
   if (error) {
@@ -252,7 +254,8 @@ export async function roomIdentitiesFor(
       embersEarned: row.embers_earned,
       avatarUrl: avatarSrc(row.avatar_url),
       frame: row.equipped_avatar_frame ?? freeFrame,
-      ring: rings.get(row.id) ?? null,
+      ring: wear.get(row.id)?.ring ?? null,
+      aura: wear.get(row.id)?.aura ?? null,
     });
   }
 

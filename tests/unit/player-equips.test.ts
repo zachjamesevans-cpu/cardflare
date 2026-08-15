@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -12,16 +12,25 @@ import { EQUIP_AREAS, EQUIP_KINDS, equipArea, isEquipKind } from "@/lib/players/
  * the other fails here instead of failing as a 500 on somebody's tap.
  */
 
-const migration = readFileSync(
-  join(process.cwd(), "supabase/migrations/20260910090000_player_equips.sql"),
-  "utf8",
-);
-
-/** The kinds the check constraint accepts, read from the migration. */
+/**
+ * The kinds the check constraint accepts, read from the migrations.
+ *
+ * Later migrations may drop and re-add the constraint (the aura split
+ * did), so the LAST definition in filename order is the live one -
+ * exactly what the database ends up enforcing.
+ */
 function constraintKinds(): string[] {
-  const check = migration.match(/kind text not null\s+check \(kind in \(([^)]+)\)/);
-  if (!check) throw new Error("player_equips kind check not found in the migration");
-  return [...check[1].matchAll(/'([a-z]+)'/g)].map((hit) => hit[1]);
+  const dir = join(process.cwd(), "supabase/migrations");
+  let latest: string | null = null;
+  for (const file of readdirSync(dir).sort()) {
+    const sql = readFileSync(join(dir, file), "utf8");
+    if (!sql.includes("player_equips")) continue;
+    const at = sql.indexOf("player_equips");
+    const check = sql.slice(at).match(/check \(kind in \(([^)]+)\)/);
+    if (check) latest = check[1];
+  }
+  if (!latest) throw new Error("player_equips kind check not found in migrations");
+  return [...latest.matchAll(/'([a-z]+)'/g)].map((hit) => hit[1]);
 }
 
 describe("EQUIP_KINDS match the player_equips migration", () => {
