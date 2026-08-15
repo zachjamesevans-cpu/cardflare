@@ -112,19 +112,32 @@ export async function unlockCosmeticsAction(
   const parsed = unlockCosmeticsSchema.safeParse({
     playerId: text(formData, "playerId"),
     unlocked: text(formData, "unlocked"),
+    scope: text(formData, "scope") || "live",
   });
 
   if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
 
-  const saved = await setCosmeticsUnlocked(parsed.data.playerId, parsed.data.unlocked);
+  const saved = await setCosmeticsUnlocked(
+    parsed.data.playerId,
+    parsed.data.unlocked,
+    parsed.data.scope,
+  );
   if (!saved) return { status: "error", message: GENERIC_ERROR };
 
   revalidatePath("/admin/players");
 
+  if (!parsed.data.unlocked) {
+    return {
+      status: "granted",
+      message: "Unlock removed. Anything they bought is still theirs.",
+    };
+  }
+
   return {
     status: "granted",
-    message: parsed.data.unlocked
-      ? "Everything unlocked, including anything added later."
-      : "Unlock removed. Anything they bought is still theirs.",
+    message:
+      parsed.data.scope === "everything"
+        ? "Everything unlocked, the behind-the-scenes catalogue included."
+        : "Every live cosmetic unlocked, including ones added later.",
   };
 }

@@ -575,6 +575,8 @@ export type PlayerRow = {
    * forever" has to cover a catalogue that grows.
    */
   cosmetics_unlocked: boolean;
+  /** Also owns the draft catalogue. Admin grant, founder only. */
+  cosmetics_unlocked_draft: boolean;
   /** When setup finished. Null means a username was never chosen. */
   onboarded_at: string | null;
   /** Membership tier: free, pro, ultra or max. Admin-set for now. */
@@ -595,6 +597,7 @@ export type PlayerInsert = Omit<
   | "equipped_effect"
   | "equipped_avatar_frame"
   | "cosmetics_unlocked"
+  | "cosmetics_unlocked_draft"
   | "onboarded_at"
 > & {
   id?: string;
@@ -608,6 +611,7 @@ export type PlayerInsert = Omit<
   equipped_effect?: string | null;
   equipped_avatar_frame?: string | null;
   cosmetics_unlocked?: boolean;
+  cosmetics_unlocked_draft?: boolean;
   onboarded_at?: string | null;
   tier?: string;
 };
@@ -649,7 +653,48 @@ export type PlayerFollowInsert = Omit<PlayerFollowRow, "created_at"> & {
 /** frame, holo and effect: the three slots a profile showcase has. */
 export type CosmeticKind = "frame" | "holo" | "effect";
 
+export type PackSeriesRow = {
+  slug: string;
+  name: string;
+  set_number: number;
+  description: string;
+  price_embers: number;
+  slots: number;
+  /** Null means unscheduled; a future instant means "not on sale yet". */
+  release_at: string | null;
+  /** Storage object path for the wrapper art, or null for the default. */
+  art_path: string | null;
+  status: "live" | "draft";
+  created_at: string;
+};
+
+export type PackSeriesInsert = Omit<
+  PackSeriesRow,
+  "created_at" | "description" | "price_embers" | "slots" | "status" | "art_path"
+> & {
+  created_at?: string;
+  description?: string;
+  price_embers?: number;
+  slots?: number;
+  status?: "live" | "draft";
+  art_path?: string | null;
+};
+
+export type PackSeriesItemRow = {
+  series_slug: string;
+  cosmetic_slug: string;
+  rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+  weight: number;
+};
+
+export type PackSeriesItemInsert = Omit<PackSeriesItemRow, "rarity" | "weight"> & {
+  rarity?: PackSeriesItemRow["rarity"];
+  weight?: number;
+};
+
 export type CosmeticRow = {
+  /** live: real. draft: exists only in the admin console. */
+  status: "live" | "draft";
   slug: string;
   kind: CosmeticKind;
   name: string;
@@ -922,6 +967,8 @@ export type Database = {
       player_follows: Table<PlayerFollowRow, PlayerFollowInsert>;
       player_packs: Table<PlayerPackRow, PlayerPackInsert>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
+      pack_series: Table<PackSeriesRow, PackSeriesInsert>;
+      pack_series_items: Table<PackSeriesItemRow, PackSeriesItemInsert>;
       player_cosmetics: Table<
         PlayerCosmeticRow,
         Omit<PlayerCosmeticRow, "acquired_at"> & { acquired_at?: string }

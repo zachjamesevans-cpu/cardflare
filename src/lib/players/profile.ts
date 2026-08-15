@@ -349,7 +349,7 @@ async function wearableOrNull(
 
   const { data: item } = await getSupabaseAdmin()
     .from("cosmetics")
-    .select("slug, kind, cost_embers")
+    .select("slug, kind, cost_embers, status")
     .eq("slug", slug)
     .maybeSingle();
 

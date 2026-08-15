@@ -131,6 +131,7 @@ export default async function AdminPlayersPage({
                   embersEarned={player.embersEarned}
                   embersBalance={player.embersBalance}
                   cosmeticsUnlocked={player.cosmeticsUnlocked}
+                  cosmeticsUnlockedDraft={player.cosmeticsUnlockedDraft}
                   purchasedCount={player.purchasedCount}
                   setupOwed={!player.onboardedAt}
                   tier={player.tier}

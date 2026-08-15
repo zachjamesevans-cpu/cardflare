@@ -23,6 +23,8 @@ export interface AdminPlayer {
   embersEarned: number;
   embersBalance: number;
   cosmeticsUnlocked: boolean;
+  /** Also holds the draft catalogue. Admin grant, founder only. */
+  cosmeticsUnlockedDraft: boolean;
   /** How many cosmetics they actually bought, ignoring free and granted. */
   purchasedCount: number;
   onboardedAt: string | null;
@@ -49,7 +51,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
   let request = admin
     .from("players")
     .select(
-      "id, display_name, avatar_url, embers_earned, embers_balance, cosmetics_unlocked, onboarded_at, created_at, tier",
+      "id, display_name, avatar_url, embers_earned, embers_balance, cosmetics_unlocked, cosmetics_unlocked_draft, onboarded_at, created_at, tier",
     )
     .order("created_at", { ascending: false })
     .limit(SEARCH_LIMIT);
@@ -96,6 +98,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
     embersEarned: row.embers_earned,
     embersBalance: row.embers_balance,
     cosmeticsUnlocked: row.cosmetics_unlocked,
+    cosmeticsUnlockedDraft: row.cosmetics_unlocked_draft,
     purchasedCount: counts.get(row.id) ?? 0,
     onboardedAt: row.onboarded_at,
     createdAt: row.created_at,
@@ -142,12 +145,25 @@ export async function grantEmbers(
 export async function setCosmeticsUnlocked(
   playerId: string,
   unlocked: boolean,
+  /** Which grant: the live catalogue, or absolutely everything. */
+  scope: "live" | "everything" = "live",
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
 
+  /*
+   * Two grants, deliberately separate. The live one is the ordinary
+   * generosity switch. The other reaches the draft catalogue, which is
+   * meant to stay behind the scenes - so it is never implied by the
+   * first, and turning the first off does not silently leave it on.
+   */
+  const patch =
+    scope === "everything"
+      ? { cosmetics_unlocked: unlocked, cosmetics_unlocked_draft: unlocked }
+      : { cosmetics_unlocked: unlocked };
+
   const { error } = await getSupabaseAdmin()
     .from("players")
-    .update({ cosmetics_unlocked: unlocked })
+    .update(patch)
     .eq("id", playerId);
 
   if (error) {
