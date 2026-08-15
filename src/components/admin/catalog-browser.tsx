@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, ChevronDown, Loader2, Trash2 } from "lucide-react";
 
+import { CosmeticArt } from "@/components/players/cosmetic-art";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge, Card } from "@/components/ui/card";
@@ -146,9 +147,9 @@ export function CatalogBrowser({
               </button>
 
               {open && (
-                <ul className="flex flex-col border-t border-border">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3 border-t border-border p-3">
                   {items.map((entry) => (
-                    <CatalogRow
+                    <CatalogTile
                       key={entry.slug}
                       entry={entry}
                       onFlip={flip}
@@ -165,10 +166,16 @@ export function CatalogBrowser({
   );
 }
 
-/** Live cosmetics that this console can genuinely draw. */
-const DRAWABLE = new Set(["frame", "holo", "effect"]);
+/** Live cosmetics drawn by the shipped components; drafts by CosmeticArt. */
+const SHIPPED = new Set(["frame", "holo", "effect"]);
 
-function CatalogRow({
+/**
+ * One cosmetic as a tile: art on top, always visible, verdict buttons
+ * underneath. The founder's brief for this screen: "have the option to
+ * test all of them at once... with the option to fully delete them."
+ * A grid of living previews with a Delete on each is exactly that.
+ */
+function CatalogTile({
   entry,
   onFlip,
   onDelete,
@@ -177,40 +184,65 @@ function CatalogRow({
   onFlip: (formData: FormData) => void;
   onDelete: (formData: FormData) => void;
 }) {
-  const [preview, setPreview] = useState(false);
-  const drawable = DRAWABLE.has(entry.kind);
-
   return (
-    <li className="flex flex-col gap-2 border-t border-border p-3 first:border-t-0">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <button
-          type="button"
-          onClick={() => setPreview((was) => !was)}
-          className="flex min-w-0 flex-1 basis-40 flex-col text-left"
-        >
-          <span className="truncate font-semibold text-text-primary">{entry.name}</span>
-          <span className="truncate text-xs text-text-muted">{entry.description}</span>
-        </button>
+    <li className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
+      <div className="grid min-h-28 place-items-center">
+        {SHIPPED.has(entry.kind) ? (
+          <div className="flex items-end gap-3">
+            <CosmeticCard
+              imageUrl={null}
+              name={entry.name}
+              number="preview"
+              imagesEnabled={false}
+              frame={entry.kind === "frame" ? entry.slug : null}
+              holo={entry.kind === "holo" ? entry.slug : null}
+              effect={entry.kind === "effect" ? entry.slug : null}
+              className="w-20"
+            />
+            {entry.kind === "frame" && (
+              <PlayerAvatar
+                displayName="CHUNC"
+                seed={entry.slug}
+                avatarUrl={null}
+                frame={entry.slug}
+                size="md"
+              />
+            )}
+          </div>
+        ) : (
+          <CosmeticArt kind={entry.kind} slug={entry.slug} className="w-full" />
+        )}
+      </div>
 
+      <div className="flex flex-col">
+        <span className="truncate text-sm font-semibold text-text-primary">
+          {entry.name}
+        </span>
+        <span className="truncate text-xs text-text-muted" title={entry.description}>
+          {entry.description}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
         {entry.status === "draft" ? (
-          <Badge tone="neutral">behind the scenes</Badge>
+          <Badge tone="neutral">hidden</Badge>
         ) : (
           <Badge>live</Badge>
         )}
-
         {entry.owners > 0 && (
           <span className="text-xs text-text-muted tabular-nums">
             {entry.owners} {entry.owners === 1 ? "owner" : "owners"}
           </span>
         )}
-
         {entry.inSets.length > 0 && (
           <span className="truncate text-xs text-text-muted">
             in {entry.inSets.join(", ")}
           </span>
         )}
+      </div>
 
-        <form action={onFlip} className="shrink-0">
+      <div className="mt-auto flex items-center gap-1.5">
+        <form action={onFlip}>
           <input type="hidden" name="slug" value={entry.slug} />
           <input
             type="hidden"
@@ -224,60 +256,14 @@ function CatalogRow({
         </form>
 
         {/* Deleting is refused server-side when anybody owns it; the
-            button is hidden here too so the offer is never made. */}
+            button is not even offered in that case. */}
         {entry.owners === 0 && (
-          <form action={onDelete} className="shrink-0">
+          <form action={onDelete}>
             <input type="hidden" name="slug" value={entry.slug} />
             <DeleteSubmit name={entry.name} />
           </form>
         )}
       </div>
-
-      {preview && (
-        <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
-          {drawable ? (
-            <div className="flex flex-wrap items-end gap-6">
-              <div className="flex flex-col items-center gap-2">
-                <CosmeticCard
-                  imageUrl={null}
-                  name={entry.name}
-                  number="preview"
-                  imagesEnabled={false}
-                  frame={entry.kind === "frame" ? entry.slug : null}
-                  holo={entry.kind === "holo" ? entry.slug : null}
-                  effect={entry.kind === "effect" ? entry.slug : null}
-                  className="w-24"
-                />
-                <span className="text-xs text-text-muted">On a card</span>
-              </div>
-              {entry.kind === "frame" && (
-                <div className="flex flex-col items-center gap-2">
-                  <PlayerAvatar
-                    displayName="CHUNC"
-                    seed={entry.slug}
-                    avatarUrl={null}
-                    frame={entry.slug}
-                    size="md"
-                  />
-                  <span className="text-xs text-text-muted">On a picture</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold text-text-primary">
-                No art built yet
-              </p>
-              <p className="text-sm text-text-secondary">
-                {entry.name} is a catalogue entry: the name, the description and the
-                slot it would fill. Its art gets built when you put it in a set and that
-                set gets scheduled.
-              </p>
-              <p className="mt-1 font-mono text-xs text-text-muted">{entry.slug}</p>
-            </div>
-          )}
-        </div>
-      )}
     </li>
   );
 }
