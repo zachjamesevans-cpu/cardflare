@@ -1,0 +1,28 @@
+diff --git a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+index 2a67797..4e4bc9a 100644
+--- a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
++++ b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+@@ -435,7 +435,22 @@ void ObjCTurboModule::performVoidMethodInvocation(
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+-      throw convertNSExceptionToJSError(runtime, exception, std::string{moduleName}, methodNameStr);
++      if (shouldVoidMethodsExecuteSync_) {
++        // Sync void methods run on the JS thread, where converting the
++        // NSException into a JSError is safe - mirrors performMethodInvocation.
++        throw convertNSExceptionToJSError(runtime, exception, std::string{moduleName}, methodNameStr);
++      } else {
++        // Async void methods run on the module's own queue. Touching the
++        // Hermes runtime from that queue (as convertNSExceptionToJSError
++        // does) races the JS thread's GC and corrupts the heap, and
++        // rethrowing an ObjC exception on a GCD queue aborts the process.
++        // Nothing awaits a void method's result, so log and carry on.
++        RCTLogError(
++            @"Exception '%@' was thrown while invoking %s on target %s - ignored because the method returns void and runs on a module queue.",
++            exception,
++            methodName,
++            moduleName);
++      }
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }

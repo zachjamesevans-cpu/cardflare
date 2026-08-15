@@ -49,14 +49,22 @@ import { colors } from "./src/theme";
  * tab used to hold is one tap away behind the cog on the profile.
  */
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+/* Guarded because this runs at module scope, before any error boundary
+   exists: a throw here would kill the bundle and strand the splash
+   screen. Without the handler, foreground notifications fall back to
+   the system default - a working app matters more. */
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (error) {
+  console.warn("Notification handler not installed", error);
+}
 
 export type TabParams = {
   Join: undefined;
