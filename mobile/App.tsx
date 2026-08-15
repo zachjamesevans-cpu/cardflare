@@ -32,6 +32,7 @@ import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { StoreScreen } from "./src/screens/store";
 import { SignInScreen } from "./src/screens/sign-in";
+import { firstBootError } from "./src/boot-errors";
 import { colors } from "./src/theme";
 
 /**
@@ -314,6 +315,31 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
           >
             {String(this.state.error)}
           </Text>
+          {(() => {
+            /* The boundary often catches a symptom (a module that failed
+               to load reads as undefined); the trap in boot-errors.ts
+               holds the error that actually started it. Show both. */
+            const root = firstBootError();
+            if (root === null || String(root) === String(this.state.error)) {
+              return null;
+            }
+            return (
+              <>
+                <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
+                  Root cause
+                </Text>
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontFamily: "Courier",
+                    fontSize: 12,
+                  }}
+                >
+                  {String(root)}
+                </Text>
+              </>
+            );
+          })()}
         </ScrollView>
       );
     }
