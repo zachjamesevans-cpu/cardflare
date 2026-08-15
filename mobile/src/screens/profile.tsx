@@ -296,28 +296,56 @@ export function ProfileScreen() {
         />
 
         {/*
-         * The wand: the one door to dressing your profile, riding the
-         * corner of the block it changes - same spot as the website.
+         * The block's two controls, riding its corner: the wand
+         * dresses the profile, the cog is everything the Account tab
+         * used to be. Same spots as the website.
          */}
-        <Tap
-          onPress={() => navigation.navigate("Customize", { area: "profile" })}
-          accessibilityLabel="Customize your profile"
+        <View
           style={{
             position: "absolute",
             top: spacing(3),
             right: spacing(3),
-            width: 40,
-            height: 40,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            alignItems: "center",
-            justifyContent: "center",
+            flexDirection: "row",
+            gap: spacing(2),
           }}
         >
-          <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
-        </Tap>
+          <Tap
+            onPress={() => navigation.navigate("Customize", { area: "profile" })}
+            accessibilityLabel="Customize your profile"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
+          </Tap>
+          <Tap
+            onPress={() => navigation.navigate("Settings")}
+            accessibilityLabel="Settings"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </Tap>
+        </View>
 
         <View
           style={{
@@ -337,60 +365,16 @@ export function ProfileScreen() {
           <EmberBadge earned={profile.embersEarned} size="md" />
         </View>
 
-        <View style={{ gap: spacing(2) }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
-            Showcase
-          </Text>
-          {profile.showcase.length === 0 ? (
-            <Muted>Nothing on the shelf yet.</Muted>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                {profile.showcase.map((entry) => (
-                  <Tap key={entry.id} onPress={() => setDressing(entry)}>
-                    <CosmeticCard
-                      imageUrl={entry.imageUrl}
-                      width={56}
-                      frame={entry.frame ?? profile.equipped.frame}
-                      holo={entry.holo ?? profile.equipped.holo}
-                      effect={profile.equipped.effect}
-                    />
-                  </Tap>
-                ))}
-              </View>
-            </ScrollView>
-          )}
-        </View>
-      </Card>
-
-      <Card>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ flex: 1, gap: spacing(1) }}>
-            <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-              Edit your profile
-            </Text>
-          </View>
-          {/* The cog. Everything the Account tab used to be. */}
-          <Tap
-            onPress={() => navigation.navigate("Settings")}
-            style={{ padding: spacing(1) }}
-          >
-            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-          </Tap>
-        </View>
-
         {/*
-         * A real upload now, not a pointer at the website: the picture
-         * is resized and re-compressed to a small JPEG on the phone,
-         * then rides the header transport in chunks. The button
-         * narrates each stage because a dozen small requests on shop
-         * wifi takes a visible moment.
+         * Picture, cover and name, editable right where they show -
+         * the founder's call after the separate edit block read as a
+         * duplicate: "it should all go live from the actual edit
+         * button... everything can be changed up top."
+         *
+         * A real upload: the picture is resized and re-compressed to a
+         * small JPEG on the phone, then rides the header transport in
+         * chunks. The button narrates each stage because a dozen small
+         * requests on shop wifi takes a visible moment.
          */}
         <View style={{ flexDirection: "row", gap: spacing(2) }}>
           <View style={{ flex: 1 }}>
@@ -418,6 +402,119 @@ export function ProfileScreen() {
           busy={busy === "rename"}
           onSave={(name) => act("rename", () => renameProfile(name), "Name updated.")}
         />
+
+        {/* The one showcase, editable in place: tap a card to dress
+            it, remove below it, add at the end. The wand carries the
+            shelf's cosmetics in a menu of its own. */}
+        <View style={{ gap: spacing(2) }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: spacing(2),
+            }}
+          >
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}
+            >
+              Your showcase
+            </Text>
+            <Tap
+              onPress={() => navigation.navigate("Customize", { area: "showcase" })}
+              accessibilityLabel="Customize your showcase"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.elevated,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
+            </Tap>
+          </View>
+          <Muted>
+            Up to nine cards you are proud of. Tap a card to dress it. Not a trade
+            list, so nobody can pledge on it.
+          </Muted>
+
+          {profile.showcase.length === 0 ? (
+            <Muted>
+              Nothing on the shelf yet. Search for a card below and it stays here
+              between events.
+            </Muted>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
+            >
+              {profile.showcase.map((entry) => (
+                <View key={entry.id} style={{ gap: spacing(1), width: 56 }}>
+                  <Tap onPress={() => setDressing(entry)}>
+                    <CosmeticCard
+                      imageUrl={entry.imageUrl}
+                      width={56}
+                      frame={entry.frame ?? profile.equipped.frame}
+                      holo={entry.holo ?? profile.equipped.holo}
+                      effect={profile.equipped.effect}
+                    />
+                  </Tap>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textSecondary, fontSize: 11 }}
+                  >
+                    {entry.name}
+                  </Text>
+                  <Tap
+                    disabled={busy === entry.id}
+                    onPress={() =>
+                      void act(
+                        entry.id,
+                        () => removeFromShowcase(entry.id),
+                        "Taken off the shelf.",
+                      )
+                    }
+                  >
+                    <Text
+                      style={{
+                        color: colors.textMuted,
+                        fontSize: 11,
+                        textDecorationLine: "underline",
+                      }}
+                    >
+                      Remove
+                    </Text>
+                  </Tap>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {profile.showcase.length < profile.showcaseLimit ? (
+            <AddToShowcase
+              busy={busy === "showcase-add"}
+              frames={ownedFrames}
+              holos={ownedHolos}
+              defaultFrame={profile.equipped.frame}
+              defaultHolo={profile.equipped.holo}
+              effect={profile.equipped.effect}
+              onPick={(cardId, printingId, picks) =>
+                void act(
+                  "showcase-add",
+                  () => addToShowcase(cardId, printingId, picks),
+                  "On the shelf.",
+                )
+              }
+            />
+          ) : (
+            <Muted>Your shelf is full. Remove one to make room.</Muted>
+          )}
+        </View>
       </Card>
 
       <Card>
@@ -490,120 +587,6 @@ export function ProfileScreen() {
               </Tap>
             ))}
           </View>
-        )}
-      </Card>
-
-      <Card>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: spacing(2),
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Title>Your showcase</Title>
-          </View>
-          {/* The showcase's own wand: card borders, foils, motion and
-              the shelf background, in a menu of their own so neither
-              wand opens a wall. */}
-          <Tap
-            onPress={() => navigation.navigate("Customize", { area: "showcase" })}
-            accessibilityLabel="Customize your showcase"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.elevated,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
-          </Tap>
-        </View>
-        <Body>
-          Up to nine cards you are proud of, wearing whatever you have unlocked.
-          This is not a trade list, and nobody can pledge on it.
-        </Body>
-
-        {profile.showcase.length === 0 ? (
-          <Muted>
-            Nothing on the shelf yet. Search for a card below and it stays here
-            between events.
-          </Muted>
-        ) : (
-          /* The board's carousel: same card width, horizontal shelf. */
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
-          >
-            {profile.showcase.map((entry) => (
-              <View key={entry.id} style={{ gap: spacing(1), width: 56 }}>
-                {/* Tapping a card opens its dressing room, the
-                    website's behaviour on your own shelf. */}
-                <Tap onPress={() => setDressing(entry)}>
-                  <CosmeticCard
-                    imageUrl={entry.imageUrl}
-                    width={56}
-                    frame={entry.frame ?? profile.equipped.frame}
-                    holo={entry.holo ?? profile.equipped.holo}
-                    effect={profile.equipped.effect}
-                  />
-                </Tap>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textSecondary, fontSize: 11 }}
-                >
-                  {entry.name}
-                </Text>
-                <Tap
-                  disabled={busy === entry.id}
-                  onPress={() =>
-                    void act(
-                      entry.id,
-                      () => removeFromShowcase(entry.id),
-                      "Taken off the shelf.",
-                    )
-                  }
-                >
-                  <Text
-                    style={{
-                      color: colors.textMuted,
-                      fontSize: 11,
-                      textDecorationLine: "underline",
-                    }}
-                  >
-                    Remove
-                  </Text>
-                </Tap>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-
-        {profile.showcase.length < profile.showcaseLimit ? (
-          <AddToShowcase
-            busy={busy === "showcase-add"}
-            frames={ownedFrames}
-            holos={ownedHolos}
-            defaultFrame={profile.equipped.frame}
-            defaultHolo={profile.equipped.holo}
-            effect={profile.equipped.effect}
-            onPick={(cardId, printingId, picks) =>
-              void act(
-                "showcase-add",
-                () => addToShowcase(cardId, printingId, picks),
-                "On the shelf.",
-              )
-            }
-          />
-        ) : (
-          <Muted>Your shelf is full. Remove one to make room.</Muted>
         )}
       </Card>
 

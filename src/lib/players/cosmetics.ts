@@ -415,6 +415,22 @@ export async function equipCosmetic(
     return false;
   }
 
+  /*
+   * The circle around the picture has ONE owner: putting an original
+   * avatar frame on takes the catalogue ring off, exactly as wearing a
+   * ring takes the frame off (see setEquip). Failure here is logged and
+   * swallowed - on a database that has not run the player_equips
+   * migration yet there is no ring to take off.
+   */
+  if (slot === "avatarFrame" && slug !== null) {
+    const { error: ringError } = await admin
+      .from("player_equips")
+      .delete()
+      .eq("player_id", playerId)
+      .eq("kind", "ring");
+    if (ringError) console.error("Could not take off the worn ring", ringError);
+  }
+
   return true;
 }
 

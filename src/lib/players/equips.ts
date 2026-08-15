@@ -155,6 +155,24 @@ export async function setEquip(
     console.error("Could not equip", error);
     return "failed";
   }
+
+  /*
+   * The circle around the picture has ONE owner. Wearing a ring takes
+   * the old avatar frame off rather than hiding it underneath - the
+   * founder cleared his ring and a frame he could not see anywhere
+   * "came back", which read as card equips touching his picture.
+   * equipCosmetic does the same in the other direction.
+   */
+  if (kind === "ring") {
+    const { error: frameError } = await admin
+      .from("players")
+      .update({ equipped_avatar_frame: null })
+      .eq("id", playerId);
+    if (frameError) {
+      console.error("Could not take off the old avatar frame", frameError);
+    }
+  }
+
   return "equipped";
 }
 
