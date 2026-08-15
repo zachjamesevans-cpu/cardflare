@@ -50,9 +50,18 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
 
   let request = admin
     .from("players")
-    .select(
-      "id, display_name, avatar_url, embers_earned, embers_balance, cosmetics_unlocked, cosmetics_unlocked_draft, onboarded_at, created_at, tier",
-    )
+    /*
+     * Every column, rather than a named list.
+     *
+     * A named list makes this query fail outright the moment the code
+     * knows about a column the database has not been given yet - and
+     * PostgREST answers that with an error, not a partial row, so the
+     * console showed "No player accounts yet" over a header reading
+     * "4 players". A deploy that lands before its migration is a normal
+     * few minutes in the life of this project; it must degrade to a
+     * missing badge, never to an empty console.
+     */
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(SEARCH_LIMIT);
 
@@ -98,7 +107,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
     embersEarned: row.embers_earned,
     embersBalance: row.embers_balance,
     cosmeticsUnlocked: row.cosmetics_unlocked,
-    cosmeticsUnlockedDraft: row.cosmetics_unlocked_draft,
+    cosmeticsUnlockedDraft: row.cosmetics_unlocked_draft ?? false,
     purchasedCount: counts.get(row.id) ?? 0,
     onboardedAt: row.onboarded_at,
     createdAt: row.created_at,
