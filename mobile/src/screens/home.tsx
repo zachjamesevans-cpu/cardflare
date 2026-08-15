@@ -13,7 +13,7 @@ import {
   storedAccessToken,
   type Me,
 } from "../api";
-import { Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, spacing } from "../theme";
 
 /**
@@ -120,10 +120,13 @@ export function HomeScreen() {
               autoCorrect={false}
             />
           </View>
-          <Button
+          <AsyncButton
             label="Go"
+            pendingLabel="Opening…"
             variant="secondary"
-            onPress={() => code.trim() && void enter(code)}
+            onPress={async () => {
+              if (code.trim()) await enter(code);
+            }}
           />
         </View>
       </Card>

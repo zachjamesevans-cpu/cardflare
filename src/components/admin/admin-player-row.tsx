@@ -2,15 +2,25 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, ChevronDown, Flame, Loader2, Sparkles } from "lucide-react";
+import { Bell, Check, ChevronDown, Flame, Loader2, Sparkles } from "lucide-react";
 
 import { EditPlayerName, EditPlayerTier } from "@/components/admin/edit-player-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TextInput } from "@/components/ui/controls";
-import { grantEmbersAction, unlockCosmeticsAction } from "@/lib/admin/grant-actions";
-import { GRANT_IDLE, GRANT_MAX, type GrantState } from "@/lib/admin/grant-schema";
+import { Select, TextInput } from "@/components/ui/controls";
+import {
+  grantEmbersAction,
+  sendTestNoticeAction,
+  unlockCosmeticsAction,
+} from "@/lib/admin/grant-actions";
+import {
+  GRANT_IDLE,
+  GRANT_MAX,
+  TEST_NOTICE_KINDS,
+  TEST_NOTICE_LABELS,
+  type GrantState,
+} from "@/lib/admin/grant-schema";
 
 /**
  * One player in the console, and everything an admin can do to them.
@@ -57,8 +67,14 @@ export function AdminPlayerRow({
     unlockCosmeticsAction,
     GRANT_IDLE,
   );
+  const [testState, test] = useActionState<GrantState, FormData>(
+    sendTestNoticeAction,
+    GRANT_IDLE,
+  );
 
-  const said = grantState.status !== "idle" ? grantState : unlockState;
+  const said =
+    [grantState, unlockState, testState].find((state) => state.status !== "idle") ??
+    GRANT_IDLE;
 
   return (
     <li className="flex flex-col border-t border-border first:border-t-0">
@@ -165,6 +181,24 @@ export function AdminPlayerRow({
             </p>
           </form>
 
+          {/* Push is the one surface that cannot be checked by looking
+              at a screen. This fires a real notification down the real
+              rails, so the plumbing is provable before a Friday night. */}
+          <form action={test} className="flex flex-wrap items-center gap-3">
+            <input type="hidden" name="playerId" value={playerId} />
+            <Select name="kind" defaultValue="offer-received" className="w-auto">
+              {TEST_NOTICE_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {TEST_NOTICE_LABELS[kind]}
+                </option>
+              ))}
+            </Select>
+            <TestNoticeButton />
+            <p className="min-w-0 flex-1 basis-48 text-xs text-text-muted">
+              Sends the real thing to every phone signed in to this account.
+            </p>
+          </form>
+
           {said.status !== "idle" && (
             <p
               role="status"
@@ -191,6 +225,21 @@ function GrantButton() {
     <Button type="submit" size="sm" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Granting…" : "Grant"}
+    </Button>
+  );
+}
+
+function TestNoticeButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <Bell className="size-3.5" aria-hidden="true" />
+      )}
+      {pending ? "Sending…" : "Send test"}
     </Button>
   );
 }

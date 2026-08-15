@@ -36,6 +36,31 @@ export const unlockCosmeticsSchema = z.object({
   unlocked: z.enum(["true", "false"]).transform((value) => value === "true"),
 });
 
+/** The sample notifications the console can fire at a player. */
+export const TEST_NOTICE_KINDS = [
+  "offer-received",
+  "trade-confirmed",
+  "board-open",
+  "early-board",
+  "new-follower",
+  "room-flare",
+] as const;
+
+export const testNoticeSchema = z.object({
+  playerId: z.guid(),
+  kind: z.enum(TEST_NOTICE_KINDS),
+});
+
+/** What each sample is called in the console's picker. */
+export const TEST_NOTICE_LABELS: Record<(typeof TEST_NOTICE_KINDS)[number], string> = {
+  "offer-received": "Offer received (with message)",
+  "trade-confirmed": "Trade confirmed",
+  "board-open": "Board open",
+  "early-board": "Early board digest",
+  "new-follower": "New follower",
+  "room-flare": "Flare posted in your room",
+};
+
 export type GrantState =
   | { status: "idle" }
   | { status: "granted"; message: string }

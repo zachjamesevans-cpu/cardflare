@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { resolveCode } from "@/lib/events/rooms";
 import { roomPhase, type PublicEvent } from "@/lib/events/schema";
-import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
+import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { hasFeature } from "@/lib/billing/features";
 import { tierForPlayer } from "@/lib/billing/repository";
 import { announceShowcase } from "./showcase";
@@ -212,6 +212,20 @@ export async function addToListAction(
       room,
       parsed.data,
       (await getPlayerSession())?.display_name ?? "A player",
+    );
+  }
+
+  /*
+   * Everyone standing in this room hears about a card going up. The
+   * board already shows it; nobody at a counter is watching a board.
+   */
+  if (result.ok && kind.data === "flare") {
+    void notifyRoomFlare(
+      room.eventId,
+      room.playerSessionId,
+      (await getPlayerSession())?.display_name ?? "A player",
+      parsed.data.cardId,
+      showcase ? "showcase" : "want",
     );
   }
 

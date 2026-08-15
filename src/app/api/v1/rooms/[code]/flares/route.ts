@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
 import { roomPhase } from "@/lib/events/schema";
-import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
+import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
@@ -80,6 +80,16 @@ export async function POST(
   if (flarePhase === "early" && intent === "want") {
     void notifyEarlyBoardFlares(resolved.room.id);
   }
+
+  // Everyone in the room hears about it, exactly as the website's
+  // Server Action does - one helper, so the surfaces cannot drift.
+  void notifyRoomFlare(
+    resolved.room.id,
+    session.id,
+    session.display_name ?? "A player",
+    parsed.data.cardId,
+    intent,
+  );
 
   // The payoff for offering a card up: everyone already hunting it is
   // told. Same helper the website uses, so the two cannot drift.

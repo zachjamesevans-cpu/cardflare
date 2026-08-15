@@ -4,7 +4,7 @@ import { ScrollView } from "react-native";
 
 import { API_BASE } from "../config";
 import { getMe, type Me } from "../api";
-import { Body, Button, Card, Muted, Title } from "../ui";
+import { AsyncButton, Body, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
 
 /**
@@ -90,18 +90,17 @@ function ConnectionTest() {
     <Card>
       <Title>Connection test</Title>
       {result && <Body>{result}</Body>}
-      <Button
+      <AsyncButton
         label="Run test"
+        pendingLabel="Testing…"
         variant="secondary"
-        onPress={() => {
+        onPress={async () => {
           setResult("Testing…");
-          void (async () => {
-            const lines: string[] = [];
-            for (const [label, method, body, type] of MATRIX) {
-              lines.push(await probe(label, method, body, type));
-              setResult(lines.join("\n"));
-            }
-          })();
+          const lines: string[] = [];
+          for (const [label, method, body, type] of MATRIX) {
+            lines.push(await probe(label, method, body, type));
+            setResult(lines.join("\n"));
+          }
         }}
       />
     </Card>

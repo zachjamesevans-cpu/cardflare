@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { JoinCodeForm } from "@/components/events/join-code-form";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card } from "@/components/ui/card";
 import { rsvpAction } from "@/lib/players/account-actions";
 import { getViewer } from "@/lib/auth/session";
@@ -100,13 +100,18 @@ export default async function JoinPage() {
                     {local.earlyOpen && local.nextEventCode && (
                       <form action={rsvpAction}>
                         <input type="hidden" name="code" value={local.nextEventCode} />
-                        <Button type="submit" variant="secondary" size="sm">
-                          {wants.length > 0
-                            ? `I'll be there. Post my ${wants.length} ${
-                                wants.length === 1 ? "Flare" : "Flares"
-                              }`
-                            : "I'll be there"}
-                        </Button>
+                        <SubmitButton
+                          variant="secondary"
+                          size="sm"
+                          pendingLabel="Posting…"
+                          label={
+                            wants.length > 0
+                              ? `I'll be there. Post my ${wants.length} ${
+                                  wants.length === 1 ? "Flare" : "Flares"
+                                }`
+                              : "I'll be there"
+                          }
+                        />
                       </form>
                     )}
                   </li>

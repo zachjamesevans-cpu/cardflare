@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { ArrowLeftRight, ChevronDown, Users } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -150,15 +151,31 @@ export function EventLobby({
 
           <form action={leaveEventAction} className="mt-3 border-t border-border pt-3">
             <input type="hidden" name="code" value={code} />
-            <button
-              type="submit"
-              className="text-sm text-text-muted underline underline-offset-4 transition-colors hover:text-text-secondary"
-            >
-              Leave this room
-            </button>
+            <LeaveRoomButton />
           </form>
         </div>
       </div>
     </Card>
+  );
+}
+
+/**
+ * Leaving says it is leaving.
+ *
+ * A quiet text link with a server round trip behind it is the exact
+ * shape of control that gets clicked three times - it looks inert
+ * because nothing about it moves.
+ */
+function LeaveRoomButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="text-sm text-text-muted underline underline-offset-4 transition-colors hover:text-text-secondary disabled:no-underline disabled:opacity-60"
+    >
+      {pending ? "Leaving…" : "Leave this room"}
+    </button>
   );
 }

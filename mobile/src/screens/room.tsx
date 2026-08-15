@@ -38,6 +38,7 @@ import {
   type RoomState,
 } from "../api";
 import {
+  AsyncButton,
   Body,
   Button,
   Card,
@@ -115,6 +116,14 @@ function RoomScreen({
    * a single quiet line. The wants stay saved either way.
    */
   const [repostOpen, setRepostOpen] = useState(false);
+
+  /*
+   * Posting a saved hunt walks the whole list one card at a time, which
+   * on a room's connection is seconds of nothing. The founder's report:
+   * "it kinda just stalls there... people don't feel they have to click
+   * it multiple times." The button counts them off as they land.
+   */
+  const [repostDone, setRepostDone] = useState<number | null>(null);
 
   /*
    * The roster folds shut by default — the founder's call: ten names
@@ -239,7 +248,13 @@ function RoomScreen({
       <View style={{ padding: spacing(4), gap: spacing(3) }}>
         <ErrorLine message={error} />
         {!error && <Muted>Loading the room…</Muted>}
-        {error && <Button label="Try again" onPress={() => void refresh()} />}
+        {error && (
+          <AsyncButton
+            label="Try again"
+            pendingLabel="Retrying…"
+            onPress={() => refresh()}
+          />
+        )}
       </View>
     );
   }
@@ -290,12 +305,14 @@ function RoomScreen({
                   : ""
               } Post now so people know what to bring.`}
             </Body>
-            <Button
+            <AsyncButton
               label="Open the early board"
-              onPress={() => {
+              pendingLabel="Opening…"
+              onPress={async () => {
                 const early = state.earlyBoard;
                 if (!early) return;
-                void rememberRoom(early.code).then(() => onSwitch(early.code));
+                await rememberRoom(early.code);
+                onSwitch(early.code);
               }}
             />
           </Card>
@@ -337,12 +354,14 @@ function RoomScreen({
                   : ""
               } Post now so people know what to bring.`}
             </Body>
-            <Button
+            <AsyncButton
               label="Open the early board"
-              onPress={() => {
+              pendingLabel="Opening…"
+              onPress={async () => {
                 const early = state.earlyBoard;
                 if (!early) return;
-                void rememberRoom(early.code).then(() => onSwitch(early.code));
+                await rememberRoom(early.code);
+                onSwitch(early.code);
               }}
             />
           </Card>
@@ -562,9 +581,19 @@ function RoomScreen({
                   ))}
                 </View>
                 <Button
-                  label={`Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`}
-                  onPress={() =>
+                  busy={repostDone !== null}
+                  label={
+                    repostDone === null
+                      ? `Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`
+                      : outstanding.length === 1
+                        ? "Posting…"
+                        : `Posting… ${repostDone} of ${outstanding.length}`
+                  }
+                  onPress={() => {
+                    if (repostDone !== null) return;
+                    setRepostDone(0);
                     void act(async () => {
+                      let done = 0;
                       for (const want of outstanding) {
                         await postFlare(code, {
                           cardId: want.cardId,
@@ -573,9 +602,11 @@ function RoomScreen({
                           note: want.note ?? undefined,
                           deckLabel: want.deckLabel,
                         }).catch(() => {});
+                        done += 1;
+                        setRepostDone(done);
                       }
-                    })
-                  }
+                    }).finally(() => setRepostDone(null));
+                  }}
                 />
               </View>
             )}
@@ -1020,10 +1051,11 @@ function RoomScreen({
           />
         </View>
         <View style={{ flex: 1 }}>
-          <Button
+          <AsyncButton
             label={youOpen ? "Open to trades ✓" : "I'm open to trades"}
+            pendingLabel={youOpen ? "Closing…" : "Opening…"}
             variant="secondary"
-            onPress={() => void act(() => setOpenToTrades(code, !youOpen))}
+            onPress={() => act(() => setOpenToTrades(code, !youOpen))}
           />
         </View>
       </View>
