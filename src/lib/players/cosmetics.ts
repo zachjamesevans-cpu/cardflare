@@ -286,8 +286,18 @@ export async function buyCosmetic(
   }
   if (!item) return { ok: false, reason: "unknown" };
 
-  const target: EquipSlot = slot ?? (item.kind === "frame" ? "cardFrame" : item.kind);
-  if (kindForSlot(target) !== item.kind) return { ok: false, reason: "unknown" };
+  /* Only the shipped kinds sell individually here. The catalogue kinds
+     arrive through packs and equip through player_equips instead. */
+  const target: EquipSlot | null =
+    slot ??
+    (item.kind === "frame"
+      ? "cardFrame"
+      : item.kind === "holo" || item.kind === "effect"
+        ? item.kind
+        : null);
+  if (!target || kindForSlot(target) !== item.kind) {
+    return { ok: false, reason: "unknown" };
+  }
 
   const owned = await ownedCosmetics(playerId);
   if (ownsCosmetic(item, owned)) {

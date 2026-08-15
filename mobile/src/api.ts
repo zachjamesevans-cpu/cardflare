@@ -845,3 +845,44 @@ export const getGames = () =>
 
 export const setGames = (games: string[]) =>
   call<{ ok: true; mine: string[] }>("POST", "/api/v1/games", { games });
+
+/* ------------------------------------------------------------------ */
+/* Customize: the catalogue categories, worn one slot each             */
+/* ------------------------------------------------------------------ */
+
+export type CustomizeKind =
+  | "ring"
+  | "border"
+  | "pattern"
+  | "animation"
+  | "background"
+  | "scene"
+  | "nameplate"
+  | "title"
+  | "badge";
+
+export interface CustomizeItem {
+  slug: string;
+  name: string;
+  description: string;
+  /** draft = unreleased; the server only sends these to a granted account. */
+  status: "live" | "draft";
+  owned: boolean;
+  equipped: boolean;
+}
+
+export interface CustomizeSection {
+  kind: CustomizeKind;
+  items: CustomizeItem[];
+}
+
+/** Every category with ownership and what is currently worn. */
+export const getCustomize = () =>
+  call<{
+    sections: CustomizeSection[];
+    equips: Record<CustomizeKind, string | null>;
+  }>("GET", "/api/v1/customize");
+
+/** Wears one cosmetic, or clears the slot with null. */
+export const setCustomizeEquip = (kind: CustomizeKind, slug: string | null) =>
+  call<{ ok: true }>("POST", "/api/v1/customize", { kind, slug });

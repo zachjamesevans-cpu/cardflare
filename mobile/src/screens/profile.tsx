@@ -339,6 +339,49 @@ export function ProfileScreen() {
         </View>
       </Card>
 
+      {/*
+       * The dressing room door, same spot as the website: right under
+       * the profile block. Wearing lives on the Customize screen now;
+       * the store only sells.
+       */}
+      <Tap
+        onPress={() => navigation.navigate("Customize")}
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderWidth: 1,
+          borderRadius: radius.card,
+          padding: spacing(4),
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(2),
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+          }}
+        >
+          <Ionicons name="color-wand" size={20} color={colors.accent} />
+          <View style={{ flex: 1, gap: spacing(1) }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
+            >
+              Customize
+            </Text>
+            <Muted>
+              Borders, name styles, effects and more. Tap anything you own to wear
+              it.
+            </Muted>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Tap>
+
       <Card>
         <View
           style={{

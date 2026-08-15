@@ -650,8 +650,45 @@ export type PlayerFollowInsert = Omit<PlayerFollowRow, "created_at"> & {
   created_at?: string;
 };
 
-/** frame, holo and effect: the three slots a profile showcase has. */
-export type CosmeticKind = "frame" | "holo" | "effect";
+/**
+ * frame, holo and effect shipped first and equip through columns on
+ * players; the other nine are the catalogue and equip through
+ * player_equips. The list mirrors cosmetics_kind_check exactly.
+ */
+export type CosmeticKind =
+  | "frame"
+  | "holo"
+  | "effect"
+  | "ring"
+  | "border"
+  | "pattern"
+  | "animation"
+  | "background"
+  | "scene"
+  | "nameplate"
+  | "title"
+  | "badge";
+
+/** One worn slot per catalogue category. Absent row = nothing worn. */
+export type PlayerEquipRow = {
+  player_id: string;
+  kind:
+    | "ring"
+    | "border"
+    | "pattern"
+    | "animation"
+    | "background"
+    | "scene"
+    | "nameplate"
+    | "title"
+    | "badge";
+  cosmetic_slug: string;
+  updated_at: string;
+};
+
+export type PlayerEquipInsert = Omit<PlayerEquipRow, "updated_at"> & {
+  updated_at?: string;
+};
 
 export type PlayerGameRow = {
   player_id: string;
@@ -977,6 +1014,7 @@ export type Database = {
       player_follows: Table<PlayerFollowRow, PlayerFollowInsert>;
       player_packs: Table<PlayerPackRow, PlayerPackInsert>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
+      player_equips: Table<PlayerEquipRow, PlayerEquipInsert>;
       pack_series: Table<PackSeriesRow, PackSeriesInsert>;
       player_games: Table<PlayerGameRow, PlayerGameInsert>;
       pack_series_items: Table<PackSeriesItemRow, PackSeriesItemInsert>;

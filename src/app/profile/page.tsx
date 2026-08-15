@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flame, Settings, Sparkles } from "lucide-react";
+import { ChevronRight, Flame, Settings, Sparkles, Wand2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
@@ -21,8 +21,17 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
+import { getEquips } from "@/lib/players/equips";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
+import {
+  backgroundClass,
+  WornCardShell,
+  WornNameRow,
+  WornRing,
+  WornSceneLayer,
+} from "@/components/players/worn";
+import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -88,7 +97,7 @@ export default async function ProfilePage() {
    * the dressing pickers (add flow and per-card editor) offer what is
    * OWNED, and ownership lives in the same read the shop uses.
    */
-  const [worn, wardrobe, areas] = await Promise.all([
+  const [worn, wardrobe, areas, dressed] = await Promise.all([
     resolveEquipped(profile.equipped),
     wardrobeFor(
       playerId,
@@ -96,7 +105,11 @@ export default async function ProfilePage() {
       profile.equipped,
     ),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
+    getEquips(playerId),
   ]);
+
+  /* The showcase background, when one is worn. */
+  const shelfBg = backgroundClass(dressed);
 
   /* What the dressing rooms may offer: owned only, free items included. */
   const ownedFrames = wardrobe.cardFrames
@@ -142,18 +155,23 @@ export default async function ProfilePage() {
               aria-hidden="true"
               className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
             />
+            <WornSceneLayer worn={dressed} />
 
-            <PlayerAvatar
-              displayName={profile.displayName}
-              seed={profile.playerId}
-              avatarUrl={profile.avatarUrl}
-              frame={worn.avatarFrame}
-              className="relative mt-12 size-24 text-2xl"
-            />
+            <WornRing slug={dressed.ring} className="relative mt-12">
+              <PlayerAvatar
+                displayName={profile.displayName}
+                seed={profile.playerId}
+                avatarUrl={profile.avatarUrl}
+                frame={worn.avatarFrame}
+                className="size-24 text-2xl"
+              />
+            </WornRing>
             <div className="relative flex flex-col items-center gap-2">
-              <p className="text-lg font-bold text-text-primary">
-                {profile.displayName}
-              </p>
+              <WornNameRow
+                name={profile.displayName}
+                worn={dressed}
+                className="text-lg font-bold"
+              />
               <EmberBadge earned={profile.embersEarned} size="md" />
               <p className="text-sm text-text-muted">
                 Earned by confirming trades, and nothing else.
@@ -178,28 +196,63 @@ export default async function ProfilePage() {
               {profile.showcase.length === 0 ? (
                 <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
               ) : (
-                <Rail ariaLabel="Showcase">
-                  {profile.showcase.map((entry) => (
-                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                      <CosmeticCard
-                        imageUrl={entry.imageUrl}
-                        name={entry.name}
-                        number={entry.number}
-                        imagesEnabled={imagesEnabled}
-                        frame={entry.frame ?? worn.frame}
-                        holo={entry.holo ?? worn.holo}
-                        effect={worn.effect}
-                        className="w-full"
-                      />
-                      <span className="truncate text-[11px] text-text-secondary">
-                        {entry.name}
-                      </span>
-                    </li>
-                  ))}
-                </Rail>
+                <div
+                  className={cn(
+                    shelfBg && "rounded-[var(--radius-control)] p-2",
+                    shelfBg,
+                  )}
+                >
+                  <Rail ariaLabel="Showcase">
+                    {profile.showcase.map((entry) => (
+                      <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                        <WornCardShell worn={dressed} className="w-full">
+                          <CosmeticCard
+                            imageUrl={entry.imageUrl}
+                            name={entry.name}
+                            number={entry.number}
+                            imagesEnabled={imagesEnabled}
+                            frame={entry.frame ?? worn.frame}
+                            holo={entry.holo ?? worn.holo}
+                            effect={worn.effect}
+                            className="w-full"
+                          />
+                        </WornCardShell>
+                        <span className="truncate text-[11px] text-text-secondary">
+                          {entry.name}
+                        </span>
+                      </li>
+                    ))}
+                  </Rail>
+                </div>
               )}
             </div>
           </Card>
+
+          {/*
+           * The dressing room door. The founder's ask, near verbatim:
+           * "why do I have to go into the store to change my profile
+           * border?... simplify the edit process". Wearing lives at
+           * /profile/customize now; the store only sells.
+           */}
+          <Link
+            href="/profile/customize"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
+          >
+            <span className="flex items-center gap-3">
+              <Wand2 className="size-5 shrink-0 text-accent" aria-hidden="true" />
+              <span className="flex flex-col gap-1">
+                <span className="font-semibold text-text-primary">Customize</span>
+                <span className="text-sm text-text-secondary">
+                  Borders, name styles, effects and more. Tap anything you own to wear
+                  it.
+                </span>
+              </span>
+            </span>
+            <ChevronRight
+              className="size-4 shrink-0 text-text-muted"
+              aria-hidden="true"
+            />
+          </Link>
 
           <Card className="flex flex-col gap-5">
             <div className="flex items-start justify-between gap-3">

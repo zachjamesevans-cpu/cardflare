@@ -15,8 +15,17 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
+import { getEquips } from "@/lib/players/equips";
 import { followState } from "@/lib/players/follows";
 import { publicProfile } from "@/lib/players/profile";
+import {
+  backgroundClass,
+  WornCardShell,
+  WornNameRow,
+  WornRing,
+  WornSceneLayer,
+} from "@/components/players/worn";
+import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
   title: "Player",
@@ -61,7 +70,11 @@ export default async function PublicProfilePage({
   const profile = await publicProfile(playerId);
   if (!profile) notFound();
 
-  const worn = await resolveEquipped(profile.equipped);
+  const [worn, dressed] = await Promise.all([
+    resolveEquipped(profile.equipped),
+    getEquips(playerId),
+  ]);
+  const shelfBg = backgroundClass(dressed);
   const imagesEnabled = cardImagesEnabled();
 
   /* The viewer's side of the follow relationship. Null hides the
@@ -112,18 +125,24 @@ export default async function PublicProfilePage({
              * render its own bare <Image> for the picture case, and a
              * bought frame never appeared here at all.
              */}
-            <PlayerAvatar
-              displayName={profile.displayName}
-              seed={profile.playerId}
-              avatarUrl={profile.avatarUrl}
-              frame={worn.avatarFrame}
-              className="relative mt-12 size-24 text-2xl"
-            />
+            <WornSceneLayer worn={dressed} />
+
+            <WornRing slug={dressed.ring} className="relative mt-12">
+              <PlayerAvatar
+                displayName={profile.displayName}
+                seed={profile.playerId}
+                avatarUrl={profile.avatarUrl}
+                frame={worn.avatarFrame}
+                className="size-24 text-2xl"
+              />
+            </WornRing>
 
             <div className="relative flex flex-col items-center gap-2">
-              <p className="text-lg font-bold text-text-primary">
-                {profile.displayName}
-              </p>
+              <WornNameRow
+                name={profile.displayName}
+                worn={dressed}
+                className="text-lg font-bold"
+              />
               <EmberBadge earned={profile.embersEarned} size="md" />
               <p className="text-sm text-text-muted">
                 Earned by confirming trades, and nothing else.
@@ -149,34 +168,43 @@ export default async function PublicProfilePage({
                 <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
               ) : (
                 /* The board's carousel: same Rail, same card width. */
-                <Rail ariaLabel="Showcase">
-                  {profile.showcase.map((entry) => (
-                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                      <CardImageZoom
-                        imageUrl={entry.imageUrl}
-                        exactName={entry.name}
-                        cardNumber={entry.number}
-                        enabled={imagesEnabled}
-                        thumbClassName="w-full"
-                        thumb={
-                          <CosmeticCard
-                            imageUrl={entry.imageUrl}
-                            name={entry.name}
-                            number={entry.number}
-                            imagesEnabled={imagesEnabled}
-                            frame={entry.frame ?? worn.frame}
-                            holo={entry.holo ?? worn.holo}
-                            effect={worn.effect}
-                            className="w-full"
-                          />
-                        }
-                      />
-                      <span className="truncate text-[11px] text-text-secondary">
-                        {entry.name}
-                      </span>
-                    </li>
-                  ))}
-                </Rail>
+                <div
+                  className={cn(
+                    shelfBg && "rounded-[var(--radius-control)] p-2",
+                    shelfBg,
+                  )}
+                >
+                  <Rail ariaLabel="Showcase">
+                    {profile.showcase.map((entry) => (
+                      <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                        <CardImageZoom
+                          imageUrl={entry.imageUrl}
+                          exactName={entry.name}
+                          cardNumber={entry.number}
+                          enabled={imagesEnabled}
+                          thumbClassName="w-full"
+                          thumb={
+                            <WornCardShell worn={dressed} className="w-full">
+                              <CosmeticCard
+                                imageUrl={entry.imageUrl}
+                                name={entry.name}
+                                number={entry.number}
+                                imagesEnabled={imagesEnabled}
+                                frame={entry.frame ?? worn.frame}
+                                holo={entry.holo ?? worn.holo}
+                                effect={worn.effect}
+                                className="w-full"
+                              />
+                            </WornCardShell>
+                          }
+                        />
+                        <span className="truncate text-[11px] text-text-secondary">
+                          {entry.name}
+                        </span>
+                      </li>
+                    ))}
+                  </Rail>
+                </div>
               )}
             </div>
           </Card>
