@@ -70,10 +70,16 @@ export function WornCardShell({
   const dressed = worn.border || worn.pattern || worn.animation;
   if (!dressed) return <>{children}</>;
 
+  /*
+   * The padded, coloured edge exists ONLY when a border is worn. The
+   * first cut drew the scaffold's default dark edge whenever anything
+   * was worn, and a pattern with no border shipped every card inside
+   * "this blueish frame" - the founder's words - that nobody chose.
+   */
   return (
     <span
       className={cn(
-        "cfx-card block",
+        worn.border ? "cfx-card block" : "cfx-card-bare block",
         worn.border && `cfa-${worn.border}`,
         worn.animation && `cfa-${worn.animation}`,
         className,

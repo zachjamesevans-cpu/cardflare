@@ -10,7 +10,7 @@ import { FollowButton } from "../follow-button";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap, Title } from "../ui";
-import { colors, spacing } from "../theme";
+import { colors, radius, spacing } from "../theme";
 
 /** The trade-room carousel's tile width; the profile shelf matches it. */
 const SHELF_TILE = 56;
@@ -123,7 +123,18 @@ export function PlayerProfileScreen() {
           <FollowButton playerId={profile.playerId} initial={profile.follow} />
         </View>
 
-        <View style={{ gap: spacing(2) }}>
+        {/* The showcase panel, same as the website: its own rounded
+            rectangle inside the one connected profile block. */}
+        <View
+          style={{
+            gap: spacing(2),
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            padding: spacing(3),
+          }}
+        >
           <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
             Showcase
           </Text>
