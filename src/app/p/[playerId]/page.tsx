@@ -148,7 +148,10 @@ export default async function PublicProfilePage({
               </p>
               {follow && <FollowButton playerId={playerId} initial={follow} />}
             </div>
-            <div className="relative flex w-full flex-col gap-4 text-left">
+            {/* The showcase panel, pixel-identical to the own-profile
+                page's - the founder's spec: viewing somebody must show
+                the same block their owner sees. */}
+            <div className="relative flex w-full flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4 text-left">
               <div className="flex items-start gap-3">
                 <Sparkles
                   className="mt-0.5 size-5 shrink-0 text-accent"

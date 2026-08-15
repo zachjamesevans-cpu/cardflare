@@ -8,6 +8,7 @@ import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { PlayerSearch } from "@/components/players/player-search";
 import { listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { DisplayNameForm } from "@/components/players/display-name-form";
@@ -211,7 +212,11 @@ export default async function ProfilePage() {
               <CoverForm coverUrl={profile.coverUrl} />
             </div>
 
-            <div className="relative flex w-full flex-col gap-4 text-left">
+            {/* The showcase in its own rounded panel - the founder's
+                call: one connected profile block, with the shelf
+                reading as its own piece of furniture inside it. The
+                public page uses these exact classes; keep them twins. */}
+            <div className="relative flex w-full flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4 text-left">
               <div className="flex items-start gap-3">
                 <Sparkles
                   className="mt-0.5 size-5 shrink-0 text-accent"
@@ -384,10 +389,12 @@ export default async function ProfilePage() {
               <p className="font-semibold text-text-primary">People</p>
               <p className="text-sm text-text-secondary">
                 Players you follow. When they follow you back, you are Trade partners.
-                Follow people from their profile popup in a room, or from their profile
-                page.
+                Follow people from their profile popup in a room, from their profile
+                page, or search for them by name right here.
               </p>
             </div>
+
+            <PlayerSearch />
 
             {following.length === 0 ? (
               <p className="text-sm text-text-muted">

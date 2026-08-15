@@ -313,19 +313,17 @@ export function PlayerPeek({
           ref={panel}
           className="relative flex max-h-[88dvh] flex-col gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-border bg-surface p-5 text-text-primary"
         >
-          {/* Their cover, blurred - the quick look reads as THEIR page. */}
+          {/* Their cover, crisp - the founder retired the blur. Shorter
+              than the header row plus its gap, so the Showcase heading
+              below never rides the banner's edge. */}
           {worn?.coverUrl && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 h-24 overflow-hidden"
+              className="pointer-events-none absolute inset-x-0 top-0 h-20 overflow-hidden"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={worn.coverUrl}
-                alt=""
-                className="size-full scale-110 object-cover blur-md"
-              />
-              <div className="absolute inset-0 bg-black/35" />
+              <img src={worn.coverUrl} alt="" className="size-full object-cover" />
+              <div className="absolute inset-0 bg-black/45" />
             </div>
           )}
           <div className="relative flex items-start justify-between gap-3">
@@ -367,7 +365,8 @@ export function PlayerPeek({
             />
           )}
 
-          <div className="flex flex-col gap-2">
+          {/* The same rounded showcase panel the profile pages draw. */}
+          <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-3">
             <p className="text-sm font-semibold text-text-primary">Showcase</p>
 
             {failed ? (

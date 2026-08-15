@@ -846,6 +846,23 @@ export const getGames = () =>
 export const setGames = (games: string[]) =>
   call<{ ok: true; mine: string[] }>("POST", "/api/v1/games", { games });
 
+/** A player found by name search: enough for a row and a door. */
+export interface FoundPlayer {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+}
+
+/** Finding somebody by username, to view and follow them. */
+export const searchPlayersByName = (query: string) =>
+  call<{ players: FoundPlayer[] }>(
+    "GET",
+    `/api/players/search?q=${encodeURIComponent(query)}`,
+  );
+
 /* ------------------------------------------------------------------ */
 /* Customize: the catalogue categories, worn one slot each             */
 /* ------------------------------------------------------------------ */

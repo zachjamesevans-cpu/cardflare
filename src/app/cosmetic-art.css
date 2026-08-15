@@ -487,6 +487,17 @@
   background: var(--cfa-edge, #2a323d);
   overflow: hidden;
 }
+/*
+ * The bare shell: pattern and motion with NO edge. Worn cards use this
+ * when no border is equipped, so nothing draws a frame nobody chose.
+ */
+.cfx-card-bare {
+  position: relative;
+  border-radius: 6px;
+}
+.cfx-card-bare .cfx-card-fx {
+  border-radius: 6px;
+}
 .cfx-card-face {
   position: relative;
   width: 100%;

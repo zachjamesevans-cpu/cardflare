@@ -3,7 +3,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -18,12 +18,14 @@ import {
   removeFromShowcase,
   renameProfile,
   searchCards,
+  searchPlayersByName,
   signOut,
   storedAccessToken,
   uploadAvatar,
   type CardHit,
   type CosmeticItem,
   type FollowedPlayer,
+  type FoundPlayer,
   type Profile,
   type ShowcaseCard,
   type Wardrobe,
@@ -75,6 +77,30 @@ export function ProfileScreen() {
 
   /* Who you follow - fetched with the profile, shown as People. */
   const [following, setFollowing] = useState<FollowedPlayer[]>([]);
+
+  /* Finding somebody by name. Debounced, and answers landing out of
+     order are dropped - same shape as the website's search box. */
+  const [playerQuery, setPlayerQuery] = useState("");
+  const [foundPlayers, setFoundPlayers] = useState<FoundPlayer[] | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
+
+  const searchFor = async (text: string) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const trimmed = text.trim();
+    if (trimmed.length < 2) {
+      setFoundPlayers(null);
+      return;
+    }
+    const request = ++searchSeq.current;
+    searchTimer.current = setTimeout(() => {
+      searchPlayersByName(trimmed)
+        .then((result) => {
+          if (searchSeq.current === request) setFoundPlayers(result.players);
+        })
+        .catch(() => {});
+    }, 300);
+  };
 
   const load = useCallback(async () => {
     const token = await storedAccessToken();
@@ -405,8 +431,18 @@ export function ProfileScreen() {
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the
-            shelf's cosmetics in a menu of its own. */}
-        <View style={{ gap: spacing(2) }}>
+            shelf's cosmetics in a menu of its own. Its own rounded
+            panel inside the block, same as the website. */}
+        <View
+          style={{
+            gap: spacing(2),
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            padding: spacing(3),
+          }}
+        >
           <View
             style={{
               flexDirection: "row",
@@ -541,8 +577,61 @@ export function ProfileScreen() {
         <Title>People</Title>
         <Body>
           Players you follow. When they follow you back, you are Trade partners.
-          Follow people from their profile popup in a room.
+          Follow people from their profile popup in a room, or search for them by
+          name right here.
         </Body>
+
+        {/* Finding somebody by name - the founder's ask: search a
+            username, see their profile, follow them there. */}
+        <Input
+          value={playerQuery}
+          onChangeText={(text) => {
+            setPlayerQuery(text);
+            void searchFor(text);
+          }}
+          placeholder="Find a player by name"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {foundPlayers !== null &&
+          (foundPlayers.length === 0 ? (
+            <Muted>Nobody by that name yet.</Muted>
+          ) : (
+            <View>
+              {foundPlayers.map((person, index) => (
+                <Tap
+                  key={person.playerId}
+                  onPress={() =>
+                    navigation.navigate("PlayerProfile", {
+                      playerId: person.playerId,
+                    })
+                  }
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(3),
+                    paddingVertical: spacing(2.5),
+                    borderTopWidth: index === 0 ? 0 : 1,
+                    borderTopColor: colors.border,
+                  }}
+                >
+                  <PlayerAvatar
+                    displayName={person.displayName}
+                    seed={person.playerId}
+                    avatarUrl={person.avatarUrl}
+                    frame={person.frame}
+                    size={32}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
+                  >
+                    {person.displayName}
+                  </Text>
+                </Tap>
+              ))}
+            </View>
+          ))}
 
         {following.length === 0 ? (
           <Muted>

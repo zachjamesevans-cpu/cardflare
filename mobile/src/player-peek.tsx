@@ -126,9 +126,9 @@ export function PlayerPeekModal({
             overflow: "hidden",
           }}
         >
-          {/* Their cover, blurred: the quick look reads as THEIR page. */}
+          {/* Their cover, crisp - the founder retired the blur. */}
           {profile?.coverUrl ? (
-            <CoverBanner coverUrl={profile.coverUrl} height={86} blur={14} />
+            <CoverBanner coverUrl={profile.coverUrl} height={86} />
           ) : null}
           {failed ? (
             <Text style={{ color: colors.textMuted }}>
