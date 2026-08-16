@@ -5,6 +5,8 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 import { avatarHue, initials } from "@/lib/players/avatar";
+import { RiveArt } from "@/components/players/rive-art";
+import type { RiveArtRef } from "@/components/players/cosmetic-art";
 
 /**
  * Tailwind cannot see a class name built at runtime, so the six hues are
@@ -75,6 +77,8 @@ export function PlayerAvatar({
   frame = null,
   ring = null,
   aura = null,
+  ringRive = null,
+  auraRive = null,
   size = "md",
   className,
 }: {
@@ -107,6 +111,9 @@ export function PlayerAvatar({
    * match. Rides with any ring or frame.
    */
   aura?: string | null;
+  /** The dropped-in file behind the ring or aura, when it is a Rive one. */
+  ringRive?: RiveArtRef | null;
+  auraRive?: RiveArtRef | null;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -120,19 +127,41 @@ export function PlayerAvatar({
   );
 
   /* The worn catalogue ring and aura, proportional to whatever size
-     this is. Two independent layers - mix and match. */
+     this is. Two independent layers - mix and match - and either can
+     be a dropped-in Rive file instead of CSS art, in which case the
+     file is the whole layer. */
   const wornRing = (
     <>
-      {ring && (
-        <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
-          <span className="cfx-ring-fx" />
-          <span className="cfx-ring-band" />
+      {ringRive ? (
+        <span className="pointer-events-none absolute inset-[-14%]" aria-hidden="true">
+          <RiveArt
+            url={ringRive.url}
+            artboard={ringRive.artboard}
+            stateMachine={ringRive.stateMachine}
+          />
         </span>
+      ) : (
+        ring && (
+          <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
+            <span className="cfx-ring-fx" />
+            <span className="cfx-ring-band" />
+          </span>
+        )
       )}
-      {aura && (
-        <span className={cn("cfx-aura-avatar", `cfa-${aura}`)} aria-hidden="true">
-          <span className="cfx-aura-fx" />
+      {auraRive ? (
+        <span className="pointer-events-none absolute inset-[-22%]" aria-hidden="true">
+          <RiveArt
+            url={auraRive.url}
+            artboard={auraRive.artboard}
+            stateMachine={auraRive.stateMachine}
+          />
         </span>
+      ) : (
+        aura && (
+          <span className={cn("cfx-aura-avatar", `cfa-${aura}`)} aria-hidden="true">
+            <span className="cfx-aura-fx" />
+          </span>
+        )
       )}
     </>
   );

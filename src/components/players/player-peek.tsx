@@ -9,6 +9,7 @@ import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { FollowButton, type FollowStateJson } from "@/components/players/follow-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import type { RiveArtRef } from "@/components/players/cosmetic-art";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -61,6 +62,9 @@ interface PeekProfile {
   ring: string | null;
   /** The avatar effect floating around the picture. */
   aura: string | null;
+  /** The dropped-in files behind those two, when they are Rive ones. */
+  ringRive: RiveArtRef | null;
+  auraRive: RiveArtRef | null;
   effect: string | null;
   /** Dressing arrives resolved per card; null never means "look it up". */
   showcase: {
@@ -84,6 +88,8 @@ export function PlayerPeek({
   frame,
   ring = null,
   aura = null,
+  ringRive = null,
+  auraRive = null,
   isYou = false,
   dimmed = false,
   imagesEnabled,
@@ -99,6 +105,9 @@ export function PlayerPeek({
   ring?: string | null;
   /** The avatar effect floating around the picture. */
   aura?: string | null;
+  /** The dropped-in files behind those two, when they are Rive ones. */
+  ringRive?: RiveArtRef | null;
+  auraRive?: RiveArtRef | null;
   isYou?: boolean;
   /** Away players read as away on the trigger, same as before. */
   dimmed?: boolean;
@@ -280,6 +289,8 @@ export function PlayerPeek({
           frame={frame}
           ring={ring}
           aura={aura}
+          ringRive={ringRive}
+          auraRive={auraRive}
           size="sm"
           className={dimmed ? "opacity-50" : undefined}
         />
@@ -337,6 +348,8 @@ export function PlayerPeek({
                 frame={worn?.frame ?? frame}
                 ring={worn ? worn.ring : ring}
                 aura={worn ? worn.aura : aura}
+                ringRive={worn ? worn.ringRive : ringRive}
+                auraRive={worn ? worn.auraRive : auraRive}
                 className="size-14 text-lg"
               />
               <div className="flex min-w-0 flex-1 items-start justify-between gap-2">

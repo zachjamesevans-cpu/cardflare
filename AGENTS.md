@@ -43,6 +43,30 @@ making changes. [BRAND.md](./BRAND.md) governs anything visual.
   social links to accounts that do not exist.
 - **Do not claim something works without running it.** Run the commands.
 
+## Rive cosmetics
+
+A cosmetic is drawn one of two ways, and `cosmetics.art_kind` says
+which. `css` means a `.cfa-<slug>` rule in `src/app/cosmetic-art.css`;
+`rive` means the uploaded file at `rive_path`. A check constraint
+refuses `rive` with no file and `css` with one.
+
+Dropping one in: /admin/packs, "Drop in a Rive file" - file, name,
+category. It lands as a draft, previews in the grid and in Customize,
+goes live from the same tile, and joins a pack from the set builder.
+Nothing about status, ownership, equipping or packs is special-cased
+for Rive; that is the point.
+
+- The runtime's WebAssembly is served from **our** origin
+  (`public/rive/rive.wasm`, copied from the installed package by
+  `scripts/copy-rive-wasm.mjs` in `prebuild`/`predev`, gitignored so it
+  cannot drift). Never let it fall back to a CDN: the founder's network
+  eats what it did not expect, and `tests/unit/rive-cosmetics.test.ts`
+  fails if the fallback comes back.
+- `@rive-app/canvas` is imported lazily inside `RiveArt`, so a page
+  that draws no Rive cosmetic never downloads 1.8 MB of WASM.
+- The app carries Rive files through its API but cannot play them yet:
+  that needs the native runtime, which lands in its own round.
+
 ## Conventions
 
 - Server Components by default. `"use client"` only where interactivity forces

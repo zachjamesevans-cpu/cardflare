@@ -1,4 +1,12 @@
 import { cn } from "@/lib/cn";
+import { RiveArt } from "@/components/players/rive-art";
+
+/** The file behind a Rive cosmetic, when it has one. */
+export interface RiveArtRef {
+  url: string;
+  artboard: string | null;
+  stateMachine: string | null;
+}
 
 /**
  * One draft cosmetic, drawn for real.
@@ -16,13 +24,44 @@ import { cn } from "@/lib/cn";
 export function CosmeticArt({
   kind,
   slug,
+  rive = null,
   className,
 }: {
   kind: string;
   slug: string;
+  /** A dropped-in Rive file. When set, it IS the art: no CSS scaffold. */
+  rive?: RiveArtRef | null;
   className?: string;
 }) {
   const art = `cfa-${slug}`;
+
+  /*
+   * A Rive cosmetic draws itself. The preview shows it on the shape it
+   * will dress - a circle for the things worn on a picture, a card for
+   * the things worn on a card, a wide panel for the rest - so the
+   * console judges it at the proportions it will actually ship at.
+   */
+  if (rive) {
+    const shape =
+      kind === "ring" || kind === "aura"
+        ? "size-[84px] overflow-hidden rounded-full"
+        : kind === "border" || kind === "animation" || kind === "pattern"
+          ? "mx-auto aspect-[63/88] w-24 overflow-hidden rounded-[10px]"
+          : "aspect-[16/7] w-full overflow-hidden rounded-[var(--radius-control)]";
+
+    return (
+      <div className={cn("grid place-items-center", className)}>
+        <div className={cn(shape, "bg-canvas")}>
+          <RiveArt
+            url={rive.url}
+            artboard={rive.artboard}
+            stateMachine={rive.stateMachine}
+            fit={kind === "ring" || kind === "aura" ? "contain" : "cover"}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (kind === "ring") {
     return (

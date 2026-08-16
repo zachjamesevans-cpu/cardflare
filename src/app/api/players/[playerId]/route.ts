@@ -3,7 +3,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
-import { getEquips } from "@/lib/players/equips";
+import { getEquips, wornRiveFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
@@ -59,6 +59,7 @@ export async function GET(
     resolveEquipped(profile.equipped),
     getEquips(playerId),
   ]);
+  const dressedRive = await wornRiveFor(dressed);
 
   /* Viewer-relative: whether YOU follow them and they follow you. Only
      a signed-in player has a side of that relationship; a guest gets
@@ -85,6 +86,9 @@ export async function GET(
     ring: dressed.ring,
     /* The avatar effect floating around the picture. */
     aura: dressed.aura,
+    /* The dropped-in files behind them, when they are Rive ones. */
+    ringRive: dressedRive.ring,
+    auraRive: dressedRive.aura,
     effect: worn.effect,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { roomIdentitiesFor } from "@/lib/players/profile";
+import type { RiveArt } from "@/lib/players/rive-art";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -55,6 +56,9 @@ export interface Participant {
   ring: string | null;
   /** The avatar effect floating around the picture. */
   aura: string | null;
+  /** The dropped-in files behind those two, when they are Rive ones. */
+  ringRive: RiveArt | null;
+  auraRive: RiveArt | null;
 }
 
 function isPresent(lastSeenAt: string, now: number): boolean {
@@ -271,6 +275,8 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
         frame: account ? (identities.get(account)?.frame ?? null) : null,
         ring: account ? (identities.get(account)?.ring ?? null) : null,
         aura: account ? (identities.get(account)?.aura ?? null) : null,
+        ringRive: account ? (identities.get(account)?.ringRive ?? null) : null,
+        auraRive: account ? (identities.get(account)?.auraRive ?? null) : null,
       };
     })
     .sort((a, b) => Number(b.present) - Number(a.present));

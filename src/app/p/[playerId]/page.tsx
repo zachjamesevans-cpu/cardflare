@@ -15,11 +15,12 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
-import { getEquips } from "@/lib/players/equips";
+import { getEquips, wornRiveFor } from "@/lib/players/equips";
 import { followState } from "@/lib/players/follows";
 import { publicProfile } from "@/lib/players/profile";
 import {
   backgroundClass,
+  WornBackdrop,
   WornCardShell,
   WornNameRow,
   WornSceneLayer,
@@ -73,6 +74,7 @@ export default async function PublicProfilePage({
     resolveEquipped(profile.equipped),
     getEquips(playerId),
   ]);
+  const dressedRive = await wornRiveFor(dressed);
   const shelfBg = backgroundClass(dressed);
   const imagesEnabled = cardImagesEnabled();
 
@@ -124,7 +126,7 @@ export default async function PublicProfilePage({
              * render its own bare <Image> for the picture case, and a
              * bought frame never appeared here at all.
              */}
-            <WornSceneLayer worn={dressed} />
+            <WornSceneLayer worn={dressed} rive={dressedRive} />
 
             <PlayerAvatar
               displayName={profile.displayName}
@@ -133,6 +135,8 @@ export default async function PublicProfilePage({
               frame={worn.avatarFrame}
               ring={dressed.ring}
               aura={dressed.aura}
+              ringRive={dressedRive.ring}
+              auraRive={dressedRive.aura}
               className="relative mt-12 size-24 text-2xl"
             />
 
@@ -172,10 +176,13 @@ export default async function PublicProfilePage({
                 /* The board's carousel: same Rail, same card width. */
                 <div
                   className={cn(
-                    shelfBg && "rounded-[var(--radius-control)] p-2",
+                    "relative",
+                    (shelfBg || dressedRive.background) &&
+                      "overflow-hidden rounded-[var(--radius-control)] p-2",
                     shelfBg,
                   )}
                 >
+                  <WornBackdrop rive={dressedRive} />
                   <Rail ariaLabel="Showcase">
                     {profile.showcase.map((entry) => (
                       <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
@@ -186,7 +193,11 @@ export default async function PublicProfilePage({
                           enabled={imagesEnabled}
                           thumbClassName="w-full"
                           thumb={
-                            <WornCardShell worn={dressed} className="w-full">
+                            <WornCardShell
+                              worn={dressed}
+                              rive={dressedRive}
+                              className="w-full"
+                            >
                               <CosmeticCard
                                 imageUrl={entry.imageUrl}
                                 name={entry.name}

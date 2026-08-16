@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-rive-wasm.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-rive-wasm.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -19,6 +21,7 @@
     "cards:sync:onepiece": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/sync-onepiece.ts"
   },
   "dependencies": {
+    "@rive-app/canvas": "^2.40.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "lucide-react": "^1.28.0",

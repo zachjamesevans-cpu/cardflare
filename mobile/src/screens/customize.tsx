@@ -157,8 +157,9 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       >
         <Ionicons name="information-circle" size={16} color={colors.textMuted} />
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
-          These categories are drawn in full on your web profile today. Wearing one
-          here equips it everywhere; in-app art for them is coming next.
+          These categories, and any Rive file dropped into them, are drawn in full
+          on your web profile today. Wearing one here equips it everywhere; in-app
+          art for them is coming next.
         </Text>
       </View>
 
