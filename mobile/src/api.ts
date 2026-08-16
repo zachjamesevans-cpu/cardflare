@@ -387,6 +387,8 @@ export interface RoomState {
     avatarUrl?: string | null;
     /** The profile border they wear, drawn around their avatar. */
     frame?: string | null;
+    /** The catalogue ring, worn over the frame when both are set. */
+    ring?: string | null;
     /**
      * A dropped-in profile border and avatar effect, when they wear
      * one. The server has sent these since the ring slots existed; the
@@ -749,6 +751,8 @@ export interface PeekProfile {
   embersEarned: number;
   /** The ring around their picture. */
   frame: string | null;
+  /** The catalogue ring, worn over the frame when both are set. */
+  ring: string | null;
   /** A dropped-in profile border and avatar effect, when worn. */
   ringArt: ArtFile | null;
   auraArt: ArtFile | null;

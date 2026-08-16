@@ -376,6 +376,7 @@ export function ProfileScreen() {
             seed={profile.playerId}
             avatarUrl={profile.avatarUrl}
             frame={profile.equipped.avatarFrame}
+            ring={profile.wear?.ring ?? null}
             ringArt={profile.wear?.ringArt ?? null}
             auraArt={profile.wear?.auraArt ?? null}
             size={96}

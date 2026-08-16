@@ -22,7 +22,7 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
-import { FRAME_COLOR } from "../player-avatar";
+import { FRAME_COLOR, RING_COLOR } from "../player-avatar";
 import { Body, Card, Muted, Tap, Title } from "../ui";
 import { colors, spacing } from "../theme";
 
@@ -255,7 +255,13 @@ function Shelf({
                         height: 30,
                         borderRadius: 15,
                         borderWidth: 2,
-                        borderColor: FRAME_COLOR[item.slug] ?? colors.border,
+                        /* Catalogue rings first, legacy frames second:
+                           both dress the same circle, and a shop tile
+                           that shows grey is a ring nobody buys. */
+                        borderColor:
+                          RING_COLOR[item.slug] ??
+                          FRAME_COLOR[item.slug] ??
+                          colors.border,
                         backgroundColor: colors.canvas,
                       }}
                     />

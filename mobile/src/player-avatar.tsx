@@ -46,6 +46,54 @@ export const FRAME_COLOR: Record<string, string | null> = {
   "galaxy-edge": colors.galaxy,
 };
 
+/**
+ * The catalogue rings, as one colour each.
+ *
+ * The website draws these in CSS - a conic gradient band per slug in
+ * `src/app/cosmetic-art.css` - and CSS is exactly what a phone does not
+ * have, so twenty-five rings a player could buy and wear were invisible
+ * in the app while dropped-in file art rendered fine.
+ *
+ * One colour is a real loss on the rings whose whole idea is that they
+ * are several: Rainbow, Pixel, Retro Arcade and Glitch each come down to
+ * whichever stop was most vivid. It is still the difference between
+ * wearing something and wearing nothing, and the honest version needs a
+ * sweep gradient per ring - the machinery for that already exists in
+ * foil.tsx for the travelling frames, and it is a round of its own.
+ *
+ * Picked from `--cfa-band` by rule rather than by taste: the most vivid
+ * stop, falling back to the lightest when a ring is a monochrome. Regenerate
+ * with the same rule if the catalogue grows; `tests/unit/ring-colors.test.ts`
+ * fails when a ring in the CSS has no colour here.
+ */
+export const RING_COLOR: Record<string, string> = {
+  "ring-inferno": "#ffb03a",
+  "ring-frozen": "#6db7e8",
+  "ring-electric": "#4f46e5",
+  "ring-galaxy": "#7b5cd6",
+  "ring-gold-foil": "#f0c24b",
+  "ring-rainbow-foil": "#ffb44d",
+  "ring-manga": "#f4f6f8",
+  "ring-pixel": "#5eb9ff",
+  "ring-glitch": "#ef3ef0",
+  "ring-vaporwave": "#b967ff",
+  "ring-aurora": "#7ee8c7",
+  "ring-ember": "#ff7a2f",
+  "ring-smoke": "#6b7280",
+  "ring-water": "#9fd8f5",
+  "ring-sakura": "#f39ec2",
+  "ring-heart": "#e05587",
+  "ring-crown": "#d9a92f",
+  "ring-starfield": "#17223e",
+  "ring-meteor": "#9db8ff",
+  "ring-diamond": "#f8fbff",
+  "ring-black-flame": "#4a1d6e",
+  "ring-white-flame": "#bcd6ea",
+  "ring-retro-arcade": "#ff3355",
+  "ring-crt": "#2fbf6b",
+  "ring-prestige": "#f0c24b",
+};
+
 /** FNV-1a, the same stable hash the website uses to pick a hue. */
 function hue(seed: string): string {
   let result = 0x811c9dc5;
@@ -71,6 +119,7 @@ export function PlayerAvatar({
   seed,
   avatarUrl = null,
   frame = null,
+  ring = null,
   ringArt = null,
   auraArt = null,
   size = 32,
@@ -82,10 +131,15 @@ export function PlayerAvatar({
   avatarUrl?: string | null;
   frame?: string | null;
   /**
-   * A dropped-in profile border, when the player wears one. Worn
-   * INSTEAD of the legacy frame, the same rule the website follows:
-   * two rings around one picture is clutter, and the newer choice is
-   * the one they made last.
+   * The catalogue ring they wear, worn INSTEAD of the legacy frame when
+   * both are set - the website's rule: two rings around one picture is
+   * clutter, and the newer choice is the one they made last.
+   */
+  ring?: string | null;
+  /**
+   * A dropped-in profile border, when the player wears one. Outranks
+   * both of the above for the same reason, and for the same reason the
+   * website gives it.
    */
   ringArt?: ArtFile | null;
   /** An avatar effect, which rides with whatever ring is worn. */
@@ -96,8 +150,22 @@ export function PlayerAvatar({
 }) {
   const [broken, setBroken] = useState(false);
 
-  const ring = !ringArt && frame ? (FRAME_COLOR[frame] ?? null) : null;
-  const kit = !ringArt && frame && travellingFrame(frame) ? getFoilKit() : null;
+  /*
+   * One band, and the newest choice wins: a dropped-in file beats a
+   * catalogue ring beats a legacy frame. Same order as the website's.
+   */
+  const band = ringArt
+    ? null
+    : ring
+      ? (RING_COLOR[ring] ?? null)
+      : frame
+        ? (FRAME_COLOR[frame] ?? null)
+        : null;
+
+  /* The travelling frames animate only when they are the ring being
+     worn; a catalogue ring on top of one replaces it outright. */
+  const kit =
+    !ringArt && !ring && frame && travellingFrame(frame) ? getFoilKit() : null;
 
   const face = (
     <View
@@ -177,7 +245,7 @@ export function PlayerAvatar({
     );
   }
 
-  if (!ring) {
+  if (!band) {
     return <View style={{ opacity: dimmed ? 0.5 : 1 }}>{face}</View>;
   }
 
@@ -191,7 +259,7 @@ export function PlayerAvatar({
         height: size + 8,
         borderRadius: (size + 8) / 2,
         borderWidth: 2,
-        borderColor: ring,
+        borderColor: band,
         backgroundColor: colors.canvas,
         alignItems: "center",
         justifyContent: "center",
