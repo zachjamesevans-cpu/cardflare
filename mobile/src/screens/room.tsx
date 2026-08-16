@@ -49,6 +49,7 @@ import {
   Tap,
   Title,
 } from "../ui";
+import { inRailOrder } from "../rail-order";
 import { OpenToTradesTag } from "../open-to-trades-tag";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
@@ -698,11 +699,20 @@ function RoomScreen({
             flare.offers.length > 0 &&
             pledgeTally(flare.offers, flare.quantity).remaining === 0;
 
+          /*
+           * Cards you can answer come first — the website's rule, word for
+           * word: "all cards you have will automatically sort to the
+           * leftmost portion of the carousel." A rail you can only read the
+           * front of should open on the part that concerns you, and the
+           * ring then says which without a sentence.
+           *
+           * Covered hunts still park at the far end whatever else is true:
+           * those are settled, and settled outranks interesting.
+           */
+          const held = (flare: RoomFlare) => Boolean(flare.match);
+
           const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
-          const orderedRail = [
-            ...railFlares.filter((f) => !isCovered(f)),
-            ...railFlares.filter(isCovered),
-          ];
+          const orderedRail = inRailOrder(railFlares, held, isCovered);
 
           const rows = (list: RoomFlare[]) =>
             list.map((flare) => (
@@ -865,9 +875,20 @@ function RoomScreen({
                       const layout = railLayout.current[sessionId];
                       if (layout != null) railMeasure(sessionId, width, layout, 0);
                     }}
+                    /*
+                     * Pulled back by exactly the padding below, so the
+                     * first card's edge lands on the same line as the
+                     * header above it. The padding itself is for the ring
+                     * on a card you are holding: a ScrollView clips what
+                     * leaves its bounds, and the ring sits two pixels
+                     * outside the art with a glow past that. The website
+                     * had this bug and this fix.
+                     */
+                    style={{ marginHorizontal: -spacing(2) }}
                     contentContainerStyle={{
                       gap: spacing(2),
-                      paddingVertical: spacing(1),
+                      paddingHorizontal: spacing(2),
+                      paddingVertical: spacing(2),
                       alignItems: "flex-start",
                     }}
                   >
@@ -1333,6 +1354,37 @@ function CarouselFlare({
             filter: removing ? [{ grayscale: 1 }] : undefined,
           }}
         >
+          {/*
+           * A ring on a card you are holding — the website's mark, and the
+           * founder's replacement for the old "you have 2 of 6" count: a
+           * ring on the card IS the finding, and it survives being glanced
+           * at across a table in a way a sentence does not.
+           *
+           * An overlay rather than a border on the wrapper, because in
+           * React Native a border takes its width out of the box it is on;
+           * the card would shrink by two pixels the moment you happened to
+           * own it. Outset by two so it sits around the art, not on it.
+           */}
+          {flare.match ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: -2,
+                top: -2,
+                right: -2,
+                bottom: -2,
+                borderWidth: 2,
+                borderColor: colors.accent,
+                borderRadius: radius.control + 2,
+                shadowColor: colors.accent,
+                shadowOpacity: 0.35,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 0 },
+                zIndex: 5,
+              }}
+            />
+          ) : null}
           {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
             flare.imageUrl ? (
               <Image
@@ -1344,6 +1396,34 @@ function CarouselFlare({
               <View key={depth} style={[styles.stackGhost, { left: depth * 4 }]} />
             ),
           )}
+          {/* The same two icons the website puts in the same corner, for
+              the same two facts. Which printing you hold is worth a glance
+              of its own: "you have it" and "you have a different version"
+              are not the same walk across a room. */}
+          {flare.match ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                top: 2,
+                left: 2,
+                zIndex: 6,
+                borderRadius: 999,
+                backgroundColor: colors.surface,
+                padding: 1,
+              }}
+            >
+              <MaterialCommunityIcons
+                name={
+                  flare.match === "exact"
+                    ? "package-variant-closed-check"
+                    : "layers-outline"
+                }
+                size={12}
+                color={colors.accent}
+              />
+            </View>
+          ) : null}
           <CardImage
             imageUrl={flare.imageUrl}
             width={56}

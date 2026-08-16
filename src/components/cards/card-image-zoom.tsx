@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import Image from "next/image";
 import { Layers, Loader2, PackageCheck, X } from "lucide-react";
 
+import { Badge } from "@/components/ui/card";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 import { youHaveLabel, type MatchKind } from "@/lib/matching/schema";
@@ -494,19 +495,27 @@ export function CardImageZoom({
               )}
               {terms && <p className="mt-1 text-sm font-medium text-accent">{terms}</p>}
               {/*
-               * Your own binder's answer, in the same green the ring on
-               * the tile is drawn in, with the same two icons the stacked
-               * view already uses for the same two facts.
+               * Your own binder's answer, drawn as the pill the stacked
+               * view has always drawn it as, with the same two icons.
+               *
+               * It was briefly a bare line in `--color-success`, which was
+               * a third treatment invented for a fact that already had
+               * one: the ring on the tile and the badge in the stacked
+               * view are both the accent. A pill also keeps it from
+               * blending into "Looking for 2" directly above it, which a
+               * bare accent line would have done.
                */}
               {youHave && (
-                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-success">
-                  {youHave.kind === "exact" ? (
-                    <PackageCheck className="size-4 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <Layers className="size-4 shrink-0" aria-hidden="true" />
-                  )}
-                  {youHaveLabel(youHave.kind, youHave.count)}
-                </p>
+                <span className="mt-1.5 self-start">
+                  <Badge>
+                    {youHave.kind === "exact" ? (
+                      <PackageCheck className="size-3.5" aria-hidden="true" />
+                    ) : (
+                      <Layers className="size-3.5" aria-hidden="true" />
+                    )}
+                    {youHaveLabel(youHave.kind, youHave.count)}
+                  </Badge>
+                </span>
               )}
               {/* The note travels with the card: the carousel tile has no
                   room for it, so the zoom is where it gets read. */}

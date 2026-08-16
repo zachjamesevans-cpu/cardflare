@@ -193,3 +193,32 @@ export function offersByFlare(offers: Offer[]): Map<string, Offer[]> {
 
   return grouped;
 }
+
+/**
+ * The order a player's rail puts its cards in.
+ *
+ * Two rules, and they can disagree. Cards you can answer come first — the
+ * founder's replacement for the old "you have 2 of 6" badge: "all cards you
+ * have will automatically sort to the leftmost portion of the carousel",
+ * because a rail you can only read the front of should open on the part
+ * that concerns you. Fully pledged hunts park at the far end, dimmed but
+ * present, so the bring-extras crowd can still see the ask.
+ *
+ * When both apply, settled outranks interesting: a card you hold that
+ * somebody else has already promised is at the end with the rest of the
+ * settled ones, not at the front pretending to need you.
+ *
+ * Extracted from the board so the app can hold the identical rule and so
+ * the disagreement above is pinned by a test rather than by two comments.
+ */
+export function inRailOrder<T>(
+  items: T[],
+  held: (item: T) => boolean,
+  covered: (item: T) => boolean,
+): T[] {
+  return [
+    ...items.filter((item) => !covered(item) && held(item)),
+    ...items.filter((item) => !covered(item) && !held(item)),
+    ...items.filter(covered),
+  ];
+}
