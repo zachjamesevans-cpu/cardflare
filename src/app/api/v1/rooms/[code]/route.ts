@@ -10,7 +10,12 @@ import {
   touchParticipation,
 } from "@/lib/events/participants";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
-import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
+import {
+  heldByCard,
+  heldCountByCard,
+  matchFor,
+  offersByFlare,
+} from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
@@ -162,6 +167,10 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
 
   const held = heldByCard(binder);
 
+  /* Counts come from the binder alone. The collection folded in below
+     proves printings, never quantities. */
+  const heldCounts = heldCountByCard(binder);
+
   if (session.player_id) {
     const collection = await collectionAvailability(
       session.player_id,
@@ -194,6 +203,8 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     flares: flares.map((entry) => ({
       ...entry,
       match: entry.playerSessionId === session.id ? null : matchFor(entry, held),
+      /* For the card viewer's "You have N in your binder", on tap. */
+      heldCount: heldCounts.get(entry.cardId) ?? 0,
       counterMayHave: counterHas.has(entry.cardId),
       offers: (grouped.get(entry.id) ?? []).map((offer) => ({
         responderSessionId: offer.responderSessionId,

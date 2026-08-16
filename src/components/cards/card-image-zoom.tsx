@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { Loader2 } from "lucide-react";
-import { X } from "lucide-react";
+import { Layers, Loader2, PackageCheck, X } from "lucide-react";
 
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
+import { youHaveLabel, type MatchKind } from "@/lib/matching/schema";
 
 /**
  * A thumbnail you can open at a readable size.
@@ -73,6 +73,7 @@ export function CardImageZoom({
   stillNeeds = null,
   terms = null,
   pledges = [],
+  youHave = null,
   thumbClassName,
   thumb,
 }: {
@@ -109,6 +110,16 @@ export function CardImageZoom({
    * ask: tap the card, see "Kaito is bringing 3".
    */
   pledges?: { name: string; quantity: number }[];
+  /**
+   * What the viewer's own binder says about this card, or null.
+   *
+   * On tap and only on tap — the founder's shape. The board already marks
+   * a card you are holding with a green ring, which reads across a table
+   * in a way a sentence never will; the sentence is what the tap is FOR.
+   * Saying it on every tile as well would be the same fact twice, in the
+   * form that costs the most room.
+   */
+  youHave?: { kind: MatchKind; count: number } | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
   /**
@@ -482,6 +493,21 @@ export function CardImageZoom({
                 </ul>
               )}
               {terms && <p className="mt-1 text-sm font-medium text-accent">{terms}</p>}
+              {/*
+               * Your own binder's answer, in the same green the ring on
+               * the tile is drawn in, with the same two icons the stacked
+               * view already uses for the same two facts.
+               */}
+              {youHave && (
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-success">
+                  {youHave.kind === "exact" ? (
+                    <PackageCheck className="size-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <Layers className="size-4 shrink-0" aria-hidden="true" />
+                  )}
+                  {youHaveLabel(youHave.kind, youHave.count)}
+                </p>
+              )}
               {/* The note travels with the card: the carousel tile has no
                   room for it, so the zoom is where it gets read. */}
               {note && (

@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { youHaveLabel } from "./held-label";
 import { colors, radius, spacing } from "./theme";
 
 /** The handful of primitives every screen shares, in the site's skin. */
@@ -104,6 +106,7 @@ export function CardImage({
   direction = "want",
   pledges = [],
   terms = null,
+  youHave = null,
 }: {
   imageUrl: string | null;
   width: number;
@@ -126,6 +129,12 @@ export function CardImage({
   pledges?: { name: string; quantity: number }[];
   /** Trade, cash or either, when it is not the assumed plain trade. */
   terms?: string | null;
+  /**
+   * What the viewer's own binder says about this card, or null. On tap and
+   * only on tap, the same rule the website follows: the ring on the tile is
+   * the glance, this sentence is the answer to the question it raises.
+   */
+  youHave?: { kind: "exact" | "other-printing"; count: number } | null;
 }) {
   const [open, setOpen] = useState(false);
   const window = useWindowDimensions();
@@ -238,6 +247,33 @@ export function CardImage({
                   </Text>
                 ))}
                 {terms ? <Text style={styles.zoomLooking}>{terms}</Text> : null}
+                {/* Your own binder's answer, in the same green the ring on
+                    the tile is drawn in. Same three phrases as the web. */}
+                {youHave ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(1),
+                      marginTop: 2,
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name={
+                        youHave.kind === "exact"
+                          ? "package-variant-closed-check"
+                          : "layers-outline"
+                      }
+                      size={15}
+                      color={colors.success}
+                    />
+                    <Text
+                      style={{ color: colors.success, fontSize: 13, fontWeight: "600" }}
+                    >
+                      {youHaveLabel(youHave.kind, youHave.count)}
+                    </Text>
+                  </View>
+                ) : null}
                 {/* The tile has no room for the note; the zoom is where
                     it gets read. */}
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}

@@ -59,6 +59,7 @@ function Entry({
   kind,
   imagesEnabled,
   match,
+  heldCount = 0,
   removable,
   counterName,
   pledges = [],
@@ -76,6 +77,8 @@ function Entry({
    * requester named a printing, and claiming the match would be guessing.
    */
   match?: MatchKind | null;
+  /** Copies of this card the viewer's own binder claims. */
+  heldCount?: number;
   removable: boolean;
   /**
    * The store whose synced counter stock includes this card, if any.
@@ -104,6 +107,7 @@ function Entry({
           direction={entry.intent}
           terms={acceptsLabel(entry)}
           pledges={pledges}
+          youHave={match ? { kind: match, count: heldCount } : null}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -301,6 +305,7 @@ function CarouselEntry({
   kind,
   imagesEnabled,
   match,
+  heldCount = 0,
   removable,
   pledgeLine = null,
   pledges = [],
@@ -317,6 +322,8 @@ function CarouselEntry({
   kind: ListKind;
   imagesEnabled: boolean;
   match?: MatchKind | null;
+  /** Copies of this card the viewer's own binder claims. */
+  heldCount?: number;
   removable: boolean;
   /** The hunt's coverage, one short line: "Needs 1 more" and kin. */
   pledgeLine?: string | null;
@@ -418,6 +425,7 @@ function CarouselEntry({
           stillNeeds={pledgeLine != null && remaining != null ? remaining : null}
           terms={acceptsLabel(entry)}
           pledges={pledges}
+          youHave={match ? { kind: match, count: heldCount } : null}
           thumbClassName="w-full"
         />
         {/*
@@ -538,6 +546,7 @@ export function FlareBoard({
   identities,
   counterHas,
   counterName,
+  heldCounts,
   early = false,
 }: {
   entries: ListEntry[];
@@ -582,6 +591,14 @@ export function FlareBoard({
   counterHas?: Set<string>;
   /** The store's name, for the "may have it" line. */
   counterName?: string;
+  /**
+   * Copies the viewer's own binder claims, keyed by card.
+   *
+   * Only the binder counts here. The synced collection proves printings but
+   * not quantities, so a card it alone vouches for gets the plain "You have
+   * this" rather than a number that would be made up.
+   */
+  heldCounts?: Map<string, number>;
   /** Early board: offers read as pledges to bring the card. */
   early?: boolean;
 }) {
@@ -668,6 +685,7 @@ export function FlareBoard({
               kind="flare"
               imagesEnabled={imagesEnabled}
               match={match}
+              heldCount={heldCounts?.get(entry.cardId) ?? 0}
               removable={isYou}
               pledgeLine={pledgeLine}
               pledges={pledges}
@@ -705,6 +723,7 @@ export function FlareBoard({
               kind="flare"
               imagesEnabled={imagesEnabled}
               match={match}
+              heldCount={heldCounts?.get(entry.cardId) ?? 0}
               removable={isYou}
               counterName={counterHas?.has(entry.cardId) ? (counterName ?? null) : null}
               pledges={entryOffers.map((offer) => ({

@@ -1358,6 +1358,11 @@ function CarouselFlare({
               name: offer.displayName ?? "A player",
               quantity: offer.quantity,
             }))}
+            youHave={
+              flare.match
+                ? { kind: flare.match, count: flare.heldCount ?? 0 }
+                : null
+            }
             terms={acceptsLabel(flare)}
           />
           {/*
@@ -1567,6 +1572,11 @@ function FlareRow({
               stillNeeds={
                 flare.offers.length > 0
                   ? pledgeTally(flare.offers, flare.quantity).remaining
+                  : null
+              }
+              youHave={
+                flare.match
+                  ? { kind: flare.match, count: flare.heldCount ?? 0 }
                   : null
               }
             />

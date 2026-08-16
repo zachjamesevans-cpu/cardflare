@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   heldByCard,
+  heldCountByCard,
   matchFor,
+  youHaveLabel,
   offerMessageSchema,
   offerQuantitySchema,
   offersByFlare,
@@ -177,5 +179,55 @@ describe("pledgeTally", () => {
 
   it("is quiet arithmetic on an unanswered Flare", () => {
     expect(pledgeTally([], 2)).toEqual({ pledged: 0, remaining: 2 });
+  });
+});
+
+/*
+ * The card viewer's line, which is the only place these three phrases
+ * appear and the only thing the founder asked for on a tap. Tested as
+ * words rather than as rendering, because the app carries a copy of this
+ * function (mobile/src/held-label.ts) and the two must not drift.
+ */
+describe("youHaveLabel", () => {
+  it("says you have it when the binder proves the printing", () => {
+    expect(youHaveLabel("exact", 1)).toBe("You have this");
+  });
+
+  /* "You have 1 in your binder" is a worse way of saying "You have this". */
+  it("does not count a single copy", () => {
+    expect(youHaveLabel("exact", 0)).toBe("You have this");
+    expect(youHaveLabel("exact", 1)).toBe("You have this");
+  });
+
+  it("counts once there is more than one", () => {
+    expect(youHaveLabel("exact", 2)).toBe("You have 2 in your binder");
+    expect(youHaveLabel("exact", 11)).toBe("You have 11 in your binder");
+  });
+
+  /*
+   * Never a number on a printing you cannot prove. The interesting fact
+   * is the mismatch, and a count beside it reads as a promise about the
+   * version the other player did not ask for.
+   */
+  it("never counts a printing it cannot prove", () => {
+    expect(youHaveLabel("other-printing", 1)).toBe("You have another printing");
+    expect(youHaveLabel("other-printing", 7)).toBe("You have another printing");
+  });
+});
+
+describe("heldCountByCard", () => {
+  it("adds up every binder row for one card", () => {
+    const counts = heldCountByCard([
+      { cardId: "a", quantity: 2 },
+      { cardId: "a", quantity: 3 },
+      { cardId: "b", quantity: 1 },
+    ]);
+
+    expect(counts.get("a")).toBe(5);
+    expect(counts.get("b")).toBe(1);
+  });
+
+  it("has nothing to say about a card the binder does not name", () => {
+    expect(heldCountByCard([]).get("a")).toBeUndefined();
   });
 });
