@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { X } from "lucide-react";
 
 import { CardThumbnail } from "./card-thumbnail";
@@ -536,6 +537,22 @@ export function CardImageZoom({
                   sharp ? "opacity-100" : "opacity-0"
                 }`}
               />
+            )}
+
+            {/*
+             * Something honest to look at while the full-size card is
+             * still coming. The blurred thumbnail underneath reads as
+             * "an image", not as "an image arriving", and the founder
+             * found the switch disorienting: "show a loading icon or
+             * something until it fully loads."
+             */}
+            {!sharp && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 grid place-items-center"
+              >
+                <Loader2 className="size-7 animate-spin text-white/70 drop-shadow" />
+              </span>
             )}
           </div>
         </div>
