@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 
@@ -95,6 +95,8 @@ export function PlayerPeek({
   imagesEnabled,
   className,
   nameClassName,
+  size = "sm",
+  below = null,
 }: {
   playerId: string;
   displayName: string;
@@ -116,6 +118,19 @@ export function PlayerPeek({
   className?: string;
   /** Extra classes for the name, e.g. the board header's bolder face. */
   nameClassName?: string;
+  /** The trigger's picture. The board header wants the big one. */
+  size?: "sm" | "md" | "lg";
+  /**
+   * Whatever belongs on the line UNDER the name — "Open to trades", today.
+   *
+   * This slot exists because of a layout bug the founder reported three
+   * times. This component renders the picture and the name as one unit, so
+   * a surface that wanted a second line put it after the whole unit, and
+   * flex-wrap dropped it beneath the PICTURE rather than beneath the name.
+   * Passing it in is what makes the name and the line under it a column
+   * BESIDE the picture, which is the only arrangement that reads right.
+   */
+  below?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -291,20 +306,24 @@ export function PlayerPeek({
           aura={aura}
           ringArt={ringArt}
           auraArt={auraArt}
-          size="sm"
+          size={size}
           className={dimmed ? "opacity-50" : undefined}
         />
-        <span className="min-w-0 flex-1 truncate text-text-secondary">
-          <span
-            className={cn(
-              "underline-offset-4 hover:underline",
-              !dimmed && "text-text-primary",
-              nameClassName,
-            )}
-          >
-            {displayName}
+        {/* A column beside the picture, never wrapped items around it. */}
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+          <span className="max-w-full truncate text-text-secondary">
+            <span
+              className={cn(
+                "underline-offset-4 hover:underline",
+                !dimmed && "text-text-primary",
+                nameClassName,
+              )}
+            >
+              {displayName}
+            </span>
+            {isYou && <span className="font-normal text-text-muted"> · you</span>}
           </span>
-          {isYou && <span className="font-normal text-text-muted"> · you</span>}
+          {below}
         </span>
       </button>
 

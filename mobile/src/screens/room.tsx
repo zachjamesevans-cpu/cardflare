@@ -742,6 +742,12 @@ function RoomScreen({
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: spacing(2),
+                  /* The website's hairline, for the same reason: the
+                     person and their cards used to run together as one
+                     block of things at slightly different sizes. */
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                  paddingBottom: spacing(3),
                 }}
               >
                 <View
@@ -750,6 +756,7 @@ function RoomScreen({
                     alignItems: "center",
                     gap: spacing(1.5),
                     flexShrink: 1,
+                    flexGrow: 1,
                   }}
                 >
                   {/* An account's identity opens their popup; the rest
@@ -775,16 +782,26 @@ function RoomScreen({
                           frame={person?.frame ?? null}
                           ringArt={person?.ringArt ?? null}
                           auraArt={person?.auraArt ?? null}
-                          /* 34, up from 26: the website's board header
-                             went from sm to md for the same reason -
-                             the founder wanted the picture to make a
-                             bigger statement, and a worn ring is most
-                             of why anybody bought one. */
-                          size={34}
+                          /* 64, matching the website's `lg`. The
+                             founder's mockup settles what this row is:
+                             the picture anchors it, and a worn ring is
+                             most of why anybody bought one. */
+                          size={64}
                         />
-                        <Title>
-                          {mine ? "Your Flares" : (group.name ?? "A player")}
-                        </Title>
+                        {/*
+                         * The name and the line under it are a COLUMN
+                         * beside the picture, never items wrapped around
+                         * it. Placed after the picture-and-name pair, the
+                         * tag lands beneath the PICTURE and reads as a
+                         * caption on the avatar — the same bug the
+                         * website had, reported three times.
+                         */}
+                        <View style={{ flexShrink: 1, gap: spacing(1) }}>
+                          <Title>
+                            {mine ? "Your Flares" : (group.name ?? "A player")}
+                          </Title>
+                          {openIds.has(sessionId) && <OpenToTradesTag />}
+                        </View>
                       </View>
                     );
                     return playerBySession.get(sessionId) ? (
@@ -795,7 +812,6 @@ function RoomScreen({
                       identity
                     );
                   })()}
-                  {openIds.has(sessionId) && <OpenToTradesTag />}
                 </View>
                 <View
                   style={{

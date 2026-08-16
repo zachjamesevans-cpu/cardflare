@@ -84,7 +84,13 @@ export function GroupView({
        * inside a button is invalid HTML, so the header splits: the
        * person on the left, and everything else remains the toggle.
        */}
-      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      {/*
+       * A hairline under the header, from the founder's mockup. The
+       * person and their cards used to run together as one block of
+       * things at slightly different sizes; a rule says "this is who,
+       * and below is what they have" without a word of copy.
+       */}
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border pb-3">
         {identity}
         <button
           type="button"

@@ -22,7 +22,7 @@ const HUE_CLASS: Record<number, string> = {
   6: "text-avatar-6 bg-avatar-6/12 border-avatar-6/25",
 };
 
-const PIXELS: Record<"sm" | "md", number> = { sm: 32, md: 40 };
+const PIXELS: Record<"sm" | "md" | "lg", number> = { sm: 32, md: 40, lg: 64 };
 
 /**
  * The frame a player bought, drawn around them.
@@ -114,14 +114,25 @@ export function PlayerAvatar({
   /** The dropped-in file behind the ring or aura, when it is a Rive one. */
   ringArt?: CosmeticArtFileRef | null;
   auraArt?: CosmeticArtFileRef | null;
-  size?: "sm" | "md";
+  /**
+   * `lg` is the board header's, and only the board header's.
+   *
+   * The founder, with a mockup: the picture there should be the anchor of
+   * the row, not a bullet beside a name. 64px is where a worn ring reads
+   * as the thing somebody spent Embers on rather than as a coloured edge.
+   */
+  size?: "sm" | "md" | "lg";
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
 
   const box = cn(
     "relative inline-flex shrink-0 items-center justify-center rounded-full border",
-    size === "sm" ? "size-8 text-xs" : "size-10 text-sm",
+    size === "sm"
+      ? "size-8 text-xs"
+      : size === "lg"
+        ? "size-16 text-xl"
+        : "size-10 text-sm",
     !ring && frame ? FRAME_CLASS[frame] : "",
     className,
   );
