@@ -170,6 +170,7 @@ export function backgroundClass(worn: Worn): string | undefined {
 }
 
 const TITLE_WORDS: Record<string, string> = {
+  "title-founder": "Founder",
   "title-custom-tagline": "Your line here",
   "title-trade-milestone": "Trade milestone",
   "title-collector": "Collector",

@@ -442,21 +442,31 @@
  */
 .cfx-ring-avatar {
   position: absolute;
-  inset: -5px;
+  inset: -4px;
   border-radius: 9999px;
   pointer-events: none;
 }
+/*
+ * TWO pixels of colour, two pixels of gap, and that is the whole rule.
+ *
+ * The original frames were `box-shadow 0 0 0 2px canvas, 0 0 0 4px
+ * colour`: a band running from 2px outside the picture to 4px. The
+ * catalogue rings drifted to three, which is fifty per cent heavier
+ * and reads as heavy at roster size - the founder, twice now, the
+ * second time as "far too thick". A -4px layer masked to its outer
+ * 2px lands on exactly the old geometry.
+ */
 .cfx-ring-avatar .cfx-ring-band {
   inset: 0;
   -webkit-mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 3px),
-    #000 calc(100% - 2px)
+    transparent calc(100% - 2px),
+    #000 calc(100% - 1px)
   );
   mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 3px),
-    #000 calc(100% - 2px)
+    transparent calc(100% - 2px),
+    #000 calc(100% - 1px)
   );
 }
 .cfx-ring-avatar .cfx-ring-fx {
@@ -2757,6 +2767,40 @@
 /* ================================================================ */
 /* TITLES (title-*): 5. The line under a username.                  */
 /* ================================================================ */
+
+/*
+ * Founder: the one title nobody can buy.
+ *
+ * A steady ember glow rather than a flash - it sits under a name on
+ * every screen the person appears on, so anything that pulses hard
+ * would be exhausting to be near. The text shadow does the work and
+ * the border carries the same colour at low alpha, so it reads as lit
+ * rather than outlined.
+ */
+.cfa-title-founder.cfx-title-chip {
+  border-color: rgba(255, 122, 61, 0.55);
+  color: #ffb27a;
+  text-shadow:
+    0 0 6px rgba(255, 122, 61, 0.75),
+    0 0 14px rgba(255, 122, 61, 0.45);
+  box-shadow:
+    0 0 10px rgba(255, 122, 61, 0.28),
+    inset 0 0 8px rgba(255, 122, 61, 0.12);
+  animation: cfa-founder-glow 3.2s ease-in-out infinite;
+}
+@keyframes cfa-founder-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 8px rgba(255, 122, 61, 0.22),
+      inset 0 0 6px rgba(255, 122, 61, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(255, 122, 61, 0.4),
+      inset 0 0 10px rgba(255, 122, 61, 0.18);
+  }
+}
 
 .cfa-title-custom-tagline.cfx-title-chip {
   font-style: italic;
