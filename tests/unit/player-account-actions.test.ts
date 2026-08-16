@@ -25,6 +25,10 @@ const setWantQuantity = vi.fn();
 const saveLocal = vi.fn();
 const removeLocal = vi.fn();
 const createPlayerSession = vi.fn();
+const renamePlayerSession = vi.fn();
+const sessionForPlayer = vi.fn();
+const addSessionToken = vi.fn();
+const mergePlayerSessions = vi.fn();
 const setPlayerCookie = vi.fn();
 const redirect = vi.fn((to: string) => {
   throw Object.assign(new Error(`NEXT_REDIRECT:${to}`), { digest: "NEXT_REDIRECT" });
@@ -37,6 +41,7 @@ vi.mock("@/lib/players/accounts", () => ({
   invitePlayer: (...a: unknown[]) => invitePlayer(...a),
   playerForUser: (...a: unknown[]) => playerForUser(...a),
   linkSessionToPlayer: (...a: unknown[]) => linkSessionToPlayer(...a),
+  sessionForPlayer: (...a: unknown[]) => sessionForPlayer(...a),
 }));
 vi.mock("@/lib/email/client", () => ({
   sendEmail: (...a: unknown[]) => sendEmail(...a),
@@ -72,6 +77,9 @@ vi.mock("@/lib/players/locals", () => ({
 }));
 vi.mock("@/lib/players/repository", () => ({
   createPlayerSession: (...a: unknown[]) => createPlayerSession(...a),
+  renamePlayerSession: (...a: unknown[]) => renamePlayerSession(...a),
+  addSessionToken: (...a: unknown[]) => addSessionToken(...a),
+  mergePlayerSessions: (...a: unknown[]) => mergePlayerSessions(...a),
 }));
 
 const {
@@ -122,6 +130,10 @@ beforeEach(() => {
     saveLocal,
     removeLocal,
     createPlayerSession,
+    renamePlayerSession,
+    sessionForPlayer,
+    addSessionToken,
+    mergePlayerSessions,
     setPlayerCookie,
     redirect,
   ]) {
@@ -137,6 +149,10 @@ beforeEach(() => {
     playerId: "player-1",
     playerName: "Kaito",
   });
+  /* No prior identity for the account: the RSVP cases that need one say so. */
+  sessionForPlayer.mockResolvedValue(null);
+  linkSessionToPlayer.mockResolvedValue(true);
+  mergePlayerSessions.mockResolvedValue(true);
   invitePlayer.mockResolvedValue({ outcome: "invited" });
   sendEmail.mockResolvedValue({ status: "sent" });
   generateSetupLink.mockResolvedValue("https://x/link");

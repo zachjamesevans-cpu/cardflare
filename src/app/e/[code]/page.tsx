@@ -118,10 +118,19 @@ function Unavailable() {
  */
 export default async function JoinByCodePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams: Promise<{ resumed?: string }>;
 }) {
   const { code } = await params;
+  /*
+   * Set by the join action when the tap picked up a seat this account
+   * already had — from the app, or from this browser earlier. Saying so is
+   * the point: a join that appears to do nothing is exactly what a duplicate
+   * used to look like from the inside.
+   */
+  const resumed = (await searchParams).resumed === "1";
 
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
@@ -503,6 +512,18 @@ export default async function JoinByCodePage({
           </div>
         )}
       </Card>
+
+      {inRoom && resumed && (
+        <Card className="flex flex-col gap-1 border-accent/30">
+          <h2 className="font-semibold text-text-primary">
+            You were already in this room
+          </h2>
+          <p className="text-sm text-text-secondary">
+            Same seat, same Flares, same binder. Your account is one player here however
+            you got in, so nothing was posted twice.
+          </p>
+        </Card>
+      )}
 
       {phase === "early" && (
         <Card className="flex flex-col gap-1 border-accent/30">

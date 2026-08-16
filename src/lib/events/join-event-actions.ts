@@ -7,6 +7,10 @@ import { text } from "@/lib/form-value";
 import { getViewer } from "@/lib/auth/session";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
 import { accountIdentity } from "@/lib/players/account-identity";
+import {
+  accountRoomIdentity,
+  nameSessionAfterAccount,
+} from "@/lib/players/room-identity";
 import { saveLocal } from "@/lib/players/locals";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -122,31 +126,30 @@ export async function joinEventAction(
 
   let session = await getPlayerSession();
   let freshToken: string | null = null;
+  /* Only a session this action created may be rolled back on a failed join.
+     Adopting one the account already had must never delete it. */
+  let created = false;
+  let resumed = false;
 
   if (account) {
-    if (session) {
-      /* Their room identity follows the account, renamed in place: the
-         binder, Flares and membership all hang off the session id. */
-      if (session.display_name !== account.displayName) {
-        try {
-          await renamePlayerSession(session.id, account.displayName);
-          session = { ...session, display_name: account.displayName };
-        } catch (error) {
-          console.error("Could not put the account's name on the session", error);
-          return invalid(GENERIC_ERROR, submitted);
-        }
-      }
-    } else {
-      freshToken = createSessionToken();
-      try {
-        session = await createPlayerSession(
-          account.displayName,
-          hashSessionToken(freshToken),
-        );
-      } catch (error) {
-        console.error("Could not create the player session", error);
-        return invalid(GENERIC_ERROR, submitted);
-      }
+    /*
+     * One identity per account, whichever device is asking. Joining from a
+     * second client picks up the seat the account already has instead of
+     * putting the same person on the board twice.
+     */
+    try {
+      const identity = await accountRoomIdentity(
+        account.playerId,
+        account.displayName,
+        session,
+      );
+      session = await nameSessionAfterAccount(identity.session, account.displayName);
+      freshToken = identity.freshToken;
+      created = identity.created;
+      resumed = identity.resumed;
+    } catch (error) {
+      console.error("Could not resolve the account's room identity", error);
+      return invalid(GENERIC_ERROR, submitted);
     }
   } else if (session) {
     /*
@@ -189,6 +192,7 @@ export async function joinEventAction(
     }
 
     freshToken = createSessionToken();
+    created = true;
 
     try {
       session = await createPlayerSession(
@@ -201,12 +205,17 @@ export async function joinEventAction(
     }
   }
 
+  /* Already here counts as joined, and is worth saying so. Asked before the
+     write, because the insert cannot tell the two apart afterwards. */
+  const wasAlreadyHere = Boolean(await findParticipation(event.id, session.id));
+
   const joined = await joinEvent(event.id, session.id);
 
   if (!joined) {
     // The identity was created but the room write failed. Roll it back rather
     // than leaving an orphaned session and a cookie pointing at nothing.
-    if (freshToken) await deletePlayerSession(session.id);
+    // Only one this action created: an adopted session belongs to the account.
+    if (created) await deletePlayerSession(session.id);
     return invalid(GENERIC_ERROR, submitted);
   }
 
@@ -230,7 +239,7 @@ export async function joinEventAction(
   if (freshToken) await setPlayerCookie(freshToken);
 
   revalidatePath(`/e/${code}`);
-  redirect(`/e/${code}`);
+  redirect(resumed || wasAlreadyHere ? `/e/${code}?resumed=1` : `/e/${code}`);
 }
 
 /**

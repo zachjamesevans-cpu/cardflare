@@ -15,6 +15,10 @@ import { roomPhase } from "@/lib/events/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
+import {
+  accountRoomIdentity,
+  nameSessionAfterAccount,
+} from "@/lib/players/room-identity";
 import { saveLocal } from "@/lib/players/locals";
 import { collectionAvailability } from "@/lib/players/collection";
 import {
@@ -236,6 +240,8 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
 
   let session = await apiSession(request);
   let freshToken: string | null = null;
+  let created = false;
+  let resumed = false;
   const submitted = (parsed.data.displayName ?? "").trim();
 
   /*
@@ -244,32 +250,54 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
    * name sent up from a join screen is ignored rather than argued with.
    */
   const account = await apiPlayer(request);
-  const wanted = account?.displayName ?? submitted;
 
-  if (session) {
+  if (account) {
+    /*
+     * One identity per account, whichever client is asking — the same call
+     * the website's join makes, so joining here while already in the room
+     * from the mobile site resumes that seat rather than adding a second
+     * person to the board.
+     */
+    const identity = await accountRoomIdentity(
+      account.playerId,
+      account.displayName,
+      session,
+    );
+    session = await nameSessionAfterAccount(identity.session, account.displayName);
+    freshToken = identity.freshToken;
+    created = identity.created;
+    resumed = identity.resumed;
+  } else if (session) {
     // Renamed in place, never replaced — a new session would abandon the
     // binder and every membership hanging off the old one.
-    if (wanted && wanted !== session.display_name) {
-      const name = joinAsPlayerSchema.safeParse({ displayName: wanted });
+    if (submitted && submitted !== session.display_name) {
+      const name = joinAsPlayerSchema.safeParse({ displayName: submitted });
       if (!name.success) return badRequest("That display name will not work.");
 
       await renamePlayerSession(session.id, name.data.displayName);
       session = { ...session, display_name: name.data.displayName };
     }
   } else {
-    const name = joinAsPlayerSchema.safeParse({ displayName: wanted });
+    const name = joinAsPlayerSchema.safeParse({ displayName: submitted });
     if (!name.success) return badRequest("A display name is required to join.");
 
     freshToken = createSessionToken();
+    created = true;
     session = await createPlayerSession(
       name.data.displayName,
       hashSessionToken(freshToken),
     );
   }
 
+  // Already here counts as joined; asked before the write, which cannot
+  // tell the two apart afterwards.
+  const wasAlreadyHere = Boolean(await findParticipation(event.id, session.id));
+
   const joined = await joinEvent(event.id, session.id);
   if (!joined) {
-    if (freshToken) await deletePlayerSession(session.id);
+    // Only a session this request created may be undone. An adopted one
+    // belongs to the account and is very likely in another room.
+    if (created) await deletePlayerSession(session.id);
     return Response.json({ error: "unavailable" }, { status: 503 });
   }
 
@@ -287,6 +315,13 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
 
   return Response.json({
     joined: true,
+    /*
+     * True when this account was already in the room from another client.
+     * The app says so rather than silently doing nothing, because "join"
+     * appearing to have no effect is exactly what a duplicate used to look
+     * like from the inside.
+     */
+    resumed: resumed || wasAlreadyHere,
     you: { sessionId: session.id, displayName: session.display_name },
     // Returned once, stored by the app; the website's cookie in header form.
     ...(freshToken ? { sessionToken: freshToken } : {}),

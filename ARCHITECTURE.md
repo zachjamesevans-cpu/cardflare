@@ -655,6 +655,53 @@ The identity is written before the room membership, so a failed join rolls the
 new session back. An orphaned session plus a cookie pointing at it is worse
 than nothing: the player would look signed in and be in no room.
 
+### One room identity per account
+
+A session is a **device**; an account is a **person**. Before this they were
+the same thing, and joining the same room from the mobile site and then from
+the app — signed in as one account both times — put the founder on the board
+twice: two rows in `event_participants`, two sections under the same name.
+
+The duplicate on the board was the visible half. Everything room-scoped hangs
+off the session id, so two sessions meant two binders, and a card listed on
+the phone did not match with it in the app.
+
+So `player_sessions` has a partial unique index on `player_id`, and joining
+resolves the identity from the account rather than from the token the client
+happens to hold (`accountRoomIdentity`, used by the website's join, the app's
+`POST /api/v1/rooms/[code]`, and the RSVP alike). What the second device does
+depends on what it arrived with:
+
+| The device holds      | What happens                                        |
+| --------------------- | --------------------------------------------------- |
+| The account's session | Nothing. The ordinary path.                         |
+| A session of its own  | `merge_player_sessions` folds it into the account's |
+| Nothing at all        | It is handed a token for the account's session      |
+
+Adopting is **additive**, never a rotation. `player_session_tokens` lets one
+session answer to several tokens, so the device that was already in the room
+keeps working — signing somebody out mid-event to fix a duplicate they never
+saw would be a worse bug than the duplicate. `findPlayerSession` consults that
+table only when the session's own `token_hash` did not match, so a guest with
+one token still costs exactly one query.
+
+Merging collapses each collision rather than failing on it, because every
+table involved has a unique index that a plain re-point would violate half way
+through: the larger binder quantity and the newer confirmation win, the open
+Flare beats a cancelled duplicate, the earlier arrival and the later sighting
+both survive on the membership. Probed on real PostgreSQL 16 with two seeded
+sessions carrying binders, Flares, offers, a membership each and a trade —
+`scripts/probe-migrations.sh`, which is also what caught the function naming
+two `trades` columns that do not exist. An empty database had said "ok",
+because plpgsql only parses a statement the first time it runs one.
+
+A resumed join **says so** on both platforms — `?resumed=1` on the website's
+redirect, `resumed: true` in the app's join response. A join that appears to
+do nothing is exactly what the duplicate looked like from the inside.
+
+Guests are untouched by all of it: no `player_id`, so the index ignores them
+and their one token resolves the way it always did.
+
 ### Presence
 
 `last_seen_at`, refreshed when a player loads the room and at most once a
