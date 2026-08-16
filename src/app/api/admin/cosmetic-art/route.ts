@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
 import { CATALOG_KINDS, createCosmetic, type CatalogKind } from "@/lib/admin/catalog";
-import { storeRiveArt } from "@/lib/admin/rive";
+import { storeRiveArt, storeSvgArt } from "@/lib/admin/art-upload";
 import { RIVE_MAX_BYTES } from "@/lib/admin/rive-file";
+import { SVG_MAX_BYTES } from "@/lib/admin/svg-file";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,11 @@ export const dynamic = "force-dynamic";
  * `if (!created.ok) back("name")`, `created` is the success shape.
  */
 function back(outcome: string): never {
-  redirect(`/admin/packs?rive=${encodeURIComponent(outcome)}`);
+  redirect(`/admin/packs?art=${encodeURIComponent(outcome)}`);
 }
 
 /**
- * Dropping a .riv file into the catalogue.
+ * Dropping art into the catalogue: a Rive animation or a drawing.
  *
  * A plain multipart POST rather than a Server Action, because the body
  * is a file - the same shape as the pack-art upload, which is the one
@@ -38,23 +39,36 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const form = await request.formData();
+
+  /*
+   * Two shapes arrive here. A .riv comes as a file. A drawing comes as
+   * markup - either an .svg the founder picked, or a Figma .tsx the
+   * console converted in his browser, which is the only place uploaded
+   * component code is ever run.
+   */
   const file = form.get("rive");
+  const markup = String(form.get("svg") ?? "");
 
-  if (!(file instanceof File) || file.size === 0) back("missing");
-  const upload = file as File;
+  const isRive = file instanceof File && file.size > 0;
+  if (!isRive && !markup.trim()) back("missing");
 
-  /* Refused before it is read into memory, not after. */
-  if (upload.size > RIVE_MAX_BYTES) back("too-big");
+  if (isRive && (file as File).size > RIVE_MAX_BYTES) back("too-big");
+  if (!isRive && markup.length > SVG_MAX_BYTES) back("too-big");
 
   const slug = String(form.get("slug") ?? "").trim();
-  const bytes = await upload.arrayBuffer();
+  const bytes = isRive ? await (file as File).arrayBuffer() : null;
+
+  const store = async (target: string) =>
+    bytes
+      ? storeRiveArt(target, bytes, {
+          artboard: String(form.get("artboard") ?? "").trim() || null,
+          stateMachine: String(form.get("stateMachine") ?? "").trim() || null,
+        })
+      : storeSvgArt(target, markup);
 
   if (slug) {
     if (!/^[a-z0-9-]{2,40}$/.test(slug)) back("unknown");
-    const stored = await storeRiveArt(slug, bytes, {
-      artboard: String(form.get("artboard") ?? "").trim() || null,
-      stateMachine: String(form.get("stateMachine") ?? "").trim() || null,
-    });
+    const stored = await store(slug);
     back(stored.ok ? "replaced" : "failed");
   }
 
@@ -64,13 +78,14 @@ export async function POST(request: Request): Promise<Response> {
   const created = await createCosmetic({
     name: String(form.get("name") ?? ""),
     kind: kind as CatalogKind,
+    description: String(form.get("description") ?? ""),
     artboard: String(form.get("artboard") ?? "").trim() || null,
     stateMachine: String(form.get("stateMachine") ?? "").trim() || null,
   });
 
   if (!created.ok) back("name");
 
-  const stored = await storeRiveArt(created.slug, bytes);
+  const stored = await store(created.slug);
 
   /*
    * A cosmetic whose file did not land is a broken tile, so the row

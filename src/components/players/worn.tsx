@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
-import { RiveArt } from "@/components/players/rive-art";
-import type { RiveArtRef } from "@/components/players/cosmetic-art";
+import { CosmeticFilm } from "@/components/players/cosmetic-film";
+import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import type { EquipKind } from "@/lib/players/equips";
 
 /**
@@ -17,7 +17,7 @@ import type { EquipKind } from "@/lib/players/equips";
 export type Worn = Partial<Record<EquipKind, string | null>>;
 
 /** The dropped-in files behind whatever is worn, by category. */
-export type WornRive = Partial<Record<EquipKind, RiveArtRef | null>>;
+export type WornArt = Partial<Record<EquipKind, CosmeticArtFileRef | null>>;
 
 /*
  * No ring component here: the worn ring is drawn by PlayerAvatar itself
@@ -70,7 +70,7 @@ export function WornCardShell({
   className,
 }: {
   worn: Worn;
-  rive?: WornRive;
+  rive?: WornArt;
   children: ReactNode;
   className?: string;
 }) {
@@ -110,12 +110,7 @@ export function WornCardShell({
           className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
           aria-hidden="true"
         >
-          <RiveArt
-            url={film.url}
-            artboard={film.artboard}
-            stateMachine={film.stateMachine}
-            fit="cover"
-          />
+          <CosmeticFilm art={film} fit="cover" />
         </span>
       ))}
     </span>
@@ -123,7 +118,7 @@ export function WornCardShell({
 }
 
 /** Background and scene, over and behind a profile block. */
-export function WornSceneLayer({ worn, rive }: { worn: Worn; rive?: WornRive }) {
+export function WornSceneLayer({ worn, rive }: { worn: Worn; rive?: WornArt }) {
   const film = rive?.scene ?? null;
 
   if (film) {
@@ -132,12 +127,7 @@ export function WornSceneLayer({ worn, rive }: { worn: Worn; rive?: WornRive }) 
         className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
         aria-hidden="true"
       >
-        <RiveArt
-          url={film.url}
-          artboard={film.artboard}
-          stateMachine={film.stateMachine}
-          fit="cover"
-        />
+        <CosmeticFilm art={film} fit="cover" />
       </span>
     );
   }
@@ -161,7 +151,7 @@ export function WornSceneLayer({ worn, rive }: { worn: Worn; rive?: WornRive }) 
  * file. CSS backgrounds stay a class on the panel (backgroundClass);
  * a file needs a layer of its own to play in.
  */
-export function WornBackdrop({ rive }: { rive?: WornRive }) {
+export function WornBackdrop({ rive }: { rive?: WornArt }) {
   const film = rive?.background ?? null;
   if (!film) return null;
 
@@ -170,12 +160,7 @@ export function WornBackdrop({ rive }: { rive?: WornRive }) {
       className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
       aria-hidden="true"
     >
-      <RiveArt
-        url={film.url}
-        artboard={film.artboard}
-        stateMachine={film.stateMachine}
-        fit="cover"
-      />
+      <CosmeticFilm art={film} fit="cover" />
     </span>
   );
 }

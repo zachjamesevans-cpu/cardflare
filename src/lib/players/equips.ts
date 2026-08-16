@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
-import { riveArtFor, riveArtOf, type RiveArt } from "@/lib/players/rive-art";
+import { artFilesFor, artFileOf, type CosmeticArtFile } from "@/lib/players/art-files";
 import type { CosmeticRow } from "@/lib/supabase/types";
 
 /**
@@ -57,8 +57,8 @@ export interface AvatarWear {
   ring: string | null;
   aura: string | null;
   /** Set when the worn piece is a dropped-in Rive file, not CSS art. */
-  ringRive: RiveArt | null;
-  auraRive: RiveArt | null;
+  ringArt: CosmeticArtFile | null;
+  auraArt: CosmeticArtFile | null;
 }
 
 /**
@@ -88,22 +88,22 @@ export async function avatarWearFor(
 
   /* One lookup for every Rive file worn in the room, not one per
      player: a table of twelve wearing the same ring costs one read. */
-  const rive = await riveArtFor(rows.map((row) => row.cosmetic_slug));
+  const rive = await artFilesFor(rows.map((row) => row.cosmetic_slug));
 
   for (const row of rows) {
     const entry = wear.get(row.player_id) ?? {
       ring: null,
       aura: null,
-      ringRive: null,
-      auraRive: null,
+      ringArt: null,
+      auraArt: null,
     };
     if (row.kind === "ring") {
       entry.ring = row.cosmetic_slug;
-      entry.ringRive = rive.get(row.cosmetic_slug) ?? null;
+      entry.ringArt = rive.get(row.cosmetic_slug) ?? null;
     }
     if (row.kind === "aura") {
       entry.aura = row.cosmetic_slug;
-      entry.auraRive = rive.get(row.cosmetic_slug) ?? null;
+      entry.auraArt = rive.get(row.cosmetic_slug) ?? null;
     }
     wear.set(row.player_id, entry);
   }
@@ -219,8 +219,8 @@ export interface CustomizeItem {
   status: "live" | "draft";
   owned: boolean;
   equipped: boolean;
-  /** Set when this one is a dropped-in Rive file rather than CSS art. */
-  rive: RiveArt | null;
+  /** Set when this one is a dropped-in file rather than CSS art. */
+  art: CosmeticArtFile | null;
 }
 
 /**
@@ -230,16 +230,16 @@ export interface CustomizeItem {
  * that draw them, in a single read, so a profile page asks once for
  * everything it is about to draw.
  */
-export async function wornRiveFor(
+export async function wornArtFor(
   equips: Record<EquipKind, string | null>,
-): Promise<Record<EquipKind, RiveArt | null>> {
-  const found = await riveArtFor(Object.values(equips));
+): Promise<Record<EquipKind, CosmeticArtFile | null>> {
+  const found = await artFilesFor(Object.values(equips));
   return Object.fromEntries(
     EQUIP_KINDS.map((kind) => {
       const slug = equips[kind];
       return [kind, slug ? (found.get(slug) ?? null) : null];
     }),
-  ) as Record<EquipKind, RiveArt | null>;
+  ) as Record<EquipKind, CosmeticArtFile | null>;
 }
 
 export interface CustomizeSection {
@@ -287,7 +287,7 @@ export async function customizeSections(playerId: string): Promise<{
         status: row.status,
         owned: ownsCosmetic(row, owned),
         equipped: equips[kind] === row.slug,
-        rive: riveArtOf(row),
+        art: artFileOf(row),
       })),
   })).filter((section) => section.items.length > 0);
 

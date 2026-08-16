@@ -7,3 +7,10 @@ package-lock.json
 *.png
 *.ico
 mobile/
+
+# The Figma export is a fixture: it must stay byte-for-byte the file
+# the founder sent, or the test stops proving anything about real files.
+tests/fixtures/
+
+# Generated from src/cosmetics by npm run cosmetics:svg.
+public/cosmetics/

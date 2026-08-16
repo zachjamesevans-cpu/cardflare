@@ -1,8 +1,10 @@
 import { cn } from "@/lib/cn";
-import { RiveArt } from "@/components/players/rive-art";
+import { CosmeticFilm } from "@/components/players/cosmetic-film";
 
-/** The file behind a Rive cosmetic, when it has one. */
-export interface RiveArtRef {
+/** The uploaded file behind a cosmetic, when it has one. */
+export interface CosmeticArtFileRef {
+  /** rive plays in a canvas; svg is a drawing that animates itself. */
+  kind: "rive" | "svg";
   url: string;
   artboard: string | null;
   stateMachine: string | null;
@@ -24,16 +26,16 @@ export interface RiveArtRef {
 export function CosmeticArt({
   kind,
   slug,
-  rive = null,
+  art = null,
   className,
 }: {
   kind: string;
   slug: string;
-  /** A dropped-in Rive file. When set, it IS the art: no CSS scaffold. */
-  rive?: RiveArtRef | null;
+  /** A dropped-in file. When set, it IS the art: no CSS scaffold. */
+  art?: CosmeticArtFileRef | null;
   className?: string;
 }) {
-  const art = `cfa-${slug}`;
+  const cssArt = `cfa-${slug}`;
 
   /*
    * A Rive cosmetic draws itself. The preview shows it on the shape it
@@ -41,7 +43,7 @@ export function CosmeticArt({
    * the things worn on a card, a wide panel for the rest - so the
    * console judges it at the proportions it will actually ship at.
    */
-  if (rive) {
+  if (art) {
     const shape =
       kind === "ring" || kind === "aura"
         ? "size-[84px] overflow-hidden rounded-full"
@@ -52,10 +54,8 @@ export function CosmeticArt({
     return (
       <div className={cn("grid place-items-center", className)}>
         <div className={cn(shape, "bg-canvas")}>
-          <RiveArt
-            url={rive.url}
-            artboard={rive.artboard}
-            stateMachine={rive.stateMachine}
+          <CosmeticFilm
+            art={art}
             fit={kind === "ring" || kind === "aura" ? "contain" : "cover"}
           />
         </div>
@@ -66,7 +66,7 @@ export function CosmeticArt({
   if (kind === "ring") {
     return (
       <div className={cn("grid place-items-center", className)}>
-        <div className={cn("cfx-ring", art)}>
+        <div className={cn("cfx-ring", cssArt)}>
           <span className="cfx-ring-fx" aria-hidden="true" />
           <span className="cfx-ring-band" aria-hidden="true" />
           <span className="cfx-ring-core" aria-hidden="true" />
@@ -80,7 +80,7 @@ export function CosmeticArt({
   if (kind === "aura") {
     return (
       <div className={cn("grid place-items-center", className)}>
-        <div className={cn("cfx-aura", art)}>
+        <div className={cn("cfx-aura", cssArt)}>
           <span className="cfx-ring-core" aria-hidden="true" />
           <span className="cfx-aura-fx" aria-hidden="true" />
         </div>
@@ -91,7 +91,7 @@ export function CosmeticArt({
   if (kind === "border" || kind === "animation" || kind === "pattern") {
     return (
       <div className={cn("mx-auto w-24", className)}>
-        <div className={cn("cfx-card", art)}>
+        <div className={cn("cfx-card", cssArt)}>
           <div className="cfx-card-face">
             <span className="cfx-card-fx" aria-hidden="true" />
           </div>
@@ -101,12 +101,12 @@ export function CosmeticArt({
   }
 
   if (kind === "background") {
-    return <div className={cn("cfx-panel", art, className)} />;
+    return <div className={cn("cfx-panel", cssArt, className)} />;
   }
 
   if (kind === "scene") {
     return (
-      <div className={cn("cfx-panel", art, className)}>
+      <div className={cn("cfx-panel", cssArt, className)}>
         <div className="cfx-panel-profile" aria-hidden="true" />
         <span className="cfx-panel-fx" aria-hidden="true" />
       </div>
@@ -116,7 +116,7 @@ export function CosmeticArt({
   if (kind === "nameplate") {
     return (
       <div className={cn("grid min-h-20 place-items-center", className)}>
-        <span className={cn("cfx-name", art)}>CHUNC</span>
+        <span className={cn("cfx-name", cssArt)}>CHUNC</span>
       </div>
     );
   }
@@ -132,7 +132,7 @@ export function CosmeticArt({
         <span className="cfx-name" style={{ fontSize: 16 }}>
           CHUNC
         </span>
-        <span className={cn("cfx-title-chip", art)}>
+        <span className={cn("cfx-title-chip", cssArt)}>
           {TITLE_SAMPLES[slug] ?? "Title"}
         </span>
       </div>
@@ -145,7 +145,7 @@ export function CosmeticArt({
         <span className="cfx-name" style={{ fontSize: 16 }}>
           CHUNC
         </span>
-        <span className={cn("cfx-badge", art)}>{BADGE_MARKS[slug] ?? "✦"}</span>
+        <span className={cn("cfx-badge", cssArt)}>{BADGE_MARKS[slug] ?? "✦"}</span>
       </div>
     );
   }

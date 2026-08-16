@@ -32,10 +32,23 @@ const CATALOG_KINDS = [
   "badge",
 ];
 
+/*
+ * Only cosmetics drawn in CSS need a rule here. One whose art is an
+ * uploaded or shipped file (art_kind rive or svg) has no `.cfa-` class
+ * and must not be counted as missing - the statement that inserts it
+ * names an art_kind column, which is how those are told apart.
+ */
+const statements = sql.split(";");
+
 const slugs = new Set(
-  [...sql.matchAll(/\('([a-z0-9-]+)',\s*'([a-z]+)'/g)]
-    .filter(([, , kind]) => CATALOG_KINDS.includes(kind))
-    .map(([, slug]) => slug),
+  statements.flatMap((statement) => {
+    const header = statement.slice(0, statement.indexOf("values"));
+    if (!header.includes("public.cosmetics")) return [];
+    if (header.includes("art_kind")) return [];
+    return [...statement.matchAll(/\('([a-z0-9-]+)',\s*'([a-z]+)'/g)]
+      .filter(([, , kind]) => CATALOG_KINDS.includes(kind))
+      .map(([, slug]) => slug);
+  }),
 );
 
 const artClasses = new Set([...css.matchAll(/\.cfa-([a-z0-9-]+)/g)].map((m) => m[1]));

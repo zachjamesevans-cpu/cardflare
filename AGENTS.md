@@ -43,18 +43,39 @@ making changes. [BRAND.md](./BRAND.md) governs anything visual.
   social links to accounts that do not exist.
 - **Do not claim something works without running it.** Run the commands.
 
-## Rive cosmetics
+## Cosmetic art: three kinds
 
-A cosmetic is drawn one of two ways, and `cosmetics.art_kind` says
-which. `css` means a `.cfa-<slug>` rule in `src/app/cosmetic-art.css`;
-`rive` means the uploaded file at `rive_path`. A check constraint
-refuses `rive` with no file and `css` with one.
+`cosmetics.art_kind` says how a cosmetic is drawn:
 
-Dropping one in: /admin/packs, "Drop in a Rive file" - file, name,
-category. It lands as a draft, previews in the grid and in Customize,
-goes live from the same tile, and joins a pack from the set builder.
-Nothing about status, ownership, equipping or packs is special-cased
-for Rive; that is the point.
+- `css` - a `.cfa-<slug>` rule in `src/app/cosmetic-art.css`.
+- `rive` - the file at `rive_path`, played by the Rive runtime.
+- `svg` - the drawing at `svg_path`, which animates itself.
+
+A check constraint gives each kind exactly its own art and none of
+anyone else's. `svg_path` is a storage object, or a `/`-prefixed path
+for art that ships in the repo (a migration cannot carry an upload, so
+seeded art lives in `public/cosmetics` and is generated from
+`src/cosmetics/*.tsx` by `npm run cosmetics:svg`).
+
+Dropping one in: /admin/packs, "Drop in cosmetic art" - file, name,
+category, description. It lands as a draft, previews in the grid and in
+Customize, goes live from the same tile, and joins a pack from the set
+builder. Nothing about status, ownership, equipping or packs is
+special-cased by art kind; that is the point.
+
+**A Figma `.tsx` export converts in the browser, never on the server.**
+`tsxToSvg` transforms and runs the component and keeps the SVG it drew.
+Running uploaded component code server-side would put it in the same
+process as the service-role key, so the console does it in the admin's
+own browser and uploads the finished drawing. The server scrubs every
+SVG (`sanitizeSvg`: no scripts, no event handlers, no off-origin refs)
+and the renderer draws it in an `<img>`, where browsers refuse to run
+scripts at all. Two locks, deliberately.
+
+**Geometry for uploaded ring art**: a 400x400 box with the ring at
+radius 152, so a real picture fills the middle 76%. Leave the middle
+transparent - a Figma frame's background and placeholder avatar have to
+go, or they cover the face.
 
 - The runtime's WebAssembly is served from **our** origin
   (`public/rive/rive.wasm`, copied from the installed package by
