@@ -749,7 +749,12 @@ function RoomScreen({
                           frame={person?.frame ?? null}
                           ringArt={person?.ringArt ?? null}
                           auraArt={person?.auraArt ?? null}
-                          size={26}
+                          /* 34, up from 26: the website's board header
+                             went from sm to md for the same reason -
+                             the founder wanted the picture to make a
+                             bigger statement, and a worn ring is most
+                             of why anybody bought one. */
+                          size={34}
                         />
                         <Title>
                           {mine ? "Your Flares" : (group.name ?? "A player")}

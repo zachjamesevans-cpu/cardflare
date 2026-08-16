@@ -785,7 +785,13 @@ export function FlareBoard({
                         auraArt={
                           identities?.get(group.playerSessionId)?.auraArt ?? null
                         }
-                        size="sm"
+                        /*
+                         * md, not sm. The founder wanted the picture to
+                         * "make a bigger statement" on a board header,
+                         * and a worn ring is most of why somebody
+                         * bought one - at 32px it was a detail.
+                         */
+                        size="md"
                       />
                       <span className="truncate font-semibold text-text-primary">
                         {group.displayName ?? "A player"}
@@ -803,19 +809,22 @@ export function FlareBoard({
                   {/* No Ember badge on board headers - in the room,
                       Embers live inside the popup and profile only. */}
                   {alsoOpen && <OpenToTradesTag />}
-                </span>
-              }
-              meta={
-                <>
                   {/*
-                   * Said once for the group as well as per card. On a long
-                   * board this is the line that decides who to walk over to.
+                   * Beside the name rather than out in the meta column.
+                   * It is the line that decides who to walk over to, and
+                   * floating centred under the header it read as
+                   * belonging to nothing - the founder: "move the you
+                   * have 2 of 6 to the left side and align with text."
                    */}
                   {answerable > 0 && (
                     <Badge className="whitespace-nowrap">
                       You have {answerable} of {group.entries.length}
                     </Badge>
                   )}
+                </span>
+              }
+              meta={
+                <>
                   <span className="text-sm whitespace-nowrap text-text-muted tabular-nums">
                     {group.entries.length}{" "}
                     {group.entries.length === 1 ? "card" : "cards"}
