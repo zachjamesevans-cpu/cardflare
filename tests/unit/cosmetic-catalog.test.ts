@@ -7,8 +7,10 @@ import { CATALOG_KINDS, KIND_LABELS } from "@/lib/admin/catalog";
 import {
   packSetItemSchema,
   packSetSchema,
+  renameCosmeticSchema,
   slugFromName,
 } from "@/lib/admin/catalog-schema";
+import { tidyCosmeticName } from "@/lib/players/cosmetic-names";
 
 /**
  * The draft catalogue's one job is to stay invisible, and the rule that
@@ -157,5 +159,56 @@ describe("building a set", () => {
       weight: "10",
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+/**
+ * Renaming from the console, which the founder asked to "change it
+ * across all platforms live - the app, website, etc." It does, because
+ * every surface selects the name off the row. What must NOT move is the
+ * slug: ownership, sets, equips and the art rule all point at it.
+ */
+describe("renaming a cosmetic", () => {
+  it("takes a name and the slug of the thing to rename", () => {
+    const parsed = renameCosmeticSchema.safeParse({
+      slug: "ring-lightning",
+      name: "Storm",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("refuses a blank name rather than saving an unnamed cosmetic", () => {
+    const parsed = renameCosmeticSchema.safeParse({
+      slug: "ring-lightning",
+      name: "   ",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("refuses a name longer than the column holds", () => {
+    const parsed = renameCosmeticSchema.safeParse({
+      slug: "ring-lightning",
+      name: "x".repeat(61),
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("has no way to ask for a different slug", () => {
+    /* The shape is the guard: an extra field is dropped, so a crafted
+       post cannot move a cosmetic's identity out from under its
+       owners. */
+    const parsed = renameCosmeticSchema.safeParse({
+      slug: "ring-lightning",
+      name: "Storm",
+      newSlug: "ring-storm",
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data).toEqual({ slug: "ring-lightning", name: "Storm" });
+  });
+
+  it("still obeys the naming rule the upload door obeys", () => {
+    /* renameCosmetic runs the typed name through this before saving. */
+    expect(tidyCosmeticName("ring", "Storm Border")).toBe("Storm");
   });
 });

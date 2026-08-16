@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, ChevronDown, Loader2, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Loader2, Pencil, Trash2 } from "lucide-react";
 
 import { CosmeticArt } from "@/components/players/cosmetic-art";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import {
   deleteCosmeticAction,
+  renameCosmeticAction,
   setCosmeticStatusAction,
 } from "@/lib/admin/catalog-actions";
 import { CATALOG_IDLE, type CatalogState } from "@/lib/admin/catalog-schema";
@@ -52,9 +53,14 @@ export function CatalogBrowser({
     deleteCosmeticAction,
     CATALOG_IDLE,
   );
+  const [renameState, rename] = useActionState<CatalogState, FormData>(
+    renameCosmeticAction,
+    CATALOG_IDLE,
+  );
 
   const said =
-    [statusState, deleteState].find((state) => state.status !== "idle") ?? CATALOG_IDLE;
+    [statusState, deleteState, renameState].find((state) => state.status !== "idle") ??
+    CATALOG_IDLE;
 
   const term = filter.trim().toLowerCase();
 
@@ -154,6 +160,7 @@ export function CatalogBrowser({
                       entry={entry}
                       onFlip={flip}
                       onDelete={remove}
+                      onRename={rename}
                     />
                   ))}
                 </ul>
@@ -179,11 +186,15 @@ function CatalogTile({
   entry,
   onFlip,
   onDelete,
+  onRename,
 }: {
   entry: CatalogEntry;
   onFlip: (formData: FormData) => void;
   onDelete: (formData: FormData) => void;
+  onRename: (formData: FormData) => void;
 }) {
+  const [renaming, setRenaming] = useState(false);
+
   return (
     <li className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
       <div className="grid min-h-28 place-items-center">
@@ -222,14 +233,62 @@ function CatalogTile({
         )}
       </div>
 
-      <div className="flex flex-col">
-        <span className="truncate text-sm font-semibold text-text-primary">
-          {entry.name}
-        </span>
-        <span className="truncate text-xs text-text-muted" title={entry.description}>
-          {entry.description}
-        </span>
-      </div>
+      {renaming ? (
+        /* Renaming in place, on the tile the art is on: the name and
+           the thing it names should never be on different screens.
+           The slug is shown but not editable - it is what every other
+           table points at, so renaming it would take a bought cosmetic
+           off somebody's profile. */
+        <form
+          action={onRename}
+          onSubmit={() => setRenaming(false)}
+          className="flex flex-col gap-1.5"
+        >
+          <input type="hidden" name="slug" value={entry.slug} />
+          <TextInput
+            name="name"
+            defaultValue={entry.name}
+            maxLength={60}
+            required
+            autoFocus
+            aria-label={`Rename ${entry.name}`}
+            className="w-full"
+          />
+          <div className="flex items-center gap-1.5">
+            <SmallSubmit label="Save" pendingLabel="Saving…" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setRenaming(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+          <span className="truncate text-xs text-text-muted">
+            Changes it live everywhere. Its id stays {entry.slug}.
+          </span>
+        </form>
+      ) : (
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1">
+            <span className="truncate text-sm font-semibold text-text-primary">
+              {entry.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRenaming(true)}
+              aria-label={`Rename ${entry.name}`}
+              className="shrink-0 cursor-pointer text-text-muted transition-colors hover:text-text-secondary"
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+          <span className="truncate text-xs text-text-muted" title={entry.description}>
+            {entry.description}
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-1.5">
         {entry.status === "draft" ? (

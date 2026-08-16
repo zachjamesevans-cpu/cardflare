@@ -463,6 +463,34 @@
   inset: -6px;
 }
 
+/*
+ * A dropped-in FILE worn as a ring, sized and clipped so the picture
+ * underneath stays a picture.
+ *
+ * Ring art is drawn in a 400 by 400 box with the ring at radius 152,
+ * and the Figma frames it comes from fill the middle with a placeholder
+ * face out to radius 148. So 148 is where the picture ends: sizing the
+ * film to 400/296 of the avatar (inset -17.568%) puts the inner edge of
+ * the band exactly on the avatar's edge, tangent, covering nothing.
+ *
+ * The mask is the part that holds. Art also carries glow - the lightning
+ * ring blurs a 48-wide halo off a 16px-deviation filter - and a glow
+ * has no edge to line up, so it washed across the face at any inset.
+ * Punching the picture out of the layer at the same radius 148 (74% of
+ * the film's half-width) means nothing a file draws inside the circle
+ * can ever land on somebody's face. The founder, twice: "the ring kinda
+ * digs into the profile pic... please don't ever do that again with
+ * these" and "the circle u added is too thick or something and covers
+ * too much of the profile pic."
+ */
+.cfx-ring-film {
+  position: absolute;
+  inset: -17.568%;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent 73.5%, #000 74.5%);
+  mask: radial-gradient(farthest-side, transparent 73.5%, #000 74.5%);
+}
+
 /* The WORN aura: the same particles, orbiting a real avatar. Sits a
    little wider than the ring layer so the two mix without colliding. */
 .cfx-aura-avatar {

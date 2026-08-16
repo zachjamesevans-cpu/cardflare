@@ -73,9 +73,17 @@ and the renderer draws it in an `<img>`, where browsers refuse to run
 scripts at all. Two locks, deliberately.
 
 **Geometry for uploaded ring art**: a 400x400 box with the ring at
-radius 152, so a real picture fills the middle 76%. Leave the middle
-transparent - a Figma frame's background and placeholder avatar have to
-go, or they cover the face.
+radius 152, so a real picture fills the middle out to radius 148. Leave
+the middle transparent - a Figma frame's background and placeholder
+avatar have to go, or they cover the face.
+
+**A worn ring never draws on the picture.** `.cfx-ring-film` sizes the
+film so radius 148 lands on the avatar's edge and then masks the circle
+out of the layer, so glow and stray art cannot reach a face however the
+file was drawn. The founder: "the ring kinda digs into the profile
+pic... please don't ever do that again with these." One rule, used by
+`PlayerAvatar` and the profile editor alike, and
+`tests/unit/rive-cosmetics.test.ts` fails if either stops using it.
 
 - The runtime's WebAssembly is served from **our** origin
   (`public/rive/rive.wasm`, copied from the installed package by

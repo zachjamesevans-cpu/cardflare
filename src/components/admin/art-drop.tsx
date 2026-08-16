@@ -279,9 +279,11 @@ export function ArtDrop() {
         </div>
 
         <p className="text-xs text-text-muted">
-          For a profile border, leave the middle transparent and draw the ring at radius
-          152 in a 400 by 400 box, so a real picture fills the middle. A Figma
-          frame&apos;s background and placeholder avatar have to go.
+          For a profile border, draw the ring at radius 152 in a 400 by 400 box and
+          leave the middle transparent: the picture fills out to radius 148, and
+          anything drawn inside that is clipped away so it can never sit on somebody
+          &apos;s face. A Figma frame&apos;s background and placeholder avatar have to
+          go.
         </p>
       </form>
     </Card>

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
-import { deleteCosmetic, setCosmeticStatus } from "./catalog";
+import { deleteCosmetic, renameCosmetic, setCosmeticStatus } from "./catalog";
 import {
   createPackSet,
   deletePackSet,
@@ -22,6 +22,7 @@ import {
   packSetRefSchema,
   packSetSchema,
   packSetStatusSchema,
+  renameCosmeticSchema,
   type CatalogState,
 } from "./catalog-schema";
 
@@ -44,6 +45,8 @@ function refresh() {
   revalidatePath("/admin/packs");
   /* The store reads the catalogue, so a status flip changes it too. */
   revalidatePath("/profile/store");
+  /* And the profile, where a name shows under whatever is worn. */
+  revalidatePath("/profile");
 }
 
 /** Turns the console's local date-time string into an instant, or null. */
@@ -75,6 +78,45 @@ export async function setCosmeticStatusAction(
       parsed.data.status === "live"
         ? "Live. Players can see it now."
         : "Back behind the scenes.",
+  };
+}
+
+/**
+ * Renames one cosmetic, which is the same as renaming it everywhere:
+ * the shop, Customize, the profile and the app all read the name off
+ * the row this writes.
+ */
+export async function renameCosmeticAction(
+  _previous: CatalogState,
+  formData: FormData,
+): Promise<CatalogState> {
+  if (!(await isAdmin())) return REFUSED;
+
+  const parsed = renameCosmeticSchema.safeParse({
+    slug: text(formData, "slug"),
+    name: text(formData, "name"),
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? GENERIC_ERROR,
+    };
+  }
+
+  const outcome = await renameCosmetic(parsed.data.slug, parsed.data.name);
+  if (!outcome.ok) return { status: "error", message: outcome.message };
+
+  refresh();
+
+  /* Named back, because the naming rule may have trimmed it: typing
+     "Frost Border" on a profile border saves "Frost", and being told
+     that is better than noticing it later in the grid. */
+  return {
+    status: "done",
+    message:
+      outcome.name === parsed.data.name
+        ? `Renamed to ${outcome.name}. Live on the website and in the app.`
+        : `Saved as ${outcome.name} - the category is already in the heading.`,
   };
 }
 
