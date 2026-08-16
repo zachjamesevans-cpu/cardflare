@@ -6,8 +6,8 @@ import Image from "next/image";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 
 import { FRAME_CLASS, PlayerAvatar } from "@/components/players/player-avatar";
-import { RiveArt } from "@/components/players/rive-art";
-import type { RiveArtRef } from "@/components/players/cosmetic-art";
+import { CosmeticFilm } from "@/components/players/cosmetic-film";
+import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { clearAvatarAction, setAvatarAction } from "@/lib/players/profile-actions";
@@ -34,8 +34,8 @@ export function AvatarForm({
   frame = null,
   ring = null,
   aura = null,
-  ringRive = null,
-  auraRive = null,
+  ringArt = null,
+  auraArt = null,
 }: {
   displayName: string;
   seed: string;
@@ -52,8 +52,8 @@ export function AvatarForm({
   /** The avatar effect floating around the picture, mixable with any ring. */
   aura?: string | null;
   /** The dropped-in files behind those two, when they are Rive ones. */
-  ringRive?: RiveArtRef | null;
-  auraRive?: RiveArtRef | null;
+  ringArt?: CosmeticArtFileRef | null;
+  auraArt?: CosmeticArtFileRef | null;
 }) {
   const [state, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
@@ -120,16 +120,12 @@ export function AvatarForm({
               !ring && frame ? FRAME_CLASS[frame] : "",
             )}
           >
-            {ringRive ? (
+            {ringArt ? (
               <span
-                className="pointer-events-none absolute inset-[-14%]"
+                className="pointer-events-none absolute inset-[-15.8%]"
                 aria-hidden="true"
               >
-                <RiveArt
-                  url={ringRive.url}
-                  artboard={ringRive.artboard}
-                  stateMachine={ringRive.stateMachine}
-                />
+                <CosmeticFilm art={ringArt} />
               </span>
             ) : (
               ring && (
@@ -142,16 +138,12 @@ export function AvatarForm({
                 </span>
               )
             )}
-            {auraRive ? (
+            {auraArt ? (
               <span
                 className="pointer-events-none absolute inset-[-22%]"
                 aria-hidden="true"
               >
-                <RiveArt
-                  url={auraRive.url}
-                  artboard={auraRive.artboard}
-                  stateMachine={auraRive.stateMachine}
-                />
+                <CosmeticFilm art={auraArt} />
               </span>
             ) : (
               aura && (
@@ -193,8 +185,8 @@ export function AvatarForm({
             frame={frame}
             ring={ring}
             aura={aura}
-            ringRive={ringRive}
-            auraRive={auraRive}
+            ringArt={ringArt}
+            auraArt={auraArt}
             className="size-24 text-2xl"
           />
         )}

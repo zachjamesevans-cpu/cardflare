@@ -5,8 +5,8 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 import { avatarHue, initials } from "@/lib/players/avatar";
-import { RiveArt } from "@/components/players/rive-art";
-import type { RiveArtRef } from "@/components/players/cosmetic-art";
+import { CosmeticFilm } from "@/components/players/cosmetic-film";
+import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 
 /**
  * Tailwind cannot see a class name built at runtime, so the six hues are
@@ -77,8 +77,8 @@ export function PlayerAvatar({
   frame = null,
   ring = null,
   aura = null,
-  ringRive = null,
-  auraRive = null,
+  ringArt = null,
+  auraArt = null,
   size = "md",
   className,
 }: {
@@ -112,8 +112,8 @@ export function PlayerAvatar({
    */
   aura?: string | null;
   /** The dropped-in file behind the ring or aura, when it is a Rive one. */
-  ringRive?: RiveArtRef | null;
-  auraRive?: RiveArtRef | null;
+  ringArt?: CosmeticArtFileRef | null;
+  auraArt?: CosmeticArtFileRef | null;
   size?: "sm" | "md";
   className?: string;
 }) {
@@ -132,13 +132,12 @@ export function PlayerAvatar({
      file is the whole layer. */
   const wornRing = (
     <>
-      {ringRive ? (
-        <span className="pointer-events-none absolute inset-[-14%]" aria-hidden="true">
-          <RiveArt
-            url={ringRive.url}
-            artboard={ringRive.artboard}
-            stateMachine={ringRive.stateMachine}
-          />
+      {ringArt ? (
+        <span
+          className="pointer-events-none absolute inset-[-15.8%]"
+          aria-hidden="true"
+        >
+          <CosmeticFilm art={ringArt} />
         </span>
       ) : (
         ring && (
@@ -148,13 +147,9 @@ export function PlayerAvatar({
           </span>
         )
       )}
-      {auraRive ? (
+      {auraArt ? (
         <span className="pointer-events-none absolute inset-[-22%]" aria-hidden="true">
-          <RiveArt
-            url={auraRive.url}
-            artboard={auraRive.artboard}
-            stateMachine={auraRive.stateMachine}
-          />
+          <CosmeticFilm art={auraArt} />
         </span>
       ) : (
         aura && (

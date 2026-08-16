@@ -754,12 +754,18 @@ export type CosmeticRow = {
   sort_order: number;
   /**
    * How this cosmetic is drawn. 'css' is a .cfa- rule in
-   * cosmetic-art.css; 'rive' is the uploaded file at rive_path. The
-   * database refuses rive without a file and css with one.
+   * cosmetic-art.css; 'rive' is the file at rive_path; 'svg' is the
+   * drawing at svg_path. The database refuses any kind without its own
+   * art, and any kind carrying somebody else's.
    */
-  art_kind: "css" | "rive";
+  art_kind: "css" | "rive" | "svg";
   /** Storage object path in the avatars bucket, for a Rive cosmetic. */
   rive_path: string | null;
+  /**
+   * The drawing behind an SVG cosmetic: a storage object, or a
+   * /-prefixed path for art that ships in the repo.
+   */
+  svg_path: string | null;
   /** Which artboard to play, or null for the file's default. */
   rive_artboard: string | null;
   /** Which state machine to run, or null for the file's default. */

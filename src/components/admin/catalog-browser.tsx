@@ -187,12 +187,12 @@ function CatalogTile({
   return (
     <li className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
       <div className="grid min-h-28 place-items-center">
-        {entry.rive ? (
+        {entry.art ? (
           /* A dropped-in file draws itself, in every category. */
           <CosmeticArt
             kind={entry.kind}
             slug={entry.slug}
-            rive={entry.rive}
+            art={entry.art}
             className="w-full"
           />
         ) : SHIPPED.has(entry.kind) ? (
@@ -237,7 +237,7 @@ function CatalogTile({
         ) : (
           <Badge>live</Badge>
         )}
-        {entry.rive && <Badge tone="neutral">rive</Badge>}
+        {entry.art && <Badge tone="neutral">{entry.art.kind}</Badge>}
         {entry.owners > 0 && (
           <span className="text-xs text-text-muted tabular-nums">
             {entry.owners} {entry.owners === 1 ? "owner" : "owners"}
@@ -267,15 +267,19 @@ function CatalogTile({
         {/* Re-exporting a file is the same gesture as judging it: look,
             change, look again. Nothing else about the cosmetic moves -
             not its name, not its status, not which sets it is in. */}
-        {entry.rive && (
-          <form action="/api/admin/rive" method="post" encType="multipart/form-data">
+        {entry.art && (
+          <form
+            action="/api/admin/cosmetic-art"
+            method="post"
+            encType="multipart/form-data"
+          >
             <input type="hidden" name="slug" value={entry.slug} />
             <label className="cursor-pointer text-xs text-text-muted underline underline-offset-2 transition-colors hover:text-text-secondary">
               Replace file
               <input
                 type="file"
                 name="rive"
-                accept=".riv,application/octet-stream"
+                accept=".riv"
                 className="sr-only"
                 onChange={(event) => event.currentTarget.form?.requestSubmit()}
               />

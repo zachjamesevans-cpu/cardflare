@@ -3,7 +3,7 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarSrc } from "./profile-image";
 import { avatarWearFor } from "./equips";
-import type { RiveArt } from "./rive-art";
+import type { CosmeticArtFile } from "./art-files";
 
 /**
  * Follows: the founder's option C.
@@ -101,8 +101,8 @@ export interface FollowedPlayer {
   /** The avatar effect floating around the picture. */
   aura: string | null;
   /** The dropped-in files behind those two, when they are Rive ones. */
-  ringRive: RiveArt | null;
-  auraRive: RiveArt | null;
+  ringArt: CosmeticArtFile | null;
+  auraArt: CosmeticArtFile | null;
   /** They follow back: Trade partners. */
   partners: boolean;
 }
@@ -154,8 +154,8 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
         frame: row.equipped_avatar_frame,
         ring: wear.get(row.id)?.ring ?? null,
         aura: wear.get(row.id)?.aura ?? null,
-        ringRive: wear.get(row.id)?.ringRive ?? null,
-        auraRive: wear.get(row.id)?.auraRive ?? null,
+        ringArt: wear.get(row.id)?.ringArt ?? null,
+        auraArt: wear.get(row.id)?.auraArt ?? null,
         partners: back.has(row.id),
       },
     ];

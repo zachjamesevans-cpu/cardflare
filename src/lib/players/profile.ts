@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
-import type { RiveArt } from "./rive-art";
+import type { CosmeticArtFile } from "./art-files";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
@@ -221,8 +221,8 @@ export interface RoomIdentity {
   /** The avatar effect floating around the picture, mixable with any ring. */
   aura: string | null;
   /** The dropped-in files behind those two, when they are Rive ones. */
-  ringRive: RiveArt | null;
-  auraRive: RiveArt | null;
+  ringArt: CosmeticArtFile | null;
+  auraArt: CosmeticArtFile | null;
 }
 
 export async function roomIdentitiesFor(
@@ -260,8 +260,8 @@ export async function roomIdentitiesFor(
       frame: row.equipped_avatar_frame ?? freeFrame,
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
-      ringRive: wear.get(row.id)?.ringRive ?? null,
-      auraRive: wear.get(row.id)?.auraRive ?? null,
+      ringArt: wear.get(row.id)?.ringArt ?? null,
+      auraArt: wear.get(row.id)?.auraArt ?? null,
     });
   }
 

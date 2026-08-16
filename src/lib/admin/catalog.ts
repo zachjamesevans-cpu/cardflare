@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { riveArtOf, type RiveArt } from "@/lib/players/rive-art";
+import { artFileOf, type CosmeticArtFile } from "@/lib/players/art-files";
 import { tidyCosmeticName } from "@/lib/players/cosmetic-names";
 import { slugFromName } from "./catalog-schema";
 import type { CosmeticRow } from "@/lib/supabase/types";
@@ -61,10 +61,10 @@ export interface CatalogEntry {
   owners: number;
   /** Which sets it has been put in, by name. */
   inSets: string[];
-  /** css: a rule in cosmetic-art.css. rive: a dropped-in file. */
-  artKind: "css" | "rive";
-  /** The file to play, when this one is a Rive cosmetic. */
-  rive: RiveArt | null;
+  /** css: a rule in cosmetic-art.css. rive or svg: a dropped-in file. */
+  artKind: "css" | "rive" | "svg";
+  /** The file to draw, when this one was dropped in. */
+  art: CosmeticArtFile | null;
 }
 
 /**
@@ -113,7 +113,7 @@ export async function catalogForConsole(): Promise<CatalogEntry[]> {
     owners: owners.get(row.slug) ?? 0,
     inSets: sets.get(row.slug) ?? [],
     artKind: row.art_kind,
-    rive: riveArtOf(row),
+    art: artFileOf(row),
   }));
 }
 
@@ -134,6 +134,7 @@ export type CreateOutcome = { ok: true; slug: string } | { ok: false; message: s
 export async function createCosmetic(input: {
   name: string;
   kind: CatalogKind;
+  description?: string;
   artboard?: string | null;
   stateMachine?: string | null;
 }): Promise<CreateOutcome> {
@@ -177,11 +178,22 @@ export async function createCosmetic(input: {
     .limit(1)
     .maybeSingle();
 
+  /*
+   * A description is required by the schema (1 to 200 characters) and
+   * shown under the name in the console and the store. Blank falls back
+   * to the category's own line rather than to an empty string, which
+   * the check constraint would refuse - the probe caught exactly that.
+   */
+  const description =
+    (input.description ?? "").trim().slice(0, 200) ||
+    KIND_LABELS[input.kind]?.blurb ||
+    "A cosmetic.";
+
   const { error } = await admin.from("cosmetics").insert({
     slug,
     kind: input.kind,
     name,
-    description: "",
+    description,
     cost_embers: 0,
     requires_earned: null,
     sort_order: (last?.sort_order ?? 0) + 10,
@@ -191,6 +203,7 @@ export async function createCosmetic(input: {
        claiming 'rive' with no file. storeRiveArt flips it. */
     art_kind: "css",
     rive_path: null,
+    svg_path: null,
     rive_artboard: input.artboard || null,
     rive_state_machine: input.stateMachine || null,
   });
