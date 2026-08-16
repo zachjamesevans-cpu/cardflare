@@ -543,6 +543,24 @@ export type PlayerSessionRow = {
   player_id: string | null;
 };
 
+/**
+ * An extra token that resolves to a session.
+ *
+ * One identity, several devices. A second client signing in as an account
+ * that is already in a room adopts that room identity and is handed one of
+ * these, rather than minting a rival session and appearing on the board
+ * twice.
+ */
+export type PlayerSessionTokenRow = {
+  token_hash: string;
+  player_session_id: string;
+  created_at: string;
+};
+
+export type PlayerSessionTokenInsert = Omit<PlayerSessionTokenRow, "created_at"> & {
+  created_at?: string;
+};
+
 export type PlayerRow = {
   id: string;
   created_at: string;
@@ -1035,6 +1053,7 @@ export type Database = {
       store_invites: Table<StoreInviteRow, StoreInviteInsert>;
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
+      player_session_tokens: Table<PlayerSessionTokenRow, PlayerSessionTokenInsert>;
       events: Table<EventRow, EventInsert>;
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       flares: Table<FlareRow, FlareInsert>;
@@ -1088,6 +1107,14 @@ export type Database = {
           filter_color?: string | null;
         };
         Returns: CardSearchRow[];
+      };
+      /* Folds one player session into another — binder, Flares, offers,
+         memberships and trades — collapsing duplicates rather than failing
+         on them. The source's token survives as an alias, so the device
+         holding it is not signed out. */
+      merge_player_sessions: {
+        Args: { source: string; target: string };
+        Returns: undefined;
       };
       /* Both return false rather than raising when the movement is
          refused — a repeated ref, or a balance that cannot cover it. */

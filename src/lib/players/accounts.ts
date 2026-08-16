@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { ensureAuthUser } from "@/lib/auth/provision";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import type { PlayerRow } from "@/lib/supabase/types";
+import type { PlayerRow, PlayerSessionRow } from "@/lib/supabase/types";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -167,12 +167,20 @@ export async function playerForUser(userId: string): Promise<PlayerRow | null> {
   return data;
 }
 
-/** Ties a guest session to an account. Idempotent; never steals a link. */
+/**
+ * Ties a guest session to an account. Idempotent; never steals a link.
+ *
+ * Can now legitimately fail: an account has exactly one room identity, and the
+ * index enforcing that refuses a second. That is not an error to shout about —
+ * it means the caller should adopt the session the account already has, which
+ * is what `accountRoomIdentity` does. Reported rather than logged for that
+ * reason.
+ */
 export async function linkSessionToPlayer(
   sessionId: string,
   playerId: string,
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
 
   const { error } = await getSupabaseAdmin()
     .from("player_sessions")
@@ -180,7 +188,41 @@ export async function linkSessionToPlayer(
     .eq("id", sessionId)
     .is("player_id", null);
 
-  if (error) console.error("Could not link the session to the account", error);
+  if (!error) return true;
+  if (error.code === UNIQUE_VIOLATION) return false;
+
+  console.error("Could not link the session to the account", error);
+  return false;
+}
+
+/**
+ * The one room identity an account has, or null before it has joined
+ * anything.
+ *
+ * "The one" is guaranteed by a partial unique index rather than by this query
+ * picking a winner — two devices can join at the same moment, and only the
+ * database sees both. Ordered anyway so that a database which somehow holds
+ * two answers the same way every time instead of alternating.
+ */
+export async function sessionForPlayer(
+  playerId: string,
+): Promise<PlayerSessionRow | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .select("*")
+    .eq("player_id", playerId)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (error) {
+    console.error("Could not look up the account's session", error);
+    return null;
+  }
+
+  return data?.[0] ?? null;
 }
 
 export interface PlayerListing {

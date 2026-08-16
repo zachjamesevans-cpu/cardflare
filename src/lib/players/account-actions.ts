@@ -14,13 +14,8 @@ import { text } from "@/lib/form-value";
 import { addFlare } from "@/lib/lists/repository";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
 import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
-import { createPlayerSession } from "@/lib/players/repository";
-import {
-  createSessionToken,
-  getPlayerSession,
-  hashSessionToken,
-  setPlayerCookie,
-} from "@/lib/players/session";
+import { accountRoomIdentity } from "@/lib/players/room-identity";
+import { getPlayerSession, setPlayerCookie } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 import { invitePlayer, linkSessionToPlayer, playerForUser } from "./accounts";
 import {
@@ -133,34 +128,37 @@ export async function rsvpAction(formData: FormData): Promise<void> {
   if (phase !== "early" && phase !== "live") return;
 
   /*
-   * The player's session, created on the spot when this browser has
-   * none: the same identity machinery the join form uses, seeded with
-   * the account's own display name so nothing has to be typed.
+   * The player's room identity: the same resolver the join form uses, so an
+   * RSVP from a laptop and a join from the app land on one seat rather than
+   * two. Created on the spot when nothing exists yet, seeded with the
+   * account's own display name so nothing has to be typed.
    */
-  let session = await getPlayerSession();
-  if (!session) {
-    const displayName =
-      viewer.kind === "player"
-        ? viewer.playerName
-        : viewer.kind === "anonymous"
-          ? null
-          : ((await playerForUser(viewer.user.id))?.display_name ?? null);
-    if (!displayName) return;
+  const displayName =
+    viewer.kind === "player"
+      ? viewer.playerName
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.display_name ?? null);
+  if (!displayName) return;
 
-    const freshToken = createSessionToken();
-    try {
-      session = await createPlayerSession(displayName, hashSessionToken(freshToken));
-    } catch (error) {
-      console.error("Could not create a session for the RSVP", error);
-      return;
-    }
-    await setPlayerCookie(freshToken);
+  let identity;
+  try {
+    identity = await accountRoomIdentity(
+      playerId,
+      displayName,
+      await getPlayerSession(),
+    );
+  } catch (error) {
+    console.error("Could not resolve the account's room identity", error);
+    return;
   }
+
+  const session = identity.session;
+  if (identity.freshToken) await setPlayerCookie(identity.freshToken);
 
   const joined = await joinEvent(event.id, session.id);
   if (!joined) return;
 
-  if (session.player_id === null) await linkSessionToPlayer(session.id, playerId);
   await saveLocal(playerId, event.storeId);
 
   // Post the whole want list; the board's duplicates are skipped and the

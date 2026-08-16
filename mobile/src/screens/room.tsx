@@ -111,6 +111,13 @@ function RoomScreen({
   const [wants, setWants] = useState<Me["wants"]>([]);
 
   /*
+   * The join resumed a seat this account already had. Kept for the visit
+   * rather than the session: it answers "did my tap do anything", and once
+   * the player is reading the board the answer has been given.
+   */
+  const [resumed, setResumed] = useState(false);
+
+  /*
    * The re-post panel starts folded, and that IS the "no thanks": the
    * founder cut the old "Never mind" button once the closed tile became
    * a single quiet line. The wants stay saved either way.
@@ -203,6 +210,7 @@ function RoomScreen({
   useEffect(() => {
     setState(null);
     setRepostOpen(false);
+    setResumed(false);
     setExpandedGroups({});
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
@@ -213,7 +221,14 @@ function RoomScreen({
     setBusy(true);
     setError(null);
     try {
-      await joinRoom(code, name.trim() || undefined);
+      const result = await joinRoom(code, name.trim() || undefined);
+      /*
+       * The account was already in here from the website or an earlier
+       * install, and this tap picked that seat up. Said out loud because
+       * silence is what the duplicate looked like: two of you on the board
+       * and no sign anything had gone wrong.
+       */
+      setResumed(Boolean(result.resumed));
       await refresh();
     } catch (caught) {
       // The reason is named so a field report can say what actually failed.
@@ -505,6 +520,17 @@ function RoomScreen({
             }`}
           </Muted>
         </Card>
+
+        {/* The same words the website uses, for the same moment. */}
+        {resumed && (
+          <Card>
+            <Title>You were already in this room</Title>
+            <Body>
+              Same seat, same Flares, same binder. Your account is one player here
+              however you got in, so nothing was posted twice.
+            </Body>
+          </Card>
+        )}
 
         {/* An early board never pretends to be a live room. */}
         {room.early && (

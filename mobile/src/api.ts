@@ -400,12 +400,23 @@ export const getRoom = (code: string) =>
 export async function joinRoom(
   code: string,
   displayName?: string,
-): Promise<{ joined: boolean; you: { sessionId: string; displayName: string } }> {
+): Promise<{
+  joined: boolean;
+  /**
+   * The account was already in this room, from the website or from an
+   * earlier install, and this tap picked that seat up rather than adding a
+   * second one. Worth saying out loud: a join that looks like it did
+   * nothing is exactly how the duplicate used to present.
+   */
+  resumed?: boolean;
+  you: { sessionId: string; displayName: string };
+}> {
   // Joining does the most server work of any call (session creation,
   // walk-in rooms opening, a possible cold start) — it gets double the
   // patience before the screen calls it a timeout.
   const result = await call<{
     joined: boolean;
+    resumed?: boolean;
     you: { sessionId: string; displayName: string };
     sessionToken?: string;
   }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}`, { displayName }, false, 30_000);

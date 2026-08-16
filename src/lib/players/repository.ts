@@ -55,15 +55,24 @@ export async function createPlayerSession(
  * Expired rows are treated as absent rather than deleted here — a read path
  * should not depend on a write succeeding, and the row is cleaned up
  * separately. See the migration.
+ *
+ * A miss falls through to `player_session_tokens`, where the extra tokens
+ * live: a session belongs to a person, and a person can hold it on more than
+ * one device. The common case — a guest with one token — still costs exactly
+ * one query, because the alias table is only consulted when the session's own
+ * column did not match.
  */
 export async function findPlayerSession(
   tokenHash: string,
 ): Promise<PlayerSessionRow | null> {
-  const { data, error } = await getSupabaseAdmin()
+  const admin = getSupabaseAdmin();
+  const now = new Date().toISOString();
+
+  const { data, error } = await admin
     .from("player_sessions")
     .select()
     .eq("token_hash", tokenHash)
-    .gt("expires_at", new Date().toISOString())
+    .gt("expires_at", now)
     .maybeSingle();
 
   if (error) {
@@ -71,7 +80,89 @@ export async function findPlayerSession(
     return null;
   }
 
-  return data ?? null;
+  if (data) return data;
+
+  const { data: alias, error: aliasError } = await admin
+    .from("player_session_tokens")
+    .select("player_session_id")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (aliasError) {
+    console.error("Could not look up the session token", aliasError);
+    return null;
+  }
+  if (!alias) return null;
+
+  const { data: session, error: sessionError } = await admin
+    .from("player_sessions")
+    .select()
+    .eq("id", alias.player_session_id)
+    .gt("expires_at", now)
+    .maybeSingle();
+
+  if (sessionError) {
+    console.error("Could not load the aliased player session", sessionError);
+    return null;
+  }
+
+  return session ?? null;
+}
+
+/**
+ * Gives a device a token for a session it does not yet hold.
+ *
+ * How a second client adopts the identity an account already has. Nothing is
+ * rotated: the token already in the first device's cookie is still a token for
+ * this session, so adopting never signs anybody out.
+ *
+ * Takes the hash, never the token — the caller keeps the only copy and puts it
+ * in the cookie or hands it to the app, exactly as `createPlayerSession` does.
+ */
+export async function addSessionToken(
+  sessionId: string,
+  tokenHash: string,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("player_session_tokens")
+    .upsert(
+      { token_hash: tokenHash, player_session_id: sessionId },
+      { onConflict: "token_hash" },
+    );
+
+  if (error) {
+    throw new Error(`Could not add the session token: ${error.message}`, {
+      cause: error,
+    });
+  }
+}
+
+/**
+ * Folds one session into another.
+ *
+ * All of it happens inside `merge_player_sessions`, in one statement per table,
+ * because doing it from here would mean a dozen round trips with the player's
+ * binder split across two identities in between. See the migration for what
+ * wins each collision.
+ *
+ * Returns whether it worked. A failed merge leaves both sessions intact, which
+ * is the right failure: the caller keeps the one it has.
+ */
+export async function mergePlayerSessions(
+  sourceId: string,
+  targetId: string,
+): Promise<boolean> {
+  const { error } = await getSupabaseAdmin().rpc("merge_player_sessions", {
+    source: sourceId,
+    target: targetId,
+  });
+
+  if (error) {
+    console.error("Could not merge the player sessions", error);
+    return false;
+  }
+
+  return true;
 }
 
 /**

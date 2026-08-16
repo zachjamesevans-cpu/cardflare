@@ -26,13 +26,19 @@ const notifyEarlyBoardFlares = vi.fn();
 const notifyTradeConfirmed = vi.fn();
 const clearWantForFlare = vi.fn();
 const linkSessionToPlayer = vi.fn();
+const sessionForPlayer = vi.fn();
+const playerForUser = vi.fn();
+const addSessionToken = vi.fn();
+const mergePlayerSessions = vi.fn();
+/** Whoever the bearer token resolves to, or null for a guest request. */
+const getUser = vi.fn();
 
 vi.mock("@/lib/request-context", () => ({
   clientKey: vi.fn().mockResolvedValue("client-1"),
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
-  getSupabaseAdmin: () => ({ auth: { getUser: vi.fn() } }),
+  getSupabaseAdmin: () => ({ auth: { getUser: (...a: unknown[]) => getUser(...a) } }),
 }));
 vi.mock("@/lib/players/repository", () => ({
   findPlayerSession: (...a: unknown[]) => findPlayerSession(...a),
@@ -40,6 +46,8 @@ vi.mock("@/lib/players/repository", () => ({
   createPlayerSession: (...a: unknown[]) => createPlayerSession(...a),
   deletePlayerSession: vi.fn(),
   renamePlayerSession: vi.fn(),
+  addSessionToken: (...a: unknown[]) => addSessionToken(...a),
+  mergePlayerSessions: (...a: unknown[]) => mergePlayerSessions(...a),
 }));
 vi.mock("@/lib/events/rooms", () => ({
   resolveCode: (...a: unknown[]) => resolveCode(...a),
@@ -77,9 +85,11 @@ vi.mock("@/lib/players/wants", () => ({
   clearWantForFlare: (...a: unknown[]) => clearWantForFlare(...a),
 }));
 vi.mock("@/lib/players/accounts", () => ({
-  playerForUser: vi.fn().mockResolvedValue(null),
+  playerForUser: (...a: unknown[]) => playerForUser(...a),
   linkSessionToPlayer: (...a: unknown[]) => linkSessionToPlayer(...a),
+  sessionForPlayer: (...a: unknown[]) => sessionForPlayer(...a),
 }));
+vi.mock("@/lib/players/locals", () => ({ saveLocal: vi.fn() }));
 vi.mock("@/lib/players/collection", () => ({
   collectionAvailability: vi.fn().mockResolvedValue(new Map()),
 }));
@@ -131,9 +141,21 @@ beforeEach(() => {
     notifyTradeConfirmed,
     clearWantForFlare,
     linkSessionToPlayer,
+    sessionForPlayer,
+    playerForUser,
+    addSessionToken,
+    mergePlayerSessions,
+    getUser,
   ]) {
     fn.mockReset();
   }
+
+  /* A guest request by default: no account behind the bearer token, and
+     no room identity for one. The signed-in cases say otherwise. */
+  getUser.mockResolvedValue({ data: { user: null }, error: null });
+  playerForUser.mockResolvedValue(null);
+  sessionForPlayer.mockResolvedValue(null);
+  mergePlayerSessions.mockResolvedValue(true);
 
   findPlayerSession.mockResolvedValue(SESSION);
   resolveCode.mockResolvedValue({
@@ -229,6 +251,93 @@ describe("POST /rooms/[code] (join)", () => {
     const response = await rooms.POST(request("POST", { displayName: "Nami" }), CODE);
 
     expect(response.status).toBe(409);
+  });
+});
+
+/*
+ * The duplicate join. Signed in as the same account, the app used to mint
+ * its own session and land a second copy of the founder on the board — two
+ * participants, two board sections, two binders that never matched.
+ *
+ * A session is a device; an account is a person. The app now adopts the
+ * identity the account already has, and says so.
+ */
+describe("POST /rooms/[code] — the same account from a second client", () => {
+  const WEB_SESSION = {
+    id: "sess-web",
+    display_name: "Kaito",
+    player_id: "player-1",
+    token_hash: "x",
+  };
+
+  /** The app: a bearer token for the account, and its own session token. */
+  function signedIn(withSession = true): Request {
+    return new Request("https://cardflare.gg/api/v1/rooms/K3M9PZ", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer jwt",
+        "x-cf-payload": "%7B%7D",
+        ...(withSession ? { "x-session-token": "tok" } : {}),
+      },
+    });
+  }
+
+  beforeEach(() => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    playerForUser.mockResolvedValue({ id: "player-1", display_name: "Kaito" });
+    sessionForPlayer.mockResolvedValue(WEB_SESSION);
+    findParticipation.mockResolvedValue(null);
+  });
+
+  it("joins as the identity the account already has", async () => {
+    const response = await rooms.POST(signedIn(), CODE);
+    const body = await response.json();
+
+    expect(createPlayerSession).not.toHaveBeenCalled();
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-web");
+    expect(body.you.sessionId).toBe("sess-web");
+    expect(body.resumed).toBe(true);
+  });
+
+  /* A fresh install holds nothing, so it is handed a token for that
+     session — additive, so the website's own token still works. */
+  it("hands a fresh install a token for that session", async () => {
+    const response = await rooms.POST(signedIn(false), CODE);
+    const body = await response.json();
+
+    expect(addSessionToken).toHaveBeenCalledWith("sess-web", expect.any(String));
+    expect(typeof body.sessionToken).toBe("string");
+  });
+
+  /* The app's own session is real work — a binder, Flares, offers — so it
+     is folded in rather than abandoned. */
+  it("folds the app's own session into the account's", async () => {
+    const response = await rooms.POST(signedIn(), CODE);
+    await response.json();
+
+    expect(mergePlayerSessions).toHaveBeenCalledWith("sess-1", "sess-web");
+  });
+
+  it("says so when this client is already in the room", async () => {
+    sessionForPlayer.mockResolvedValue({ ...SESSION, player_id: "player-1" });
+    findParticipation.mockResolvedValue({ lastSeenAt: "now" });
+
+    const response = await rooms.POST(signedIn(), CODE);
+    const body = await response.json();
+
+    expect(body.resumed).toBe(true);
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-1");
+  });
+
+  it("is a plain join when the account has no identity yet", async () => {
+    sessionForPlayer.mockResolvedValue(null);
+
+    const response = await rooms.POST(signedIn(), CODE);
+    const body = await response.json();
+
+    expect(body.resumed).toBe(false);
+    expect(linkSessionToPlayer).toHaveBeenCalledWith("sess-1", "player-1");
+    expect(mergePlayerSessions).not.toHaveBeenCalled();
   });
 });
 

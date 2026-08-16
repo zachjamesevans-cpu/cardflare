@@ -4,6 +4,7 @@ import { resetRateLimits } from "@/lib/rate-limit";
 
 const findEventByJoinCode = vi.fn();
 const joinEvent = vi.fn();
+const findParticipation = vi.fn();
 const leaveEvent = vi.fn();
 const createPlayerSession = vi.fn();
 const deletePlayerSession = vi.fn();
@@ -48,6 +49,7 @@ vi.mock("@/lib/events/repository", () => ({
 vi.mock("@/lib/events/participants", () => ({
   joinEvent: (...a: unknown[]) => joinEvent(...a),
   leaveEvent: (...a: unknown[]) => leaveEvent(...a),
+  findParticipation: (...a: unknown[]) => findParticipation(...a),
 }));
 
 vi.mock("@/lib/players/repository", () => ({
@@ -55,6 +57,8 @@ vi.mock("@/lib/players/repository", () => ({
   createPlayerSession: (...a: unknown[]) => createPlayerSession(...a),
   deletePlayerSession: (...a: unknown[]) => deletePlayerSession(...a),
   renamePlayerSession: (...a: unknown[]) => renamePlayerSession(...a),
+  addSessionToken: (...a: unknown[]) => addSessionToken(...(a as [])),
+  mergePlayerSessions: (...a: unknown[]) => mergePlayerSessions(...(a as [])),
 }));
 
 /*
@@ -71,9 +75,21 @@ vi.mock("@/lib/players/account-identity", () => ({
   accountIdentity: (...a: unknown[]) => accountIdentity(...(a as [])),
 }));
 
-const linkSessionToPlayer = vi.fn(async () => {});
+const linkSessionToPlayer = vi.fn(async () => true);
+/*
+ * The account's one room identity. Null by default: every case below is
+ * either a guest or an account joining its first room, and the cases that
+ * exercise a second device set it explicitly.
+ */
+const sessionForPlayer = vi.fn(
+  async () => null as { id: string; display_name: string; player_id: string } | null,
+);
+const addSessionToken = vi.fn(async () => {});
+const mergePlayerSessions = vi.fn(async () => true);
+
 vi.mock("@/lib/players/accounts", () => ({
   linkSessionToPlayer: (...a: unknown[]) => linkSessionToPlayer(...(a as [])),
+  sessionForPlayer: (...a: unknown[]) => sessionForPlayer(...(a as [])),
 }));
 
 const saveLocal = vi.fn(async () => {});
@@ -124,6 +140,7 @@ beforeEach(() => {
   resetRateLimits();
   findEventByJoinCode.mockReset().mockResolvedValue(OPEN_EVENT);
   joinEvent.mockReset().mockResolvedValue(true);
+  findParticipation.mockReset().mockResolvedValue(null);
   leaveEvent.mockReset().mockResolvedValue(undefined);
   createPlayerSession.mockReset().mockResolvedValue({ id: "session-new" });
   deletePlayerSession.mockReset().mockResolvedValue(undefined);
@@ -132,7 +149,10 @@ beforeEach(() => {
   setPlayerCookie.mockReset().mockResolvedValue(undefined);
   isSupabaseConfigured.mockReset().mockReturnValue(true);
   accountIdentity.mockReset().mockResolvedValue(null);
-  linkSessionToPlayer.mockReset();
+  linkSessionToPlayer.mockReset().mockResolvedValue(true);
+  sessionForPlayer.mockReset().mockResolvedValue(null);
+  addSessionToken.mockReset().mockResolvedValue(undefined);
+  mergePlayerSessions.mockReset().mockResolvedValue(true);
   saveLocal.mockReset();
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -440,5 +460,135 @@ describe("joinEventAction — a signed-in player", () => {
       expect.any(String),
     );
     expect(linkSessionToPlayer).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * The duplicate join, reported from a real room: the founder joined from
+ * the mobile site and then from the app, signed in as the same account
+ * both times, and appeared on the board twice.
+ *
+ * A session is a device; an account is a person. A second device now
+ * adopts the identity the account already has rather than minting a rival,
+ * and the redirect says so — a join that appears to do nothing is exactly
+ * what the duplicate looked like from the inside.
+ */
+describe("joinEventAction — the same account from a second device", () => {
+  const ACCOUNT = { playerId: "player-1", displayName: "Chunc" };
+  const EXISTING = {
+    id: "session-web",
+    display_name: "Chunc",
+    player_id: "player-1",
+  };
+
+  beforeEach(() => {
+    accountIdentity.mockResolvedValue(ACCOUNT);
+    sessionForPlayer.mockResolvedValue(EXISTING);
+  });
+
+  it("joins as the identity the account already has", async () => {
+    const to = await captureRedirect(() => join(formData()));
+
+    expect(createPlayerSession).not.toHaveBeenCalled();
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "session-web");
+    expect(to).toBe("/e/K3M9PZ?resumed=1");
+  });
+
+  it("hands a device with no identity a token for that session", async () => {
+    await captureRedirect(() => join(formData()));
+
+    expect(addSessionToken).toHaveBeenCalledWith("session-web", expect.any(String));
+    expect(setPlayerCookie).toHaveBeenCalledOnce();
+  });
+
+  /*
+   * The device's own session is real work — a binder, Flares, offers — so
+   * it is folded in rather than abandoned. Dropping it to end a duplicate
+   * would be a worse bug than the duplicate.
+   */
+  it("folds the device's own session into the account's", async () => {
+    getPlayerSession.mockResolvedValue({
+      id: "session-app",
+      display_name: "Chunc",
+      player_id: "player-1",
+    });
+
+    const to = await captureRedirect(() => join(formData()));
+
+    expect(mergePlayerSessions).toHaveBeenCalledWith("session-app", "session-web");
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "session-web");
+    expect(to).toBe("/e/K3M9PZ?resumed=1");
+  });
+
+  /* The merged device's token became an alias, so nothing to re-issue. */
+  it("does not reissue a cookie after a merge", async () => {
+    getPlayerSession.mockResolvedValue({
+      id: "session-app",
+      display_name: "Chunc",
+      player_id: "player-1",
+    });
+
+    await captureRedirect(() => join(formData()));
+
+    expect(setPlayerCookie).not.toHaveBeenCalled();
+  });
+
+  /*
+   * A failed merge must not fail the join. The player keeps the session
+   * they arrived with, which is exactly the old behaviour — the duplicate
+   * is a bug worth fixing, not one worth blocking a room over.
+   */
+  it("still joins when the merge fails", async () => {
+    mergePlayerSessions.mockResolvedValue(false);
+    getPlayerSession.mockResolvedValue({
+      id: "session-app",
+      display_name: "Chunc",
+      player_id: "player-1",
+    });
+
+    const to = await captureRedirect(() => join(formData()));
+
+    expect(joinEvent).toHaveBeenCalledWith("event-1", "session-app");
+    expect(to).toBe("/e/K3M9PZ");
+  });
+
+  /*
+   * An adopted session is the account's and is very likely in other rooms.
+   * Deleting it because this one join failed would take the player's whole
+   * identity with it.
+   */
+  it("never deletes an adopted session when the room write fails", async () => {
+    joinEvent.mockResolvedValue(false);
+
+    const result = await join(formData());
+
+    expect(result.status).toBe("error");
+    expect(deletePlayerSession).not.toHaveBeenCalled();
+  });
+
+  /* Re-scanning the printed code is the likeliest thing anybody does. */
+  it("says so when the same device is already in the room", async () => {
+    getPlayerSession.mockResolvedValue(EXISTING);
+    findParticipation.mockResolvedValue({
+      joinedAt: "2026-08-16T10:00:00.000Z",
+      lastSeenAt: "2026-08-16T10:05:00.000Z",
+    });
+
+    const to = await captureRedirect(() => join(formData()));
+
+    expect(to).toBe("/e/K3M9PZ?resumed=1");
+    expect(createPlayerSession).not.toHaveBeenCalled();
+  });
+
+  /* A guest re-scanning is not resuming an account; nothing changes. */
+  it("leaves a guest's join exactly as it was", async () => {
+    accountIdentity.mockResolvedValue(null);
+    sessionForPlayer.mockResolvedValue(null);
+
+    const to = await captureRedirect(() => join(formData({ displayName: "Mika" })));
+
+    expect(to).toBe("/e/K3M9PZ");
+    expect(mergePlayerSessions).not.toHaveBeenCalled();
+    expect(addSessionToken).not.toHaveBeenCalled();
   });
 });
