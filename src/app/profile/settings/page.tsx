@@ -20,6 +20,8 @@ import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
+import { DisplayNameForm } from "@/components/players/display-name-form";
+import { ownProfile } from "@/lib/players/profile";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -61,6 +63,8 @@ export default async function ProfileSettingsPage() {
       ? viewer.playerId
       : ((await playerForUser(viewer.user.id))?.id ?? null);
   const wants = playerId ? await listWants(playerId) : null;
+  const profile = playerId ? await ownProfile(playerId) : null;
+  const displayName = profile?.displayName ?? "";
   const locals = playerId ? await listLocals(playerId) : [];
 
   const sync = playerId ? await collectionSyncFor(playerId) : null;
@@ -87,6 +91,23 @@ export default async function ProfileSettingsPage() {
     : undefined;
 
   const isPlayerHome = viewer.kind === "player";
+
+  /*
+   * Your name, which is housekeeping rather than decoration. It used
+   * to sit on the front of the profile; the founder moved it here:
+   * "no need to have the name editor front and center on a profile."
+   */
+  const nameCard = !playerId ? null : (
+    <Card key="name" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="font-semibold text-text-primary">Your name</h2>
+        <p className="text-sm text-text-secondary">
+          What people see when you walk into a room.
+        </p>
+      </div>
+      <DisplayNameForm displayName={displayName} />
+    </Card>
+  );
 
   const emailCard = (
     <Card key="email" className="flex flex-col gap-3">
@@ -271,8 +292,8 @@ export default async function ProfileSettingsPage() {
 
   /* A player's own things lead; sign-in housekeeping follows. */
   const cards = isPlayerHome
-    ? [localsCard, wantsCard, collectionCard, emailCard, passwordCard]
-    : [emailCard, localsCard, wantsCard, collectionCard, passwordCard];
+    ? [localsCard, wantsCard, collectionCard, nameCard, emailCard, passwordCard]
+    : [nameCard, emailCard, localsCard, wantsCard, collectionCard, passwordCard];
 
   return (
     <>

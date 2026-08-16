@@ -14,10 +14,8 @@ import { colors, radius, spacing } from "../theme";
 
 /** The trade-room carousel's tile width; the profile shelf matches it. */
 const SHELF_TILE = 56;
-const COVER_HEIGHT = 110;
-/* Where the content layer's rounded edge crosses: the picture's middle
-   sits exactly on this line, half on the cover, half on the panel. */
-const SEAM = COVER_HEIGHT - 14;
+/** How far the cover reaches: past the name and the Embers badge. */
+const COVER_HEIGHT = 280;
 
 /**
  * Somebody else's profile, the full page — where the popup's "View full
@@ -82,32 +80,16 @@ export function PlayerProfileScreen() {
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
       {/* The profile block: cover, picture, name, badge, shelf. */}
-      <Card style={{ paddingTop: COVER_HEIGHT + spacing(2), overflow: "hidden" }}>
-        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} />
-
-        {/* The embossed content layer: rounded top edge with a light
-            border, reading as a sheet laid over the cover. */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: SEAM,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            borderTopWidth: 1,
-            borderColor: colors.borderStrong,
-          }}
-        />
+      <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
+        {/* The cover carries down behind the picture, the name and the
+            badge, then fades into the card. The same block your own
+            profile shows: what you see is what they see. */}
+        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
 
         <View
           style={{
             alignItems: "center",
             gap: spacing(2),
-            marginTop: SEAM - 48 - (COVER_HEIGHT + spacing(2)),
           }}
         >
           <PlayerAvatar

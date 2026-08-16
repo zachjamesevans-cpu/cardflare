@@ -26,6 +26,7 @@ import {
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
+import { ProfileCover } from "@/components/players/profile-cover";
 
 export const metadata: Metadata = {
   title: "Player",
@@ -96,29 +97,9 @@ export default async function PublicProfilePage({
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
-            {/*
-             * The cover banner, behind the picture - the founder's
-             * profile block: banner, picture overlapping it, name,
-             * badge, shelf, all in one rounded card.
-             */}
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-0 h-28 overflow-hidden bg-elevated"
-            >
-              {profile.coverUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.coverUrl} alt="" className="size-full object-cover" />
-              )}
-              <div className="absolute inset-0 bg-black/25" />
-            </div>
-
-            {/* The content layer: rounded top edge with a highlight
-                border and lifted shadow crossing the picture's middle,
-                so the cover reads as a layer physically behind. */}
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
-            />
+            {/* The cover, carrying down behind the name and badge and
+                fading out. The same component your own profile uses. */}
+            <ProfileCover coverUrl={profile.coverUrl} />
 
             {/*
              * One component for picture, initials and frame alike, so

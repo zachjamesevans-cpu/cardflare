@@ -38,6 +38,9 @@ import { CoverBanner } from "../showcase-zoom";
 import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
+/** How far the cover reaches: past the name and the Embers badge. */
+const COVER_HEIGHT = 280;
+
 /**
  * The Profile tab, which used to be Account.
  *
@@ -303,23 +306,11 @@ export function ProfileScreen() {
           profile shows anyone else - same cover, same seam crossing the
           picture's middle, same centered name and badge, same shelf.
           The founder's rule: what you see is what they see. */}
-      <Card style={{ paddingTop: 110 + spacing(2), overflow: "hidden" }}>
-        <CoverBanner coverUrl={profile.coverUrl} height={110} />
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 96,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            borderTopWidth: 1,
-            borderColor: colors.borderStrong,
-          }}
-        />
+      <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
+        {/* The cover carries down behind the picture, the name and the
+            badge, then fades into the card. No seam: the founder's
+            mockup, and the same shape the website draws. */}
+        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
 
         {/*
          * The block's two controls, riding its corner: the wand
@@ -424,12 +415,6 @@ export function ProfileScreen() {
             />
           </View>
         </View>
-
-        <NameField
-          current={profile.displayName}
-          busy={busy === "rename"}
-          onSave={(name) => act("rename", () => renameProfile(name), "Name updated.")}
-        />
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the
@@ -815,7 +800,7 @@ function Stat({
   );
 }
 
-function NameField({
+export function NameField({
   current,
   busy,
   onSave,

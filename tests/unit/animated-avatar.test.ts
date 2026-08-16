@@ -158,8 +158,27 @@ describe("where it is stored and how it is served", () => {
       join(process.cwd(), "src/lib/players/profile.ts"),
       "utf8",
     );
-    expect(source).toContain("Math.min(probe.pages ?? 1, ANIMATED_AVATAR_MAX_FRAMES)");
+    /* Whatever the cap is on a given rung, it is always a floor
+       against the file's real length rather than a demand. */
+    expect(source).toContain("Math.min(probe.pages ?? 1, rung.frames)");
     expect(source).not.toContain("pages: ANIMATED_AVATAR_MAX_FRAMES");
+  });
+
+  it("shrinks a heavy GIF instead of refusing it", () => {
+    /* The founder asked whether to compress by hand or pay for a
+       bigger limit. Neither: each rung gives up a little size, then
+       frames, then palette, and the first one under target is stored.
+       Only a file that survives every rung is turned away. */
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/players/profile.ts"),
+      "utf8",
+    );
+    expect(source).toContain("const rungs");
+    expect(source).toContain("ANIMATED_AVATAR_MAX_STORED_BYTES");
+    /* Descending, so the cheapest sacrifice is tried first. */
+    const sizes = [...source.matchAll(/size: (\d+), frames/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThan(2);
+    expect([...sizes].sort((a, b) => b - a)).toEqual(sizes);
   });
 
   it("forgives a GIF that has been round a few tools", () => {

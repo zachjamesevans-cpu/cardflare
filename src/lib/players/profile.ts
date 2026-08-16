@@ -777,26 +777,48 @@ export async function setAnimatedAvatar(
       failOn: "truncated",
     }).metadata();
 
-    const pages = Math.min(probe.pages ?? 1, ANIMATED_AVATAR_MAX_FRAMES);
-
     /*
-     * `failOn: "truncated"` rather than the still pipeline's "error".
-     * A photograph out of a camera roll is clean; a GIF off the
-     * internet has been through a dozen tools and routinely carries
-     * warning-level oddities that libvips notices and no viewer cares
-     * about. A half-downloaded file is still refused - that is what
-     * "truncated" catches - but we re-encode every frame anyway, so
-     * refusing art over a warning would only ever cost the founder a
-     * working GIF.
+     * Squeezed until it fits, rather than refused for being big.
+     *
+     * A 500px GIF off the internet becomes a much heavier file once
+     * every frame is scaled to 512 square, and "that GIF is too heavy"
+     * is a useless thing to tell somebody holding a GIF that plays
+     * perfectly well everywhere else. So each rung gives up a little
+     * of something - size, then frames, then palette - and the first
+     * one under target is what gets stored.
+     *
+     * Ordered so the cheapest sacrifice comes first: nobody looking at
+     * a 40px roster avatar can tell 512 from 384, and dropping frames
+     * changes the animation itself, so that comes later.
      */
-    animation = await sharp(source, {
-      animated: true,
-      pages,
-      failOn: "truncated",
-    })
-      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
-      .gif()
-      .toBuffer();
+    const rungs: { size: number; frames: number; colours: number }[] = [
+      { size: AVATAR_SIZE, frames: ANIMATED_AVATAR_MAX_FRAMES, colours: 256 },
+      { size: 384, frames: ANIMATED_AVATAR_MAX_FRAMES, colours: 256 },
+      { size: 320, frames: 40, colours: 192 },
+      { size: 256, frames: 30, colours: 128 },
+      { size: 192, frames: 24, colours: 96 },
+    ];
+
+    let encoded: Buffer | null = null;
+
+    for (const rung of rungs) {
+      const attempt = await sharp(source, {
+        animated: true,
+        pages: Math.min(probe.pages ?? 1, rung.frames),
+        failOn: "truncated",
+      })
+        .resize(rung.size, rung.size, { fit: "cover", position: "centre" })
+        .gif({ colours: rung.colours })
+        .toBuffer();
+
+      if (attempt.length <= ANIMATED_AVATAR_MAX_STORED_BYTES) {
+        encoded = attempt;
+        break;
+      }
+    }
+
+    if (!encoded) return { ok: false, reason: "too-big" };
+    animation = encoded;
 
     frames = (await sharp(animation, { animated: true }).metadata()).pages ?? 1;
 
@@ -808,15 +830,6 @@ export async function setAnimatedAvatar(
   } catch (error) {
     console.error("Could not decode the uploaded animation", error);
     return { ok: false, reason: "unreadable" };
-  }
-
-  /*
-   * Checked on the way OUT as well as in. A modest GIF can re-encode
-   * larger than it arrived once every frame is scaled to 512, and an
-   * avatar nobody can afford to load is not an avatar.
-   */
-  if (animation.length > ANIMATED_AVATAR_MAX_STORED_BYTES) {
-    return { ok: false, reason: "too-big" };
   }
 
   const gifPath = animatedAvatarObjectPath(playerId);
