@@ -10,8 +10,12 @@ import { CosmeticFilm } from "@/components/players/cosmetic-film";
 import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { clearAvatarAction, setAvatarAction } from "@/lib/players/profile-actions";
-import { checkAvatarFile } from "@/lib/players/profile-image";
+import {
+  clearAvatarAction,
+  setAnimatedAvatarAction,
+  setAvatarAction,
+} from "@/lib/players/profile-actions";
+import { checkAnimatedAvatarFile, checkAvatarFile } from "@/lib/players/profile-image";
 import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
 
 /**
@@ -36,10 +40,19 @@ export function AvatarForm({
   aura = null,
   ringArt = null,
   auraArt = null,
+  animatedAllowed = false,
 }: {
   displayName: string;
   seed: string;
   avatarUrl: string | null;
+  /**
+   * Whether this player's tier includes an animated picture. Decided by
+   * `tierAllows(tier, "animatedAvatar")` on the server and passed in,
+   * so the client never holds an opinion about who has paid for what -
+   * it only knows whether to offer the option and what to say if a GIF
+   * is picked anyway.
+   */
+  animatedAllowed?: boolean;
   /**
    * The equipped frame, worn here too. The founder bought one, equipped
    * it, and looked at their own profile first: this component showed a
@@ -55,10 +68,24 @@ export function AvatarForm({
   ringArt?: CosmeticArtFileRef | null;
   auraArt?: CosmeticArtFileRef | null;
 }) {
-  const [state, action] = useActionState<ProfileState, FormData>(
+  const [stillState, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
     PROFILE_IDLE,
   );
+
+  /*
+   * A second action rather than a branch inside the first. A GIF takes
+   * a different path all the way down - different ceiling, a tier to
+   * satisfy, two objects written - and the camera button picks which
+   * one to dispatch from the file's own type.
+   */
+  const [animatedState, animate] = useActionState<ProfileState, FormData>(
+    setAnimatedAvatarAction,
+    PROFILE_IDLE,
+  );
+
+  const state =
+    [stillState, animatedState].find((one) => one.status !== "idle") ?? PROFILE_IDLE;
 
   const form = useRef<HTMLFormElement>(null);
 
@@ -201,13 +228,32 @@ export function AvatarForm({
           <input
             type="file"
             name="avatar"
-            accept="image/png,image/jpeg,image/webp"
+            accept={
+              animatedAllowed
+                ? "image/png,image/jpeg,image/webp,image/gif"
+                : "image/png,image/jpeg,image/webp"
+            }
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (!file) return;
 
-              const check = checkAvatarFile(file);
+              const moving = file.type === "image/gif";
+
+              /* A GIF from somebody without Pro is turned away here
+                 with the reason, rather than sent to be refused. */
+              if (moving && !animatedAllowed) {
+                setRejected(
+                  "Animated pictures are a Pro feature. Any PNG, JPEG or WebP works on every plan.",
+                );
+                event.target.value = "";
+                return;
+              }
+
+              const check = moving
+                ? checkAnimatedAvatarFile(file)
+                : checkAvatarFile(file);
+
               if (!check.ok) {
                 setRejected(check.message);
                 event.target.value = "";
@@ -220,6 +266,17 @@ export function AvatarForm({
               setPreview(url);
               setBroken(false);
               setRejected(null);
+
+              if (moving) {
+                /* Dispatched directly rather than submitted, so one
+                   file input can feed either action. */
+                const carried = new FormData();
+                carried.set("avatar", file);
+                event.target.value = "";
+                animate(carried);
+                return;
+              }
+
               form.current?.requestSubmit();
             }}
           />

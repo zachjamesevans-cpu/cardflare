@@ -5,13 +5,21 @@ import sharp from "sharp";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
+import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
   AVATAR_MAX_BYTES,
   AVATAR_MIME_TYPES,
   AVATAR_SIZE,
+  animatedAvatarObjectPath,
+  ANIMATED_AVATAR_MAX_BYTES,
+  ANIMATED_AVATAR_MAX_FRAMES,
+  ANIMATED_AVATAR_MAX_STORED_BYTES,
+  ANIMATED_AVATAR_MIME_TYPES,
   avatarObjectPath,
+  avatarPathFor,
   avatarSrc,
+  looksLikeGif,
   coverObjectPath,
   COVER_HEIGHT,
   COVER_WIDTH,
@@ -53,6 +61,12 @@ export interface PublicProfile {
   coverUrl: string | null;
   /** Lifetime. The badge. */
   embersEarned: number;
+  /**
+   * free, pro, ultra or max. Public because what it unlocks is public:
+   * an animated picture is visible to everybody in the room, so the
+   * tier behind it is not a secret.
+   */
+  tier: string;
   equipped: Equipped;
   showcase: ShowcaseCard[];
   joinedAt: string;
@@ -92,10 +106,11 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
      * saved but could not be loaded", which is the worst state the
      * profile has: a message with nothing anybody can do about it.
      */
-    avatarUrl: await verifiedAvatar(playerId, player.avatar_url),
+    avatarUrl: await verifiedAvatar(playerId, avatarPathFor(player)),
     coverUrl: avatarSrc(player.cover_image),
     embersEarned: player.embers_earned,
     embersBalance: player.embers_balance,
+    tier: player.tier,
     equipped: {
       avatarFrame: player.equipped_avatar_frame,
       frame: player.equipped_frame,
@@ -234,7 +249,9 @@ export async function roomIdentitiesFor(
   const [{ data, error }, wear] = await Promise.all([
     getSupabaseAdmin()
       .from("players")
-      .select("id, embers_earned, avatar_url, equipped_avatar_frame")
+      .select(
+        "id, embers_earned, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+      )
       .in("id", [...new Set(playerIds)]),
     avatarWearFor(playerIds),
   ]);
@@ -256,7 +273,7 @@ export async function roomIdentitiesFor(
   for (const row of data ?? []) {
     identities.set(row.id, {
       embersEarned: row.embers_earned,
-      avatarUrl: avatarSrc(row.avatar_url),
+      avatarUrl: avatarSrc(avatarPathFor(row)),
       frame: row.equipped_avatar_frame ?? freeFrame,
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
@@ -675,6 +692,185 @@ export async function setAvatar(
   await deleteAvatarObject(previous?.avatar_url ?? null);
 
   return { ok: true, path };
+}
+
+export type AnimatedAvatarOutcome =
+  | { ok: true; path: string; frames: number }
+  | {
+      ok: false;
+      reason: "too-big" | "wrong-type" | "unreadable" | "not-pro" | "unavailable";
+    };
+
+/**
+ * Stores an animated profile picture: the Pro feature.
+ *
+ * The founder: "make your avatar a GIF file, that will be viewable in
+ * the room and the profile. this will be a pro and up only feature."
+ *
+ * Re-encoded rather than stored as sent, the same position `setAvatar`
+ * takes and for the same reason: the bucket is public, so nothing a
+ * player uploads may be served back byte for byte. Decoding and
+ * re-encoding through sharp is what turns "somebody's file" into "our
+ * file", and it is also what enforces the shape - squared to the same
+ * 512, capped at 60 frames by only decoding that many pages, so a long
+ * loop is politely shortened instead of refused.
+ *
+ * TWO objects are written every time. The GIF is the animation; a
+ * still JPEG poster goes to the ordinary avatar path beside it. That
+ * still is not a nicety: it is what a player sees the moment their
+ * tier drops below Pro, what any client that will not animate falls
+ * back to, and the reason a picture never simply vanishes when a
+ * subscription lapses.
+ *
+ * The tier is checked HERE and not only at the action, because this is
+ * the function that can write the column.
+ */
+export async function setAnimatedAvatar(
+  playerId: string,
+  file: { arrayBuffer(): Promise<ArrayBuffer>; size: number; type: string },
+): Promise<AnimatedAvatarOutcome> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  if (file.size > ANIMATED_AVATAR_MAX_BYTES) return { ok: false, reason: "too-big" };
+  if (!(ANIMATED_AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { ok: false, reason: "wrong-type" };
+  }
+
+  const admin = getSupabaseAdmin();
+
+  const { data: player } = await admin
+    .from("players")
+    .select("tier, avatar_url, avatar_animated")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (!player) return { ok: false, reason: "unavailable" };
+  if (!tierAllows(player.tier, "animatedAvatar")) {
+    return { ok: false, reason: "not-pro" };
+  }
+
+  const sent = new Uint8Array(await file.arrayBuffer());
+
+  /* The bytes decide, not the browser's guess at an extension. */
+  if (!looksLikeGif(sent)) return { ok: false, reason: "wrong-type" };
+
+  let animation: Buffer;
+  let still: Buffer;
+  let frames: number;
+
+  try {
+    const source = Buffer.from(sent);
+
+    /*
+     * `pages` caps the decode itself, so a 900-frame file costs us 60
+     * frames of work rather than 900 and then a refusal. `failOn:
+     * "error"` refuses a truncated file instead of half-decoding it,
+     * the same discipline as the still pipeline.
+     */
+    animation = await sharp(source, {
+      animated: true,
+      pages: ANIMATED_AVATAR_MAX_FRAMES,
+      failOn: "error",
+    })
+      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
+      .gif()
+      .toBuffer();
+
+    frames = (await sharp(animation, { animated: true }).metadata()).pages ?? 1;
+
+    /* The poster: frame one, through the ordinary still pipeline. */
+    still = await sharp(source, { failOn: "error" })
+      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+  } catch (error) {
+    console.error("Could not decode the uploaded animation", error);
+    return { ok: false, reason: "unreadable" };
+  }
+
+  /*
+   * Checked on the way OUT as well as in. A modest GIF can re-encode
+   * larger than it arrived once every frame is scaled to 512, and an
+   * avatar nobody can afford to load is not an avatar.
+   */
+  if (animation.length > ANIMATED_AVATAR_MAX_STORED_BYTES) {
+    return { ok: false, reason: "too-big" };
+  }
+
+  const gifPath = animatedAvatarObjectPath(playerId);
+  const stillPath = avatarObjectPath(playerId);
+
+  const wroteGif = await putAvatarObject(gifPath, animation, "image/gif");
+  if (!wroteGif) return { ok: false, reason: "unavailable" };
+
+  const wroteStill = await putAvatarObject(stillPath, still, "image/jpeg");
+  if (!wroteStill) {
+    await admin.storage.from("avatars").remove([gifPath]);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  const { error } = await admin
+    .from("players")
+    .update({ avatar_url: stillPath, avatar_animated: gifPath })
+    .eq("id", playerId);
+
+  if (error) {
+    console.error("Could not record the animated picture", error);
+    await admin.storage.from("avatars").remove([gifPath, stillPath]);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  /* Old objects go only once the new pair is recorded. */
+  await deleteAvatarObject(player.avatar_url ?? null);
+  await deleteAvatarObject(player.avatar_animated ?? null);
+
+  return { ok: true, path: gifPath, frames };
+}
+
+/**
+ * Writes one avatar object and proves the bytes landed.
+ *
+ * The Blob, the readback and the byte compare are all here rather than
+ * repeated: that trio is the hard-won shape of `setAvatar`'s upload -
+ * a Buffer body once got coerced through UTF-8 in the deployed runtime
+ * and left a correctly-sized object no browser could decode - and an
+ * animation written any other way would reproduce the same bug.
+ */
+async function putAvatarObject(
+  path: string,
+  bytes: Buffer,
+  contentType: string,
+): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+
+  const { error: uploadError } = await admin.storage
+    .from("avatars")
+    .upload(path, new Blob([new Uint8Array(bytes)], { type: contentType }), {
+      contentType,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error(`Could not store ${path}`, uploadError);
+    return false;
+  }
+
+  const { data: readBack, error: verifyError } = await admin.storage
+    .from("avatars")
+    .download(path);
+
+  const landed = readBack ? Buffer.from(await readBack.arrayBuffer()) : null;
+
+  if (verifyError || !landed || !landed.equals(bytes)) {
+    console.error(
+      `Avatar readback mismatch for ${path}: sent ${bytes.length} bytes, ` +
+        `read ${landed?.length ?? "none"} back.`,
+    );
+    await admin.storage.from("avatars").remove([path]);
+    return false;
+  }
+
+  return true;
 }
 
 /**
