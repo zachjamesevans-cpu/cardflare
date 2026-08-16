@@ -127,6 +127,32 @@ describe("worn ring art never lands on the picture", () => {
     expect(rule).toContain("-webkit-mask: radial-gradient(");
   });
 
+  it("the app scales its film by the same 400/296", () => {
+    /* React Native has no CSS mask, so the app keeps the same promise
+       by drawing the film UNDER an opaque face. Different mechanism,
+       identical geometry - and if one side's number moves, this
+       fails. */
+    const avatar = readFileSync(
+      join(process.cwd(), "mobile/src/player-avatar.tsx"),
+      "utf8",
+    );
+    expect(avatar).toContain("const FILM_SCALE = 400 / 296");
+    /* Drawn before the face in JSX, which is what puts it behind. */
+    expect(avatar.indexOf("ringArt && (")).toBeLessThan(
+      avatar.indexOf("{face}\n        {auraArt"),
+    );
+  });
+
+  it("the app never lets uploaded art run code either", () => {
+    const film = readFileSync(
+      join(process.cwd(), "mobile/src/cosmetic-film.tsx"),
+      "utf8",
+    );
+    expect(film).toContain("javaScriptEnabled={false}");
+    expect(film).toContain("originWhitelist={[]}");
+    expect(film).not.toContain("javaScriptEnabled={true}");
+  });
+
   it("is the one rule both the avatar and the editor use", () => {
     for (const file of [
       "src/components/players/player-avatar.tsx",

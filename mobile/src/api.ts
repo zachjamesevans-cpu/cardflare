@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
 import { API_BASE } from "./config";
+import type { ArtFile } from "./cosmetic-film";
 
 /**
  * The whole client for cardflare.gg's `/api/v1`.
@@ -378,6 +379,13 @@ export interface RoomState {
     avatarUrl?: string | null;
     /** The profile border they wear, drawn around their avatar. */
     frame?: string | null;
+    /**
+     * A dropped-in profile border and avatar effect, when they wear
+     * one. The server has sent these since the ring slots existed; the
+     * app only started drawing them once it had a renderer for a file.
+     */
+    ringArt?: ArtFile | null;
+    auraArt?: ArtFile | null;
     /** Lifetime Embers, or null for a guest with no account. */
     embersEarned?: number | null;
     /** The account behind the session, for the profile popup. */
@@ -623,6 +631,17 @@ export interface Profile {
   /** The banner behind the picture, or null for the plain block. */
   coverUrl: string | null;
   equipped: Equipped;
+  /**
+   * The profile border and avatar effect worn from the catalogue, and
+   * the files behind them when they were dropped in rather than drawn
+   * in CSS. The app draws these itself now.
+   */
+  wear?: {
+    ring: string | null;
+    aura: string | null;
+    ringArt: ArtFile | null;
+    auraArt: ArtFile | null;
+  } | null;
   showcase: ShowcaseCard[];
   showcaseLimit: number;
 }
@@ -711,6 +730,9 @@ export interface PeekProfile {
   embersEarned: number;
   /** The ring around their picture. */
   frame: string | null;
+  /** A dropped-in profile border and avatar effect, when worn. */
+  ringArt: ArtFile | null;
+  auraArt: ArtFile | null;
   effect: string | null;
   showcase: {
     id: string;

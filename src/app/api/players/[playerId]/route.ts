@@ -10,6 +10,12 @@ import { publicProfile } from "@/lib/players/profile";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 
+/** Repo-shipped art, made fetchable by a client with no origin. */
+function absoluteArt<T extends { url: string } | null>(art: T): T {
+  if (!art || !art.url.startsWith("/")) return art;
+  return { ...art, url: `${siteUrl()}${art.url}` };
+}
+
 /** The signed-in PLAYER behind a request, from cookie or bearer alike. */
 async function viewerPlayerId(request: Request): Promise<string | null> {
   const viewer = await getViewer();
@@ -86,9 +92,12 @@ export async function GET(
     ring: dressed.ring,
     /* The avatar effect floating around the picture. */
     aura: dressed.aura,
-    /* The dropped-in files behind them, when they are Rive ones. */
-    ringArt: dressedArt.ring,
-    auraArt: dressedArt.aura,
+    /* The dropped-in files behind them. Absolute for the same reason
+       the picture is: art seeded by a migration ships in the repo as
+       "/cosmetics/x.svg", and a phone has no origin to resolve that
+       against. */
+    ringArt: absoluteArt(dressedArt.ring),
+    auraArt: absoluteArt(dressedArt.aura),
     effect: worn.effect,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */

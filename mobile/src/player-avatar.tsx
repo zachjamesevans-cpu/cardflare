@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
+import { CosmeticFilm, type ArtFile } from "./cosmetic-film";
 import { getFoilKit, travellingFrame } from "./foil";
 import { avatarHues, colors } from "./theme";
+
+/**
+ * How much wider than the avatar a worn art file is drawn.
+ *
+ * The website's `.cfx-ring-film`, in a number: art is authored in a 400
+ * box with the picture filling out to radius 148, so a film of
+ * 400/296 of the avatar puts the band's inner edge exactly on the
+ * avatar's edge. Same constant, same result on both platforms.
+ */
+const FILM_SCALE = 400 / 296;
 
 /**
  * A player's avatar in the app: their picture, or their initials.
@@ -60,6 +71,8 @@ export function PlayerAvatar({
   seed,
   avatarUrl = null,
   frame = null,
+  ringArt = null,
+  auraArt = null,
   size = 32,
   dimmed = false,
 }: {
@@ -68,14 +81,23 @@ export function PlayerAvatar({
   seed: string;
   avatarUrl?: string | null;
   frame?: string | null;
+  /**
+   * A dropped-in profile border, when the player wears one. Worn
+   * INSTEAD of the legacy frame, the same rule the website follows:
+   * two rings around one picture is clutter, and the newer choice is
+   * the one they made last.
+   */
+  ringArt?: ArtFile | null;
+  /** An avatar effect, which rides with whatever ring is worn. */
+  auraArt?: ArtFile | null;
   size?: number;
   /** Away players read as away, the same as on the website. */
   dimmed?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
 
-  const ring = frame ? (FRAME_COLOR[frame] ?? null) : null;
-  const kit = frame && travellingFrame(frame) ? getFoilKit() : null;
+  const ring = !ringArt && frame ? (FRAME_COLOR[frame] ?? null) : null;
+  const kit = !ringArt && frame && travellingFrame(frame) ? getFoilKit() : null;
 
   const face = (
     <View
@@ -111,6 +133,49 @@ export function PlayerAvatar({
       )}
     </View>
   );
+
+  /*
+   * A worn art file, drawn UNDER the picture rather than over it.
+   *
+   * The website masks the picture's circle out of the film so a ring
+   * can never sit on somebody's face - "please don't ever do that
+   * again with these". React Native has no CSS mask, so the same
+   * promise is kept by z-order: the face is opaque and drawn last, so
+   * nothing the file paints inside the circle is ever visible. The
+   * aura goes over the top, because floating around the picture is
+   * exactly what an aura is for.
+   */
+  if (ringArt || auraArt) {
+    const film = Math.round(size * FILM_SCALE);
+    const offset = Math.round((film - size) / 2);
+
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: dimmed ? 0.5 : 1,
+        }}
+      >
+        {ringArt && (
+          <View style={{ position: "absolute", top: -offset, left: -offset }}>
+            <CosmeticFilm art={ringArt} size={film} />
+          </View>
+        )}
+        {face}
+        {auraArt && (
+          <View
+            pointerEvents="none"
+            style={{ position: "absolute", top: -offset, left: -offset }}
+          >
+            <CosmeticFilm art={auraArt} size={film} />
+          </View>
+        )}
+      </View>
+    );
+  }
 
   if (!ring) {
     return <View style={{ opacity: dimmed ? 0.5 : 1 }}>{face}</View>;

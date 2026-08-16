@@ -148,6 +148,8 @@ export function PlayerPeekModal({
                   seed={profile.playerId}
                   avatarUrl={profile.avatarUrl}
                   frame={profile.frame}
+                  ringArt={profile.ringArt}
+                  auraArt={profile.auraArt}
                   size={56}
                 />
                 <View
