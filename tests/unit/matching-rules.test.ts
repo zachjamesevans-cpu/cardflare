@@ -262,18 +262,17 @@ describe("inRailOrder", () => {
      somebody has already promised is not something you need to see first. */
   it("sends a card you hold to the end once it is spoken for", () => {
     expect(
-      rail({ id: "a" }, { id: "b", held: true, covered: true }, { id: "c", held: true }),
+      rail(
+        { id: "a" },
+        { id: "b", held: true, covered: true },
+        { id: "c", held: true },
+      ),
     ).toEqual(["c", "a", "b"]);
   });
 
   it("keeps the original order inside each band", () => {
     expect(
-      rail(
-        { id: "a", held: true },
-        { id: "b" },
-        { id: "c", held: true },
-        { id: "d" },
-      ),
+      rail({ id: "a", held: true }, { id: "b" }, { id: "c", held: true }, { id: "d" }),
     ).toEqual(["a", "c", "b", "d"]);
   });
 });

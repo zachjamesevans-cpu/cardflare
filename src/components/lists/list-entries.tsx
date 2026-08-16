@@ -785,8 +785,7 @@ export function FlareBoard({
          */
         const held = (entry: ListEntry) => !isYou && matches.has(entry.id);
 
-        const inTileOrder = (list: ListEntry[]) =>
-          inRailOrder(list, held, isCovered);
+        const inTileOrder = (list: ListEntry[]) => inRailOrder(list, held, isCovered);
 
         const wantEntries = [...folders.flatMap((folder) => folder.entries), ...loose];
 

@@ -1,9 +1,18 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
 import { getFoilKit, travellingFrame } from "./foil";
 import { colors } from "./theme";
+
+/**
+ * How long a foiled card waits for Skia before showing the plain art.
+ *
+ * Long enough that a normal decode never trips it, short enough that a
+ * card which is never going to foil does not sit blank while somebody is
+ * looking straight at it.
+ */
+const FOIL_PATIENCE_MS = 1500;
 
 /**
  * A showcased card, wearing what the player bought.
@@ -91,6 +100,46 @@ export function CosmeticCard({
     (holo === "classic-holo" || holo === "prism-holo" || holo === "galaxy-holo");
   const kit = wantsFoil || travellingFrame(frame) || effect === "orbit" ? getFoilKit() : null;
 
+  /*
+   * A foiled card appears once, finished.
+   *
+   * The art used to be decoded twice: by the React Native `<Image>` and
+   * again by Skia, which draws its own copy under the foil. The plain one
+   * always won, so the card painted matte, looked done, and then gained a
+   * holo a beat later - the founder: "opening a card flashes the holo in
+   * after the image." Two decodes, one card, one visible seam.
+   *
+   * So when Skia is going to draw this card, it draws all of it, and
+   * nothing shows until it can. A blank card is a card still loading,
+   * which is a thing people read every day; a card that finishes and then
+   * changes is a glitch.
+   */
+  const [foilReady, setFoilReady] = useState(false);
+  const [foilGaveUp, setFoilGaveUp] = useState(false);
+
+  /* A new picture is a new race. */
+  useEffect(() => {
+    setFoilReady(false);
+    setFoilGaveUp(false);
+  }, [imageUrl]);
+
+  const foilDrawsArt = wantsFoil && kit !== null && !foilGaveUp;
+
+  /*
+   * Skia's decode can also simply never finish - a URL it cannot fetch on
+   * a network that eats what it did not expect. Waiting forever would
+   * leave a permanently blank card where there used to be a perfectly
+   * good matte one, so the plain image comes back after a moment and
+   * stays: falling back and then flashing anyway would be both bugs.
+   */
+  useEffect(() => {
+    if (!foilDrawsArt || foilReady) return;
+    const timer = setTimeout(() => setFoilGaveUp(true), FOIL_PATIENCE_MS);
+    return () => clearTimeout(timer);
+  }, [foilDrawsArt, foilReady]);
+
+  const onFoilReady = useCallback(() => setFoilReady(true), []);
+
   return (
     <View
       style={{
@@ -103,7 +152,7 @@ export function CosmeticCard({
         borderColor: border ?? colors.border,
       }}
     >
-      {imageUrl ? (
+      {imageUrl && !foilDrawsArt ? (
         <Image
           source={{ uri: imageUrl }}
           style={{ width: "100%", height: "100%" }}
@@ -111,12 +160,13 @@ export function CosmeticCard({
         />
       ) : null}
 
-      {kit !== null && wantsFoil && imageUrl !== null ? (
+      {foilDrawsArt && imageUrl !== null ? (
         <kit.Foil
           imageUrl={imageUrl}
           width={width}
           height={height}
           holo={holo as "classic-holo" | "prism-holo" | "galaxy-holo"}
+          onReady={onFoilReady}
         />
       ) : (
         stops.length > 1 && (

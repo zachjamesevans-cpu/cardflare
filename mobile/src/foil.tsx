@@ -35,6 +35,16 @@ export type FoilProps = {
   width: number;
   height: number;
   holo: "classic-holo" | "prism-holo" | "galaxy-holo";
+  /**
+   * Fired once this layer can actually draw the art.
+   *
+   * Skia decodes the image itself, separately from the React Native
+   * `<Image>` that used to sit underneath, and it always loses that race.
+   * The card therefore looked finished and matte, and then gained its
+   * foil - the founder: "opening a card flashes the holo in after the
+   * image." The card above waits for this instead.
+   */
+  onReady?: () => void;
 };
 
 /* The web palette families, restated for dodge: black stops are the
@@ -213,8 +223,13 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
   /** The 115deg-ish axis every travelling gradient slides along. */
   const axis = (w: number, h: number) => ({ dx: w, dy: h * 0.32 });
 
-  function Foil({ imageUrl, width, height, holo }: FoilProps) {
+  function Foil({ imageUrl, width, height, holo, onReady }: FoilProps) {
     const image = useImage(imageUrl);
+
+    /* Before the early return below, like every other hook here. */
+    useEffect(() => {
+      if (image) onReady?.();
+    }, [image, onReady]);
 
     const w = width;
     const h = height;
@@ -255,8 +270,10 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
 
     const starsOpacity = useDerivedValue(() => 0.55 + 0.45 * breathe.value);
 
-    /* Until the art decodes, show nothing: the plain RN Image sits
-       underneath, so the card is never blank, just briefly matte. */
+    /* Nothing to draw yet. The card above is holding the whole tile
+       back until `onReady`, so this is a blank card rather than a matte
+       one - blank is a card still loading, matte is a card that looks
+       done and then changes. */
     if (!image) return null;
 
     return (
