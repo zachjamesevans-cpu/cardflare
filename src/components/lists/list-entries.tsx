@@ -23,7 +23,7 @@ import {
 } from "@/components/matching/offer-controls";
 import { GroupView } from "@/components/lists/group-view";
 import { QuickPledge } from "@/components/matching/quick-pledge";
-import { pledgeTally } from "@/lib/matching/schema";
+import { inRailOrder, pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerPeek } from "@/components/players/player-peek";
@@ -785,11 +785,8 @@ export function FlareBoard({
          */
         const held = (entry: ListEntry) => !isYou && matches.has(entry.id);
 
-        const inTileOrder = (list: ListEntry[]) => [
-          ...list.filter((entry) => !isCovered(entry) && held(entry)),
-          ...list.filter((entry) => !isCovered(entry) && !held(entry)),
-          ...list.filter(isCovered),
-        ];
+        const inTileOrder = (list: ListEntry[]) =>
+          inRailOrder(list, held, isCovered);
 
         const wantEntries = [...folders.flatMap((folder) => folder.entries), ...loose];
 

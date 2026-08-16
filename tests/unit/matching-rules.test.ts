@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   heldByCard,
   heldCountByCard,
+  inRailOrder,
   matchFor,
   youHaveLabel,
   offerMessageSchema,
@@ -229,5 +230,50 @@ describe("heldCountByCard", () => {
 
   it("has nothing to say about a card the binder does not name", () => {
     expect(heldCountByCard([]).get("a")).toBeUndefined();
+  });
+});
+
+/*
+ * The rail's order, which is two rules that can disagree. The app holds a
+ * copy of this function (mobile/src/rail-order.ts), so the tie-break is
+ * pinned here rather than living in a comment on each side.
+ */
+describe("inRailOrder", () => {
+  const rail = (...items: { id: string; held?: boolean; covered?: boolean }[]) =>
+    inRailOrder(
+      items,
+      (item) => Boolean(item.held),
+      (item) => Boolean(item.covered),
+    ).map((item) => item.id);
+
+  it("puts cards you can answer at the front", () => {
+    expect(rail({ id: "a" }, { id: "b", held: true }, { id: "c" })).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+  });
+
+  it("parks settled hunts at the end", () => {
+    expect(rail({ id: "a", covered: true }, { id: "b" })).toEqual(["b", "a"]);
+  });
+
+  /* The disagreement: settled outranks interesting. A card you hold that
+     somebody has already promised is not something you need to see first. */
+  it("sends a card you hold to the end once it is spoken for", () => {
+    expect(
+      rail({ id: "a" }, { id: "b", held: true, covered: true }, { id: "c", held: true }),
+    ).toEqual(["c", "a", "b"]);
+  });
+
+  it("keeps the original order inside each band", () => {
+    expect(
+      rail(
+        { id: "a", held: true },
+        { id: "b" },
+        { id: "c", held: true },
+        { id: "d" },
+      ),
+    ).toEqual(["a", "c", "b", "d"]);
   });
 });
