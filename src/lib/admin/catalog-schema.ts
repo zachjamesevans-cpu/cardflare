@@ -18,6 +18,21 @@ export const cosmeticStatusSchema = z.object({
 
 export const deleteCosmeticSchema = z.object({ slug });
 
+/*
+ * Renaming is name-only on purpose. The slug is the cosmetic's identity
+ * everywhere else - who owns it, which sets hold it, which slot it is
+ * worn in, which CSS rule draws it - so a rename that moved the slug
+ * would quietly take a bought cosmetic off somebody's profile.
+ */
+export const renameCosmeticSchema = z.object({
+  slug,
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(60, "Sixty characters at most."),
+});
+
 export const packSetSchema = z.object({
   slug,
   name: z.string().trim().min(1, "Give the set a name.").max(60),

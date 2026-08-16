@@ -121,10 +121,9 @@ export function AvatarForm({
             )}
           >
             {ringArt ? (
-              <span
-                className="pointer-events-none absolute inset-[-15.8%]"
-                aria-hidden="true"
-              >
+              /* The same one rule PlayerAvatar uses, so what the editor
+                 previews is what a room draws. */
+              <span className="cfx-ring-film" aria-hidden="true">
                 <CosmeticFilm art={ringArt} />
               </span>
             ) : (

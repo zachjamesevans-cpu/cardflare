@@ -102,3 +102,40 @@ describe("the art-kind rule reaches the database", () => {
     expect(component).not.toContain("unpkg");
   });
 });
+
+/**
+ * The founder, on the lightning ring: "the ring kinda digs into the
+ * profile pic a bit too much. Please don't ever do that again with
+ * these." The promise is kept by geometry, so it is checked as
+ * geometry: one rule, used by everything that wears one.
+ */
+describe("worn ring art never lands on the picture", () => {
+  const css = readFileSync(join(process.cwd(), "src/app/cosmetic-art.css"), "utf8");
+  const rule = css.slice(css.indexOf(".cfx-ring-film"));
+
+  it("sizes the film so radius 148 meets the avatar's edge", () => {
+    /* 400/296: art radius 148 in a 400 box, on an avatar of diameter
+       296 of those units. Anything smaller puts the band on the face. */
+    expect(rule).toContain("inset: -17.568%");
+    expect((400 / 296 - 1) / 2).toBeCloseTo(0.17568, 5);
+  });
+
+  it("punches the picture out of the layer, glow and all", () => {
+    /* A glow has no edge to line up, so clipping is what actually
+       holds the promise. 74% of the film's half-width is radius 148. */
+    expect(rule).toContain("mask: radial-gradient(farthest-side, transparent 73.5%");
+    expect(rule).toContain("-webkit-mask: radial-gradient(");
+  });
+
+  it("is the one rule both the avatar and the editor use", () => {
+    for (const file of [
+      "src/components/players/player-avatar.tsx",
+      "src/components/players/avatar-form.tsx",
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source).toContain('className="cfx-ring-film"');
+      /* No hand-placed inset beside it: two copies drift. */
+      expect(source).not.toContain("inset-[-15.8%]");
+    }
+  });
+});

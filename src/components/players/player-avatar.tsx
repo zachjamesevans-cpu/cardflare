@@ -133,10 +133,10 @@ export function PlayerAvatar({
   const wornRing = (
     <>
       {ringArt ? (
-        <span
-          className="pointer-events-none absolute inset-[-15.8%]"
-          aria-hidden="true"
-        >
+        /* cfx-ring-film sizes and clips it: see cosmetic-art.css. The
+           geometry lives in one rule so the profile editor and every
+           avatar on the site cannot drift apart. */
+        <span className="cfx-ring-film" aria-hidden="true">
           <CosmeticFilm art={ringArt} />
         </span>
       ) : (

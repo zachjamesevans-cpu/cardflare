@@ -270,6 +270,63 @@ export async function deleteCosmetic(slug: string): Promise<DeleteOutcome> {
   return "deleted";
 }
 
+export type RenameOutcome = { ok: true; name: string } | { ok: false; message: string };
+
+/**
+ * Gives a cosmetic a different name, everywhere at once.
+ *
+ * The founder's ask: "give me the option to rename any cosmetic when
+ * I'm in the admin console. This update will change it across all
+ * platforms live - the app, website, etc."
+ *
+ * It does, and without any syncing: every surface reads the name off
+ * this row. The website's shop, Customize and profile all select it,
+ * and the app's /api/v1/customize hands the same column straight to the
+ * phone. Nothing caches a copy, so there is nothing to go stale.
+ *
+ * What does NOT move is the slug. That is the identity the rest of the
+ * database points at - player_cosmetics, pack_series_items,
+ * player_equips, and the `.cfa-<slug>` rule that draws the art - so a
+ * rename that renamed the slug too would take a cosmetic somebody
+ * bought straight off their profile. The name is the label; the slug is
+ * the thing.
+ *
+ * The naming rule applies here the same as at the upload door: this is
+ * a door future names come through, and "no need to have 'edge' after
+ * everything" was given as a standing instruction.
+ */
+export async function renameCosmetic(
+  slug: string,
+  typed: string,
+): Promise<RenameOutcome> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "The database is not configured." };
+  }
+
+  const admin = getSupabaseAdmin();
+
+  const { data: existing } = await admin
+    .from("cosmetics")
+    .select("slug, kind, name")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, message: "That cosmetic is gone." };
+
+  const name = tidyCosmeticName(existing.kind, typed);
+  if (!name) return { ok: false, message: "Give it a name." };
+  if (name === existing.name) return { ok: true, name };
+
+  const { error } = await admin.from("cosmetics").update({ name }).eq("slug", slug);
+
+  if (error) {
+    console.error("Could not rename the cosmetic", error);
+    return { ok: false, message: "Could not rename it. Try again in a moment." };
+  }
+
+  return { ok: true, name };
+}
+
 /** Flips one cosmetic between the catalogue and the shop floor. */
 export async function setCosmeticStatus(
   slug: string,
