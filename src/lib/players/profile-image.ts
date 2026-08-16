@@ -167,6 +167,8 @@ export function avatarObjectPath(playerId: string, at = Date.now()): string {
  */
 export function avatarContentType(path: string): string {
   if (path.endsWith(".gif")) return "image/gif";
+  if (path.endsWith(".svg")) return "image/svg+xml";
+  if (path.endsWith(".html")) return "text/html; charset=utf-8";
   return path.endsWith(".webp") ? "image/webp" : "image/jpeg";
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -47,6 +47,15 @@ export interface ArtFile {
 export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
   const [failed, setFailed] = useState(false);
 
+  /* The one origin this frame is allowed to load from: the art's own. */
+  const origin = useMemo(() => {
+    try {
+      return new URL(art.url).origin;
+    } catch {
+      return null;
+    }
+  }, [art.url]);
+
   /*
    * Rive is carried by the API but never drawn here. Playing one needs
    * a native runtime, and the founder has stopped making them: "I will
@@ -69,9 +78,31 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
         /* The containment. Never turn this on for uploaded art. */
         javaScriptEnabled={false}
         domStorageEnabled={false}
-        /* Nothing in a cosmetic is a link, so nothing may navigate. */
-        originWhitelist={[]}
-        onShouldStartLoadWithRequest={() => false}
+        /*
+         * Transparent, and on iOS that takes BOTH of these. Without
+         * `opaque={false}` a WKWebView paints its own white page
+         * behind the art, which as a worn ring is a white square over
+         * somebody's face.
+         */
+        opaque={false}
+        /*
+         * The art's own origin, and nothing else. An empty list here
+         * does not mean "deny navigation", it means "deny everything
+         * including the page you were asked to show" - the first cut
+         * had that, and it is why no ring appeared in the app at all.
+         */
+        originWhitelist={origin ? [`${origin}/*`] : ["about:blank"]}
+        /*
+         * Called for the FIRST load as well as later ones, so this
+         * has to say yes to the art itself and no to anything a file
+         * tries to navigate to afterwards. Returning a flat false
+         * blocked the art from ever appearing.
+         */
+        onShouldStartLoadWithRequest={(request) =>
+          request.url === art.url ||
+          request.url === "about:blank" ||
+          request.url.startsWith("data:")
+        }
         scrollEnabled={false}
         overScrollMode="never"
         showsHorizontalScrollIndicator={false}

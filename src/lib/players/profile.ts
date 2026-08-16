@@ -762,15 +762,37 @@ export async function setAnimatedAvatar(
     const source = Buffer.from(sent);
 
     /*
-     * `pages` caps the decode itself, so a 900-frame file costs us 60
-     * frames of work rather than 900 and then a refusal. `failOn:
-     * "error"` refuses a truncated file instead of half-decoding it,
-     * the same discipline as the still pipeline.
+     * How many frames there actually ARE, before asking for any.
+     *
+     * This line is the whole bug the founder hit. `pages` was set to
+     * the cap outright, and libvips does not treat that as "at most":
+     * asking a four-frame GIF for sixty throws "bad page number",
+     * which this function reported as "that file could not be read as
+     * a GIF". Every GIF shorter than the cap - which is very nearly
+     * every GIF - was refused for being the wrong length, with a
+     * message blaming the file.
+     */
+    const probe = await sharp(source, {
+      animated: true,
+      failOn: "truncated",
+    }).metadata();
+
+    const pages = Math.min(probe.pages ?? 1, ANIMATED_AVATAR_MAX_FRAMES);
+
+    /*
+     * `failOn: "truncated"` rather than the still pipeline's "error".
+     * A photograph out of a camera roll is clean; a GIF off the
+     * internet has been through a dozen tools and routinely carries
+     * warning-level oddities that libvips notices and no viewer cares
+     * about. A half-downloaded file is still refused - that is what
+     * "truncated" catches - but we re-encode every frame anyway, so
+     * refusing art over a warning would only ever cost the founder a
+     * working GIF.
      */
     animation = await sharp(source, {
       animated: true,
-      pages: ANIMATED_AVATAR_MAX_FRAMES,
-      failOn: "error",
+      pages,
+      failOn: "truncated",
     })
       .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
       .gif()
@@ -778,8 +800,8 @@ export async function setAnimatedAvatar(
 
     frames = (await sharp(animation, { animated: true }).metadata()).pages ?? 1;
 
-    /* The poster: frame one, through the ordinary still pipeline. */
-    still = await sharp(source, { failOn: "error" })
+    /* The poster: frame one, on the same forgiving terms. */
+    still = await sharp(source, { failOn: "truncated" })
       .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "centre" })
       .jpeg({ quality: 82 })
       .toBuffer();

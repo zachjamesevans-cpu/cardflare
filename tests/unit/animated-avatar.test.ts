@@ -142,9 +142,15 @@ describe("where it is stored and how it is served", () => {
     expect(avatarContentType("p/1.webp")).toBe("image/webp");
   });
 
-  it("caps the loop at a couple of seconds rather than refusing it", () => {
-    /* Enforced by decoding only this many pages, so a long GIF is
-       shortened instead of turned away. */
+  it("caps the loop by asking how long it is first", () => {
+    /*
+     * The founder's GIF was refused with "that file could not be read
+     * as a GIF" because `pages` was set to the cap outright, and
+     * libvips throws "bad page number" when a four-frame file is asked
+     * for sixty. Nearly every GIF is shorter than the cap, so nearly
+     * every GIF was refused. The cap has to be a MINIMUM against the
+     * real page count, never a demand.
+     */
     expect(ANIMATED_AVATAR_MAX_FRAMES).toBeGreaterThan(1);
     expect(ANIMATED_AVATAR_MAX_FRAMES).toBeLessThanOrEqual(120);
 
@@ -152,7 +158,58 @@ describe("where it is stored and how it is served", () => {
       join(process.cwd(), "src/lib/players/profile.ts"),
       "utf8",
     );
-    expect(source).toContain("pages: ANIMATED_AVATAR_MAX_FRAMES");
+    expect(source).toContain("Math.min(probe.pages ?? 1, ANIMATED_AVATAR_MAX_FRAMES)");
+    expect(source).not.toContain("pages: ANIMATED_AVATAR_MAX_FRAMES");
+  });
+
+  it("forgives a GIF that has been round a few tools", () => {
+    /* A photograph out of a camera is clean; a GIF off the internet
+       carries warning-level oddities no viewer cares about. Truncated
+       is still refused. */
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/players/profile.ts"),
+      "utf8",
+    );
+    expect(source).toContain('failOn: "truncated"');
+  });
+
+  it("is served from our own origin, never the storage host", () => {
+    /* The same rule the pictures follow, for the same reason: a phone
+       on real-world wifi could not fetch the storage host, and that is
+       why the founder's ring did not appear in the app. */
+    const art = readFileSync(
+      join(process.cwd(), "src/lib/players/art-files.ts"),
+      "utf8",
+    );
+    expect(art).toContain("/api/avatars/");
+    /* The word survives in the comment explaining why it went. */
+    expect(art).not.toMatch(/\.getPublicUrl\(/);
+  });
+
+  it("names the new formats honestly through the proxy", () => {
+    expect(avatarContentType("cosmetics/x.svg")).toBe("image/svg+xml");
+    expect(avatarContentType("cosmetics/x.html")).toBe("text/html; charset=utf-8");
+  });
+
+  it("the app's frame is allowed to load the art it was given", () => {
+    /*
+     * An empty originWhitelist does not mean "deny navigation", it
+     * means "deny everything, including the page you were asked to
+     * show", and a flat false from onShouldStartLoadWithRequest blocks
+     * the first load too. Both were in the first cut, and between them
+     * no ring could ever appear on a phone.
+     */
+    const film = readFileSync(
+      join(process.cwd(), "mobile/src/cosmetic-film.tsx"),
+      "utf8",
+    );
+    expect(film).not.toContain("originWhitelist={[]}");
+    expect(film).not.toContain("onShouldStartLoadWithRequest={() => false}");
+    expect(film).toContain("request.url === art.url");
+    /* And iOS paints a white page behind a WebView without this. */
+    expect(film).toContain("opaque={false}");
+    /* The containment that actually matters is still off. */
+    expect(film).toContain("javaScriptEnabled={false}");
   });
 });
 

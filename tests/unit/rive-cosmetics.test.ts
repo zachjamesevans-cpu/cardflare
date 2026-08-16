@@ -148,9 +148,15 @@ describe("worn ring art never lands on the picture", () => {
       join(process.cwd(), "mobile/src/cosmetic-film.tsx"),
       "utf8",
     );
+    /*
+     * JavaScript off is the containment. The origin whitelist is NOT:
+     * an empty one blocks the art itself, which is what kept any ring
+     * from appearing in the app at all - see the animated-avatar
+     * tests, where that regression is pinned.
+     */
     expect(film).toContain("javaScriptEnabled={false}");
-    expect(film).toContain("originWhitelist={[]}");
     expect(film).not.toContain("javaScriptEnabled={true}");
+    expect(film).toContain("domStorageEnabled={false}");
   });
 
   it("is the one rule both the avatar and the editor use", () => {
