@@ -116,4 +116,26 @@ values
    '44444444-4444-4444-4444-444444444444',
    '88888888-8888-8888-8888-888888888888', 1);
 
+/*
+ * The founder's real database had this and the probe did not: one half of
+ * the split offering on the other half's Flare, and then a trade confirmed
+ * against it. Perfectly legal today — they are two sessions, so nothing
+ * refuses it — and impossible the moment they become one person, because
+ * `trades_not_self` forbids the row and the application has always refused
+ * a self-offer. Both have to survive the fold.
+ */
+insert into public.flare_responses (flare_id, responder_session_id, message)
+values
+  ('aaaaaaaa-0000-0000-0000-000000000003',
+   '44444444-4444-4444-4444-444444444444', 'Other pocket');
+
+insert into public.trades
+  (event_id, flare_id, requester_session_id, holder_session_id, card_id, quantity)
+values
+  ('77777777-7777-7777-7777-777777777777',
+   'aaaaaaaa-0000-0000-0000-000000000003',
+   '33333333-3333-3333-3333-333333333333',
+   '44444444-4444-4444-4444-444444444444',
+   '88888888-8888-8888-8888-888888888888', 1);
+
 commit;

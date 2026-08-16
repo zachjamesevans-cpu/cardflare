@@ -695,6 +695,24 @@ sessions carrying binders, Flares, offers, a membership each and a trade —
 two `trades` columns that do not exist. An empty database had said "ok",
 because plpgsql only parses a statement the first time it runs one.
 
+Two rows exist only because the split existed, and both have to be dealt with
+rather than moved: an **offer on your own Flare**, made from your other
+device, which the application has always refused and which would advertise you
+to yourself once the halves are one person — deleted; and a **trade confirmed
+against that offer**, which `trades_not_self` forbids the moment both columns
+point at the same session. The trade keeps its requester and loses its
+partner. That is a shape the table already has ("a trade with somebody who
+never tapped offer is recorded partnerless") and the honest one here, because
+there was never a second person — while deleting it would shrink a store's
+history, which these rows are not allowed to do.
+
+Neither was caught by review or by the first probe. The pilot database raised
+`23514` on the self-trade, and the scenario now carries both so it cannot come
+back. Every step also tolerates having already run: the migration is one
+transaction, so a failure part way through leaves nothing behind and the fix
+is pasted again — which only works if the second attempt is a no-op where the
+first succeeded. The probe's third pass is that attempt.
+
 A resumed join **says so** on both platforms — `?resumed=1` on the website's
 redirect, `resumed: true` in the app's join response. A join that appears to
 do nothing is exactly what the duplicate looked like from the inside.

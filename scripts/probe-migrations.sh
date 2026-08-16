@@ -83,3 +83,11 @@ done
 $PSQL -d cfscenario -f "$seed" >/dev/null
 $PSQL -d cfscenario -f "$REPO/supabase/migrations/$UNDER_TEST" >/dev/null
 $PSQL -d cfscenario -f "$assert"
+
+echo
+echo "3. $UNDER_TEST a second time, on the database it already changed"
+# A migration that aborts part way through leaves nothing behind — one
+# transaction — so the fix is pasted again. That only works if every step
+# tolerates having already happened, and the only way to know is to try.
+$PSQL -d cfscenario -f "$REPO/supabase/migrations/$UNDER_TEST" >/dev/null
+$PSQL -d cfscenario -f "$assert"

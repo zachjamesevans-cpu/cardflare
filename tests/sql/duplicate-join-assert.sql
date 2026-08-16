@@ -77,6 +77,26 @@ begin
    where holder_session_id = '33333333-3333-3333-3333-333333333333';
   if not found then raise exception 'the trade lost its partner'; end if;
 
+  /*
+   * The trade the player confirmed against their own other device. It stays
+   * in the store's numbers — history is not allowed to shrink — but it is
+   * partnerless, because there was never a second person.
+   */
+  select count(*) into n from public.trades;
+  if n <> 2 then raise exception 'trades has % rows, expected 2', n; end if;
+
+  perform 1 from public.trades
+   where flare_id = 'aaaaaaaa-0000-0000-0000-000000000003'
+     and requester_session_id = '33333333-3333-3333-3333-333333333333'
+     and holder_session_id is null;
+  if not found then raise exception 'the self-trade kept a partner'; end if;
+
+  -- And the offer behind it is gone rather than advertising them to themselves.
+  perform 1 from public.flare_responses r
+    join public.flares f on f.id = r.flare_id
+   where r.responder_session_id = f.player_session_id;
+  if found then raise exception 'a self-offer survived the fold'; end if;
+
   -- And a second identity is now impossible.
   begin
     insert into public.player_sessions (display_name, token_hash, expires_at, player_id)

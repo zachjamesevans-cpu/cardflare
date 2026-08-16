@@ -27,6 +27,11 @@
 --
 -- Guests are untouched throughout. A guest has no `player_id`, so the index
 -- ignores them, and their one token still resolves the way it always did.
+--
+-- Every step is written to survive a second run. The first attempt at the
+-- pilot database aborted part way through the fold — one transaction, so
+-- nothing landed — and a migration that cannot simply be pasted again after
+-- a fix is a migration you are afraid of.
 
 begin;
 
@@ -34,7 +39,7 @@ begin;
 /* 1. A session can answer to more than one token                             */
 /* -------------------------------------------------------------------------- */
 
-create table public.player_session_tokens (
+create table if not exists public.player_session_tokens (
   -- SHA-256 of a session token, lowercase hex. Never the token itself, for
   -- the same reason `player_sessions.token_hash` is a hash: read access to
   -- this table must not let anyone resume a session.
@@ -52,7 +57,7 @@ create table public.player_session_tokens (
 comment on table public.player_session_tokens is
   'Extra tokens that resolve to a player session. One identity, several devices: an account joining from a second client adopts the session it already has rather than creating a second one.';
 
-create index player_session_tokens_session_idx
+create index if not exists player_session_tokens_session_idx
   on public.player_session_tokens (player_session_id);
 
 alter table public.player_session_tokens enable row level security;
@@ -191,6 +196,20 @@ begin
    where responder_session_id = source;
 
   /*
+   * An offer the player made on their own Flare from their other device.
+   * The split is the only way one could exist — the application has always
+   * refused a self-offer — and once the two halves are one person it would
+   * advertise them to themselves. Deleted rather than carried over, and
+   * deliberately after the moves above, so it catches the pairs that only
+   * became self-offers by being merged.
+   */
+  delete from public.flare_responses r
+   using public.flares f
+   where r.flare_id = f.id
+     and r.responder_session_id = target
+     and f.player_session_id = target;
+
+  /*
    * Room membership. The earlier arrival and the later sighting both survive,
    * which keeps `last_seen_at >= joined_at` true by construction rather than
    * by luck — the check constraint on that table is not negotiable.
@@ -214,6 +233,26 @@ begin
   update public.event_participants
      set player_session_id = target
    where player_session_id = source;
+
+  /*
+   * A trade recorded between the two halves of one person.
+   *
+   * Found by the founder's own data, not by review: he had confirmed a
+   * Flare against an offer his other device had made on it, which the
+   * split made possible and `trades_not_self` forbids the moment the two
+   * sessions become one. Re-pointing both columns raised 23514 and took
+   * the whole migration down with it.
+   *
+   * The partner is dropped and the trade stays. That is a shape the table
+   * already has — "a trade with somebody who never tapped offer is
+   * recorded partnerless" — and it is the honest one here, because there
+   * was never a second person. Deleting it instead would shrink a store's
+   * history, which is the one thing these rows are not allowed to do.
+   */
+  update public.trades
+     set holder_session_id = null
+   where requester_session_id in (source, target)
+     and holder_session_id in (source, target);
 
   -- History survives its pointers, so a store's numbers do not shrink.
   update public.trades set requester_session_id = target where requester_session_id = source;
@@ -275,7 +314,7 @@ end
 $$;
 
 -- What the whole migration is for: an account cannot have a second identity.
-create unique index player_sessions_one_per_account_idx
+create unique index if not exists player_sessions_one_per_account_idx
   on public.player_sessions (player_id)
   where player_id is not null;
 
