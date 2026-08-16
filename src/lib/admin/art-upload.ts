@@ -148,7 +148,14 @@ export async function storeMarkupArt(
     const clean = sanitizeHtml(markup);
     if (!clean.ok) return { ok: false, message: HTML_REJECTION_COPY[clean.reason] };
     body = artDocument(clean.html);
-    contentType = "text/html; charset=utf-8";
+    /*
+     * No charset parameter: the bucket's allowed_mime_types is an
+     * exact-match list, so "text/html; charset=utf-8" would be
+     * refused where "text/html" is accepted. The document carries its
+     * own <meta charset> anyway, and the proxy adds the parameter
+     * back when it serves the object.
+     */
+    contentType = "text/html";
   }
 
   const admin = getSupabaseAdmin();

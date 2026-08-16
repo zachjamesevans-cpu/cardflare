@@ -3,7 +3,15 @@ import { useFocusEffect } from "@react-navigation/native";
 import { ScrollView } from "react-native";
 
 import { API_BASE } from "../config";
-import { getMe, type Me } from "../api";
+import {
+  describeError,
+  getMe,
+  getProfile,
+  renameProfile,
+  type Me,
+  type Profile,
+} from "../api";
+import { NameField } from "./profile";
 import { AsyncButton, Body, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
 
@@ -109,14 +117,44 @@ function ConnectionTest() {
 
 export function SettingsScreen() {
   const [me, setMe] = useState<Me | null>(null);
+  /*
+   * Your name lives here rather than on the front of the profile.
+   * The founder: "no need to have the name editor front and center on
+   * a profile. that should be buried somewhere in the profile
+   * settings." Renaming is a once-a-year act; the profile is a place
+   * to look at, not a form.
+   */
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renamed, setRenamed] = useState<string | null>(null);
+
+  async function rename(displayName: string) {
+    setRenaming(true);
+    setRenamed(null);
+    try {
+      await renameProfile(displayName);
+      setProfile((was) => (was ? { ...was, displayName } : was));
+      setRenamed("Name updated.");
+    } catch (caught) {
+      setRenamed(`Could not save that name. ${describeError(caught)}`);
+    } finally {
+      setRenaming(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
       let live = true;
       void (async () => {
         try {
-          const result = await getMe();
-          if (live) setMe(result);
+          const [result, mine] = await Promise.all([
+            getMe(),
+            getProfile().catch(() => null),
+          ]);
+          if (live) {
+            setMe(result);
+            setProfile(mine?.profile ?? null);
+          }
         } catch {
           if (live) setMe(null);
         }
@@ -129,6 +167,15 @@ export function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      {profile && (
+        <Card>
+          <Title>Your name</Title>
+          <Body>What people see when you walk into a room.</Body>
+          <NameField current={profile.displayName} busy={renaming} onSave={rename} />
+          {renamed && <Muted>{renamed}</Muted>}
+        </Card>
+      )}
+
       {me?.collection && (
         <Card>
           <Title>Your collection</Title>

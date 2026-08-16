@@ -8,6 +8,8 @@ import {
 } from "react-native";
 
 import { CosmeticCard } from "./cosmetic-card";
+import { LinearGradient } from "expo-linear-gradient";
+
 import { colors, spacing } from "./theme";
 
 /** What the zoom shows: a showcase entry and the dressing it wears. */
@@ -86,10 +88,21 @@ export function CoverBanner({
   coverUrl,
   height,
   blur = 0,
+  fade = false,
 }: {
   coverUrl: string | null;
   height: number;
   blur?: number;
+  /**
+   * Dissolve into the card instead of stopping at an edge.
+   *
+   * The founder's redesign, with a mockup: the art carries down past
+   * the name and the badge and fades out, rather than ending at a hard
+   * seam across the picture's middle. The web does this with a
+   * gradient over the lower two thirds; this is the same shape in
+   * Skia-free React Native, so the two platforms match.
+   */
+  fade?: boolean;
 }) {
   return (
     <View
@@ -111,6 +124,8 @@ export function CoverBanner({
           source={{ uri: coverUrl }}
           blurRadius={blur}
           style={{ width: "100%", height: "100%" }}
+          /* Top-anchored, so a face or a logo in the upper half of
+             somebody's banner survives the crop. */
           resizeMode="cover"
         />
       ) : null}
@@ -125,6 +140,24 @@ export function CoverBanner({
           backgroundColor: "rgba(0,0,0,0.25)",
         }}
       />
+      {fade ? (
+        /*
+         * Ends on the card's own colour, not on transparent: a fade
+         * that finishes anywhere else stops in a visible band instead
+         * of dissolving.
+         */
+        <LinearGradient
+          colors={["transparent", `${colors.surface}CC`, colors.surface]}
+          locations={[0, 0.55, 1]}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: Math.round(height * 0.66),
+          }}
+        />
+      ) : null}
     </View>
   );
 }

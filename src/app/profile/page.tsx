@@ -7,11 +7,11 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
+import { ProfileCover } from "@/components/players/profile-cover";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerSearch } from "@/components/players/player-search";
 import { listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
-import { DisplayNameForm } from "@/components/players/display-name-form";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
@@ -147,20 +147,7 @@ export default async function ProfilePage() {
               actual edit button... everything can be changed up top."
               One block owns the whole profile now. */}
           <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-0 h-28 overflow-hidden bg-elevated"
-            >
-              {profile.coverUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.coverUrl} alt="" className="size-full object-cover" />
-              )}
-              <div className="absolute inset-0 bg-black/25" />
-            </div>
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
-            />
+            <ProfileCover coverUrl={profile.coverUrl} />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
             {/*
@@ -214,9 +201,12 @@ export default async function ProfilePage() {
               </p>
             </div>
 
-            {/* Name and cover, editable right where they show. */}
+            {/* The cover, editable where it shows. The NAME is not
+                here any more - the founder: "no need to have the name
+                editor front and center on a profile. that should be
+                buried somewhere in the profile settings." Renaming is
+                a once-a-year act; the cover is a decoration. */}
             <div className="relative flex w-full max-w-sm flex-col gap-3 text-left">
-              <DisplayNameForm displayName={profile.displayName} />
               <CoverForm coverUrl={profile.coverUrl} />
             </div>
 
