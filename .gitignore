@@ -47,3 +47,6 @@ next-env.d.ts
 /test-results/
 /blob-report/
 /.playwright/
+
+# Copied from the installed @rive-app/canvas at build time.
+public/rive/

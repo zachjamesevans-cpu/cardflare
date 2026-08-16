@@ -887,6 +887,16 @@ export interface CustomizeItem {
   status: "live" | "draft";
   owned: boolean;
   equipped: boolean;
+  /**
+   * A dropped-in Rive file, when the cosmetic is one of those.
+   *
+   * Carried but not yet drawn: playing it needs the native Rive
+   * runtime, which is its own milestone (a native module lands in the
+   * build, and this app has been crashed by one before - it gets a
+   * round of its own). Equipping works today and the file plays on the
+   * web profile.
+   */
+  rive: { url: string; artboard: string | null; stateMachine: string | null } | null;
 }
 
 export interface CustomizeSection {

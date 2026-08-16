@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { CatalogBrowser } from "@/components/admin/catalog-browser";
+import { RiveDrop } from "@/components/admin/rive-drop";
 import { PackSetBuilder } from "@/components/admin/pack-set-builder";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -24,6 +25,18 @@ const ART_MESSAGES: Record<string, string> = {
   failed: "That did not upload. Try again in a moment.",
 };
 
+/** What each outcome of a Rive drop says when the redirect lands. */
+const RIVE_MESSAGES: Record<string, string> = {
+  added: "Added as a draft. It is in the grid below, ready to judge.",
+  replaced: "File replaced. Everything else about it is unchanged.",
+  missing: "Pick a .riv file first.",
+  "too-big": "That file is over 4 MB. Export it smaller and try again.",
+  name: "That name clashes with one already in the catalogue, or repeats its category.",
+  kind: "Pick a category.",
+  unknown: "That cosmetic could not be found.",
+  failed: "That did not upload. Try again in a moment.",
+};
+
 /**
  * The room where sets get built and the catalogue gets curated.
  *
@@ -38,7 +51,7 @@ const ART_MESSAGES: Record<string, string> = {
 export default async function AdminPacksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ art?: string }>;
+  searchParams: Promise<{ art?: string; rive?: string }>;
 }) {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
@@ -46,7 +59,9 @@ export default async function AdminPacksPage({
 
   const [entries, sets] = await Promise.all([catalogForConsole(), listPackSets()]);
 
-  const artSaid = ART_MESSAGES[(await searchParams).art ?? ""] ?? null;
+  const params = await searchParams;
+  const artSaid = ART_MESSAGES[params.art ?? ""] ?? null;
+  const riveSaid = RIVE_MESSAGES[params.rive ?? ""] ?? null;
 
   const groups = CATALOG_KINDS.map((kind) => ({
     kind,
@@ -89,6 +104,16 @@ export default async function AdminPacksPage({
           </p>
         </Card>
       )}
+
+      {riveSaid && (
+        <Card>
+          <p role="status" className="text-sm text-text-secondary">
+            {riveSaid}
+          </p>
+        </Card>
+      )}
+
+      <RiveDrop />
 
       <PackSetBuilder sets={sets} choices={choices} />
 

@@ -27,6 +27,7 @@ import { pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerPeek } from "@/components/players/player-peek";
+import type { RiveArtRef } from "@/components/players/cosmetic-art";
 import { Badge, Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { RemoveEntry } from "@/components/lists/remove-entry";
@@ -538,6 +539,9 @@ export function FlareBoard({
       ring: string | null;
       /** The avatar effect floating around the picture. */
       aura: string | null;
+      /** The dropped-in files behind those two, when they are Rive ones. */
+      ringRive: RiveArtRef | null;
+      auraRive: RiveArtRef | null;
       /** The account behind the session, for the profile popup. */
       playerId: string | null;
     }
@@ -758,6 +762,8 @@ export function FlareBoard({
                       frame={identities.get(group.playerSessionId)?.frame ?? null}
                       ring={identities.get(group.playerSessionId)?.ring ?? null}
                       aura={identities.get(group.playerSessionId)?.aura ?? null}
+                      ringRive={identities.get(group.playerSessionId)?.ringRive ?? null}
+                      auraRive={identities.get(group.playerSessionId)?.auraRive ?? null}
                       isYou={isYou}
                       imagesEnabled={imagesEnabled}
                       nameClassName="font-semibold"
@@ -773,6 +779,12 @@ export function FlareBoard({
                         frame={identities?.get(group.playerSessionId)?.frame ?? null}
                         ring={identities?.get(group.playerSessionId)?.ring ?? null}
                         aura={identities?.get(group.playerSessionId)?.aura ?? null}
+                        ringRive={
+                          identities?.get(group.playerSessionId)?.ringRive ?? null
+                        }
+                        auraRive={
+                          identities?.get(group.playerSessionId)?.auraRive ?? null
+                        }
                         size="sm"
                       />
                       <span className="truncate font-semibold text-text-primary">

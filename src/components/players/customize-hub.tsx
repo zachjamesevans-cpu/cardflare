@@ -92,6 +92,7 @@ export function CustomizeHub({ sections }: { sections: CustomizeSection[] }) {
                       <CosmeticArt
                         kind={section.kind}
                         slug={item.slug}
+                        rive={item.rive}
                         className="w-full"
                       />
                     </div>

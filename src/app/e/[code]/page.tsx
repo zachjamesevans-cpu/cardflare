@@ -436,6 +436,8 @@ export default async function JoinByCodePage({
           frame: participant.frame,
           ring: participant.ring,
           aura: participant.aura,
+          ringRive: participant.ringRive,
+          auraRive: participant.auraRive,
           playerId: participant.playerId,
         },
       ]),

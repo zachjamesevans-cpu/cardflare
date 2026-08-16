@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
+import { RiveArt } from "@/components/players/rive-art";
+import type { RiveArtRef } from "@/components/players/cosmetic-art";
 import type { EquipKind } from "@/lib/players/equips";
 
 /**
@@ -13,6 +15,9 @@ import type { EquipKind } from "@/lib/players/equips";
  */
 
 export type Worn = Partial<Record<EquipKind, string | null>>;
+
+/** The dropped-in files behind whatever is worn, by category. */
+export type WornRive = Partial<Record<EquipKind, RiveArtRef | null>>;
 
 /*
  * No ring component here: the worn ring is drawn by PlayerAvatar itself
@@ -60,15 +65,24 @@ export function WornNameRow({
 /** A showcase card wearing its border, pattern and animation. */
 export function WornCardShell({
   worn,
+  rive,
   children,
   className,
 }: {
   worn: Worn;
+  rive?: WornRive;
   children: ReactNode;
   className?: string;
 }) {
   const dressed = worn.border || worn.pattern || worn.animation;
   if (!dressed) return <>{children}</>;
+
+  /* A Rive border, pattern or animation plays over the card face. Each
+     is its own layer, so a Rive foil and a CSS border still mix. */
+  const films = (["border", "pattern", "animation"] as const).flatMap((kind) => {
+    const film = rive?.[kind] ?? null;
+    return film ? [{ kind, film }] : [];
+  });
 
   /*
    * The padded, coloured edge exists ONLY when a border is worn. The
@@ -90,12 +104,44 @@ export function WornCardShell({
         className={cn("cfx-card-fx", worn.pattern && `cfa-${worn.pattern}`)}
         aria-hidden="true"
       />
+      {films.map(({ kind, film }) => (
+        <span
+          key={kind}
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+          aria-hidden="true"
+        >
+          <RiveArt
+            url={film.url}
+            artboard={film.artboard}
+            stateMachine={film.stateMachine}
+            fit="cover"
+          />
+        </span>
+      ))}
     </span>
   );
 }
 
 /** Background and scene, over and behind a profile block. */
-export function WornSceneLayer({ worn }: { worn: Worn }) {
+export function WornSceneLayer({ worn, rive }: { worn: Worn; rive?: WornRive }) {
+  const film = rive?.scene ?? null;
+
+  if (film) {
+    return (
+      <span
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+        aria-hidden="true"
+      >
+        <RiveArt
+          url={film.url}
+          artboard={film.artboard}
+          stateMachine={film.stateMachine}
+          fit="cover"
+        />
+      </span>
+    );
+  }
+
   if (!worn.scene) return null;
   return (
     <span
@@ -106,6 +152,30 @@ export function WornSceneLayer({ worn }: { worn: Worn }) {
       aria-hidden="true"
     >
       <span className="cfx-panel-fx" />
+    </span>
+  );
+}
+
+/**
+ * The showcase shelf's backdrop, when the worn background is a Rive
+ * file. CSS backgrounds stay a class on the panel (backgroundClass);
+ * a file needs a layer of its own to play in.
+ */
+export function WornBackdrop({ rive }: { rive?: WornRive }) {
+  const film = rive?.background ?? null;
+  if (!film) return null;
+
+  return (
+    <span
+      className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      aria-hidden="true"
+    >
+      <RiveArt
+        url={film.url}
+        artboard={film.artboard}
+        stateMachine={film.stateMachine}
+        fit="cover"
+      />
     </span>
   );
 }

@@ -6,6 +6,8 @@ import Image from "next/image";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 
 import { FRAME_CLASS, PlayerAvatar } from "@/components/players/player-avatar";
+import { RiveArt } from "@/components/players/rive-art";
+import type { RiveArtRef } from "@/components/players/cosmetic-art";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { clearAvatarAction, setAvatarAction } from "@/lib/players/profile-actions";
@@ -32,6 +34,8 @@ export function AvatarForm({
   frame = null,
   ring = null,
   aura = null,
+  ringRive = null,
+  auraRive = null,
 }: {
   displayName: string;
   seed: string;
@@ -47,6 +51,9 @@ export function AvatarForm({
   ring?: string | null;
   /** The avatar effect floating around the picture, mixable with any ring. */
   aura?: string | null;
+  /** The dropped-in files behind those two, when they are Rive ones. */
+  ringRive?: RiveArtRef | null;
+  auraRive?: RiveArtRef | null;
 }) {
   const [state, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
@@ -113,16 +120,48 @@ export function AvatarForm({
               !ring && frame ? FRAME_CLASS[frame] : "",
             )}
           >
-            {ring && (
-              <span className={cn("cfx-ring-avatar", `cfa-${ring}`)} aria-hidden="true">
-                <span className="cfx-ring-fx" />
-                <span className="cfx-ring-band" />
+            {ringRive ? (
+              <span
+                className="pointer-events-none absolute inset-[-14%]"
+                aria-hidden="true"
+              >
+                <RiveArt
+                  url={ringRive.url}
+                  artboard={ringRive.artboard}
+                  stateMachine={ringRive.stateMachine}
+                />
               </span>
+            ) : (
+              ring && (
+                <span
+                  className={cn("cfx-ring-avatar", `cfa-${ring}`)}
+                  aria-hidden="true"
+                >
+                  <span className="cfx-ring-fx" />
+                  <span className="cfx-ring-band" />
+                </span>
+              )
             )}
-            {aura && (
-              <span className={cn("cfx-aura-avatar", `cfa-${aura}`)} aria-hidden="true">
-                <span className="cfx-aura-fx" />
+            {auraRive ? (
+              <span
+                className="pointer-events-none absolute inset-[-22%]"
+                aria-hidden="true"
+              >
+                <RiveArt
+                  url={auraRive.url}
+                  artboard={auraRive.artboard}
+                  stateMachine={auraRive.stateMachine}
+                />
               </span>
+            ) : (
+              aura && (
+                <span
+                  className={cn("cfx-aura-avatar", `cfa-${aura}`)}
+                  aria-hidden="true"
+                >
+                  <span className="cfx-aura-fx" />
+                </span>
+              )
             )}
             {/*
              * Unoptimised on purpose, and it has to be: the src is either
@@ -154,6 +193,8 @@ export function AvatarForm({
             frame={frame}
             ring={ring}
             aura={aura}
+            ringRive={ringRive}
+            auraRive={auraRive}
             className="size-24 text-2xl"
           />
         )}

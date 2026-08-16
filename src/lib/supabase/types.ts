@@ -752,6 +752,18 @@ export type CosmeticRow = {
   /** A lifetime-earned floor, or null for none. */
   requires_earned: number | null;
   sort_order: number;
+  /**
+   * How this cosmetic is drawn. 'css' is a .cfa- rule in
+   * cosmetic-art.css; 'rive' is the uploaded file at rive_path. The
+   * database refuses rive without a file and css with one.
+   */
+  art_kind: "css" | "rive";
+  /** Storage object path in the avatars bucket, for a Rive cosmetic. */
+  rive_path: string | null;
+  /** Which artboard to play, or null for the file's default. */
+  rive_artboard: string | null;
+  /** Which state machine to run, or null for the file's default. */
+  rive_state_machine: string | null;
 };
 
 /**

@@ -21,11 +21,12 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
-import { getEquips } from "@/lib/players/equips";
+import { getEquips, wornRiveFor } from "@/lib/players/equips";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 import {
   backgroundClass,
+  WornBackdrop,
   WornCardShell,
   WornNameRow,
   WornSceneLayer,
@@ -107,6 +108,9 @@ export default async function ProfilePage() {
     getEquips(playerId),
   ]);
 
+  /* The dropped-in files behind whatever is worn, in one read. */
+  const dressedRive = await wornRiveFor(dressed);
+
   /* The showcase background, when one is worn. */
   const shelfBg = backgroundClass(dressed);
 
@@ -156,7 +160,7 @@ export default async function ProfilePage() {
               aria-hidden="true"
               className="absolute inset-x-0 top-24 bottom-0 rounded-t-2xl border-t border-border-strong bg-surface shadow-[0_-8px_20px_rgba(0,0,0,0.35)]"
             />
-            <WornSceneLayer worn={dressed} />
+            <WornSceneLayer worn={dressed} rive={dressedRive} />
 
             {/*
              * The block's two controls, riding its corner: the wand
@@ -192,6 +196,8 @@ export default async function ProfilePage() {
                 frame={worn.avatarFrame}
                 ring={dressed.ring}
                 aura={dressed.aura}
+                ringRive={dressedRive.ring}
+                auraRive={dressedRive.aura}
               />
             </div>
             <div className="relative flex flex-col items-center gap-2">
@@ -251,10 +257,13 @@ export default async function ProfilePage() {
               ) : (
                 <div
                   className={cn(
-                    shelfBg && "rounded-[var(--radius-control)] p-2",
+                    "relative",
+                    (shelfBg || dressedRive.background) &&
+                      "overflow-hidden rounded-[var(--radius-control)] p-2",
                     shelfBg,
                   )}
                 >
+                  <WornBackdrop rive={dressedRive} />
                   <Rail ariaLabel="Your showcase">
                     {profile.showcase.map((entry) => (
                       <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
@@ -264,7 +273,11 @@ export default async function ProfilePage() {
                          * spec. Everyone else still gets the zoom, on
                          * the public page and in the room popup.
                          */}
-                        <WornCardShell worn={dressed} className="w-full">
+                        <WornCardShell
+                          worn={dressed}
+                          rive={dressedRive}
+                          className="w-full"
+                        >
                           <ShowcaseEditor
                             entryId={entry.id}
                             name={entry.name}
@@ -415,6 +428,8 @@ export default async function ProfilePage() {
                       frame={person.frame}
                       ring={person.ring}
                       aura={person.aura}
+                      ringRive={person.ringRive}
+                      auraRive={person.auraRive}
                       size="sm"
                     />
                     <Link
