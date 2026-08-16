@@ -774,10 +774,7 @@ export function FlareBoard({
                  * username lost - the founder: "can't even see a full
                  * username anymore". Stacked, the name gets the width.
                  */
-                <span
-                  id={headingId}
-                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-                >
+                <span id={headingId} className="flex min-w-0 flex-1 items-center gap-3">
                   {/*
                    * An account opens the profile popup right here on the
                    * board — the founder's ask: finding somebody's name
@@ -800,7 +797,11 @@ export function FlareBoard({
                       auraArt={identities.get(group.playerSessionId)?.auraArt ?? null}
                       isYou={isYou}
                       imagesEnabled={imagesEnabled}
-                      nameClassName="font-semibold"
+                      nameClassName="text-lg font-semibold"
+                      size="lg"
+                      className="min-w-0 flex-1"
+                      /* Under the NAME, in the column beside the picture. */
+                      below={alsoOpen ? <OpenToTradesTag /> : null}
                     />
                   ) : (
                     <>
@@ -820,35 +821,42 @@ export function FlareBoard({
                           identities?.get(group.playerSessionId)?.auraArt ?? null
                         }
                         /*
-                         * md, not sm. The founder wanted the picture to
-                         * "make a bigger statement" on a board header,
-                         * and a worn ring is most of why somebody
-                         * bought one - at 32px it was a detail.
+                         * lg, and the third size this component has had
+                         * on this one row. The founder's mockup settles
+                         * it: the picture anchors the header, and a
+                         * worn ring is most of why anybody bought one.
                          */
-                        size="md"
+                        size="lg"
                       />
-                      <span className="truncate font-semibold text-text-primary">
-                        {group.displayName ?? "A player"}
-                        {isYou && (
-                          <span className="font-normal text-text-muted"> · you</span>
-                        )}
+                      {/* The same column a peekable player gets, by hand,
+                          because a guest has no profile to open. */}
+                      <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                        <span className="max-w-full truncate text-lg font-semibold text-text-primary">
+                          {group.displayName ?? "A player"}
+                          {isYou && (
+                            <span className="text-base font-normal text-text-muted">
+                              {" "}
+                              · you
+                            </span>
+                          )}
+                        </span>
+                        {alsoOpen && <OpenToTradesTag />}
                       </span>
                     </>
                   )}
                   {/*
-                   * On the name, not in the list. It is a fact about the
-                   * person, and as a row it cost this player's whole
-                   * section to say one short sentence.
+                   * "Open to trades" is on the name, not in the list. It
+                   * is a fact about the person, and as a row it cost this
+                   * player's whole section to say one short sentence.
+                   *
+                   * It sits UNDER the name and left-aligned with it,
+                   * which took three reports to get right: it is passed
+                   * into the identity block rather than placed after it,
+                   * because anything placed after the block wraps beneath
+                   * the PICTURE and reads as a caption on the avatar.
                    */}
                   {/* No Ember badge on board headers - in the room,
                       Embers live inside the popup and profile only. */}
-                  {/* basis-full: the tag takes its own line rather
-                      than competing with the name for one. */}
-                  {alsoOpen && (
-                    <span className="basis-full">
-                      <OpenToTradesTag />
-                    </span>
-                  )}
                 </span>
               }
               meta={
