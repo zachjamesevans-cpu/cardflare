@@ -61,8 +61,8 @@ export interface CatalogEntry {
   owners: number;
   /** Which sets it has been put in, by name. */
   inSets: string[];
-  /** css: a rule in cosmetic-art.css. rive or svg: a dropped-in file. */
-  artKind: "css" | "rive" | "svg";
+  /** css: a rule in cosmetic-art.css. Anything else: a dropped-in file. */
+  artKind: "css" | "rive" | "svg" | "html";
   /** The file to draw, when this one was dropped in. */
   art: CosmeticArtFile | null;
 }
@@ -204,6 +204,7 @@ export async function createCosmetic(input: {
     art_kind: "css",
     rive_path: null,
     svg_path: null,
+    html_path: null,
     rive_artboard: input.artboard || null,
     rive_state_machine: input.stateMachine || null,
   });

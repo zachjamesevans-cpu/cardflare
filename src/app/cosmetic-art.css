@@ -505,6 +505,40 @@
   mask: radial-gradient(farthest-side, transparent 52%, #000 70%);
 }
 
+/*
+ * The console's art preview: a stand-in face, and a checkerboard.
+ *
+ * The founder asked for "a preview built in to that screen of what it
+ * would look like running", and the two things he has actually been
+ * caught out by are art that covers the picture and art that ships
+ * with the Figma page background still attached. So the preview shows
+ * it worn over a face, and again over squares - where an opaque
+ * background is impossible to miss and a transparent one obvious.
+ */
+.cfx-preview-face {
+  position: relative;
+  display: inline-flex;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 50% 34%, #4b5666 0 22%, transparent 23%),
+    radial-gradient(ellipse 34% 26% at 50% 86%, #4b5666 0 100%, transparent 0),
+    linear-gradient(160deg, #aab4c2, #7d8898);
+}
+.cfx-preview-checker {
+  position: relative;
+  display: inline-flex;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background-color: #20262f;
+  background-image:
+    linear-gradient(45deg, #39414d 25%, transparent 25%, transparent 75%, #39414d 75%),
+    linear-gradient(45deg, #39414d 25%, transparent 25%, transparent 75%, #39414d 75%);
+  background-position:
+    0 0,
+    8px 8px;
+  background-size: 16px 16px;
+}
+
 /* A card preview: the fancy edge is the padding, the face sits on it. */
 .cfx-card {
   position: relative;

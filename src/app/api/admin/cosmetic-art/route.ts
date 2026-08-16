@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
 import { CATALOG_KINDS, createCosmetic, type CatalogKind } from "@/lib/admin/catalog";
-import { storeRiveArt, storeSvgArt } from "@/lib/admin/art-upload";
+import { storeMarkupArt, storeRiveArt } from "@/lib/admin/art-upload";
 import { RIVE_MAX_BYTES } from "@/lib/admin/rive-file";
 import { SVG_MAX_BYTES } from "@/lib/admin/svg-file";
 
@@ -41,13 +41,16 @@ export async function POST(request: Request): Promise<Response> {
   const form = await request.formData();
 
   /*
-   * Two shapes arrive here. A .riv comes as a file. A drawing comes as
-   * markup - either an .svg the founder picked, or a Figma .tsx the
-   * console converted in his browser, which is the only place uploaded
-   * component code is ever run.
+   * Three shapes arrive here. A .riv comes as a file. Markup comes as
+   * text with a word for which kind it is: `svg` for a drawing, `html`
+   * for a Figma export that animates with divs and keyframes rather
+   * than shapes. Either way the conversion happened in the founder's
+   * browser, which is the only place uploaded component code is ever
+   * run.
    */
   const file = form.get("rive");
-  const markup = String(form.get("svg") ?? "");
+  const markup = String(form.get("markup") ?? form.get("svg") ?? "");
+  const markupKind = form.get("markupKind") === "html" ? "html" : "svg";
 
   const isRive = file instanceof File && file.size > 0;
   if (!isRive && !markup.trim()) back("missing");
@@ -64,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
           artboard: String(form.get("artboard") ?? "").trim() || null,
           stateMachine: String(form.get("stateMachine") ?? "").trim() || null,
         })
-      : storeSvgArt(target, markup);
+      : storeMarkupArt(target, markupKind, markup);
 
   if (slug) {
     if (!/^[a-z0-9-]{2,40}$/.test(slug)) back("unknown");
