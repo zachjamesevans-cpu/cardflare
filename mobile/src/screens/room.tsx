@@ -667,6 +667,10 @@ function RoomScreen({
              lone hunt "Looking for" is furniture. */
           const labelled = showcases.length > 0;
 
+          /* One answer for the whole rail, so tiles beside each other
+             still agree on where their buttons sit. */
+          const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
+
           const tile = (flare: RoomFlare) => {
             const own = flare.offers.find((o) => o.responderSessionId === youId);
 
@@ -675,6 +679,7 @@ function RoomScreen({
                 key={flare.id}
                 flare={flare}
                 mine={mine}
+                reserveCaption={railHasDecks}
                 offered={Boolean(own)}
                 ownQuantity={own?.quantity ?? 1}
                 early={room.early}
@@ -1198,6 +1203,7 @@ function CarouselFlare({
   offered,
   ownQuantity,
   early,
+  reserveCaption,
   onOffer,
   onWithdraw,
   onRemove,
@@ -1209,6 +1215,16 @@ function CarouselFlare({
   /** How many the standing pledge promised, the stepper's start. */
   ownQuantity: number;
   early: boolean;
+  /**
+   * Hold a line open under the name for a deck label.
+   *
+   * Decided for the whole rail, not per card - the website's rule, and
+   * the same reason: the line exists so the action row sits at one
+   * height across tiles standing side by side, and when nobody in a rail
+   * has named a deck there is no drift to prevent, only an empty row
+   * between the names and the buttons.
+   */
+  reserveCaption: boolean;
   onOffer: (quantity?: number) => Promise<void>;
   onWithdraw: () => Promise<void>;
   onRemove: () => Promise<void>;
@@ -1438,11 +1454,15 @@ function CarouselFlare({
           {flare.cardName}
         </Text>
 
-        {/* The caption slot: exactly one line tall whether or not there
-            is a deck to name, so the action row below never drifts. */}
-        <Text numberOfLines={1} style={styles.tileCaption}>
-          {flare.deckLabel ?? " "}
-        </Text>
+        {/* The caption slot: one line tall whether or not THIS card has a
+            deck to name, so the action row never drifts across a rail.
+            Reserved per rail, so a board where nobody named a deck - very
+            nearly every board - has no empty row in it. */}
+        {reserveCaption && (
+          <Text numberOfLines={1} style={styles.tileCaption}>
+            {flare.deckLabel ?? " "}
+          </Text>
+        )}
 
         {/* The action row: reserved on every tile. Pledging is open to
             anyone — no binder required, the founder's call — and a
