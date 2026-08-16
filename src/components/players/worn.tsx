@@ -26,6 +26,30 @@ export type WornArt = Partial<Record<EquipKind, CosmeticArtFileRef | null>>;
  * already renders PlayerAvatar.
  */
 
+/**
+ * What a title chip says.
+ *
+ * The seeded titles have wording of their own - "Your line here" is
+ * not what `title-custom-tagline` would spell out - so the map wins
+ * where it has an answer. Everything else reads its own slug, which is
+ * built from the cosmetic's name in the first place.
+ *
+ * The fallback used to be the literal word "Title", which meant every
+ * title dropped in through the console announced itself as "Title".
+ * The founder hit exactly that with Founder.
+ */
+export function titleWords(slug: string): string {
+  const known = TITLE_WORDS[slug];
+  if (known) return known;
+
+  return slug
+    .replace(/^title-/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 /** The name row: nameplate style, badge beside, title under. */
 export function WornNameRow({
   name,
@@ -55,7 +79,7 @@ export function WornNameRow({
       </span>
       {worn.title && (
         <span className={cn("cfx-title-chip", `cfa-${worn.title}`)}>
-          {TITLE_WORDS[worn.title] ?? "Title"}
+          {titleWords(worn.title)}
         </span>
       )}
     </span>

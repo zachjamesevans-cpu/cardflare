@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { redundantCosmeticWord, tidyCosmeticName } from "@/lib/players/cosmetic-names";
+import { titleWords } from "@/components/players/worn";
 
 /**
  * The founder's naming rule, enforced rather than remembered.
@@ -107,5 +108,20 @@ describe("the cosmetic naming rule", () => {
 
   it("reads a sensible number of cosmetics, so the scan cannot pass by finding none", () => {
     expect(seededCosmetics().length).toBeGreaterThan(200);
+  });
+});
+
+describe("what a title chip says", () => {
+  it("uses the seeded wording where there is some", () => {
+    /* "Your line here" is not what the slug would spell out. */
+    expect(titleWords("title-custom-tagline")).toBe("Your line here");
+  });
+
+  it("reads its own slug otherwise, rather than saying 'Title'", () => {
+    /* The founder equipped Founder and the chip said "Title", because
+       the fallback was that literal word. Every title dropped in
+       through the console would have hit it. */
+    expect(titleWords("title-founder")).toBe("Founder");
+    expect(titleWords("title-grand-line")).toBe("Grand Line");
   });
 });
