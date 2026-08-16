@@ -127,7 +127,6 @@ export function EventLobby({
                         >
                           {participant.displayName}
                         </span>
-                        {isYou && <span className="text-text-muted"> · you</span>}
                       </span>
                     </>
                   )}
