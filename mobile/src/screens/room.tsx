@@ -747,6 +747,8 @@ function RoomScreen({
                           seed={sessionId}
                           avatarUrl={person?.avatarUrl ?? null}
                           frame={person?.frame ?? null}
+                          ringArt={person?.ringArt ?? null}
+                          auraArt={person?.auraArt ?? null}
                           size={26}
                         />
                         <Title>
@@ -985,6 +987,8 @@ function RoomScreen({
                         seed={p.playerSessionId}
                         avatarUrl={p.avatarUrl ?? null}
                         frame={p.frame ?? null}
+                        ringArt={p.ringArt ?? null}
+                        auraArt={p.auraArt ?? null}
                         dimmed={!p.present}
                       />
                       <Text

@@ -45,13 +45,31 @@ type Params = { params: Promise<{ code: string }> };
  * has no origin to resolve them against. Absolutised here, at the one
  * seam where the audience stops being a browser.
  */
-function absoluteAvatars<T extends { avatarUrl: string | null }>(rows: T[]): T[] {
+type WithArt = {
+  avatarUrl: string | null;
+  ringArt?: { url: string } | null;
+  auraArt?: { url: string } | null;
+};
+
+function absoluteAvatars<T extends WithArt>(rows: T[]): T[] {
   const base = siteUrl();
-  return rows.map((row) =>
-    row.avatarUrl?.startsWith("/")
-      ? { ...row, avatarUrl: `${base}${row.avatarUrl}` }
-      : row,
-  );
+
+  /* Cosmetic art seeded by a migration ships in the repo and is stored
+     as "/cosmetics/x.svg", so it needs the same treatment the pictures
+     do before a phone can fetch it. */
+  const art = <A extends { url: string } | null | undefined>(file: A): A =>
+    file && file.url.startsWith("/")
+      ? ({ ...file, url: `${base}${file.url}` } as A)
+      : file;
+
+  return rows.map((row) => ({
+    ...row,
+    avatarUrl: row.avatarUrl?.startsWith("/")
+      ? `${base}${row.avatarUrl}`
+      : row.avatarUrl,
+    ...(row.ringArt !== undefined ? { ringArt: art(row.ringArt) } : {}),
+    ...(row.auraArt !== undefined ? { auraArt: art(row.auraArt) } : {}),
+  }));
 }
 
 function normalized(raw: string): string | null {

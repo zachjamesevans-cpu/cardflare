@@ -13,8 +13,13 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /** Everything a surface needs to draw one cosmetic's file. */
 export interface CosmeticArtFile {
-  /** rive plays in a canvas; svg is a drawing, animations and all. */
-  kind: "rive" | "svg";
+  /**
+   * How it draws. `svg` is a drawing, animations and all, shown in an
+   * `<img>`. `html` is markup and CSS, shown in a frame with scripting
+   * switched off. `rive` plays in a canvas; nothing new arrives as
+   * Rive any more, but the ones already in the catalogue still play.
+   */
+  kind: "rive" | "svg" | "html";
   url: string;
   /** Rive only: which artboard, or null for the file's default. */
   artboard: string | null;
@@ -39,9 +44,10 @@ export function artFileSrc(path: string | null): string | null {
 
 /** The art file behind a row, or null when the row draws itself in CSS. */
 export function artFileOf(row: {
-  art_kind?: "css" | "rive" | "svg";
+  art_kind?: "css" | "rive" | "svg" | "html";
   rive_path?: string | null;
   svg_path?: string | null;
+  html_path?: string | null;
   rive_artboard?: string | null;
   rive_state_machine?: string | null;
 }): CosmeticArtFile | null {
@@ -62,6 +68,11 @@ export function artFileOf(row: {
     return url ? { kind: "svg", url, artboard: null, stateMachine: null } : null;
   }
 
+  if (row.art_kind === "html") {
+    const url = artFileSrc(row.html_path ?? null);
+    return url ? { kind: "html", url, artboard: null, stateMachine: null } : null;
+  }
+
   return null;
 }
 
@@ -79,8 +90,10 @@ export async function artFilesFor(
 
   const { data, error } = await getSupabaseAdmin()
     .from("cosmetics")
-    .select("slug, art_kind, rive_path, svg_path, rive_artboard, rive_state_machine")
-    .in("art_kind", ["rive", "svg"])
+    .select(
+      "slug, art_kind, rive_path, svg_path, html_path, rive_artboard, rive_state_machine",
+    )
+    .in("art_kind", ["rive", "svg", "html"])
     .in("slug", wanted);
 
   if (error) {

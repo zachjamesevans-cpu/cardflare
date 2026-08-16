@@ -2,15 +2,20 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { checkRiveFile, RIVE_REJECTION_COPY } from "./rive-file";
+import { artDocument, HTML_REJECTION_COPY, sanitizeHtml } from "./html-file";
 import { sanitizeSvg, SVG_REJECTION_COPY } from "./svg-file";
 
 /**
  * Cosmetic art in storage: dropped in from the console, served to every
  * surface that draws a cosmetic.
  *
- * Two file types through one door. A .riv is stored as it arrived; an
- * SVG - typed in as a drawing, or converted from a Figma .tsx in the
- * founder's browser - is scrubbed first and stored as text.
+ * Three shapes through one door. A .riv is stored as it arrived. A
+ * drawing - typed in as an .svg, or converted from a Figma .tsx in the
+ * founder's browser - is scrubbed and stored as text. HTML art, which
+ * is what a Figma export turns out to be whenever it animates with
+ * divs and keyframes rather than shapes, is scrubbed and stored as a
+ * whole small document, policy header and all, so the frame that draws
+ * it needs to know nothing.
  *
  * The upload follows the pack-art path exactly, because that one is
  * proven on the founder's network: write, read back, compare, and only
@@ -20,9 +25,16 @@ import { sanitizeSvg, SVG_REJECTION_COPY } from "./svg-file";
 
 /** Where a cosmetic's file lives. Timestamped, so a replacement never
     fights a cached copy of the old one. */
-function objectPath(slug: string, extension: "riv" | "svg"): string {
+function objectPath(slug: string, extension: "riv" | "svg" | "html"): string {
   return `cosmetics/${slug}-${Date.now()}.${extension}`;
 }
+
+/** Every art column, so setting one always clears the other three. */
+const NO_ART = {
+  rive_path: null,
+  svg_path: null,
+  html_path: null,
+} as const;
 
 export type ArtStoreResult =
   { ok: true; path: string } | { ok: false; message: string };
@@ -74,20 +86,14 @@ export async function storeRiveArt(
     return { ok: false, message: "The upload did not land intact. Try again." };
   }
 
-  const { data: before } = await admin
-    .from("cosmetics")
-    .select("rive_path, svg_path")
-    .eq("slug", slug)
-    .maybeSingle();
+  const before = await currentArt(slug);
 
   const { error: saveError } = await admin
     .from("cosmetics")
     .update({
+      ...NO_ART,
       art_kind: "rive",
       rive_path: path,
-      /* One art source at a time: the check constraint says so, and a
-         cosmetic that used to be a drawing is now an animation. */
-      svg_path: null,
       ...(meta?.artboard !== undefined ? { rive_artboard: meta.artboard || null } : {}),
       ...(meta?.stateMachine !== undefined
         ? { rive_state_machine: meta.stateMachine || null }
@@ -102,87 +108,117 @@ export async function storeRiveArt(
   }
 
   /* The old object goes only once the new one is proven and recorded. */
-  await removeStoredArt(before?.rive_path ?? null, path);
-  await removeStoredArt(before?.svg_path ?? null, path);
+  await forgetOldArt(before, path);
 
   return { ok: true, path };
 }
 
 /**
- * Stores a drawing for a cosmetic that already exists.
+ * Stores markup art - a drawing or an HTML animation - for a cosmetic
+ * that already exists.
  *
- * The SVG is scrubbed before it is written, not after: what lands in
- * storage is what players are served, and the scrubber is the only
- * thing standing between an uploaded document and somebody else's
- * profile. (The renderer draws it in an `<img>` as well, which is the
- * second lock on the same door.)
+ * Scrubbed before it is written, not after: what lands in storage is
+ * what players are served. The renderer is the second lock on the same
+ * door either way, an `<img>` for a drawing and a script-free sandbox
+ * for HTML, so a hole in the scrubber is still not a hole in the page.
+ *
+ * HTML is wrapped in its document here rather than at render time, so
+ * the policy header travels WITH the art. The website and the app both
+ * just point a frame at the URL, and neither can accidentally serve it
+ * without its policy.
  */
-export async function storeSvgArt(
+export async function storeMarkupArt(
   slug: string,
+  kind: "svg" | "html",
   markup: string,
 ): Promise<ArtStoreResult> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "Storage is not configured." };
   }
 
-  const clean = sanitizeSvg(markup);
-  if (!clean.ok) return { ok: false, message: SVG_REJECTION_COPY[clean.reason] };
+  let body: string;
+  let contentType: string;
+
+  if (kind === "svg") {
+    const clean = sanitizeSvg(markup);
+    if (!clean.ok) return { ok: false, message: SVG_REJECTION_COPY[clean.reason] };
+    body = clean.svg;
+    contentType = "image/svg+xml";
+  } else {
+    const clean = sanitizeHtml(markup);
+    if (!clean.ok) return { ok: false, message: HTML_REJECTION_COPY[clean.reason] };
+    body = artDocument(clean.html);
+    contentType = "text/html; charset=utf-8";
+  }
 
   const admin = getSupabaseAdmin();
-  const path = objectPath(slug, "svg");
-  const bytes = new TextEncoder().encode(clean.svg);
+  const path = objectPath(slug, kind);
+  const bytes = new TextEncoder().encode(body);
 
   const { error: uploadError } = await admin.storage
     .from("avatars")
-    .upload(path, new Blob([bytes], { type: "image/svg+xml" }), {
-      contentType: "image/svg+xml",
+    .upload(path, new Blob([bytes], { type: contentType }), {
+      contentType,
       upsert: true,
     });
 
   if (uploadError) {
-    console.error("Could not store the drawing", uploadError);
+    console.error("Could not store the art", uploadError);
     return { ok: false, message: "That did not upload. Try again in a moment." };
   }
 
   const { data: readBack } = await admin.storage.from("avatars").download(path);
   const landed = readBack ? await readBack.text() : null;
 
-  if (landed !== clean.svg) {
+  if (landed !== body) {
     await admin.storage.from("avatars").remove([path]);
     return { ok: false, message: "The upload did not land intact. Try again." };
   }
 
-  const { data: before } = await admin
-    .from("cosmetics")
-    .select("rive_path, svg_path")
-    .eq("slug", slug)
-    .maybeSingle();
+  const before = await currentArt(slug);
 
   const { error: saveError } = await admin
     .from("cosmetics")
-    .update({ art_kind: "svg", svg_path: path, rive_path: null })
+    .update({
+      ...NO_ART,
+      art_kind: kind,
+      ...(kind === "svg" ? { svg_path: path } : { html_path: path }),
+    })
     .eq("slug", slug);
 
   if (saveError) {
-    console.error("Could not record the drawing", saveError);
+    console.error("Could not record the art", saveError);
     await admin.storage.from("avatars").remove([path]);
     return { ok: false, message: "Could not record the file against the cosmetic." };
   }
 
-  await removeStoredArt(before?.svg_path ?? null, path);
-  await removeStoredArt(before?.rive_path ?? null, path);
+  await forgetOldArt(before, path);
 
   return { ok: true, path };
 }
 
+/** Whatever the row pointed at before this upload, so it can be tidied. */
+async function currentArt(slug: string): Promise<(string | null)[]> {
+  const { data } = await getSupabaseAdmin()
+    .from("cosmetics")
+    .select("rive_path, svg_path, html_path")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  return [data?.rive_path ?? null, data?.svg_path ?? null, data?.html_path ?? null];
+}
+
 /**
- * Deletes a replaced object, never the one just written, and never a
+ * Deletes replaced objects, never the one just written, and never a
  * file that ships in the repo (those start with a slash and belong to
  * the deployment, not to storage).
  */
-async function removeStoredArt(path: string | null, keep: string): Promise<void> {
-  if (!path || path === keep || path.startsWith("/")) return;
-  await getSupabaseAdmin().storage.from("avatars").remove([path]);
+async function forgetOldArt(paths: (string | null)[], keep: string): Promise<void> {
+  const stale = paths.filter(
+    (path): path is string => Boolean(path) && path !== keep && !path!.startsWith("/"),
+  );
+  if (stale.length === 0) return;
+  await getSupabaseAdmin().storage.from("avatars").remove(stale);
 }
 
 /* Reading art files lives in lib/players/art-files.ts: every surface

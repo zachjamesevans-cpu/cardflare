@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { sanitizeSvg } from "../src/lib/admin/svg-file";
-import { tsxToSvg } from "../src/lib/admin/tsx-to-svg";
+import { tsxToArt } from "../src/lib/admin/tsx-to-art";
 
 /**
  * Turns the cosmetic art sources in src/cosmetics into the SVG files
@@ -23,10 +23,16 @@ const SOURCES = join(process.cwd(), "src/cosmetics");
 const OUT = join(process.cwd(), "public/cosmetics");
 
 export function buildCosmeticSvg(source: string): string {
-  const result = tsxToSvg(source, renderToStaticMarkup);
+  const result = tsxToArt(source, renderToStaticMarkup);
   if (!result.ok) throw new Error(`Could not convert the art: ${result.reason}`);
+  if (result.kind !== "svg") {
+    /* Art that ships in the repo is seeded by a migration, and a
+       migration can only carry text that the site serves as a file.
+       HTML art is welcome through the console, not through here. */
+    throw new Error("Art in src/cosmetics has to draw a single <svg>.");
+  }
 
-  const clean = sanitizeSvg(result.svg);
+  const clean = sanitizeSvg(result.markup);
   if (!clean.ok) throw new Error(`The art did not survive sanitising: ${clean.reason}`);
 
   return clean.svg;

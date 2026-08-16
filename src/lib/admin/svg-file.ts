@@ -30,7 +30,7 @@ export const SVG_REJECTION_COPY: Record<SvgRejection, string> = {
 };
 
 /** Attributes that run code. Matched case-insensitively, with or without a value. */
-const EVENT_ATTRIBUTE = /\son[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+export const EVENT_ATTRIBUTE = /\son[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 /** Elements that either script or reach outside the drawing. */
 const BANNED_ELEMENTS = [
@@ -67,7 +67,7 @@ export type SvgResult = { ok: true; svg: string } | { ok: false; reason: SvgReje
  */
 export function sanitizeSvg(markup: string): SvgResult {
   if (!markup.trim()) return { ok: false, reason: "empty" };
-  if (Buffer.byteLength(markup, "utf8") > SVG_MAX_BYTES) {
+  if (new TextEncoder().encode(markup).length > SVG_MAX_BYTES) {
     return { ok: false, reason: "too-big" };
   }
 

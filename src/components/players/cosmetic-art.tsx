@@ -3,8 +3,12 @@ import { CosmeticFilm } from "@/components/players/cosmetic-film";
 
 /** The uploaded file behind a cosmetic, when it has one. */
 export interface CosmeticArtFileRef {
-  /** rive plays in a canvas; svg is a drawing that animates itself. */
-  kind: "rive" | "svg";
+  /**
+   * svg is a drawing that animates itself, shown in an `<img>`; html
+   * is markup and CSS, shown in a frame with scripting switched off;
+   * rive plays in a canvas.
+   */
+  kind: "rive" | "svg" | "html";
   url: string;
   artboard: string | null;
   stateMachine: string | null;

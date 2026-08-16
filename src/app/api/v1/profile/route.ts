@@ -15,10 +15,24 @@ import {
   setDisplayName,
 } from "@/lib/players/profile";
 import { buyCosmetic } from "@/lib/players/cosmetics";
+import { avatarWearFor } from "@/lib/players/equips";
+import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { displayNameSchema } from "@/lib/players/profile-schema";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Art the phone can actually fetch.
+ *
+ * Seeded art ships in the repo and is stored as "/cosmetics/x.svg",
+ * which resolves for a browser sitting on the site and to nothing at
+ * all for a native client. The same rule the avatars follow.
+ */
+function absoluteArt(art: CosmeticArtFile | null): CosmeticArtFile | null {
+  if (!art) return null;
+  return art.url.startsWith("/") ? { ...art, url: `${siteUrl()}${art.url}` } : art;
+}
 
 /**
  * The app's Profile tab, in one request each way.
@@ -49,14 +63,17 @@ export async function GET(request: Request): Promise<Response> {
   const profile = await ownProfile(player.playerId);
   if (!profile) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const [wardrobe, worn] = await Promise.all([
+  const [wardrobe, worn, wearing] = await Promise.all([
     wardrobeFor(
       player.playerId,
       { earned: profile.embersEarned, balance: profile.embersBalance },
       profile.equipped,
     ),
     resolveEquipped(profile.equipped),
+    avatarWearFor([player.playerId]),
   ]);
+
+  const wear = wearing.get(player.playerId);
 
   return Response.json({
     profile: {
@@ -76,6 +93,18 @@ export async function GET(request: Request): Promise<Response> {
       embersEarned: profile.embersEarned,
       embersBalance: profile.embersBalance,
       equipped: worn,
+      /*
+       * The worn profile border and avatar effect, and the files
+       * behind them. The app draws these itself now rather than
+       * carrying them unused: one WebView with scripting off is the
+       * native answer to the website's `<img>` and sandboxed frame.
+       */
+      wear: {
+        ring: wear?.ring ?? null,
+        aura: wear?.aura ?? null,
+        ringArt: absoluteArt(wear?.ringArt ?? null),
+        auraArt: absoluteArt(wear?.auraArt ?? null),
+      },
       showcase: profile.showcase,
       showcaseLimit: SHOWCASE_LIMIT,
     },

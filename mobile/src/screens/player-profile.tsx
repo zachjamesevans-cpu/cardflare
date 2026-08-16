@@ -115,6 +115,8 @@ export function PlayerProfileScreen() {
             seed={profile.playerId}
             avatarUrl={profile.avatarUrl}
             frame={profile.frame}
+            ringArt={profile.ringArt}
+            auraArt={profile.auraArt}
             size={96}
           />
           <Title>{profile.displayName}</Title>
