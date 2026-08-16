@@ -81,7 +81,14 @@ export function Rail({
         ref={list}
         aria-label={ariaLabel}
         aria-labelledby={labelledBy}
-        className="flex items-start gap-2 overflow-x-auto pb-2"
+        /*
+         * The padding is for the glow, not for looks. `overflow-x-auto`
+         * clips vertically as well as horizontally, so a ring with a
+         * soft shadow on a tile - which is how a card you are holding
+         * is marked - got sliced off at the top and at the left edge
+         * where those tiles now sort to. This is the room it needs.
+         */
+        className="flex items-start gap-2 overflow-x-auto px-2 pt-2 pb-3"
       >
         {children}
       </ul>
