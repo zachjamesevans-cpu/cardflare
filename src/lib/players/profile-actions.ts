@@ -14,11 +14,17 @@ import {
   dressAllShowcase,
   dressShowcaseCard,
   removeFromShowcase,
+  setAnimatedAvatar,
   setAvatar,
   setCover,
   setDisplayName,
 } from "./profile";
-import { AVATAR_MAX_BYTES, AVATAR_MIME_TYPES } from "./profile-image";
+import {
+  ANIMATED_AVATAR_MAX_BYTES,
+  ANIMATED_AVATAR_MIME_TYPES,
+  AVATAR_MAX_BYTES,
+  AVATAR_MIME_TYPES,
+} from "./profile-image";
 import {
   BUY_REFUSALS,
   displayNameSchema,
@@ -165,6 +171,76 @@ export async function setAvatarAction(
 
   revalidateProfile();
   return { status: "saved", message: "Picture updated." };
+}
+
+/**
+ * An animated profile picture: the Pro feature.
+ *
+ * Its own action rather than a branch inside `setAvatarAction`,
+ * because almost nothing about it is the same: a different ceiling, a
+ * different type, a tier to satisfy, and two objects written instead
+ * of one. Sharing the entry point would have meant a function whose
+ * every line asked which kind of upload this was.
+ *
+ * The rate limit is deliberately the SAME bucket as the still picture.
+ * They are the same act from a player's side, and two buckets would
+ * let somebody alternate between them to double their allowance.
+ */
+export async function setAnimatedAvatarAction(
+  _previous: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const rate = checkRateLimit(
+    `avatar:${await clientKey()}`,
+    AVATAR_MAX,
+    AVATAR_WINDOW_MS,
+  );
+  if (!rate.allowed) {
+    return {
+      status: "error",
+      message: "That is a lot of new pictures. Try again in a little while.",
+    };
+  }
+
+  const file = formData.get("avatar");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "error", message: "Pick a GIF to upload." };
+  }
+
+  if (file.size > ANIMATED_AVATAR_MAX_BYTES) {
+    return { status: "error", message: "That GIF is over 8MB. Pick a smaller one." };
+  }
+  if (!(ANIMATED_AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { status: "error", message: "An animated picture has to be a GIF." };
+  }
+
+  const outcome = await setAnimatedAvatar(playerId, file);
+
+  if (!outcome.ok) {
+    return {
+      status: "error",
+      message:
+        outcome.reason === "not-pro"
+          ? "Animated pictures are a Pro feature."
+          : outcome.reason === "unreadable"
+            ? "That file could not be read as a GIF. Try another one."
+            : outcome.reason === "too-big"
+              ? "That GIF is too heavy once it is squared up. Try a shorter loop."
+              : outcome.reason === "wrong-type"
+                ? "An animated picture has to be a GIF."
+                : GENERIC_ERROR,
+    };
+  }
+
+  revalidateProfile();
+  return {
+    status: "saved",
+    message: `Picture updated. ${outcome.frames} frames, looping.`,
+  };
 }
 
 /** The cover banner: same rules and rate as the picture, its own field. */

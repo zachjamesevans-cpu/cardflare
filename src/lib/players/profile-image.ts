@@ -1,3 +1,5 @@
+import { tierAllows } from "@/lib/tiers";
+
 /**
  * The rules an uploaded profile picture has to satisfy.
  *
@@ -49,6 +51,74 @@ export const AVATAR_FORMAT = "jpg" as const;
 /** Matches the bucket's allowed_mime_types. */
 export const AVATAR_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
+/**
+ * Animated avatars: a Pro feature, and a different set of numbers.
+ *
+ * A GIF is many pictures in one file, so the still ceiling would refuse
+ * almost every real one. 8MB in is roughly what a phone's GIF keyboard
+ * or a Giphy download weighs; what comes out is squared to the same 512
+ * and capped at 60 frames, which is a couple of seconds of a loop and
+ * lands well under a megabyte. Anything longer than that is a video
+ * wearing a GIF's clothes, and it would cost every person in the room
+ * to look at.
+ *
+ * The frame cap is enforced by DECODING only that many pages rather
+ * than by refusing the file, so a long loop is politely shortened
+ * instead of rejected.
+ */
+export const ANIMATED_AVATAR_MAX_BYTES = 8 * 1024 * 1024;
+export const ANIMATED_AVATAR_MAX_FRAMES = 60;
+export const ANIMATED_AVATAR_MIME_TYPES = ["image/gif"] as const;
+
+/** What the re-encoded animation may weigh before it is refused. */
+export const ANIMATED_AVATAR_MAX_STORED_BYTES = 3 * 1024 * 1024;
+
+/**
+ * The first six bytes of every GIF, and the only thing that decides.
+ *
+ * A browser's `file.type` comes from the operating system's guess at an
+ * extension, so it is a hint and not a fact. The bytes are the fact.
+ */
+export function looksLikeGif(bytes: Uint8Array): boolean {
+  if (bytes.length < 14) return false;
+  const header = String.fromCharCode(...bytes.slice(0, 6));
+  return header === "GIF87a" || header === "GIF89a";
+}
+
+/** Where an animated avatar is stored, beside the still it posters. */
+export function animatedAvatarObjectPath(playerId: string, at = Date.now()): string {
+  return `${playerId}/${at}.gif`;
+}
+
+export type AnimatedAvatarCheck = { ok: true } | { ok: false; message: string };
+
+/**
+ * Whether a chosen GIF is worth sending. Client-side courtesy only,
+ * exactly like `checkAvatarFile`: the Server Action re-checks the size,
+ * the type AND the bytes, because it is a public POST endpoint.
+ */
+export function checkAnimatedAvatarFile(file: {
+  size: number;
+  type: string;
+}): AnimatedAvatarCheck {
+  if (file.size === 0) {
+    return { ok: false, message: "That file looks empty. Pick another one." };
+  }
+
+  if (file.size > ANIMATED_AVATAR_MAX_BYTES) {
+    return {
+      ok: false,
+      message: "That GIF is over 8MB. Pick a shorter or smaller one.",
+    };
+  }
+
+  if (!(ANIMATED_AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { ok: false, message: "An animated picture has to be a GIF." };
+  }
+
+  return { ok: true };
+}
+
 export type AvatarCheck = { ok: true } | { ok: false; message: string };
 
 /**
@@ -96,7 +166,32 @@ export function avatarObjectPath(playerId: string, at = Date.now()): string {
  * unrecognised falls back to JPEG, the format everything decodes.
  */
 export function avatarContentType(path: string): string {
+  if (path.endsWith(".gif")) return "image/gif";
   return path.endsWith(".webp") ? "image/webp" : "image/jpeg";
+}
+
+/**
+ * Which of a player's two pictures to serve.
+ *
+ * A Pro player with an animation gets the animation; everybody else
+ * gets the still, including a player who WAS Pro and is not any more.
+ * That is the whole downgrade story, and it is one line rather than a
+ * lifecycle: the GIF stays in the bucket, unreferenced by every
+ * renderer, and comes back the moment the tier does.
+ *
+ * Every read of a player's picture goes through here, so no surface
+ * has to know what a tier is - the room roster, the profile, the app's
+ * API and the search results all just ask for a path.
+ */
+export function avatarPathFor(row: {
+  avatar_url?: string | null;
+  avatar_animated?: string | null;
+  tier?: string | null;
+}): string | null {
+  if (row.avatar_animated && tierAllows(row.tier ?? null, "animatedAvatar")) {
+    return row.avatar_animated;
+  }
+  return row.avatar_url ?? null;
 }
 
 /**

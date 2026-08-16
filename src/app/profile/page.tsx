@@ -32,6 +32,7 @@ import {
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
+import { tierAllows } from "@/lib/tiers";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -198,6 +199,7 @@ export default async function ProfilePage() {
                 aura={dressed.aura}
                 ringArt={dressedArt.ring}
                 auraArt={dressedArt.aura}
+                animatedAllowed={tierAllows(profile.tier, "animatedAvatar")}
               />
             </div>
             <div className="relative flex flex-col items-center gap-2">

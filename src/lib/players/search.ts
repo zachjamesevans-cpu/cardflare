@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarWearFor } from "./equips";
-import { avatarSrc } from "./profile-image";
+import { avatarPathFor, avatarSrc } from "./profile-image";
 
 /**
  * Finding a player by name - the founder's ask: "I can search up
@@ -33,7 +33,9 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
 
   const { data, error } = await getSupabaseAdmin()
     .from("players")
-    .select("id, display_name, avatar_url, equipped_avatar_frame")
+    .select(
+      "id, display_name, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+    )
     .ilike("display_name", like)
     .order("display_name")
     .limit(12);
@@ -51,7 +53,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
   return rows.map((row) => ({
     playerId: row.id,
     displayName: row.display_name,
-    avatarUrl: avatarSrc(row.avatar_url),
+    avatarUrl: avatarSrc(avatarPathFor(row)),
     frame: row.equipped_avatar_frame,
     ring: wear.get(row.id)?.ring ?? null,
     aura: wear.get(row.id)?.aura ?? null,

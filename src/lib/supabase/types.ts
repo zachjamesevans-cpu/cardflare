@@ -550,6 +550,12 @@ export type PlayerRow = {
   display_name: string;
   /** Public object URL in the `avatars` bucket, or null for the initials. */
   avatar_url: string | null;
+  /**
+   * An animated GIF avatar, shown only while the player is pro or
+   * above. avatar_url keeps the still poster beside it, so a tier
+   * change stops the motion rather than removing the picture.
+   */
+  avatar_animated: string | null;
   /** Cover banner object path in the same bucket, or null for none. */
   cover_image: string | null;
   /** Lifetime Embers. Public, monotonic, the badge. */
@@ -588,6 +594,7 @@ export type PlayerInsert = Omit<
   | "id"
   | "created_at"
   | "avatar_url"
+  | "avatar_animated"
   | "cover_image"
   | "tier"
   | "embers_earned"
@@ -603,6 +610,7 @@ export type PlayerInsert = Omit<
   id?: string;
   created_at?: string;
   avatar_url?: string | null;
+  avatar_animated?: string | null;
   cover_image?: string | null;
   embers_earned?: number;
   embers_balance?: number;

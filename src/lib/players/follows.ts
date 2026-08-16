@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { avatarSrc } from "./profile-image";
+import { avatarPathFor, avatarSrc } from "./profile-image";
 import { avatarWearFor } from "./equips";
 import type { CosmeticArtFile } from "./art-files";
 
@@ -130,7 +130,9 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
   const [{ data: rows }, { data: backEdges }, wear] = await Promise.all([
     admin
       .from("players")
-      .select("id, display_name, avatar_url, equipped_avatar_frame")
+      .select(
+        "id, display_name, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+      )
       .in("id", ids),
     admin
       .from("player_follows")
@@ -150,7 +152,7 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
       {
         playerId: row.id,
         displayName: row.display_name,
-        avatarUrl: avatarSrc(row.avatar_url),
+        avatarUrl: avatarSrc(avatarPathFor(row)),
         frame: row.equipped_avatar_frame,
         ring: wear.get(row.id)?.ring ?? null,
         aura: wear.get(row.id)?.aura ?? null,
