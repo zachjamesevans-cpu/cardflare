@@ -363,7 +363,20 @@ function CarouselEntry({
       }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      <div className="relative flex">
+      {/*
+       * A green ring on a card you are holding.
+       *
+       * The founder replaced the "You have 2 of 6" badge with this:
+       * "the cards you have will be highlighted with a green ring
+       * around them." A count told you there was something to find; a
+       * ring on the card IS the finding, and it survives being glanced
+       * at across a table in a way a sentence does not.
+       */}
+      <div
+        className={`relative flex rounded-[9px] ${
+          match ? "shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent" : ""
+        }`}
+      >
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
           <div
             key={depth}
@@ -576,9 +589,6 @@ export function FlareBoard({
     <ul className="flex flex-col gap-3">
       {groups.map((group) => {
         const isYou = group.playerSessionId === youId;
-        const answerable = group.entries.filter(
-          (entry) => !isYou && matches.has(entry.id),
-        ).length;
         const headingId = `flares-${group.playerSessionId}`;
         const alsoOpen = openIds.has(group.playerSessionId);
 
@@ -718,8 +728,23 @@ export function FlareBoard({
          * Fully pledged hunts park at the far end of whichever rail
          * they belong to, dimmed but present.
          */
+        /*
+         * Cards you can answer come first.
+         *
+         * The founder's revision, replacing the "You have 2 of 6"
+         * badge: "all cards you have will automatically sort to the
+         * leftmost portion of the carousel." A rail you can only read
+         * the front of should open on the part that concerns you, and
+         * the green ring then says which without a sentence.
+         *
+         * Covered hunts still park at the far end whatever else is
+         * true: those are settled, and settled outranks interesting.
+         */
+        const held = (entry: ListEntry) => !isYou && matches.has(entry.id);
+
         const inTileOrder = (list: ListEntry[]) => [
-          ...list.filter((entry) => !isCovered(entry)),
+          ...list.filter((entry) => !isCovered(entry) && held(entry)),
+          ...list.filter((entry) => !isCovered(entry) && !held(entry)),
           ...list.filter(isCovered),
         ];
 
@@ -743,7 +768,16 @@ export function FlareBoard({
              */}
             <GroupView
               identity={
-                <span id={headingId} className="flex min-w-0 items-center gap-2.5">
+                /*
+                 * Picture on the left, name and status stacked beside
+                 * it. Inline they competed for one line and a real
+                 * username lost - the founder: "can't even see a full
+                 * username anymore". Stacked, the name gets the width.
+                 */
+                <span
+                  id={headingId}
+                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                >
                   {/*
                    * An account opens the profile popup right here on the
                    * board — the founder's ask: finding somebody's name
@@ -808,18 +842,12 @@ export function FlareBoard({
                    */}
                   {/* No Ember badge on board headers - in the room,
                       Embers live inside the popup and profile only. */}
-                  {alsoOpen && <OpenToTradesTag />}
-                  {/*
-                   * Beside the name rather than out in the meta column.
-                   * It is the line that decides who to walk over to, and
-                   * floating centred under the header it read as
-                   * belonging to nothing - the founder: "move the you
-                   * have 2 of 6 to the left side and align with text."
-                   */}
-                  {answerable > 0 && (
-                    <Badge className="whitespace-nowrap">
-                      You have {answerable} of {group.entries.length}
-                    </Badge>
+                  {/* basis-full: the tag takes its own line rather
+                      than competing with the name for one. */}
+                  {alsoOpen && (
+                    <span className="basis-full">
+                      <OpenToTradesTag />
+                    </span>
                   )}
                 </span>
               }
