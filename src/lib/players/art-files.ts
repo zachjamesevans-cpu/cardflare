@@ -37,9 +37,19 @@ export interface CosmeticArtFile {
 export function artFileSrc(path: string | null): string | null {
   if (!path) return null;
   if (path.startsWith("/")) return path;
-  if (!isSupabaseConfigured()) return null;
-  const { data } = getSupabaseAdmin().storage.from("avatars").getPublicUrl(path);
-  return data?.publicUrl ?? null;
+
+  /*
+   * Through OUR origin, never the storage host directly.
+   *
+   * The first cut handed out `getPublicUrl(path)` and the founder's
+   * ring did not appear in the app at all. That is the same shape as
+   * the bug that already forced avatars onto `/api/avatars/...` and
+   * this app's writes into a header: something between a phone on
+   * real-world wifi and a third-party host eats the request. Cosmetic
+   * art lives in the same bucket as the avatars, so it can go through
+   * the same proxy and get the same answer.
+   */
+  return `/api/avatars/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 /** The art file behind a row, or null when the row draws itself in CSS. */

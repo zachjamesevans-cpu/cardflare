@@ -77,6 +77,17 @@ export async function GET(
       "content-type": avatarContentType(path.join("/")),
       "content-length": String(bytes.byteLength),
       "cache-control": CACHE,
+      /*
+       * The bucket now also holds cosmetic art, including HTML, and
+       * HTML served from our own origin is same-origin unless
+       * something says otherwise. Both renderers already put it in a
+       * frame with scripting off, but somebody can also paste this URL
+       * into a tab - so the response carries its own refusal to run
+       * anything, and a refusal to be sniffed into a type it is not.
+       */
+      "content-security-policy":
+        "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+      "x-content-type-options": "nosniff",
     },
   });
 }
