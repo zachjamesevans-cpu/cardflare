@@ -857,13 +857,6 @@ export function FlareBoard({
                       <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                         <span className="max-w-full truncate text-lg font-semibold text-text-primary">
                           {group.displayName ?? "A player"}
-                          {/* One type size for the line: only the weight
-                              and the colour change, so the two read as
-                              level rather than as two sizes on a shared
-                              baseline. */}
-                          {isYou && (
-                            <span className="font-normal text-text-muted"> · you</span>
-                          )}
                         </span>
                         {alsoOpen && <OpenToTradesTag />}
                       </span>
@@ -1016,9 +1009,6 @@ export function FlareBoard({
                 />
                 <span className="min-w-0 truncate text-sm text-text-primary">
                   {player.displayName}
-                  {player.playerSessionId === youId && (
-                    <span className="font-normal text-text-muted"> · you</span>
-                  )}
                 </span>
               </li>
             ))}

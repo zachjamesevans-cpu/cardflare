@@ -311,13 +311,10 @@ export function PlayerPeek({
         />
         {/* A column beside the picture, never wrapped items around it. */}
         <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-          {/*
-           * `nameClassName` dresses the whole LINE, not just the name.
-           * On the inner span it sized the name alone, and "· you" stayed
-           * at the default — same baseline, different cap height, which
-           * the founder read as the two not being level. One type size
-           * for the line and the suffix only varies weight and colour.
-           */}
+          {/* `nameClassName` dresses the whole LINE, not just the name:
+              on the inner span it sized the name and left anything beside
+              it at the default, which reads as two things not being
+              level however carefully they share a baseline. */}
           <span
             className={cn("max-w-full truncate text-text-secondary", nameClassName)}
           >
@@ -329,7 +326,6 @@ export function PlayerPeek({
             >
               {displayName}
             </span>
-            {isYou && <span className="font-normal text-text-muted"> · you</span>}
           </span>
           {below}
         </span>

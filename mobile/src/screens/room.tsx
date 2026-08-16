@@ -802,9 +802,7 @@ function RoomScreen({
                          * website had, reported three times.
                          */}
                         <View style={{ flexShrink: 1, gap: spacing(1) }}>
-                          <Title>
-                            {mine ? "Your Flares" : (group.name ?? "A player")}
-                          </Title>
+                          <Title>{group.name ?? "A player"}</Title>
                           {openIds.has(sessionId) && <OpenToTradesTag />}
                         </View>
                       </View>
@@ -1051,9 +1049,6 @@ function RoomScreen({
                         numberOfLines={1}
                       >
                         {p.displayName ?? "A player"}
-                        {p.playerSessionId === youId ? (
-                          <Text style={{ color: colors.textMuted }}>{" · you"}</Text>
-                        ) : null}
                       </Text>
                       {p.openToTrades && <OpenToTradesTag />}
                       {!p.present && (
