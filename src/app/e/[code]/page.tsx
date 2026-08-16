@@ -39,7 +39,12 @@ import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
 import { WantEntries } from "@/components/players/want-entries";
 import { listRoomOffers } from "@/lib/matching/repository";
-import { heldByCard, matchFor, offersByFlare } from "@/lib/matching/schema";
+import {
+  heldByCard,
+  heldCountByCard,
+  matchFor,
+  offersByFlare,
+} from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
 import { listMyTrades } from "@/lib/trades/repository";
 import { cn } from "@/lib/cn";
@@ -377,6 +382,10 @@ export default async function JoinByCodePage({
    */
   const held = heldByCard(binder);
 
+  /* How many of each the binder claims, for the card viewer's own line.
+     The binder alone: the collection below proves printings, not counts. */
+  const heldCounts = heldCountByCard(binder);
+
   /*
    * The imported collection joins the cross-reference the quiet way:
    * checked against the board rather than loaded whole. A card arrives
@@ -593,6 +602,7 @@ export default async function JoinByCodePage({
               identities={boardIdentities}
               counterHas={counterHas}
               counterName={event.storeName}
+              heldCounts={heldCounts}
               early={phase === "early"}
             />
           </section>

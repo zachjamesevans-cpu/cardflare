@@ -332,6 +332,14 @@ export interface RoomFlare {
   acceptsTrade: boolean;
   acceptsCash: boolean;
   match: "exact" | "other-printing" | null;
+  /**
+   * Copies of this card the viewer's own binder claims.
+   *
+   * The card viewer's line, and only the card viewer's: the board already
+   * says you are holding it with a green ring, which reads across a table
+   * in a way a sentence never will. The number is what the tap is for.
+   */
+  heldCount?: number;
   counterMayHave: boolean;
   offers: {
     responderSessionId: string;

@@ -49,6 +49,44 @@ export function heldByCard(
 }
 
 /**
+ * How many copies the viewer's binder claims, per card.
+ *
+ * The binder only — never the synced collection, which knows printings but
+ * not counts. A card the collection proves and the binder does not simply
+ * has no number, and the phrase below says nothing about how many rather
+ * than saying "1" and being wrong.
+ */
+export function heldCountByCard(
+  binder: { cardId: string; quantity: number }[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const entry of binder) {
+    counts.set(entry.cardId, (counts.get(entry.cardId) ?? 0) + entry.quantity);
+  }
+
+  return counts;
+}
+
+/**
+ * What the card viewer says about a card you are holding.
+ *
+ * The founder's three phrases, as three states of one line. Only ever
+ * reached by tapping a card: the board marks what you hold with a green
+ * ring, and a ring says "look here" in a glance, while a sentence on every
+ * tile is a wall of them. The sentence is the answer to the tap.
+ *
+ * A count only appears above one, because "You have 1 in your binder" is a
+ * worse way of saying "You have this". A printing you cannot prove never
+ * carries a number at all: the interesting fact there is the mismatch, and
+ * a count beside it reads as a promise about the wrong version.
+ */
+export function youHaveLabel(kind: MatchKind, count: number): string {
+  if (kind === "other-printing") return "You have another printing";
+  return count > 1 ? `You have ${count} in your binder` : "You have this";
+}
+
+/**
  * Whether — and how well — the viewer can answer one Flare.
  *
  * A Flare that names a printing is answered exactly only by that printing.
