@@ -128,7 +128,18 @@ export function GroupView({
        */}
       {!open && (
         <div ref={railBox}>
-          <div className="overflow-hidden">{rail}</div>
+          {/*
+           * No `overflow-hidden` here, unlike the drawer below.
+           *
+           * The drawer needs it because it animates its own height. The
+           * rail does not animate at all, and clipping it undoes the one
+           * thing its padding exists for: the rail bleeds outward by
+           * exactly that padding so its first card lines up with the
+           * header, and a clip box at the header's edge slices the glow
+           * off a card you are holding. That is a bug this board has
+           * already had once.
+           */}
+          {rail}
         </div>
       )}
 

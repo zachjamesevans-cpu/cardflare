@@ -76,7 +76,13 @@ export function Rail({
   }, [measure]);
 
   return (
-    <div className="relative">
+    /*
+     * Pulled back by exactly the padding below, so the first card's edge
+     * lands on the same line as everything above it. Without this the
+     * shelf sat eight pixels right of the header it belongs to, which is
+     * the sort of thing nobody can name and everybody can see.
+     */
+    <div className="relative -mx-2">
       <ul
         ref={list}
         aria-label={ariaLabel}

@@ -310,6 +310,7 @@ function CarouselEntry({
   early = false,
   covered = false,
   remaining,
+  reserveCaption = false,
 }: {
   entry: ListEntry;
   code: string;
@@ -332,6 +333,15 @@ function CarouselEntry({
   covered?: boolean;
   /** Copies still unpledged; equals the ask until someone raises a hand. */
   remaining?: number;
+  /**
+   * Hold a line open under the name for a deck label.
+   *
+   * Decided for the whole rail, not per card: the line exists so the
+   * action row sits at one height across tiles standing side by side, and
+   * when nobody in a rail has named a deck there is no drift to prevent —
+   * only an empty row between the names and the buttons.
+   */
+  reserveCaption?: boolean;
 }) {
   /*
    * Quantity drawn instead of written — and it is the *live need*, the
@@ -464,17 +474,26 @@ function CarouselEntry({
       </p>
 
       {/*
-       * The caption slot: exactly one line tall whether or not there is
-       * a deck to name, so the action row below never drifts.
+       * The caption slot: exactly one line tall whether or not THIS card
+       * has a deck to name, so the action row never drifts across a rail.
+       *
+       * Reserved per rail rather than per tile, which is the correction.
+       * Every tile held the line open, so a board where nobody had named
+       * a deck — nearly every board — carried an empty row between the
+       * card names and the buttons, and the founder saw a section with a
+       * hole in it. The guarantee only ever needed to hold between tiles
+       * standing next to each other.
        */}
-      <p className="flex min-h-[13px] items-center gap-1 text-[10px] leading-[13px] text-text-muted">
-        {entry.deckLabel && (
-          <>
-            <Folder className="size-3 shrink-0 text-accent" aria-hidden="true" />
-            <span className="min-w-0 truncate">{entry.deckLabel}</span>
-          </>
-        )}
-      </p>
+      {reserveCaption && (
+        <p className="flex min-h-[13px] items-center gap-1 text-[10px] leading-[13px] text-text-muted">
+          {entry.deckLabel && (
+            <>
+              <Folder className="size-3 shrink-0 text-accent" aria-hidden="true" />
+              <span className="min-w-0 truncate">{entry.deckLabel}</span>
+            </>
+          )}
+        </p>
+      )}
 
       {/* The action row: reserved on every tile, one control per side
           of the trade. Pledging is open to anyone — no binder required,
@@ -613,6 +632,10 @@ export function FlareBoard({
          * coverage is public — the founder's ask — so the next holder
          * knows whether a hunt still needs them.
          */
+        /* One answer for the whole rail, so tiles beside each other still
+           agree on where their buttons sit. */
+        const railHasDecks = group.entries.some((item) => Boolean(item.deckLabel));
+
         const renderTile = (entry: ListEntry) => {
           const match = isYou ? null : (matches.get(entry.id) ?? null);
           const entryOffers = offers.get(entry.id) ?? [];
@@ -654,6 +677,7 @@ export function FlareBoard({
               early={early}
               covered={covered}
               remaining={remaining}
+              reserveCaption={railHasDecks}
             />
           );
         };
@@ -833,11 +857,12 @@ export function FlareBoard({
                       <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                         <span className="max-w-full truncate text-lg font-semibold text-text-primary">
                           {group.displayName ?? "A player"}
+                          {/* One type size for the line: only the weight
+                              and the colour change, so the two read as
+                              level rather than as two sizes on a shared
+                              baseline. */}
                           {isYou && (
-                            <span className="text-base font-normal text-text-muted">
-                              {" "}
-                              · you
-                            </span>
+                            <span className="font-normal text-text-muted"> · you</span>
                           )}
                         </span>
                         {alsoOpen && <OpenToTradesTag />}

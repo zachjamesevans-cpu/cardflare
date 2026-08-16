@@ -311,12 +311,20 @@ export function PlayerPeek({
         />
         {/* A column beside the picture, never wrapped items around it. */}
         <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-          <span className="max-w-full truncate text-text-secondary">
+          {/*
+           * `nameClassName` dresses the whole LINE, not just the name.
+           * On the inner span it sized the name alone, and "· you" stayed
+           * at the default — same baseline, different cap height, which
+           * the founder read as the two not being level. One type size
+           * for the line and the suffix only varies weight and colour.
+           */}
+          <span
+            className={cn("max-w-full truncate text-text-secondary", nameClassName)}
+          >
             <span
               className={cn(
                 "underline-offset-4 hover:underline",
                 !dimmed && "text-text-primary",
-                nameClassName,
               )}
             >
               {displayName}
