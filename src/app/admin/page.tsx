@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CalendarDays,
+  FileUp,
   Flame,
   Package,
   Radio,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
+import { listImportedSets } from "@/lib/cards/imported-sets";
 import { catalogForConsole } from "@/lib/admin/catalog";
 import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
@@ -116,6 +118,8 @@ export default async function AdminPage() {
   /* The catalogue at a glance: what is on sale, and what is waiting. */
   const catalogue = await catalogForConsole();
   const liveCosmetics = catalogue.filter((item) => item.status === "live").length;
+  /* Sets that came in by hand rather than from a provider. */
+  const importedSets = (await listImportedSets()).length;
   const draftCosmetics = catalogue.length - liveCosmetics;
 
   const gameStores = stores.filter((store) => store.kind === "lgs").length;
@@ -189,6 +193,13 @@ export default async function AdminPage() {
             label="Packs and cosmetics"
             value={liveCosmetics}
             detail={`${draftCosmetics} more behind the scenes`}
+          />
+          <AreaLink
+            href="/admin/cards/import"
+            icon={FileUp}
+            label="Import a set"
+            value={importedSets}
+            detail="Sets no provider carries yet"
           />
         </div>
       </section>

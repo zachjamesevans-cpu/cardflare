@@ -1,3 +1,5 @@
+import { isHostedCardArt } from "./art-storage";
+
 /**
  * Whether card artwork may be rendered.
  *
@@ -31,12 +33,25 @@ export const ALLOWED_IMAGE_HOSTS = ["optcgapi.com", "www.optcgapi.com"] as const
 /**
  * Whether a stored URL is safe to render.
  *
- * Belt and braces over the database's `https://` constraint. A malformed value
- * returns false rather than throwing, because a bad row must not break a
- * search result page.
+ * Belt and braces over the database's constraint. A malformed value returns
+ * false rather than throwing, because a bad row must not break a search
+ * result page.
+ *
+ * Two legal shapes, and they are checked by different rules because they are
+ * different kinds of thing. An absolute URL is a third-party reference and
+ * has to name an allow-listed host over https. A `/api/card-art/...` path is
+ * not a reference to anywhere — it is this application's own route, serving
+ * a file out of our own bucket, and there is no host to allow-list.
+ *
+ * The hosted form is tested FIRST and by `isHostedCardArt`, which rejects
+ * `..` explicitly. Relying on `new URL()` to reason about a relative path
+ * would be the mistake here: without a base it throws, and with one it would
+ * happily resolve traversal.
  */
 export function isRenderableImageUrl(url: string | null | undefined): url is string {
   if (!url) return false;
+
+  if (url.startsWith("/")) return isHostedCardArt(url);
 
   try {
     const parsed = new URL(url);
