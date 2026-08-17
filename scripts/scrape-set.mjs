@@ -39,6 +39,9 @@ import { chromium } from "@playwright/test";
 /** Politeness. A spoiler site is somebody's hobby, not a CDN. */
 const DELAY_MS = 400;
 
+/** Consecutive refusals before this is one problem rather than many. */
+const GIVE_UP_AFTER = 5;
+
 /**
  * Launches a browser, honouring the same override the e2e suite uses.
  *
@@ -50,6 +53,23 @@ const DELAY_MS = 400;
 function launch() {
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
   return chromium.launch(executablePath ? { executablePath } : {});
+}
+
+/**
+ * A browser, an explicit context, and a page in it.
+ *
+ * The context is explicit because `fetchImage` opens a second tab beside
+ * the gallery when a download is refused, and `page.context().newPage()`
+ * throws "Please use browser.newContext()" on the implicit context that
+ * `browser.newPage()` creates. That crash only appears on the fallback
+ * path, so it survived every run where nothing was refused.
+ */
+async function openPage() {
+  const browser = await launch();
+  const context = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+  });
+  return { browser, page: await context.newPage() };
 }
 
 /** Card numbers look like OP17-001. Overridable for other games. */
@@ -115,8 +135,7 @@ async function loadEverything(page) {
 async function discover(args) {
   if (!args.url) usage("discover needs --url");
 
-  const browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const { browser, page } = await openPage();
 
   console.log(`Opening ${args.url} …`);
   await page.goto(args.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -240,7 +259,14 @@ const LARGER_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
  * each would be thousands of pointless requests at somebody else's
  * expense.
  */
-async function bestRender(request, src, seen) {
+async function bestRender(request, src, seen, referer) {
+  /* Same hotlink protection as the download itself: a probe without a
+     Referer is refused, which would make every candidate look absent
+     and quietly settle for the thumbnail. */
+  const headers = {
+    referer,
+    accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+  };
   const match = /^(.*?)(_sm|_s|_thumb|_small)?(\.[a-z0-9]+)$/i.exec(src);
   if (!match) return { src, note: null };
 
@@ -251,7 +277,7 @@ async function bestRender(request, src, seen) {
     return winner ? { src: `${stem}${winner}`, note: null } : { src, note: null };
   }
 
-  const original = await request.get(src).catch(() => null);
+  const original = await request.get(src, { headers }).catch(() => null);
   const originalSize = original?.ok() ? (await original.body()).length : 0;
 
   /* Both axes, because the real answer changed both. Deduplicated so a
@@ -265,7 +291,7 @@ async function bestRender(request, src, seen) {
   }
 
   for (const tail of candidates) {
-    const response = await request.get(`${stem}${tail}`).catch(() => null);
+    const response = await request.get(`${stem}${tail}`, { headers }).catch(() => null);
     if (!response?.ok()) continue;
 
     const size = (await response.body()).length;
@@ -287,6 +313,66 @@ async function bestRender(request, src, seen) {
   };
 }
 
+/**
+ * Asks for one image the way a browser would.
+ *
+ * A plain `request.get` returned 403 for every card on Kaizoku's CDN
+ * while the very same URLs rendered fine in the page. That is hotlink
+ * protection: the server is checking where the request came from, and a
+ * bare fetch does not look like a page loading a picture.
+ *
+ * So two attempts, cheapest first. A request carrying the page's own
+ * Referer covers the ordinary case. When that is still refused, a real
+ * navigation in a real tab carries the browser's whole fingerprint and
+ * is the closest thing to what the gallery itself does — slower, which
+ * is why it is second rather than first.
+ *
+ * Returns null when both are refused, so the caller can report the
+ * status rather than write a 403 body to disk as if it were a card.
+ */
+async function fetchImage(page, url, referer) {
+  const headers = {
+    referer,
+    accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+  };
+
+  const direct = await page.request.get(url, { headers }).catch(() => null);
+  if (direct?.ok()) {
+    return {
+      body: await direct.body(),
+      type: (direct.headers()["content-type"] ?? "").split(";")[0].trim(),
+      status: direct.status(),
+    };
+  }
+
+  const tab = await page.context().newPage();
+  try {
+    const response = await tab.goto(url, {
+      referer,
+      waitUntil: "commit",
+      timeout: 30_000,
+    });
+
+    if (response?.ok()) {
+      return {
+        body: await response.body(),
+        type: (response.headers()["content-type"] ?? "").split(";")[0].trim(),
+        status: response.status(),
+      };
+    }
+
+    return {
+      body: null,
+      type: null,
+      status: response?.status() ?? direct?.status() ?? 0,
+    };
+  } catch {
+    return { body: null, type: null, status: direct?.status() ?? 0 };
+  } finally {
+    await tab.close();
+  }
+}
+
 async function collect(args) {
   if (!args.url) usage("collect needs --url");
   if (!args.set) usage("collect needs --set, e.g. --set OP17");
@@ -299,8 +385,7 @@ async function collect(args) {
 
   await mkdir(join(out, "images"), { recursive: true });
 
-  const browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const { browser, page } = await openPage();
 
   console.log(`Opening ${args.url} …`);
   await page.goto(args.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -390,6 +475,7 @@ async function collect(args) {
 
   const cards = [];
   let downloaded = 0;
+  let refused = 0;
 
   /* Shared across every card, so the suffix is worked out once. */
   const renderChoice = new Map();
@@ -399,23 +485,51 @@ async function collect(args) {
   )) {
     const { src, note } = args["no-upgrade"]
       ? { src: card.src, note: null }
-      : await bestRender(page.request, card.src, renderChoice);
+      : await bestRender(page.request, card.src, renderChoice, args.url);
 
     if (note) console.log(`\n  ${note}`);
 
-    const response = await page.request.get(src);
+    const image = await fetchImage(page, src, args.url);
 
-    if (!response.ok()) {
-      console.error(`  ${card.number}: HTTP ${response.status()}, skipped`);
+    if (!image.body) {
+      refused += 1;
+      console.error(`\n  ${card.number}: HTTP ${image.status}, skipped`);
+
+      /*
+       * Stop rather than grind. The first run against the real CDN
+       * printed two hundred identical 403 lines and wrote an empty
+       * manifest: when everything is refused it is one problem, not two
+       * hundred, and hammering somebody's server to prove it again is
+       * rude as well as pointless.
+       */
+      if (refused >= GIVE_UP_AFTER && downloaded === 0) {
+        console.error(
+          [
+            "",
+            `Every request so far came back ${image.status}.`,
+            "",
+            "That is the CDN refusing a fetch that does not look like a",
+            "page loading a picture. Both the Referer request and a real",
+            "browser navigation were refused, so this needs a look rather",
+            "than a retry. Send me this output.",
+            "",
+            `  tried: ${src}`,
+            "",
+          ].join("\n"),
+        );
+        await browser.close();
+        process.exit(1);
+      }
+
       continue;
     }
 
-    const type = (response.headers()["content-type"] ?? "").split(";")[0].trim();
+    const type = image.type ?? "";
     const extension =
       type === "image/jpeg" ? "jpg" : type === "image/webp" ? "webp" : "png";
     const file = `${card.number}.${extension}`;
 
-    await writeFile(join(out, "images", file), await response.body());
+    await writeFile(join(out, "images", file), image.body);
     downloaded += 1;
 
     cards.push({
