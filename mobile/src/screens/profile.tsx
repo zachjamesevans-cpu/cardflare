@@ -446,6 +446,7 @@ export function ProfileScreen() {
             avatarUrl={profile.avatarUrl}
             frame={profile.equipped.avatarFrame}
             ring={profile.wear?.ring ?? null}
+            aura={profile.wear?.aura ?? null}
             ringArt={profile.wear?.ringArt ?? null}
             auraArt={profile.wear?.auraArt ?? null}
             size={96}

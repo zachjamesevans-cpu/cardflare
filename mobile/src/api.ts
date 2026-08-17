@@ -389,6 +389,8 @@ export interface RoomState {
     frame?: string | null;
     /** The catalogue ring, worn over the frame when both are set. */
     ring?: string | null;
+    /** The catalogue avatar effect, which rides with any ring. */
+    aura?: string | null;
     /**
      * A dropped-in profile border and avatar effect, when they wear
      * one. The server has sent these since the ring slots existed; the
@@ -753,6 +755,8 @@ export interface PeekProfile {
   frame: string | null;
   /** The catalogue ring, worn over the frame when both are set. */
   ring: string | null;
+  /** The catalogue avatar effect, which rides with any ring. */
+  aura: string | null;
   /** A dropped-in profile border and avatar effect, when worn. */
   ringArt: ArtFile | null;
   auraArt: ArtFile | null;
@@ -917,6 +921,43 @@ export type FeedItem =
       timeZone: string;
       youCanAnswer: number;
       sample: FeedCard[];
+    }
+  | {
+      kind: "traded";
+      storeName: string;
+      eventName: string;
+      requester: string;
+      holder: string | null;
+      cardName: string;
+      cardNumber: string;
+      imageUrl: string | null;
+      confirmedAt: string;
+    }
+  | {
+      kind: "added";
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+      total: number;
+      onYourListCount: number;
+      cards: {
+        cardId: string;
+        cardName: string;
+        cardNumber: string;
+        imageUrl: string | null;
+        onYourList: boolean;
+      }[];
+    }
+  | {
+      kind: "suggest";
+      players: {
+        playerId: string;
+        displayName: string;
+        avatarUrl: string | null;
+        answers: number;
+      }[];
     }
   | {
       kind: "hunt";

@@ -18,6 +18,50 @@ import { describe, expect, it } from "vitest";
 const CSS = readFileSync("src/app/cosmetic-art.css", "utf8");
 const APP = readFileSync("mobile/src/player-avatar.tsx", "utf8");
 
+/** Every avatar effect the stylesheet draws, and the particle it scatters. */
+function aurasFromCss(): Map<string, string[]> {
+  const auras = new Map<string, string[]>();
+
+  for (const [, slug, body] of CSS.matchAll(
+    /\.cfa-(aura-[a-z0-9-]+) \.cfx-aura-fx \{([^}]*)\}/g,
+  )) {
+    const particle = /--cfa-p-([a-z0-9-]+)/.exec(body);
+    if (!particle) continue;
+
+    /* The particle is an inline SVG; its fills are the effect's colours. */
+    const defined = new RegExp(`--cfa-p-${particle[1]}:([^\n]*)`).exec(CSS);
+    if (!defined) continue;
+
+    auras.set(
+      slug,
+      [...defined[1].matchAll(/%23([0-9a-fA-F]{6})/g)].map(
+        ([, hex]) => `#${hex.toLowerCase()}`,
+      ),
+    );
+  }
+
+  return auras;
+}
+
+/** The app's AURA_COLOR map, read the same way RING_COLOR is. */
+function auraColorsFromApp(): Map<string, string> {
+  const block =
+    /export const AURA_COLOR: Record<string, string> = \{([\s\S]*?)\n\};/.exec(APP);
+  expect(
+    block,
+    "AURA_COLOR should still be declared in the app's PlayerAvatar",
+  ).not.toBeNull();
+
+  const colors = new Map<string, string>();
+  for (const [, slug, hex] of block![1].matchAll(
+    /"([a-z0-9-]+)":\s*"(#[0-9a-fA-F]{6})"/g,
+  )) {
+    colors.set(slug, hex.toLowerCase());
+  }
+
+  return colors;
+}
+
 /** Every `.cfa-<slug>` rule that declares a band, with its colour stops. */
 function bandsFromCss(): Map<string, string[]> {
   const bands = new Map<string, string[]>();
@@ -95,5 +139,37 @@ describe("catalogue rings render in the app", () => {
     const stale = [...colors.keys()].filter((slug) => !bands.has(slug));
 
     expect(stale, `no longer in the stylesheet: ${stale.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("avatar effects render in the app", () => {
+  const auras = aurasFromCss();
+  const colors = auraColorsFromApp();
+
+  it("finds the effects it is meant to be checking", () => {
+    expect(auras.size).toBeGreaterThan(5);
+    expect(colors.size).toBeGreaterThan(5);
+  });
+
+  it("gives every effect the website draws a colour the app can draw", () => {
+    const missing = [...auras.keys()].filter((slug) => !colors.has(slug));
+
+    expect(
+      missing,
+      `these effects would be invisible on a phone: ${missing.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  /* The halo is the colour of the thing that would have been floating, so
+     it has to be a fill the particle actually paints. */
+  it("takes each colour from that effect's own particle", () => {
+    const invented = [...colors.entries()].filter(
+      ([slug, hex]) => auras.has(slug) && !auras.get(slug)!.includes(hex),
+    );
+
+    expect(
+      invented.map(([slug, hex]) => `${slug} (${hex})`),
+      "these colours are not fills in the effect's own particle",
+    ).toEqual([]);
   });
 });
