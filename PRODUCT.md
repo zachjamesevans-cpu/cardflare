@@ -82,6 +82,64 @@ reinvented piecemeal:
   farmable by two friends confirming each other all afternoon, so any
   such score has to weigh distinct partners, rooms and stores.
 
+## The Feed
+
+**Approved 2026-08-17.** The largest scope change the product has taken, so
+the boundary is written down before the code is.
+
+The Feed replaces Join as the app's first tab. Join was a tab used four times
+a month, on the days a player stands in a shop; the Feed is the answer to
+"why would I open CardFlare on a Tuesday". Scanning does not go away — it
+becomes a button, reachable from every screen, which is fewer taps than the
+tab it replaces.
+
+### What it is
+
+**A want board across time and place.** The room tells you who has a card
+_tonight, here_. The Feed tells you the same thing when you are on a sofa: a
+board opening at your store on Friday with four of your wants already on it, a
+player you follow hunting a card your binder answers, a trade that happened
+last night at the counter you go to.
+
+Its unit is **a card and an intent** — want, have, got. A card with no intent
+is a picture of a card, and there are better places on the internet to look at
+card art. The intent is what makes an item actionable, and every item ends in
+a place and a time: _bring it Friday_, not _post it to me_.
+
+### What it is not
+
+- **Not a photo feed.** No free-form captions, no uploaded photographs, no
+  comments, in this milestone. Posts are card-shaped: a card from the
+  catalogue and, at most, a short note. That is nearly moderation-free, and
+  CardFlare does not have a moderation system and has never claimed one.
+- **Not somewhere you post.** In this milestone the Feed reports what players
+  did — joined, hunted, added, traded — rather than offering a compose box.
+  Almost every item is derived, which is also how a pilot with six players has
+  a Feed worth opening on its first day.
+- **Not a step toward the nationwide marketplace** ruled out above. That is
+  the drift this feature makes possible, and the guard is the rule about place
+  and time: an item that could be satisfied by post has no business here.
+
+### Why it earns its place
+
+Three things CardFlare has that a general social app does not:
+
+1. **Who to follow is computable.** The players worth following are the ones
+   whose binder answers your wants, and that is a query rather than a guess.
+   The cold-start problem that kills small social products is not one here.
+2. **Stores are reliable producers.** A player may post nothing for a month; a
+   store has something on every week. The Feed is seeded with places, not
+   people.
+3. **It gives the cosmetics somewhere to be seen.** A player buys a ring today
+   and three people at a counter notice. Rings, showcases and Embers only make
+   sense where people look at each other, and the Feed is that place.
+
+### The measure
+
+Not daily actives. **Trades and wants that trace back to a Feed item.** A Feed
+that does not produce trades is a cost with good engagement numbers, which is
+the most expensive kind of mistake available here.
+
 ## The core loop
 
 This is the product. Protect it. Every feature should make one of these steps
