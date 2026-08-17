@@ -5,6 +5,8 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
+  getFeed,
+  type FeedItem,
   getMe,
   joinRoom,
   postFlare,
@@ -13,7 +15,8 @@ import {
   storedAccessToken,
   type Me,
 } from "../api";
-import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, CardImage, Input, Muted, Tap, Title } from "../ui";
+import { PlayerAvatar } from "../player-avatar";
 import { colors, spacing } from "../theme";
 
 /**
@@ -22,10 +25,31 @@ import { colors, spacing } from "../theme";
  * the stores they actually go to, saved automatically on every join —
  * so the second visit never needs the QR code at all.
  */
+/**
+ * When the doors open, in the store's own clock — the website's `doorsAt`.
+ *
+ * A board days out needs a day and an hour and nothing else, and "open
+ * since" is what the room's own formatter would say, which is true of an
+ * event underway and wrong about every board this line is drawn for.
+ */
+function doorsAt(startsAt: string | null, timeZone: string): string {
+  if (!startsAt) return "Taking Flares early";
+
+  return `Doors ${new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(startsAt))}`;
+}
+
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [code, setCode] = useState("");
   const [me, setMe] = useState<Me | null>(null);
+  /* What is on at the places you go, and who needs what you have. The
+     website's Feed, from the same server answer. */
+  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [rsvping, setRsvping] = useState<string | null>(null);
   const locals = me?.locals ?? [];
 
@@ -35,7 +59,10 @@ export function HomeScreen() {
 
       void (async () => {
         if (!(await storedAccessToken())) {
-          if (live) setMe(null);
+          if (live) {
+            setMe(null);
+            setFeed([]);
+          }
           return;
         }
         try {
@@ -43,6 +70,15 @@ export function HomeScreen() {
           if (live) setMe(fresh);
         } catch {
           if (live) setMe(null);
+        }
+
+        /* Its own try: the feed is the screen's headline, but a feed that
+           failed must not take the locals list down with it. */
+        try {
+          const fresh = await getFeed();
+          if (live) setFeed(fresh.items);
+        } catch {
+          if (live) setFeed([]);
         }
       })();
 
@@ -101,6 +137,99 @@ export function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      {/*
+       * The Feed leads. Everything here is derived - nobody posts to it -
+       * so a pilot with six players still opens something worth reading.
+       * The website's two item kinds, in the website's order: people
+       * before places, because a board will still be there tomorrow and
+       * somebody needing a card you are holding will not.
+       */}
+      {feed.map((item, index) =>
+        item.kind === "hunt" ? (
+          <Card key={`hunt-${index}`}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <PlayerAvatar
+                displayName={item.displayName}
+                seed={item.playerId}
+                avatarUrl={item.avatarUrl}
+                frame={item.frame}
+                ring={item.ring}
+                size={40}
+              />
+              <View style={{ flexShrink: 1 }}>
+                <Title>{item.displayName}</Title>
+                <Muted>{`is hunting · ${item.eventName}`}</Muted>
+              </View>
+            </View>
+
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <CardImage
+                imageUrl={item.card.imageUrl}
+                width={56}
+                name={item.card.cardName}
+                cardNumber={item.card.cardNumber}
+                youHave={{ kind: item.card.match, count: 0 }}
+              />
+              <View style={{ flexShrink: 1 }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  {item.card.cardName}
+                </Text>
+                <Muted>{item.card.cardNumber}</Muted>
+                <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                  {item.card.match === "exact"
+                    ? "You have this"
+                    : "You have another printing"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Every item ends in a place and a time. */}
+            <Button
+              label={`Go to ${item.storeName}`}
+              onPress={() => void enter(item.code)}
+            />
+          </Card>
+        ) : (
+          <Card key={`board-${index}`}>
+            <Muted>{item.storeName}</Muted>
+            <Title>{item.eventName}</Title>
+            <Muted>{item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}</Muted>
+
+            {item.youCanAnswer > 0 && (
+              <>
+                <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                  {`You can answer ${item.youCanAnswer} ${
+                    item.youCanAnswer === 1 ? "card" : "cards"
+                  } on this board`}
+                </Text>
+                <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                  {item.sample.map((card) => (
+                    <CardImage
+                      key={card.cardId}
+                      imageUrl={card.imageUrl}
+                      width={48}
+                      name={card.cardName}
+                      cardNumber={card.cardNumber}
+                      youHave={{ kind: card.match, count: 0 }}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+
+            <Button
+              label={item.live ? "Go to the room" : "See the board"}
+              variant="secondary"
+              onPress={() => void enter(item.code)}
+            />
+          </Card>
+        ),
+      )}
+
       {locals.length > 0 && (
         <Card>
           <Title>Your locals</Title>
