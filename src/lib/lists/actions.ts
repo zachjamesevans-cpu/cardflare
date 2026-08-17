@@ -224,7 +224,7 @@ export async function addToListAction(
       room.eventId,
       room.playerSessionId,
       (await getPlayerSession())?.display_name ?? "A player",
-      parsed.data.cardId,
+      [parsed.data.cardId],
       showcase ? "showcase" : "want",
     );
   }

@@ -21,6 +21,7 @@ import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
 import { DisplayNameForm } from "@/components/players/display-name-form";
+import { DeckListForm } from "@/components/players/deck-list-form";
 import { HandleForm } from "@/components/players/handle-form";
 import { ownProfile } from "@/lib/players/profile";
 
@@ -224,9 +225,25 @@ export default async function ProfileSettingsPage() {
           </div>
         </div>
 
+        {/*
+         * The fast way in, above the list rather than below it. A player
+         * arriving here before a release has nothing to scroll past and
+         * a deck to paste; a player with fifty wants already knows where
+         * their list is.
+         */}
+        <details className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-text-primary">
+            Paste a deck list
+          </summary>
+          <div className="pt-4">
+            <DeckListForm />
+          </div>
+        </details>
+
         {wants.length === 0 ? (
           <p className="text-sm text-text-muted">
-            Nothing yet. Post a Flare at your next event and it will be waiting here.
+            Nothing yet. Paste a deck above, or post a Flare at your next event and it
+            will be waiting here.
           </p>
         ) : (
           <ul className="flex flex-col">

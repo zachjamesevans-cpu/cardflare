@@ -180,3 +180,39 @@ export async function countCards(): Promise<number> {
 
   return count ?? 0;
 }
+
+/**
+ * Card ids for a list of printed numbers, keyed by compact number.
+ *
+ * One query for a whole deck list rather than one per line: a pasted
+ * deck is fifty cards, and fifty round trips inside a Server Action is
+ * how a paste turns into a timeout.
+ *
+ * Matched on `compact_card_number`, so a list written "OP17001" finds
+ * the same card as one written "OP17-001" — deck builders disagree about
+ * the dash and a player pasting one should never have to care.
+ */
+export async function findCardsByNumbers(
+  numbers: string[],
+): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+
+  const compact = [
+    ...new Set(numbers.map((n) => n.replace(/[^A-Za-z0-9]/g, "").toUpperCase())),
+  ];
+  if (!isSupabaseConfigured() || compact.length === 0) return found;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("cards")
+    .select("id, compact_card_number")
+    .in("compact_card_number", compact);
+
+  if (error) {
+    console.error("Could not resolve the deck list's card numbers", error);
+    return found;
+  }
+
+  for (const row of data ?? []) found.set(row.compact_card_number, row.id);
+
+  return found;
+}

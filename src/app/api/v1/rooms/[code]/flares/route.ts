@@ -87,7 +87,7 @@ export async function POST(
     resolved.room.id,
     session.id,
     session.display_name ?? "A player",
-    parsed.data.cardId,
+    [parsed.data.cardId],
     intent,
   );
 

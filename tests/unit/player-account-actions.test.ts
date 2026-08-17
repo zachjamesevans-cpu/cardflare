@@ -18,7 +18,7 @@ const resolveCode = vi.fn();
 const enterRoomByCode = vi.fn();
 const findParticipation = vi.fn();
 const joinEvent = vi.fn();
-const addFlare = vi.fn();
+const addFlareBatch = vi.fn();
 const listWants = vi.fn();
 const removeWant = vi.fn();
 const setWantQuantity = vi.fn();
@@ -64,7 +64,7 @@ vi.mock("@/lib/events/participants", () => ({
   joinEvent: (...a: unknown[]) => joinEvent(...a),
 }));
 vi.mock("@/lib/lists/repository", () => ({
-  addFlare: (...a: unknown[]) => addFlare(...a),
+  addFlareBatch: (...a: unknown[]) => addFlareBatch(...a),
 }));
 vi.mock("@/lib/players/wants", () => ({
   listWants: (...a: unknown[]) => listWants(...a),
@@ -123,7 +123,7 @@ beforeEach(() => {
     enterRoomByCode,
     findParticipation,
     joinEvent,
-    addFlare,
+    addFlareBatch,
     listWants,
     removeWant,
     setWantQuantity,
@@ -159,7 +159,7 @@ beforeEach(() => {
   getPlayerSession.mockResolvedValue({ id: "sess-1", player_id: "player-1" });
   resolveCode.mockResolvedValue({ outcome: "room", room: { id: "event-1" } });
   findParticipation.mockResolvedValue({ lastSeenAt: "now" });
-  addFlare.mockResolvedValue({ ok: true });
+  addFlareBatch.mockResolvedValue({ batchId: "b1", posted: [], atCap: false });
   listWants.mockResolvedValue([want("w1", "c1"), want("w2", "c2")]);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -206,19 +206,31 @@ describe("repostWantsAction", () => {
 
   it("posts every saved want into the room", async () => {
     listWants.mockResolvedValue([want("w1", "c1", "RG Luffy"), want("w2", "c2")]);
+    addFlareBatch.mockResolvedValue({
+      batchId: "b1",
+      posted: ["c1", "c2"],
+      atCap: false,
+    });
 
     const state = await repostWantsAction(REPOST_IDLE, form(fields));
 
     expect(state).toEqual({ status: "posted", count: 2 });
-    expect(addFlare).toHaveBeenCalledTimes(2);
+
+    /* ONE call, not one per want. A want list posted at a counter is a
+       single act, and this is what keeps it to a single notification
+       and a single Feed item. */
+    expect(addFlareBatch).toHaveBeenCalledTimes(1);
     // The deck label re-posts with the want, so the folder survives the trip.
-    expect(addFlare).toHaveBeenCalledWith("event-1", "sess-1", {
-      cardId: "c1",
-      printingId: null,
-      quantity: 1,
-      note: null,
-      deckLabel: "RG Luffy",
-    });
+    expect(addFlareBatch).toHaveBeenCalledWith("event-1", "sess-1", [
+      {
+        cardId: "c1",
+        printingId: null,
+        quantity: 1,
+        note: null,
+        deckLabel: "RG Luffy",
+      },
+      { cardId: "c2", printingId: null, quantity: 1, note: null, deckLabel: null },
+    ]);
     expect(linkSessionToPlayer).toHaveBeenCalledWith("sess-1", "player-1");
   });
 
@@ -228,7 +240,7 @@ describe("repostWantsAction", () => {
     const state = await repostWantsAction(REPOST_IDLE, form(fields));
 
     expect(state.status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
+    expect(addFlareBatch).not.toHaveBeenCalled();
   });
 
   it("posts nothing without room membership", async () => {
@@ -237,18 +249,19 @@ describe("repostWantsAction", () => {
     const state = await repostWantsAction(REPOST_IDLE, form(fields));
 
     expect(state.status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
+    expect(addFlareBatch).not.toHaveBeenCalled();
   });
 
-  it("stops at the Flare cap instead of hammering it", async () => {
-    addFlare
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({ ok: false, reason: "at-cap" });
+  it("reports what the cap let through", async () => {
+    /* The cap is the batch's own business now — it stops there rather
+       than being counted out here — so what this checks is that the
+       count reaching the player is what actually posted. */
+    addFlareBatch.mockResolvedValue({ batchId: "b1", posted: ["c1"], atCap: true });
 
     const state = await repostWantsAction(REPOST_IDLE, form(fields));
 
     expect(state).toEqual({ status: "posted", count: 1 });
-    expect(addFlare).toHaveBeenCalledTimes(2);
+    expect(addFlareBatch).toHaveBeenCalledTimes(1);
   });
 
   it("resolves the account for an admin who also plays", async () => {
@@ -336,12 +349,17 @@ describe("rsvpAction", () => {
     enterRoomByCode.mockResolvedValue(earlyEvent());
     joinEvent.mockResolvedValue(true);
     listWants.mockResolvedValue([want("w1", "c1"), want("w2", "c2")]);
-    addFlare.mockResolvedValue({ ok: true });
+    addFlareBatch.mockResolvedValue({
+      batchId: "b1",
+      posted: ["c1", "c2"],
+      atCap: false,
+    });
 
     await expect(rsvpAction(form({ code: "K3M9PZ" }))).rejects.toThrow("NEXT_REDIRECT");
 
     expect(joinEvent).toHaveBeenCalledWith("event-1", "sess-1");
-    expect(addFlare).toHaveBeenCalledTimes(2);
+    /* An RSVP is one act too: one batch, whatever the list's length. */
+    expect(addFlareBatch).toHaveBeenCalledTimes(1);
     expect(saveLocal).toHaveBeenCalledWith("player-1", "store-1");
   });
 
@@ -369,7 +387,7 @@ describe("rsvpAction", () => {
     await rsvpAction(form({ code: "K3M9PZ" }));
 
     expect(joinEvent).not.toHaveBeenCalled();
-    expect(addFlare).not.toHaveBeenCalled();
+    expect(addFlareBatch).not.toHaveBeenCalled();
   });
 
   it("is a silent no-op for anyone without a player account", async () => {

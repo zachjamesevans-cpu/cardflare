@@ -263,9 +263,10 @@ function Tabs() {
       })}
     >
       {/* Feed, not Join. Join was a tab used four times a month, on the
-          days somebody stands in a shop; scanning is a button on this
-          screen now, which is fewer taps than the tab it replaced. The
-          header still carries the product name, as the website's does. */}
+          days somebody stands in a shop; getting into a room lives on
+          the Room tab now, which is the one you are already opening
+          when you are standing at a counter. The header still carries
+          the product name, as the website's does. */}
       <Tab.Screen
         name="Feed"
         component={HomeScreen}

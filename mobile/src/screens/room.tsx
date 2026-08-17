@@ -70,6 +70,8 @@ const POLL_MS = 12_000;
  */
 export function RoomTab() {
   const [code, setCode] = useState<string | null>(null);
+  /* What is being typed, for the player whose camera will not focus. */
+  const [typed, setTyped] = useState("");
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
   useFocusEffect(
@@ -81,13 +83,46 @@ export function RoomTab() {
   if (!code) {
     return (
       <View style={{ padding: spacing(4) }}>
+        {/*
+         * Getting INTO a room happens here now, not on the Feed. The
+         * founder: "move the qr code scanner/code entry to Room. No need
+         * to have that in the feed." Both ways in are on this card,
+         * because typing is a first-class route and not a consolation —
+         * a meaningful share of players have a camera that will not
+         * focus, a locked-down work phone or a cracked screen.
+         */}
         <Card>
           <Title>No room yet</Title>
           <Body>
-            Scan a store&rsquo;s counter code from the Join tab and the room lives
-            here.
+            Scan the code at your store&rsquo;s counter, or type it here. Either way
+            the room lives on this tab until you leave it.
           </Body>
-          <Button label="Scan a code" onPress={() => navigation.navigate("Scan")} />
+
+          <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
+
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                value={typed}
+                onChangeText={setTyped}
+                placeholder="Or enter the code"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
+            <AsyncButton
+              label="Go"
+              pendingLabel="Opening…"
+              variant="secondary"
+              onPress={async () => {
+                const entered = typed.trim().toUpperCase();
+                if (!entered) return;
+                await rememberRoom(entered);
+                setTyped("");
+                setCode(entered);
+              }}
+            />
+          </View>
         </Card>
       </View>
     );

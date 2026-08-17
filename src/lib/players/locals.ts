@@ -61,21 +61,19 @@ export async function removeLocal(playerId: string, storeId: string): Promise<vo
 }
 
 /** The player's saved stores, newest first, each with its current pulse. */
-export async function listLocals(playerId: string): Promise<LocalStore[]> {
-  if (!isSupabaseConfigured()) return [];
-
-  const { data: rows, error } = await getSupabaseAdmin()
-    .from("player_locals")
-    .select("store_id, created_at")
-    .eq("player_id", playerId)
-    .order("created_at", { ascending: false });
-
-  if (error || !rows || rows.length === 0) {
-    if (error) console.error("Could not list the player's locals", error);
-    return [];
-  }
-
-  const storeIds = rows.map((row) => row.store_id);
+/**
+ * Turns a set of store ids into what the Feed needs to know about them.
+ *
+ * Extracted so "the stores I saved" and "the stores with something on
+ * right now" derive their boards identically. They are the same
+ * question asked from two directions, and two copies of this would drift
+ * the moment one of them learned about a new event status.
+ */
+async function boardsForStores(
+  storeIds: string[],
+  savedAt: Map<string, string>,
+): Promise<LocalStore[]> {
+  if (storeIds.length === 0) return [];
 
   const [{ data: stores }, { data: events }] = await Promise.all([
     getSupabaseAdmin()
@@ -116,11 +114,11 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
     }
   }
 
-  return rows.flatMap((row) => {
-    const store = byStore.get(row.store_id);
+  return storeIds.flatMap((storeId) => {
+    const store = byStore.get(storeId);
     if (!store) return [];
 
-    const upcoming = next.get(row.store_id) ?? null;
+    const upcoming = next.get(storeId) ?? null;
 
     // The board is already open when the start is inside the store's
     // early window — or when it is already event day, the founder's
@@ -143,7 +141,7 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
         city: store.city,
         region: store.region,
         joinCode: store.join_code,
-        savedAt: row.created_at,
+        savedAt: savedAt.get(storeId) ?? "",
         liveNow: live.has(store.id),
         nextEventAt: upcoming?.startsAt ?? null,
         nextEventName: upcoming?.name ?? null,
@@ -152,4 +150,76 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
       },
     ];
   });
+}
+
+export async function listLocals(playerId: string): Promise<LocalStore[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const { data: rows, error } = await getSupabaseAdmin()
+    .from("player_locals")
+    .select("store_id, created_at")
+    .eq("player_id", playerId)
+    .order("created_at", { ascending: false });
+
+  if (error || !rows || rows.length === 0) {
+    if (error) console.error("Could not list the player's locals", error);
+    return [];
+  }
+
+  return boardsForStores(
+    rows.map((row) => row.store_id),
+    new Map(rows.map((row) => [row.store_id, row.created_at])),
+  );
+}
+
+/**
+ * Stores with something on right now, anywhere.
+ *
+ * The Feed's answer to a brand-new player. Every other item is
+ * personalised — a friend's hunt, a saved store's board, a trade where
+ * you play — so on day one they all return nothing and the feed is
+ * empty. This one needs nothing from the player at all: a room open
+ * tonight is news whether or not they have told us anything.
+ *
+ * Honest at pilot scale precisely because the list is short. When there
+ * are eight stores, "every store with something on" IS the nearby list;
+ * when there are eight hundred it stops being one, and that is the
+ * moment to ask a player where they play rather than guess.
+ */
+export async function listOpenStores(
+  exclude: string[] = [],
+  limit = 3,
+): Promise<LocalStore[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  /* Started from the EVENTS, not the stores: a shop with nothing on is
+     not news, and scanning every store to discover that would be a
+     query whose answer is almost always "no". */
+  const { data: events, error } = await getSupabaseAdmin()
+    .from("events")
+    .select("store_id, starts_at")
+    .neq("status", "closed")
+    .order("starts_at", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    console.error("Could not look for open rooms", error);
+    return [];
+  }
+
+  const skip = new Set(exclude);
+  const candidates = [
+    ...new Set(
+      (events ?? []).map((event) => event.store_id).filter((id) => !skip.has(id)),
+    ),
+  ];
+
+  const boards = await boardsForStores(candidates, new Map());
+
+  /* Only the ones somebody could actually walk into or post onto, and a
+     room open NOW before a board opening later. */
+  return boards
+    .filter((store) => store.liveNow || store.earlyOpen)
+    .sort((a, b) => Number(b.liveNow) - Number(a.liveNow))
+    .slice(0, limit);
 }

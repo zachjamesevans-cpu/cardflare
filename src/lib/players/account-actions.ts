@@ -11,9 +11,12 @@ import { findParticipation, joinEvent } from "@/lib/events/participants";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
-import { addFlare } from "@/lib/lists/repository";
+import { addFlareBatch } from "@/lib/lists/repository";
+import { deckLabelSchema } from "@/lib/lists/schema";
+import { findCardsByNumbers } from "@/lib/cards/search";
+import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
-import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
+import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { accountRoomIdentity } from "@/lib/players/room-identity";
 import { getPlayerSession, setPlayerCookie } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
@@ -161,19 +164,22 @@ export async function rsvpAction(formData: FormData): Promise<void> {
 
   await saveLocal(playerId, event.storeId);
 
-  // Post the whole want list; the board's duplicates are skipped and the
-  // cap stops the loop the same way the repost panel's does.
+  /* Post the whole want list as ONE batch — an RSVP is one act, and a
+     twenty-card list arriving as twenty separate posts is what this
+     round exists to stop. Duplicates are skipped and the cap stops it
+     the same way the repost panel's does. */
   const wants = await listWants(playerId);
-  for (const want of wants) {
-    const result = await addFlare(event.id, session.id, {
+  await addFlareBatch(
+    event.id,
+    session.id,
+    wants.map((want) => ({
       cardId: want.cardId,
       printingId: want.printingId,
       quantity: want.quantity,
       note: want.note,
       deckLabel: want.deckLabel,
-    });
-    if (!result.ok && result.reason === "at-cap") break;
-  }
+    })),
+  );
 
   // An RSVP's Flares wake the store's regulars the same way any early
   // post does; the dedupe makes this free when the digest already went.
@@ -286,28 +292,36 @@ export async function repostWantsAction(
   const wants = await listWants(playerId);
   if (wants.length === 0) return { status: "posted", count: 0 };
 
-  let posted = 0;
-
-  for (const want of wants) {
-    const result = await addFlare(resolved.room.id, session.id, {
+  /*
+   * One batch, so the room hears about a want list once. This used to
+   * loop `addFlare` and tell nobody at all — quiet, but the wrong kind:
+   * a player posting twenty cards ahead of a release is exactly the
+   * event everybody else in the room wants to know about.
+   */
+  const { posted } = await addFlareBatch(
+    resolved.room.id,
+    session.id,
+    wants.map((want) => ({
       cardId: want.cardId,
       printingId: want.printingId,
       quantity: want.quantity,
       note: want.note,
       deckLabel: want.deckLabel,
-    });
+    })),
+  );
 
-    if (result.ok) {
-      posted += 1;
-    } else if (result.reason === "at-cap") {
-      break;
-    }
-    // A duplicate (already on the board) is skipped by the repository; any
-    // other failure skips one want rather than abandoning the rest.
+  if (posted.length > 0) {
+    void notifyRoomFlare(
+      resolved.room.id,
+      session.id,
+      session.display_name ?? "A player",
+      posted,
+      "want",
+    );
   }
 
   revalidatePath(`/e/${code}`);
-  return { status: "posted", count: posted };
+  return { status: "posted", count: posted.length };
 }
 
 /**
@@ -364,4 +378,78 @@ export async function saveWantAction(
     kind: "flare",
     cardName: text(formData, "cardName").slice(0, 200),
   };
+}
+
+/**
+ * Saves a pasted deck list to the want list, under one name.
+ *
+ * The bulk half of "post multiple flares at once". This puts the cards
+ * on the account; the room's existing "still hunting these?" panel posts
+ * them as ONE batch, which is what makes a thirty-card deck a single
+ * notification and a single Feed item.
+ *
+ * Deliberately not a posting action itself. A deck is written at home
+ * and posted at a counter, often days apart, and a want list is the
+ * thing that already survives that gap — see `saveWantAction`.
+ */
+export async function importDeckListAction(
+  _previous: DeckImportState,
+  formData: FormData,
+): Promise<DeckImportState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) {
+    return { status: "error", message: "Sign in to keep a list between events." };
+  }
+
+  const { lines, unreadable } = parseDeckList(text(formData, "list"));
+
+  if (lines.length === 0) {
+    return {
+      status: "error",
+      message: "No card numbers in that. Lines look like “OP17-001” or “4x OP17-001”.",
+    };
+  }
+
+  const label = deckLabelSchema.safeParse(text(formData, "deckLabel") || null);
+  const deckLabel = label.success ? (label.data ?? null) : null;
+
+  /*
+   * Resolved by NUMBER, in one query. Names are ignored on purpose: they
+   * differ by printing, language and punctuation, and a list that
+   * half-matches on names is worse than one that says plainly what it
+   * could not find.
+   */
+  const found = await findCardsByNumbers(lines.map((line) => line.cardNumber));
+
+  let saved = 0;
+  let atCap = false;
+  const unknown: string[] = [];
+
+  for (const line of lines) {
+    const cardId = found.get(compactCardNumber(line.cardNumber));
+
+    if (!cardId) {
+      unknown.push(line.cardNumber);
+      continue;
+    }
+
+    const outcome = await saveWant(playerId, {
+      cardId,
+      /* Any printing. A deck list says which card, never which art. */
+      printingId: null,
+      quantity: line.quantity,
+      note: null,
+      deckLabel,
+    });
+
+    if (outcome === "saved") saved += 1;
+    else if (outcome === "at-cap") {
+      atCap = true;
+      break;
+    }
+  }
+
+  revalidatePath("/profile");
+
+  return { status: "saved", saved, unknown, unreadable, atCap };
 }

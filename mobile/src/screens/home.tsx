@@ -1,7 +1,8 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Image, Linking, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
@@ -15,15 +16,20 @@ import {
   storedAccessToken,
   type Me,
 } from "../api";
-import { AsyncButton, Body, Button, Card, CardImage, Input, Muted, Tap, Title } from "../ui";
+import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
 import { PlayerAvatar } from "../player-avatar";
+import { API_BASE } from "../config";
 import { colors, spacing } from "../theme";
 
 /**
- * The Join tab — the front door, guest-first like the website: scan the
- * counter code or type it. A signed-in player also gets their locals —
- * the stores they actually go to, saved automatically on every join —
- * so the second visit never needs the QR code at all.
+ * The Feed tab — what is on, and who needs what you are holding.
+ *
+ * Scanning is not here. It used to be the card at the bottom of this
+ * screen, and the founder cut it: "move the qr code scanner/code entry
+ * to Room. No need to have that in the feed." Room is the tab you are
+ * already opening when you are standing at a counter, and this one is
+ * for reading. A signed-in player still gets their locals here — the
+ * stores they actually go to, saved automatically on every join.
  */
 /**
  * When the doors open, in the store's own clock — the website's `doorsAt`.
@@ -43,9 +49,36 @@ function doorsAt(startsAt: string | null, timeZone: string): string {
   }).format(new Date(startsAt))}`;
 }
 
+/**
+ * What the two starter items say — the website's copy, word for word.
+ *
+ * Kept as data rather than two more branches below, because the pair are
+ * the same card with different words in it and the shape is the
+ * argument: a question, why it is worth answering, and one button.
+ */
+const STARTERS = {
+  store: {
+    icon: "map-marker-outline",
+    headline: "Where do you play?",
+    body: "Join your store's room once and it saves itself here, with its next board and who is hunting what. The code is on the counter.",
+    label: "Enter a store code",
+  },
+  deck: {
+    icon: "clipboard-list-outline",
+    headline: "What are you hunting?",
+    body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
+    label: "Paste a deck list",
+  },
+} as const;
+
+/**
+ * The mark is taller than it is wide — BRAND.md's one rule about it. It
+ * is sized by height here and its width follows the artwork.
+ */
+const MARK_ASPECT = 60 / 72;
+
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const [code, setCode] = useState("");
   const [me, setMe] = useState<Me | null>(null);
   /* What is on at the places you go, and who needs what you have. The
      website's Feed, from the same server answer. */
@@ -90,8 +123,40 @@ export function HomeScreen() {
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
-    setCode("");
     navigation.navigate("Tabs", { screen: "Room" });
+  };
+
+  /*
+   * Where a notice's button goes on a phone.
+   *
+   * The link is stored as a website path, because that is the one form
+   * both platforms can read and the only form the database accepts. The
+   * handful the app has a screen for are routed to it; anything else
+   * opens the website, which is honest — the button always ends up
+   * where its label said it would.
+   */
+  const follow = (href: string) => {
+    if (href.startsWith("/e/")) {
+      void enter(href.slice(3));
+      return;
+    }
+    if (href === "/room") {
+      navigation.navigate("Tabs", { screen: "Room" });
+      return;
+    }
+    if (href === "/profile/settings") {
+      navigation.navigate("Settings");
+      return;
+    }
+    if (href === "/profile") {
+      navigation.navigate("Tabs", { screen: "Profile" });
+      return;
+    }
+    if (href === "/feed") {
+      navigation.navigate("Tabs", { screen: "Feed" });
+      return;
+    }
+    void Linking.openURL(`${API_BASE}${href}`).catch(() => {});
   };
 
   /*
@@ -145,7 +210,86 @@ export function HomeScreen() {
        * somebody needing a card you are holding will not.
        */}
       {feed.map((item, index) =>
-        item.kind === "traded" ? (
+        item.kind === "announcement" ? (
+          <Card key={`announcement-${index}`}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              {/* The mark, not a face. There is no CardFlare player and
+                  this is the item that has to look like it knows that. */}
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Image
+                  source={require("../../assets/cardflare-mark.png")}
+                  style={{ height: 20, width: 20 * MARK_ASPECT, resizeMode: "contain" }}
+                />
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Title>{item.headline}</Title>
+                <Muted>CardFlare</Muted>
+              </View>
+            </View>
+
+            <Body>{item.body}</Body>
+
+            {item.linkLabel && item.linkHref ? (
+              <Button
+                label={item.linkLabel}
+                variant="secondary"
+                onPress={() => follow(item.linkHref as string)}
+              />
+            ) : null}
+          </Card>
+        ) : item.kind === "start" ? (
+          <Card key={`start-${index}`}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <MaterialCommunityIcons
+                  name={STARTERS[item.topic].icon}
+                  size={20}
+                  color={colors.accent}
+                />
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Title>{STARTERS[item.topic].headline}</Title>
+              </View>
+            </View>
+
+            <Body>{STARTERS[item.topic].body}</Body>
+
+            <Button
+              label={STARTERS[item.topic].label}
+              onPress={() =>
+                item.topic === "store"
+                  ? navigation.navigate("Tabs", { screen: "Room" })
+                  : navigation.navigate("Settings")
+              }
+            />
+          </Card>
+        ) : item.kind === "traded" ? (
           <Card key={`traded-${index}`}>
             <Body>
               {`${item.requester} traded for ${item.cardName}${
@@ -244,32 +388,72 @@ export function HomeScreen() {
               />
               <View style={{ flexShrink: 1 }}>
                 <Title>{item.displayName}</Title>
-                <Muted>{`is hunting · ${item.eventName}`}</Muted>
+                <Muted>
+                  {`${
+                    item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
+                  }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
+                </Muted>
               </View>
             </View>
 
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-            >
-              <CardImage
-                imageUrl={item.card.imageUrl}
-                width={56}
-                name={item.card.cardName}
-                cardNumber={item.card.cardNumber}
-                youHave={{ kind: item.card.match, count: 0 }}
-              />
-              <View style={{ flexShrink: 1 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {item.card.cardName}
-                </Text>
-                <Muted>{item.card.cardNumber}</Muted>
-                <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                  {item.card.match === "exact"
-                    ? "You have this"
-                    : "You have another printing"}
-                </Text>
+            {/* One card reads as a card; a deck reads as a row of them.
+                A player posting thirty cards is one thing that happened,
+                not thirty — the founder's rule for the whole Feed. */}
+            {item.total === 1 && item.cards[0] ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+              >
+                <CardImage
+                  imageUrl={item.cards[0].imageUrl}
+                  width={56}
+                  name={item.cards[0].cardName}
+                  cardNumber={item.cards[0].cardNumber}
+                  youHave={
+                    item.cards[0].match
+                      ? { kind: item.cards[0].match, count: 0 }
+                      : undefined
+                  }
+                />
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {item.cards[0].cardName}
+                  </Text>
+                  <Muted>{item.cards[0].cardNumber}</Muted>
+                  {item.cards[0].match ? (
+                    <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                      {item.cards[0].match === "exact"
+                        ? "You have this"
+                        : "You have another printing"}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={{ gap: spacing(2) }}>
+                <View
+                  style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}
+                >
+                  {item.cards.map((card) => (
+                    <CardImage
+                      key={card.cardId}
+                      imageUrl={card.imageUrl}
+                      width={48}
+                      name={card.cardName}
+                      cardNumber={card.cardNumber}
+                      youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+                    />
+                  ))}
+                  {item.total > item.cards.length ? (
+                    <Muted>{`+${item.total - item.cards.length} more`}</Muted>
+                  ) : null}
+                </View>
+                {item.youCanAnswer > 0 ? (
+                  <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                    {`You can answer ${item.youCanAnswer} of ${item.total}`}
+                  </Text>
+                ) : null}
+              </View>
+            )}
 
             {/* Every item ends in a place and a time. */}
             <Button
@@ -279,7 +463,13 @@ export function HomeScreen() {
           </Card>
         ) : (
           <Card key={`board-${index}`}>
-            <Muted>{item.storeName}</Muted>
+            {/* A local needs no address — you drive there. A room
+                somewhere you have never been needs a place attached. */}
+            <Muted>
+              {item.yours || !item.city
+                ? item.storeName
+                : `${item.storeName} · ${item.city}`}
+            </Muted>
             <Title>{item.eventName}</Title>
             <Muted>{item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}</Muted>
 
@@ -298,7 +488,7 @@ export function HomeScreen() {
                       width={48}
                       name={card.cardName}
                       cardNumber={card.cardNumber}
-                      youHave={{ kind: card.match, count: 0 }}
+                      youHave={card.match ? { kind: card.match, count: 0 } : undefined}
                     />
                   ))}
                 </View>
@@ -401,39 +591,6 @@ export function HomeScreen() {
           </View>
         </Card>
       )}
-
-      {/* Below your stores now, not above them. The tab is Feed: what is
-          on at the places you go leads, and scanning is the thing you
-          reach for when you are standing in one. */}
-      <Card>
-        <Title>Join a room</Title>
-        <Body>
-          Scan the code on the store&rsquo;s counter, or type it if scanning is
-          awkward. No account needed.
-        </Body>
-
-        <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
-
-        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-          <View style={{ flex: 1 }}>
-            <Input
-              value={code}
-              onChangeText={setCode}
-              placeholder="Or enter the code"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-          </View>
-          <AsyncButton
-            label="Go"
-            pendingLabel="Opening…"
-            variant="secondary"
-            onPress={async () => {
-              if (code.trim()) await enter(code);
-            }}
-          />
-        </View>
-      </Card>
 
       <Card>
         <Title>How it works</Title>

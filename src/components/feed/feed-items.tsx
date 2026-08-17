@@ -1,6 +1,13 @@
 import Link from "next/link";
-import { CalendarClock, PackageCheck, Layers } from "lucide-react";
+import {
+  CalendarClock,
+  ClipboardList,
+  MapPin,
+  PackageCheck,
+  Layers,
+} from "lucide-react";
 
+import { Logo } from "@/components/brand/logo";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
@@ -40,14 +47,33 @@ function FeedTile({
 }: {
   imageUrl: string | null;
   name: string;
-  match: "exact" | "other-printing";
+  /**
+   * What the viewer's binder says, or null for nothing.
+   *
+   * Nullable since a friend's hunt shows cards the viewer does NOT hold
+   * — seeing what a friend is chasing is the point. An unheld card is
+   * drawn plain: the green ring means "you have this" everywhere in the
+   * product, and a ring on a card you do not own would be a lie in the
+   * one place it is loudest.
+   */
+  match: "exact" | "other-printing" | null;
 }) {
   return (
     <span
-      title={match === "exact" ? `You have ${name}` : `You have another printing`}
+      title={
+        match === "exact"
+          ? `You have ${name}`
+          : match
+            ? "You have another printing"
+            : name
+      }
       /* The board's own mark for a card you are holding, so the feed and
          the room are not two dialects of the same fact. */
-      className="relative block w-14 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
+      className={`relative block w-14 shrink-0 overflow-hidden rounded-[6px] border bg-elevated ${
+        match
+          ? "border-border shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
+          : "border-border"
+      }`}
     >
       <span className="block aspect-[60/84] w-full">
         {imageUrl && (
@@ -55,18 +81,97 @@ function FeedTile({
           <img src={imageUrl} alt="" className="size-full object-cover" />
         )}
       </span>
-      <span className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-surface/90 p-0.5">
-        {match === "exact" ? (
-          <PackageCheck className="size-3 text-accent" aria-hidden="true" />
-        ) : (
-          <Layers className="size-3 text-accent" aria-hidden="true" />
-        )}
-      </span>
+      {match && (
+        <span className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-surface/90 p-0.5">
+          {match === "exact" ? (
+            <PackageCheck className="size-3 text-accent" aria-hidden="true" />
+          ) : (
+            <Layers className="size-3 text-accent" aria-hidden="true" />
+          )}
+        </span>
+      )}
     </span>
   );
 }
 
+/**
+ * What the two starter items say.
+ *
+ * Kept as data rather than two more branches below, because the pair
+ * are the same card with different words in it and the shape is the
+ * argument: a question, why it is worth answering, and one button.
+ */
+const STARTERS = {
+  store: {
+    icon: MapPin,
+    variant: "primary",
+    headline: "Where do you play?",
+    body: "Join your store's room once and it saves itself here, with its next board and who is hunting what. The code is on the counter.",
+    label: "Enter a store code",
+    href: "/room",
+  },
+  deck: {
+    icon: ClipboardList,
+    /* Secondary, deliberately. Two accent buttons stacked is two leads
+       and therefore none, and a store is the answer that makes every
+       other item on this screen possible. */
+    variant: "secondary",
+    headline: "What are you hunting?",
+    body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
+    label: "Paste a deck list",
+    href: "/profile/settings",
+  },
+} as const;
+
 export function Item({ item }: { item: FeedItem }) {
+  if (item.kind === "announcement") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          {/* The mark, not a face. There is no CardFlare player and this
+              is the item that has to look like it knows that. */}
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-elevated">
+            <Logo size={20} markOnly />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <p className="truncate font-semibold text-text-primary">{item.headline}</p>
+            <p className="text-xs text-text-muted">CardFlare</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-text-secondary">{item.body}</p>
+
+        {item.linkLabel && item.linkHref && (
+          <Link href={item.linkHref} className={buttonStyles("secondary", "sm")}>
+            {item.linkLabel}
+          </Link>
+        )}
+      </Card>
+    );
+  }
+
+  if (item.kind === "start") {
+    const starter = STARTERS[item.topic];
+    const Icon = starter.icon;
+
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated">
+            <Icon className="size-5 text-accent" aria-hidden="true" />
+          </span>
+          <p className="min-w-0 font-semibold text-text-primary">{starter.headline}</p>
+        </div>
+
+        <p className="text-sm text-text-secondary">{starter.body}</p>
+
+        <Link href={starter.href} className={buttonStyles(starter.variant, "sm")}>
+          {starter.label}
+        </Link>
+      </Card>
+    );
+  }
+
   if (item.kind === "hunt") {
     return (
       <Card className="flex flex-col gap-3 p-4">
@@ -84,29 +189,64 @@ export function Item({ item }: { item: FeedItem }) {
               {item.displayName}
             </p>
             <p className="truncate text-xs text-text-muted">
-              is hunting · {item.eventName}
+              {item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`}
+              {item.deckLabel ? ` · ${item.deckLabel}` : ""} · {item.eventName}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <FeedTile
-            imageUrl={item.card.imageUrl}
-            name={item.card.cardName}
-            match={item.card.match}
-          />
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="truncate font-semibold text-text-primary">
-              {item.card.cardName}
-            </p>
-            <p className="font-mono text-xs text-text-muted">{item.card.cardNumber}</p>
-            <p className="text-sm font-medium text-accent">
-              {item.card.match === "exact"
-                ? "You have this"
-                : "You have another printing"}
-            </p>
+        {/* One card reads as a card; a deck reads as a row of them. The
+            founder's rule for the whole Feed: a person posting thirty
+            cards is one thing that happened, not thirty. */}
+        {item.total === 1 && item.cards[0] ? (
+          <div className="flex items-center gap-3">
+            <FeedTile
+              imageUrl={item.cards[0].imageUrl}
+              name={item.cards[0].cardName}
+              match={item.cards[0].match}
+            />
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="truncate font-semibold text-text-primary">
+                {item.cards[0].cardName}
+              </p>
+              <p className="font-mono text-xs text-text-muted">
+                {item.cards[0].cardNumber}
+              </p>
+              {item.cards[0].match && (
+                <p className="text-sm font-medium text-accent">
+                  {item.cards[0].match === "exact"
+                    ? "You have this"
+                    : "You have another printing"}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              {item.cards.map((card) => (
+                <FeedTile
+                  key={card.cardId}
+                  imageUrl={card.imageUrl}
+                  name={card.cardName}
+                  match={card.match}
+                />
+              ))}
+              {item.total > item.cards.length && (
+                <span className="self-center text-xs text-text-muted tabular-nums">
+                  +{item.total - item.cards.length} more
+                </span>
+              )}
+            </div>
+            {item.youCanAnswer > 0 && (
+              /* The line that earns the tap. Absent when it would read
+                 "you can answer 0", which is not news. */
+              <p className="text-sm font-medium text-accent">
+                You can answer {item.youCanAnswer} of {item.total}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Every item ends in a place and a time. */}
         <Link href={`/e/${item.code}`} className={buttonStyles("primary", "sm")}>
@@ -243,7 +383,12 @@ export function Item({ item }: { item: FeedItem }) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium text-accent">{item.storeName}</p>
+        {/* A local needs no address — you drive there. A room somewhere
+            you have never been is only useful with a place attached. */}
+        <p className="text-sm font-medium text-accent">
+          {item.storeName}
+          {!item.yours && item.city ? ` · ${item.city}` : ""}
+        </p>
         <p className="text-lg font-semibold text-text-primary">{item.eventName}</p>
         {/*
          * "Open now", not "Trading now": a walk-in room is itself called
