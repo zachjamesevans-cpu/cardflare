@@ -35,6 +35,31 @@ export function SetImport() {
 
   const [chosen, setChosen] = useState(0);
 
+  /* Held in state so the manifest FILE can fill it in. A collected set
+     is twenty thousand characters of JSON, and asking somebody to
+     select and paste that is a step that goes wrong. */
+  const [manifest, setManifest] = useState("");
+  const [cardCount, setCardCount] = useState<number | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
+
+  /** Reads manifest.json off disk and drops it into the field. */
+  async function loadManifest(file: File) {
+    setReadError(null);
+    try {
+      const text = await file.text();
+      setManifest(text);
+
+      /* Counted here so the two file pickers can be compared before
+         anything is sent: a manifest naming 214 cards beside 12 chosen
+         images is a mistake worth seeing at a glance. */
+      const parsed = JSON.parse(text) as { cards?: unknown[] };
+      setCardCount(Array.isArray(parsed.cards) ? parsed.cards.length : null);
+    } catch {
+      setCardCount(null);
+      setReadError("That file is not valid JSON.");
+    }
+  }
+
   return (
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
@@ -65,15 +90,41 @@ export function SetImport() {
         >
           Manifest
         </label>
+        <input
+          type="file"
+          accept="application/json,.json"
+          aria-label="Choose manifest.json"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void loadManifest(file);
+          }}
+          className="text-sm text-text-secondary file:mr-3 file:rounded-[var(--radius-control)] file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-semibold file:text-text-primary"
+        />
+        <p className="text-xs text-text-muted">
+          Choose the <code className="font-mono">manifest.json</code> the collector
+          wrote, or paste it below.
+        </p>
         <Textarea
           id="import-manifest"
           name="manifest"
           required
-          rows={10}
+          rows={8}
           spellCheck={false}
+          value={manifest}
+          onChange={(event) => {
+            setManifest(event.target.value);
+            setCardCount(null);
+            setReadError(null);
+          }}
           className="font-mono text-xs"
           placeholder={`{\n  "provider": "kaizoku",\n  "setCode": "OP17",\n  "setName": "…",\n  "cards": [\n    { "cardNumber": "OP17-001", "name": "…", "file": "OP17-001.png" }\n  ]\n}`}
         />
+        {readError && <p className="text-xs text-danger">{readError}</p>}
+        {cardCount !== null && (
+          <p className="text-xs text-text-muted">
+            {cardCount} card{cardCount === 1 ? "" : "s"} in the manifest.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -92,10 +143,18 @@ export function SetImport() {
           onChange={(event) => setChosen(event.target.files?.length ?? 0)}
           className="text-sm text-text-secondary file:mr-3 file:rounded-[var(--radius-control)] file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-semibold file:text-text-primary"
         />
-        <p className="text-xs text-text-muted">
+        <p
+          className={`text-xs ${
+            cardCount !== null && chosen > 0 && chosen < cardCount
+              ? "text-danger"
+              : "text-text-muted"
+          }`}
+        >
           {chosen === 0
             ? "None selected yet. Cards import without art if you send none."
-            : `${chosen} file${chosen === 1 ? "" : "s"} selected.`}
+            : cardCount !== null && chosen < cardCount
+              ? `${chosen} selected, but the manifest names ${cardCount}. Select all of them.`
+              : `${chosen} file${chosen === 1 ? "" : "s"} selected.`}
         </p>
       </div>
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -257,5 +258,52 @@ describe("duplicatePrintings", () => {
 describe("compactNumber", () => {
   it("strips the dash so a number typed without one still matches", () => {
     expect(compactNumber("OP17-001")).toBe("OP17001");
+  });
+});
+
+/**
+ * A manifest the collector actually produced.
+ *
+ * Written by running `scripts/scrape-set.mjs collect` against a fixture
+ * gallery shaped like Kaizoku's real one — `_sm.webp` thumbnails on the
+ * page with the full-size `.png` beside them, and the rarity as a bare
+ * token after the number in the caption.
+ *
+ * Kept because the two halves of this feature are written in different
+ * languages and run on different machines, so nothing else checks that
+ * what the collector emits is what the importer accepts. A change to
+ * either that breaks the handshake fails here.
+ */
+describe("the collector and the importer agree", () => {
+  const manifest = JSON.parse(
+    readFileSync("tests/fixtures/import/kaizoku-manifest.json", "utf8"),
+  );
+
+  it("parses unchanged", () => {
+    const parsed = importManifestSchema.parse(manifest);
+    expect(parsed.setCode).toBe("OP17");
+    expect(parsed.cards.length).toBeGreaterThan(0);
+    expect(duplicatePrintings(parsed)).toEqual([]);
+  });
+
+  it("collected full-size art rather than the thumbnails on the page", () => {
+    /* The whole point of the upgrade probe. Kaizoku shows 172x240
+       `_sm.webp` thumbnails; the art is the same stem as a plain
+       `.png`, and a manifest full of thumbnails would look fine on a
+       board tile and terrible the moment a card is tapped. */
+    for (const card of manifest.cards) {
+      expect(card.sourceUrl).not.toContain("_sm");
+      expect(card.file.endsWith(".png")).toBe(true);
+    }
+  });
+
+  it("carried the rarity out of the caption", () => {
+    const rarities = manifest.cards.map((card: { rarity?: string }) => card.rarity);
+    expect(rarities).toContain("L");
+    expect(rarities).toContain("SR");
+  });
+
+  it("read the name without the number stuck to it", () => {
+    expect(manifest.cards[0].name).toBe("Edward.Newgate");
   });
 });
