@@ -5,6 +5,8 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { openSignup } from "@/lib/auth/signup";
+import { starterNameFromEmail } from "@/lib/auth/signup-schema";
+import { handleSeedFrom } from "@/lib/players/handle";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,10 @@ const schema = z.discriminatedUnion("action", [
     action: z.literal("sign-up"),
     email: z.string().trim().toLowerCase().email().max(200),
     password: z.string().min(8).max(200),
+    /* Optional so an app build that predates one-page sign-up still
+       works; the server derives both from the address in that case. */
+    displayName: z.string().trim().max(40).optional(),
+    handle: z.string().trim().max(20).optional(),
   }),
   z.object({
     action: z.literal("refresh"),
@@ -84,7 +90,11 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "rate-limited" }, { status: 429 });
     }
 
-    const outcome = await openSignup(body.email, body.password);
+    const name = body.displayName?.trim() || starterNameFromEmail(body.email);
+    const outcome = await openSignup(body.email, body.password, {
+      displayName: name,
+      handle: body.handle?.trim().toLowerCase() || handleSeedFrom(name),
+    });
     if (!outcome.ok) {
       return outcome.reason === "already-registered"
         ? Response.json({ error: "already-registered" }, { status: 409 })

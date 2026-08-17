@@ -871,17 +871,31 @@ the store hosts the room, it does not read it.
 Only a confirmed trade earns anything. Not posting, not pledging, not turning
 up. The one act the whole product exists to cause is the only one that pays.
 
-### One account, one name
+### A handle to be found by, a name to be seen as
 
-`players.display_name` is unique, case-insensitively, enforced by a unique
-index on `lower(display_name)`. Guests are deliberately exempt: a guest's name
-lives on `player_sessions`, expires with it, and only has to tell six people at
-a counter apart for one evening.
+`players.handle` is unique — lowercase, `[a-z0-9_]`, three to twenty — and
+`players.display_name` is not. The name may repeat, carry spaces and capitals,
+and be changed freely; the handle is the address.
+
+That split replaced a single unique `display_name`, which was one column doing
+two incompatible jobs: one person on the whole platform could be called "Zach"
+and everybody after them was refused. The founder asked for Discord-style
+discriminators; Discord dropped those in 2023, for the reason that decides it
+here — you cannot say "Zach#62847" across a shop counter. What they moved to is
+what this does.
+
+Guests are exempt from both: a guest's name lives on `player_sessions`, expires
+with it, and only has to tell six people at a counter apart for one evening.
 
 Availability is decided by the index, never by a SELECT before the UPDATE — two
-people can type the same name into two phones at the same counter, and
-check-then-write loses that race every time. `setDisplayName` returns `taken`
-on a `23505` and the UI says so.
+people can type the same handle into two phones at the same counter, and
+check-then-write loses that race every time. `setHandle` and `setIdentity`
+return `taken` on a `23505` and the UI says so. `setDisplayName` no longer can.
+
+The derivation is stated three times — `handleFrom` in the web app, its twin in
+`mobile/src/handle.ts`, and `public.handle_from` in the migration that
+backfilled every existing account. `tests/unit/handle.test.ts` walks the same
+cases through the first two; the migration probe runs the third.
 
 The name is written through to every `player_sessions` row the account owns.
 Rooms render the session's name, and a copy that is never refreshed drifts:
@@ -894,9 +908,14 @@ ignored rather than merely pre-filled. That was the founder's report — signing
 in still dropped them in as a guest — and pre-filling was exactly the bug: the
 form was the source of truth and the account was not consulted.
 
-An invitation carries a name typed months earlier, so `claimPendingPlayerInvite`
-nudges it ("Zach", "Zach2", …) until the index accepts it. Being unable to sign
-in because a stranger shares your first name is not an acceptable outcome.
+An invitation carries a name typed months earlier, so `createPlayerWithFreeName`
+nudges the HANDLE derived from it ("zach", "zach2", …) until the index accepts
+it. Being unable to sign in because a stranger shares your first name is not an
+acceptable outcome — and the name itself no longer collides at all.
+
+A handle somebody TYPED is never nudged. Numbering an invitation's stale name is
+a kindness; doing it to a handle a person just chose is handing them a different
+account from the one they asked for, so that comes back as an error instead.
 
 ### Setting up an account
 
@@ -907,20 +926,28 @@ one nobody has to remember to come back to. Existing accounts were backfilled
 from `created_at` by the migration, so shipping the flow did not ambush the
 pilot with a setup screen for accounts they had been using for weeks.
 
-Two steps: the name, then an optional picture. The account is marked set up at
-the **name**, not after the picture, because the picture is genuinely optional
-— the generated initials are a real avatar — and gating "you are set up" on
-something optional leaves anyone who skipped it permanently owing a step.
+**Open sign-up asks everything at once.** Address, password, name and handle on
+one screen, and the account is marked set up the moment it exists. It used to be
+two fields here and the name behind a link on a success page after; the founder
+walked it and named the seam: "this should all be on one page." The old defence
+— a short form at the door converts better — was true of a short form and not of
+what that actually was, which is the same questions with a door in the middle.
+The optional picture is the only screen left after.
 
-The flow keys on `onboarded_at`, never on how the account was created. That is
-the seam that makes invite-only and open registration the same path: opening
-registration is a decision about who may create an account, not a second
-onboarding to build. Public registration itself is still closed — PRODUCT.md
-says invite-only pilot, and that has not changed.
+**An invited account still walks the wizard**, because nobody has been there to
+answer. The flow keys on `onboarded_at`, never on how the account was created,
+and `createPlayerWithFreeName` sets it only when a handle was CHOSEN — an
+invitation's derived handle is a placeholder, and a placeholder is not a
+decision. `/profile` bounces an unset account to `/welcome/username` until it is.
 
-The username field checks availability while it is typed. A courtesy only: the
-unique index decides, two people can type the same name at the same moment, and
-only the database sees both.
+The account is marked set up at the **name and handle**, not after the picture,
+because the picture is genuinely optional — the generated initials are a real
+avatar — and gating "you are set up" on something optional leaves anyone who
+skipped it permanently owing a step.
+
+The setup wizard's handle field checks availability while it is typed. A
+courtesy only: the unique index decides, two people can type the same handle at
+the same moment, and only the database sees both.
 
 ### Admin grants
 

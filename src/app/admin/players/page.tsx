@@ -20,11 +20,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Player accounts, invite-only for now.
+ * Player accounts.
  *
  * Deliberately not a directory of everyone who ever scanned a code — guests
- * are the product's front door and never appear here. These are the handful
- * of pilot players whose wants follow them between stores.
+ * are the product's front door and never appear here. These are the players
+ * whose wants follow them between stores.
  */
 export default async function AdminPlayersPage({
   searchParams,
@@ -68,9 +68,10 @@ export default async function AdminPlayersPage({
 
         <h2 className="text-xl font-bold text-text-primary">Players</h2>
         <p className="max-w-2xl text-sm text-text-secondary">
-          Accounts are optional and invite-only: guests scan and trade with nothing but
-          a nickname, exactly as before. An account makes a player&rsquo;s wants follow
-          them between stores.
+          Accounts are optional: guests scan and trade with nothing but a nickname,
+          exactly as before. An account makes a player&rsquo;s wants follow them between
+          stores, and anybody can create one. Inviting is for handing an account to
+          somebody who asked in person.
         </p>
       </div>
 

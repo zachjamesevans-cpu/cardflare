@@ -16,19 +16,37 @@ const sql = readdirSync(join(process.cwd(), "supabase/migrations"))
   .join("\n");
 
 describe("the signup schema", () => {
-  it("accepts a normal address and password", () => {
-    const parsed = signupSchema.safeParse({
-      email: "  Chunc@Example.com ",
-      password: "hunter22hunter",
-    });
+  /* Everything an account is, asked once. The name and handle used to be
+     a second screen behind a link, which is the seam the founder named. */
+  const VALID = {
+    email: "  Chunc@Example.com ",
+    password: "hunter22hunter",
+    displayName: "Steven B",
+    handle: "steven_b",
+  };
+
+  it("accepts a normal address, password, name and handle", () => {
+    const parsed = signupSchema.safeParse(VALID);
     expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.email).toBe("chunc@example.com");
+    if (parsed.success) {
+      expect(parsed.data.email).toBe("chunc@example.com");
+      expect(parsed.data.displayName).toBe("Steven B");
+      expect(parsed.data.handle).toBe("steven_b");
+    }
+  });
+
+  it("refuses a handle with a space, which is why handles exist", () => {
+    expect(signupSchema.safeParse({ ...VALID, handle: "steven b" }).success).toBe(
+      false,
+    );
+  });
+
+  it("refuses a missing name", () => {
+    expect(signupSchema.safeParse({ ...VALID, displayName: "" }).success).toBe(false);
   });
 
   it("refuses a short password", () => {
-    expect(signupSchema.safeParse({ email: "a@b.co", password: "short" }).success).toBe(
-      false,
-    );
+    expect(signupSchema.safeParse({ ...VALID, password: "short" }).success).toBe(false);
   });
 
   it("refuses a non-address", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { storeInviteEmail } from "@/lib/email/store-invite";
+import { playerInviteEmail, storeInviteEmail } from "@/lib/email/store-invite";
 import { inviteStoreSchema, toInviteFieldErrors } from "@/lib/stores/schema";
 
 function validInput(overrides: Record<string, unknown> = {}) {
@@ -210,5 +210,56 @@ describe("storeInviteEmail with a setup link", () => {
     for (const body of [message().html, message().text]) {
       expect(body).toMatch(/ask for (a link|this address)/i);
     }
+  });
+});
+
+/**
+ * The player flavour of the same message.
+ *
+ * One function serves stores, card-show vendors and players, which is
+ * the right shape — the account, the link and the expiry story are
+ * identical — but the store's own sentence had leaked into all three.
+ * A player was being told "Zach is in the CardFlare beta": the sentence
+ * a shop gets, with a person's name dropped into it.
+ */
+describe("playerInviteEmail", () => {
+  const sent = playerInviteEmail("Zach", "zach@example.test", "https://cardflare.gg");
+
+  it("does not tell a person they are a store in the beta", () => {
+    expect(sent.subject).not.toContain("beta");
+    expect(sent.html).not.toContain("is in the CardFlare beta");
+    expect(sent.text).not.toContain("is in the CardFlare beta");
+  });
+
+  it("tells them what actually happened", () => {
+    expect(sent.subject).toBe("Your CardFlare account is ready");
+    expect(sent.html).toContain("Your CardFlare account is ready, Zach.");
+    expect(sent.text).toContain("Your CardFlare account is ready, Zach.");
+  });
+
+  it("says what an account is for, not what a store gets", () => {
+    expect(sent.html).toContain("makes your wants follow you");
+    expect(sent.html).not.toContain("players at your events");
+  });
+
+  it("still escapes the name so it cannot inject markup", () => {
+    const nasty = playerInviteEmail(
+      "<script>alert(1)</script>",
+      "x@example.test",
+      "https://cardflare.gg",
+    );
+    expect(nasty.html).not.toContain("<script>alert(1)</script>");
+  });
+
+  it("leaves the store wording alone", () => {
+    /* The store's sentence was written for a shop owner and is right.
+       Fixing the player one must not have touched it. */
+    const shop = storeInviteEmail(
+      "Test Cards",
+      "shop@example.test",
+      "https://cardflare.gg",
+    );
+    expect(shop.subject).toBe("Test Cards is in the CardFlare beta");
+    expect(shop.html).toContain("Test Cards is in the CardFlare beta.");
   });
 });

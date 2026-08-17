@@ -10,12 +10,16 @@ import { handleSeedFrom, handleWithSuffix } from "./handle";
 const UNIQUE_VIOLATION = "23505";
 
 /**
- * Player accounts: optional, invite-only, and never a gate.
+ * Player accounts: optional, open, and never a gate.
  *
  * A guest scans and trades with nothing but a nickname — that stays the
  * front door. An account is for the player who wants their wants and
- * history to follow them between stores, and for now the founder hands
- * them out one at a time.
+ * history to follow them between stores, and anybody can make one from
+ * the website or the app.
+ *
+ * The invitation path below outlived the invite-only pilot on purpose:
+ * it is how the founder hands an account to somebody who asked for one
+ * in person, and it creates the auth user so a later sign-in works.
  */
 
 export type InvitePlayerResult =
@@ -124,19 +128,37 @@ export async function createPlayerWithFreeName(
   admin: ReturnType<typeof getSupabaseAdmin>,
   userId: string,
   wanted: string,
+  /**
+   * The handle they chose, when somebody was there to choose one. Absent
+   * for an admin invitation, where the account exists before its owner
+   * has ever seen it, and one is derived from the name instead.
+   */
+  wantedHandle?: string,
 ): Promise<{ message: string } | null> {
   const name = wanted.trim().slice(0, 40);
-  const base = handleSeedFrom(name);
+  const chosen = wantedHandle?.trim().toLowerCase();
+  const base = chosen || handleSeedFrom(name);
 
   for (let attempt = 1; attempt <= 10; attempt += 1) {
     const handle = attempt === 1 ? base : handleWithSuffix(base, attempt);
 
-    const { error } = await admin
-      .from("players")
-      .upsert(
-        { user_id: userId, display_name: name, handle },
-        { onConflict: "user_id", ignoreDuplicates: true },
-      );
+    const { error } = await admin.from("players").upsert(
+      {
+        user_id: userId,
+        display_name: name,
+        handle,
+        /*
+         * Choosing a handle IS the setup step, so an account created by
+         * somebody who chose one is already set up. Without this,
+         * `/profile` would bounce them to the very screen that one-page
+         * sign-up exists to remove. An invited account has no chosen
+         * handle and is still asked, which is correct: nobody has been
+         * there yet to answer.
+         */
+        ...(chosen ? { onboarded_at: new Date().toISOString() } : {}),
+      },
+      { onConflict: "user_id", ignoreDuplicates: true },
+    );
 
     if (!error) return null;
     if (error.code !== UNIQUE_VIOLATION) return error;
@@ -148,6 +170,14 @@ export async function createPlayerWithFreeName(
      * constraint fired.
      */
     if (!error.message.includes("handle")) return null;
+
+    /*
+     * A handle somebody TYPED is not silently numbered. Nudging an
+     * invitation's months-old name to "Zach2" is a kindness; doing it to
+     * a handle a person just chose and watched being checked is a
+     * different account from the one they asked for.
+     */
+    if (chosen) return { message: "handle-taken" };
   }
 
   return { message: `Could not find a free handle near "${base}"` };

@@ -450,6 +450,87 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ One-page sign-up, and a documentation truth pass
+
+Sign-up asked for an address and a password, then sent the new player to a
+success screen with a LINK to "choose my username". The founder walked his
+own flow and named it: "this should all be on one page." Address, password,
+name and handle together now, website and app, with the handle deriving from
+the name until it is touched. Choosing a handle IS the setup step, so an
+account made this way is marked set up on creation; an invited account still
+walks the wizard, because nobody has been there to answer.
+
+Auditing the setup flows meant reading what the repo claims about them, and
+several statements had gone false: ARCHITECTURE.md still described
+`display_name` as unique and registration as closed, and called setup two
+steps; PRODUCT.md's status said matching and trading were not built. Both
+corrected, along with three code comments and the admin console still saying
+"invite-only".
+
+Also found by reading rather than by a report: a player invitation emailed
+them "Zach is in the CardFlare beta" — the store's sentence with a person's
+name in it. The player flavour has its own subject and headline now, and a
+test pins the store wording so fixing one cannot move the other.
+
+## ✅ Card art CardFlare hosts, and a door for sets no provider carries
+
+OP-17 exists as spoilers months before any API has it. Collection happens on
+a laptop (`scripts/scrape-set.mjs`, discover then collect) and what reaches
+the server is data, checked at the door — a fan site's redesign must not
+become our outage. A private `card-art` bucket, a serving route on our own
+origin with a year-long immutable cache, and an importer at
+`/admin/cards/import` that writes rows under the manifest's own provider key,
+so the whole import is reversible in one click the day a provider ships the
+set properly.
+
+`image_url` gained a second legal shape for this, which is the risky part, so
+it is checked three times: the database constraint, the render gate and the
+serving route. The migration probe earned its keep on the first draft —
+`/api/card-art/../../etc/passwd` walked through a character class that had to
+contain a dot for the file extension.
+
+Three faults came out of the founder's real import and are fixed: two hundred
+pictures in one form post exceeded the 1MB Server Action cap (each picture is
+its own request now, with progress, and resumable because the bucket is the
+record); an imported set could not be removed; and the picker made him select
+every file rather than the folder.
+
+## ✅ A handle to be found by, a name to be seen as
+
+`players.display_name` was one column doing two jobs — one person on the whole
+platform could be called "Zach" and everybody after them was refused. The
+founder asked about Discord-style discriminators; Discord dropped those in
+2023 because you cannot say "Zach#62847" across a shop counter, and what they
+moved to is what this does. A unique lowercase `handle` carries identity;
+the name is free to repeat, carry spaces and change.
+
+Existing accounts were backfilled from their names ("Steven B" → `@steven_b`),
+oldest keeping the plain handle, a number only where two genuinely collide.
+Probed on real PostgreSQL against a roster built to break it. The rule is
+stated three times — web, app and SQL — so a unit test walks two of them and
+the probe runs the third.
+
+## ✅ The Feed replaces Join
+
+The left tab was a Join button for a QR scan that the room already offers.
+The Feed answers "is anything worth my Friday?" from things CardFlare already
+knows: somebody you follow needs a card you are holding, a board is open near
+you, people you follow added cards, a trade happened at your store, and
+players worth following because their binder answers your want list. No
+photos, no captions, no comments, no compose box — see PRODUCT.md.
+
+Ordered from things that go stale to things that do not. Both platforms, same
+five kinds, same wording.
+
+## ✅ One room identity per account (duplicate join)
+
+An account could hold two room identities and appear twice on a board.
+`player_sessions` gained a partial unique index on `player_id`, with a
+`merge_player_sessions` function folding binders, Flares, offers, memberships
+and trades onto the survivor. The self-trade and self-offer cases were found
+by the founder hitting `trades_not_self` on his own data, and the seeded probe
+now reproduces them.
+
 ## ✅ Feedback round — pledges for anyone, with a count
 
 Two founder rulings reshaped offers. First: anyone may pledge on any

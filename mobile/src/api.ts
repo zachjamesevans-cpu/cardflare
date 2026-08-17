@@ -96,11 +96,21 @@ async function authRequest(payload: unknown): Promise<{
  * server runs both so the phone never makes two round trips over
  * networks that have eaten this app's requests before.
  */
-export async function signUp(email: string, password: string): Promise<AuthResult> {
+export async function signUp(
+  email: string,
+  password: string,
+  /* Asked at the door now rather than on a second screen. Optional on
+     the wire so an older build still works; the server derives both
+     from the address in that case. */
+  displayName?: string,
+  handle?: string,
+): Promise<AuthResult> {
   const result = await authRequest({
     action: "sign-up",
     email: email.trim().toLowerCase(),
     password,
+    displayName,
+    handle,
   });
 
   if (result.accessToken) {

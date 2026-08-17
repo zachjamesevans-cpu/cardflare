@@ -2,7 +2,6 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { createPlayerWithFreeName } from "@/lib/players/accounts";
-import { starterNameFromEmail } from "./signup-schema";
 
 /**
  * Open sign-up: an account from nothing but an address and a password.
@@ -26,11 +25,18 @@ import { starterNameFromEmail } from "./signup-schema";
  */
 
 export type SignupOutcome =
-  { ok: true } | { ok: false; reason: "already-registered" | "failed" };
+  | { ok: true }
+  | { ok: false; reason: "already-registered" | "handle-taken" | "failed" };
 
 export async function openSignup(
   email: string,
   password: string,
+  /**
+   * What they typed on the way in. Sign-up asks for both now rather than
+   * making the name a second screen, so the account is somebody from the
+   * moment it exists instead of carrying a placeholder off the address.
+   */
+  identity: { displayName: string; handle: string },
 ): Promise<SignupOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "failed" };
 
@@ -51,7 +57,8 @@ export async function openSignup(
   const playerError = await createPlayerWithFreeName(
     admin,
     created.user.id,
-    starterNameFromEmail(email),
+    identity.displayName,
+    identity.handle,
   );
 
   if (playerError) {
@@ -61,8 +68,15 @@ export async function openSignup(
      * registered" with no way through, so it is cleaned up and the
      * whole thing reads as one failed attempt.
      */
-    console.error("Could not create the player at sign-up", playerError);
     await admin.auth.admin.deleteUser(created.user.id);
+
+    /* Told apart, because one of these is the person's to fix and the
+       other is ours. A chosen handle that is taken is a form error. */
+    if (playerError.message === "handle-taken") {
+      return { ok: false, reason: "handle-taken" };
+    }
+
+    console.error("Could not create the player at sign-up", playerError);
     return { ok: false, reason: "failed" };
   }
 
