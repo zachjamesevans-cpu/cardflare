@@ -119,9 +119,7 @@ export default async function FeedPage() {
           </Link>
         </Card>
       ) : (
-        items.map((item, index) => (
-          <Item key={`${item.kind}-${item.code}-${index}`} item={item} />
-        ))
+        items.map((item, index) => <Item key={`${item.kind}-${index}`} item={item} />)
       )}
     </Shell>
   );

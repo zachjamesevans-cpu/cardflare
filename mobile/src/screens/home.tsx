@@ -145,7 +145,91 @@ export function HomeScreen() {
        * somebody needing a card you are holding will not.
        */}
       {feed.map((item, index) =>
-        item.kind === "hunt" ? (
+        item.kind === "traded" ? (
+          <Card key={`traded-${index}`}>
+            <Body>
+              {`${item.requester} traded for ${item.cardName}${
+                item.holder ? ` with ${item.holder}` : ""
+              } at ${item.storeName}.`}
+            </Body>
+          </Card>
+        ) : item.kind === "added" ? (
+          <Card key={`added-${index}`}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <PlayerAvatar
+                displayName={item.displayName}
+                seed={item.playerId}
+                avatarUrl={item.avatarUrl}
+                frame={item.frame}
+                ring={item.ring}
+                size={40}
+              />
+              <View style={{ flexShrink: 1 }}>
+                <Title>{item.displayName}</Title>
+                <Muted>{`added ${item.total} ${
+                  item.total === 1 ? "card" : "cards"
+                } to their binder`}</Muted>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: spacing(2) }}>
+              {item.cards.map((card) => (
+                <CardImage
+                  key={card.cardId}
+                  imageUrl={card.imageUrl}
+                  width={48}
+                  name={card.cardName}
+                  cardNumber={card.cardNumber}
+                  /* Ringed only when it is on YOUR list, same as the web. */
+                  youHave={card.onYourList ? { kind: "exact", count: 0 } : null}
+                />
+              ))}
+            </View>
+
+            {item.onYourListCount > 0 && (
+              <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                {item.onYourListCount === 1
+                  ? "One of these is on your want list"
+                  : `${item.onYourListCount} of these are on your want list`}
+              </Text>
+            )}
+          </Card>
+        ) : item.kind === "suggest" ? (
+          <Card key={`suggest-${index}`}>
+            <Title>Worth following</Title>
+            <Muted>Their binders answer what you&rsquo;re hunting.</Muted>
+            {item.players.map((person) => (
+              <Tap
+                key={person.playerId}
+                onPress={() =>
+                  navigation.navigate("PlayerProfile", { playerId: person.playerId })
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(2),
+                }}
+              >
+                <PlayerAvatar
+                  displayName={person.displayName}
+                  seed={person.playerId}
+                  avatarUrl={person.avatarUrl}
+                  size={36}
+                />
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {person.displayName}
+                  </Text>
+                  {/* Always "wants": the list is plural even when the
+                      overlap with it is one card. */}
+                  <Muted>{`has ${person.answers} of your wants`}</Muted>
+                </View>
+              </Tap>
+            ))}
+          </Card>
+        ) : item.kind === "hunt" ? (
           <Card key={`hunt-${index}`}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}

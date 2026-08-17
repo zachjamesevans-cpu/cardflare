@@ -923,6 +923,43 @@ export type FeedItem =
       sample: FeedCard[];
     }
   | {
+      kind: "traded";
+      storeName: string;
+      eventName: string;
+      requester: string;
+      holder: string | null;
+      cardName: string;
+      cardNumber: string;
+      imageUrl: string | null;
+      confirmedAt: string;
+    }
+  | {
+      kind: "added";
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+      total: number;
+      onYourListCount: number;
+      cards: {
+        cardId: string;
+        cardName: string;
+        cardNumber: string;
+        imageUrl: string | null;
+        onYourList: boolean;
+      }[];
+    }
+  | {
+      kind: "suggest";
+      players: {
+        playerId: string;
+        displayName: string;
+        avatarUrl: string | null;
+        answers: number;
+      }[];
+    }
+  | {
       kind: "hunt";
       code: string;
       storeName: string;
