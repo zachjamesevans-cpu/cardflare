@@ -58,6 +58,26 @@ export function storeInviteEmail(
 ): EmailMessage {
   const name = escapeHtml(storeName);
   const signInUrl = `${origin}/login`;
+
+  /*
+   * A player is not a store, and this message told them they were: the
+   * subject and the headline both read "Zach is in the CardFlare beta",
+   * which is the sentence a shop gets with a person's name dropped into
+   * it. Found by walking the invitation paths rather than by anybody
+   * receiving one, which is the only reason it had not been reported.
+   *
+   * The store wording stays exactly as it was — it was written for a
+   * shop owner and it is right.
+   */
+  const headline =
+    kind === "player"
+      ? `Your ${SITE.name} account is ready, ${name}.`
+      : `${name} is in the ${SITE.name} beta.`;
+
+  const subject =
+    kind === "player"
+      ? `Your ${SITE.name} account is ready`
+      : `${storeName} is in the ${SITE.name} beta`;
   /*
    * The fallback, and the recovery path when the one-click link has expired.
    * An invited account exists with no password, so "choose a password" and "I
@@ -97,7 +117,7 @@ export function storeInviteEmail(
       </p>
 
       <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:${COLOR.textPrimary};">
-        ${name} is in the CardFlare beta.
+        ${headline}
       </h1>
 
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
@@ -175,7 +195,9 @@ export function storeInviteEmail(
           ];
 
   const text = [
-    `${storeName} is in the CardFlare beta.`,
+    kind === "player"
+      ? `Your ${SITE.name} account is ready, ${storeName}.`
+      : `${storeName} is in the ${SITE.name} beta.`,
     "",
     ...intro,
     "",
@@ -189,7 +211,7 @@ export function storeInviteEmail(
 
   return {
     to,
-    subject: `${storeName} is in the ${SITE.name} beta`,
+    subject,
     html,
     text,
   };
