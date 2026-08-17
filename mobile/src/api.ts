@@ -891,6 +891,48 @@ export const getGames = () =>
 export const setGames = (games: string[]) =>
   call<{ ok: true; mine: string[] }>("POST", "/api/v1/games", { games });
 
+/**
+ * The Feed: what is on at the places you go, and who needs what you have.
+ *
+ * Shapes mirror the website's `src/lib/feed/repository.ts` exactly, because
+ * both clients render the same server answer - a feed that disagreed between
+ * a phone and a laptop would be two products.
+ */
+export interface FeedCard {
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  match: "exact" | "other-printing";
+}
+
+export type FeedItem =
+  | {
+      kind: "board";
+      code: string;
+      storeName: string;
+      eventName: string;
+      live: boolean;
+      startsAt: string | null;
+      timeZone: string;
+      youCanAnswer: number;
+      sample: FeedCard[];
+    }
+  | {
+      kind: "hunt";
+      code: string;
+      storeName: string;
+      eventName: string;
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+      card: FeedCard;
+    };
+
+export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");
+
 /** A player found by name search: enough for a row and a door. */
 export interface FoundPlayer {
   playerId: string;
