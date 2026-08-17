@@ -13,7 +13,7 @@ import {
 } from "react-native";
 
 import { chooseUsername, describeError, setGames, signUp } from "../api";
-import { HANDLE_MAX, handleFrom, handleSeedFrom } from "../handle";
+import { HANDLE_MAX, HANDLE_MIN, handleFrom, handleSeedFrom } from "../handle";
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { SignInScreen } from "./sign-in";
@@ -54,7 +54,7 @@ async function markWelcomeSeen(): Promise<void> {
   }
 }
 
-type Step = "splash" | "account" | "username" | "games" | "signin";
+type Step = "splash" | "account" | "games" | "signin";
 
 export function WelcomeScreen({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<Step>("splash");
@@ -75,16 +75,11 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
       )}
       {step === "account" && (
         <StepShell step={1} title="Create your account">
-          <AccountStep onDone={() => setStep("username")} />
-        </StepShell>
-      )}
-      {step === "username" && (
-        <StepShell step={2} title="Pick your name">
-          <UsernameStep onDone={() => setStep("games")} />
+          <AccountStep onDone={() => setStep("games")} />
         </StepShell>
       )}
       {step === "games" && (
-        <StepShell step={3} title="Which games do you play?">
+        <StepShell step={2} title="Which games do you play?">
           <GamesStep onDone={done} />
         </StepShell>
       )}
@@ -244,7 +239,7 @@ function StepShell({
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Muted>Step {step} of 3</Muted>
+        <Muted>Step {step} of 2</Muted>
         <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: "800" }}>
           {title}
         </Text>
@@ -254,14 +249,32 @@ function StepShell({
   );
 }
 
+/**
+ * Everything an account is, asked once — the website's shape, word for
+ * word.
+ *
+ * It used to be two screens with the name behind the second. The founder
+ * walked his own sign-up on the website and named the seam: "this should
+ * all be on one page." The app had the same split and the same fix.
+ *
+ * The handle writes itself from the name until it is touched by hand.
+ * Somebody who has decided to be @stevo should not have it yanked back
+ * to @steven_b by a later correction to their name.
+ */
 function AccountStep({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleOwned, setHandleOwned] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <Card>
-      <Body>An email address and a password. Everything else comes after.</Body>
+      <Body>
+        Your address and a password, then who you are in a room. The only thing
+        after this is which games you play.
+      </Body>
       <Input
         value={email}
         onChangeText={setEmail}
@@ -278,6 +291,29 @@ function AccountStep({ onDone }: { onDone: () => void }) {
         secureTextEntry
         autoComplete="new-password"
       />
+      <Input
+        value={name}
+        onChangeText={(next) => {
+          setName(next);
+          if (!handleOwned) setHandle(handleSeedFrom(next));
+        }}
+        placeholder="Your name, e.g. Steven B"
+        autoCorrect={false}
+        maxLength={40}
+      />
+      <HandleInput
+        value={handle}
+        onChangeText={(next) => {
+          setHandleOwned(true);
+          setHandle(handleFrom(next));
+        }}
+        placeholder="steven_b"
+        maxLength={HANDLE_MAX}
+      />
+      <Muted>
+        Your name is what a room shows. Your handle is how people look you up, and
+        it is yours alone.
+      </Muted>
       <ErrorLine message={error} />
       <AsyncButton
         label="Create my account"
@@ -288,75 +324,21 @@ function AccountStep({ onDone }: { onDone: () => void }) {
             setError("The password needs at least 8 characters.");
             return;
           }
-          const result = await signUp(email, password);
+          if (name.trim().length < 2) {
+            setError("Please put in a name people will recognise.");
+            return;
+          }
+          if (handle.trim().length < HANDLE_MIN) {
+            setError(`A handle needs at least ${HANDLE_MIN} characters.`);
+            return;
+          }
+
+          const result = await signUp(email, password, name.trim(), handle.trim());
           if (!result.ok) {
             setError(result.message);
             return;
           }
           onDone();
-        }}
-      />
-    </Card>
-  );
-}
-
-/**
- * Who you are, in two halves — the website's shape, word for word.
- *
- * The name keeps its spaces and capitals; the handle is derived from it
- * while it is typed, and stops being derived the moment it is edited by
- * hand. Somebody who has decided to be @stevo should not have it yanked
- * back to @steven_b by a later correction to their name.
- */
-function UsernameStep({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [handleOwned, setHandleOwned] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  return (
-    <Card>
-      <Body>
-        The name people see when you walk into a room. Spaces and capitals are fine,
-        and it does not have to be unique.
-      </Body>
-      <Input
-        value={name}
-        onChangeText={(next) => {
-          setName(next);
-          if (!handleOwned) setHandle(handleSeedFrom(next));
-        }}
-        placeholder="Steven B"
-        autoCorrect={false}
-        maxLength={40}
-      />
-
-      <Body>
-        Your handle is how people look you up. Letters, numbers and underscores, so
-        it can be said out loud and typed without guessing.
-      </Body>
-      <HandleInput
-        value={handle}
-        onChangeText={(next) => {
-          setHandleOwned(true);
-          setHandle(handleFrom(next));
-        }}
-        placeholder="steven_b"
-        maxLength={HANDLE_MAX}
-      />
-
-      <ErrorLine message={error} />
-      <AsyncButton
-        label="That is me"
-        pendingLabel="Saving…"
-        onPress={async () => {
-          setError(null);
-          try {
-            await chooseUsername(name.trim(), handle.trim());
-            onDone();
-          } catch (caught) {
-            setError(describeError(caught));
-          }
         }}
       />
     </Card>

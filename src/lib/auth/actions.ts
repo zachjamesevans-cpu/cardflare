@@ -201,6 +201,8 @@ export async function signUpWithPassword(
   const parsed = signupSchema.safeParse({
     email,
     password: text(formData, "password"),
+    displayName: text(formData, "displayName"),
+    handle: text(formData, "handle"),
   });
 
   if (!parsed.success) {
@@ -226,12 +228,18 @@ export async function signUpWithPassword(
 
   if (!isSupabaseConfigured()) return failure(GENERIC_ERROR);
 
-  const outcome = await openSignup(parsed.data.email, parsed.data.password);
+  const outcome = await openSignup(parsed.data.email, parsed.data.password, {
+    displayName: parsed.data.displayName,
+    handle: parsed.data.handle,
+  });
+
   if (!outcome.ok) {
     return failure(
       outcome.reason === "already-registered"
         ? "That address already has an account. Sign in instead."
-        : GENERIC_ERROR,
+        : outcome.reason === "handle-taken"
+          ? "That handle is taken. Try another one."
+          : GENERIC_ERROR,
     );
   }
 
@@ -246,7 +254,9 @@ export async function signUpWithPassword(
     redirect("/login");
   }
 
-  redirect("/welcome/username");
+  /* Straight to the picture. The name and handle were the setup, and
+     they were answered at the door — see `signupSchema`. */
+  redirect("/welcome/picture");
 }
 
 export async function signInWithPassword(

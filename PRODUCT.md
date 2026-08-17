@@ -169,11 +169,18 @@ care of itself.
 
 ## Current status
 
-**Milestone 1 (public splash page and waitlist) is live at
-https://cardflare.gg.** Event rooms, authentication, card search and Flares are
-built; matching and trading are not. Steps 1 to 4 of the core loop work, with
-step 4 done by a player reading the room's Flare board rather than by the
-application. See [ROADMAP.md](./ROADMAP.md) for the sequence.
+**Live at https://cardflare.gg, with the whole core loop working.** Event rooms,
+accounts, card search, Flares, matching, pledges and confirmed trades are all
+built, on the website and in the Expo app. So are the things that grew out of
+them: Embers and cosmetics, the profile and showcase, follows and locals, the
+Feed, and a console for stores, players, packs and card sets.
+
+Sign-up is open. Anyone can create an account from the website or the app; the
+invite-only pilot ended when the TestFlight link became the invitation. A guest
+still needs no account at all to scan in and trade, and that stays the front
+door.
+
+See [ROADMAP.md](./ROADMAP.md) for what is next.
 
 The landing page must not imply the product has launched. Copy says CardFlare
 "is currently being built and preparing for its first local-store pilots".
