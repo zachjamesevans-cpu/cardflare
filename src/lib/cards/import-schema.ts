@@ -134,17 +134,21 @@ export function compactNumber(cardNumber: string): string {
   return cardNumber.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
+/** What one picture's upload came back with. */
+export type UploadResult = { ok: true } | { ok: false; reason: string };
+
 export type ImportState =
   | { status: "idle" }
   | { status: "error"; message: string }
+  | { status: "deleted"; message: string }
   | {
       status: "done";
       message: string;
       cards: number;
       printings: number;
       images: number;
-      /** Cards whose art could not be stored, named so they can be retried. */
-      skipped: string[];
+      /** Cards with no art in the bucket, named so they can be retried. */
+      missing: string[];
     };
 
 export const IMPORT_IDLE: ImportState = { status: "idle" };

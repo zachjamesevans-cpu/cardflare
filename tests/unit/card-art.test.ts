@@ -5,8 +5,10 @@ import {
   CARD_ART_ROUTE,
   cardArtContentType,
   cardArtExtension,
+  cardArtFolder,
   cardArtObjectPath,
   cardArtSrc,
+  cardArtStem,
   isHostedCardArt,
 } from "@/lib/cards/art-storage";
 import { isRenderableImageUrl } from "@/lib/cards/images";
@@ -305,5 +307,66 @@ describe("the collector and the importer agree", () => {
 
   it("read the name without the number stuck to it", () => {
     expect(manifest.cards[0].name).toBe("Edward.Newgate");
+  });
+});
+
+/**
+ * The pieces the per-image upload needs to agree on.
+ *
+ * The whole set used to go up in one form post, and the founder's real
+ * import — two hundred cards, some forty megabytes — took the page down:
+ * a Server Action request is capped at 1MB by default and Vercel refuses
+ * a body over 4.5MB regardless. Each picture is its own request now, and
+ * the rows are written afterwards by matching what is in the bucket
+ * against what the manifest expects. That match is a new seam, so it is
+ * checked.
+ */
+describe("finding stored art again", () => {
+  it("puts a set's art in one folder", () => {
+    expect(cardArtFolder("kaizoku", "OP17")).toBe("kaizoku/op17");
+  });
+
+  it("names the file after the card, so a row can find it later", () => {
+    const stem = cardArtStem("OP17-001");
+    const path = cardArtObjectPath({
+      providerKey: "kaizoku",
+      setCode: "OP17",
+      cardNumber: "OP17-001",
+      extension: "png",
+    });
+
+    /* The write-rows step lists the bucket and matches on the stem, so
+       a path that does not start folder/stem would leave every card
+       looking artless however many pictures actually landed. */
+    expect(path).toBe(`${cardArtFolder("kaizoku", "OP17")}/${stem}.png`);
+  });
+
+  it("matches whatever extension the picture arrived as", () => {
+    /* The row is written from the bucket listing, so a card uploaded as
+       a webp and a card uploaded as a png both have to be findable from
+       the same stem. */
+    const stem = cardArtStem("OP17-001");
+
+    for (const extension of ["png", "webp", "jpg"]) {
+      const path = cardArtObjectPath({
+        providerKey: "kaizoku",
+        setCode: "OP17",
+        cardNumber: "OP17-001",
+        extension,
+      });
+      expect(path.slice(0, path.lastIndexOf("."))).toBe(
+        `${cardArtFolder("kaizoku", "OP17")}/${stem}`,
+      );
+    }
+  });
+
+  it("keeps a printing label in the stem", () => {
+    /* Base art and alternate art share a card number and must not share
+       a file, or the second upload would silently replace the first. */
+    expect(cardArtStem("OP17-001")).not.toBe(cardArtStem("OP17-001::Alternate art"));
+  });
+
+  it("squeezes a folder out of a set code that contains one", () => {
+    expect(cardArtFolder("kaizoku", "../../etc")).not.toContain("..");
   });
 });

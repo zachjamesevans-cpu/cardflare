@@ -1,67 +1,142 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useState, useTransition } from "react";
 import { Check, Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Select, Textarea } from "@/components/ui/controls";
-import { importSetAction } from "@/lib/admin/import-actions";
+import { finishImportAction, uploadCardArtAction } from "@/lib/admin/import-actions";
+import { CARD_ART_MIME_TYPES } from "@/lib/cards/art-storage";
 import {
   IMPORT_IDLE,
   IMPORT_PROVIDER_LABELS,
   IMPORT_PROVIDERS,
+  importExternalId,
+  importManifestSchema,
+  type ImportManifest,
   type ImportState,
 } from "@/lib/cards/import-schema";
 
 /**
- * Dropping a whole set in: a manifest and the pictures it names.
+ * Dropping a whole set in: a manifest and the folder of pictures it names.
  *
- * Two inputs rather than one archive, because a folder of images is what
- * a collector actually ends up holding and asking them to zip it is a
- * step that can go wrong on the way. The manifest is pasted rather than
- * uploaded for the same reason the SQL blocks are pasted: it is text,
- * and text in front of you is text you can check.
+ * The pictures go up ONE REQUEST EACH, driven from here rather than
+ * posted together. The first cut sent the lot in a single form and the
+ * founder's real import — two hundred cards, some forty megabytes — took
+ * the page down with no message: a Server Action request is capped at
+ * 1MB by default, and Vercel refuses a body over 4.5MB whatever Next is
+ * configured to allow. That is a shape to change, not a limit to raise.
  *
- * The count of selected files is shown before anything is sent. An
- * import that silently landed with forty missing pictures would look
- * like it worked until somebody opened a board.
+ * Doing it here also buys a progress count, which matters when the thing
+ * being waited on takes minutes; and it makes the import resumable,
+ * because the rows are written at the end from whatever reached the
+ * bucket rather than from anything held in this page.
  */
 export function SetImport() {
-  const [state, action] = useActionState<ImportState, FormData>(
-    importSetAction,
-    IMPORT_IDLE,
-  );
-
-  const [chosen, setChosen] = useState(0);
+  const [state, setState] = useState<ImportState>(IMPORT_IDLE);
+  const [pending, startTransition] = useTransition();
 
   /* Held in state so the manifest FILE can fill it in. A collected set
-     is twenty thousand characters of JSON, and asking somebody to
-     select and paste that is a step that goes wrong. */
-  const [manifest, setManifest] = useState("");
-  const [cardCount, setCardCount] = useState<number | null>(null);
-  const [readError, setReadError] = useState<string | null>(null);
+     is twenty thousand characters of JSON, and asking somebody to select
+     and paste that is a step that goes wrong. */
+  const [manifestText, setManifestText] = useState("");
+  const [manifest, setManifest] = useState<ImportManifest | null>(null);
+  const [manifestError, setManifestError] = useState<string | null>(null);
 
-  /** Reads manifest.json off disk and drops it into the field. */
-  async function loadManifest(file: File) {
-    setReadError(null);
+  const [images, setImages] = useState<Map<string, File>>(new Map());
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+
+  function readManifest(raw: string) {
+    setManifestText(raw);
+    setManifestError(null);
+    setState(IMPORT_IDLE);
+
     try {
-      const text = await file.text();
-      setManifest(text);
-
-      /* Counted here so the two file pickers can be compared before
-         anything is sent: a manifest naming 214 cards beside 12 chosen
-         images is a mistake worth seeing at a glance. */
-      const parsed = JSON.parse(text) as { cards?: unknown[] };
-      setCardCount(Array.isArray(parsed.cards) ? parsed.cards.length : null);
+      const parsed = importManifestSchema.safeParse(JSON.parse(raw));
+      if (parsed.success) {
+        setManifest(parsed.data);
+      } else {
+        setManifest(null);
+        const issue = parsed.error.issues[0];
+        setManifestError(
+          issue ? `${issue.path.join(".") || "manifest"}: ${issue.message}` : null,
+        );
+      }
     } catch {
-      setCardCount(null);
-      setReadError("That file is not valid JSON.");
+      setManifest(null);
+      setManifestError("That file is not valid JSON.");
     }
   }
 
+  /**
+   * Takes a whole folder and keeps only what the manifest asked for.
+   *
+   * Picking a folder rather than selecting two hundred files by hand was
+   * the founder's ask, and it drags in everything else that lives there
+   * — .DS_Store, the manifest itself, a stray screenshot. Filtered by
+   * name against the manifest, so the extras are simply never looked at.
+   */
+  function chooseImages(files: FileList | null) {
+    const wanted = new Set(manifest?.cards.map((card) => card.file) ?? []);
+    const kept = new Map<string, File>();
+
+    for (const file of files ?? []) {
+      if (wanted.size > 0 && !wanted.has(file.name)) continue;
+      if (!(CARD_ART_MIME_TYPES as readonly string[]).includes(file.type)) continue;
+      kept.set(file.name, file);
+    }
+
+    setImages(kept);
+    setState(IMPORT_IDLE);
+  }
+
+  async function run() {
+    if (!manifest) return;
+
+    setState(IMPORT_IDLE);
+    const total = manifest.cards.length;
+    setProgress({ done: 0, total });
+
+    /*
+     * Sequential, not parallel. Two hundred requests at once would be
+     * rude to our own server and would make a failure impossible to
+     * attribute, and the point of this loop is that each request is
+     * small — which parallelism does not change.
+     */
+    for (const [index, card] of manifest.cards.entries()) {
+      setProgress({ done: index, total });
+
+      const file = images.get(card.file);
+      if (!file) continue;
+
+      const body = new FormData();
+      body.set("provider", manifest.provider);
+      body.set("setCode", manifest.setCode);
+      body.set("externalId", importExternalId(card));
+      body.set("image", file);
+
+      await uploadCardArtAction(body).catch(() => undefined);
+    }
+
+    setProgress({ done: total, total });
+
+    /* The rows, once, from whatever actually reached the bucket. */
+    const body = new FormData();
+    body.set("manifest", JSON.stringify(manifest));
+
+    setState(await finishImportAction(IMPORT_IDLE, body));
+    setProgress(null);
+  }
+
+  const shortfall =
+    manifest && images.size > 0 && images.size < manifest.cards.length
+      ? manifest.cards.length - images.size
+      : 0;
+
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label
           htmlFor="import-provider"
@@ -69,17 +144,18 @@ export function SetImport() {
         >
           Where it came from
         </label>
-        <Select id="import-provider" name="provider" defaultValue="kaizoku">
+        <Select id="import-provider" value={manifest?.provider ?? "kaizoku"} disabled>
           {IMPORT_PROVIDERS.map((provider) => (
             <option key={provider} value={provider}>
               {IMPORT_PROVIDER_LABELS[provider]}
             </option>
           ))}
         </Select>
-        {/* The reason this field exists at all, said where it is chosen. */}
+        {/* Read from the manifest rather than chosen here, so the file
+            and the console cannot disagree about what is being imported. */}
         <p className="text-xs text-text-muted">
-          Stored on every row, so the whole import can be removed in one statement the
-          day a real provider ships the set.
+          Taken from the manifest. Stored on every row, so the whole import can be
+          removed in one click.
         </p>
       </div>
 
@@ -96,7 +172,7 @@ export function SetImport() {
           aria-label="Choose manifest.json"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file) void loadManifest(file);
+            if (file) void file.text().then(readManifest);
           }}
           className="text-sm text-text-secondary file:mr-3 file:rounded-[var(--radius-control)] file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-semibold file:text-text-primary"
         />
@@ -106,23 +182,18 @@ export function SetImport() {
         </p>
         <Textarea
           id="import-manifest"
-          name="manifest"
-          required
-          rows={8}
+          rows={6}
           spellCheck={false}
-          value={manifest}
-          onChange={(event) => {
-            setManifest(event.target.value);
-            setCardCount(null);
-            setReadError(null);
-          }}
+          value={manifestText}
+          onChange={(event) => readManifest(event.target.value)}
           className="font-mono text-xs"
           placeholder={`{\n  "provider": "kaizoku",\n  "setCode": "OP17",\n  "setName": "…",\n  "cards": [\n    { "cardNumber": "OP17-001", "name": "…", "file": "OP17-001.png" }\n  ]\n}`}
         />
-        {readError && <p className="text-xs text-danger">{readError}</p>}
-        {cardCount !== null && (
+        {manifestError && <p className="text-xs text-danger">{manifestError}</p>}
+        {manifest && (
           <p className="text-xs text-text-muted">
-            {cardCount} card{cardCount === 1 ? "" : "s"} in the manifest.
+            {manifest.setCode} · {manifest.setName} · {manifest.cards.length} card
+            {manifest.cards.length === 1 ? "" : "s"}
           </p>
         )}
       </div>
@@ -132,33 +203,66 @@ export function SetImport() {
           htmlFor="import-images"
           className="text-sm font-medium text-text-secondary"
         >
-          The pictures the manifest names
+          The folder of pictures
         </label>
         <input
           id="import-images"
-          name="images"
           type="file"
           multiple
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(event) => setChosen(event.target.files?.length ?? 0)}
+          /*
+           * Non-standard, and every browser that matters supports it.
+           * React does not know the attribute, hence the cast — without
+           * it this is a picker that makes somebody select two hundred
+           * files by hand, which was the founder's complaint.
+           */
+          {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+          onChange={(event) => chooseImages(event.target.files)}
           className="text-sm text-text-secondary file:mr-3 file:rounded-[var(--radius-control)] file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-semibold file:text-text-primary"
         />
-        <p
-          className={`text-xs ${
-            cardCount !== null && chosen > 0 && chosen < cardCount
-              ? "text-danger"
-              : "text-text-muted"
-          }`}
-        >
-          {chosen === 0
-            ? "None selected yet. Cards import without art if you send none."
-            : cardCount !== null && chosen < cardCount
-              ? `${chosen} selected, but the manifest names ${cardCount}. Select all of them.`
-              : `${chosen} file${chosen === 1 ? "" : "s"} selected.`}
+        <p className={`text-xs ${shortfall > 0 ? "text-danger" : "text-text-muted"}`}>
+          {images.size === 0
+            ? "Pick the images folder itself, not the files inside it."
+            : shortfall > 0
+              ? `${images.size} matched, ${shortfall} still missing. Is this the right folder?`
+              : `${images.size} picture${images.size === 1 ? "" : "s"} matched the manifest.`}
         </p>
       </div>
 
-      <ImportButton />
+      <Button
+        type="button"
+        disabled={!manifest || pending}
+        onClick={() => startTransition(run)}
+        className="w-fit"
+      >
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Upload className="size-4" aria-hidden="true" />
+        )}
+        {pending ? "Importing…" : "Import the set"}
+      </Button>
+
+      {progress && (
+        /* Said out loud because this takes minutes, and a page that looks
+           frozen is a page somebody reloads half way through. */
+        <div className="flex flex-col gap-1.5">
+          <p role="status" className="text-sm text-text-secondary tabular-nums">
+            Uploading {progress.done} of {progress.total}…
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
+            <div
+              className="h-full bg-accent transition-[width] duration-[var(--duration-base)]"
+              style={{
+                width: `${Math.round((progress.done / progress.total) * 100)}%`,
+              }}
+            />
+          </div>
+          <p className="text-xs text-text-muted">
+            Leave this page open. Closing it stops the upload, but nothing is lost —
+            running it again picks up where it left off.
+          </p>
+        </div>
+      )}
 
       {state.status === "error" && (
         <p role="status" className="text-sm text-danger">
@@ -174,33 +278,20 @@ export function SetImport() {
           </p>
           <p className="text-xs text-text-muted tabular-nums">
             {state.cards} card{state.cards === 1 ? "" : "s"} · {state.printings}{" "}
-            printing{state.printings === 1 ? "" : "s"} · {state.images} image
-            {state.images === 1 ? "" : "s"} stored
+            printing{state.printings === 1 ? "" : "s"} · {state.images} with art
           </p>
-          {state.skipped.length > 0 && (
-            /* Named, not counted. A number tells you something went wrong;
-               the numbers tell you which ones to go back for. */
+          {state.missing.length > 0 && (
+            /* Named, not counted. A number says something went wrong;
+               the numbers say which ones to go back for. */
             <p className="text-xs text-danger">
-              No art stored for: {state.skipped.join(", ")}
+              No art for: {state.missing.slice(0, 20).join(", ")}
+              {state.missing.length > 20
+                ? ` and ${state.missing.length - 20} more`
+                : ""}
             </p>
           )}
         </div>
       )}
-    </form>
-  );
-}
-
-function ImportButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" disabled={pending} className="w-fit">
-      {pending ? (
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-      ) : (
-        <Upload className="size-4" aria-hidden="true" />
-      )}
-      {pending ? "Importing…" : "Import the set"}
-    </Button>
+    </div>
   );
 }
