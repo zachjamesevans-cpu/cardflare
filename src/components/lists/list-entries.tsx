@@ -13,7 +13,7 @@ import {
   Store,
 } from "lucide-react";
 
-import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import {
   MarkTraded,
@@ -316,6 +316,8 @@ function CarouselEntry({
   covered = false,
   remaining,
   reserveCaption = false,
+  siblings,
+  position,
 }: {
   entry: ListEntry;
   code: string;
@@ -349,6 +351,9 @@ function CarouselEntry({
    * only an empty row between the names and the buttons.
    */
   reserveCaption?: boolean;
+  /** The rest of this player's rail, so the viewer can walk it. */
+  siblings?: ZoomCard[];
+  position?: number;
 }) {
   /*
    * Quantity drawn instead of written — and it is the *live need*, the
@@ -426,6 +431,8 @@ function CarouselEntry({
           terms={acceptsLabel(entry)}
           pledges={pledges}
           youHave={match ? { kind: match, count: heldCount } : null}
+          siblings={siblings}
+          position={position}
           thumbClassName="w-full"
         />
         {/*
@@ -653,6 +660,41 @@ export function FlareBoard({
            agree on where their buttons sit. */
         const railHasDecks = group.entries.some((item) => Boolean(item.deckLabel));
 
+        /*
+         * The rail as one shelf, in the order it is actually drawn.
+         *
+         * The founder: tapping a card should let you swipe along to the
+         * next without closing. So every tile is handed the same array
+         * and its own place in it, and the viewer walks the shelf.
+         */
+        const zoomCardFor = (entry: ListEntry): ZoomCard => {
+          const entryOffers = offers.get(entry.id) ?? [];
+          const entryMatch = isYou ? null : (matches.get(entry.id) ?? null);
+
+          return {
+            imageUrl: entry.imageUrl,
+            exactName: entry.cardName,
+            cardNumber: entry.cardNumber,
+            anyPrinting: !entry.printingId,
+            caption: entry.printingLabel ?? "Any printing",
+            note: entry.note,
+            lookingFor: entry.quantity,
+            direction: entry.intent,
+            stillNeeds:
+              entryOffers.length > 0
+                ? pledgeTally(entryOffers, entry.quantity).remaining
+                : null,
+            terms: acceptsLabel(entry),
+            pledges: entryOffers.map((offer) => ({
+              name: offer.displayName ?? "A player",
+              quantity: offer.quantity,
+            })),
+            youHave: entryMatch
+              ? { kind: entryMatch, count: heldCounts?.get(entry.cardId) ?? 0 }
+              : null,
+          };
+        };
+
         const renderTile = (entry: ListEntry) => {
           const match = isYou ? null : (matches.get(entry.id) ?? null);
           const entryOffers = offers.get(entry.id) ?? [];
@@ -696,6 +738,8 @@ export function FlareBoard({
               covered={covered}
               remaining={remaining}
               reserveCaption={railHasDecks}
+              siblings={shelf}
+              position={shelfAt.get(entry.id) ?? 0}
             />
           );
         };
@@ -797,6 +841,16 @@ export function FlareBoard({
          * as a want, which is the one mistake this must never make.
          */
         const labelled = showcases.length > 0;
+
+        /*
+         * The rail as one shelf, in the order it is actually drawn, so
+         * swiping goes the way the eye already went. Declared here rather
+         * than beside `zoomCardFor` because this is the first line at
+         * which the order is known.
+         */
+        const shelfEntries = [...inTileOrder(wantEntries), ...inTileOrder(showcases)];
+        const shelf = shelfEntries.map(zoomCardFor);
+        const shelfAt = new Map(shelfEntries.map((entry, index) => [entry.id, index]));
 
         return (
           <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">

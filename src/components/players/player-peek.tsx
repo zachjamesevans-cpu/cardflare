@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link";
 import { X } from "lucide-react";
 
-import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { FollowButton, type FollowStateJson } from "@/components/players/follow-button";
@@ -286,6 +286,16 @@ export function PlayerPeek({
 
   const worn = profile;
 
+  /* The five slots as one shelf, in the order they are drawn. */
+  const shelf: ZoomCard[] = (worn?.showcase ?? [])
+    .slice(0, PEEK_SHELF)
+    .map((entry) => ({
+      imageUrl: entry.imageUrl,
+      exactName: entry.name,
+      cardNumber: entry.number,
+      direction: "showcase" as const,
+    }));
+
   return (
     <>
       <button
@@ -424,7 +434,7 @@ export function PlayerPeek({
                * cards and two cards occupy the same, evenly spaced row.
                */
               <ul className="grid grid-cols-5 gap-2">
-                {worn.showcase.slice(0, PEEK_SHELF).map((entry) => (
+                {worn.showcase.slice(0, PEEK_SHELF).map((entry, index) => (
                   <li key={entry.id}>
                     {/* The board's viewer again, opened from the dressed
                         card — the same tap does the same thing here as
@@ -434,6 +444,11 @@ export function PlayerPeek({
                       exactName={entry.name}
                       cardNumber={entry.number}
                       enabled={imagesEnabled}
+                      /* A shelf is a set: tapping one card opens on it and
+                         swipes along the rest, rather than making somebody
+                         dismiss and re-open five times to read five cards. */
+                      siblings={shelf}
+                      position={index}
                       thumbClassName="w-full"
                       thumb={
                         <CosmeticCard

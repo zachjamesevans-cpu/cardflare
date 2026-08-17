@@ -43,6 +43,7 @@ import {
   Button,
   Card,
   CardImage,
+  type ZoomCard,
   ErrorLine,
   Input,
   Muted,
@@ -681,6 +682,8 @@ function RoomScreen({
                 flare={flare}
                 mine={mine}
                 reserveCaption={railHasDecks}
+                siblings={shelf}
+                position={shelfAt.get(flare.id) ?? 0}
                 offered={Boolean(own)}
                 ownQuantity={own?.quantity ?? 1}
                 early={room.early}
@@ -713,6 +716,34 @@ function RoomScreen({
 
           const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
           const orderedRail = inRailOrder(railFlares, held, isCovered);
+
+          /*
+           * The rail as one shelf, in the order it is drawn, so swiping
+           * goes the way the eye already went. The website's rule and the
+           * website's shape.
+           */
+          const shelf: ZoomCard[] = orderedRail.map((f) => ({
+            imageUrl: f.imageUrl,
+            name: f.cardName,
+            cardNumber: f.cardNumber,
+            caption: f.printingLabel ?? "Any printing",
+            note: f.note,
+            lookingFor: f.quantity,
+            direction: f.intent,
+            stillNeeds:
+              f.offers.length > 0
+                ? pledgeTally(f.offers, f.quantity).remaining
+                : null,
+            pledges: f.offers.map((offer) => ({
+              name: offer.displayName ?? "A player",
+              quantity: offer.quantity,
+            })),
+            youHave: f.match
+              ? { kind: f.match, count: f.heldCount ?? 0 }
+              : null,
+          }));
+          const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
+
 
           const rows = (list: RoomFlare[]) =>
             list.map((flare) => (
@@ -1222,6 +1253,8 @@ function CarouselFlare({
   ownQuantity,
   early,
   reserveCaption,
+  siblings,
+  position,
   onOffer,
   onWithdraw,
   onRemove,
@@ -1243,6 +1276,9 @@ function CarouselFlare({
    * between the names and the buttons.
    */
   reserveCaption: boolean;
+  /** The rest of this player's rail, so the viewer can walk it. */
+  siblings: ZoomCard[];
+  position: number;
   onOffer: (quantity?: number) => Promise<void>;
   onWithdraw: () => Promise<void>;
   onRemove: () => Promise<void>;
@@ -1445,6 +1481,8 @@ function CarouselFlare({
                 ? { kind: flare.match, count: flare.heldCount ?? 0 }
                 : null
             }
+            siblings={siblings}
+            position={position}
             terms={acceptsLabel(flare)}
           />
           {/*
