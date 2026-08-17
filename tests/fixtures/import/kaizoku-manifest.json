@@ -1,0 +1,35 @@
+{
+  "provider": "kaizoku",
+  "setCode": "OP17",
+  "setName": "Emperors",
+  "cards": [
+    {
+      "cardNumber": "OP17-001",
+      "name": "Edward.Newgate",
+      "file": "OP17-001.png",
+      "sourceUrl": "http://127.0.0.1:3315/cards_en/OP17/OP17-001.png",
+      "rarity": "L"
+    },
+    {
+      "cardNumber": "OP17-002",
+      "name": "Atmos",
+      "file": "OP17-002.png",
+      "sourceUrl": "http://127.0.0.1:3315/cards_en/OP17/OP17-002.png",
+      "rarity": "C"
+    },
+    {
+      "cardNumber": "OP17-003",
+      "name": "Izo",
+      "file": "OP17-003.png",
+      "sourceUrl": "http://127.0.0.1:3315/cards_en/OP17/OP17-003.png",
+      "rarity": "R"
+    },
+    {
+      "cardNumber": "OP17-005",
+      "name": "Edward.Newgate",
+      "file": "OP17-005.png",
+      "sourceUrl": "http://127.0.0.1:3315/cards_en/OP17/OP17-005.png",
+      "rarity": "SR"
+    }
+  ]
+}
