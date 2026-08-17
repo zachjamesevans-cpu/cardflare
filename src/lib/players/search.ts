@@ -18,6 +18,8 @@ import { avatarPathFor, avatarSrc } from "./profile-image";
 export interface FoundPlayer {
   playerId: string;
   displayName: string;
+  /** The unique one. Two results may share a name; never a handle. */
+  handle: string;
   avatarUrl: string | null;
   frame: string | null;
   ring: string | null;
@@ -29,14 +31,23 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
   if (!isSupabaseConfigured() || trimmed.length < 2) return [];
 
   /* Escape the LIKE wildcards so "100%" searches for a percent sign. */
-  const like = `%${trimmed.replace(/[\\%_]/g, "\\$&")}%`;
+  const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
+  const like = `%${escaped}%`;
+
+  /*
+   * Either half of an identity finds somebody, because a person at a
+   * counter will type whichever one they were told. A leading "@" is
+   * dropped rather than searched for: it is how a handle is written, not
+   * part of the handle itself.
+   */
+  const byHandle = `%${escaped.replace(/^@/, "").toLowerCase()}%`;
 
   const { data, error } = await getSupabaseAdmin()
     .from("players")
     .select(
-      "id, display_name, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+      "id, display_name, handle, avatar_url, avatar_animated, tier, equipped_avatar_frame",
     )
-    .ilike("display_name", like)
+    .or(`display_name.ilike.${like},handle.ilike.${byHandle}`)
     .order("display_name")
     .limit(12);
 
@@ -53,6 +64,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
   return rows.map((row) => ({
     playerId: row.id,
     displayName: row.display_name,
+    handle: row.handle,
     avatarUrl: avatarSrc(avatarPathFor(row)),
     frame: row.equipped_avatar_frame,
     ring: wear.get(row.id)?.ring ?? null,

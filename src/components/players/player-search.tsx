@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { TextInput } from "@/components/ui/controls";
+import { formatHandle } from "@/lib/players/handle";
 
 /**
  * Finding somebody by name - the founder's ask: "I can search up
@@ -19,6 +20,7 @@ import { TextInput } from "@/components/ui/controls";
 interface FoundPlayer {
   playerId: string;
   displayName: string;
+  handle: string;
   avatarUrl: string | null;
   frame: string | null;
   ring: string | null;
@@ -76,8 +78,8 @@ export function PlayerSearch() {
         <TextInput
           value={query}
           onChange={(event) => search(event.target.value)}
-          placeholder="Find a player by name"
-          aria-label="Find a player by name"
+          placeholder="Find a player by name or @handle"
+          aria-label="Find a player by name or handle"
           className="w-full pl-9"
         />
       </label>
@@ -90,7 +92,7 @@ export function PlayerSearch() {
 
       {found && found.length === 0 && !failed && (
         <p className="text-sm text-text-muted">
-          Nobody by that name yet. Names match anywhere in the word.
+          Nobody yet. Try their handle instead, or part of either.
         </p>
       )}
 
@@ -110,11 +112,19 @@ export function PlayerSearch() {
                 aura={person.aura}
                 size="sm"
               />
+              {/* Both, because a result list is exactly where two
+                  people called Zach turn up together and the handle is
+                  the only thing that tells them apart. */}
               <Link
                 href={`/p/${person.playerId}`}
-                className="min-w-0 flex-1 truncate font-semibold text-text-primary underline-offset-4 hover:underline"
+                className="flex min-w-0 flex-1 flex-col underline-offset-4 hover:underline"
               >
-                {person.displayName}
+                <span className="truncate font-semibold text-text-primary">
+                  {person.displayName}
+                </span>
+                <span className="truncate text-xs text-text-muted">
+                  {formatHandle(person.handle)}
+                </span>
               </Link>
             </li>
           ))}

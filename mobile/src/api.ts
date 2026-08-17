@@ -643,6 +643,8 @@ export interface CosmeticItem {
 export interface Profile {
   playerId: string;
   displayName: string;
+  /** The unique one, written `@handle` wherever a person reads it. */
+  handle: string;
   avatarUrl: string | null;
   embersEarned: number;
   /**
@@ -684,15 +686,29 @@ export const getProfile = () =>
     "/api/v1/profile",
   );
 
-/** Step one of account setup: the name, which marks setup done. */
-export const chooseUsername = (displayName: string) =>
+/**
+ * Step one of account setup: the name people see AND the handle they are
+ * found by, which together mark setup done.
+ *
+ * The handle is optional on the wire so an older app build still
+ * finishes setup; the server derives one from the name in that case.
+ */
+export const chooseUsername = (displayName: string, handle?: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {
     action: "choose-username",
     displayName,
+    handle,
   });
 
 export const renameProfile = (displayName: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
+
+/** Changing the handle. The one field that can still come back taken. */
+export const setHandle = (handle: string) =>
+  call<{ ok: true; handle: string }>("POST", "/api/v1/profile", {
+    action: "set-handle",
+    handle,
+  });
 
 /** Buys it if it is not yours, wears it if it is. One tap either way. */
 export const buyCosmetic = (slug: string, slot?: EquipSlot) =>
@@ -745,6 +761,8 @@ export const dressAllShowcase = (frame: string | null, holo: string | null) =>
 export interface PeekProfile {
   playerId: string;
   displayName: string;
+  /** The unique one, so a popup can say who this actually is. */
+  handle: string;
   avatarUrl: string | null;
   /** Their cover banner, blurred behind the popup header. */
   coverUrl: string | null;
@@ -978,6 +996,8 @@ export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");
 export interface FoundPlayer {
   playerId: string;
   displayName: string;
+  /** What tells two people with the same name apart. */
+  handle: string;
   avatarUrl: string | null;
   frame: string | null;
   ring: string | null;

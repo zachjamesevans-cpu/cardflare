@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { ensureAuthUser } from "@/lib/auth/provision";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { PlayerRow, PlayerSessionRow } from "@/lib/supabase/types";
+import { handleSeedFrom, handleWithSuffix } from "./handle";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -108,13 +109,14 @@ export async function claimPendingPlayerInvite(user: User): Promise<void> {
 }
 
 /**
- * Creates the players row, working around a name somebody else has.
+ * Creates the players row, working around a HANDLE somebody else has.
  *
- * Tries the invited name first, then "Name2", "Name3" and so on. The
- * unique index is what decides, not a lookup beforehand: two invitations
- * to the same name can be claimed at the same moment, and only the index
- * sees both. Ten attempts is far more than a pilot will ever need and
- * still terminates.
+ * The name itself is free now — two people may both be "Zach" — so the
+ * only thing that can collide is the handle derived from it. Tries the
+ * plain one first, then "zach2", "zach3" and so on. The unique index is
+ * what decides, not a lookup beforehand: two accounts can be claimed at
+ * the same moment, and only the index sees both. Ten attempts is far
+ * more than a pilot will ever need and still terminates.
  *
  * Returns the error to report, or null on success.
  */
@@ -123,14 +125,16 @@ export async function createPlayerWithFreeName(
   userId: string,
   wanted: string,
 ): Promise<{ message: string } | null> {
+  const name = wanted.trim().slice(0, 40);
+  const base = handleSeedFrom(name);
+
   for (let attempt = 1; attempt <= 10; attempt += 1) {
-    const suffix = attempt === 1 ? "" : String(attempt);
-    const name = wanted.trim().slice(0, 40 - suffix.length) + suffix;
+    const handle = attempt === 1 ? base : handleWithSuffix(base, attempt);
 
     const { error } = await admin
       .from("players")
       .upsert(
-        { user_id: userId, display_name: name },
+        { user_id: userId, display_name: name, handle },
         { onConflict: "user_id", ignoreDuplicates: true },
       );
 
@@ -139,14 +143,14 @@ export async function createPlayerWithFreeName(
 
     /*
      * A unique violation on `user_id` means the row already exists,
-     * which is success for an idempotent claim. Only a name collision
+     * which is success for an idempotent claim. Only a handle collision
      * is worth another attempt, and the two are told apart by which
      * constraint fired.
      */
-    if (!error.message.includes("display_name")) return null;
+    if (!error.message.includes("handle")) return null;
   }
 
-  return { message: `Could not find a free name near "${wanted}"` };
+  return { message: `Could not find a free handle near "${base}"` };
 }
 
 /** The persistent player behind an auth user, if they have one. */
@@ -262,6 +266,92 @@ export interface PlayerListing {
   createdAt: string;
 }
 
+/**
+ * One player's email address, read from auth.
+ *
+ * Separate from the bulk read above because the console needs it for a
+ * single row and paging the whole roster to answer that would be silly.
+ */
+export async function emailForPlayer(playerId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const admin = getSupabaseAdmin();
+
+  const { data: player, error } = await admin
+    .from("players")
+    .select("user_id")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (error || !player) return null;
+
+  const { data, error: authError } = await admin.auth.admin.getUserById(player.user_id);
+
+  if (authError) {
+    console.error("Could not read the account's address", authError.message);
+    return null;
+  }
+
+  return data?.user?.email ?? null;
+}
+
+/** Accounts read per page from the auth admin API. Supabase caps this. */
+const AUTH_PAGE_SIZE = 200;
+
+/**
+ * A stop, so a bug upstream cannot turn one page load into a thousand
+ * round trips. Well above any plausible pilot roster; if it is ever hit
+ * the console says so rather than quietly listing a subset.
+ */
+const AUTH_MAX_PAGES = 25;
+
+/**
+ * Every account's email address, keyed by auth user id.
+ *
+ * This used to be read from the accepted invitations instead, with a
+ * comment claiming "every player got in through one". That stopped being
+ * true the day open sign-up shipped: `openSignup` creates the auth user
+ * and the players row directly and writes no invite, so everybody who
+ * signed themselves up showed as "No address on file" in the console —
+ * the founder's report. The address was never missing, only unread.
+ *
+ * Auth is the only place that actually holds it, so it is read from
+ * there. Paged rather than fetched per player: one call per two hundred
+ * accounts instead of one call each.
+ */
+async function emailsByUserId(): Promise<Map<string, string>> {
+  const admin = getSupabaseAdmin();
+  const emails = new Map<string, string>();
+
+  for (let page = 1; page <= AUTH_MAX_PAGES; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: AUTH_PAGE_SIZE,
+    });
+
+    if (error) {
+      console.error("Could not read the accounts' addresses", error.message);
+      break;
+    }
+
+    const users = data?.users ?? [];
+    for (const user of users) {
+      if (user.email) emails.set(user.id, user.email);
+    }
+
+    /* A short page is the last page. */
+    if (users.length < AUTH_PAGE_SIZE) return emails;
+
+    if (page === AUTH_MAX_PAGES) {
+      console.error(
+        `Stopped reading addresses at ${AUTH_MAX_PAGES} pages; some will show as missing.`,
+      );
+    }
+  }
+
+  return emails;
+}
+
 export interface PlayerInviteListing {
   email: string;
   displayName: string;
@@ -293,19 +383,7 @@ export async function listPlayersForAdmin(): Promise<{
 
   const rows = playersResult.data ?? [];
 
-  /*
-   * Emails live in auth, not in the players table; fetched one by one via
-   * the admin API would be N calls, so they come from the accepted invites
-   * instead — every player got in through one.
-   */
-  const { data: accepted } = await admin
-    .from("player_invites")
-    .select("email, accepted_by")
-    .not("accepted_by", "is", null);
-
-  const emailByUser = new Map(
-    (accepted ?? []).map((row) => [row.accepted_by as string, row.email]),
-  );
+  const emailByUser = await emailsByUserId();
 
   return {
     players: rows.map((row) => ({

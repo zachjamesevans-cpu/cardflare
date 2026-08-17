@@ -521,7 +521,10 @@ export function CardImageZoom({
         onFocus={intent}
         onBlur={cool}
         aria-label={`View ${exactName} larger`}
-        className={`shrink-0 cursor-zoom-in rounded-[7px] transition-transform duration-[var(--duration-base)] hover:ring-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none active:scale-95 ${thumbClassName ? "w-full" : ""}`}
+        /* 6px, the radius the thumbnail inside actually clips to. Any
+           other number here puts the hover and focus rings on a
+           different curve from the picture they are ringing. */
+        className={`shrink-0 cursor-zoom-in rounded-[6px] transition-transform duration-[var(--duration-base)] hover:ring-2 hover:ring-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none active:scale-95 ${thumbClassName ? "w-full" : ""}`}
       >
         {thumbnail}
       </button>

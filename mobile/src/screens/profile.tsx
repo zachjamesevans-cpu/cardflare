@@ -8,6 +8,13 @@ import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
+  formatHandle,
+  HANDLE_MAX,
+  HANDLE_MIN,
+  handleFrom,
+  handleSeedFrom,
+} from "../handle";
+import {
   addToShowcase,
   chooseUsername,
   describeError,
@@ -35,7 +42,7 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner } from "../showcase-zoom";
-import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, HandleInput, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 /** How far the cover reaches: past the name and the Embers badge. */
@@ -326,12 +333,24 @@ export function ProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
         <Card>
           <Title>Pick your name</Title>
-          <Body>This is the name people see when you walk into a room.</Body>
+          <Body>
+            This is the name people see when you walk into a room. Spaces and
+            capitals are fine, and it does not have to be unique.
+          </Body>
           <NameField
             current={profile.displayName}
             busy={busy === "setup"}
             onSave={(name) =>
-              act("setup", () => chooseUsername(name), "Welcome to CardFlare.")
+              act(
+                "setup",
+                /* The handle is derived here rather than asked for
+                   twice: this screen is the fallback path for somebody
+                   who reached the profile tab before finishing setup,
+                   and the welcome flow is where both are chosen. It can
+                   be changed in Settings straight after. */
+                () => chooseUsername(name, handleSeedFrom(name)),
+                "Welcome to CardFlare.",
+              )
             }
           />
           {message && <Muted>{message}</Muted>}
@@ -664,7 +683,7 @@ export function ProfileScreen() {
             setPlayerQuery(text);
             void searchFor(text);
           }}
-          placeholder="Find a player by name"
+          placeholder="Find a player by name or @handle"
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -697,12 +716,23 @@ export function ProfileScreen() {
                     frame={person.frame}
                     size={32}
                   />
-                  <Text
-                    numberOfLines={1}
-                    style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
-                  >
-                    {person.displayName}
-                  </Text>
+                  {/* Both, because a result list is exactly where two
+                      people called Zach turn up together and the handle
+                      is the only thing that tells them apart. */}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.textPrimary, fontWeight: "600" }}
+                    >
+                      {person.displayName}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.textMuted, fontSize: 12 }}
+                    >
+                      {formatHandle(person.handle)}
+                    </Text>
+                  </View>
                 </Tap>
               ))}
             </View>
@@ -901,7 +931,6 @@ export function NameField({
 
   return (
     <View style={{ gap: spacing(2) }}>
-      <Muted>Display name</Muted>
       <Input
         value={value}
         onChangeText={setValue}
@@ -914,6 +943,45 @@ export function NameField({
         variant="secondary"
         busy={busy}
         disabled={value.trim().length === 0 || value.trim() === current}
+        onPress={() => onSave(value.trim())}
+      />
+    </View>
+  );
+}
+
+/**
+ * The handle, changed on its own.
+ *
+ * Separate from the name for the same reason it is separate on the
+ * website: only one of the two can come back "taken", and one message
+ * trying to explain both situations would explain neither.
+ */
+export function HandleField({
+  current,
+  busy,
+  onSave,
+}: {
+  current: string;
+  busy: boolean;
+  onSave: (handle: string) => void;
+}) {
+  const [value, setValue] = useState(current);
+
+  return (
+    <View style={{ gap: spacing(2) }}>
+      <HandleInput
+        value={value}
+        /* Typed straight into shape, so the field never shows something
+           the server is about to refuse. */
+        onChangeText={(next) => setValue(handleFrom(next))}
+        maxLength={HANDLE_MAX}
+        placeholder="steven_b"
+      />
+      <Button
+        label="Save"
+        variant="secondary"
+        busy={busy}
+        disabled={value.trim().length < HANDLE_MIN || value.trim() === current}
         onPress={() => onSave(value.trim())}
       />
     </View>

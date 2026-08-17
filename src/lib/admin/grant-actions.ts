@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 
+import { generateSetupLink } from "@/lib/auth/invite-link";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { sendTestNotice } from "@/lib/notifications/notify";
+import { emailForPlayer } from "@/lib/players/accounts";
 import { grantEmbers, setCosmeticsUnlocked } from "./grants";
 import {
   grantEmbersSchema,
+  resetLinkSchema,
   testNoticeSchema,
   unlockCosmeticsSchema,
   type GrantState,
@@ -139,5 +142,44 @@ export async function unlockCosmeticsAction(
       parsed.data.scope === "everything"
         ? "Everything unlocked, the behind-the-scenes catalogue included."
         : "Every live cosmetic unlocked, including ones added later.",
+  };
+}
+
+/**
+ * Mints a one-time sign-in link for a player and hands it back.
+ *
+ * The founder's ask: "make their emails visible to me so, from the admin
+ * side, I can update / reset password link to them if they reach out to
+ * our support email." So the link is RETURNED, not sent — somebody
+ * writing in from a second address, or locked out of the first one, is
+ * exactly the case where mailing it to the account address helps nobody.
+ *
+ * The same `recovery` link the store invitations use, which works on an
+ * account that has never had a password as well as one that has.
+ */
+export async function resetLinkAction(
+  _previous: GrantState,
+  formData: FormData,
+): Promise<GrantState> {
+  if (!(await isAdmin())) return REFUSED;
+
+  const parsed = resetLinkSchema.safeParse({ playerId: text(formData, "playerId") });
+  if (!parsed.success) return { status: "error", message: GENERIC_ERROR };
+
+  const email = await emailForPlayer(parsed.data.playerId);
+  if (!email) {
+    return {
+      status: "error",
+      message: "No address on this account, so there is nothing to send them to.",
+    };
+  }
+
+  const url = await generateSetupLink(email);
+  if (!url) return { status: "error", message: GENERIC_ERROR };
+
+  return {
+    status: "link",
+    message: `A one-time link for ${email}. It expires, and it signs in whoever opens it.`,
+    url,
   };
 }

@@ -13,10 +13,11 @@ import {
 } from "react-native";
 
 import { chooseUsername, describeError, setGames, signUp } from "../api";
+import { HANDLE_MAX, handleFrom, handleSeedFrom } from "../handle";
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { SignInScreen } from "./sign-in";
-import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, ErrorLine, HandleInput, Input, Muted, Tap, Title } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 /**
@@ -299,23 +300,51 @@ function AccountStep({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * Who you are, in two halves — the website's shape, word for word.
+ *
+ * The name keeps its spaces and capitals; the handle is derived from it
+ * while it is typed, and stops being derived the moment it is edited by
+ * hand. Somebody who has decided to be @stevo should not have it yanked
+ * back to @steven_b by a later correction to their name.
+ */
 function UsernameStep({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleOwned, setHandleOwned] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <Card>
       <Body>
-        The name people see when you walk into a room. You can change it later.
+        The name people see when you walk into a room. Spaces and capitals are fine,
+        and it does not have to be unique.
       </Body>
       <Input
         value={name}
-        onChangeText={setName}
-        placeholder="Your player name"
-        autoCapitalize="none"
+        onChangeText={(next) => {
+          setName(next);
+          if (!handleOwned) setHandle(handleSeedFrom(next));
+        }}
+        placeholder="Steven B"
         autoCorrect={false}
         maxLength={40}
       />
+
+      <Body>
+        Your handle is how people look you up. Letters, numbers and underscores, so
+        it can be said out loud and typed without guessing.
+      </Body>
+      <HandleInput
+        value={handle}
+        onChangeText={(next) => {
+          setHandleOwned(true);
+          setHandle(handleFrom(next));
+        }}
+        placeholder="steven_b"
+        maxLength={HANDLE_MAX}
+      />
+
       <ErrorLine message={error} />
       <AsyncButton
         label="That is me"
@@ -323,7 +352,7 @@ function UsernameStep({ onDone }: { onDone: () => void }) {
         onPress={async () => {
           setError(null);
           try {
-            await chooseUsername(name.trim());
+            await chooseUsername(name.trim(), handle.trim());
             onDone();
           } catch (caught) {
             setError(describeError(caught));

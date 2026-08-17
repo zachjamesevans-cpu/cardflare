@@ -17,6 +17,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 export interface AdminPlayer {
   id: string;
   displayName: string;
+  handle: string;
   /** Membership tier: free, pro, ultra or max. */
   tier: string;
   avatarUrl: string | null;
@@ -68,7 +69,11 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
   if (term) {
     /* Escaped so a name containing % or _ matches itself, not everything. */
     const pattern = term.replace(/([%_\\])/g, "\\$1");
-    request = request.ilike("display_name", `%${pattern}%`);
+    /* Either half finds them: an admin looking somebody up from a
+       support email has whichever one the player quoted. */
+    request = request.or(
+      `display_name.ilike.%${pattern}%,handle.ilike.%${pattern.toLowerCase()}%`,
+    );
   }
 
   const { data, error } = await request;
@@ -102,6 +107,10 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
   return rows.map((row) => ({
     id: row.id,
     displayName: row.display_name,
+    /* `?? ""` for the same reason the select above is `*`: a deploy can
+       land minutes before its migration, and a missing handle must
+       degrade to a blank line rather than an empty console. */
+    handle: row.handle ?? "",
     tier: row.tier,
     avatarUrl: avatarSrc(row.avatar_url),
     embersEarned: row.embers_earned,

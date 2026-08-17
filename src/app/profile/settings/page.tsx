@@ -21,6 +21,7 @@ import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
 import { DisplayNameForm } from "@/components/players/display-name-form";
+import { HandleForm } from "@/components/players/handle-form";
 import { ownProfile } from "@/lib/players/profile";
 
 export const metadata: Metadata = {
@@ -65,6 +66,7 @@ export default async function ProfileSettingsPage() {
   const wants = playerId ? await listWants(playerId) : null;
   const profile = playerId ? await ownProfile(playerId) : null;
   const displayName = profile?.displayName ?? "";
+  const handle = profile?.handle ?? "";
   const locals = playerId ? await listLocals(playerId) : [];
 
   const sync = playerId ? await collectionSyncFor(playerId) : null;
@@ -98,14 +100,27 @@ export default async function ProfileSettingsPage() {
    * "no need to have the name editor front and center on a profile."
    */
   const nameCard = !playerId ? null : (
-    <Card key="name" className="flex flex-col gap-3">
+    <Card key="name" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold text-text-primary">Your name</h2>
         <p className="text-sm text-text-secondary">
-          What people see when you walk into a room.
+          What people see when you walk into a room. Spaces and capitals are fine, and
+          it does not have to be unique.
         </p>
       </div>
       <DisplayNameForm displayName={displayName} />
+
+      {/* The other half of the same question, so both are changed in
+          the same place. Its own explanation, because "unique, no
+          spaces" is exactly the part that surprises people. */}
+      <div className="flex flex-col gap-1 border-t border-border pt-4">
+        <h3 className="font-semibold text-text-primary">How people find you</h3>
+        <p className="text-sm text-text-secondary">
+          Your handle is yours alone. Letters, numbers and underscores, so it can be
+          said out loud and typed without guessing.
+        </p>
+      </div>
+      <HandleForm handle={handle} />
     </Card>
   );
 

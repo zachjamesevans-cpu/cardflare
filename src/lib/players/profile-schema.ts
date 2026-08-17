@@ -52,6 +52,7 @@ export const BUY_REFUSALS: Record<string, string> = {
  * export only async functions — a const would fail the build.
  */
 export type SetupState =
-  { status: "idle" } | { status: "error"; message: string; displayName: string };
+  | { status: "idle" }
+  | { status: "error"; message: string; displayName: string; handle: string };
 
 export const SETUP_IDLE: SetupState = { status: "idle" };

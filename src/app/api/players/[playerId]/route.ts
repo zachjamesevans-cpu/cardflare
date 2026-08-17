@@ -77,6 +77,7 @@ export async function GET(
     follow: me && me !== playerId ? follow : null,
     playerId: profile.playerId,
     displayName: profile.displayName,
+    handle: profile.handle,
     /* Absolute, because the app has no origin to resolve "/api/..."
        against; the website resolves it against itself either way. */
     avatarUrl: profile.avatarUrl?.startsWith("/")

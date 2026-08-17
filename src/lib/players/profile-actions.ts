@@ -18,7 +18,9 @@ import {
   setAvatar,
   setCover,
   setDisplayName,
+  setHandle,
 } from "./profile";
+import { handleSchema } from "./handle";
 import {
   ANIMATED_AVATAR_MAX_BYTES,
   ANIMATED_AVATAR_MIME_TYPES,
@@ -80,14 +82,9 @@ export async function renameProfileAction(
     };
   }
 
+  /* No "taken" branch any more: names stopped needing to be unique the
+     day handles arrived, and the handle is what carries the identity. */
   const outcome = await setDisplayName(playerId, parsed.data.displayName);
-
-  if (outcome === "taken") {
-    return {
-      status: "error",
-      message: "Somebody already goes by that. Pick another one.",
-    };
-  }
   if (outcome === "failed") return { status: "error", message: GENERIC_ERROR };
 
   /*
@@ -416,4 +413,40 @@ export async function removeShowcaseAction(formData: FormData): Promise<void> {
 
   await removeFromShowcase(playerId, entryId);
   revalidateProfile();
+}
+
+/**
+ * Changing the handle people find you by.
+ *
+ * Its own action rather than a second field on the rename, because they
+ * fail in different ways and for different reasons: a name cannot be
+ * refused now, and a handle can. Folding them together would mean one
+ * error message trying to explain two unrelated situations.
+ */
+export async function changeHandleAction(
+  _previous: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const parsed = handleSchema.safeParse({ handle: text(formData, "handle") });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? GENERIC_ERROR,
+    };
+  }
+
+  const outcome = await setHandle(playerId, parsed.data.handle);
+
+  if (outcome === "taken") {
+    return { status: "error", message: "That handle is taken. Pick another one." };
+  }
+  if (outcome === "failed") return { status: "error", message: GENERIC_ERROR };
+
+  revalidateProfile();
+
+  return { status: "saved", message: `You are now @${parsed.data.handle}.` };
 }

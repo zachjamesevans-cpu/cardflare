@@ -82,7 +82,7 @@ export function Rail({
      * shelf sat eight pixels right of the header it belongs to, which is
      * the sort of thing nobody can name and everybody can see.
      */
-    <div className="relative -mx-2">
+    <div className="relative -mx-3">
       <ul
         ref={list}
         aria-label={ariaLabel}
@@ -93,8 +93,13 @@ export function Rail({
          * soft shadow on a tile - which is how a card you are holding
          * is marked - got sliced off at the top and at the left edge
          * where those tiles now sort to. This is the room it needs.
+         *
+         * Twelve, not eight: the shadow is a 10px blur sitting outside
+         * a 2px ring, so eight pixels cut the last of it off. Measure
+         * the glow before changing this, and keep the negative margin
+         * above in step or the shelf stops lining up with its header.
          */
-        className="flex items-start gap-2 overflow-x-auto px-2 pt-2 pb-3"
+        className="flex items-start gap-2 overflow-x-auto px-3 pt-3 pb-4"
       >
         {children}
       </ul>
