@@ -202,6 +202,75 @@ export function ProfileScreen() {
     }
   };
 
+  /**
+   * The animated picture: a GIF, sent as it was picked.
+   *
+   * Deliberately not the flow above. That one resizes and re-encodes to
+   * a JPEG, which is exactly the thing that turns an animation into one
+   * frame of an animation - so a GIF cannot go through it and there was
+   * no other way in. No crop either: the editor hands back a still.
+   *
+   * The size ceiling is the transport's, not the format's. Every 6KB of
+   * GIF is another request, so this is a couple of hundred of them at
+   * 2MB, counted out loud while they go. The website takes larger ones
+   * because a browser can send a body and this cannot.
+   */
+  const changeAnimatedPicture = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage("CardFlare needs photo access to change your picture.");
+      return;
+    }
+
+    const chosen = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      /* No editing: cropping re-encodes, and a re-encoded GIF is a JPEG
+         of its first frame. The server squares it instead. */
+      allowsEditing: false,
+      quality: 1,
+      base64: true,
+    });
+    if (chosen.canceled || chosen.assets.length === 0) return;
+
+    const asset = chosen.assets[0];
+    const looksAnimated =
+      asset.mimeType === "image/gif" || /\.gif($|\?)/i.test(asset.uri);
+
+    if (!looksAnimated) {
+      setMessage("An animated picture has to be a GIF.");
+      return;
+    }
+
+    const encoded = asset.base64 ?? null;
+    if (!encoded) {
+      setMessage("That GIF could not be read. Try a different one.");
+      return;
+    }
+
+    /* Said before the wait rather than after it: base64 is four
+       characters per three bytes, so this is the real file size. */
+    if (encoded.length > 2_800_000) {
+      setMessage("That GIF is over 2MB. Try a shorter or smaller one.");
+      return;
+    }
+
+    setBusy("avatar");
+    setMessage("Uploading GIF…");
+    try {
+      await uploadAvatar(
+        encoded,
+        (sent, total) => setMessage(`Uploading GIF… ${sent} of ${total}`),
+        "avatar-animated",
+      );
+      await load();
+      setMessage("Animated picture updated.");
+    } catch (caught) {
+      setMessage(`The GIF did not go through (${describeError(caught)}). Try again.`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const act = async (
     key: string,
     run: () => Promise<unknown>,
@@ -416,6 +485,23 @@ export function ProfileScreen() {
             />
           </View>
         </View>
+
+        {/*
+         * The GIF, on its own line and its own flow. It cannot share the
+         * button above: that one resizes and re-encodes to a JPEG, which
+         * is what turns an animation into one frame of an animation.
+         *
+         * Offered to everybody rather than hidden behind the tier. The
+         * server refuses a non-Pro upload by name, and a button that
+         * says what it is teaches the feature exists; a button that is
+         * simply absent teaches nothing.
+         */}
+        <Button
+          label={busy === "avatar" ? (message ?? "Uploading…") : "Use a GIF (Pro)"}
+          variant="secondary"
+          disabled={busy === "avatar" || busy === "cover"}
+          onPress={() => void changeAnimatedPicture()}
+        />
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the

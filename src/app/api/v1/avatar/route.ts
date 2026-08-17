@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { AVATAR_MAX_BYTES } from "@/lib/players/profile-image";
-import { setAvatar, setCover } from "@/lib/players/profile";
+import { setAnimatedAvatar, setAvatar, setCover } from "@/lib/players/profile";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +28,33 @@ export const dynamic = "force-dynamic";
  * under 200KB before sending, so a normal upload is a dozen chunks.
  */
 
+/*
+ * A chunk stays at 8000 characters because that number is the thing
+ * already proven to survive the founder's network. Percent-encoded into
+ * `x-cf-payload` it lands near 9KB, which is comfortably inside the 16KB
+ * a Node front door allows for all headers; doubling it would buy half
+ * the round trips and risk the whole transport.
+ *
+ * The COUNT is what grew. Sixty-four chunks is 384KB, which is a JPEG the
+ * app already shrank and nothing like a GIF, so an animated picture had
+ * no way through at all. Four hundred carries the 2MB below with room to
+ * spare, at the cost of round trips - which is why the app counts them
+ * out loud while it sends.
+ */
 const CHUNK_MAX_CHARS = 8000;
-const CHUNK_MAX_COUNT = 64;
+const CHUNK_MAX_COUNT = 400;
+
+/**
+ * The largest animated picture the APP may send, which is smaller than
+ * the 8MB the website takes.
+ *
+ * Not a rule about GIFs, a rule about this transport: every 6KB of image
+ * is another request, so 2MB is already a few hundred of them on shop
+ * wifi. The website keeps its own ceiling; a phone gets the one it can
+ * actually deliver, and is told the number rather than left to discover
+ * it two minutes in.
+ */
+const APP_ANIMATED_MAX_BYTES = 2 * 1024 * 1024;
 
 const uploadId = z.string().uuid();
 
@@ -57,7 +82,10 @@ const schema = z.discriminatedUnion("action", [
     count: z.number().int().min(1).max(CHUNK_MAX_COUNT),
     /* What the assembled picture becomes: the square profile picture,
        or the wide cover banner behind it. Same transport either way. */
-    kind: z.enum(["avatar", "cover"]).default("avatar"),
+    /* "avatar-animated" is the GIF, which skips the still pipeline
+       entirely: sharp re-encodes it as an animation and writes a poster
+       beside it. Pro only, checked server-side by setAnimatedAvatar. */
+    kind: z.enum(["avatar", "cover", "avatar-animated"]).default("avatar"),
   }),
 ]);
 
@@ -117,23 +145,50 @@ export async function POST(request: Request): Promise<Response> {
 
     const bytes = Buffer.from(encoded, "base64");
     if (bytes.length === 0) return badRequest("That upload was empty.");
-    if (bytes.length > AVATAR_MAX_BYTES) {
-      return badRequest("That picture is over 2MB.");
+
+    const animated = body.kind === "avatar-animated";
+    const ceiling = animated ? APP_ANIMATED_MAX_BYTES : AVATAR_MAX_BYTES;
+
+    if (bytes.length > ceiling) {
+      return badRequest(
+        animated
+          ? "That GIF is over 2MB. Try a shorter or smaller one."
+          : "That picture is over 2MB.",
+      );
     }
 
-    const store = body.kind === "cover" ? setCover : setAvatar;
-    const outcome = await store(player.playerId, {
+    /* The bytes are handed over as sent. `setAnimatedAvatar` decides
+       what a GIF really is by reading its header, exactly as it does for
+       the website's upload - a type named by a client is a hint. */
+    const file = {
       arrayBuffer: async () =>
         bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
       size: bytes.length,
-      type: "image/jpeg",
-    });
+      type: animated ? "image/gif" : "image/jpeg",
+    };
+
+    const outcome = animated
+      ? await setAnimatedAvatar(player.playerId, file)
+      : await (body.kind === "cover" ? setCover : setAvatar)(player.playerId, file);
 
     if (!outcome.ok) {
+      /*
+       * Named rather than generic. An animated upload can fail for a
+       * reason the player can act on - it is a Pro feature, and a GIF
+       * that is not a GIF is a common mis-pick - and "try again" would
+       * send them round the same loop.
+       */
+      const reason = outcome.reason;
       return badRequest(
-        outcome.reason === "unreadable"
-          ? "That picture could not be read. Try a different one."
-          : "The picture could not be saved. Try again.",
+        reason === "not-pro"
+          ? "Animated pictures are a Pro feature."
+          : reason === "wrong-type"
+            ? "An animated picture has to be a GIF."
+            : reason === "too-big"
+              ? "That picture is too big."
+              : reason === "unreadable"
+                ? "That picture could not be read. Try a different one."
+                : "The picture could not be saved. Try again.",
       );
     }
 
