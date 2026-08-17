@@ -389,6 +389,8 @@ export interface RoomState {
     frame?: string | null;
     /** The catalogue ring, worn over the frame when both are set. */
     ring?: string | null;
+    /** The catalogue avatar effect, which rides with any ring. */
+    aura?: string | null;
     /**
      * A dropped-in profile border and avatar effect, when they wear
      * one. The server has sent these since the ring slots existed; the
@@ -753,6 +755,8 @@ export interface PeekProfile {
   frame: string | null;
   /** The catalogue ring, worn over the frame when both are set. */
   ring: string | null;
+  /** The catalogue avatar effect, which rides with any ring. */
+  aura: string | null;
   /** A dropped-in profile border and avatar effect, when worn. */
   ringArt: ArtFile | null;
   auraArt: ArtFile | null;

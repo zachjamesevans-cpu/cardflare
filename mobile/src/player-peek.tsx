@@ -149,6 +149,7 @@ export function PlayerPeekModal({
                   avatarUrl={profile.avatarUrl}
                   frame={profile.frame}
                   ring={profile.ring}
+                  aura={profile.aura}
                   ringArt={profile.ringArt}
                   auraArt={profile.auraArt}
                   size={56}

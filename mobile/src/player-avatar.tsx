@@ -94,6 +94,35 @@ export const RING_COLOR: Record<string, string> = {
   "ring-prestige": "#f0c24b",
 };
 
+/**
+ * The catalogue avatar effects, as one colour each.
+ *
+ * The same gap the rings had, and closed the same way: the website draws
+ * these in CSS - drifting hearts, rising sparks, falling snow - and a phone
+ * has no CSS, so a player wearing one wore nothing in the app.
+ *
+ * One colour is a bigger loss here than it was for rings, because an effect
+ * IS its movement. What the app draws is a soft halo in the effect's own
+ * colour: enough to say "this player is wearing something", honest about
+ * not being the animation. Particles need a Skia pass and a round of their
+ * own, the same conclusion the multi-colour rings reached.
+ *
+ * Taken from the particle each effect scatters — the fill inside the SVG
+ * the website inlines — so the halo is the colour of the thing that would
+ * have been floating. `tests/unit/ring-colors.test.ts` fails when an effect
+ * in the CSS has no colour here.
+ */
+export const AURA_COLOR: Record<string, string> = {
+  "aura-hearts": "#ff8fb3",
+  "aura-sakura": "#f7b6cf",
+  "aura-sparks": "#ffb45e",
+  "aura-stars": "#eef4ff",
+  "aura-snow": "#dcecff",
+  "aura-bubbles": "#bfe8ff",
+  "aura-static": "#ffe36e",
+  "aura-holo-shards": "#a9d5ff",
+};
+
 /** FNV-1a, the same stable hash the website uses to pick a hue. */
 function hue(seed: string): string {
   let result = 0x811c9dc5;
@@ -120,6 +149,7 @@ export function PlayerAvatar({
   avatarUrl = null,
   frame = null,
   ring = null,
+  aura = null,
   ringArt = null,
   auraArt = null,
   size = 32,
@@ -142,7 +172,12 @@ export function PlayerAvatar({
    * website gives it.
    */
   ringArt?: ArtFile | null;
-  /** An avatar effect, which rides with whatever ring is worn. */
+  /**
+   * The catalogue avatar effect they wear. Rides WITH a ring rather than
+   * replacing it — the website's rule: the two slots mix and match.
+   */
+  aura?: string | null;
+  /** A dropped-in avatar effect, which outranks the catalogue one. */
   auraArt?: ArtFile | null;
   size?: number;
   /** Away players read as away, the same as on the website. */
@@ -166,6 +201,24 @@ export function PlayerAvatar({
      worn; a catalogue ring on top of one replaces it outright. */
   const kit =
     !ringArt && !ring && frame && travellingFrame(frame) ? getFoilKit() : null;
+
+  /*
+   * The worn effect, as a halo in its own colour.
+   *
+   * A dropped-in file outranks it, the same order the ring slot follows.
+   * Drawn as a soft glow rather than particles: an effect is its movement,
+   * and standing still is the honest version of it until Skia draws these.
+   */
+  const halo = !auraArt && aura ? (AURA_COLOR[aura] ?? null) : null;
+
+  const haloStyle = halo
+    ? {
+        shadowColor: halo,
+        shadowOpacity: 0.9,
+        shadowRadius: Math.max(4, Math.round(size * 0.22)),
+        shadowOffset: { width: 0, height: 0 },
+      }
+    : null;
 
   const face = (
     <View
@@ -225,6 +278,7 @@ export function PlayerAvatar({
           alignItems: "center",
           justifyContent: "center",
           opacity: dimmed ? 0.5 : 1,
+          ...(haloStyle ?? {}),
         }}
       >
         {ringArt && (
@@ -246,7 +300,9 @@ export function PlayerAvatar({
   }
 
   if (!band) {
-    return <View style={{ opacity: dimmed ? 0.5 : 1 }}>{face}</View>;
+    return (
+      <View style={[{ opacity: dimmed ? 0.5 : 1 }, haloStyle]}>{face}</View>
+    );
   }
 
   /* Ring, gap, face: 2px band + 2px canvas, the web's box-shadow made
@@ -264,6 +320,7 @@ export function PlayerAvatar({
         alignItems: "center",
         justifyContent: "center",
         opacity: dimmed ? 0.5 : 1,
+        ...(haloStyle ?? {}),
       }}
     >
       {face}
