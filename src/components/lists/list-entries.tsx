@@ -394,8 +394,17 @@ function CarouselEntry({
        * ring on the card IS the finding, and it survives being glanced
        * at across a table in a way a sentence does not.
        */}
+      {/*
+       * One radius, shared by the ring and the artwork it is drawn
+       * around. A ring follows its own element's corner, so the picture
+       * inside has to be clipped to the SAME number or the two curves
+       * part company and leave a dark wedge in every corner — which is
+       * what the founder saw: "the green glow is kinda cut off... make
+       * sure it actually fits the card perfectly on the corners." It
+       * was 9px out here against 6px on the picture.
+       */}
       <div
-        className={`relative flex rounded-[9px] ${
+        className={`relative flex rounded-[6px] ${
           match ? "shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent" : ""
         }`}
       >
@@ -403,7 +412,7 @@ function CarouselEntry({
           <div
             key={depth}
             aria-hidden="true"
-            className="absolute inset-0 overflow-hidden rounded-[7px] border border-border bg-elevated opacity-40"
+            className="absolute inset-0 overflow-hidden rounded-[6px] border border-border bg-elevated opacity-40"
             style={{ transform: `translate(${depth * 4}px, 0)` }}
           >
             {isRenderableImageUrl(entry.imageUrl) && (

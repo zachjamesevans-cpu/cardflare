@@ -23,6 +23,8 @@ export interface ApiPlayer {
   playerId: string;
   userId: string;
   displayName: string;
+  /** The unique one, so the app can show `@handle` without a second call. */
+  handle: string;
 }
 
 function bearerToken(request: Request): string | null {
@@ -61,6 +63,7 @@ export async function apiPlayer(request: Request): Promise<ApiPlayer | null> {
       playerId: player.id,
       userId: data.user.id,
       displayName: player.display_name,
+      handle: player.handle,
     };
   } catch (error) {
     console.error("Could not authenticate the API request", error);

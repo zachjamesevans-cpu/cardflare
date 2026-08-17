@@ -1416,7 +1416,14 @@ function CarouselFlare({
                 bottom: -2,
                 borderWidth: 2,
                 borderColor: colors.accent,
-                borderRadius: radius.control + 2,
+                /*
+                 * The art's own radius plus the two pixels this sits
+                 * outset by, so the ring's INNER curve lands exactly on
+                 * the picture's edge. `radius.control + 2` was a curve
+                 * twice as round as the card it was ringing, and the
+                 * corners showed the daylight between them.
+                 */
+                borderRadius: radius.control / 2 + 2,
                 shadowColor: colors.accent,
                 shadowOpacity: 0.35,
                 shadowRadius: 6,

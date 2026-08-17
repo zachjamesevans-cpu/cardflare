@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { accountIdentity } from "./account-identity";
-import { isDisplayNameFree, markOnboarded, setDisplayName } from "./profile";
+import { handleSchema } from "./handle";
+import { isHandleFree, markOnboarded, setIdentity } from "./profile";
 import { displayNameSchema, type SetupState } from "./profile-schema";
 
 /**
@@ -31,34 +32,39 @@ export async function chooseUsernameAction(
   formData: FormData,
 ): Promise<SetupState> {
   const submitted = text(formData, "displayName");
+  const submittedHandle = text(formData, "handle");
+
+  const fail = (message: string): SetupState => ({
+    status: "error",
+    message,
+    displayName: submitted,
+    handle: submittedHandle,
+  });
 
   const account = await accountIdentity(await getViewer());
-  if (!account) {
-    return { status: "error", message: GENERIC_ERROR, displayName: submitted };
-  }
+  if (!account) return fail(GENERIC_ERROR);
 
   const parsed = displayNameSchema.safeParse({ displayName: submitted });
-
   if (!parsed.success) {
-    return {
-      status: "error",
-      message: parsed.error.issues[0]?.message ?? GENERIC_ERROR,
-      displayName: submitted,
-    };
+    return fail(parsed.error.issues[0]?.message ?? GENERIC_ERROR);
   }
 
-  const outcome = await setDisplayName(account.playerId, parsed.data.displayName);
+  const parsedHandle = handleSchema.safeParse({ handle: submittedHandle });
+  if (!parsedHandle.success) {
+    return fail(parsedHandle.error.issues[0]?.message ?? GENERIC_ERROR);
+  }
 
+  const outcome = await setIdentity(
+    account.playerId,
+    parsed.data.displayName,
+    parsedHandle.data.handle,
+  );
+
+  /* Only the handle can be taken now. A name is free to repeat. */
   if (outcome === "taken") {
-    return {
-      status: "error",
-      message: "Somebody already goes by that. Try another one.",
-      displayName: submitted,
-    };
+    return fail("That handle is taken. Try another one.");
   }
-  if (outcome === "failed") {
-    return { status: "error", message: GENERIC_ERROR, displayName: submitted };
-  }
+  if (outcome === "failed") return fail(GENERIC_ERROR);
 
   /*
    * Marked set up here, at the name, rather than after the picture.
@@ -84,21 +90,25 @@ export async function skipPictureAction(): Promise<void> {
 }
 
 /**
- * Whether a name is free, for the field to say so while it is typed.
+ * Whether a HANDLE is free, for the field to say so while it is typed.
  *
  * A courtesy, never the gate — the unique index decides, and
- * `setDisplayName` reports what it decided. This exists because a
- * username picker that only tells you at submit time is the most
- * annoying form on the internet.
+ * `setIdentity` reports what it decided. This exists because a picker
+ * that only tells you at submit time is the most annoying form on the
+ * internet.
+ *
+ * It checks the handle rather than the name because the name stopped
+ * needing to be unique the day handles arrived: "taken" is no longer a
+ * thing that can happen to somebody called Zach.
  */
-export async function checkNameAction(name: string): Promise<"free" | "taken" | "bad"> {
+export async function checkHandleAction(
+  handle: string,
+): Promise<"free" | "taken" | "bad"> {
   const account = await accountIdentity(await getViewer());
   if (!account) return "bad";
 
-  const parsed = displayNameSchema.safeParse({ displayName: name });
+  const parsed = handleSchema.safeParse({ handle });
   if (!parsed.success) return "bad";
 
-  return (await isDisplayNameFree(parsed.data.displayName, account.playerId))
-    ? "free"
-    : "taken";
+  return (await isHandleFree(parsed.data.handle, account.playerId)) ? "free" : "taken";
 }

@@ -13,7 +13,10 @@ import {
   removeFromShowcase,
   SHOWCASE_LIMIT,
   setDisplayName,
+  setHandle,
+  setIdentity,
 } from "@/lib/players/profile";
+import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
 import { buyCosmetic } from "@/lib/players/cosmetics";
 import { avatarWearFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
@@ -79,6 +82,7 @@ export async function GET(request: Request): Promise<Response> {
     profile: {
       playerId: profile.playerId,
       displayName: profile.displayName,
+      handle: profile.handle,
       /*
        * Absolute, because a native client has no origin to resolve
        * "/api/avatars/..." against. The website gets the relative form
@@ -125,7 +129,16 @@ export async function GET(request: Request): Promise<Response> {
  */
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), displayName: z.string() }),
-  z.object({ action: z.literal("choose-username"), displayName: z.string() }),
+  /* The handle is its own action for the same reason it is its own form
+     on the website: only one of the two can come back "taken". */
+  z.object({ action: z.literal("set-handle"), handle: z.string() }),
+  z.object({
+    action: z.literal("choose-username"),
+    displayName: z.string(),
+    /* Optional so an app build that predates handles still finishes
+       setup; the server derives one from the name in that case. */
+    handle: z.string().optional(),
+  }),
   z.object({
     action: z.literal("buy"),
     slug: z.string().max(40),
@@ -174,10 +187,24 @@ export async function POST(request: Request): Promise<Response> {
       return badRequest(name.error.issues[0]?.message ?? "That name will not work.");
     }
 
-    const outcome = await setDisplayName(player.playerId, name.data.displayName);
+    const wanted = handleSchema.safeParse({
+      handle: body.handle ?? handleSeedFrom(name.data.displayName),
+    });
+    if (!wanted.success) {
+      return badRequest(
+        wanted.error.issues[0]?.message ?? "That handle will not work.",
+      );
+    }
 
+    const outcome = await setIdentity(
+      player.playerId,
+      name.data.displayName,
+      wanted.data.handle,
+    );
+
+    /* Only the handle can be taken. Two people called Zach is fine. */
     if (outcome === "taken") {
-      return badRequest("Somebody already goes by that. Pick another one.");
+      return badRequest("That handle is taken. Pick another one.");
     }
     if (outcome !== "renamed") {
       return Response.json({ error: "unavailable" }, { status: 503 });
@@ -189,6 +216,25 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
+  if (body.action === "set-handle") {
+    const wanted = handleSchema.safeParse({ handle: body.handle });
+    if (!wanted.success) {
+      return badRequest(
+        wanted.error.issues[0]?.message ?? "That handle will not work.",
+      );
+    }
+
+    const outcome = await setHandle(player.playerId, wanted.data.handle);
+
+    if (outcome === "taken") {
+      return badRequest("That handle is taken. Pick another one.");
+    }
+
+    return outcome === "renamed"
+      ? Response.json({ ok: true, handle: wanted.data.handle })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
   if (body.action === "rename") {
     const name = displayNameSchema.safeParse({ displayName: body.displayName });
     if (!name.success) {
@@ -196,10 +242,6 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const outcome = await setDisplayName(player.playerId, name.data.displayName);
-
-    if (outcome === "taken") {
-      return badRequest("Somebody already goes by that. Pick another one.");
-    }
 
     return outcome === "renamed"
       ? Response.json({ ok: true })

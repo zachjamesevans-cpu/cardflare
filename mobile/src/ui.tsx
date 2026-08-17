@@ -553,6 +553,29 @@ export function Input(props: TextInputProps) {
   );
 }
 
+/**
+ * A handle field: an input with the at-sign drawn inside it.
+ *
+ * Inside rather than beside, so this input keeps the same left edge as
+ * whatever name field sits above it. A prefix outside the box pushes the
+ * text in by its own width, and a ragged left edge on a two-field form
+ * is exactly the "all over the place" the founder has called out.
+ */
+export function HandleInput(props: TextInputProps) {
+  return (
+    <View style={{ justifyContent: "center" }}>
+      <Text style={styles.handlePrefix}>@</Text>
+      <TextInput
+        placeholderTextColor={colors.textMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        {...props}
+        style={[styles.input, styles.handleInput]}
+      />
+    </View>
+  );
+}
+
 export function ErrorLine({ message }: { message: string | null }) {
   if (!message) return null;
   return <Text style={styles.error}>{message}</Text>;
@@ -597,6 +620,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(3),
     paddingHorizontal: spacing(3.5),
     minHeight: 48,
+  },
+  /* Room for the at-sign, which is drawn over this padding. */
+  handleInput: { paddingLeft: spacing(7) },
+  handlePrefix: {
+    position: "absolute",
+    left: spacing(3.5),
+    color: colors.textMuted,
+    fontSize: 16,
+    zIndex: 1,
   },
   error: { color: colors.danger, fontSize: 14 },
   zoomBackdrop: {

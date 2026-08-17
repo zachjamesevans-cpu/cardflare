@@ -7,6 +7,7 @@ import { peekPlayer, type PeekProfile } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { EmberBadge } from "../ember-badge";
 import { FollowButton } from "../follow-button";
+import { formatHandle } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap, Title } from "../ui";
@@ -104,6 +105,11 @@ export function PlayerProfileScreen() {
             size={96}
           />
           <Title>{profile.displayName}</Title>
+          {/* Under the name and quieter than it: the name is who they
+              are, the handle is how you find them again. */}
+          <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+            {formatHandle(profile.handle)}
+          </Text>
           {/* Centered directly under the name, inside the block. */}
           <EmberBadge earned={profile.embersEarned} size="md" />
           <FollowButton playerId={profile.playerId} initial={profile.follow} />

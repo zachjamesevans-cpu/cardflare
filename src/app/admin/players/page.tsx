@@ -126,6 +126,7 @@ export default async function AdminPlayersPage({
                   key={player.id}
                   playerId={player.id}
                   displayName={player.displayName}
+                  handle={player.handle}
                   email={emailFor.get(player.id) ?? null}
                   avatarUrl={player.avatarUrl}
                   embersEarned={player.embersEarned}

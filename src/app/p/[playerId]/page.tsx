@@ -17,6 +17,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { getEquips, wornArtFor } from "@/lib/players/equips";
 import { followState } from "@/lib/players/follows";
+import { formatHandle } from "@/lib/players/handle";
 import { publicProfile } from "@/lib/players/profile";
 import {
   backgroundClass,
@@ -127,6 +128,11 @@ export default async function PublicProfilePage({
                 worn={dressed}
                 className="text-lg font-bold"
               />
+              {/* Under the name, quieter than it: the name is who they
+                  are, the handle is how you find them again. */}
+              <p className="-mt-1 text-sm text-text-muted">
+                {formatHandle(profile.handle)}
+              </p>
               <EmberBadge earned={profile.embersEarned} size="md" />
               <p className="text-sm text-text-muted">
                 Earned by confirming trades, and nothing else.

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import {
   Bell,
   Check,
@@ -10,6 +11,7 @@ import {
   KeyRound,
   Loader2,
   Sparkles,
+  SquareArrowOutUpRight,
 } from "lucide-react";
 
 import { EditPlayerName, EditPlayerTier } from "@/components/admin/edit-player-form";
@@ -19,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Select, TextInput } from "@/components/ui/controls";
 import {
   grantEmbersAction,
+  resetLinkAction,
   sendTestNoticeAction,
   unlockCosmeticsAction,
 } from "@/lib/admin/grant-actions";
@@ -44,6 +47,7 @@ import {
 export function AdminPlayerRow({
   playerId,
   displayName,
+  handle,
   email,
   avatarUrl,
   embersEarned,
@@ -56,6 +60,8 @@ export function AdminPlayerRow({
 }: {
   playerId: string;
   displayName: string;
+  /** The unique one. Blank only in the minutes before its migration lands. */
+  handle: string;
   email: string | null;
   avatarUrl: string | null;
   embersEarned: number;
@@ -86,51 +92,73 @@ export function AdminPlayerRow({
     sendTestNoticeAction,
     GRANT_IDLE,
   );
+  const [resetState, reset] = useActionState<GrantState, FormData>(
+    resetLinkAction,
+    GRANT_IDLE,
+  );
 
   const said =
-    [grantState, unlockState, unlockAllState, testState].find(
+    [grantState, unlockState, unlockAllState, testState, resetState].find(
       (state) => state.status !== "idle",
     ) ?? GRANT_IDLE;
 
   return (
     <li className="flex flex-col border-t border-border first:border-t-0">
-      <button
-        type="button"
-        onClick={() => setOpen((was) => !was)}
-        aria-expanded={open}
-        className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] py-3 text-left transition-colors hover:bg-elevated/60"
-      >
-        <PlayerAvatar
-          displayName={displayName}
-          seed={playerId}
-          avatarUrl={avatarUrl}
-          size="sm"
-        />
-        <span className="flex min-w-0 flex-1 basis-48 flex-col">
-          <span className="truncate font-semibold text-text-primary">
-            {displayName}
+      {/*
+       * The row opens the drawer; the arrow beside it opens their actual
+       * profile. Two targets rather than one because they are two
+       * different intentions, and because a link nested inside a button
+       * is not markup a browser will honour.
+       */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((was) => !was)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] py-3 text-left transition-colors hover:bg-elevated/60"
+        >
+          <PlayerAvatar
+            displayName={displayName}
+            seed={playerId}
+            avatarUrl={avatarUrl}
+            size="sm"
+          />
+          <span className="flex min-w-0 flex-1 basis-48 flex-col">
+            <span className="truncate font-semibold text-text-primary">
+              {displayName}
+            </span>
+            <span className="truncate text-xs text-text-muted">
+              {handle ? `@${handle} · ` : ""}
+              {email ?? "No address on file"}
+            </span>
           </span>
-          <span className="truncate text-xs text-text-muted">
-            {email ?? "No address on file"}
+
+          <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-secondary tabular-nums">
+            <Flame className="size-3.5 text-accent" aria-hidden="true" />
+            {embersEarned.toLocaleString()} Embers
           </span>
-        </span>
 
-        <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-secondary tabular-nums">
-          <Flame className="size-3.5 text-accent" aria-hidden="true" />
-          {embersEarned.toLocaleString()} Embers
-        </span>
+          {cosmeticsUnlocked && <Badge>all unlocked</Badge>}
+          {/* Signed up and never chose a username: worth seeing at a glance. */}
+          {setupOwed && <Badge tone="neutral">setup owed</Badge>}
 
-        {cosmeticsUnlocked && <Badge>all unlocked</Badge>}
-        {/* Signed up and never chose a username: worth seeing at a glance. */}
-        {setupOwed && <Badge tone="neutral">setup owed</Badge>}
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 shrink-0 text-text-muted transition-transform duration-300 ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </button>
 
-        <ChevronDown
-          aria-hidden="true"
-          className={`size-4 shrink-0 text-text-muted transition-transform duration-300 ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+        <Link
+          href={`/p/${playerId}`}
+          aria-label={`Open ${displayName}'s profile`}
+          title="Open their profile"
+          className="shrink-0 rounded-[var(--radius-control)] p-2 text-text-muted transition-colors hover:bg-elevated/60 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        >
+          <SquareArrowOutUpRight className="size-4" aria-hidden="true" />
+        </Link>
+      </div>
 
       {open && (
         <div className="mb-3 flex flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated p-4">
@@ -235,7 +263,38 @@ export function AdminPlayerRow({
             </p>
           </form>
 
-          {said.status !== "idle" && (
+          {/* Locked out and writing to support is the case this answers,
+              so the link comes back here to be pasted into the reply
+              rather than being posted to an address they may have lost. */}
+          <form action={reset} className="flex flex-wrap items-center gap-3">
+            <input type="hidden" name="playerId" value={playerId} />
+            <ResetLinkButton />
+            <p className="min-w-0 flex-1 basis-48 text-xs text-text-muted">
+              {email
+                ? `Makes a one-time sign-in link for ${email}. Nothing is emailed.`
+                : "No address on this account, so there is no link to make."}
+            </p>
+          </form>
+
+          {said.status === "link" && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={`reset-${playerId}`} className="text-xs text-text-muted">
+                {said.message}
+              </label>
+              {/* Read-only and selectable: an admin copies this into an
+                  email, and a link they might edit by accident is worse
+                  than useless. */}
+              <TextInput
+                id={`reset-${playerId}`}
+                readOnly
+                value={said.url}
+                onFocus={(event) => event.currentTarget.select()}
+                className="font-mono text-xs"
+              />
+            </div>
+          )}
+
+          {said.status !== "idle" && said.status !== "link" && (
             <p
               role="status"
               className={`flex items-center gap-1.5 text-sm ${
@@ -261,6 +320,21 @@ function GrantButton() {
     <Button type="submit" size="sm" disabled={pending}>
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Granting…" : "Grant"}
+    </Button>
+  );
+}
+
+function ResetLinkButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <KeyRound className="size-3.5" aria-hidden="true" />
+      )}
+      {pending ? "Making…" : "Make a reset link"}
     </Button>
   );
 }

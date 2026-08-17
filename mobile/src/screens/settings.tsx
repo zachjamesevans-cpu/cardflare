@@ -8,10 +8,11 @@ import {
   getMe,
   getProfile,
   renameProfile,
+  setHandle,
   type Me,
   type Profile,
 } from "../api";
-import { NameField } from "./profile";
+import { HandleField, NameField } from "./profile";
 import { AsyncButton, Body, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
 
@@ -128,6 +129,9 @@ export function SettingsScreen() {
   const [renaming, setRenaming] = useState(false);
   const [renamed, setRenamed] = useState<string | null>(null);
 
+  const [rehandling, setRehandling] = useState(false);
+  const [rehandled, setRehandled] = useState<string | null>(null);
+
   async function rename(displayName: string) {
     setRenaming(true);
     setRenamed(null);
@@ -139,6 +143,20 @@ export function SettingsScreen() {
       setRenamed(`Could not save that name. ${describeError(caught)}`);
     } finally {
       setRenaming(false);
+    }
+  }
+
+  async function rehandle(handle: string) {
+    setRehandling(true);
+    setRehandled(null);
+    try {
+      await setHandle(handle);
+      setProfile((was) => (was ? { ...was, handle } : was));
+      setRehandled(`You are now @${handle}.`);
+    } catch (caught) {
+      setRehandled(describeError(caught));
+    } finally {
+      setRehandling(false);
     }
   }
 
@@ -170,9 +188,26 @@ export function SettingsScreen() {
       {profile && (
         <Card>
           <Title>Your name</Title>
-          <Body>What people see when you walk into a room.</Body>
+          <Body>
+            What people see when you walk into a room. Spaces and capitals are fine,
+            and it does not have to be unique.
+          </Body>
           <NameField current={profile.displayName} busy={renaming} onSave={rename} />
           {renamed && <Muted>{renamed}</Muted>}
+
+          {/* The other half of the same question, in the same card, the
+              same way the website groups them. */}
+          <Title>How people find you</Title>
+          <Body>
+            Your handle is yours alone. Letters, numbers and underscores, so it can
+            be said out loud and typed without guessing.
+          </Body>
+          <HandleField
+            current={profile.handle}
+            busy={rehandling}
+            onSave={rehandle}
+          />
+          {rehandled && <Muted>{rehandled}</Muted>}
         </Card>
       )}
 

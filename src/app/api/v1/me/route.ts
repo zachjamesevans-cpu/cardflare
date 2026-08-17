@@ -22,7 +22,11 @@ export async function GET(request: Request): Promise<Response> {
   ]);
 
   return Response.json({
-    player: { id: player.playerId, displayName: player.displayName },
+    player: {
+      id: player.playerId,
+      displayName: player.displayName,
+      handle: player.handle,
+    },
     wants: wants.map((want) => ({
       id: want.id,
       cardId: want.cardId,

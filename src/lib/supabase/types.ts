@@ -565,7 +565,18 @@ export type PlayerRow = {
   id: string;
   created_at: string;
   user_id: string;
+  /**
+   * What a room shows. Spaces, capitals and repeats all fine — two
+   * people may both be "Zach", because `handle` is what tells them
+   * apart. It was unique until handles arrived, and that was one column
+   * doing two jobs.
+   */
   display_name: string;
+  /**
+   * The name a player is FOUND by: lowercase, no spaces, unique.
+   * Written as `@zach_b` wherever a person reads one.
+   */
+  handle: string;
   /** Public object URL in the `avatars` bucket, or null for the initials. */
   avatar_url: string | null;
   /**

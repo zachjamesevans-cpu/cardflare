@@ -55,6 +55,8 @@ export interface ShowcaseCard {
 export interface PublicProfile {
   playerId: string;
   displayName: string;
+  /** The unique one, written `@handle` wherever a person reads it. */
+  handle: string;
   /** Ready to put in an `<img>`. Null means the generated initials. */
   avatarUrl: string | null;
   /** The banner behind the picture, ready for an `<img>`. */
@@ -99,6 +101,7 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
   return {
     playerId: player.id,
     displayName: player.display_name,
+    handle: player.handle,
     /*
      * Resolved to a src here rather than at every render point, and
      * VERIFIED against storage — see `verifiedAvatar`. This is the page
@@ -1134,31 +1137,87 @@ export async function syncSessionNames(
 }
 
 /**
- * Is this name free, ignoring case?
+ * Sets both halves of who somebody is, in one write.
  *
- * A courtesy for the UI, never the gate — see `setDisplayName`. The
- * `ilike` is an exact comparison with no wildcards in it: the pattern is
- * escaped, so a name containing `%` matches only itself.
+ * One statement rather than two calls because they are chosen together
+ * at setup: a handle that landed while the name it was derived from was
+ * refused would leave an account describing somebody who does not exist.
  */
-export async function isDisplayNameFree(
+export async function setIdentity(
+  playerId: string,
   displayName: string,
+  handle: string,
+): Promise<RenameOutcome> {
+  if (!isSupabaseConfigured()) return "failed";
+
+  const name = displayName.trim();
+
+  const { error } = await getSupabaseAdmin()
+    .from("players")
+    .update({ display_name: name, handle })
+    .eq("id", playerId);
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return "taken";
+    console.error("Could not set the player's identity", error);
+    return "failed";
+  }
+
+  await syncSessionNames(playerId, name);
+  return "renamed";
+}
+
+/**
+ * Changes the handle a player is found by.
+ *
+ * The one field that still has to be unique, so this is the one that can
+ * still come back "taken". `setDisplayName` no longer can: two people
+ * called Zach is a fact about names, not a collision.
+ */
+export async function setHandle(
+  playerId: string,
+  handle: string,
+): Promise<RenameOutcome> {
+  if (!isSupabaseConfigured()) return "failed";
+
+  const { error } = await getSupabaseAdmin()
+    .from("players")
+    .update({ handle })
+    .eq("id", playerId);
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return "taken";
+    console.error("Could not change the handle", error);
+    return "failed";
+  }
+
+  return "renamed";
+}
+
+/**
+ * Is this handle free?
+ *
+ * A courtesy for the UI, never the gate — the unique index decides, and
+ * `setHandle` reports what it decided. A plain `eq`: handles are stored
+ * lowercase, so there is no case to fold and no pattern to escape.
+ */
+export async function isHandleFree(
+  handle: string,
   exceptPlayerId?: string,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return true;
 
-  const pattern = displayName.trim().replace(/([%_\\])/g, "\\$1");
-
   let query = getSupabaseAdmin()
     .from("players")
     .select("id")
-    .ilike("display_name", pattern);
+    .eq("handle", handle.trim().toLowerCase());
   if (exceptPlayerId) query = query.neq("id", exceptPlayerId);
 
   const { data, error } = await query.limit(1);
 
   if (error) {
-    console.error("Could not check whether a name is free", error);
-    // Say yes and let the index decide; a false "taken" blocks a valid name.
+    console.error("Could not check whether a handle is free", error);
+    // Say yes and let the index decide; a false "taken" blocks a valid one.
     return true;
   }
 

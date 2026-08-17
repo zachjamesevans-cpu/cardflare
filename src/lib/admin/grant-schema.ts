@@ -63,9 +63,18 @@ export const TEST_NOTICE_LABELS: Record<(typeof TEST_NOTICE_KINDS)[number], stri
   "room-flare": "Flare posted in your room",
 };
 
+export const resetLinkSchema = z.object({ playerId: z.guid() });
+
 export type GrantState =
   | { status: "idle" }
   | { status: "granted"; message: string }
+  /**
+   * A one-time sign-in link, handed back to the admin rather than
+   * emailed. The founder's ask is a support reply: somebody writes in
+   * locked out, and the answer is a link pasted into that reply. Mailing
+   * it from here would send it to the address they may have lost.
+   */
+  | { status: "link"; message: string; url: string }
   | { status: "error"; message: string };
 
 export const GRANT_IDLE: GrantState = { status: "idle" };
