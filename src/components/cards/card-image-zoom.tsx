@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { Layers, Loader2, PackageCheck, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Loader2,
+  PackageCheck,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/card";
 import { CardThumbnail } from "./card-thumbnail";
@@ -23,6 +30,27 @@ import { youHaveLabel, type MatchKind } from "@/lib/matching/schema";
  * Not used inside the card search: those thumbnails live inside the result
  * button, and a button inside a button is invalid.
  */
+
+/**
+ * One card as the large view draws it.
+ *
+ * Everything the panel says about a card, so a whole shelf can be handed
+ * over in one array and the viewer can move along it.
+ */
+export interface ZoomCard {
+  imageUrl: string | null;
+  exactName: string;
+  cardNumber: string;
+  anyPrinting?: boolean;
+  caption?: string | null;
+  note?: string | null;
+  lookingFor?: number | null;
+  direction?: "want" | "showcase";
+  stillNeeds?: number | null;
+  terms?: string | null;
+  pledges?: { name: string; quantity: number }[];
+  youHave?: { kind: MatchKind; count: number } | null;
+}
 
 /** Long enough to read as a movement, short enough not to be in the way. */
 const OPEN_MS = 220;
@@ -62,19 +90,21 @@ const BACKDROP_DIM: Keyframe = {
 };
 
 export function CardImageZoom({
-  imageUrl,
-  exactName,
-  cardNumber,
+  imageUrl: ownImageUrl,
+  exactName: ownExactName,
+  cardNumber: ownCardNumber,
   enabled,
-  anyPrinting = false,
-  caption,
-  note = null,
-  lookingFor = null,
-  direction = "want",
-  stillNeeds = null,
-  terms = null,
-  pledges = [],
-  youHave = null,
+  anyPrinting: ownAnyPrinting = false,
+  caption: ownCaption,
+  note: ownNote = null,
+  lookingFor: ownLookingFor = null,
+  direction: ownDirection = "want",
+  stillNeeds: ownStillNeeds = null,
+  terms: ownTerms = null,
+  pledges: ownPledges = [],
+  youHave: ownYouHave = null,
+  siblings,
+  position = 0,
   thumbClassName,
   thumb,
 }: {
@@ -131,6 +161,24 @@ export function CardImageZoom({
    * everywhere else — one zoom, whatever the card is dressed in.
    */
   thumb?: ReactNode;
+  /**
+   * The other cards on the shelf this one was opened from, so the viewer
+   * can move along it without closing.
+   *
+   * The founder: "once you click on someone's showcase, or cards they're
+   * looking for, you can swipe between them without having to click out to
+   * see the next card." A rail is a set, and the viewer treated every card
+   * in it as an island - five taps and five dismissals to read five cards
+   * somebody is hunting.
+   *
+   * Passed whole rather than as references, because the panel draws the
+   * card: name, number, the ask, who has pledged, what your own binder
+   * says. Every tile on a shelf passes the same array and its own index,
+   * so whichever one is tapped opens on itself.
+   */
+  siblings?: ZoomCard[];
+  /** Where in `siblings` this thumbnail sits. */
+  position?: number;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -146,6 +194,45 @@ export function CardImageZoom({
    * arriving, a finger landing, or keyboard focus. Touch-to-click is a couple
    * of hundred milliseconds, which is a real head start.
    */
+  /*
+   * Which card of the shelf is on screen.
+   *
+   * A shelf of one is no shelf: a single card carries no arrows and no
+   * counter, so an ordinary tile is exactly what it was.
+   */
+  const shelf = siblings && siblings.length > 1 ? siblings : null;
+  const [at, setAt] = useState(position);
+  const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
+
+  /*
+   * Everything below reads these, not the props, so the panel draws
+   * whichever card the shelf is on. The thumbnail reads them too and is
+   * behind a modal backdrop the whole time they differ - `at` returns to
+   * this tile's own position when the viewer closes.
+   */
+  const imageUrl = shown ? shown.imageUrl : ownImageUrl;
+  const exactName = shown ? shown.exactName : ownExactName;
+  const cardNumber = shown ? shown.cardNumber : ownCardNumber;
+  const anyPrinting = shown ? (shown.anyPrinting ?? false) : ownAnyPrinting;
+  const caption = shown ? shown.caption : ownCaption;
+  const note = shown ? (shown.note ?? null) : ownNote;
+  const lookingFor = shown ? (shown.lookingFor ?? null) : ownLookingFor;
+  const direction = shown ? (shown.direction ?? "want") : ownDirection;
+  const stillNeeds = shown ? (shown.stillNeeds ?? null) : ownStillNeeds;
+  const terms = shown ? (shown.terms ?? null) : ownTerms;
+  const pledges = shown ? (shown.pledges ?? []) : ownPledges;
+  const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
+
+  /*
+   * A swipe ends in a click, and a click anywhere on this dialog closes
+   * it. Without this every swipe would dismiss the card it just moved to.
+   */
+  const swiped = useRef(false);
+  const touchFrom = useRef<number | null>(null);
+
+  /** The art the panel can actually draw, or null for a card with none. */
+  const large = isRenderableImageUrl(imageUrl) ? imageUrl : null;
+
   const [warm, setWarm] = useState(false);
 
   const [sharp, setSharp] = useState(false);
@@ -265,11 +352,26 @@ export function CardImageZoom({
       backdropRunning.current = null;
       setWarm(false);
       setSharp(false);
+      setAt(position);
     };
 
     element.addEventListener("close", onClose);
     return () => element.removeEventListener("close", onClose);
-  }, []);
+  }, [position]);
+
+  /*
+   * Wraps, deliberately. A shelf is a loop of five or six cards, not a
+   * document with a first page and a last one, and running off the end
+   * into a dead arrow is a worse answer than coming back round.
+   */
+  const go = useCallback(
+    (delta: number) => {
+      if (!shelf) return;
+      setSharp(false);
+      setAt((current) => (current + delta + shelf.length) % shelf.length);
+    },
+    [shelf],
+  );
 
   const reducedMotion = useCallback(
     () =>
@@ -379,7 +481,7 @@ export function CardImageZoom({
    * Nothing to open, so nothing to press. Rendering a button over the
    * placeholder would promise a bigger picture that does not exist.
    */
-  if (!enabled || !isRenderableImageUrl(imageUrl)) return thumbnail;
+  if (!enabled || !isRenderableImageUrl(ownImageUrl)) return thumbnail;
 
   const intent = () => {
     if (isOpen.current) return;
@@ -442,7 +544,42 @@ export function CardImageZoom({
          * X button just runs the same close), so the whole surface can
          * be the dismissal. The app's zoom already worked this way.
          */
-        onClick={() => close()}
+        onClick={() => {
+          /* Except the click a swipe leaves behind, and the arrows,
+             which stop it themselves. */
+          if (swiped.current) {
+            swiped.current = false;
+            return;
+          }
+          close();
+        }}
+        onKeyDown={(event) => {
+          if (!shelf) return;
+          if (event.key === "ArrowRight") {
+            event.preventDefault();
+            go(1);
+          }
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            go(-1);
+          }
+        }}
+        onTouchStart={(event) => {
+          touchFrom.current = event.touches[0]?.clientX ?? null;
+        }}
+        onTouchEnd={(event) => {
+          const from = touchFrom.current;
+          touchFrom.current = null;
+          if (from === null || !shelf) return;
+
+          const travelled = (event.changedTouches[0]?.clientX ?? from) - from;
+          /* Forty pixels: far enough that a tap with a shaky thumb is
+             still a tap, near enough that a flick counts. */
+          if (Math.abs(travelled) < 40) return;
+
+          swiped.current = true;
+          go(travelled < 0 ? 1 : -1);
+        }}
         className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] cursor-zoom-out overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]"
       >
         <div
@@ -535,6 +672,47 @@ export function CardImageZoom({
           </div>
 
           {/*
+           * Arrows and a place in the shelf.
+           *
+           * The swipe is the gesture the founder asked for and the one
+           * nobody can see; this row is what says the gesture exists, and
+           * it is also the whole feature for anyone on a mouse or a
+           * keyboard. `stopPropagation` because every other click on this
+           * dialog closes it.
+           */}
+          {shelf && (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                aria-label="Previous card"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  go(-1);
+                }}
+                className="rounded-[var(--radius-control)] border border-border p-1.5 text-text-secondary hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              >
+                <ChevronLeft className="size-5" aria-hidden="true" />
+              </button>
+
+              <p aria-live="polite" className="text-xs text-text-muted tabular-nums">
+                {at + 1} of {shelf.length}
+              </p>
+
+              <button
+                type="button"
+                aria-label="Next card"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  go(1);
+                }}
+                className="rounded-[var(--radius-control)] border border-border p-1.5 text-text-secondary hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              >
+                <ChevronRight className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+
+          {/*
            * Sized to the card's own proportions so nothing jumps when the
            * image arrives.
            */}
@@ -545,18 +723,23 @@ export function CardImageZoom({
              * there is never an empty box. Blurred on purpose, so it reads as
              * an image arriving rather than as a broken one.
              */}
-            <Image
-              src={imageUrl}
-              alt=""
-              aria-hidden="true"
-              fill
-              sizes={THUMB_SIZES}
-              className="scale-105 object-contain blur-md"
-            />
-
-            {warm && (
+            {/* A sibling can be a card with no art of its own, so the
+                large view checks rather than assuming: the tile that was
+                tapped had a picture, the one two swipes along may not. */}
+            {large && (
               <Image
-                src={imageUrl}
+                src={large}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes={THUMB_SIZES}
+                className="scale-105 object-contain blur-md"
+              />
+            )}
+
+            {warm && large && (
+              <Image
+                src={large}
                 alt={cardImageAlt(exactName, cardNumber)}
                 fill
                 sizes="(max-width: 448px) 92vw, 416px"

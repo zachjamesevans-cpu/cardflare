@@ -94,19 +94,39 @@ export function Tap({
  * A card without provider art gets an honest empty frame, and an empty
  * frame promises no bigger picture, so it does not open one.
  */
+/**
+ * One card as the large view draws it - the app's copy of the website's
+ * `ZoomCard`, so a shelf can be handed over in one array.
+ */
+export interface ZoomCard {
+  imageUrl: string | null;
+  name: string;
+  cardNumber: string;
+  caption?: string | null;
+  note?: string | null;
+  lookingFor?: number | null;
+  stillNeeds?: number | null;
+  direction?: "want" | "showcase";
+  pledges?: { name: string; quantity: number }[];
+  terms?: string | null;
+  youHave?: { kind: "exact" | "other-printing"; count: number } | null;
+}
+
 export function CardImage({
-  imageUrl,
+  imageUrl: ownImageUrl,
   width,
-  name,
-  cardNumber,
-  caption,
-  note,
-  lookingFor,
-  stillNeeds,
-  direction = "want",
-  pledges = [],
-  terms = null,
-  youHave = null,
+  name: ownName,
+  cardNumber: ownCardNumber,
+  caption: ownCaption,
+  note: ownNote,
+  lookingFor: ownLookingFor,
+  stillNeeds: ownStillNeeds,
+  direction: ownDirection = "want",
+  pledges: ownPledges = [],
+  terms: ownTerms = null,
+  youHave: ownYouHave = null,
+  siblings,
+  position = 0,
 }: {
   imageUrl: string | null;
   width: number;
@@ -135,8 +155,47 @@ export function CardImage({
    * the glance, this sentence is the answer to the question it raises.
    */
   youHave?: { kind: "exact" | "other-printing"; count: number } | null;
+  /**
+   * The rest of the shelf this card was opened from, so the viewer can be
+   * swiped along it - the website's `siblings`, same idea and same shape.
+   *
+   * The founder: "once you click on someone's showcase, or cards they're
+   * looking for, you can swipe between them without having to click out to
+   * see the next card."
+   */
+  siblings?: ZoomCard[];
+  /** Where on that shelf this thumbnail sits. */
+  position?: number;
 }) {
   const [open, setOpen] = useState(false);
+
+  /* A shelf of one is no shelf: no arrows, no counter, nothing new. */
+  const shelf = siblings && siblings.length > 1 ? siblings : null;
+  const [at, setAt] = useState(position);
+  const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
+
+  /* Everything below reads these, so the panel draws whichever card the
+     shelf is on; the thumbnail keeps its own. */
+  const imageUrl = shown ? shown.imageUrl : ownImageUrl;
+  const name = shown ? shown.name : ownName;
+  const cardNumber = shown ? shown.cardNumber : ownCardNumber;
+  const caption = shown ? shown.caption : ownCaption;
+  const note = shown ? shown.note : ownNote;
+  const lookingFor = shown ? shown.lookingFor : ownLookingFor;
+  const stillNeeds = shown ? shown.stillNeeds : ownStillNeeds;
+  const direction = shown ? (shown.direction ?? "want") : ownDirection;
+  const pledges = shown ? (shown.pledges ?? []) : ownPledges;
+  const terms = shown ? (shown.terms ?? null) : ownTerms;
+  const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
+
+  /* A swipe ends in a press, and a press anywhere here closes. */
+  const swiped = useRef(false);
+  const touchFrom = useRef<number | null>(null);
+
+  const go = (delta: number) => {
+    if (!shelf) return;
+    setAt((current) => (current + delta + shelf.length) % shelf.length);
+  };
   const window = useWindowDimensions();
 
   /*
@@ -177,19 +236,49 @@ export function CardImage({
     borderWidth: 1,
   };
 
-  if (!imageUrl) return <View style={frame} />;
+  if (!ownImageUrl) return <View style={frame} />;
 
   const large = Math.min(window.width - spacing(14), 380);
 
   return (
     <>
-      <Tap onPress={() => setOpen(true)}>
-        <Image source={{ uri: imageUrl }} style={frame} resizeMode="cover" />
+      <Tap
+        onPress={() => {
+          setAt(position);
+          setOpen(true);
+        }}
+      >
+        <Image source={{ uri: ownImageUrl }} style={frame} resizeMode="cover" />
       </Tap>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>
         <Animated.View style={[styles.zoomBackdrop, { opacity: fade }]}>
-          <Pressable style={styles.zoomFill} onPress={close}>
+          <Pressable
+            style={styles.zoomFill}
+            onPress={() => {
+              if (swiped.current) {
+                swiped.current = false;
+                return;
+              }
+              close();
+            }}
+            onTouchStart={(event) => {
+              touchFrom.current = event.nativeEvent.pageX;
+            }}
+            onTouchEnd={(event) => {
+              const from = touchFrom.current;
+              touchFrom.current = null;
+              if (from === null || !shelf) return;
+
+              const travelled = event.nativeEvent.pageX - from;
+              /* Forty points: a shaky thumb is still a tap, a flick is a
+                 flick. The same number the website uses. */
+              if (Math.abs(travelled) < 40) return;
+
+              swiped.current = true;
+              go(travelled < 0 ? 1 : -1);
+            }}
+          >
             {/* A whisper of scale rides the fade, so the panel settles
                 into place instead of just appearing. */}
             <Animated.View
@@ -277,9 +366,43 @@ export function CardImage({
                 {/* The tile has no room for the note; the zoom is where
                     it gets read. */}
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
+
+                {/* The swipe is the gesture and the one nobody can see;
+                    this row says it exists, and is the whole feature for
+                    anybody who does not think to try. */}
+                {shelf ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: spacing(2),
+                    }}
+                  >
+                    <Tap onPress={() => go(-1)} hitSlop={12}>
+                      <MaterialCommunityIcons
+                        name="chevron-left"
+                        size={26}
+                        color={colors.textSecondary}
+                      />
+                    </Tap>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                      {`${at + 1} of ${shelf.length}`}
+                    </Text>
+                    <Tap onPress={() => go(1)} hitSlop={12}>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={26}
+                        color={colors.textSecondary}
+                      />
+                    </Tap>
+                  </View>
+                ) : null}
               </View>
+              {/* A sibling can be a card with no art of its own; the
+                  panel shows the empty frame rather than a broken box. */}
               <Image
-                source={{ uri: imageUrl }}
+                source={{ uri: imageUrl ?? undefined }}
                 style={{
                   width: large,
                   height: Math.round((large * 88) / 63),
