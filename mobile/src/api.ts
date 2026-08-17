@@ -848,7 +848,7 @@ export const peekPlayer = (playerId: string) =>
 export async function uploadAvatar(
   base64: string,
   onProgress?: (sent: number, total: number) => void,
-  kind: "avatar" | "cover" = "avatar",
+  kind: "avatar" | "cover" | "avatar-animated" = "avatar",
 ): Promise<void> {
   const CHUNK = 6000;
   const total = Math.ceil(base64.length / CHUNK);
