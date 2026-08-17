@@ -1,7 +1,7 @@
 import "server-only";
 
 import { findEventByJoinCode } from "@/lib/events/repository";
-import { listRoomFlares } from "@/lib/lists/repository";
+import { listRoomFlares, type ListEntry } from "@/lib/lists/repository";
 import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { listFollowing } from "@/lib/players/follows";
@@ -32,6 +32,16 @@ const LOCALS_SHOWN = 4;
 
 /** Cards shown on a board item before it stops listing and starts counting. */
 const BOARD_SAMPLE = 4;
+
+/**
+ * Cards shown on one friend's hunt. A deck is thirty; a Feed row is not.
+ *
+ * Four, the same as a board's sample, because that is what fits on ONE
+ * line at phone width beside the "+N more" that follows it. Six wrapped,
+ * leaving a lone tile on a second row with the count stranded next to
+ * it — untidy in exactly the way the founder keeps catching.
+ */
+const HUNT_SAMPLE = 4;
 
 /** How far back "just added" and "traded recently" reach. */
 const RECENT_DAYS = 7;
@@ -90,7 +100,14 @@ export interface FeedCard {
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
-  match: MatchKind;
+  /**
+   * What the viewer's own binder says about it, or null for nothing.
+   *
+   * Nullable since a friend's hunt shows cards the viewer does NOT hold
+   * — that is the point of seeing what a friend is chasing. A board's
+   * sample only ever carries matches, and still does.
+   */
+  match: MatchKind | null;
 }
 
 export interface BoardItem {
@@ -108,6 +125,22 @@ export interface BoardItem {
   sample: FeedCard[];
 }
 
+/**
+ * What somebody you follow is hunting, in one item.
+ *
+ * ONE per person per posting action, not one per card. A player building
+ * a deck posts thirty Flares in a sitting, and the first cut turned that
+ * into thirty separate items from the same face — the founder's words:
+ * "I don't want all of those notifications to show up as separate posts
+ * or notifications in the feed."
+ *
+ * It also appears when the viewer holds NONE of it. The earlier version
+ * only surfaced cards your own binder could answer, which quietly meant
+ * you could not see what your friends were chasing unless you happened
+ * to own it. "You can see which friends are looking for which cards" is
+ * the founder's ask, and `youCanAnswer` carries the actionable part
+ * without hiding the rest.
+ */
 export interface HuntItem {
   kind: "hunt";
   code: string;
@@ -118,7 +151,14 @@ export interface HuntItem {
   avatarUrl: string | null;
   frame: string | null;
   ring: string | null;
-  card: FeedCard;
+  /** The hunt's name, when they gave it one ("Red Luffy"). */
+  deckLabel: string | null;
+  /** Every card in this batch, the ones the viewer holds first. */
+  cards: FeedCard[];
+  /** How many they posted, which can exceed what is shown. */
+  total: number;
+  /** How many of them the viewer's own binder answers. */
+  youCanAnswer: number;
 }
 
 /**
@@ -475,14 +515,38 @@ export async function listFeed(
     });
 
     /*
-     * The same cards again, but only where the person asking is someone this
-     * player follows. That is the item worth acting on: a stranger's Flare is
-     * a board entry, and a friend's is a plan.
+     * The same board again, read as people rather than cards: a
+     * stranger's Flare is a board entry, a friend's is a plan.
+     *
+     * Grouped by poster AND posting action, so a deck put up in one
+     * sitting is one item. A Flare with no batch — posted alone, or
+     * before batches existed — falls back to its own id, which makes it
+     * a group of one rather than lumping every loose card together.
      */
-    for (const { flare, match } of answerable) {
+    const hunts = new Map<string, { flare: ListEntry; match: MatchKind | null }[]>();
+
+    for (const flare of flares) {
+      if (flare.intent !== "want") continue;
+
       const author = playerBySession.get(flare.playerSessionId);
-      const person = author ? followed.get(author) : undefined;
+      if (!author || !followed.has(author)) continue;
+
+      const key = `${author}::${flare.postedBatch ?? flare.id}`;
+      hunts.set(key, [
+        ...(hunts.get(key) ?? []),
+        { flare, match: matchFor(flare, held) },
+      ]);
+    }
+
+    for (const [key, group] of hunts) {
+      const person = followed.get(key.split("::")[0]);
       if (!person) continue;
+
+      /* The ones they can act on first: a friend's list is worth
+         reading, and the card in your binder is worth reading first. */
+      const ordered = [...group].sort(
+        (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
+      );
 
       items.push({
         kind: "hunt",
@@ -496,13 +560,16 @@ export async function listFeed(
         avatarUrl: person.avatarUrl,
         frame: person.frame,
         ring: person.ring,
-        card: {
+        deckLabel: ordered[0]?.flare.deckLabel ?? null,
+        total: group.length,
+        youCanAnswer: group.filter(({ match }) => match).length,
+        cards: ordered.slice(0, HUNT_SAMPLE).map(({ flare, match }) => ({
           cardId: flare.cardId,
           cardName: flare.cardName,
           cardNumber: flare.cardNumber,
           imageUrl: flare.imageUrl,
           match,
-        },
+        })),
       });
     }
   }

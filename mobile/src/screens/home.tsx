@@ -244,32 +244,72 @@ export function HomeScreen() {
               />
               <View style={{ flexShrink: 1 }}>
                 <Title>{item.displayName}</Title>
-                <Muted>{`is hunting · ${item.eventName}`}</Muted>
+                <Muted>
+                  {`${
+                    item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
+                  }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
+                </Muted>
               </View>
             </View>
 
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-            >
-              <CardImage
-                imageUrl={item.card.imageUrl}
-                width={56}
-                name={item.card.cardName}
-                cardNumber={item.card.cardNumber}
-                youHave={{ kind: item.card.match, count: 0 }}
-              />
-              <View style={{ flexShrink: 1 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {item.card.cardName}
-                </Text>
-                <Muted>{item.card.cardNumber}</Muted>
-                <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                  {item.card.match === "exact"
-                    ? "You have this"
-                    : "You have another printing"}
-                </Text>
+            {/* One card reads as a card; a deck reads as a row of them.
+                A player posting thirty cards is one thing that happened,
+                not thirty — the founder's rule for the whole Feed. */}
+            {item.total === 1 && item.cards[0] ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+              >
+                <CardImage
+                  imageUrl={item.cards[0].imageUrl}
+                  width={56}
+                  name={item.cards[0].cardName}
+                  cardNumber={item.cards[0].cardNumber}
+                  youHave={
+                    item.cards[0].match
+                      ? { kind: item.cards[0].match, count: 0 }
+                      : undefined
+                  }
+                />
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {item.cards[0].cardName}
+                  </Text>
+                  <Muted>{item.cards[0].cardNumber}</Muted>
+                  {item.cards[0].match ? (
+                    <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                      {item.cards[0].match === "exact"
+                        ? "You have this"
+                        : "You have another printing"}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={{ gap: spacing(2) }}>
+                <View
+                  style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}
+                >
+                  {item.cards.map((card) => (
+                    <CardImage
+                      key={card.cardId}
+                      imageUrl={card.imageUrl}
+                      width={48}
+                      name={card.cardName}
+                      cardNumber={card.cardNumber}
+                      youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+                    />
+                  ))}
+                  {item.total > item.cards.length ? (
+                    <Muted>{`+${item.total - item.cards.length} more`}</Muted>
+                  ) : null}
+                </View>
+                {item.youCanAnswer > 0 ? (
+                  <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                    {`You can answer ${item.youCanAnswer} of ${item.total}`}
+                  </Text>
+                ) : null}
+              </View>
+            )}
 
             {/* Every item ends in a place and a time. */}
             <Button
@@ -298,7 +338,7 @@ export function HomeScreen() {
                       width={48}
                       name={card.cardName}
                       cardNumber={card.cardNumber}
-                      youHave={{ kind: card.match, count: 0 }}
+                      youHave={card.match ? { kind: card.match, count: 0 } : undefined}
                     />
                   ))}
                 </View>

@@ -669,7 +669,17 @@ export async function notifyRoomFlare(
   eventId: string,
   posterSessionId: string,
   posterName: string,
-  cardId: string,
+  /**
+   * Every card that went up in ONE posting action.
+   *
+   * A list rather than a card because a deck is one act. This used to
+   * take a single id and be called once per Flare, so a player posting
+   * thirty cards for a build sent thirty pushes to everybody in the
+   * room — the founder's words: "I don't want all of those
+   * notifications to show up as separate posts." One notice now, and
+   * the count is the news.
+   */
+  cardIds: string[],
   intent: "want" | "showcase",
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
@@ -680,19 +690,27 @@ export async function notifyRoomFlare(
     /* The card's name is read here rather than passed in, so the app's
        route and the website's action cannot word the same event
        differently - and so no caller can put text of its own in a push. */
-    const [{ data: event }, { data: participants }, { data: card }] = await Promise.all(
-      [
+    const unique = [...new Set(cardIds)];
+    if (unique.length === 0) return;
+
+    const [{ data: event }, { data: participants }, { data: cards }] =
+      await Promise.all([
         admin.from("events").select("join_code").eq("id", eventId).maybeSingle(),
         admin
           .from("event_participants")
           .select("player_session_id")
           .eq("event_id", eventId),
-        admin.from("cards").select("exact_name").eq("id", cardId).maybeSingle(),
-      ],
-    );
+        /* Names are read here rather than passed in, so the app's route
+           and the website's action cannot word the same event
+           differently — and so no caller can put text of its own in a
+           push. Only the first is needed, but reading one row and
+           counting the rest would be two queries for one sentence. */
+        admin.from("cards").select("exact_name").in("id", unique).limit(2),
+      ]);
 
     if (!event?.join_code) return;
-    const cardName = card?.exact_name ?? "a card";
+    const cardName = cards?.[0]?.exact_name ?? "a card";
+    const count = unique.length;
 
     const sessionIds = (participants ?? [])
       .map((row) => row.player_session_id)
@@ -709,15 +727,33 @@ export async function notifyRoomFlare(
     );
     if (recipients.size === 0) return;
 
+    /*
+     * One card is named; a batch is counted. "Zach is hunting 24 cards"
+     * is the whole news — naming one of twenty-four would suggest the
+     * others matter less, and listing them will not fit in a push.
+     */
+    const subject = count === 1 ? cardName : `${count} cards`;
+
     const title =
       intent === "showcase"
-        ? `${posterName} is letting go of ${cardName}`
-        : `${posterName} is hunting ${cardName}`;
+        ? `${posterName} is letting go of ${subject}`
+        : `${posterName} is hunting ${subject}`;
     const body =
       intent === "showcase"
-        ? "It just went up in your room. Have a look before it goes."
-        : "It just went up in your room. Check your binder.";
+        ? count === 1
+          ? "It just went up in your room. Have a look before it goes."
+          : "They just went up in your room. Have a look before they go."
+        : count === 1
+          ? "It just went up in your room. Check your binder."
+          : "They just went up in your room. Check your binder.";
     const path = `/e/${event.join_code}`;
+
+    /*
+     * Keyed on the batch rather than the card, so posting a deck cannot
+     * dedupe down to one card's worth of news, and re-running the same
+     * post is still free.
+     */
+    const key = unique.slice().sort().join(",");
 
     for (const playerId of recipients) {
       const id = await record({
@@ -726,7 +762,7 @@ export async function notifyRoomFlare(
         title,
         body,
         url: path,
-        dedupeKey: `room-flare:${eventId}:${posterSessionId}:${cardId}:${playerId}`,
+        dedupeKey: `room-flare:${eventId}:${posterSessionId}:${key}:${playerId}`,
       });
 
       if (id) await deliverByPush(playerId, title, body, path);

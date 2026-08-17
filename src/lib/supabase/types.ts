@@ -419,6 +419,12 @@ export type FlareRow = {
   note: string | null;
   /** Groups a player's Flares under a named hunt ("RG Luffy"). Null = loose. */
   deck_label: string | null;
+  /**
+   * The posting action that created this Flare. Shared by every Flare
+   * posted in one go, so a deck notifies once and reads as one Feed
+   * item. Null for a lone post and for anything posted before batches.
+   */
+  posted_batch: string | null;
   /** Which way the card points: wanted, or offered up. */
   intent: FlareIntent;
   /** The poster will trade cards. On a showcase, will trade it away. */

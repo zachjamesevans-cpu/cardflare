@@ -935,7 +935,8 @@ export interface FeedCard {
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
-  match: "exact" | "other-printing";
+  /** Null when the viewer holds none of it — a friend's hunt shows those. */
+  match: "exact" | "other-printing" | null;
 }
 
 export type FeedItem =
@@ -997,7 +998,12 @@ export type FeedItem =
       avatarUrl: string | null;
       frame: string | null;
       ring: string | null;
-      card: FeedCard;
+      /** The hunt's name, when they gave it one. */
+      deckLabel: string | null;
+      /** Every card in one posting action, the viewer's first. */
+      cards: FeedCard[];
+      total: number;
+      youCanAnswer: number;
     };
 
 export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");
@@ -1072,3 +1078,21 @@ export const getCustomize = () =>
 /** Wears one cosmetic, or clears the slot with null. */
 export const setCustomizeEquip = (kind: CustomizeKind, slug: string | null) =>
   call<{ ok: true }>("POST", "/api/v1/customize", { kind, slug });
+
+/**
+ * A pasted deck list, saved to the want list under one name.
+ *
+ * The app's half of "post multiple flares at once". These land as WANTS,
+ * not Flares: a deck is written at home and posted at a counter, often
+ * days apart, and the room's "still hunting these?" panel posts the lot
+ * as ONE batch when the player walks in — one notification, one Feed
+ * item, however many cards.
+ */
+export const saveDeckList = (list: string, deckLabel?: string | null) =>
+  call<{
+    ok: true;
+    saved: number;
+    unknown: string[];
+    unreadable: string[];
+    atCap: boolean;
+  }>("POST", "/api/v1/wants", { list, deckLabel: deckLabel || null });

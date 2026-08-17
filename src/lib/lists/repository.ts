@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { capFor, type Accepts, type AddEntryInput, type ListKind } from "./schema";
@@ -22,6 +24,12 @@ export interface ListEntry {
   note: string | null;
   /** The named hunt this Flare belongs to. Null = a loose card. */
   deckLabel: string | null;
+  /**
+   * The posting action that created this Flare. Shared by everything
+   * posted in one go, which is how the Feed shows a deck as one item
+   * instead of thirty. Null for a lone post and for older rows.
+   */
+  postedBatch: string | null;
   cardId: string;
   cardNumber: string;
   cardName: string;
@@ -58,7 +66,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, deck_label, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id";
+  "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
 
@@ -68,6 +76,7 @@ interface EntryRow {
   note: string | null;
   /** Flares only; binder selects never ask for either. */
   deck_label?: string | null;
+  posted_batch?: string | null;
   intent?: FlareIntent;
   accepts_trade?: boolean;
   accepts_cash?: boolean;
@@ -219,6 +228,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     quantity: row.quantity,
     note: row.note,
     deckLabel: row.deck_label ?? null,
+    postedBatch: row.posted_batch ?? null,
     cardId: row.card_id,
     cardNumber: card?.number ?? "",
     cardName,
@@ -286,6 +296,12 @@ export async function addFlare(
   intent: FlareIntent = "want",
   /** Trade, cash or either. Defaults to what the board has always meant. */
   accepts: Accepts = { acceptsTrade: true, acceptsCash: false },
+  /**
+   * The posting action that created this Flare, shared by every Flare it
+   * writes. Absent for a lone post, which is a batch of one and reads as
+   * null — see `20260920090000_flare_batches.sql`.
+   */
+  postedBatch: string | null = null,
 ): Promise<AddResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -304,6 +320,7 @@ export async function addFlare(
         quantity: input.quantity,
         note: input.note,
         deck_label: input.deckLabel,
+        posted_batch: postedBatch,
         intent,
         accepts_trade: accepts.acceptsTrade,
         accepts_cash: accepts.acceptsCash,
@@ -322,6 +339,55 @@ export async function addFlare(
   }
 
   return { ok: true };
+}
+
+/**
+ * Posts several Flares as ONE act.
+ *
+ * A deck is one decision, and the whole point of this function is that
+ * everything downstream can tell. Every row it writes carries the same
+ * `posted_batch`, which is what lets the room be told once and the Feed
+ * show one item instead of thirty.
+ *
+ * Sequential rather than one multi-row upsert, deliberately: the cap is
+ * checked per Flare, and a batch that runs into it should post what
+ * fits and say so, rather than failing whole. A card already on the
+ * board is not a failure either — the repository treats a duplicate as
+ * success, so re-posting a deck after adding two cards to it costs two
+ * rows.
+ */
+export async function addFlareBatch(
+  eventId: string,
+  playerSessionId: string,
+  inputs: AddEntryInput[],
+  intent: FlareIntent = "want",
+  accepts: Accepts = { acceptsTrade: true, acceptsCash: false },
+): Promise<{ batchId: string; posted: string[]; atCap: boolean }> {
+  const batchId = randomUUID();
+  const posted: string[] = [];
+
+  for (const input of inputs) {
+    const result = await addFlare(
+      eventId,
+      playerSessionId,
+      input,
+      intent,
+      accepts,
+      batchId,
+    );
+
+    if (result.ok) {
+      posted.push(input.cardId);
+      continue;
+    }
+
+    /* The cap stops the batch rather than skipping past it: every
+       remaining card would hit the same wall, and grinding through
+       them to prove it is a hundred pointless writes. */
+    if (result.reason === "at-cap") return { batchId, posted, atCap: true };
+  }
+
+  return { batchId, posted, atCap: false };
 }
 
 /**

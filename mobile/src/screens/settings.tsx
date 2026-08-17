@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { ScrollView } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import { API_BASE } from "../config";
 import {
@@ -8,12 +8,14 @@ import {
   getMe,
   getProfile,
   renameProfile,
+  saveDeckList,
   setHandle,
   type Me,
   type Profile,
 } from "../api";
 import { HandleField, NameField } from "./profile";
-import { AsyncButton, Body, Card, Muted, Title } from "../ui";
+import { AsyncButton, Body, Card, Input, Muted, Title } from "../ui";
+import { parseDeckList } from "../deck-list";
 import { spacing } from "../theme";
 
 /**
@@ -226,6 +228,12 @@ export function SettingsScreen() {
           Saved automatically when you post a Flare, cleared when a trade finds the
           card. Walk into any room and it offers to post these again.
         </Body>
+
+        {/* The fast way in, before a release. Pasting rather than
+            tapping through a search twenty-four times: a deck already
+            exists as text, and somewhere to put it is quicker than any
+            picker. */}
+        <DeckListField />
         {!me || me.wants.length === 0 ? (
           <Muted>Nothing yet. Post a Flare and it will be waiting here.</Muted>
         ) : (
@@ -255,5 +263,71 @@ export function SettingsScreen() {
 
       <ConnectionTest />
     </ScrollView>
+  );
+}
+
+/**
+ * Paste a deck, get a want list — the app's twin of the website's form.
+ *
+ * What lands here are wants, not Flares. The room posts them as one
+ * batch when the player walks in, which is what keeps a thirty-card deck
+ * to a single notification and a single Feed item.
+ */
+function DeckListField() {
+  const [list, setList] = useState("");
+  const [label, setLabel] = useState("");
+  const [said, setSaid] = useState<string | null>(null);
+
+  const { lines } = parseDeckList(list);
+
+  return (
+    <View style={{ gap: spacing(2) }}>
+      <Input
+        value={list}
+        onChangeText={(next) => {
+          setList(next);
+          setSaid(null);
+        }}
+        placeholder={"Paste a deck list\n4x OP17-001\n2x OP17-005"}
+        multiline
+        numberOfLines={5}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        style={{ minHeight: 110, textAlignVertical: "top" }}
+      />
+      <Input
+        value={label}
+        onChangeText={setLabel}
+        placeholder="Call it something (optional)"
+        maxLength={40}
+      />
+      <Muted>
+        One card per line. Counts in front or behind both work, and anything after
+        the number is ignored.
+      </Muted>
+      <AsyncButton
+        label={lines.length === 0 ? "Paste a list first" : `Save ${lines.length}`}
+        pendingLabel="Saving…"
+        disabled={lines.length === 0}
+        onPress={async () => {
+          setSaid(null);
+          try {
+            const result = await saveDeckList(list, label.trim() || null);
+            setList("");
+            setLabel("");
+            setSaid(
+              `${result.saved} saved.${
+                result.unknown.length > 0
+                  ? ` Not in the catalogue: ${result.unknown.slice(0, 6).join(", ")}.`
+                  : ""
+              }${result.atCap ? " Your list is full, so the rest were skipped." : ""}`,
+            );
+          } catch (caught) {
+            setSaid(describeError(caught));
+          }
+        }}
+      />
+      {said ? <Muted>{said}</Muted> : null}
+    </View>
   );
 }

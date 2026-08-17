@@ -9,11 +9,14 @@ begin;
 insert into auth.users (id, email)
 values ('11111111-1111-1111-1111-111111111111', 'founder@example.test');
 
-insert into public.players (id, user_id, display_name)
+-- `handle` arrived after this fixture and is NOT NULL, so it is named
+-- here rather than left to a default that does not exist.
+insert into public.players (id, user_id, display_name, handle)
 values (
   '22222222-2222-2222-2222-222222222222',
   '11111111-1111-1111-1111-111111111111',
-  'Zach'
+  'Zach',
+  'zach'
 );
 
 -- The mobile site's session, older, and the app's, newer. Both the account's.
