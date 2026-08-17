@@ -101,36 +101,6 @@ export function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Card>
-        <Title>Join a room</Title>
-        <Body>
-          Scan the code on the store&rsquo;s counter, or type it if scanning is
-          awkward. No account needed.
-        </Body>
-
-        <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
-
-        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-          <View style={{ flex: 1 }}>
-            <Input
-              value={code}
-              onChangeText={setCode}
-              placeholder="Or enter the code"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-          </View>
-          <AsyncButton
-            label="Go"
-            pendingLabel="Opening…"
-            variant="secondary"
-            onPress={async () => {
-              if (code.trim()) await enter(code);
-            }}
-          />
-        </View>
-      </Card>
-
       {locals.length > 0 && (
         <Card>
           <Title>Your locals</Title>
@@ -218,6 +188,39 @@ export function HomeScreen() {
           </View>
         </Card>
       )}
+
+      {/* Below your stores now, not above them. The tab is Feed: what is
+          on at the places you go leads, and scanning is the thing you
+          reach for when you are standing in one. */}
+      <Card>
+        <Title>Join a room</Title>
+        <Body>
+          Scan the code on the store&rsquo;s counter, or type it if scanning is
+          awkward. No account needed.
+        </Body>
+
+        <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
+
+        <View style={{ flexDirection: "row", gap: spacing(2) }}>
+          <View style={{ flex: 1 }}>
+            <Input
+              value={code}
+              onChangeText={setCode}
+              placeholder="Or enter the code"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </View>
+          <AsyncButton
+            label="Go"
+            pendingLabel="Opening…"
+            variant="secondary"
+            onPress={async () => {
+              if (code.trim()) await enter(code);
+            }}
+          />
+        </View>
+      </Card>
 
       <Card>
         <Title>How it works</Title>

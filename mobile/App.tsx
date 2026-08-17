@@ -71,7 +71,7 @@ try {
 }
 
 export type TabParams = {
-  Join: undefined;
+  Feed: undefined;
   Room: undefined;
   Flare: undefined;
   Inbox: undefined;
@@ -147,7 +147,9 @@ const theme: Theme = {
 /* Outline weights, because the website's dock draws line icons - the
    filled set read as a different product sitting on the same colours. */
 const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>> = {
-  Join: "qr-code-outline",
+  /* Home-shaped, the founder's call: this is the screen you open by
+     habit, and scanning moved to a button on it. */
+  Feed: "home-outline",
   Room: "people-outline",
   Inbox: "notifications-outline",
   Profile: "person-circle-outline",
@@ -260,13 +262,14 @@ function Tabs() {
         },
       })}
     >
-      {/* The dock says Join, the header says CardFlare - the website's
-          split exactly: its dock label is Join under a QR icon while the
-          page banner carries the product name. */}
+      {/* Feed, not Join. Join was a tab used four times a month, on the
+          days somebody stands in a shop; scanning is a button on this
+          screen now, which is fewer taps than the tab it replaced. The
+          header still carries the product name, as the website's does. */}
       <Tab.Screen
-        name="Join"
+        name="Feed"
         component={HomeScreen}
-        options={{ title: "CardFlare", tabBarLabel: "Join" }}
+        options={{ title: "CardFlare", tabBarLabel: "Feed" }}
       />
       <Tab.Screen name="Room" component={RoomTab} />
       {/* The tab keeps the product's name; the header says what the

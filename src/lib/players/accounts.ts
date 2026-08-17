@@ -225,6 +225,36 @@ export async function sessionForPlayer(
   return data?.[0] ?? null;
 }
 
+/**
+ * Room identities for a set of accounts, keyed by session.
+ *
+ * One query rather than one per player, and it answers the question the feed
+ * actually has: a Flare knows the session that posted it, and the feed knows
+ * the accounts you follow. An account has exactly one session by construction,
+ * so this is a clean join rather than a best guess.
+ */
+export async function sessionsForPlayers(
+  playerIds: string[],
+): Promise<Map<string, string>> {
+  if (playerIds.length === 0 || !isSupabaseConfigured()) return new Map();
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .select("id, player_id")
+    .in("player_id", playerIds);
+
+  if (error) {
+    console.error("Could not look up the accounts' sessions", error);
+    return new Map();
+  }
+
+  return new Map(
+    (data ?? []).flatMap((row) =>
+      row.player_id ? [[row.id, row.player_id] as const] : [],
+    ),
+  );
+}
+
 export interface PlayerListing {
   id: string;
   displayName: string;

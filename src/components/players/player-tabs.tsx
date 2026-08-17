@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, QrCode, UserCircle2, Users } from "lucide-react";
+import { Bell, Home, UserCircle2, Users } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
@@ -24,7 +24,10 @@ import { cn } from "@/lib/cn";
  */
 
 const TABS = [
-  { href: "/join", label: "Join", icon: QrCode },
+  /* Feed, not Join. Join was a tab used four times a month, on the days
+     somebody stands in a shop; scanning is a button on the Feed now, which
+     is fewer taps than the tab it replaced. See PRODUCT.md. */
+  { href: "/feed", label: "Feed", icon: Home },
   { href: "/room", label: "Room", icon: Users },
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },

@@ -60,7 +60,7 @@ export function InboxScreen() {
             <Button
               label="Find a room"
               variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Join" })}
+              onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
             />
           </View>
         </Card>
