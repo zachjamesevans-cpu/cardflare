@@ -4,9 +4,11 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { normalizeName } from "./domain";
 import {
   CARD_ART_BUCKET,
+  cardArtExtension,
+  cardArtFolder,
   cardArtObjectPath,
   cardArtSrc,
-  cardArtExtension,
+  cardArtStem,
 } from "./art-storage";
 import {
   compactNumber,
@@ -24,49 +26,131 @@ import {
  * Folding the two together would mean the sync's contracts quietly
  * loosening to accommodate a scrape.
  *
- * Everything is written under the manifest's own provider key, never
- * under a real provider's. That is what makes the whole import
- * reversible in one statement the day a provider ships the set properly:
+ * **The pictures arrive one request each.** The first cut posted the
+ * whole set in a single form and the founder's real import — two hundred
+ * cards, some forty megabytes — took the page down. A Server Action
+ * request is capped at 1MB by default and Vercel refuses a body over
+ * 4.5MB whatever Next is configured to allow, so no amount of raising a
+ * limit fixes it. Each picture is its own small request now, and the
+ * rows are written afterwards from what actually landed in the bucket.
  *
- *   delete from public.card_printings
- *    where provider_key = 'kaizoku' and set_code = 'OP17';
+ * That split has a second benefit worth keeping: an import that dies
+ * half way can be run again and picks up where it stopped, because the
+ * bucket is the record of what arrived rather than a variable in a
+ * request that no longer exists.
+ *
+ * Everything is written under the manifest's own provider key, never
+ * under a real provider's, which is what makes the whole import
+ * reversible — see `deleteImportedSet`.
  */
-
-export interface ImportOutcome {
-  cards: number;
-  printings: number;
-  images: number;
-  /** Card numbers whose art did not store. Named so they can be retried. */
-  skipped: string[];
-}
 
 /** One card's artwork, already read into memory by the caller. */
 export interface ImportImage {
-  /** Matches `ImportCard.file`. */
-  file: string;
   mimeType: string;
   bytes: ArrayBuffer;
 }
 
 /**
- * Writes the cards, stores the art, then writes the printings.
+ * Stores one card's picture, and nothing else.
  *
- * In that order for a reason. A printing row carries the path its image
- * will be served from, so the file has to be in the bucket before the
- * row claiming it exists — the other way round leaves a window where the
- * catalogue points at nothing. A card whose image fails to store gets a
- * printing with no art rather than no printing at all: the number and
- * the name are still worth having, and the board renders the placeholder
- * exactly as it does for any card the provider gave no picture for.
+ * Returns the object path so the caller can report it. Re-storing
+ * replaces rather than fails: the path is derived from the card, so an
+ * upload for a card that already has art IS the correction.
  */
-export async function importCardSet(
+export async function storeCardArt(
+  providerKey: string,
+  setCode: string,
+  externalId: string,
+  image: ImportImage,
+): Promise<{ objectPath: string } | { error: string }> {
+  if (!isSupabaseConfigured()) return { error: "The database is not configured." };
+
+  const extension = cardArtExtension(image.mimeType);
+  if (!extension) return { error: `${image.mimeType} is not an image we store.` };
+
+  const objectPath = cardArtObjectPath({
+    providerKey,
+    setCode,
+    cardNumber: externalId,
+    extension,
+  });
+
+  const { error } = await getSupabaseAdmin()
+    .storage.from(CARD_ART_BUCKET)
+    .upload(objectPath, image.bytes, { contentType: image.mimeType, upsert: true });
+
+  if (error) {
+    console.error(`Could not store art at ${objectPath}`, error);
+    return { error: error.message };
+  }
+
+  return { objectPath };
+}
+
+/**
+ * The art already in the bucket for one set, keyed by card stem.
+ *
+ * Read from storage rather than tracked through the upload, so a run
+ * that was interrupted, retried, or done in two sittings still writes
+ * rows that match what is actually there.
+ */
+export async function storedArtFor(
+  providerKey: string,
+  setCode: string,
+): Promise<Map<string, string>> {
+  const folder = cardArtFolder(providerKey, setCode);
+  const found = new Map<string, string>();
+
+  if (!isSupabaseConfigured()) return found;
+
+  /* Paged: the listing caps at 100 by default, and a set is bigger. */
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const { data, error } = await getSupabaseAdmin()
+      .storage.from(CARD_ART_BUCKET)
+      .list(folder, { limit: 100, offset });
+
+    if (error) {
+      console.error("Could not list the stored card art", error);
+      break;
+    }
+
+    const page = data ?? [];
+    for (const object of page) {
+      const stem = object.name.slice(0, object.name.lastIndexOf("."));
+      if (stem) found.set(stem, `${folder}/${object.name}`);
+    }
+
+    if (page.length < 100) break;
+  }
+
+  return found;
+}
+
+export interface ImportOutcome {
+  cards: number;
+  printings: number;
+  images: number;
+  /** Card numbers with no art in the bucket. Named so they can be retried. */
+  missing: string[];
+}
+
+/**
+ * Writes the cards and printings, pointing each at whatever art is
+ * already stored for it.
+ *
+ * Runs after the pictures, never before: a row claiming an image that is
+ * not in the bucket is a card that renders as a broken placeholder, and
+ * the other order guarantees a window where that is true for every card
+ * in the set.
+ */
+export async function writeImportedSet(
   manifest: ImportManifest,
-  images: Map<string, ImportImage>,
 ): Promise<ImportOutcome | { error: string }> {
   if (!isSupabaseConfigured()) return { error: "The database is not configured." };
 
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
+  const stored = await storedArtFor(manifest.provider, manifest.setCode);
 
   /*
    * One row per card NUMBER, not per manifest entry: a base art and an
@@ -91,8 +175,8 @@ export async function importCardSet(
      * Gameplay fields are written EXPLICITLY null rather than left off.
      * A scrape has a picture and a number; writing a guessed cost would
      * put something in the catalogue that nothing later tells apart from
-     * a fact. Spelling them out also means a column added tomorrow
-     * fails the typecheck here rather than being quietly skipped.
+     * a fact. Spelling them out also means a column added tomorrow fails
+     * the typecheck here rather than being quietly skipped.
      */
     card_type: null,
     colors: [],
@@ -114,9 +198,7 @@ export async function importCardSet(
     .from("cards")
     .upsert(cardRows, { onConflict: "game,canonical_card_number" });
 
-  if (cardError) {
-    return { error: `Could not write the cards: ${cardError.message}` };
-  }
+  if (cardError) return { error: `Could not write the cards: ${cardError.message}` };
 
   /* Read the ids back: the upsert may have updated rows that already
      existed, so the ids are not knowable from what was just sent. */
@@ -133,58 +215,28 @@ export async function importCardSet(
     (written ?? []).map((row) => [row.canonical_card_number, row.id]),
   );
 
-  const skipped: string[] = [];
-  let stored = 0;
+  const missing: string[] = [];
+  let withArt = 0;
 
   const printingRows = [];
 
   for (const card of manifest.cards) {
     const cardId = idByNumber.get(card.cardNumber);
     if (!cardId) {
-      skipped.push(card.cardNumber);
+      missing.push(card.cardNumber);
       continue;
     }
 
-    const image = images.get(card.file);
-    let imageUrl: string | null = null;
+    const externalId = importExternalId(card);
+    const objectPath = stored.get(cardArtStem(externalId)) ?? null;
 
-    if (image) {
-      const extension = cardArtExtension(image.mimeType);
-
-      if (!extension) {
-        skipped.push(card.cardNumber);
-      } else {
-        const objectPath = cardArtObjectPath({
-          providerKey: manifest.provider,
-          setCode: manifest.setCode,
-          cardNumber: importExternalId(card),
-          extension,
-        });
-
-        const { error: uploadError } = await admin.storage
-          .from(CARD_ART_BUCKET)
-          .upload(objectPath, image.bytes, {
-            contentType: image.mimeType,
-            /* Re-running an import with a corrected picture must replace
-               the file rather than fail: the path is derived from the
-               card, so the old object is the one being corrected. */
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error(`Could not store art for ${card.cardNumber}`, uploadError);
-          skipped.push(card.cardNumber);
-        } else {
-          imageUrl = cardArtSrc(objectPath);
-          stored += 1;
-        }
-      }
-    }
+    if (objectPath) withArt += 1;
+    else missing.push(card.cardNumber);
 
     printingRows.push({
       card_id: cardId,
       provider_key: manifest.provider,
-      provider_external_id: importExternalId(card),
+      provider_external_id: externalId,
       set_code: manifest.setCode,
       set_name: manifest.setName,
       printing_label: card.printingLabel ?? null,
@@ -200,7 +252,7 @@ export async function importCardSet(
       is_parallel: null,
       is_reprint: null,
       language: "en",
-      image_url: imageUrl,
+      image_url: objectPath ? cardArtSrc(objectPath) : null,
       raw_metadata: card.sourceUrl ? { sourceUrl: card.sourceUrl } : null,
       provider_updated_at: null,
       updated_at: now,
@@ -218,7 +270,96 @@ export async function importCardSet(
   return {
     cards: cardRows.length,
     printings: printingRows.length,
-    images: stored,
-    skipped: [...new Set(skipped)].sort(),
+    images: withArt,
+    missing: [...new Set(missing)].sort(),
+  };
+}
+
+export interface DeleteOutcome {
+  printings: number;
+  cards: number;
+  images: number;
+}
+
+/**
+ * Removes an imported set completely: rows, art and all.
+ *
+ * The founder imported a manifest before its pictures, ended up with two
+ * hundred artless cards and no way back. A door in needs a door out, and
+ * "run some SQL" is not one when the console is where the mistake was
+ * made.
+ *
+ * Card rows are deleted only when nothing else points at them. A card
+ * this import created that a real provider has since also published
+ * belongs to the provider now, and deleting it would take the provider's
+ * printing down with it.
+ */
+export async function deleteImportedSet(
+  providerKey: string,
+  setCode: string,
+): Promise<DeleteOutcome | { error: string }> {
+  if (!isSupabaseConfigured()) return { error: "The database is not configured." };
+
+  const admin = getSupabaseAdmin();
+
+  const { data: doomed, error: findError } = await admin
+    .from("card_printings")
+    .select("id, card_id")
+    .eq("provider_key", providerKey)
+    .eq("set_code", setCode);
+
+  if (findError) return { error: `Could not find the set: ${findError.message}` };
+
+  const printings = doomed ?? [];
+  const cardIds = [...new Set(printings.map((row) => row.card_id))];
+
+  if (printings.length > 0) {
+    const { error } = await admin
+      .from("card_printings")
+      .delete()
+      .in(
+        "id",
+        printings.map((row) => row.id),
+      );
+
+    if (error) return { error: `Could not remove the printings: ${error.message}` };
+  }
+
+  /*
+   * Only the cards nothing is left pointing at. Asked AFTER the
+   * printings are gone, so the question is "is anything still using
+   * this?" rather than "was anything else using it before?".
+   */
+  let orphaned: string[] = [];
+
+  if (cardIds.length > 0) {
+    const { data: survivors } = await admin
+      .from("card_printings")
+      .select("card_id")
+      .in("card_id", cardIds);
+
+    const stillUsed = new Set((survivors ?? []).map((row) => row.card_id));
+    orphaned = cardIds.filter((id) => !stillUsed.has(id));
+
+    if (orphaned.length > 0) {
+      const { error } = await admin.from("cards").delete().in("id", orphaned);
+      if (error) return { error: `Could not remove the cards: ${error.message}` };
+    }
+  }
+
+  /* The bucket last. A stored object with no row is invisible; a row
+     pointing at a deleted object is a broken picture on a board. */
+  const stored = await storedArtFor(providerKey, setCode);
+  const paths = [...stored.values()];
+
+  if (paths.length > 0) {
+    const { error } = await admin.storage.from(CARD_ART_BUCKET).remove(paths);
+    if (error) console.error("Could not remove the stored art", error);
+  }
+
+  return {
+    printings: printings.length,
+    cards: orphaned.length,
+    images: paths.length,
   };
 }

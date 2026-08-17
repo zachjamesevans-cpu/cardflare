@@ -59,23 +59,41 @@ export function cardArtContentType(objectPath: string): string {
  * and the database constraint both enforce, so a set code with a slash
  * or a space in it becomes a legal name rather than a broken path.
  */
+function safeSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[.-]+|[.-]+$/g, "")
+    .slice(0, 60);
+}
+
+/** The folder one set's art lives in, e.g. `kaizoku/op17`. */
+export function cardArtFolder(providerKey: string, setCode: string): string {
+  return `${safeSegment(providerKey).toLowerCase()}/${safeSegment(setCode).toLowerCase()}`;
+}
+
+/**
+ * A card's file name without its extension.
+ *
+ * Separate from the full path because the two are needed apart: the
+ * upload builds a path, and the write-rows step matches what is already
+ * in the bucket against what the manifest expects. Matching on the stem
+ * rather than the whole name means the row does not have to know
+ * whether the picture arrived as a png or a webp.
+ */
+export function cardArtStem(cardNumber: string): string {
+  return safeSegment(cardNumber);
+}
+
 export function cardArtObjectPath(input: {
   providerKey: string;
   setCode: string;
   cardNumber: string;
   extension: string;
 }): string {
-  const safe = (value: string) =>
-    value
-      .trim()
-      .replace(/[^A-Za-z0-9._-]+/g, "-")
-      .replace(/^[.-]+|[.-]+$/g, "")
-      .slice(0, 60);
-
   return [
-    safe(input.providerKey).toLowerCase(),
-    safe(input.setCode).toLowerCase(),
-    `${safe(input.cardNumber)}.${safe(input.extension).toLowerCase()}`,
+    cardArtFolder(input.providerKey, input.setCode),
+    `${cardArtStem(input.cardNumber)}.${safeSegment(input.extension).toLowerCase()}`,
   ].join("/");
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+import { DeleteImportedSet } from "@/components/admin/delete-imported-set";
 import { SetImport } from "@/components/admin/set-import";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -83,34 +84,37 @@ export default async function ImportSetPage() {
                   <span className="min-w-0 flex-1 truncate text-sm text-text-secondary">
                     {set.setName ?? "Unnamed set"}
                   </span>
-                  <span className="text-xs text-text-muted tabular-nums">
+                  <span
+                    className={`text-xs tabular-nums ${
+                      set.withArt < set.printings ? "text-danger" : "text-text-muted"
+                    }`}
+                  >
                     {set.printings} printing{set.printings === 1 ? "" : "s"} ·{" "}
                     {set.withArt} with art
                   </span>
+                  <DeleteImportedSet
+                    provider={set.providerKey}
+                    setCode={set.setCode}
+                    printings={set.printings}
+                  />
                 </li>
               ))}
             </ul>
 
-            {/*
-             * The exit, written down where somebody standing in front of
-             * the mess will look for it. Deliberately not a button: it
-             * deletes a whole set, and the moment to do it is after a
-             * provider sync has already landed, which is not something
-             * this page can check.
-             */}
             <div className="flex flex-col gap-1.5 rounded-[var(--radius-control)] border border-border bg-elevated p-4">
               <p className="text-sm font-semibold text-text-primary">
-                Retiring an imported set
+                What Remove does
               </p>
               <p className="text-sm text-text-secondary">
-                Once a provider carries the set, sync it and then delete these
-                printings. The card rows need no cleanup: they are keyed on the card
-                number, so the sync updates them in place on the way past.
+                Deletes the set&rsquo;s printings and its stored pictures. Card rows go
+                too, but only the ones nothing else is pointing at &mdash; once a real
+                provider carries a card, that card belongs to the provider and removing
+                this import leaves it alone.
               </p>
-              <code className="mt-1 block overflow-x-auto rounded-[var(--radius-control)] bg-canvas p-3 font-mono text-xs text-text-secondary">
-                delete from public.card_printings where provider_key =
-                &apos;kaizoku&apos; and set_code = &apos;OP17&apos;;
-              </code>
+              <p className="text-sm text-text-secondary">
+                So the day a provider ships the set: sync it first, then Remove. The
+                placeholders disappear and the provider&rsquo;s own artwork stays.
+              </p>
             </div>
           </Card>
         )}
