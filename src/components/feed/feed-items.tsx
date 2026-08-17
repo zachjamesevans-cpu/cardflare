@@ -1,6 +1,13 @@
 import Link from "next/link";
-import { CalendarClock, PackageCheck, Layers } from "lucide-react";
+import {
+  CalendarClock,
+  ClipboardList,
+  MapPin,
+  PackageCheck,
+  Layers,
+} from "lucide-react";
 
+import { Logo } from "@/components/brand/logo";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
@@ -87,7 +94,84 @@ function FeedTile({
   );
 }
 
+/**
+ * What the two starter items say.
+ *
+ * Kept as data rather than two more branches below, because the pair
+ * are the same card with different words in it and the shape is the
+ * argument: a question, why it is worth answering, and one button.
+ */
+const STARTERS = {
+  store: {
+    icon: MapPin,
+    variant: "primary",
+    headline: "Where do you play?",
+    body: "Join your store's room once and it saves itself here, with its next board and who is hunting what. The code is on the counter.",
+    label: "Enter a store code",
+    href: "/room",
+  },
+  deck: {
+    icon: ClipboardList,
+    /* Secondary, deliberately. Two accent buttons stacked is two leads
+       and therefore none, and a store is the answer that makes every
+       other item on this screen possible. */
+    variant: "secondary",
+    headline: "What are you hunting?",
+    body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
+    label: "Paste a deck list",
+    href: "/profile/settings",
+  },
+} as const;
+
 export function Item({ item }: { item: FeedItem }) {
+  if (item.kind === "announcement") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          {/* The mark, not a face. There is no CardFlare player and this
+              is the item that has to look like it knows that. */}
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-elevated">
+            <Logo size={20} markOnly />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <p className="truncate font-semibold text-text-primary">{item.headline}</p>
+            <p className="text-xs text-text-muted">CardFlare</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-text-secondary">{item.body}</p>
+
+        {item.linkLabel && item.linkHref && (
+          <Link href={item.linkHref} className={buttonStyles("secondary", "sm")}>
+            {item.linkLabel}
+          </Link>
+        )}
+      </Card>
+    );
+  }
+
+  if (item.kind === "start") {
+    const starter = STARTERS[item.topic];
+    const Icon = starter.icon;
+
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated">
+            <Icon className="size-5 text-accent" aria-hidden="true" />
+          </span>
+          <p className="min-w-0 font-semibold text-text-primary">{starter.headline}</p>
+        </div>
+
+        <p className="text-sm text-text-secondary">{starter.body}</p>
+
+        <Link href={starter.href} className={buttonStyles(starter.variant, "sm")}>
+          {starter.label}
+        </Link>
+      </Card>
+    );
+  }
+
   if (item.kind === "hunt") {
     return (
       <Card className="flex flex-col gap-3 p-4">
@@ -299,7 +383,12 @@ export function Item({ item }: { item: FeedItem }) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium text-accent">{item.storeName}</p>
+        {/* A local needs no address — you drive there. A room somewhere
+            you have never been is only useful with a place attached. */}
+        <p className="text-sm font-medium text-accent">
+          {item.storeName}
+          {!item.yours && item.city ? ` · ${item.city}` : ""}
+        </p>
         <p className="text-lg font-semibold text-text-primary">{item.eventName}</p>
         {/*
          * "Open now", not "Trading now": a walk-in room is itself called

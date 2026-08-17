@@ -16,7 +16,11 @@ export const metadata: Metadata = {
  * no password at all, and Supabase will send a recovery link to it happily,
  * so there is no separate activation flow to build or to keep in step.
  */
-export default async function ResetPasswordPage(props: PageProps<"/login/reset">) {
+export default async function ResetPasswordPage(props: {
+  /* Typed here rather than from Next's generated `PageProps` global —
+     see the note in ../page.tsx. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await props.searchParams;
   const expired = params.expired !== undefined;
 

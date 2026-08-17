@@ -903,6 +903,36 @@ export type PlayerLocalInsert = Omit<PlayerLocalRow, "id" | "created_at"> & {
   created_at?: string;
 };
 
+/**
+ * A notice from CardFlare, shown on the Feed.
+ *
+ * The only authored thing on a screen that is otherwise entirely
+ * derived, and not a player: it wears the mark, cannot be followed, and
+ * has to say when it stops being true.
+ */
+export type AnnouncementRow = {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  headline: string;
+  body: string;
+  link_label: string | null;
+  /** A path on our own origin, or null. Off-origin links are refused in SQL. */
+  link_href: string | null;
+  starts_at: string;
+  /** Required, with no default: a notice with no end date is how a feed rots. */
+  expires_at: string;
+};
+
+export type AnnouncementInsert = Omit<
+  AnnouncementRow,
+  "id" | "created_at" | "starts_at"
+> & {
+  id?: string;
+  created_at?: string;
+  starts_at?: string;
+};
+
 export type PlayerWantRow = {
   id: string;
   created_at: string;
@@ -1098,6 +1128,7 @@ export type Database = {
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
+      announcements: Table<AnnouncementRow, AnnouncementInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;

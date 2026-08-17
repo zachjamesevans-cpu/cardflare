@@ -115,7 +115,13 @@ a place and a time: _bring it Friday_, not _post it to me_.
 - **Not somewhere you post.** In this milestone the Feed reports what players
   did — joined, hunted, added, traded — rather than offering a compose box.
   Almost every item is derived, which is also how a pilot with six players has
-  a Feed worth opening on its first day.
+  a Feed worth opening on its first day. The one exception is an announcement
+  from CardFlare: written in the admin console, wearing the mark rather than a
+  face, and carrying a required expiry so it leaves without anybody
+  remembering to take it down. It is deliberately not an official CardFlare
+  player account — that would be a fake person on a screen where every other
+  face belongs to somebody who stood in a shop — and no player can put a word
+  in front of another one.
 - **Not a step toward the nationwide marketplace** ruled out above. That is
   the drift this feature makes possible, and the guard is the rule about place
   and time: an item that could be satisfied by post has no business here.

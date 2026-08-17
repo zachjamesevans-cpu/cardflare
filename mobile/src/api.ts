@@ -940,10 +940,33 @@ export interface FeedCard {
 }
 
 export type FeedItem =
+  /**
+   * A notice from CardFlare. The only authored item on the Feed, and
+   * not a player: it wears the mark, cannot be followed, and carries
+   * an expiry that takes it away without anybody remembering to.
+   */
+  | {
+      kind: "announcement";
+      id: string;
+      headline: string;
+      body: string;
+      linkLabel: string | null;
+      /** A path on our own origin. The server refuses anything else. */
+      linkHref: string | null;
+    }
+  /** One of the two questions the Feed cannot answer until you answer it. */
+  | {
+      kind: "start";
+      topic: "store" | "deck";
+    }
   | {
       kind: "board";
       code: string;
       storeName: string;
+      /** Where the shop is, for a store you have never been to. */
+      city: string | null;
+      /** True when this is one of your own stores. */
+      yours: boolean;
       eventName: string;
       live: boolean;
       startsAt: string | null;

@@ -4,6 +4,7 @@ import {
   CalendarDays,
   FileUp,
   Flame,
+  Megaphone,
   Package,
   Radio,
   Store as StoreIcon,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
+import { listAnnouncements } from "@/lib/announcements/repository";
 import { listImportedSets } from "@/lib/cards/imported-sets";
 import { catalogForConsole } from "@/lib/admin/catalog";
 import { AreaLink, StatTile } from "@/components/admin/glance";
@@ -120,6 +122,12 @@ export default async function AdminPage() {
   const liveCosmetics = catalogue.filter((item) => item.status === "live").length;
   /* Sets that came in by hand rather than from a provider. */
   const importedSets = (await listImportedSets()).length;
+
+  /* Notices on the Feed. The number that matters is how many are showing,
+     because that is what a player is reading right now. */
+  const showingNotices = (await listAnnouncements()).filter(
+    (notice) => notice.showing,
+  ).length;
   const draftCosmetics = catalogue.length - liveCosmetics;
 
   const gameStores = stores.filter((store) => store.kind === "lgs").length;
@@ -185,7 +193,7 @@ export default async function AdminPage() {
             icon={UserRound}
             label="Players"
             value={playerCount}
-            detail="Invite-only accounts"
+            detail="Accounts, handles and profiles"
           />
           <AreaLink
             href="/admin/packs"
@@ -200,6 +208,17 @@ export default async function AdminPage() {
             label="Import a set"
             value={importedSets}
             detail="Sets no provider carries yet"
+          />
+          <AreaLink
+            href="/admin/announcements"
+            icon={Megaphone}
+            label="Announcements"
+            value={showingNotices}
+            detail={
+              showingNotices > 0
+                ? "Showing on every Feed"
+                : "Nothing on the Feed right now"
+            }
           />
         </div>
       </section>

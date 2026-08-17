@@ -25,7 +25,16 @@ const ERRORS: Record<string, string> = {
   unavailable: "Sign-in is unavailable right now. Please try again in a moment.",
 };
 
-export default async function LoginPage(props: PageProps<"/login">) {
+/*
+ * The search params are typed here rather than taken from Next's
+ * generated `PageProps` global. That global only exists once `.next/types`
+ * has been written, so a typecheck on a clean checkout — which is what CI
+ * runs before it builds — failed on a page that was perfectly fine. The
+ * explicit shape is the convention everywhere else in this app anyway.
+ */
+export default async function LoginPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await props.searchParams;
   const rawNext = firstValue(params.next);
   const next = rawNext ? safeNextPath(rawNext) : undefined;

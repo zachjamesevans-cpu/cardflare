@@ -1,11 +1,12 @@
 import "server-only";
 
+import { showingAnnouncements } from "@/lib/announcements/repository";
 import { findEventByJoinCode } from "@/lib/events/repository";
 import { listRoomFlares, type ListEntry } from "@/lib/lists/repository";
 import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { listFollowing } from "@/lib/players/follows";
-import { listLocals } from "@/lib/players/locals";
+import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listWants } from "@/lib/players/wants";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -51,6 +52,21 @@ const ADDED_SAMPLE = 3;
 
 /** Players suggested at once. A list of ten is a chore, not a suggestion. */
 const SUGGESTIONS = 3;
+
+/**
+ * Rooms shown from stores the player has never been to.
+ *
+ * The day-one answer. Every other item on this screen is personalised —
+ * a friend's hunt, a saved store's board, a trade where you play — so on
+ * a new account they all return nothing and the Feed teaches "nothing
+ * happens here" on the one render that decides whether anybody comes
+ * back. A room open tonight is news whether or not we have been told
+ * anything about the person reading it.
+ *
+ * Three, and below your own stores rather than above them: this is what
+ * the Feed falls back on, not what it is for.
+ */
+const OPEN_ANYWHERE = 3;
 
 interface CardFacts {
   cardName: string;
@@ -114,6 +130,14 @@ export interface BoardItem {
   kind: "board";
   code: string;
   storeName: string;
+  /**
+   * Where the shop is, for a board at a store the player has never been
+   * to. One of your own locals needs no address — you drive there — but
+   * "a room is open right now" is only useful with a place attached.
+   */
+  city: string | null;
+  /** True when this is one of the player's own stores. */
+  yours: boolean;
   eventName: string;
   /** Open now, or a board taking Flares ahead of doors. */
   live: boolean;
@@ -213,7 +237,53 @@ export interface SuggestionItem {
   }[];
 }
 
-export type FeedItem = BoardItem | HuntItem | TradedItem | AddedItem | SuggestionItem;
+/**
+ * A notice from CardFlare.
+ *
+ * The only authored item on the Feed, and the only one that is not a
+ * player: it wears the mark rather than a face, and there is nothing to
+ * follow or unfollow. The founder floated an official CardFlare account
+ * instead — "everyone has one following when they first load the app" —
+ * and this is deliberately not that. A CardFlare row in `players` would
+ * be a fake person on a screen where every other face belongs to
+ * somebody who stood in a shop.
+ *
+ * It carries its own expiry in the database, so it leaves without
+ * anybody remembering to take it down.
+ */
+export interface AnnouncementItem {
+  kind: "announcement";
+  id: string;
+  headline: string;
+  body: string;
+  linkLabel: string | null;
+  /** A path on our own origin. The database refuses anything else. */
+  linkHref: string | null;
+}
+
+/**
+ * The two things the Feed cannot derive until the player tells it
+ * something.
+ *
+ * Both appear only while the answer is missing and vanish the moment it
+ * arrives, so this is not onboarding bolted to the top of a screen —
+ * it is the screen saying which of its own questions it cannot answer
+ * yet. A player with a local and a want list never sees either.
+ */
+export interface StartItem {
+  kind: "start";
+  /** `store` when they have no locals, `deck` when they have no wants. */
+  topic: "store" | "deck";
+}
+
+export type FeedItem =
+  | AnnouncementItem
+  | BoardItem
+  | HuntItem
+  | TradedItem
+  | AddedItem
+  | SuggestionItem
+  | StartItem;
 
 /** ISO for "this many days ago", the cut both recent items share. */
 function since(days: number): string {
@@ -437,6 +507,132 @@ async function suggestionItem(
 }
 
 /**
+ * One store's board, and the people on it worth naming.
+ *
+ * Lifted out of `listFeed` so the stores a player saved and the stores
+ * with something on tonight go through exactly the same reading — and
+ * so the reads happen side by side rather than one store at a time.
+ * Seven stores of sequential round trips is a screen that arrives late
+ * on a shop's wifi, which is where this screen is actually opened.
+ */
+async function boardWithHunts(
+  local: LocalStore,
+  yours: boolean,
+  held: ReturnType<typeof heldByCard>,
+  followed: Map<
+    string,
+    {
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+    }
+  >,
+  playerBySession: Map<string, string>,
+): Promise<FeedItem[]> {
+  const code = local.liveNow ? local.joinCode : local.nextEventCode;
+  if (!code) return [];
+
+  const event = await findEventByJoinCode(code);
+  if (!event) return [];
+
+  const flares = await listRoomFlares(event.id);
+
+  /* Matched once, read twice: the board's count and the people below it. */
+  const answerable = flares.flatMap((flare) => {
+    const match = matchFor(flare, held);
+    if (!match) return [];
+    return [{ flare, match }];
+  });
+
+  const eventName = local.liveNow
+    ? (event.name ?? "Trading now")
+    : (local.nextEventName ?? event.name);
+
+  const items: FeedItem[] = [
+    {
+      kind: "board",
+      code,
+      storeName: local.name,
+      city: local.city,
+      yours,
+      eventName,
+      live: local.liveNow,
+      startsAt: local.liveNow ? null : local.nextEventAt,
+      timeZone: event.storeTimeZone,
+      youCanAnswer: answerable.length,
+      sample: answerable.slice(0, BOARD_SAMPLE).map(({ flare, match }) => ({
+        cardId: flare.cardId,
+        cardName: flare.cardName,
+        cardNumber: flare.cardNumber,
+        imageUrl: flare.imageUrl,
+        match,
+      })),
+    },
+  ];
+
+  /*
+   * The same board again, read as people rather than cards: a
+   * stranger's Flare is a board entry, a friend's is a plan.
+   *
+   * Grouped by poster AND posting action, so a deck put up in one
+   * sitting is one item. A Flare with no batch — posted alone, or
+   * before batches existed — falls back to its own id, which makes it
+   * a group of one rather than lumping every loose card together.
+   */
+  const hunts = new Map<string, { flare: ListEntry; match: MatchKind | null }[]>();
+
+  for (const flare of flares) {
+    if (flare.intent !== "want") continue;
+
+    const author = playerBySession.get(flare.playerSessionId);
+    if (!author || !followed.has(author)) continue;
+
+    const key = `${author}::${flare.postedBatch ?? flare.id}`;
+    hunts.set(key, [
+      ...(hunts.get(key) ?? []),
+      { flare, match: matchFor(flare, held) },
+    ]);
+  }
+
+  for (const [key, group] of hunts) {
+    const person = followed.get(key.split("::")[0]);
+    if (!person) continue;
+
+    /* The ones they can act on first: a friend's list is worth
+       reading, and the card in your binder is worth reading first. */
+    const ordered = [...group].sort(
+      (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
+    );
+
+    items.push({
+      kind: "hunt",
+      code,
+      storeName: local.name,
+      eventName,
+      playerId: person.playerId,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      frame: person.frame,
+      ring: person.ring,
+      deckLabel: ordered[0]?.flare.deckLabel ?? null,
+      total: group.length,
+      youCanAnswer: group.filter(({ match }) => match).length,
+      cards: ordered.slice(0, HUNT_SAMPLE).map(({ flare, match }) => ({
+        cardId: flare.cardId,
+        cardName: flare.cardName,
+        cardNumber: flare.cardNumber,
+        imageUrl: flare.imageUrl,
+        match,
+      })),
+    });
+  }
+
+  return items;
+}
+
+/**
  * Builds the feed for one player.
  *
  * `sessionId` is the room identity whose binder answers the boards — the
@@ -448,11 +644,12 @@ export async function listFeed(
   playerId: string,
   sessionId: string | null,
 ): Promise<FeedItem[]> {
-  const [locals, following, binder, wants] = await Promise.all([
+  const [locals, following, binder, wants, notices] = await Promise.all([
     listLocals(playerId),
     listFollowing(playerId),
     sessionId ? listBinder(sessionId) : Promise.resolve([]),
     listWants(playerId),
+    showingAnnouncements(),
   ]);
 
   /* The want list as a set of cards, which is the question two of the item
@@ -476,103 +673,37 @@ export async function listFeed(
     .filter((local) => local.liveNow || local.earlyOpen)
     .slice(0, LOCALS_SHOWN);
 
-  const items: FeedItem[] = [];
+  /*
+   * And then everywhere else. Nothing about this depends on the player,
+   * which is exactly the point: it is the item a brand-new account can
+   * still be shown. Their own stores are excluded so a local never
+   * appears twice under two headings.
+   */
+  const elsewhere = await listOpenStores(
+    locals.map((local) => local.storeId),
+    OPEN_ANYWHERE,
+  );
 
-  for (const local of live) {
-    const code = local.liveNow ? local.joinCode : local.nextEventCode;
-    if (!code) continue;
+  const boards = (
+    await Promise.all([
+      ...live.map((local) =>
+        boardWithHunts(local, true, held, followed, playerBySession),
+      ),
+      ...elsewhere.map((local) =>
+        boardWithHunts(local, false, held, followed, playerBySession),
+      ),
+    ])
+  ).flat();
 
-    const event = await findEventByJoinCode(code);
-    if (!event) continue;
-
-    const flares = await listRoomFlares(event.id);
-
-    /* Matched once, read twice: the board's count and the people below it. */
-    const answerable = flares.flatMap((flare) => {
-      const match = matchFor(flare, held);
-      if (!match) return [];
-      return [{ flare, match }];
-    });
-
-    items.push({
-      kind: "board",
-      code,
-      storeName: local.name,
-      eventName: local.liveNow
-        ? (event.name ?? "Trading now")
-        : (local.nextEventName ?? event.name),
-      live: local.liveNow,
-      startsAt: local.liveNow ? null : local.nextEventAt,
-      timeZone: event.storeTimeZone,
-      youCanAnswer: answerable.length,
-      sample: answerable.slice(0, BOARD_SAMPLE).map(({ flare, match }) => ({
-        cardId: flare.cardId,
-        cardName: flare.cardName,
-        cardNumber: flare.cardNumber,
-        imageUrl: flare.imageUrl,
-        match,
-      })),
-    });
-
-    /*
-     * The same board again, read as people rather than cards: a
-     * stranger's Flare is a board entry, a friend's is a plan.
-     *
-     * Grouped by poster AND posting action, so a deck put up in one
-     * sitting is one item. A Flare with no batch — posted alone, or
-     * before batches existed — falls back to its own id, which makes it
-     * a group of one rather than lumping every loose card together.
-     */
-    const hunts = new Map<string, { flare: ListEntry; match: MatchKind | null }[]>();
-
-    for (const flare of flares) {
-      if (flare.intent !== "want") continue;
-
-      const author = playerBySession.get(flare.playerSessionId);
-      if (!author || !followed.has(author)) continue;
-
-      const key = `${author}::${flare.postedBatch ?? flare.id}`;
-      hunts.set(key, [
-        ...(hunts.get(key) ?? []),
-        { flare, match: matchFor(flare, held) },
-      ]);
-    }
-
-    for (const [key, group] of hunts) {
-      const person = followed.get(key.split("::")[0]);
-      if (!person) continue;
-
-      /* The ones they can act on first: a friend's list is worth
-         reading, and the card in your binder is worth reading first. */
-      const ordered = [...group].sort(
-        (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
-      );
-
-      items.push({
-        kind: "hunt",
-        code,
-        storeName: local.name,
-        eventName: local.liveNow
-          ? (event.name ?? "Trading now")
-          : (local.nextEventName ?? event.name),
-        playerId: person.playerId,
-        displayName: person.displayName,
-        avatarUrl: person.avatarUrl,
-        frame: person.frame,
-        ring: person.ring,
-        deckLabel: ordered[0]?.flare.deckLabel ?? null,
-        total: group.length,
-        youCanAnswer: group.filter(({ match }) => match).length,
-        cards: ordered.slice(0, HUNT_SAMPLE).map(({ flare, match }) => ({
-          cardId: flare.cardId,
-          cardName: flare.cardName,
-          cardNumber: flare.cardNumber,
-          imageUrl: flare.imageUrl,
-          match,
-        })),
-      });
-    }
-  }
+  /*
+   * The two questions the Feed cannot answer on its own, asked only
+   * while they are unanswered. A player with a local and a want list
+   * sees neither, which is what keeps them out of the way of the
+   * product rather than in front of it.
+   */
+  const starters: StartItem[] = [];
+  if (locals.length === 0) starters.push({ kind: "start", topic: "store" });
+  if (wanted.size === 0) starters.push({ kind: "start", topic: "deck" });
 
   /*
    * The three that do not depend on a board being open, fetched together
@@ -588,15 +719,29 @@ export async function listFeed(
    * The order is an argument about what is worth a tap, and it runs from
    * things that go stale to things that do not.
    *
-   * Somebody needing a card you are holding expires on Friday night. A board
-   * expires with the event. Cards somebody just added are news for a few
-   * days. A trade already happened and is only ever social proof. And a
-   * suggestion is true until you act on it, so it waits at the bottom where
-   * it is found rather than pushed.
+   * A notice from us leads, because it is the only item somebody chose to
+   * write and it carries an expiry that takes it away again. Then
+   * somebody needing a card you are holding, which expires on Friday
+   * night. Then a board at one of your own stores, which expires with the
+   * event. Then the two questions we cannot answer yet, above the rooms
+   * that answer the first of them. Cards somebody just added are news for
+   * a few days. A trade already happened and is only ever social proof.
+   * And a suggestion is true until you act on it, so it waits at the
+   * bottom where it is found rather than pushed.
    */
   return [
-    ...items.filter((item) => item.kind === "hunt"),
-    ...items.filter((item) => item.kind === "board"),
+    ...notices.map((notice): AnnouncementItem => ({
+      kind: "announcement",
+      id: notice.id,
+      headline: notice.headline,
+      body: notice.body,
+      linkLabel: notice.linkLabel,
+      linkHref: notice.linkHref,
+    })),
+    ...boards.filter((item) => item.kind === "hunt"),
+    ...boards.filter((item) => item.kind === "board" && item.yours),
+    ...starters,
+    ...boards.filter((item) => item.kind === "board" && !item.yours),
     ...added,
     ...traded,
     ...suggested,

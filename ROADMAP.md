@@ -450,6 +450,58 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ A Feed worth opening on day one, and scanning moves to Room
+
+The founder, before OP-17 week: "trying to figure out a way for people to
+have at least a few things in their feed when they first login. Also, move
+the qr code scanner/code entry to Room. No need to have that in the feed."
+
+**Scanning left the Feed.** It was a button in the header and a card at the
+bottom of the app's Feed; both are gone. Room holds the scanner and the code
+form now — inline on the page, not a link away — which is the tab you are
+already opening when you are standing at a counter. The app's Room tab had
+been telling players to scan "from the Join tab" since Join was renamed
+months ago; it now offers both ways in itself.
+
+**Rooms open right now, anywhere.** `listOpenStores` starts from the events
+rather than the stores (a shop with nothing on is not news, and scanning
+every store to discover that is a query whose answer is almost always no),
+and returns up to three boards that are live or already taking Flares,
+excluding stores the player has saved. Below your own stores, never above:
+this is what the Feed falls back on, not what it is for. A store you have
+never been to carries its city, because a room somewhere needs a place
+attached.
+
+**The two questions the Feed cannot derive.** "Where do you play?" while a
+player has no locals, "What are you hunting?" while they have no wants.
+Each vanishes the moment it is answered, so this is not onboarding bolted to
+the top of a screen — it is the screen saying which of its own questions it
+cannot answer yet.
+
+**A notice from CardFlare.** The founder floated an official CardFlare
+account that everybody follows on sign-up. Deliberately not that: a
+CardFlare row in `players` would be a fake person, followable and
+unfollowable, with a binder it never fills, on a screen where every other
+face belongs to somebody who stood in a shop. It is its own table, it wears
+the mark instead of an avatar, and there is nothing to follow.
+
+`expires_at` is `not null` with no default. A system notice nobody remembers
+to take down is how a feed rots — OP-17 week is news on Thursday and clutter
+a fortnight later — so writing one means saying when it stops being true.
+The `link_href` is refused unless it is a path on our own origin, in the
+form, in the Server Action and in a check constraint: this is the single
+surface in the product where typed words reach every player at once, which
+makes it the single place a link could be aimed at all of them. Written at
+/admin/announcements, taken down rather than deleted, so what was said and
+when survives.
+
+Ordering, top to bottom: a notice from us, a friend's hunt, a board at one
+of your stores, the questions, rooms open elsewhere, cards just added, a
+trade that happened, people worth following. Stale-soonest first, as before.
+
+Probed on real PostgreSQL, including the four ways an announcement can be
+written wrong. Both platforms, same items, same words.
+
 ## ✅ One-page sign-up, and a documentation truth pass
 
 Sign-up asked for an address and a password, then sent the new player to a
