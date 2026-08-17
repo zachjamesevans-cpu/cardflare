@@ -827,6 +827,7 @@ function RoomScreen({
                           avatarUrl={person?.avatarUrl ?? null}
                           frame={person?.frame ?? null}
                           ring={person?.ring ?? null}
+                          aura={person?.aura ?? null}
                           ringArt={person?.ringArt ?? null}
                           auraArt={person?.auraArt ?? null}
                           /* 64, matching the website's `lg`. The
@@ -1091,6 +1092,7 @@ function RoomScreen({
                         avatarUrl={p.avatarUrl ?? null}
                         frame={p.frame ?? null}
                         ring={p.ring ?? null}
+                        aura={p.aura ?? null}
                         ringArt={p.ringArt ?? null}
                         auraArt={p.auraArt ?? null}
                         dimmed={!p.present}

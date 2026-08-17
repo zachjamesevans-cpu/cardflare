@@ -389,6 +389,8 @@ export interface RoomState {
     frame?: string | null;
     /** The catalogue ring, worn over the frame when both are set. */
     ring?: string | null;
+    /** The catalogue avatar effect, which rides with any ring. */
+    aura?: string | null;
     /**
      * A dropped-in profile border and avatar effect, when they wear
      * one. The server has sent these since the ring slots existed; the
@@ -753,6 +755,8 @@ export interface PeekProfile {
   frame: string | null;
   /** The catalogue ring, worn over the frame when both are set. */
   ring: string | null;
+  /** The catalogue avatar effect, which rides with any ring. */
+  aura: string | null;
   /** A dropped-in profile border and avatar effect, when worn. */
   ringArt: ArtFile | null;
   auraArt: ArtFile | null;
@@ -890,6 +894,85 @@ export const getGames = () =>
 
 export const setGames = (games: string[]) =>
   call<{ ok: true; mine: string[] }>("POST", "/api/v1/games", { games });
+
+/**
+ * The Feed: what is on at the places you go, and who needs what you have.
+ *
+ * Shapes mirror the website's `src/lib/feed/repository.ts` exactly, because
+ * both clients render the same server answer - a feed that disagreed between
+ * a phone and a laptop would be two products.
+ */
+export interface FeedCard {
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  match: "exact" | "other-printing";
+}
+
+export type FeedItem =
+  | {
+      kind: "board";
+      code: string;
+      storeName: string;
+      eventName: string;
+      live: boolean;
+      startsAt: string | null;
+      timeZone: string;
+      youCanAnswer: number;
+      sample: FeedCard[];
+    }
+  | {
+      kind: "traded";
+      storeName: string;
+      eventName: string;
+      requester: string;
+      holder: string | null;
+      cardName: string;
+      cardNumber: string;
+      imageUrl: string | null;
+      confirmedAt: string;
+    }
+  | {
+      kind: "added";
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+      total: number;
+      onYourListCount: number;
+      cards: {
+        cardId: string;
+        cardName: string;
+        cardNumber: string;
+        imageUrl: string | null;
+        onYourList: boolean;
+      }[];
+    }
+  | {
+      kind: "suggest";
+      players: {
+        playerId: string;
+        displayName: string;
+        avatarUrl: string | null;
+        answers: number;
+      }[];
+    }
+  | {
+      kind: "hunt";
+      code: string;
+      storeName: string;
+      eventName: string;
+      playerId: string;
+      displayName: string;
+      avatarUrl: string | null;
+      frame: string | null;
+      ring: string | null;
+      card: FeedCard;
+    };
+
+export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");
 
 /** A player found by name search: enough for a row and a door. */
 export interface FoundPlayer {

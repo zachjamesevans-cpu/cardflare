@@ -116,6 +116,130 @@ export function Item({ item }: { item: FeedItem }) {
     );
   }
 
+  if (item.kind === "traded") {
+    return (
+      <Card className="flex items-center gap-3 p-4">
+        {item.imageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={item.imageUrl}
+            alt=""
+            className="w-9 shrink-0 rounded-[4px] border border-border"
+          />
+        )}
+        <p className="min-w-0 flex-1 text-sm text-text-secondary">
+          <span className="font-semibold text-text-primary">{item.requester}</span>
+          {" traded for "}
+          <span className="font-semibold text-text-primary">{item.cardName}</span>
+          {item.holder ? (
+            <>
+              {" with "}
+              <span className="font-semibold text-text-primary">{item.holder}</span>
+            </>
+          ) : null}
+          {` at ${item.storeName}.`}
+        </p>
+      </Card>
+    );
+  }
+
+  if (item.kind === "added") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <PlayerAvatar
+            displayName={item.displayName}
+            seed={item.playerId}
+            avatarUrl={item.avatarUrl}
+            frame={item.frame}
+            ring={item.ring}
+            size="md"
+          />
+          <div className="flex min-w-0 flex-col">
+            <p className="truncate font-semibold text-text-primary">
+              {item.displayName}
+            </p>
+            <p className="text-xs text-text-muted">
+              added {item.total} {item.total === 1 ? "card" : "cards"} to their binder
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {item.cards.map((card) => (
+            <span
+              key={card.cardId}
+              title={card.cardName}
+              /* Ringed only when it is on YOUR list — the same green the
+                 board uses, for the same "this one concerns you". */
+              className={`block w-14 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated ${
+                card.onYourList
+                  ? "shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
+                  : ""
+              }`}
+            >
+              <span className="block aspect-[60/84] w-full">
+                {card.imageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={card.imageUrl} alt="" className="size-full object-cover" />
+                )}
+              </span>
+            </span>
+          ))}
+        </div>
+
+        {item.onYourListCount > 0 && (
+          <p className="text-sm font-medium text-accent">
+            {item.onYourListCount === 1
+              ? "One of these is on your want list"
+              : `${item.onYourListCount} of these are on your want list`}
+          </p>
+        )}
+      </Card>
+    );
+  }
+
+  if (item.kind === "suggest") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="font-semibold text-text-primary">Worth following</p>
+          <p className="text-xs text-text-muted">
+            Their binders answer what you&rsquo;re hunting.
+          </p>
+        </div>
+
+        {item.players.map((person) => (
+          <div key={person.playerId} className="flex items-center gap-3">
+            <PlayerAvatar
+              displayName={person.displayName}
+              seed={person.playerId}
+              avatarUrl={person.avatarUrl}
+              frame={null}
+              size="md"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-text-primary">
+                {person.displayName}
+              </p>
+              <p className="text-xs text-text-muted">
+                {/* Always "wants": the list is plural even when the
+                    overlap with it is one card. */}
+                has {person.answers} of your wants
+              </p>
+            </div>
+            <Link
+              href={`/p/${person.playerId}`}
+              className={buttonStyles("secondary", "sm")}
+            >
+              View
+            </Link>
+          </div>
+        ))}
+      </Card>
+    );
+  }
+
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-0.5">
