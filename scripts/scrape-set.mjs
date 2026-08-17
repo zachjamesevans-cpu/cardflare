@@ -31,7 +31,10 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium } from "playwright";
+/* From @playwright/test, which package.json actually declares. Importing
+   "playwright" works today only because npm hoists it as a transitive
+   dependency, and a clean install is free to stop doing that. */
+import { chromium } from "@playwright/test";
 
 /** Politeness. A spoiler site is somebody's hobby, not a CDN. */
 const DELAY_MS = 400;
