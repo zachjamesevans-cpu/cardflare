@@ -390,9 +390,9 @@ export function ProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      {/* Your own profile block, PIXEL-IDENTICAL to what View full
-          profile shows anyone else - same cover, same seam crossing the
-          picture's middle, same centered name and badge, same shelf.
+      {/* Your own profile block, laid out exactly as View full profile
+          shows anyone else - same cover, same picture, same centered
+          name and badge, same shelf, with the edit controls added.
           The founder's rule: what you see is what they see. */}
       <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
         {/* The cover carries down behind the picture, the name and the
@@ -452,11 +452,26 @@ export function ProfileScreen() {
           </Tap>
         </View>
 
+        {/*
+         * No negative margin here, and that IS the fix.
+         *
+         * This carried `marginTop: 96 - 48 - (110 + spacing(2))` — minus
+         * seventy pixels — left over from a layout where something 110
+         * tall sat above it. The cover is `position: absolute` now, so
+         * this column is the card's FIRST in-flow child: seventy pixels
+         * up from a twenty-four pixel padding put the picture's top edge
+         * forty-six pixels above the card, and the card clips its
+         * overflow. Half of everybody's face was cut off.
+         *
+         * The block a player sees of somebody else never had the margin,
+         * which is how the two drifted apart. They match again now,
+         * which is the founder's own rule for this screen: what you see
+         * is what they see.
+         */}
         <View
           style={{
             alignItems: "center",
             gap: spacing(2),
-            marginTop: 96 - 48 - (110 + spacing(2)),
           }}
         >
           <PlayerAvatar
