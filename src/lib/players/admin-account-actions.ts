@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { requireAdmin } from "@/lib/auth/session";
 import { generateSetupLink } from "@/lib/auth/invite-link";
 import { sendEmail } from "@/lib/email/client";
@@ -69,7 +67,14 @@ export async function adminSetIdentityAction(
   }
   if (outcome === "failed") return { status: "error", message: GENERIC };
 
-  revalidatePath("/admin/players");
+  /*
+   * Deliberately NO revalidatePath. Revalidating the current route makes
+   * the action's response carry a full re-render of /admin/players — a
+   * page heavy enough that the response blew its time budget, and the
+   * admin watched a spinner stop with no message after the write had
+   * already committed. The answer goes back immediately; the form calls
+   * router.refresh() once the message is on screen.
+   */
 
   return { status: "done", message: `Saved. They are @${handle.data.handle} now.` };
 }
@@ -113,7 +118,7 @@ export async function adminSetEmailAction(
     };
   }
 
-  revalidatePath("/admin/players");
+  /* No revalidatePath call, for the reason the rename gives above. */
 
   return { status: "done", message: `They sign in with ${email} now.` };
 }

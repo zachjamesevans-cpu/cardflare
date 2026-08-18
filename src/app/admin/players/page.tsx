@@ -19,6 +19,17 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/*
+ * Server Actions posted to this route inherit its time limit — the same
+ * rule /admin already documents — and this page's render is the heavy
+ * kind: it pages the whole auth user list for email addresses. Without
+ * this, Vercel's default budget killed a rename's RESPONSE after the
+ * write had committed: the admin watched a spinner stop with no message
+ * while the database quietly held the new name. 60 is the ceiling every
+ * Vercel plan allows.
+ */
+export const maxDuration = 60;
+
 /**
  * Player accounts.
  *
@@ -29,16 +40,26 @@ export const dynamic = "force-dynamic";
 export default async function AdminPlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; check?: string }>;
 }) {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
   const user = await requireAdmin();
 
-  const query = (await searchParams).q ?? "";
+  const params = await searchParams;
+  const query = params.q ?? "";
 
-  /* The admin's own player, for the picture check at the bottom. */
-  const self = await playerForUser(user.id);
+  /*
+   * The picture check runs ON REQUEST now, never as part of an ordinary
+   * render. It downloads the stored avatar, decodes it with sharp, and
+   * re-fetches it over the public internet with a ten-second timeout —
+   * a fine diagnostic and a terrible thing to do on every page view,
+   * because a Server Action's response re-renders this page and had to
+   * carry all of that inside its own time budget. That is the delay
+   * that ate the rename confirmation.
+   */
+  const wantsCheck = params.check === "pictures";
+  const self = wantsCheck ? await playerForUser(user.id) : null;
   const check = self ? await avatarDiagnostics(self.id) : null;
 
   /*
@@ -206,11 +227,25 @@ export default async function AdminPlayersPage({
 
               {check.src && <AvatarProbe src={check.src} />}
             </>
-          ) : (
+          ) : wantsCheck ? (
             <p className="text-sm text-text-muted">
               Your admin account has no player attached, so there is no picture to
               check.
             </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-text-muted">
+                Downloads your stored picture, decodes it, and re-fetches it exactly as
+                a browser would. Takes a few seconds, so it runs when you ask rather
+                than on every visit.
+              </p>
+              <Link
+                href="/admin/players?check=pictures"
+                className="w-fit text-sm font-semibold text-accent hover:underline"
+              >
+                Run the picture check
+              </Link>
+            </div>
           )}
         </Card>
       </section>
