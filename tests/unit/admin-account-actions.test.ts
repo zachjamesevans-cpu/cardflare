@@ -20,7 +20,10 @@ const userIdForPlayer = vi.fn();
 const generateSetupLink = vi.fn();
 const sendEmail = vi.fn();
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+const revalidatePath = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidatePath: (...a: unknown[]) => revalidatePath(...a),
+}));
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: () => requireAdmin() }));
 vi.mock("@/lib/auth/invite-link", () => ({
   generateSetupLink: (...a: unknown[]) => generateSetupLink(...a),
@@ -72,6 +75,27 @@ describe("changing a username", () => {
 
     expect(setIdentity).toHaveBeenCalledWith("p1", "Steven B", "steven_b");
     expect(state.status).toBe("done");
+  });
+
+  it("answers without re-rendering the page it came from", async () => {
+    /*
+     * The regression this pins: revalidating /admin/players inside the
+     * action made the response carry a re-render of a page heavy enough
+     * to blow its time budget — the founder watched the spinner stop
+     * with no message while Savannah's rename sat committed in the
+     * database. The confirmation must never wait on that page again;
+     * the form refreshes the roster itself after showing it.
+     */
+    await adminSetIdentityAction(
+      ADMIN_ACCOUNT_IDLE,
+      form({ playerId: "p1", displayName: "Steven B", handle: "steven_b" }),
+    );
+    await adminSetEmailAction(
+      ADMIN_ACCOUNT_IDLE,
+      form({ playerId: "p1", email: "them@example.com" }),
+    );
+
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("says who they are now, so the console can be believed", async () => {

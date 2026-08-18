@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { KeyRound, Mail, UserPen } from "lucide-react";
 
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -49,6 +50,24 @@ export function PlayerAccountControls({
   );
 }
 
+/**
+ * Refreshes the roster once a save has been ANSWERED.
+ *
+ * The actions deliberately do not revalidate their own route: doing so
+ * made the response carry a full re-render of a heavy page, and when
+ * that blew its time budget the admin watched a spinner stop with no
+ * message — after the write had committed. So the message lands first,
+ * and the row catches up a beat later. Each successful save returns a
+ * fresh state object, so this fires once per save.
+ */
+function useRefreshWhenDone(state: AdminAccountState) {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.status === "done") router.refresh();
+  }, [state, router]);
+}
+
 function Outcome({ state }: { state: AdminAccountState }) {
   if (state.status === "idle") return null;
 
@@ -75,6 +94,8 @@ function IdentityForm({
     adminSetIdentityAction,
     ADMIN_ACCOUNT_IDLE,
   );
+
+  useRefreshWhenDone(state);
 
   const [name, setName] = useState(displayName);
   const [tag, setTag] = useState(handle ?? handleSeedFrom(displayName));
@@ -137,6 +158,8 @@ function EmailForm({ playerId, email }: { playerId: string; email: string | null
     ADMIN_ACCOUNT_IDLE,
   );
 
+  useRefreshWhenDone(state);
+
   return (
     <form action={action} className="flex flex-col gap-2">
       <input type="hidden" name="playerId" value={playerId} />
@@ -185,6 +208,8 @@ function ResetForm({
     adminSendResetAction,
     ADMIN_ACCOUNT_IDLE,
   );
+
+  useRefreshWhenDone(state);
 
   return (
     <form action={action} className="flex flex-col gap-2">
