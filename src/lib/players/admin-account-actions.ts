@@ -11,7 +11,7 @@ import { updateSignInEmail, userIdForPlayer } from "@/lib/admin/records";
 import { siteUrl } from "@/lib/site";
 import { handleSchema } from "./handle";
 import { setIdentity } from "./profile";
-import { displayNameSchema } from "./profile-schema";
+import { displayNameSchema, type AdminAccountState } from "./profile-schema";
 
 /**
  * The support desk, in the console.
@@ -27,13 +27,6 @@ import { displayNameSchema } from "./profile-schema";
  * people's credentials, so the check is never inherited from the page
  * that rendered the button.
  */
-
-export type AdminAccountState =
-  | { status: "idle" }
-  | { status: "error"; message: string }
-  | { status: "done"; message: string };
-
-export const ADMIN_ACCOUNT_IDLE: AdminAccountState = { status: "idle" };
 
 const GENERIC = "That didn't work. Try again in a moment.";
 

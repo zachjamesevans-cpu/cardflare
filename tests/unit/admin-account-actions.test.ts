@@ -40,12 +40,12 @@ vi.mock("@/lib/players/profile", () => ({
 }));
 vi.mock("@/lib/site", () => ({ siteUrl: () => "https://cardflare.gg" }));
 
-const {
-  ADMIN_ACCOUNT_IDLE,
-  adminSendResetAction,
-  adminSetEmailAction,
-  adminSetIdentityAction,
-} = await import("@/lib/players/admin-account-actions");
+const { adminSendResetAction, adminSetEmailAction, adminSetIdentityAction } =
+  await import("@/lib/players/admin-account-actions");
+
+/* From the schema module now, not the actions — the crash this round
+   fixed was exactly that constant living in a "use server" file. */
+const { ADMIN_ACCOUNT_IDLE } = await import("@/lib/players/profile-schema");
 
 function form(fields: Record<string, string>): FormData {
   const data = new FormData();

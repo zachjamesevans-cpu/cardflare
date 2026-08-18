@@ -6,12 +6,14 @@ import { KeyRound, Mail, UserPen } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextInput } from "@/components/ui/controls";
 import {
-  ADMIN_ACCOUNT_IDLE,
   adminSendResetAction,
   adminSetEmailAction,
   adminSetIdentityAction,
-  type AdminAccountState,
 } from "@/lib/players/admin-account-actions";
+import {
+  ADMIN_ACCOUNT_IDLE,
+  type AdminAccountState,
+} from "@/lib/players/profile-schema";
 import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
 
 /**

@@ -56,3 +56,23 @@ export type SetupState =
   | { status: "error"; message: string; displayName: string; handle: string };
 
 export const SETUP_IDLE: SetupState = { status: "idle" };
+
+/**
+ * What the console's account controls are showing.
+ *
+ * Here rather than beside the actions that produce it, and the reason is
+ * the one at the top of this file: a `"use server"` module may export
+ * ONLY async functions. Exporting this object from the actions file
+ * built fine and then crashed the players page at request time, because
+ * a client component importing a non-function across the server-action
+ * boundary is a thing Next refuses to resolve.
+ *
+ * `tests/unit/server-action-exports.test.ts` now walks every `"use
+ * server"` file in the repo so this cannot happen a third time.
+ */
+export type AdminAccountState =
+  | { status: "idle" }
+  | { status: "error"; message: string }
+  | { status: "done"; message: string };
+
+export const ADMIN_ACCOUNT_IDLE: AdminAccountState = { status: "idle" };
