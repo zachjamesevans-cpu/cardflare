@@ -830,6 +830,53 @@ connection management on locked phones for a few seconds nobody needs.
 Supabase Realtime is ruled out regardless — RLS with zero policies means the
 anon key can subscribe to nothing, which is the point of the security model.
 
+### The Event Hub
+
+The store's television. `/store/event-hub` controls it; `/display/[token]`
+is the screen, with no shell, no navigation and no session — nobody signs a
+store account into a browser that lives on a shelf, and if they did, that
+browser would hold an account that can rewrite the store's inventory. The
+token reaches exactly one read-only payload and no Server Action accepts it.
+
+**A display belongs to a store, not to an event.** A shop runs One Piece and
+Flesh and Blood at neighbouring tables on one night, in one physical room,
+which in CardFlare is one room. So the game lives on the TIMER — `events.game`
+is still an enum with one value and is deliberately untouched, because
+widening it would encode "a room has one game", which is the opposite of what
+a shop does. The QR is the store's existing counter code; there is no second
+way in.
+
+**No countdown is written, ever.** `event_hub_timers` holds only what a person
+decided: `started_at`, `paused_at`, `remaining_ms_when_paused`,
+`overtime_started_at`. Every client derives the rest against its own clock via
+`src/lib/event-hub/timer.ts`. Two things follow. Poll cadence decides how fast
+a PAUSE reaches the wall and has nothing to do with whether the number is
+right, which is what makes the same polling decision above correct here rather
+than merely consistent. And regulation reaching zero is a DERIVED phase, so
+TIME IN ROUND appears at the instant it happens whether or not a staff phone
+is awake to write a row. Every transition returns null when it would change
+nothing — a double tap, a second control tab and a retried request are all
+no-ops rather than a second start.
+
+**Tournament rules are data.** `src/lib/event-hub/game-timer-profiles.ts`
+carries the five launch games with their presets, both end-of-round
+procedures, `officialRulesUrl`, `rulesLastVerified` and `procedureVersion`.
+Nothing procedural lives in a component, so a publisher changing a rule is an
+edit to a string array. Three of the five count turns rather than seconds, and
+a turn-counted procedure carries `overtimeSeconds: null` so no display can
+invent a clock the publisher never specified. **These summaries must be
+reviewed against official publisher documentation periodically; nothing here
+is fetched or scraped.**
+
+**Privacy is one file.** `src/lib/event-hub/display-payload.ts` assembles
+everything the television may know, so "can a display token see X?" has one
+place to be answered. Wants only, grouped by card and counted by session; no
+session ids, player ids, avatars or notes; never a Have List or a stock list;
+`storeMayHave` is one boolean per card somebody already posted. It reads the
+counter code through `resolveCode`, which finds a live room but never opens
+one — a television left on overnight must not be able to start a trading room
+by looking at it.
+
 ### Trades
 
 A trade row is the tally that the loop closed: event, Flare, both sessions,

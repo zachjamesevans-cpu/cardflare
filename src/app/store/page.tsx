@@ -11,6 +11,7 @@ import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { CreateEventForm } from "@/components/events/create-event-form";
 import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
+import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
@@ -193,6 +194,26 @@ export default async function StorePage({
             qrSvg={counterQr}
             walkInEnabled={store.walk_in_enabled}
           />
+        </section>
+      )}
+
+      {store && (
+        <section className="flex flex-col gap-5" aria-labelledby="event-hub-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="event-hub-heading" className="text-xl font-bold text-text-primary">
+              Event Hub
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Your tournament timers, what the room is looking for and your counter
+              code, on the television. Put it on at the start of the night and leave it
+              running.
+            </p>
+          </div>
+          <div>
+            <ButtonLink href={`/store/event-hub?as=${store.id}`} variant="secondary">
+              Open the Event Hub
+            </ButtonLink>
+          </div>
         </section>
       )}
 

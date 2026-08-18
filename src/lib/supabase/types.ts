@@ -933,6 +933,68 @@ export type AnnouncementInsert = Omit<
   starts_at?: string;
 };
 
+/**
+ * One television in a shop, and the read-only token it authenticates
+ * with. See supabase/migrations/20260922090000_event_hub.sql.
+ */
+export type EventHubDisplayRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  store_id: string;
+  created_by: string | null;
+  name: string;
+  night_title: string | null;
+  /** The read-only display identifier. Never leaves the server as a value. */
+  token: string;
+  layout: string;
+  announcement: string | null;
+  show_flares: boolean;
+  show_qr: boolean;
+  sound_enabled: boolean;
+};
+
+/** Everything the table defaults is optional here, and only `store_id` is not. */
+export type EventHubDisplayInsert = Pick<EventHubDisplayRow, "store_id"> &
+  Partial<Omit<EventHubDisplayRow, "store_id">>;
+
+/**
+ * One tournament on one display.
+ *
+ * No countdown value is stored — only what a person decided and when.
+ * `src/lib/event-hub/timer.ts` does the arithmetic.
+ */
+export type EventHubTimerRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  display_id: string;
+  position: number;
+  game: string;
+  event_name: string;
+  round: number | null;
+  format: string | null;
+  bracket: string;
+  preset_id: string;
+  /** Null is a deliberate "untimed", not a missing value. */
+  duration_seconds: number | null;
+  status: string;
+  started_at: string | null;
+  paused_at: string | null;
+  remaining_ms_when_paused: number | null;
+  overtime_started_at: string | null;
+  /** Null in overtime means the procedure counts turns, not seconds. */
+  overtime_duration_seconds: number | null;
+  overtime_turn: number;
+  rules_dismissed: boolean;
+};
+
+export type EventHubTimerInsert = Pick<
+  EventHubTimerRow,
+  "display_id" | "game" | "event_name" | "preset_id"
+> &
+  Partial<Omit<EventHubTimerRow, "display_id" | "game" | "event_name" | "preset_id">>;
+
 export type PlayerWantRow = {
   id: string;
   created_at: string;
@@ -1129,6 +1191,8 @@ export type Database = {
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
       announcements: Table<AnnouncementRow, AnnouncementInsert>;
+      event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;
+      event_hub_timers: Table<EventHubTimerRow, EventHubTimerInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;

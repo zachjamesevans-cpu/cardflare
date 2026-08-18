@@ -450,6 +450,73 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ The Event Hub — the store's television
+
+A shop runs two tournaments at neighbouring tables and puts a YouTube
+countdown on the TV. This replaces that: timers, the end-of-round procedure
+for whichever game reached zero, the room's live Flares, the counter code as a
+QR, the store's name and its night, all on one screen a store switches on and
+leaves running.
+
+**Where it sits.** `/store/event-hub` is the control panel, inside the
+existing store area with the same `getViewer` authorisation everything else
+uses. `/display/[token]` is the television — no `AppShell`, no navigation, no
+sign-in. Nobody is signing a store account into a browser that lives on a
+shelf, and if they did, that browser would hold an account that can rewrite
+the store's inventory.
+
+**No countdown is ever written.** The obvious build persists the number on the
+wall and updates it: four writes a second across a busy shop, drifting the
+moment the wifi hiccups, and a refresh that resets the round. Instead the row
+holds only what a person decided — started at this instant, paused with this
+much left, overtime began here — and every client does the arithmetic against
+its own clock. The consequence is the whole reason it works on shop wifi: poll
+cadence decides how fast a PAUSE reaches the wall and has nothing to do with
+whether the number is right. A television that has not heard from us in a
+minute is still counting down correctly.
+
+Two things fall out of that. Regulation reaching zero puts TIME IN ROUND on
+the wall as a DERIVED state, so it happens at 19:35 whether or not a staff
+phone is awake. And every transition returns null when it would change
+nothing, which is what makes a double tap, a second staff phone and a retried
+request all harmless rather than a second start.
+
+**Still no websockets.** `RoomTicker` already explained why — every table is
+RLS-on with no policies, so Realtime would need read policies written for the
+first time, and a socket on a shop's wifi is a liability. The display polls a
+2KB payload every three seconds and corrects its own clock against the
+server's, so a television whose clock is four minutes out still shows the
+right round.
+
+**Rules are data, not components.** `game-timer-profiles.ts` carries the five
+launch games — One Piece, Pokémon, Lorcana, Riftbound, Flesh and Blood — with
+their presets, both procedures, `officialRulesUrl`, `rulesLastVerified` and
+`procedureVersion`. A publisher changing an end-of-round rule is an edit to a
+string array. Three of the five count TURNS rather than seconds, and the
+display refuses to invent a countdown for them: Lorcana shows "+5 TURNS",
+Flesh and Blood "+1 TURN", and only One Piece and the Pokémon Championship
+preset get a clock. Pokémon's preset is labelled Championship Series rather
+than implying every casual event runs the same structure.
+
+**The overlay is per panel, never per page.** One Piece reaching zero puts its
+rules card over the One Piece panel; the Flesh and Blood round beside it does
+not blink.
+
+**Privacy has one file.** `display-payload.ts` assembles everything the
+television may know, so "can a display token see X?" has exactly one place to
+be answered. Wants only — a showcase Flare is public but reads as an inventory
+projected on a wall. No session ids, no player ids, no avatars, no notes, no
+Have List, no stock list, no price. `storeMayHave` is one boolean per card
+somebody already asked for. A test asserts the payload's whole key list, so a
+new field fails until somebody has thought about it.
+
+**Not built, deliberately:** pairings, standings, registration, decklists,
+brackets, result reporting. It runs alongside whatever the store already uses.
+
+Migration probed on real PostgreSQL, including every state a row must not be
+allowed into. Rendered at 1920x1080, 1366x768, 1024x768 and 2560x1080 before
+shipping.
+
 ## ✅ A Feed worth opening on day one, and scanning moves to Room
 
 The founder, before OP-17 week: "trying to figure out a way for people to
