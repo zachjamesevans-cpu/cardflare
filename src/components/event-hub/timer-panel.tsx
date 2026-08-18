@@ -2,6 +2,7 @@
 
 import {
   GAME_PROFILES,
+  nameRepeatsGame,
   procedureFor,
   RULES_DISCLAIMER,
 } from "@/lib/event-hub/game-profiles";
@@ -98,6 +99,7 @@ export function TimerPanel({
   now: number;
 }) {
   const profile = GAME_PROFILES[timer.game];
+  const repeats = nameRepeatsGame(profile, timer.eventName);
   const phase = timerPhase(timer, now);
   const band = urgency(timer, now);
   const untimed = timer.durationSeconds === null;
@@ -135,16 +137,33 @@ export function TimerPanel({
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-2 p-[clamp(0.75rem,1.6vw,2rem)]">
         <header className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <p
-              className={`truncate font-semibold tracking-[0.18em] text-[var(--game)] uppercase ${META_SIZE[layout]}`}
-            >
-              {profile.shortName}
-            </p>
-            <h2
-              className={`truncate font-bold text-text-primary ${TITLE_SIZE[layout]}`}
-            >
-              {timer.eventName}
-            </h2>
+            {/*
+             * One name, never the same one twice. A tournament called
+             * "One Piece Card Game" under a heading that already says
+             * ONE PIECE is the game's name printed on two lines, so in
+             * that case the game becomes the heading and the second line
+             * goes away entirely.
+             */}
+            {repeats ? (
+              <h2
+                className={`truncate font-bold text-[var(--game)] ${TITLE_SIZE[layout]}`}
+              >
+                {profile.displayName}
+              </h2>
+            ) : (
+              <>
+                <p
+                  className={`truncate font-semibold tracking-[0.18em] text-[var(--game)] uppercase ${META_SIZE[layout]}`}
+                >
+                  {profile.shortName}
+                </p>
+                <h2
+                  className={`truncate font-bold text-text-primary ${TITLE_SIZE[layout]}`}
+                >
+                  {timer.eventName}
+                </h2>
+              </>
+            )}
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-1">

@@ -74,13 +74,16 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
         </Field>
 
         <Field label="Tournament name" htmlFor="eventName">
+          {/* No default. Pre-filling it with the game's own name meant
+              every panel read "One Piece" above "One Piece Card Game",
+              and a field that already looks answered is a field nobody
+              corrects. */}
           <TextInput
             id="eventName"
             name="eventName"
             required
             maxLength={EVENT_NAME_MAX}
-            defaultValue={profile.displayName}
-            placeholder="Friday Night One Piece"
+            placeholder="Friday Night Locals"
           />
         </Field>
 

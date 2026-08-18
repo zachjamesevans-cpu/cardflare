@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
   Flag,
   Minus,
   Pause,
@@ -18,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   GAME_PROFILES,
+  nameRepeatsGame,
   procedureFor,
   RULES_DISCLAIMER,
 } from "@/lib/event-hub/game-profiles";
@@ -67,6 +70,9 @@ import { useDisplayClock } from "./display-clock";
  * moment a poll comes back newer than it — the server is always the
  * authority, this just stops the wait being visible.
  */
+/** How long an unconfirmed guess may stand. Two polls of the display. */
+const GUESS_MS = 6_000;
+
 export function ControlPanel({
   initial,
   token,
@@ -93,12 +99,29 @@ export function ControlPanel({
 
     /* The server has spoken since we guessed. Its answer wins — it
        always does; this only ever hides the round trip. */
-    return Date.parse(server.updatedAt) >= guess.at ? server : guess.timer;
+    if (Date.parse(server.updatedAt) >= guess.at) return server;
+
+    /*
+     * And a backstop, because a guess that never clears is worse than no
+     * guess at all: if the write failed, or was a no-op the server
+     * declined to make, the panel would otherwise show a state the wall
+     * does not have, indefinitely. Two polls is long enough to hide the
+     * round trip and short enough that a lie is brief.
+     */
+    if (at - guess.at > GUESS_MS) return server;
+
+    return guess.timer;
   });
 
   const run = (timer: HubTimer, op: string, patch: TimerPatch | null) => {
     if (patch) {
-      const stamp = Date.now();
+      /*
+       * Stamped with the SERVER-corrected clock, not this device's.
+       * Comparing a phone's `Date.now()` against a server's `updated_at`
+       * is comparing two clocks that disagree, and on a phone running
+       * fast the guess would outlive every answer the server gave.
+       */
+      const stamp = at;
       setGuesses((current) => ({
         ...current,
         [timer.id]: {
@@ -175,9 +198,13 @@ function TimerCard({
               {profile.shortName}
               {timer.bracket === "elimination" ? " · Elimination" : ""}
             </p>
-            <h3 className="truncate text-lg font-bold text-text-primary">
-              {timer.eventName}
-            </h3>
+            {/* The same rule the wall follows: a tournament named after
+                its own game does not get the name printed twice. */}
+            {!nameRepeatsGame(profile, timer.eventName) && (
+              <h3 className="truncate text-lg font-bold text-text-primary">
+                {timer.eventName}
+              </h3>
+            )}
             <p className="text-sm text-text-muted">
               {timer.round !== null ? `Round ${timer.round}` : "No round set"}
               {timer.format ? ` · ${timer.format}` : ""}
@@ -265,22 +292,37 @@ function TimerCard({
               )}
 
               {procedure.additionalTurns > 0 && (
-                <Control
-                  label={`Next turn (${timer.overtimeTurn}/${procedure.additionalTurns})`}
-                  icon={ChevronUp}
-                  onClick={() =>
-                    onRun(
-                      timer,
-                      "next-turn",
-                      advanceTurn(timer, procedure.additionalTurns, 1),
-                    )
-                  }
-                />
+                <>
+                  <Control
+                    label={`Next turn (${timer.overtimeTurn}/${procedure.additionalTurns})`}
+                    icon={ChevronUp}
+                    onClick={() =>
+                      onRun(
+                        timer,
+                        "next-turn",
+                        advanceTurn(timer, procedure.additionalTurns, 1, now),
+                      )
+                    }
+                  />
+                  {/* Both directions. A turn counted by mistake has to be
+                      takeable back, or staff stop touching the tracker. */}
+                  <Control
+                    label="Previous turn"
+                    icon={ChevronDown}
+                    onClick={() =>
+                      onRun(
+                        timer,
+                        "previous-turn",
+                        advanceTurn(timer, procedure.additionalTurns, -1, now),
+                      )
+                    }
+                  />
+                </>
               )}
 
               <Control
-                label={timer.rulesDismissed ? "Reopen rules" : "Dismiss rules"}
-                icon={ChevronDown}
+                label={timer.rulesDismissed ? "Show the rules again" : "Hide the rules"}
+                icon={timer.rulesDismissed ? Eye : EyeOff}
                 onClick={() =>
                   timer.rulesDismissed
                     ? onRun(timer, "reopen-rules", setRulesDismissed(timer, false))
@@ -294,6 +336,24 @@ function TimerCard({
                 onClick={() => onRun(timer, "complete", complete(timer))}
               />
             </div>
+
+            {/*
+             * What the television is doing, in words.
+             *
+             * Hiding the rules changed nothing a staff member could see on
+             * this screen — the block stayed, the buttons stayed, and only
+             * a label moved — so the button read as broken even when it had
+             * worked. The wall's state belongs on the device driving it.
+             */}
+            <p
+              className={`text-xs font-semibold ${
+                timer.rulesDismissed ? "text-text-muted" : "text-[var(--game)]"
+              }`}
+            >
+              {timer.rulesDismissed
+                ? "Rules hidden. The display shows the timer."
+                : "Rules are on the display now."}
+            </p>
 
             <p className="text-xs text-text-muted">{RULES_DISCLAIMER}</p>
 

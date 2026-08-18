@@ -15,6 +15,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const getViewer = vi.fn();
+const claimPendingInvite = vi.fn();
+const accountIdentity = vi.fn();
+const needsSetup = vi.fn();
 const redirect = vi.fn((path: string) => {
   // Next's redirect throws to unwind rendering; mirroring that means a missing
   // redirect shows up as a returned element rather than passing silently.
@@ -22,7 +25,16 @@ const redirect = vi.fn((path: string) => {
 });
 
 vi.mock("next/navigation", () => ({ redirect: (p: string) => redirect(p) }));
-vi.mock("@/lib/auth/session", () => ({ getViewer: () => getViewer() }));
+vi.mock("@/lib/auth/session", () => ({
+  getViewer: () => getViewer(),
+  claimPendingInvite: (...a: unknown[]) => claimPendingInvite(...a),
+}));
+vi.mock("@/lib/players/account-identity", () => ({
+  accountIdentity: (...a: unknown[]) => accountIdentity(...a),
+}));
+vi.mock("@/lib/players/profile", () => ({
+  needsSetup: (...a: unknown[]) => needsSetup(...a),
+}));
 
 const WelcomePage = (await import("@/app/welcome/page")).default;
 
@@ -77,7 +89,13 @@ function propsWith(node: unknown, key: string): Record<string, unknown> | null {
 
 beforeEach(() => {
   getViewer.mockReset();
+  claimPendingInvite.mockReset();
+  accountIdentity.mockReset();
+  needsSetup.mockReset();
   redirect.mockClear();
+
+  accountIdentity.mockResolvedValue(null);
+  needsSetup.mockResolvedValue(true);
 });
 
 describe("/welcome", () => {
@@ -128,6 +146,67 @@ describe("/welcome", () => {
 
     expect(redirected).toBeNull();
     expect(tree).not.toBeNull();
+  });
+
+  /*
+   * The bug this pins, and it reached a real person. Savannah was invited
+   * as a PLAYER, and the screen after her password said "go to your
+   * store". The page had asked "is this a player?" and given everybody
+   * else the store wording — so a player whose account row had not been
+   * created yet fell through to it.
+   *
+   * A person with no store membership is not a store.
+   */
+  it("never tells somebody without a store that they have one", async () => {
+    getViewer.mockResolvedValue({
+      kind: "unaffiliated",
+      user: { id: "u1", email: "savannah@example.com" },
+    });
+
+    const { tree } = await visit();
+    const words = visibleText(tree).join(" ").toLowerCase();
+
+    expect(words).not.toContain("your store");
+    expect(propsWith(tree, "continueHref")).toMatchObject({
+      continueHref: "/profile",
+    });
+  });
+
+  it("retries the invitation claim, so a failed one is not permanent", async () => {
+    /* Creating the player row can fail on the way in, and the invite is
+       left open precisely so the next page load can try again. Without
+       the retry the account exists and the person is stuck being nobody. */
+    getViewer.mockResolvedValue({
+      kind: "unaffiliated",
+      user: { id: "u1", email: "savannah@example.com" },
+    });
+
+    await visit();
+
+    expect(claimPendingInvite).toHaveBeenCalledWith({
+      id: "u1",
+      email: "savannah@example.com",
+    });
+  });
+
+  it("asks a player for a password and a name on one screen", async () => {
+    /* The founder, watching a first sign-up: "the username should also be
+       something you can type in on the same screen. It should not go to
+       'choose your username' after." */
+    getViewer.mockResolvedValue({
+      kind: "player",
+      user: { id: "u1", email: "savannah@example.com" },
+      playerId: "p1",
+      playerName: "Savannah",
+    });
+    accountIdentity.mockResolvedValue({ playerId: "p1", displayName: "Savannah" });
+
+    const { tree } = await visit();
+
+    expect(propsWith(tree, "withPassword")).toMatchObject({
+      withPassword: true,
+      suggestion: "Savannah",
+    });
   });
 
   it("turns a signed-out visitor away, to a fresh link rather than a sign-in form", async () => {

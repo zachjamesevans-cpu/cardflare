@@ -226,3 +226,81 @@ export function playerInviteEmail(
 ): EmailMessage {
   return storeInviteEmail(displayName, to, origin, setupLink, "player");
 }
+
+/**
+ * A fresh password link, sent by a human at the support desk.
+ *
+ * Deliberately not the invitation email. "Your CardFlare account is
+ * ready" is the wrong sentence for somebody who has had an account for
+ * a month and cannot get into it, and an email whose words do not match
+ * why it arrived is how people decide a message is phishing.
+ */
+export function passwordResetEmail(
+  displayName: string,
+  to: string,
+  origin: string,
+  link: string,
+): EmailMessage {
+  const name = escapeHtml(displayName);
+  const resetUrl = `${origin}/login/reset`;
+
+  const html = `<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:24px;background-color:${COLOR.canvas};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background-color:${COLOR.surface};border:1px solid ${COLOR.border};border-radius:16px;padding:32px;">
+      <p style="margin:0 0 24px;font-size:20px;font-weight:700;color:${COLOR.textPrimary};">
+        Card<span style="color:${COLOR.accent};">Flare</span>
+      </p>
+
+      <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:${COLOR.textPrimary};">
+        Set a new password, ${name}.
+      </h1>
+
+      <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
+        You asked us for a way back in. One tap below signs you in on this
+        address and lets you choose a new password.
+      </p>
+
+      <p style="margin:0 0 24px;">
+        <a href="${link}" style="display:inline-block;background-color:${COLOR.accent};color:${COLOR.accentContrast};font-weight:700;font-size:16px;text-decoration:none;padding:12px 24px;border-radius:10px;">
+          Choose a new password
+        </a>
+      </p>
+
+      <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
+        The link expires after a while. If it has,
+        <a href="${resetUrl}" style="color:${COLOR.accent};">${SITE.domain}/login/reset</a>
+        will send you a fresh one.
+      </p>
+
+      <p style="margin:0;padding-top:24px;border-top:1px solid ${COLOR.border};font-size:13px;line-height:1.6;color:${COLOR.textMuted};">
+        Did not ask for this? Reply and let us know. Your password does not
+        change until you choose a new one.
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  const text = [
+    `Set a new password, ${displayName}.`,
+    "",
+    "You asked us for a way back in. The link below signs you in on this",
+    "address and lets you choose a new password.",
+    "",
+    `Choose a new password: ${link}`,
+    "",
+    `That link expires after a while. If it has, go to ${resetUrl} and we will`,
+    "send you a fresh one.",
+    "",
+    "---",
+    "Did not ask for this? Reply and let us know - your password does not change",
+    "until you choose a new one.",
+  ].join("\n");
+
+  return {
+    to,
+    subject: `Set a new ${SITE.name} password`,
+    html,
+    text,
+  };
+}

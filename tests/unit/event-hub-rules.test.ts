@@ -5,6 +5,7 @@ import {
   GAME_IDS,
   GAME_PROFILES,
   gameProfile,
+  nameRepeatsGame,
   procedureFor,
   RULES_DISCLAIMER,
   timerPreset,
@@ -268,5 +269,40 @@ describe("switching between Swiss and elimination", () => {
     expect(overtimeSecondsFor("one-piece", "elimination")).toBe(5 * 60);
     expect(overtimeSecondsFor("lorcana", "elimination")).toBeNull();
     expect(overtimeSecondsFor("riftbound", "elimination")).toBeNull();
+  });
+});
+
+/**
+ * A tournament's name is not the game's name again.
+ *
+ * From a shop floor: "in the event hub it says 'one piece card game' and
+ * 'one piece card game' in the timer screen, twice." The panel is headed
+ * by the game and the form used to pre-fill the tournament name with the
+ * game's own name, so both lines said the same thing and the line that
+ * should carry "Friday Night Locals" carried nothing.
+ *
+ * The same rule cosmetics already follow: a name never repeats the
+ * category it is sitting under.
+ */
+describe("a tournament name that repeats its game", () => {
+  it.each([
+    ["One Piece Card Game", "one-piece"],
+    ["One Piece", "one-piece"],
+    ["one piece tcg", "one-piece"],
+    ["Pokémon TCG", "pokemon"],
+    ["Lorcana", "lorcana"],
+    ["Flesh & Blood", "flesh-and-blood"],
+    ["   ", "one-piece"],
+  ])("spots %j under %s", (name, id) => {
+    expect(nameRepeatsGame(GAME_PROFILES[id as GameId], name)).toBe(true);
+  });
+
+  it.each([
+    ["Friday Night Locals", "one-piece"],
+    ["Armory: Classic Constructed", "flesh-and-blood"],
+    ["Release Weekend", "pokemon"],
+    ["Store Championship", "lorcana"],
+  ])("leaves %j alone under %s", (name, id) => {
+    expect(nameRepeatsGame(GAME_PROFILES[id as GameId], name)).toBe(false);
   });
 });

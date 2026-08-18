@@ -261,6 +261,9 @@ export interface FolderedEntries<T> {
   loose: T[];
 }
 
+/** What an unlabelled batch is called on the board. */
+export const UNNAMED_BATCH = "Posted together";
+
 /**
  * Splits one player's entries into deck folders and loose cards.
  *
@@ -268,32 +271,64 @@ export interface FolderedEntries<T> {
  * same hunt: folders merge case-insensitively and keep the spelling of the
  * first card seen. Folder order and card order both follow the order in,
  * which the board already sorts newest first.
+ *
+ * A BATCH WITH NO LABEL IS STILL A BATCH, and missing that was a bug the
+ * founder hit: "the grouped flares are not functioning properly."
+ * `posted_batch` was added so a deck put up in one action could be told
+ * apart from thirty separate decisions, and the notifications and the
+ * Feed both use it — but this function, which is what the ROOM board
+ * groups by, was still reading `deck_label` alone. So anybody who pasted
+ * a list without naming it got thirty loose rows on the board, which is
+ * exactly the pile the feature exists to prevent.
+ *
+ * A label still wins when there is one: it is what the player chose to
+ * call the hunt, and two sittings of the same deck belong together.
  */
-export function partitionByDeck<T extends { deckLabel: string | null }>(
-  entries: T[],
-): FolderedEntries<T> {
+export function partitionByDeck<
+  T extends { deckLabel: string | null; postedBatch?: string | null },
+>(entries: T[]): FolderedEntries<T> {
   const folders = new Map<string, DeckFolder<T>>();
   const loose: T[] = [];
 
   for (const entry of entries) {
     const label = entry.deckLabel?.trim();
+    const batch = entry.postedBatch ?? null;
 
-    if (!label) {
+    /* Neither a name nor a batch: a card posted on its own, which is a
+       loose row and should stay one. */
+    if (!label && !batch) {
       loose.push(entry);
       continue;
     }
 
-    const key = label.toLowerCase();
+    const key = label ? `label:${label.toLowerCase()}` : `batch:${batch}`;
     const existing = folders.get(key);
 
     if (existing) {
       existing.entries.push(entry);
-    } else {
-      folders.set(key, { label, entries: [entry] });
+      continue;
     }
+
+    folders.set(key, { label: label ?? UNNAMED_BATCH, entries: [entry] });
   }
 
-  return { folders: [...folders.values()], loose };
+  /*
+   * A batch of one is not a folder. Somebody posting a single card from
+   * a screen that happens to stamp a batch id should see a row, not a
+   * folder containing one thing — the grouping is there to collapse a
+   * pile, and a pile of one is a card.
+   */
+  const kept: DeckFolder<T>[] = [];
+
+  for (const folder of folders.values()) {
+    if (folder.label === UNNAMED_BATCH && folder.entries.length === 1) {
+      loose.push(folder.entries[0]);
+      continue;
+    }
+    kept.push(folder);
+  }
+
+  return { folders: kept, loose };
 }
 
 /**

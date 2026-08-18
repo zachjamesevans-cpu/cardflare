@@ -272,23 +272,78 @@ describe("overtime", () => {
   it("advances turns only when staff say so", () => {
     let t = apply(timer(), startOvertime(timer(), T0, 5 * 60));
 
-    t = apply(t, advanceTurn(t, 3, 1));
+    t = apply(t, advanceTurn(t, 3, 1, T0));
     expect(t.overtimeTurn).toBe(1);
 
-    t = apply(t, advanceTurn(t, 3, 1));
-    t = apply(t, advanceTurn(t, 3, 1));
+    t = apply(t, advanceTurn(t, 3, 1, T0));
+    t = apply(t, advanceTurn(t, 3, 1, T0));
     expect(t.overtimeTurn).toBe(3);
 
     /* Capped at the procedure's own count — "Turn 4 of 3" is not a thing. */
-    expect(advanceTurn(t, 3, 1)).toBeNull();
+    expect(advanceTurn(t, 3, 1, T0)).toBeNull();
 
-    t = apply(t, advanceTurn(t, 3, -1));
+    t = apply(t, advanceTurn(t, 3, -1, T0));
     expect(t.overtimeTurn).toBe(2);
+  });
+
+  it("advances turns the moment the rules card appears, not only after START", () => {
+    /*
+     * The bug this pins, reported from a shop floor: "the turn up and
+     * down button does not work in One Piece when a tournament goes to
+     * overtime."
+     *
+     * Regulation reaching zero is a DERIVED phase — the wall says TIME
+     * IN ROUND with no row written — but the row still says "running"
+     * until staff confirm it. The guard here read the row, so the turn
+     * buttons were dead in exactly the moment they first appear.
+     */
+    const running = apply(timer(), start(timer(), T0));
+    const atTime = T0 + 36 * MIN;
+
+    expect(running.status).toBe("running");
+    expect(timerPhase(running, atTime)).toBe("time_called");
+
+    expect(advanceTurn(running, 3, 1, atTime)).toEqual({ overtimeTurn: 1 });
+  });
+
+  it("still refuses to advance a turn while the round is running", () => {
+    const running = apply(timer(), start(timer(), T0));
+    expect(advanceTurn(running, 3, 1, T0 + 10 * MIN)).toBeNull();
+  });
+
+  it("takes a turn back, so a miscount is not permanent", () => {
+    let t = apply(timer(), startOvertime(timer(), T0, 5 * 60));
+    t = apply(t, advanceTurn(t, 3, 1, T0));
+    t = apply(t, advanceTurn(t, 3, 1, T0));
+    expect(t.overtimeTurn).toBe(2);
+
+    t = apply(t, advanceTurn(t, 3, -1, T0));
+    expect(t.overtimeTurn).toBe(1);
+
+    t = apply(t, advanceTurn(t, 3, -1, T0));
+    expect(t.overtimeTurn).toBe(0);
+    /* And never below zero. */
+    expect(advanceTurn(t, 3, -1, T0)).toBeNull();
+  });
+
+  it("hides the rules card at time, before overtime has been started", () => {
+    /* The other half of the same report. Hiding has to work while the
+       row still says "running", which is when staff first reach for it. */
+    const running = apply(timer(), start(timer(), T0));
+    const atTime = T0 + 36 * MIN;
+
+    expect(showsOvertimeRules(running, atTime)).toBe(true);
+
+    const hidden = apply(running, setRulesDismissed(running, true));
+    expect(showsOvertimeRules(hidden, atTime)).toBe(false);
+
+    const shown = apply(hidden, setRulesDismissed(hidden, false));
+    expect(showsOvertimeRules(shown, atTime)).toBe(true);
   });
 
   it("does not track turns for a procedure that has none", () => {
     const t = apply(timer(), startOvertime(timer(), T0, 5 * 60));
-    expect(advanceTurn(t, 0, 1)).toBeNull();
+    expect(advanceTurn(t, 0, 1, T0)).toBeNull();
   });
 
   it("stretches a timed overtime when a judge asks", () => {

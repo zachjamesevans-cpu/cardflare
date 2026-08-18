@@ -311,10 +311,10 @@ export async function timerControlAction(formData: FormData): Promise<void> {
       );
       break;
     case "next-turn":
-      patch = advanceTurn(timer, procedure.additionalTurns, 1);
+      patch = advanceTurn(timer, procedure.additionalTurns, 1, now);
       break;
     case "previous-turn":
-      patch = advanceTurn(timer, procedure.additionalTurns, -1);
+      patch = advanceTurn(timer, procedure.additionalTurns, -1, now);
       break;
     case "dismiss-rules":
       patch = setRulesDismissed(timer, true);

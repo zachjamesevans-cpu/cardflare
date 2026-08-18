@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 
 import { FRAME_CLASS, PlayerAvatar } from "@/components/players/player-avatar";
+import { ImageCropper } from "@/components/players/image-cropper";
 import { CosmeticFilm } from "@/components/players/cosmetic-film";
 import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,12 @@ import {
   setAnimatedAvatarAction,
   setAvatarAction,
 } from "@/lib/players/profile-actions";
-import { checkAnimatedAvatarFile, checkAvatarFile } from "@/lib/players/profile-image";
+import {
+  AVATAR_MAX_BYTES,
+  AVATAR_SIZE,
+  checkAnimatedAvatarFile,
+  checkAvatarFile,
+} from "@/lib/players/profile-image";
 import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
 
 /**
@@ -68,6 +74,9 @@ export function AvatarForm({
   ringArt?: CosmeticArtFileRef | null;
   auraArt?: CosmeticArtFileRef | null;
 }) {
+  /** The photo being cropped, before it becomes the picture. */
+  const [picked, setPicked] = useState<File | null>(null);
+
   const [stillState, action] = useActionState<ProfileState, FormData>(
     setAvatarAction,
     PROFILE_IDLE,
@@ -228,11 +237,11 @@ export function AvatarForm({
           <input
             type="file"
             name="avatar"
-            accept={
-              animatedAllowed
-                ? "image/png,image/jpeg,image/webp,image/gif"
-                : "image/png,image/jpeg,image/webp"
-            }
+            /* Any image the browser can decode for a still picture: it
+               is re-encoded to JPEG at 512 before it is sent, so the
+               bucket never sees a format it does not take. A GIF still
+               has to arrive as a GIF — it is the animation being kept. */
+            accept={animatedAllowed ? "image/*,image/gif" : "image/*"}
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -250,24 +259,25 @@ export function AvatarForm({
                 return;
               }
 
-              const check = moving
-                ? checkAnimatedAvatarFile(file)
-                : checkAvatarFile(file);
-
-              if (!check.ok) {
-                setRejected(check.message);
-                event.target.value = "";
-                return;
-              }
-
-              const url = URL.createObjectURL(file);
-              objectUrls.current.push(url);
-
-              setPreview(url);
-              setBroken(false);
-              setRejected(null);
-
               if (moving) {
+                /* An animated picture is the one thing that cannot go
+                   through the cropper: cropping it would mean decoding
+                   and re-encoding every frame, and what makes it worth
+                   having is that it moves. */
+                const check = checkAnimatedAvatarFile(file);
+
+                if (!check.ok) {
+                  setRejected(check.message);
+                  event.target.value = "";
+                  return;
+                }
+
+                const url = URL.createObjectURL(file);
+                objectUrls.current.push(url);
+                setPreview(url);
+                setBroken(false);
+                setRejected(null);
+
                 /* Dispatched directly rather than submitted, so one
                    file input can feed either action. */
                 const carried = new FormData();
@@ -277,11 +287,55 @@ export function AvatarForm({
                 return;
               }
 
-              form.current?.requestSubmit();
+              /*
+               * A still picture goes to the cropper, which is also the
+               * compressor: whatever rectangle they choose is drawn at
+               * 512 and re-encoded, so a 9MB photo off a Mac arrives
+               * well under the bucket's ceiling.
+               */
+              setRejected(null);
+              setPicked(file);
+              event.target.value = "";
             }}
           />
         </label>
       </form>
+
+      {picked && (
+        <ImageCropper
+          key={`${picked.name}:${picked.size}:${picked.lastModified}`}
+          file={picked}
+          aspect={1}
+          round
+          target={{
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
+            maxBytes: AVATAR_MAX_BYTES,
+          }}
+          onCancel={() => setPicked(null)}
+          onDone={(prepared) => {
+            const check = checkAvatarFile(prepared);
+            if (!check.ok) {
+              setRejected(check.message);
+              setPicked(null);
+              return;
+            }
+
+            const url = URL.createObjectURL(prepared);
+            objectUrls.current.push(url);
+            setPreview(url);
+            setBroken(false);
+            setPicked(null);
+
+            /* Dispatched rather than submitted, for the same reason the
+               animated path is: the file input has already been cleared
+               and this is the file that matters. */
+            const carried = new FormData();
+            carried.set("avatar", prepared);
+            action(carried);
+          }}
+        />
+      )}
 
       {/*
        * Only rendered when there is something to remove. A control that

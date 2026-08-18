@@ -14,7 +14,8 @@ import {
   SquareArrowOutUpRight,
 } from "lucide-react";
 
-import { EditPlayerName, EditPlayerTier } from "@/components/admin/edit-player-form";
+import { EditPlayerTier } from "@/components/admin/edit-player-form";
+import { PlayerAccountControls } from "@/components/admin/player-account-controls";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,8 +168,20 @@ export function AdminPlayerRow({
               {embersEarned.toLocaleString()} earned · {embersBalance.toLocaleString()}{" "}
               to spend · {purchasedCount} bought
             </p>
-            <EditPlayerName playerId={playerId} displayName={displayName} />
           </div>
+
+          {/*
+           * The support desk: name and handle together, the sign-in
+           * address, and a password link. All three exist because a
+           * player wrote in and an admin had to open the Supabase
+           * dashboard to help them.
+           */}
+          <PlayerAccountControls
+            playerId={playerId}
+            displayName={displayName}
+            handle={handle}
+            email={email}
+          />
 
           <EditPlayerTier playerId={playerId} tier={tier} />
 
