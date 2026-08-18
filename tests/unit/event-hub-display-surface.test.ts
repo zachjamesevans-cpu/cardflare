@@ -96,6 +96,45 @@ describe("readable from across a shop", () => {
     expect(panel).toContain("tabular-nums");
   });
 
+  it("makes the game the panel's headline, above everything but the clock", () => {
+    /*
+     * The founder, looking at a wall from across a shop: "the game name
+     * should be much bigger font, should take up pretty much the entire
+     * top of the tournament widget."
+     *
+     * The order that has to hold: the clock is the biggest thing, the
+     * game is next, and the tournament's own name is small print under
+     * it. Read as the maximum of each clamp, per layout, so a future
+     * tweak that quietly demotes the game fails here.
+     */
+    const cap = (scale: string, layout: string) => {
+      const block = panel.slice(panel.indexOf(`const ${scale}`));
+      const line = block.slice(block.indexOf(`${layout}:`)).split("\n")[0];
+      const max = /,([0-9.]+)rem\)/.exec(line);
+      if (!max) throw new Error(`No ${layout} size in ${scale}`);
+      return Number(max[1]);
+    };
+
+    for (const layout of ["single", "split", "grid"]) {
+      expect(cap("CLOCK_SIZE", layout)).toBeGreaterThan(cap("GAME_SIZE", layout));
+      expect(cap("GAME_SIZE", layout)).toBeGreaterThan(cap("ROUND_SIZE", layout));
+      expect(cap("ROUND_SIZE", layout)).toBeGreaterThanOrEqual(
+        cap("META_SIZE", layout),
+      );
+    }
+  });
+
+  it("uses the short name, which is the one that reads at forty feet", () => {
+    /* "One Piece" reads across a shop; "One Piece Card Game" wraps. */
+    expect(panel).toContain("{profile.shortName}");
+  });
+
+  it("keeps the game legible on the rules card too", () => {
+    /* The one moment a room most needs to know WHICH tournament is the
+       moment the rules card covers the panel's headline. */
+    expect(panel).toContain("OVERLAY_GAME_SIZE");
+  });
+
   it("says every urgency band in words as well as colour", () => {
     expect(panel).toContain("URGENCY_WORD");
     expect(panel).toContain("Under 10 minutes");

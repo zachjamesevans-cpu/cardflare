@@ -37,10 +37,55 @@ const CLOCK_SIZE: Record<ResolvedLayout, string> = {
   grid: "text-[clamp(2.5rem,6.5vw,6rem)]",
 };
 
-const TITLE_SIZE: Record<ResolvedLayout, string> = {
-  single: "text-[clamp(1.5rem,3.2vw,3rem)]",
-  split: "text-[clamp(1.1rem,2vw,1.9rem)]",
-  grid: "text-[clamp(0.9rem,1.4vw,1.3rem)]",
+/**
+ * The game's own name, and the biggest thing on the panel after the
+ * clock.
+ *
+ * The founder, looking at a wall from across a shop: "the game name
+ * should be much bigger font, should take up pretty much the entire top
+ * of the tournament widget. There's a lot of open space there."
+ *
+ * He is right about the space and right about the priority. Somebody
+ * walking in reads WHICH TOURNAMENT before they read how long is left —
+ * the clock only means something once you know whose it is — and the old
+ * header spent its top line on a caption while the name of the game sat
+ * in eleven-pixel tracking above it.
+ *
+ * `shortName` rather than `displayName`, because this is exactly the job
+ * the short name exists for: "One Piece" reads at forty feet, "One Piece
+ * Card Game" wraps.
+ */
+const GAME_SIZE: Record<ResolvedLayout, string> = {
+  single: "text-[clamp(2.75rem,8.5vw,9.5rem)]",
+  split: "text-[clamp(1.75rem,4.6vw,5rem)]",
+  grid: "text-[clamp(1rem,2.4vw,2.4rem)]",
+};
+
+/**
+ * The game's name on the rules card.
+ *
+ * Smaller than the panel's own headline, because TIME IN ROUND has to
+ * lead once the round is over — but far bigger than a caption, so a
+ * shop running four tournaments can still tell at a glance whose rules
+ * these are.
+ */
+const OVERLAY_GAME_SIZE: Record<ResolvedLayout, string> = {
+  single: "text-[clamp(1.5rem,3vw,3rem)]",
+  split: "text-[clamp(1.1rem,2vw,2rem)]",
+  grid: "text-[clamp(0.8rem,1.2vw,1.15rem)]",
+};
+
+/**
+ * The round number, which is the other thing read from a distance.
+ *
+ * Bigger than the rest of the small print and smaller than the game, so
+ * the top of the panel reads as one line with a number on the end of it
+ * rather than as two competing headings.
+ */
+const ROUND_SIZE: Record<ResolvedLayout, string> = {
+  single: "text-[clamp(1.1rem,2.2vw,2.2rem)]",
+  split: "text-[clamp(0.9rem,1.5vw,1.5rem)]",
+  grid: "text-[clamp(0.75rem,1.05vw,1rem)]",
 };
 
 const META_SIZE: Record<ResolvedLayout, string> = {
@@ -135,47 +180,42 @@ export function TimerPanel({
       <span aria-hidden="true" className="h-1.5 w-full shrink-0 bg-[var(--game)]" />
 
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-2 p-[clamp(0.75rem,1.6vw,2rem)]">
-        <header className="flex items-start justify-between gap-3">
+        <header className="flex items-baseline justify-between gap-4">
           <div className="flex min-w-0 flex-col">
+            {/* The game, at the size somebody reads from the door. */}
+            <h2
+              className={`truncate font-bold tracking-tight text-[var(--game)] uppercase ${GAME_SIZE[layout]} leading-none`}
+            >
+              {profile.shortName}
+            </h2>
+
             {/*
-             * One name, never the same one twice. A tournament called
-             * "One Piece Card Game" under a heading that already says
-             * ONE PIECE is the game's name printed on two lines, so in
-             * that case the game becomes the heading and the second line
-             * goes away entirely.
+             * And what this particular tournament is called, under it —
+             * unless that is the game's name again, in which case the
+             * heading above has already said it and a second line would
+             * be the same words twice.
              */}
-            {repeats ? (
-              <h2
-                className={`truncate font-bold text-[var(--game)] ${TITLE_SIZE[layout]}`}
+            {!repeats && (
+              <p
+                className={`truncate pt-1 font-semibold text-text-secondary ${META_SIZE[layout]}`}
               >
-                {profile.displayName}
-              </h2>
-            ) : (
-              <>
-                <p
-                  className={`truncate font-semibold tracking-[0.18em] text-[var(--game)] uppercase ${META_SIZE[layout]}`}
-                >
-                  {profile.shortName}
-                </p>
-                <h2
-                  className={`truncate font-bold text-text-primary ${TITLE_SIZE[layout]}`}
-                >
-                  {timer.eventName}
-                </h2>
-              </>
+                {timer.eventName}
+              </p>
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          {/* Baseline-aligned with the game name, so the top of the panel
+              reads as one line rather than two stacked corners. */}
+          <div className="flex shrink-0 items-baseline gap-3">
+            {timer.format && (
+              <p className={`text-text-muted ${META_SIZE[layout]}`}>{timer.format}</p>
+            )}
             {timer.round !== null && (
               <p
-                className={`font-semibold text-text-secondary tabular-nums ${META_SIZE[layout]}`}
+                className={`font-semibold text-text-secondary tabular-nums ${ROUND_SIZE[layout]}`}
               >
                 Round {timer.round}
               </p>
-            )}
-            {timer.format && (
-              <p className={`text-text-muted ${META_SIZE[layout]}`}>{timer.format}</p>
             )}
           </div>
         </header>
@@ -279,13 +319,16 @@ function OvertimeOverlay({
       className="absolute inset-0 flex flex-col gap-[clamp(0.3rem,0.7vw,0.85rem)] overflow-hidden rounded-[calc(var(--radius-panel)-2px)] bg-canvas p-[clamp(0.75rem,1.6vw,2rem)] motion-safe:animate-[cf-overtime-in_var(--duration-slow)_var(--ease-out-soft)]"
       role="status"
     >
+      {/* The game keeps its size here too. Covering the panel's headline
+          with a caption would mean the one moment a room most needs to
+          know WHICH tournament is the moment it stops saying. */}
       <div className="flex items-baseline justify-between gap-3">
         <p
-          className={`font-semibold tracking-[0.18em] text-[var(--game)] uppercase ${step}`}
+          className={`truncate font-bold tracking-tight text-[var(--game)] uppercase ${OVERLAY_GAME_SIZE[layout]} leading-none`}
         >
           {profile.shortName}
         </p>
-        <p className={`font-semibold text-text-muted uppercase ${step}`}>
+        <p className={`shrink-0 font-semibold text-text-muted uppercase ${step}`}>
           {timer.bracket === "elimination" ? "Elimination" : "Swiss"}
         </p>
       </div>
