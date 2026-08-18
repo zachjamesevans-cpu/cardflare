@@ -336,6 +336,14 @@ export interface RoomFlare {
   note: string | null;
   /** The named hunt this Flare belongs to. Null = a loose card. */
   deckLabel: string | null;
+  /**
+   * The posting action that created it, shared by every Flare it wrote.
+   *
+   * What lets a pasted list nobody named still read as one hunt rather
+   * than thirty loose rows. Null for a Flare posted on its own, and for
+   * anything posted before batches existed.
+   */
+  postedBatch: string | null;
   /** Which way the card points: wanted, or offered up. */
   intent: "want" | "showcase";
   /** What the poster will take. Trade-only is the board's default. */

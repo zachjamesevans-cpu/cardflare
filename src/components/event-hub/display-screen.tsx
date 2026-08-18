@@ -84,7 +84,11 @@ export function DisplayScreen({
              item defaults to min-height:auto, so without both the panels
              refuse to shrink and push the board off the bottom. */
           className={`grid min-h-0 flex-1 gap-[clamp(0.5rem,1vw,1.25rem)] [&>*]:min-h-0 ${
-            plan.columns === 1 ? "grid-cols-1" : "grid-cols-2"
+            plan.columns === 1
+              ? "grid-cols-1"
+              : plan.columns === 3
+                ? "grid-cols-3"
+                : "grid-cols-2"
           }`}
         >
           {timers.map((timer) => (
@@ -141,11 +145,14 @@ function Header({
         <h1 className="truncate text-[clamp(1rem,2.1vw,2.4rem)] font-bold tracking-tight text-text-primary uppercase">
           {storeName}
         </h1>
-        {nightTitle && (
-          <p className="truncate text-[clamp(0.75rem,1.5vw,1.7rem)] font-semibold tracking-[0.2em] text-accent uppercase">
-            {nightTitle}
-          </p>
-        )}
+        {/* Not when it is the store's own name again. A header reading
+            "MOX VALLEY GAMES · MOX VALLEY GAMES" is the same word twice. */}
+        {nightTitle &&
+          nightTitle.trim().toLowerCase() !== storeName.trim().toLowerCase() && (
+            <p className="truncate text-[clamp(0.75rem,1.5vw,1.7rem)] font-semibold tracking-[0.2em] text-accent uppercase">
+              {nightTitle}
+            </p>
+          )}
       </div>
 
       <div className="flex shrink-0 items-center gap-3">

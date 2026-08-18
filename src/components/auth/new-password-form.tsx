@@ -33,6 +33,14 @@ function SubmitButton({ label }: { label: string }) {
  */
 export function NewPasswordForm({
   signedInAs,
+  /*
+   * "New password" is right when somebody is replacing one they already
+   * have, and wrong on the screen where an account is being created —
+   * nobody setting up has an old one. The founder caught it from a
+   * first-time sign-up, so the words are a prop rather than a constant.
+   */
+  passwordLabel = "New password",
+  confirmLabel = "Confirm new password",
   submitLabel = "Save password",
   savedTitle = "Password saved",
   savedBody,
@@ -40,6 +48,8 @@ export function NewPasswordForm({
   continueHref = "/store",
 }: {
   signedInAs: string;
+  passwordLabel?: string;
+  confirmLabel?: string;
   submitLabel?: string;
   savedTitle?: string;
   savedBody?: string;
@@ -109,7 +119,7 @@ export function NewPasswordForm({
 
       <Field
         name="password"
-        label="New password"
+        label={passwordLabel}
         hint={`At least ${PASSWORD_MIN} characters. A phrase you can remember beats a short scramble.`}
         error={errors.password}
       >
@@ -126,7 +136,7 @@ export function NewPasswordForm({
         />
       </Field>
 
-      <Field name="confirm" label="Confirm new password" error={errors.confirm}>
+      <Field name="confirm" label={confirmLabel} error={errors.confirm}>
         <TextInput
           {...fieldIds("confirm")}
           name="confirm"

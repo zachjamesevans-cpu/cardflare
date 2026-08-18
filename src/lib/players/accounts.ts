@@ -292,6 +292,8 @@ export async function sessionsForPlayers(
 export interface PlayerListing {
   id: string;
   displayName: string;
+  /** What they are found by. The one field that still has to be unique. */
+  handle: string | null;
   email: string | null;
   createdAt: string;
 }
@@ -419,6 +421,7 @@ export async function listPlayersForAdmin(): Promise<{
     players: rows.map((row) => ({
       id: row.id,
       displayName: row.display_name,
+      handle: row.handle ?? null,
       email: emailByUser.get(row.user_id) ?? null,
       createdAt: row.created_at,
     })),

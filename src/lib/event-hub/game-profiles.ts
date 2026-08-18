@@ -452,3 +452,27 @@ export function procedureFor(
 export function allProfiles(): GameProfile[] {
   return GAME_IDS.map((id) => GAME_PROFILES[id]);
 }
+
+/**
+ * Whether a tournament's name is just the game's name again.
+ *
+ * The founder's rule, first written for cosmetics and true here too: a
+ * name never repeats the category it is already sitting under. A panel
+ * headed ONE PIECE with "One Piece Card Game" under it says the same
+ * thing twice and wastes the line that should carry "Friday Night
+ * Locals".
+ *
+ * Compared on letters and digits only, so "One Piece TCG" and
+ * "one-piece" collapse to the same answer as the full name.
+ */
+export function nameRepeatsGame(profile: GameProfile, eventName: string): boolean {
+  const bare = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const name = bare(eventName);
+  if (!name) return true;
+
+  return [profile.displayName, profile.shortName, profile.id].some((candidate) => {
+    const other = bare(candidate);
+    return name === other || name.includes(other) || other.includes(name);
+  });
+}

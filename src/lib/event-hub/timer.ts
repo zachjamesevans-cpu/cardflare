@@ -416,9 +416,25 @@ export function advanceTurn(
   timer: HubTimer,
   additionalTurns: number,
   by = 1,
+  now: number = Date.now(),
 ): TimerPatch | null {
   if (additionalTurns <= 0) return null;
-  if (timer.status !== "overtime" && timer.status !== "time_called") return null;
+
+  /*
+   * Keyed off the PHASE, not the stored status, and that distinction is a
+   * bug this had.
+   *
+   * Regulation reaching zero is derived — the wall says TIME IN ROUND
+   * without anybody writing a row, which is the whole point. But the row
+   * still says "running" until staff confirm it, and this guard was
+   * reading the row. So the turn buttons were dead in exactly the moment
+   * they first appear: the rules card is on the wall, staff tap Next
+   * turn, and nothing happens.
+   */
+  const phase = timerPhase(timer, now);
+  if (phase !== "overtime" && phase !== "overtime_expired" && phase !== "time_called") {
+    return null;
+  }
 
   const next = Math.min(Math.max(0, timer.overtimeTurn + by), additionalTurns);
   if (next === timer.overtimeTurn) return null;

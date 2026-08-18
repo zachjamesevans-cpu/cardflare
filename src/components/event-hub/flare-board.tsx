@@ -17,6 +17,21 @@ import type { FlareShape } from "@/lib/event-hub/layout";
  * than an empty strip.
  */
 
+/**
+ * Columns, from how many cards are actually showing.
+ *
+ * Driven by the count rather than by the shape, because the two can
+ * disagree: three tournaments in a row leave a strip that holds three,
+ * and a strip hardcoded to two columns wrapped the third card onto a
+ * second row and clipped it off the bottom of the television.
+ */
+const COLUMNS: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+};
+
 export function FlareBoard({
   flares,
   shape,
@@ -39,11 +54,7 @@ export function FlareBoard({
       <div
         key={tick}
         className={`grid min-h-0 flex-1 gap-[clamp(0.4rem,0.8vw,1rem)] motion-safe:animate-[cf-flare-in_var(--duration-slow)_var(--ease-out-soft)] ${
-          shape === "strip"
-            ? "grid-cols-2"
-            : shape === "carousel"
-              ? "grid-cols-3"
-              : "grid-cols-4"
+          COLUMNS[Math.min(4, Math.max(1, flares.length))]
         }`}
       >
         {flares.map((flare) => (

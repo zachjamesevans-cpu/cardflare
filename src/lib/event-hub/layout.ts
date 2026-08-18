@@ -79,9 +79,23 @@ export function displayPlan(choice: LayoutChoice, timerCount: number): DisplayPl
     case "split":
       return { layout, columns: 2, flareShape: "carousel", flareSlots: 3 };
     case "grid":
-      /* Two columns rather than four: a 1366x768 projector cannot make
-         four side-by-side countdowns readable across a room. */
-      return { layout, columns: 2, flareShape: "strip", flareSlots: 2 };
+      /*
+       * Three tournaments go in a ROW, not in a 2x2 with a hole in it.
+       * The founder's report: "if there's 3 tournaments going on it
+       * should be stacked horizontally like I I I, instead of having a
+       * dead space in the 4th quadrant." A quarter of a television doing
+       * nothing is the most expensive thing on the wall.
+       *
+       * Four still take two columns: a 1366x768 projector cannot make
+       * four side-by-side countdowns readable across a room, and two
+       * rows of two is the shape that stays legible.
+       */
+      return {
+        layout,
+        columns: timerCount === 3 ? 3 : 2,
+        flareShape: "strip",
+        flareSlots: timerCount === 3 ? 3 : 2,
+      };
   }
 }
 

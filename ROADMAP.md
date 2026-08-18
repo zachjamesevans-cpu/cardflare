@@ -450,6 +450,65 @@ than an evening of tapping), attendee want-lists at shows (search-first ships
 tonight's value; persistence can follow observed use), and vendor
 self-signup (invites gate operators, same as stores).
 
+## ✅ Bug round — sign-up, the board's grouping, and the Event Hub's controls
+
+Eleven reports off a shop floor and a first invited player. The ones that
+were real, and what each turned out to be.
+
+**"It said she was a store."** An invited PLAYER finished her password and
+the next screen said "go to your store". The page asked "is this a player?"
+and gave everybody else the store wording, so a player whose account row had
+not been created yet fell straight through to it. Decided by store
+membership now: a person with no store is not a store. `/welcome` also
+retries the invitation claim, because creating the player row can fail on the
+way in and the invite is left open precisely so the next page load can try
+again — without the retry the account exists and the person is stuck being
+nobody.
+
+**Sign-up is one screen.** Name, handle, Password and Confirm password, one
+button. "New password" was wrong on the screen where an account is created —
+nobody setting up has an old one — and the handle was a second page nobody
+asked for.
+
+**The board's grouping never used the batch.** `posted_batch` was added so a
+deck put up in one action could be told apart from thirty decisions, and the
+notifications and the Feed both used it — but `partitionByDeck`, which is
+what the ROOM board groups by, still read `deck_label` alone. Anybody who
+pasted a list without naming it got thirty loose rows. Both platforms group
+by the batch now, a batch of one stays a card rather than becoming a folder
+of one thing, and a test asserts nothing is ever lost whatever the mix.
+
+**The Event Hub's turn buttons were dead when they mattered.** Regulation
+reaching zero is a derived phase — the wall says TIME IN ROUND without a row
+being written — but `advanceTurn` guarded on the stored status, which still
+says "running" until staff confirm. So the rules card appeared, staff tapped
+Next turn, and nothing happened. It reads the phase now, there is a Previous
+turn beside it, and hiding the rules says on the control panel what the wall
+is doing rather than only moving a label.
+
+**Smaller ones, all real:** the transport buttons read "+ +1 min" and
+"− −1 min" because the icon was already the sign; three tournaments left a
+dead quadrant instead of standing in a row; the add-timer form pre-filled the
+tournament name with the game's own name, so every panel read ONE PIECE above
+"One Piece Card Game"; and a night title identical to the store's name
+printed the shop twice.
+
+**Photos from a Mac.** A Retina screenshot is several megabytes and the
+avatars bucket takes two, so header uploads were refused. Pictures are now
+cropped and re-encoded in the browser before anything is sent — one pass that
+answers both "build in a compressor" and "ability to crop profile pics and
+header banners". Drag to move, a slider to zoom, and what leaves the browser
+is already the banner.
+
+**The support desk moved into the console.** A player's name and handle,
+their sign-in address, and a one-tap password link, all from the players tab
+— so helping somebody who wrote in no longer means opening the Supabase
+dashboard.
+
+Not reproduced: a single Flare that did not appear. The grouping fault above
+is the likeliest thing behind it and is fixed; if it happens again the board
+now has one honest place to look.
+
 ## ✅ The Event Hub — the store's television
 
 A shop runs two tournaments at neighbouring tables and puts a YouTube

@@ -1228,6 +1228,9 @@ function pledgeLineFor(flare: RoomFlare): string | null {
   return `Needs ${remaining} more`;
 }
 
+/** What an unlabelled batch is called. Mirrors the website's own. */
+const UNNAMED_BATCH = "Posted together";
+
 /** The website's partition, in miniature: folders merge case-insensitively
     and keep the spelling of the first card seen; order follows the board. */
 /**
@@ -1255,25 +1258,43 @@ function partitionByDeck(flares: RoomFlare[]): {
 
   for (const flare of flares) {
     const label = flare.deckLabel?.trim();
+    const batch = flare.postedBatch ?? null;
 
-    if (!label) {
+    /* Neither a name nor a batch: a card posted on its own. */
+    if (!label && !batch) {
       loose.push(flare);
       continue;
     }
 
-    const key = label.toLowerCase();
+    /*
+     * A batch with no label is still a batch. Grouping only by the
+     * label meant a pasted list nobody named came out as thirty loose
+     * rows, which is the pile the grouping exists to prevent.
+     */
+    const key = label ? `label:${label.toLowerCase()}` : `batch:${batch}`;
     const existing = folders.get(key);
 
     if (existing) {
       existing.flares.push(flare);
-    } else {
-      folders.set(key, { label, flares: [flare] });
+      continue;
     }
+
+    folders.set(key, { label: label ?? UNNAMED_BATCH, flares: [flare] });
   }
 
-  return { folders: [...folders.values()], loose };
-}
+  /* A batch of one is a card, not a folder containing one thing. */
+  const kept: { label: string; flares: RoomFlare[] }[] = [];
 
+  for (const folder of folders.values()) {
+    if (folder.label === UNNAMED_BATCH && folder.flares.length === 1) {
+      loose.push(folder.flares[0]);
+      continue;
+    }
+    kept.push(folder);
+  }
+
+  return { folders: kept, loose };
+}
 /**
  * One Flare as the carousel shows it: a contact sheet, not a row.
  *

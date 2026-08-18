@@ -77,12 +77,24 @@ describe("allocating the screen", () => {
     });
   });
 
-  it.each([3, 4])("gives %i tournaments a strip and two columns", (count) => {
-    const plan = displayPlan("auto", count);
+  it("puts three tournaments in a row rather than leaving a hole", () => {
+    /* The founder's report: "if there's 3 tournaments going on it should
+       be stacked horizontally like I I I, instead of having a dead space
+       in the 4th quadrant." A quarter of a television doing nothing is
+       the most expensive thing on the wall. */
+    const plan = displayPlan("auto", 3);
 
     expect(plan.layout).toBe("grid");
-    /* Two columns, not four: a 1366x768 projector cannot make four
-       side-by-side countdowns readable from across a shop. */
+    expect(plan.columns).toBe(3);
+    expect(plan.flareShape).toBe("strip");
+  });
+
+  it("gives four tournaments two columns, not four", () => {
+    /* A 1366x768 projector cannot make four side-by-side countdowns
+       readable from across a shop; two rows of two stays legible. */
+    const plan = displayPlan("auto", 4);
+
+    expect(plan.layout).toBe("grid");
     expect(plan.columns).toBe(2);
     expect(plan.flareShape).toBe("strip");
   });

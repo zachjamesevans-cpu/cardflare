@@ -7,7 +7,12 @@ import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
-import { checkHandleAction, chooseUsernameAction } from "@/lib/players/setup-actions";
+import {
+  checkHandleAction,
+  chooseUsernameAction,
+  finishSetupAction,
+} from "@/lib/players/setup-actions";
+import { PASSWORD_MIN } from "@/lib/auth/schema";
 import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
 import { SETUP_IDLE, type SetupState } from "@/lib/players/profile-schema";
 
@@ -34,9 +39,31 @@ type Availability = "idle" | "checking" | "free" | "taken" | "bad";
  * unique the day this shipped, so "somebody already goes by that" is a
  * sentence a person called Zach never has to read again.
  */
-export function ChooseUsernameForm({ suggestion }: { suggestion: string }) {
+export function ChooseUsernameForm({
+  suggestion,
+  /**
+   * Ask for a password here too, and finish the whole account in one
+   * submit.
+   *
+   * The founder's report: "the username should also be something you
+   * can type in on the same screen. It should not go to 'choose your
+   * username' after." Both halves of signing up are one act, so an
+   * invited account gets one form. Somebody who already has a password
+   * and is only picking a name gets this same form without the two
+   * extra fields.
+   */
+  withPassword = false,
+  /** The address being set up, for password managers and for the copy. */
+  signedInAs,
+  submitLabel = "Continue",
+}: {
+  suggestion: string;
+  withPassword?: boolean;
+  signedInAs?: string;
+  submitLabel?: string;
+}) {
   const [state, action] = useActionState<SetupState, FormData>(
-    chooseUsernameAction,
+    withPassword ? finishSetupAction : chooseUsernameAction,
     SETUP_IDLE,
   );
 
@@ -162,7 +189,56 @@ export function ChooseUsernameForm({ suggestion }: { suggestion: string }) {
       {/* Live, and quiet about it: no verdict until there is one. */}
       {!error && <Verdict availability={availability} handle={trimmed} />}
 
-      <SubmitButton blocked={availability === "taken"} />
+      {withPassword && (
+        <>
+          {/* Hidden, and there for password managers rather than for
+              people: a save prompt files the entry under this. */}
+          {signedInAs && (
+            <input
+              type="text"
+              name="username"
+              value={signedInAs}
+              autoComplete="username"
+              readOnly
+              hidden
+            />
+          )}
+
+          {/*
+           * "Password", not "New password". Nobody setting up an account
+           * has an old one, and calling it new is the sort of small
+           * wrongness that makes a person wonder what they missed.
+           */}
+          <Field
+            name="password"
+            label="Password"
+            hint={`At least ${PASSWORD_MIN} characters. A phrase you can remember beats a short scramble.`}
+          >
+            <TextInput
+              {...fieldIds("password")}
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={PASSWORD_MIN}
+              required
+              aria-describedby={describedBy("password", false, true)}
+            />
+          </Field>
+
+          <Field name="confirm" label="Confirm password">
+            <TextInput
+              {...fieldIds("confirm")}
+              name="confirm"
+              type="password"
+              autoComplete="new-password"
+              required
+              aria-describedby={describedBy("confirm", false, false)}
+            />
+          </Field>
+        </>
+      )}
+
+      <SubmitButton blocked={availability === "taken"} label={submitLabel} />
     </form>
   );
 }
@@ -204,13 +280,13 @@ function Verdict({
   );
 }
 
-function SubmitButton({ blocked }: { blocked: boolean }) {
+function SubmitButton({ blocked, label }: { blocked: boolean; label: string }) {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" size="lg" disabled={pending || blocked} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-      {pending ? "Saving…" : "Continue"}
+      {pending ? "Saving…" : label}
     </Button>
   );
 }
