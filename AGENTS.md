@@ -96,6 +96,18 @@ pic... please don't ever do that again with these." One rule, used by
 - The app carries Rive files through its API but cannot play them yet:
   that needs the native runtime, which lands in its own round.
 
+**A catalogue cosmetic is CSS on the web and Skia in the app.** There is
+no conic gradient and no keyframe in React Native, so the app cannot
+reuse `cosmetic-art.css` — it draws the same thing with
+`@shopify/react-native-skia`, the way `foil.tsx` already draws card
+holo. Rings and auras are done: their palettes and periods are extracted
+from the stylesheet into `mobile/src/cosmetic-art-data.ts`, and
+`tests/unit/app-cosmetic-art.test.ts` fails if the two drift, so adding
+a ring to the web without giving the app its art is caught rather than
+shipping as a flat band nobody notices. Every other family still shows
+its flat-colour stand-in on a phone, which is honest but is not what
+somebody paid Embers for.
+
 ## Conventions
 
 - Server Components by default. `"use client"` only where interactivity forces

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
+import { hasAuraArt, hasRingArt } from "./cosmetic-art-data";
+import { WornCosmetics } from "./cosmetic-worn";
+
 import { CosmeticFilm, type ArtFile } from "./cosmetic-film";
 import { getFoilKit, travellingFrame } from "./foil";
 import { avatarHues, colors } from "./theme";
@@ -192,7 +195,9 @@ export function PlayerAvatar({
   const band = ringArt
     ? null
     : ring
-      ? (RING_COLOR[ring] ?? null)
+      ? hasRingArt(ring)
+        ? null
+        : (RING_COLOR[ring] ?? null)
       : frame
         ? (FRAME_COLOR[frame] ?? null)
         : null;
@@ -205,11 +210,14 @@ export function PlayerAvatar({
   /*
    * The worn effect, as a halo in its own colour.
    *
-   * A dropped-in file outranks it, the same order the ring slot follows.
-   * Drawn as a soft glow rather than particles: an effect is its movement,
-   * and standing still is the honest version of it until Skia draws these.
+   * The stand-in, and only for an aura Skia cannot draw yet. A dropped-in
+   * file outranks it and so does real art; what is left is the two
+   * hundred catalogue cosmetics still waiting their turn, where a soft
+   * glow remains the honest version of a thing whose whole point is that
+   * it moves.
    */
-  const halo = !auraArt && aura ? (AURA_COLOR[aura] ?? null) : null;
+  const halo =
+    !auraArt && aura && !hasAuraArt(aura) ? (AURA_COLOR[aura] ?? null) : null;
 
   const haloStyle = halo
     ? {
@@ -295,6 +303,44 @@ export function PlayerAvatar({
             <CosmeticFilm art={auraArt} size={film} />
           </View>
         )}
+      </View>
+    );
+  }
+
+  /*
+   * The catalogue's own rings and auras, drawn rather than approximated.
+   *
+   * Reported from a phone: "animated cosmetics don't work in app still -
+   * any of them. The holo patterns work for cards but all profile
+   * cosmetics do not." Right, and never a bug — the app had no way to
+   * draw a conic gradient or a keyframe, so a ring somebody spent Embers
+   * on came out as the flat band below.
+   *
+   * `WornCosmetics` returns null for a slug it has no art for and on any
+   * device where Skia will not load, so everything not yet ported keeps
+   * exactly the stand-in it had. The face is drawn after the aura and
+   * over the ring, which is how the promise about faces is kept here:
+   * the website masks the circle out, and z-order does the same job.
+   */
+  const worn = hasRingArt(ring) || hasAuraArt(aura);
+
+  if (worn) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: dimmed ? 0.5 : 1,
+        }}
+      >
+        <WornCosmetics
+          ring={hasRingArt(ring) ? ring : null}
+          aura={hasAuraArt(aura) ? aura : null}
+          size={size}
+        />
+        {face}
       </View>
     );
   }
