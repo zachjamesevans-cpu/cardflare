@@ -26,6 +26,9 @@ explicit approval, not an implementation detail.
 - A nationwide marketplace
 - A shipping platform
 - A card-pricing application
+- Tournament-management software. The Event Hub runs timers and shows the
+  room what is on; pairings, standings, registration, decklists, brackets and
+  result reporting belong to whatever the store already uses.
 
 ## Core product language
 
@@ -145,6 +148,49 @@ Three things CardFlare has that a general social app does not:
 Not daily actives. **Trades and wants that trace back to a Feed item.** A Feed
 that does not produce trades is a cost with good engagement numbers, which is
 the most expensive kind of mistake available here.
+
+## The Event Hub
+
+The screen a store puts on its television at the start of locals and leaves
+running. What it replaces is a YouTube countdown and a whiteboard, so the
+measure is not "does it keep time" but "does a shop employee reach for it
+instead", and the target is under two minutes from opening the console to a
+timer on the wall.
+
+### What it is
+
+One always-on display per television: tournament timers for up to four
+simultaneous events, each with its own game, round, structure and clock; the
+end-of-round procedure for whichever game reached zero, over that tournament's
+panel and no other; the room's current Flares rotating beside them; the
+store's counter code as a QR; the store's name and its night; and one line of
+announcement when there is something to say.
+
+A player looking at it from across the shop should get four things without
+asking anybody: what is running, how long is left, what happens when time is
+called, and what the people around them are looking for.
+
+### What it is not
+
+- **Not tournament management.** No pairings, no standings, no registration,
+  no decklists, no brackets, no result reporting. It runs alongside whatever
+  software the store already uses, and it does not want that job.
+- **Not a rules authority.** The end-of-round summaries are a quick reference
+  for a room; current official tournament rules and the event's own staff and
+  judges control. Every overlay says so, every game links to its publisher's
+  documentation, and every profile records the date a person last checked it.
+- **Not a second front door.** The QR is the store's existing counter code.
+  There is no new way into a room and no second code to laminate.
+- **Not a window into anything private.** The display link is handed to a
+  browser on a shelf and read by anyone who looks at the screen, so it reaches
+  one assembled, read-only payload: timers, public Flares, and the store's own
+  branding. Never a Have List, never a stock list, never a price, never a
+  person's account.
+
+### The measure
+
+Not hours displayed. **Stores that put it on a second week**, and Flares
+posted during an event by people who scanned the code off the television.
 
 ## The core loop
 

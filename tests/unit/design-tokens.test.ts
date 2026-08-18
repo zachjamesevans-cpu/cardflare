@@ -125,3 +125,39 @@ describe("design tokens", () => {
     expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 });
+
+/**
+ * The Event Hub's five game accents.
+ *
+ * A timer panel is read from across a shop by somebody who is not
+ * looking for it, so these have to clear AA against every surface they
+ * can land on — not just the darkest one. Read from globals.css rather
+ * than duplicated, so tuning a colour and breaking it fails here.
+ */
+describe("game accents", () => {
+  const GAMES = [
+    "game-one-piece",
+    "game-pokemon",
+    "game-lorcana",
+    "game-riftbound",
+    "game-flesh-and-blood",
+  ];
+
+  it.each(GAMES)("%s clears AA on canvas, surface and elevated", (name) => {
+    const accent = token(name);
+
+    for (const surface of ["canvas", "surface", "elevated"]) {
+      expect(contrastRatio(accent, token(surface))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps every game distinct from the CardFlare accent", () => {
+    /* A game colour must never be mistaken for a CardFlare control —
+       the same rule the avatar hues and the cosmetics follow. */
+    const brand = token("accent");
+
+    for (const name of GAMES) {
+      expect(token(name)).not.toBe(brand);
+    }
+  });
+});

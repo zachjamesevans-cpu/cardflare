@@ -48,6 +48,25 @@
   --color-avatar-5: #ffadad;
   --color-avatar-6: #7fe3d4;
 
+  /*
+   * Game accents — the five TCGs the Event Hub runs timers for.
+   *
+   * Used as a thin rule above a panel and on the game's own name, never
+   * as a panel background: a shop's television has to stay recognisably
+   * CardFlare rather than becoming five unrelated visual themes on one
+   * screen. Each clears AA against canvas, surface AND elevated, because
+   * a timer panel is read from across a room by someone who is not
+   * looking for it. tests/unit/design-tokens.test.ts enforces that.
+   *
+   * Deliberately not sampled from any publisher's brand: these are
+   * CardFlare's own colours, chosen to sit together.
+   */
+  --color-game-one-piece: #ff7a6b;
+  --color-game-pokemon: #f5d547;
+  --color-game-lorcana: #c9a3ff;
+  --color-game-riftbound: #5fd8ee;
+  --color-game-flesh-and-blood: #ff9d5c;
+
   /* Radius */
   --radius-control: 0.625rem;
   --radius-card: 1rem;
@@ -288,6 +307,37 @@
  * No reduced-motion guard of its own: the global rule near the top of
  * this file already collapses every animation to nothing.
  */
+/*
+ * The Event Hub's two motions, and both are restrained on purpose.
+ *
+ * A shop's television runs for eight hours in the corner of people's
+ * eyes. Anything that moves continuously becomes something staff turn
+ * off, so the overtime card arrives once and the Flare board crossfades
+ * — nothing loops, nothing strobes, and the whole screen never flashes.
+ * Both are inside `motion-safe:` at the call site.
+ */
+@keyframes cf-overtime-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.5%) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cf-flare-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes cf-slide-open {
   from {
     opacity: 0;
