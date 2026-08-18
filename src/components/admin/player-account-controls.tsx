@@ -17,9 +17,15 @@ import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
 /**
  * The support desk for one player.
  *
- * Folded away by default. An admin opening the roster is usually
- * counting people, not editing one, and three forms per row would bury
- * the list this page exists to be.
+ * NOT folded away, and that is a correction. This shipped behind a link
+ * reading "Fix their account", inside a row that was itself collapsed —
+ * so changing somebody's username took three clicks and the word
+ * "username" appeared nowhere along the way. The founder then asked for
+ * a feature that already existed, which is the clearest report possible
+ * that it could not be found.
+ *
+ * The row is already folded. Folding its contents again bought nothing
+ * and cost the only thing this panel is for.
  */
 export function PlayerAccountControls({
   playerId,
@@ -32,33 +38,11 @@ export function PlayerAccountControls({
   handle: string | null;
   email: string | null;
 }) {
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-fit text-xs font-semibold text-accent hover:underline"
-      >
-        Fix their account
-      </button>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-5 rounded-[var(--radius-control)] border border-border bg-canvas p-4">
       <IdentityForm playerId={playerId} displayName={displayName} handle={handle} />
       <EmailForm playerId={playerId} email={email} />
       <ResetForm playerId={playerId} displayName={displayName} email={email} />
-
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="w-fit text-xs text-text-muted hover:text-text-secondary"
-      >
-        Close
-      </button>
     </div>
   );
 }
@@ -99,31 +83,45 @@ function IdentityForm({
 
       <p className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
         <UserPen className="size-3.5" aria-hidden="true" />
-        Name and handle
+        Name and username
       </p>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <TextInput
-          name="displayName"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={40}
-          aria-label="Display name"
-        />
-        <TextInput
-          name="handle"
-          value={tag}
-          /* Typed straight into shape, the same as the player's own
-             field, so the console never submits something the index is
-             about to refuse. */
-          onChange={(event) => setTag(handleSeedFrom(event.target.value))}
-          maxLength={HANDLE_MAX}
-          autoCapitalize="none"
-          spellCheck={false}
-          className="font-mono"
-          aria-label="Handle"
-        />
+      {/* "Username" out loud, because that is the word somebody looking
+          for this uses. The two fields keep the product's own
+          distinction underneath — a name to be seen as, a handle to be
+          found by — but the heading has to be findable first. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs text-text-muted">
+          Display name
+          <TextInput
+            name="displayName"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={40}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs text-text-muted">
+          Username (@handle)
+          <TextInput
+            name="handle"
+            value={tag}
+            /* Typed straight into shape, the same as the player's own
+               field, so the console never submits something the index is
+               about to refuse. */
+            onChange={(event) => setTag(handleSeedFrom(event.target.value))}
+            maxLength={HANDLE_MAX}
+            autoCapitalize="none"
+            spellCheck={false}
+            className="font-mono"
+          />
+        </label>
       </div>
+
+      <p className="text-xs text-text-muted">
+        The name is what a room sees. The username is what people search for, and it has
+        to be unique.
+      </p>
 
       <SubmitButton label="Save" pendingLabel="Saving…" variant="secondary" size="sm" />
       <Outcome state={state} />
