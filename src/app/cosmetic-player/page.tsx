@@ -3,38 +3,38 @@ import type { Metadata } from "next";
 import { RiveArt } from "@/components/players/rive-art";
 
 /**
- * One Rive cosmetic, playing on its own, for the app to put in a frame.
+ * One cosmetic's uploaded art, on a page of its own, for the app.
  *
- * WHY THIS PAGE EXISTS. A Rive cosmetic animates on the website and drew
- * nothing at all on a phone. The app renders uploaded art in a WebView
- * with JavaScript OFF - which is the right containment for an SVG or a
- * page of HTML somebody uploaded, and is fatal for Rive, because a .riv
- * file is played BY a runtime rather than being a picture. So
- * `cosmetic-film.tsx` returned null for the whole kind, and a founder
- * wearing one saw a bare avatar and reasonably concluded the app was
- * broken.
+ * WHY THE APP NEEDS A PAGE AT ALL. The website draws uploaded art
+ * inline: an `<img>` for a drawing, a sandboxed `<iframe>` for markup, a
+ * canvas for Rive. React Native has none of those, only a WebView, and
+ * the app's first answer was to hand that WebView an HTML STRING it
+ * built itself. That works in Chromium and is a trap on iOS: a string
+ * loaded with no base URL gets an opaque origin, and an opaque-origin
+ * document is not a reliable place to fetch an https subresource from.
+ * Same file, same URL, renders on the website and blank on a phone.
  *
- * The distinction this page turns on: the .riv file is DATA, and the
- * only code that runs is OURS. The app loads this page - our origin,
- * our bundle, our WASM copied out of the installed package - and hands
- * it a path to play. Nothing an uploader supplied ever becomes script.
- * That is a different bargain from switching JavaScript on for an
- * uploaded document, which stays off and always will.
+ * So the app stops inventing documents. It points at this URL, which is
+ * a real page on our own origin, and what it gets back is the same
+ * three renderers the website uses. One place to be right.
  *
- * Same runtime as the website's, deliberately: `RiveArt` is the
- * component a profile already uses, so a cosmetic cannot look like two
- * different things on the two platforms.
+ * Rive additionally needs SCRIPT - a .riv is played by a runtime rather
+ * than decoded like a picture - and this page is where that is
+ * acceptable, because the page, the bundle and the WASM are all ours
+ * and the uploaded file is data handed to them. Drawings and markup
+ * still run with scripting off in the app's frame, and the sandbox on
+ * the iframe below is not a formality.
  */
 
 export const metadata: Metadata = {
   title: "Cosmetic",
   /* Nothing here is for a person browsing, and a search result pointing
-     at a bare animation helps nobody. */
+     at a bare ornament helps nobody. */
   robots: { index: false, follow: false },
 };
 
 /**
- * Which paths may be played.
+ * Which paths may be drawn.
  *
  * A path on OUR origin, and only from the two places cosmetic art can
  * legitimately live: the storage proxy, and art seeded into the repo by
@@ -52,6 +52,17 @@ export function playablePath(src: string | undefined): string | null {
   return src;
 }
 
+/** How to draw it: what was asked for, or what the file looks like. */
+export function artKind(
+  kind: string | undefined,
+  src: string,
+): "rive" | "svg" | "html" {
+  if (kind === "rive" || kind === "svg" || kind === "html") return kind;
+  if (src.endsWith(".riv")) return "rive";
+  if (src.endsWith(".html")) return "html";
+  return "svg";
+}
+
 const one = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
 
@@ -62,9 +73,10 @@ export default async function CosmeticPlayerPage({
 }) {
   const params = await searchParams;
   const src = playablePath(one(params.src));
+  const kind = src ? artKind(one(params.kind), src) : null;
   const artboard = one(params.artboard) ?? null;
   const stateMachine = one(params.machine) ?? null;
-  const fit = one(params.fit) === "cover" ? "cover" : "contain";
+  const cover = one(params.fit) === "cover";
 
   return (
     <>
@@ -77,27 +89,44 @@ export default async function CosmeticPlayerPage({
         html, body { background: transparent !important; margin: 0; padding: 0;
                      height: 100%; overflow: hidden; }
         body { display: block !important; }
+        .cf-art { position: fixed; inset: 0; width: 100%; height: 100%;
+                  border: 0; background: transparent; display: block;
+                  pointer-events: none; object-fit: ${cover ? "cover" : "contain"}; }
       `}</style>
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "transparent",
-          pointerEvents: "none",
-        }}
-      >
-        {/* A missing or disallowed src draws nothing, the same failure
-            an unloadable file already has: the thing underneath is
-            still there and still readable. */}
-        {src ? (
+
+      {/* A missing or disallowed src draws nothing, the same failure an
+          unloadable file already has: whatever this was decorating is
+          still there and still readable. */}
+      {src && kind === "svg" ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={src} alt="" aria-hidden="true" className="cf-art" />
+      ) : null}
+
+      {src && kind === "html" ? (
+        <iframe
+          src={src}
+          title=""
+          aria-hidden="true"
+          tabIndex={-1}
+          /* No allow-scripts, on purpose: this is the containment, not
+             a formality. The app's frame has scripting off for this
+             kind too, so uploaded markup is boxed twice. */
+          sandbox=""
+          scrolling="no"
+          className="cf-art"
+        />
+      ) : null}
+
+      {src && kind === "rive" ? (
+        <div className="cf-art">
           <RiveArt
             url={src}
             artboard={artboard}
             stateMachine={stateMachine}
-            fit={fit}
+            fit={cover ? "cover" : "contain"}
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </>
   );
 }

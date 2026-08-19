@@ -62,7 +62,7 @@ describe("the app's side of it", () => {
      * must depend on whether we are showing OUR page - never a constant
      * true, and never keyed on anything an uploader controls.
      */
-    expect(film).toContain("javaScriptEnabled={player !== null}");
+    expect(film).toContain('javaScriptEnabled={art.kind === "rive"}');
     expect(film).not.toMatch(/javaScriptEnabled=\{true\}/);
   });
 
@@ -72,7 +72,21 @@ describe("the app's side of it", () => {
   });
 
   it("draws nothing rather than pointing the player somewhere else", () => {
-    expect(film).toContain('if (art.kind === "rive" && !player) return null;');
+    expect(film).toContain("if (failed || !player) return null;");
+  });
+
+  it("never builds a document of its own again", () => {
+    /*
+     * The bug this whole page exists for. Handing the WebView an HTML
+     * STRING gives it an opaque origin on iOS, and an opaque-origin
+     * document is not a reliable place to fetch an https subresource
+     * from - so an uploaded SVG rendered on the website, rendered in
+     * Chromium when tested, and drew nothing on the founder's phone.
+     * The app points at a real URL now and never composes markup.
+     */
+    expect(film).not.toContain("<!doctype html");
+    expect(film).not.toMatch(/source=\{\{\s*html/);
+    expect(film).toContain("source={{ uri: player }}");
   });
 });
 
