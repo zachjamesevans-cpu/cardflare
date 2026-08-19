@@ -1,11 +1,4 @@
-import {
-  Image,
-  Modal,
-  Pressable,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Image, Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
 
 import { CosmeticCard } from "./cosmetic-card";
 import { LinearGradient } from "expo-linear-gradient";
@@ -14,6 +7,8 @@ import { colors, spacing } from "./theme";
 
 /** What the zoom shows: a showcase entry and the dressing it wears. */
 export type ZoomedCard = {
+  /** The catalogue border worn on the owner's cards, when one is. */
+  border?: string | null;
   name: string;
   imageUrl: string | null;
   frame: string | null;
@@ -65,6 +60,7 @@ export function ShowcaseZoom({
               frame={card.frame}
               holo={card.holo}
               effect={card.effect}
+              border={card.border ?? null}
             />
             <Text style={{ color: colors.textSecondary, fontSize: 15 }}>
               {card.name}

@@ -42,7 +42,17 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { CoverBanner } from "../showcase-zoom";
-import { AsyncButton, Body, Button, Card, HandleInput, Input, Muted, Tap, Title } from "../ui";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  HandleInput,
+  Input,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 /** How far the cover reaches: past the name and the Embers badge. */
@@ -314,8 +324,8 @@ export function ProfileScreen() {
         <Card>
           <Title>Signed in, but your profile could not load</Title>
           <Body>
-            The connection to cardflare.gg did not go through. Check your signal and
-            try again.
+            The connection to cardflare.gg did not go through. Check your signal and try
+            again.
           </Body>
           <Muted>What the server said: {loadFailed}</Muted>
           <AsyncButton
@@ -334,8 +344,8 @@ export function ProfileScreen() {
         <Card>
           <Title>Pick your name</Title>
           <Body>
-            This is the name people see when you walk into a room. Spaces and
-            capitals are fine, and it does not have to be unique.
+            This is the name people see when you walk into a room. Spaces and capitals
+            are fine, and it does not have to be unique.
           </Body>
           <NameField
             current={profile.displayName}
@@ -444,11 +454,7 @@ export function ProfileScreen() {
               justifyContent: "center",
             }}
           >
-            <Ionicons
-              name="settings-outline"
-              size={20}
-              color={colors.textSecondary}
-            />
+            <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
           </Tap>
         </View>
 
@@ -503,9 +509,7 @@ export function ProfileScreen() {
         <View style={{ flexDirection: "row", gap: spacing(2) }}>
           <View style={{ flex: 1 }}>
             <Button
-              label={
-                busy === "avatar" ? (message ?? "Uploading…") : "Change picture"
-              }
+              label={busy === "avatar" ? (message ?? "Uploading…") : "Change picture"}
               variant="secondary"
               disabled={busy === "avatar" || busy === "cover"}
               onPress={() => void changePicture("avatar")}
@@ -583,8 +587,8 @@ export function ProfileScreen() {
             </Tap>
           </View>
           <Muted>
-            Up to nine cards you are proud of. Tap a card to dress it. Not a trade
-            list, so nobody can pledge on it.
+            Up to nine cards you are proud of. Tap a card to dress it. Not a trade list,
+            so nobody can pledge on it.
           </Muted>
 
           {profile.showcase.length === 0 ? (
@@ -607,6 +611,7 @@ export function ProfileScreen() {
                       frame={entry.frame ?? profile.equipped.frame}
                       holo={entry.holo ?? profile.equipped.holo}
                       effect={profile.equipped.effect}
+                      border={profile.equips?.border ?? null}
                     />
                   </Tap>
                   <Text
@@ -648,6 +653,7 @@ export function ProfileScreen() {
               defaultFrame={profile.equipped.frame}
               defaultHolo={profile.equipped.holo}
               effect={profile.equipped.effect}
+              border={profile.equips?.border ?? null}
               onPick={(cardId, printingId, picks) =>
                 void act(
                   "showcase-add",
@@ -679,15 +685,14 @@ export function ProfileScreen() {
             accent
           />
         </View>
-
       </Card>
 
       <Card>
         <Title>People</Title>
         <Body>
-          Players you follow. When they follow you back, you are Trade partners.
-          Follow people from their profile popup in a room, or search for them by
-          name right here.
+          Players you follow. When they follow you back, you are Trade partners. Follow
+          people from their profile popup in a room, or search for them by name right
+          here.
         </Body>
 
         {/* Finding somebody by name - the founder's ask: search a
@@ -755,8 +760,7 @@ export function ProfileScreen() {
 
         {following.length === 0 ? (
           <Muted>
-            Nobody yet. The next time somebody impresses you at a table, tap
-            their name.
+            Nobody yet. The next time somebody impresses you at a table, tap their name.
           </Muted>
         ) : (
           <View>
@@ -850,6 +854,7 @@ export function ProfileScreen() {
 
       <DressModal
         entry={dressing}
+        border={profile.equips?.border ?? null}
         defaults={profile.equipped}
         frames={ownedFrames}
         holos={ownedHolos}
@@ -883,7 +888,10 @@ function initials(displayName: string): string {
   const words = displayName.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "?";
   const picked = words.length === 1 ? [words[0]] : [words[0], words[words.length - 1]];
-  return picked.map((word) => [...word][0] ?? "").join("").toUpperCase();
+  return picked
+    .map((word) => [...word][0] ?? "")
+    .join("")
+    .toUpperCase();
 }
 
 function Stat({
@@ -1022,6 +1030,7 @@ function AddToShowcase({
   defaultFrame,
   defaultHolo,
   effect,
+  border,
   onPick,
 }: {
   busy: boolean;
@@ -1030,6 +1039,8 @@ function AddToShowcase({
   defaultFrame: string | null;
   defaultHolo: string | null;
   effect: string | null;
+  /** The worn catalogue border, so the preview is the card they get. */
+  border: string | null;
   onPick: (
     cardId: string,
     printingId: string | null,
@@ -1087,6 +1098,7 @@ function AddToShowcase({
             frame={picked.frame}
             holo={picked.holo}
             effect={effect}
+            border={border}
           />
         </View>
 
@@ -1169,7 +1181,6 @@ function AddToShowcase({
   );
 }
 
-
 /**
  * One card's dressing room - the website's editor, in a Modal.
  *
@@ -1184,6 +1195,7 @@ function DressModal({
   frames,
   holos,
   effect,
+  border,
   onClose,
   onDress,
   onDressAll,
@@ -1193,6 +1205,8 @@ function DressModal({
   frames: DressingOption[];
   holos: DressingOption[];
   effect: string | null;
+  /** The worn catalogue border, so the preview is the card they get. */
+  border: string | null;
   onClose: () => void;
   onDress: (entryId: string, frame: string | null, holo: string | null) => void;
   /** Resolves true when the write landed, so the button can say so. */
@@ -1259,6 +1273,7 @@ function DressModal({
               frame={picked.frame}
               holo={picked.holo}
               effect={effect}
+              border={border}
             />
           </View>
 
@@ -1296,8 +1311,7 @@ function DressModal({
             }}
           />
           <Muted>
-            Every card on your shelf wears this border and holo, and new cards will
-            too.
+            Every card on your shelf wears this border and holo, and new cards will too.
           </Muted>
           <Button label="Done" onPress={onClose} />
         </Pressable>

@@ -449,7 +449,13 @@ export async function joinRoom(
     resumed?: boolean;
     you: { sessionId: string; displayName: string };
     sessionToken?: string;
-  }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}`, { displayName }, false, 30_000);
+  }>(
+    "POST",
+    `/api/v1/rooms/${encodeURIComponent(code)}`,
+    { displayName },
+    false,
+    30_000,
+  );
 
   // Handed out exactly once; keep it or the membership is lost.
   if (result.sessionToken) {
@@ -502,7 +508,8 @@ export const postFlare = (
     acceptsTrade?: boolean;
     acceptsCash?: boolean;
   },
-) => call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
+) =>
+  call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, entry);
 
 export const withdrawOffer = (code: string, flareId: string) =>
   call<{ ok: true }>("DELETE", `/api/v1/rooms/${encodeURIComponent(code)}/offers`, {
@@ -521,7 +528,11 @@ export const offerOnFlare = (
     quantity,
   });
 
-export const confirmTrade = (code: string, flareId: string, partnerSessionId?: string) =>
+export const confirmTrade = (
+  code: string,
+  flareId: string,
+  partnerSessionId?: string,
+) =>
   call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/trades`, {
     flareId,
     partnerSessionId,
@@ -564,10 +575,7 @@ export interface CardHit {
 }
 
 export const searchCards = (query: string) =>
-  call<{ cards: CardHit[] }>(
-    "GET",
-    `/api/v1/cards?q=${encodeURIComponent(query)}`,
-  );
+  call<{ cards: CardHit[] }>("GET", `/api/v1/cards?q=${encodeURIComponent(query)}`);
 
 /** One trade, as the room renders it for one viewer - the web's shape. */
 export interface TradeRecord {
@@ -685,6 +693,20 @@ export interface Profile {
     ringArt: ArtFile | null;
     auraArt: ArtFile | null;
   } | null;
+  /**
+   * Every catalogue slot, as the slug worn in it or null.
+   *
+   * Separate from `equipped`, which carries the LEGACY four - the nine
+   * original frames, the four holos, the avatar frame - and is what the
+   * app dressed cards with before the catalogue existed. This is the
+   * catalogue: 43 card borders, 35 holo patterns, 31 card animations,
+   * 30 showcase backgrounds, 19 profile scenes, 13 name styles, and the
+   * rings and auras the avatar already draws.
+   *
+   * Optional because an app build older than the server's payload
+   * should keep working, not crash on a missing key.
+   */
+  equips?: Partial<Record<CustomizeKind, string | null>> | null;
   showcase: ShowcaseCard[];
   showcaseLimit: number;
 }
@@ -797,6 +819,8 @@ export interface PeekProfile {
   ringArt: ArtFile | null;
   auraArt: ArtFile | null;
   effect: string | null;
+  /** Every catalogue slot they wear; see Profile.equips. */
+  equips?: Partial<Record<CustomizeKind, string | null>> | null;
   showcase: {
     id: string;
     name: string;
