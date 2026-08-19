@@ -1,7 +1,5 @@
 import "server-only";
 
-import sharp from "sharp";
-
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -16,6 +14,28 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * No admin check in this file — the action layer does it, as everywhere
  * else under lib/admin.
  */
+
+/**
+ * sharp, fetched only when an image is actually being processed.
+ *
+ * Lazy for the same reason `src/lib/players/profile.ts` is lazy: a
+ * top-level import of a native module makes every page that imports
+ * this file fail to render when the binary is missing on the host,
+ * rather than failing the one operation that needs it. That took the
+ * whole site down once.
+ */
+type SharpFactory = (typeof import("sharp"))["default"];
+
+async function loadSharp(): Promise<SharpFactory> {
+  try {
+    return (await import("sharp")).default;
+  } catch (cause) {
+    throw new Error(
+      "Image encoding is unavailable: the sharp native module failed to load.",
+      { cause },
+    );
+  }
+}
 
 export const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"] as const;
 export type Rarity = (typeof RARITIES)[number];
@@ -289,6 +309,8 @@ export async function setPackArt(
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "Storage is not configured." };
   }
+
+  const sharp = await loadSharp();
 
   let encoded: Buffer;
   try {

@@ -1,7 +1,5 @@
 import "server-only";
 
-import sharp from "sharp";
-
 import { avatarSrc, objectPathFrom } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/site";
@@ -33,6 +31,28 @@ export interface AvatarCheck {
   steps: AvatarCheckStep[];
   /** What an <img> should be given, for the client-side probe. */
   src: string | null;
+}
+
+/**
+ * sharp, fetched only when an image is actually being processed.
+ *
+ * Lazy for the same reason `src/lib/players/profile.ts` is lazy: a
+ * top-level import of a native module makes every page that imports
+ * this file fail to render when the binary is missing on the host,
+ * rather than failing the one operation that needs it. That took the
+ * whole site down once.
+ */
+type SharpFactory = (typeof import("sharp"))["default"];
+
+async function loadSharp(): Promise<SharpFactory> {
+  try {
+    return (await import("sharp")).default;
+  } catch (cause) {
+    throw new Error(
+      "Image encoding is unavailable: the sharp native module failed to load.",
+      { cause },
+    );
+  }
 }
 
 export async function avatarDiagnostics(playerId: string): Promise<AvatarCheck> {
@@ -139,6 +159,7 @@ export async function avatarDiagnostics(playerId: string): Promise<AvatarCheck> 
   let storedBytes: Buffer | null = null;
 
   if (blob) {
+    const sharp = await loadSharp();
     storedBytes = Buffer.from(await blob.arrayBuffer());
     const magic = storedBytes.subarray(0, 12).toString("hex");
 

@@ -1,7 +1,5 @@
 import "server-only";
 
-import sharp from "sharp";
-
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
@@ -569,6 +567,40 @@ export type AvatarOutcome =
  * uploads were deliberately out of scope; the founder has since asked
  * for them, so that note has been corrected rather than left to mislead.
  */
+/**
+ * sharp, fetched at the moment something actually needs to encode.
+ *
+ * NOT a top-level import, and that is the whole point. This module is
+ * `ownProfile`, `publicProfile` and everything that reads a player, so
+ * every player page, every store page and the sign-in flow import it.
+ * A top-level `import sharp from "sharp"` made all of those depend on a
+ * NATIVE BINARY at module-evaluation time - and when that binary was
+ * missing on the host, the failure was not "you cannot upload a
+ * picture", it was every one of those pages answering "This page
+ * couldn't load". A whole site down because reading a name needed an
+ * image encoder to be present.
+ *
+ * The three functions below are the only ones that encode, they are all
+ * uploads, and they are the only places that should ever be able to
+ * fail for want of libvips.
+ *
+ * Not memoised: the runtime caches a dynamic import already, and
+ * caching the PROMISE would cache a rejection too - one bad load at
+ * boot and encoding would stay broken until the instance recycled.
+ */
+type SharpFactory = (typeof import("sharp"))["default"];
+
+async function loadSharp(): Promise<SharpFactory> {
+  try {
+    return (await import("sharp")).default;
+  } catch (cause) {
+    throw new Error(
+      "Image encoding is unavailable: the sharp native module failed to load.",
+      { cause },
+    );
+  }
+}
+
 export async function setAvatar(
   playerId: string,
   file: { arrayBuffer(): Promise<ArrayBuffer>; size: number; type: string },
@@ -579,6 +611,8 @@ export async function setAvatar(
   if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
     return { ok: false, reason: "wrong-type" };
   }
+
+  const sharp = await loadSharp();
 
   let encoded: Buffer;
   try {
@@ -757,6 +791,8 @@ export async function setAnimatedAvatar(
   /* The bytes decide, not the browser's guess at an extension. */
   if (!looksLikeGif(sent)) return { ok: false, reason: "wrong-type" };
 
+  const sharp = await loadSharp();
+
   let animation: Buffer;
   let still: Buffer;
   let frames: number;
@@ -929,6 +965,8 @@ export async function setCover(
   if (!(AVATAR_MIME_TYPES as readonly string[]).includes(file.type)) {
     return { ok: false, reason: "wrong-type" };
   }
+
+  const sharp = await loadSharp();
 
   let encoded: Buffer;
   try {
