@@ -224,11 +224,18 @@ describe("where it is stored and how it is served", () => {
     );
     expect(film).not.toContain("originWhitelist={[]}");
     expect(film).not.toContain("onShouldStartLoadWithRequest={() => false}");
-    expect(film).toContain("request.url === art.url");
+    expect(film).toContain("request.url === (player ?? art.url)");
     /* And iOS paints a white page behind a WebView without this. */
     expect(film).toContain("opaque={false}");
-    /* The containment that actually matters is still off. */
-    expect(film).toContain("javaScriptEnabled={false}");
+    /*
+     * The containment that actually matters is still off for uploaded
+     * art. It is ON for exactly one thing - our own Rive player page,
+     * where the script is our bundle and the uploaded file is data it
+     * reads - and `player` is null for every other kind, so this
+     * expression IS the rule rather than a comment about it. See
+     * tests/unit/cosmetic-player.test.ts.
+     */
+    expect(film).toContain("javaScriptEnabled={player !== null}");
   });
 });
 
