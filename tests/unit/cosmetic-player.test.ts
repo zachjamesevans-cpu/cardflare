@@ -90,6 +90,56 @@ describe("the app's side of it", () => {
   });
 });
 
+describe("the origin whitelist", () => {
+  /*
+   * react-native-webview's whitelist logic, re-implemented VERBATIM
+   * from WebViewShared so it can run here (the real module imports
+   * react-native and cannot load under Node). If the library changes
+   * this, the pin below against our source keeps us honest.
+   */
+  const extractOrigin = (url: string): string => {
+    const result = /^[A-Za-z][A-Za-z0-9+\-.]+:(\/\/)?[^/]*/.exec(url);
+    return result === null ? "" : result[0];
+  };
+  const escapeRe = (value: string) =>
+    value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+  const passes = (whitelist: string[], url: string) =>
+    ["about:blank", ...whitelist]
+      .map((entry) => `^${escapeRe(entry).replace(/\\\*/g, ".*")}`)
+      .some((pattern) => new RegExp(pattern).test(extractOrigin(url)));
+
+  const API_BASE = "https://cardflare.gg";
+  const player = `${API_BASE}/cosmetic-player?src=%2Fapi%2Favatars%2Fx.svg&kind=svg`;
+
+  it("admits our own player page", () => {
+    /* The app's whitelist is the BARE origin. This is what the source
+       must keep computing. */
+    expect(passes([new URL(API_BASE).origin], player)).toBe(true);
+  });
+
+  it("proves the '/*' form was the Safari bug", () => {
+    /*
+     * The library matches the whitelist against the URL's EXTRACTED
+     * ORIGIN - no trailing slash - so a pattern ending in "/*" demands
+     * a slash that is never there and admits nothing. And its answer
+     * to a non-whitelisted URL is not "block": it is Linking.openURL.
+     * That one character difference is why tapping Profile threw the
+     * founder out of the app into Safari with a cosmetic in a tab.
+     */
+    expect(passes([`${API_BASE}/*`], player)).toBe(false);
+  });
+
+  it("is the form the app actually ships", () => {
+    const film = readFileSync(resolve(root, "mobile/src/cosmetic-film.tsx"), "utf8");
+    expect(film).toContain("originWhitelist={[new URL(API_BASE).origin]}");
+    expect(film).not.toMatch(/originWhitelist=\{\[[^\]]*\/\*/);
+    /* And the load gate matches by prefix, never equality: iOS may
+       re-serialise our query encoding, and refusing our own page draws
+       nothing forever. */
+    expect(film).toContain("request.url.startsWith(`${API_BASE}/cosmetic-player`)");
+  });
+});
+
 describe("the page itself", () => {
   const page = readFileSync(resolve(root, "src/app/cosmetic-player/page.tsx"), "utf8");
 
