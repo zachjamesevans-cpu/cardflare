@@ -224,7 +224,7 @@ describe("where it is stored and how it is served", () => {
     );
     expect(film).not.toContain("originWhitelist={[]}");
     expect(film).not.toContain("onShouldStartLoadWithRequest={() => false}");
-    expect(film).toContain("request.url === (player ?? art.url)");
+    expect(film).toContain("request.url === player");
     /* And iOS paints a white page behind a WebView without this. */
     expect(film).toContain("opaque={false}");
     /*
@@ -235,7 +235,7 @@ describe("where it is stored and how it is served", () => {
      * expression IS the rule rather than a comment about it. See
      * tests/unit/cosmetic-player.test.ts.
      */
-    expect(film).toContain("javaScriptEnabled={player !== null}");
+    expect(film).toContain('javaScriptEnabled={art.kind === "rive"}');
   });
 });
 

@@ -177,9 +177,8 @@ describe("worn ring art never lands on the picture", () => {
      * rather than on a constant, is what keeps the exception to one
      * page we wrote.
      */
-    expect(film).toContain("javaScriptEnabled={player !== null}");
+    expect(film).toContain('javaScriptEnabled={art.kind === "rive"}');
     expect(film).not.toContain("javaScriptEnabled={true}");
-    expect(film).toMatch(/const player =[\s\S]{0,120}art\.kind === "rive"/);
     expect(film).toContain("domStorageEnabled={false}");
   });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -7,48 +7,31 @@ import { API_BASE } from "./config";
 /**
  * A cosmetic's uploaded art, drawn in the app.
  *
- * The website draws a drawing in an `<img>` and HTML art in a
- * script-free sandboxed iframe. React Native has neither: `Image` will
- * not render an SVG at all, and nothing in RN runs CSS keyframes. What
- * it does have is a WebView, which is the same engine the website's
- * two renderers are, so both kinds go through one here.
+ * ONE URL, ON OUR OWN ORIGIN, FOR ALL THREE KINDS. That is the whole
+ * design, and it replaces the thing that was wrong.
  *
- * JavaScript is OFF FOR UPLOADED ART. That is the whole containment,
- * and it is the same bargain the web makes with `sandbox` and no
- * `allow-scripts`: CSS animates, nothing executes. The document the
- * server stored already carries a `default-src 'none'` policy, so the
- * art cannot fetch anything either, and `originWhitelist` keeps the
- * view itself from navigating anywhere.
+ * The first version built an HTML document as a STRING in the app and
+ * handed it to the WebView. It reads as tidy and it is a trap on iOS: a
+ * string loaded with no base URL gets an opaque origin, and an
+ * opaque-origin document is not a reliable place to fetch an https
+ * subresource from. The founder's Haki ring - an SVG, uploaded, working
+ * on the website - drew nothing on his phone, and the same markup
+ * rendered perfectly when tested in Chromium, which is exactly the
+ * shape of a WebKit-only origin problem.
  *
- * A drawing arrives as a bare .svg rather than a document, so it is
- * wrapped in the smallest page that will scale it - written here to
- * match what `artDocument` does on the server, because the two have to
- * agree or the same cosmetic looks different on the two platforms.
+ * So the app no longer invents documents. It points at
+ * `/cosmetic-player` on our own origin, and the server draws the art
+ * with the same three renderers the website uses: an `<img>` for a
+ * drawing, a sandboxed `<iframe>` for markup, a canvas for Rive. One
+ * place to be right instead of two that can drift.
  *
- * RIVE IS THE EXCEPTION, and it is an exception about whose code runs
- * rather than a relaxation. A .riv file cannot be drawn by a browser at
- * all; it is played by a runtime, and that runtime is script. So Rive
- * goes to `/cosmetic-player` on our own origin - our bundle, our WASM -
- * with the file handed over as data. Scripting is on for that one frame
- * and nothing an uploader supplied is ever the thing running. This kind
- * used to return null, which is why a founder wearing a Rive ring saw a
- * bare avatar and a working website.
+ * JAVASCRIPT IS OFF EXCEPT FOR RIVE, and that exception is about whose
+ * code runs rather than a relaxation. A .riv file cannot be drawn by a
+ * browser at all - it is played by a runtime, and that runtime is
+ * script - so it plays on our page, in our bundle, against our copy of
+ * the WASM, with the uploaded file handed over as data. A drawing and a
+ * page of uploaded markup keep scripting off, and always will.
  */
-
-/** The page a bare SVG is shown in. Mirrors artDocument in html-file.ts. */
-function svgPage(url: string): string {
-  return (
-    "<!doctype html><html><head><meta charset='utf-8'>" +
-    "<meta http-equiv='Content-Security-Policy' " +
-    `content="default-src 'none'; style-src 'unsafe-inline'; img-src ${new URL(url).origin} data:">` +
-    "<style>html,body{margin:0;padding:0;width:100%;height:100%;" +
-    "background:transparent;overflow:hidden}" +
-    "img{width:100%;height:100%;display:block;object-fit:contain}" +
-    "</style></head><body>" +
-    `<img src="${url.replace(/"/g, "&quot;")}" alt="">` +
-    "</body></html>"
-  );
-}
 
 export interface ArtFile {
   kind: "rive" | "svg" | "html";
@@ -60,23 +43,13 @@ export interface ArtFile {
 }
 
 /**
- * The page that plays a Rive cosmetic, on our own origin.
+ * The page that draws this file, or null if the file is not ours.
  *
- * A .riv file is not a picture: it is played BY a runtime, and the
- * runtime is JavaScript and WebAssembly. There is no way to draw one
- * with scripting off, which is why this kind used to return null and a
- * founder wearing a Rive ring saw a bare avatar.
- *
- * So the file goes to `/cosmetic-player`, which is OUR page running OUR
- * bundle against OUR copy of the WASM, and the .riv is handed to it as
- * data. Scripting is on for that frame and nothing an uploader supplied
- * is ever the script - the same distinction the website makes, since it
- * plays these with the identical component. Uploaded SVG and uploaded
- * HTML keep scripting off, and always will.
+ * The player takes a PATH on our origin and refuses anything else, so
+ * the absolute URL the API hands us is reduced to one here. A file
+ * somewhere else draws nothing rather than being pointed at.
  */
-function riveHost(art: ArtFile): string | null {
-  /* The player takes a PATH on our origin and refuses anything else, so
-     the absolute URL the API hands us is reduced to one here. */
+export function playerUrl(art: ArtFile): string | null {
   let path: string;
   try {
     const parsed = new URL(art.url);
@@ -86,7 +59,7 @@ function riveHost(art: ArtFile): string | null {
     return null;
   }
 
-  const query = new URLSearchParams({ src: path });
+  const query = new URLSearchParams({ src: path, kind: art.kind });
   if (art.artboard) query.set("artboard", art.artboard);
   if (art.stateMachine) query.set("machine", art.stateMachine);
 
@@ -96,31 +69,8 @@ function riveHost(art: ArtFile): string | null {
 export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
   const [failed, setFailed] = useState(false);
 
-  /* The one origin this frame is allowed to load from: the art's own. */
-  const origin = useMemo(() => {
-    try {
-      return new URL(art.url).origin;
-    } catch {
-      return null;
-    }
-  }, [art.url]);
-
-  if (failed) return null;
-
-  /*
-   * Rive plays through our own page; everything else is the art itself,
-   * with scripting off. `player` is null when the file is not on our
-   * origin, which draws nothing rather than pointing a scripting-enabled
-   * frame at somebody else's server.
-   */
-  const player = art.kind === "rive" ? riveHost(art) : null;
-  if (art.kind === "rive" && !player) return null;
-
-  const source = player
-    ? { uri: player }
-    : art.kind === "html"
-      ? { uri: art.url }
-      : { html: svgPage(art.url) };
+  const player = playerUrl(art);
+  if (failed || !player) return null;
 
   return (
     <View
@@ -128,17 +78,17 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
       style={{ width: size, height: size, backgroundColor: "transparent" }}
     >
       <WebView
-        source={source}
+        source={{ uri: player }}
         /*
-         * The containment, and the one exception to it.
+         * The containment, and its one exception.
          *
-         * OFF for uploaded art - an SVG or a page of HTML somebody sent
-         * us - which is the whole bargain, and the same one the website
-         * makes with `sandbox` and no `allow-scripts`. ON only for our
-         * own player page, where the script is our bundle and the
-         * uploaded file is the data it reads. Never widen this.
+         * OFF for a drawing and for uploaded markup, which is the whole
+         * bargain and the same one the website makes with `sandbox` and
+         * no `allow-scripts`. ON only for Rive, which cannot be drawn
+         * any other way, and only on our own page. Never widen this,
+         * and never key it on anything an uploader controls.
          */
-        javaScriptEnabled={player !== null}
+        javaScriptEnabled={art.kind === "rive"}
         domStorageEnabled={false}
         /*
          * Transparent, and on iOS that takes BOTH of these. Without
@@ -148,22 +98,20 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
          */
         opaque={false}
         /*
-         * The art's own origin, and nothing else. An empty list here
-         * does not mean "deny navigation", it means "deny everything
-         * including the page you were asked to show" - the first cut
-         * had that, and it is why no ring appeared in the app at all.
+         * Our origin, and nothing else. An empty list here does not
+         * mean "deny navigation", it means "deny everything including
+         * the page you were asked to show" - the first cut had that,
+         * and it is why no ring appeared in the app at all.
          */
-        originWhitelist={origin ? [`${origin}/*`] : ["about:blank"]}
+        originWhitelist={[`${API_BASE}/*`]}
         /*
-         * Called for the FIRST load as well as later ones, so this
-         * has to say yes to the art itself and no to anything a file
-         * tries to navigate to afterwards. Returning a flat false
-         * blocked the art from ever appearing.
+         * Called for the FIRST load as well as later ones, so it has to
+         * say yes to the player and no to wherever a file might try to
+         * send the view afterwards. The player's own subresources are
+         * not navigations and are not filtered here.
          */
         onShouldStartLoadWithRequest={(request) =>
-          request.url === (player ?? art.url) ||
-          request.url === "about:blank" ||
-          request.url.startsWith("data:")
+          request.url === player || request.url === "about:blank"
         }
         scrollEnabled={false}
         overScrollMode="never"
