@@ -1,0 +1,45 @@
+# Opening a Flare and swiping between the cards in it.
+#
+# This is the founder's report, as a flow: "swiping between card flares
+# immediately closes the card in the app". The zoom marked a swipe in
+# onTouchEnd and read it in a Pressable's onPress, which run in that
+# order about half the time, so the card closed instead of turning the
+# page.
+#
+# The assertion that matters is the boring one after the swipe: the
+# close hint is still on screen. If the card shut, it is gone.
+appId: gg.cardflare.app
+---
+- launchApp:
+    clearState: false
+- runFlow: sign-in.yaml
+
+- tapOn: "Feed"
+- assertVisible: "Feed"
+
+# The first card image on the Feed. Points rather than text, because a
+# card tile is a picture and carries no label of its own.
+- tapOn:
+    point: "50%,45%"
+- assertVisible: "Tap anywhere to close"
+- takeScreenshot: shots/05-zoom-opened
+
+# A flick right to left. Forty points is the threshold in the app; this
+# travels most of the screen, so it is unambiguously a swipe.
+- swipe:
+    start: "85%,55%"
+    end: "15%,55%"
+- assertVisible: "Tap anywhere to close"
+- takeScreenshot: shots/06-zoom-after-swipe
+
+# And back the other way, which used to leave the flag set and make the
+# NEXT tap do nothing.
+- swipe:
+    start: "15%,55%"
+    end: "85%,55%"
+- assertVisible: "Tap anywhere to close"
+
+# A tap still closes it.
+- tapOn:
+    point: "50%,92%"
+- assertNotVisible: "Tap anywhere to close"

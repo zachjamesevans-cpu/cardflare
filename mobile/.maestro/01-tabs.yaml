@@ -1,0 +1,31 @@
+# Every tab, once, with a screenshot of each.
+#
+# The cheapest thing that would have caught the profile picture being
+# cropped: open the tab, look at the picture. It is deliberately dumb -
+# no assertions beyond "the tab opened" - because its job is to produce
+# five pictures for a person or a model to look at, not to encode what
+# they should contain.
+appId: gg.cardflare.app
+---
+- launchApp:
+    clearState: false
+- runFlow: sign-in.yaml
+
+- tapOn: "Feed"
+- assertVisible: "Feed"
+- takeScreenshot: shots/01-feed
+
+- tapOn: "Room"
+- takeScreenshot: shots/02-room
+
+- tapOn: "Inbox"
+- takeScreenshot: shots/03-inbox
+
+- tapOn: "Profile"
+# The header is the part that was clipping somebody's face. Scrolled to
+# the top on purpose, so the shot always frames the same thing.
+- scrollUntilVisible:
+    element: "Profile"
+    direction: UP
+    timeout: 5000
+- takeScreenshot: shots/04-profile

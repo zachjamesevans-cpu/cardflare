@@ -112,6 +112,17 @@ export interface ZoomCard {
   youHave?: { kind: "exact" | "other-printing"; count: number } | null;
 }
 
+/**
+ * How far a thumb travels before it stops being a tap.
+ *
+ * Forty points: a shaky thumb is still a tap, a flick is a flick. The
+ * same number the website uses, and used by BOTH halves of the zoom's
+ * gesture, which is the point of it being a constant - the two used to
+ * be two literals and could have drifted into a gap where a drag was
+ * neither a swipe nor a press.
+ */
+const SWIPE = 40;
+
 export function CardImage({
   imageUrl: ownImageUrl,
   width,
@@ -188,7 +199,22 @@ export function CardImage({
   const terms = shown ? (shown.terms ?? null) : ownTerms;
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
 
-  /* A swipe ends in a press, and a press anywhere here closes. */
+  /*
+   * A swipe ends in a press, and a press anywhere here closes.
+   *
+   * WHICH IS WHY THE FLAG IS SET WHILE THE THUMB IS STILL DOWN. The
+   * first cut set it in `onTouchEnd` and read it in the Pressable's
+   * `onPress`, which reads like it happens in that order and does not:
+   * a press comes out of the responder system and a touch event comes
+   * out of the touch system, and the responder plugin is dispatched
+   * first. So every swipe closed the card - reported from a phone as
+   * "swiping between card flares immediately closes the card" - and
+   * left the flag set behind it, so the next tap refused to close.
+   *
+   * Setting it in `onTouchMove` takes the ordering out of it entirely.
+   * By the time either handler runs, the thumb has already travelled
+   * and the answer is already recorded.
+   */
   const swiped = useRef(false);
   const touchFrom = useRef<number | null>(null);
 
@@ -256,14 +282,19 @@ export function CardImage({
           <Pressable
             style={styles.zoomFill}
             onPress={() => {
-              if (swiped.current) {
-                swiped.current = false;
-                return;
-              }
+              if (swiped.current) return;
               close();
             }}
             onTouchStart={(event) => {
               touchFrom.current = event.nativeEvent.pageX;
+              swiped.current = false;
+            }}
+            onTouchMove={(event) => {
+              const from = touchFrom.current;
+              if (from === null) return;
+              if (Math.abs(event.nativeEvent.pageX - from) >= SWIPE) {
+                swiped.current = true;
+              }
             }}
             onTouchEnd={(event) => {
               const from = touchFrom.current;
@@ -271,11 +302,8 @@ export function CardImage({
               if (from === null || !shelf) return;
 
               const travelled = event.nativeEvent.pageX - from;
-              /* Forty points: a shaky thumb is still a tap, a flick is a
-                 flick. The same number the website uses. */
-              if (Math.abs(travelled) < 40) return;
+              if (Math.abs(travelled) < SWIPE) return;
 
-              swiped.current = true;
               go(travelled < 0 ? 1 : -1);
             }}
           >

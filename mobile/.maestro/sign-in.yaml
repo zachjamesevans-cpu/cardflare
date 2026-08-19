@@ -1,0 +1,21 @@
+# Signs in, but only if the app is asking. A device that is already
+# signed in skips straight past this, so the flows can be run over and
+# over without logging out first.
+#
+# Credentials come from the environment, never from this file:
+#   maestro test .maestro -e EMAIL=you@example.com -e PASSWORD=...
+appId: gg.cardflare.app
+---
+- runFlow:
+    when:
+      visible: "Sign in"
+    commands:
+      - tapOn: "Email"
+      - inputText: ${EMAIL}
+      - tapOn: "Password"
+      - inputText: ${PASSWORD}
+      - hideKeyboard
+      - tapOn: "Sign in"
+      - extendedWaitUntil:
+          notVisible: "Signing in…"
+          timeout: 20000

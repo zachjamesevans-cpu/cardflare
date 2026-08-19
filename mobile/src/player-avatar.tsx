@@ -1,22 +1,13 @@
 import { useState } from "react";
 import { Image, Text, View } from "react-native";
 
+import { filmLayer } from "./avatar-geometry";
 import { hasAuraArt, hasRingArt } from "./cosmetic-art-data";
-import { WornCosmetics } from "./cosmetic-worn";
+import { WornAura, WornRing } from "./cosmetic-worn";
 
 import { CosmeticFilm, type ArtFile } from "./cosmetic-film";
 import { getFoilKit, travellingFrame } from "./foil";
 import { avatarHues, colors } from "./theme";
-
-/**
- * How much wider than the avatar a worn art file is drawn.
- *
- * The website's `.cfx-ring-film`, in a number: art is authored in a 400
- * box with the picture filling out to radius 148, so a film of
- * 400/296 of the avatar puts the band's inner edge exactly on the
- * avatar's edge. Same constant, same result on both platforms.
- */
-const FILM_SCALE = 400 / 296;
 
 /**
  * A player's avatar in the app: their picture, or their initials.
@@ -275,8 +266,7 @@ export function PlayerAvatar({
    * exactly what an aura is for.
    */
   if (ringArt || auraArt) {
-    const film = Math.round(size * FILM_SCALE);
-    const offset = Math.round((film - size) / 2);
+    const { box: film, offset } = filmLayer(size);
 
     return (
       <View
@@ -316,11 +306,16 @@ export function PlayerAvatar({
    * draw a conic gradient or a keyframe, so a ring somebody spent Embers
    * on came out as the flat band below.
    *
-   * `WornCosmetics` returns null for a slug it has no art for and on any
-   * device where Skia will not load, so everything not yet ported keeps
-   * exactly the stand-in it had. The face is drawn after the aura and
-   * over the ring, which is how the promise about faces is kept here:
-   * the website masks the circle out, and z-order does the same job.
+   * Both return null for a slug they have no art for and on any device
+   * where Skia will not load, so everything not yet ported keeps exactly
+   * the stand-in it had.
+   *
+   * THE RING GOES UNDER THE FACE AND THE AURA GOES OVER IT, which is
+   * the same order the website draws them in and the same order the
+   * dropped-in-file branch above uses. A ring under a face is the
+   * promise about not covering anybody's picture. An aura over it is
+   * the difference between wearing something and, in the founder's
+   * words off a real phone, hearts that are "behind the avatar".
    */
   const worn = hasRingArt(ring) || hasAuraArt(aura);
 
@@ -335,20 +330,15 @@ export function PlayerAvatar({
           opacity: dimmed ? 0.5 : 1,
         }}
       >
-        <WornCosmetics
-          ring={hasRingArt(ring) ? ring : null}
-          aura={hasAuraArt(aura) ? aura : null}
-          size={size}
-        />
+        <WornRing ring={hasRingArt(ring) ? ring : null} size={size} />
         {face}
+        <WornAura aura={hasAuraArt(aura) ? aura : null} size={size} />
       </View>
     );
   }
 
   if (!band) {
-    return (
-      <View style={[{ opacity: dimmed ? 0.5 : 1 }, haloStyle]}>{face}</View>
-    );
+    return <View style={[{ opacity: dimmed ? 0.5 : 1 }, haloStyle]}>{face}</View>;
   }
 
   /* Ring, gap, face: 2px band + 2px canvas, the web's box-shadow made
