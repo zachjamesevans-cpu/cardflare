@@ -100,6 +100,15 @@ export async function GET(
     ringArt: absoluteArt(dressedArt.ring),
     auraArt: absoluteArt(dressedArt.aura),
     effect: worn.effect,
+    /*
+     * Every catalogue slot they are wearing.
+     *
+     * Already read above for the ring and the aura, so this costs
+     * nothing extra, and without it the app could not draw somebody
+     * else's card border however much drawing code it had. The website
+     * reads these from the same `dressed` map by another route.
+     */
+    equips: dressed,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */
     showcase: profile.showcase.map((entry) => ({

@@ -141,7 +141,11 @@ export function PlayerPeekModal({
               {/* Top-aligned, per the founder: the name line and the badge
                   sit level with the top of the picture's circle. */}
               <View
-                style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: spacing(3),
+                }}
               >
                 <PlayerAvatar
                   displayName={profile.displayName}
@@ -219,6 +223,7 @@ export function PlayerPeekModal({
                             frame: entry.frame,
                             holo: entry.holo,
                             effect: profile.effect,
+                            border: profile.equips?.border ?? null,
                           })
                         }
                       >
@@ -228,6 +233,7 @@ export function PlayerPeekModal({
                           frame={entry.frame}
                           holo={entry.holo}
                           effect={profile.effect}
+                          border={profile.equips?.border ?? null}
                         />
                       </Pressable>
                     ))}

@@ -2,6 +2,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
+import {
+  CardEdge,
+  EDGE,
+  EDGE_RADIUS,
+  FACE_RADIUS,
+  borderStyle,
+  drawsBorder,
+} from "./cosmetic-border";
 import { getFoilKit, travellingFrame } from "./foil";
 import { colors } from "./theme";
 
@@ -81,24 +89,36 @@ export function CosmeticCard({
   frame,
   holo,
   effect,
+  border = null,
 }: {
   imageUrl: string | null;
   width: number;
   frame: string | null;
   holo: string | null;
   effect: string | null;
+  /**
+   * A catalogue card border, when one is worn.
+   *
+   * Outranks the legacy `frame` for the same reason a catalogue ring
+   * outranks a legacy avatar frame on the website: two edges on one
+   * card is clutter, and the newer choice is the one they made last.
+   */
+  border?: string | null;
 }) {
   /* The same 60:84 the website's thumbnails use, so a card is a card. */
   const height = Math.round((width * 84) / 60);
 
-  const border = frame ? FRAME_COLOR[frame] : null;
+  const frameColor = frame ? FRAME_COLOR[frame] : null;
+  /* Skia and a slug we have art for, or the legacy frame keeps the card. */
+  const edge = drawsBorder(border) ? border : null;
   const stops = holo ? (HOLO_STOPS[holo] ?? []) : [];
   /* Skia is loaded on the first card that wants it, never at app
      launch - see foil.tsx for why that ordering is load-bearing. */
   const wantsFoil =
     imageUrl !== null &&
     (holo === "classic-holo" || holo === "prism-holo" || holo === "galaxy-holo");
-  const kit = wantsFoil || travellingFrame(frame) || effect === "orbit" ? getFoilKit() : null;
+  const kit =
+    wantsFoil || travellingFrame(frame) || effect === "orbit" ? getFoilKit() : null;
 
   /*
    * A foiled card appears once, finished.
@@ -140,18 +160,17 @@ export function CosmeticCard({
 
   const onFoilReady = useCallback(() => setFoilReady(true), []);
 
-  return (
-    <View
-      style={{
-        width,
-        height,
-        borderRadius: 6,
-        overflow: "hidden",
-        backgroundColor: colors.elevated,
-        borderWidth: border ? 2 : 1,
-        borderColor: border ?? colors.border,
-      }}
-    >
+  /*
+   * The card's face, at whatever size the edge around it leaves.
+   *
+   * A worn catalogue border is the website's `padding: 4px` - the
+   * gradient IS the padding, and the art sits inside it - so the foil,
+   * the holo wash and every effect have to be drawn at the inner size
+   * rather than the card's. Getting that wrong puts a shimmer under the
+   * border where nobody can see it.
+   */
+  const face = (w: number, h: number) => (
+    <>
       {imageUrl && !foilDrawsArt ? (
         <Image
           source={{ uri: imageUrl }}
@@ -163,8 +182,8 @@ export function CosmeticCard({
       {foilDrawsArt && imageUrl !== null ? (
         <kit.Foil
           imageUrl={imageUrl}
-          width={width}
-          height={height}
+          width={w}
+          height={h}
           holo={holo as "classic-holo" | "prism-holo" | "galaxy-holo"}
           onReady={onFoilReady}
         />
@@ -182,18 +201,70 @@ export function CosmeticCard({
 
       {/* The travelling frames move exactly as on the web; the static
           border underneath stays as the Skia-less fallback. */}
-      {kit !== null && frame !== null && travellingFrame(frame) && (
-        <kit.FrameRing width={width} height={height} slug={frame} radius={5} />
+      {kit !== null && frame !== null && travellingFrame(frame) && !edge && (
+        <kit.FrameRing width={w} height={h} slug={frame} radius={5} />
       )}
 
-      {effect === "shimmer" && <Shimmer width={width} height={height} />}
+      {effect === "shimmer" && <Shimmer width={w} height={h} />}
       {effect === "pulse" && <Pulse />}
       {effect === "orbit" &&
         (kit !== null ? (
-          <kit.OrbitRing width={width} height={height} color={colors.accent} radius={5} />
+          <kit.OrbitRing width={w} height={h} color={colors.accent} radius={5} />
         ) : (
           <Orbit />
         ))}
+    </>
+  );
+
+  /*
+   * A worn catalogue border, drawn as the card's edge.
+   *
+   * The legacy frame's coloured hairline is dropped when one is worn -
+   * a 2px line inside a 4px gradient is a smudge, not a second border.
+   */
+  if (edge) {
+    return (
+      <View
+        style={{
+          width,
+          height,
+          borderRadius: EDGE_RADIUS,
+          backgroundColor: colors.elevated,
+          ...(borderStyle(edge) ?? {}),
+        }}
+      >
+        <CardEdge border={edge} width={width} height={height} />
+        <View
+          style={{
+            position: "absolute",
+            left: EDGE,
+            top: EDGE,
+            width: width - EDGE * 2,
+            height: height - EDGE * 2,
+            borderRadius: FACE_RADIUS,
+            overflow: "hidden",
+            backgroundColor: colors.canvas,
+          }}
+        >
+          {face(width - EDGE * 2, height - EDGE * 2)}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        width,
+        height,
+        borderRadius: 6,
+        overflow: "hidden",
+        backgroundColor: colors.elevated,
+        borderWidth: frameColor ? 2 : 1,
+        borderColor: frameColor ?? colors.border,
+      }}
+    >
+      {face(width, height)}
     </View>
   );
 }
@@ -245,7 +316,11 @@ function Shimmer({ width, height }: { width: number; height: number }) {
       }}
     >
       <LinearGradient
-        colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.32)", "rgba(255,255,255,0)"]}
+        colors={[
+          "rgba(255,255,255,0)",
+          "rgba(255,255,255,0.32)",
+          "rgba(255,255,255,0)",
+        ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={{ flex: 1 }}

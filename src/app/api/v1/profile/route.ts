@@ -18,7 +18,7 @@ import {
 } from "@/lib/players/profile";
 import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
 import { buyCosmetic } from "@/lib/players/cosmetics";
-import { avatarWearFor } from "@/lib/players/equips";
+import { avatarWearFor, getEquips } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { displayNameSchema } from "@/lib/players/profile-schema";
 import { siteUrl } from "@/lib/site";
@@ -66,7 +66,7 @@ export async function GET(request: Request): Promise<Response> {
   const profile = await ownProfile(player.playerId);
   if (!profile) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const [wardrobe, worn, wearing] = await Promise.all([
+  const [wardrobe, worn, wearing, equips] = await Promise.all([
     wardrobeFor(
       player.playerId,
       { earned: profile.embersEarned, balance: profile.embersBalance },
@@ -74,6 +74,7 @@ export async function GET(request: Request): Promise<Response> {
     ),
     resolveEquipped(profile.equipped),
     avatarWearFor([player.playerId]),
+    getEquips(player.playerId),
   ]);
 
   const wear = wearing.get(player.playerId);
@@ -109,6 +110,22 @@ export async function GET(request: Request): Promise<Response> {
         ringArt: absoluteArt(wear?.ringArt ?? null),
         auraArt: absoluteArt(wear?.auraArt ?? null),
       },
+      /*
+       * EVERY CATALOGUE SLOT, not just the two the avatar draws.
+       *
+       * The app was sent `frame`, `holo` and `effect` - the nine legacy
+       * frames and four legacy holos - plus the worn ring and aura, and
+       * nothing else. So a player who had bought one of the 43 card
+       * borders, or a nameplate, or a showcase background, wore it on
+       * the website and wore nothing in the app, and no amount of
+       * drawing code in the app could have fixed that: the slug never
+       * left the server.
+       *
+       * Sent whole rather than slot by slot as each one learns to draw,
+       * so the app side of a family is one round of work instead of two
+       * and a deploy in between.
+       */
+      equips,
       showcase: profile.showcase,
       showcaseLimit: SHOWCASE_LIMIT,
     },

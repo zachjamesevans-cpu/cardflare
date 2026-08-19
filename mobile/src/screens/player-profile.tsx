@@ -153,6 +153,7 @@ export function PlayerProfileScreen() {
                         frame: entry.frame,
                         holo: entry.holo,
                         effect: profile.effect,
+                        border: profile.equips?.border ?? null,
                       })
                     }
                   >
@@ -162,6 +163,7 @@ export function PlayerProfileScreen() {
                       frame={entry.frame}
                       holo={entry.holo}
                       effect={profile.effect}
+                      border={profile.equips?.border ?? null}
                     />
                   </Tap>
                 ))}

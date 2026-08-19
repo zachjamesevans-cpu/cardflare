@@ -9,6 +9,8 @@ import {
   type CustomizeKind,
   type CustomizeSection,
 } from "../api";
+import { CosmeticCard } from "../cosmetic-card";
+import { drawsBorder } from "../cosmetic-border";
 import { WornAura, WornRing } from "../cosmetic-worn";
 import { hasAuraArt, hasRingArt } from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
@@ -86,6 +88,20 @@ const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
  * avatar draws them in, so what a tile shows is what a profile shows.
  */
 function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) {
+  /* A card border previews on a card, because that is where it goes. */
+  if (kind === "border" && drawsBorder(slug)) {
+    return (
+      <CosmeticCard
+        imageUrl={null}
+        width={PREVIEW - 8}
+        frame={null}
+        holo={null}
+        effect={null}
+        border={slug}
+      />
+    );
+  }
+
   const ring = kind === "ring" && hasRingArt(slug) ? slug : null;
   const aura = kind === "aura" && hasAuraArt(slug) ? slug : null;
 
@@ -222,7 +238,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
           {area === "profile"
             ? "Profile borders and avatar effects are drawn here now. The rest of these, and any Rive file dropped into them, still draw in full only on your web profile. Wearing one here equips it everywhere."
-            : "These categories, and any Rive file dropped into them, are drawn in full on your web profile today. Wearing one here equips it everywhere; in-app art for them is coming next."}
+            : "Card borders are drawn here now. Holo patterns, card animations, showcase backgrounds and any Rive file dropped in still draw in full only on your web profile. Wearing one here equips it everywhere."}
         </Text>
       </View>
 
