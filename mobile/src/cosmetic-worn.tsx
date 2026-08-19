@@ -9,12 +9,8 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
-import {
-  AURA_ART,
-  RING_ART,
-  type AuraArt,
-  type RingArt,
-} from "./cosmetic-art-data";
+import { auraLayer, ringLayer } from "./avatar-geometry";
+import { AURA_ART, RING_ART, type AuraArt, type RingArt } from "./cosmetic-art-data";
 
 /**
  * A worn ring and a worn aura, drawn on a phone.
@@ -42,12 +38,8 @@ import {
 
 type Skia = typeof import("@shopify/react-native-skia");
 
-/** Where the band sits, as fractions of the avatar box. */
-const BAND_INSET = 0.02;
-const BAND_WIDTH = 0.055;
-
 function makeKit(S: Skia) {
-  const { Canvas, Circle, Group, SweepGradient, vec } = S;
+  const { BlurMask, Canvas, Circle, Group, SweepGradient, vec } = S;
 
   /**
    * The ring: a stroked circle filled with a turning sweep gradient.
@@ -55,6 +47,12 @@ function makeKit(S: Skia) {
    * Stroked rather than two filled circles, because a stroke is one draw
    * call and this sits behind every avatar in a room roster. A shop's
    * Friday night can put a dozen of these on one screen.
+   *
+   * IT DRAWS ITS OWN BOX, bigger than the avatar and pulled back over
+   * it, because the band belongs OUTSIDE the picture and the glow
+   * belongs outside that. The first cut stroked at a radius inside the
+   * avatar and let the caller place it, which put a ring somebody had
+   * paid Embers for entirely underneath their own face.
    */
   function Ring({ art, size }: { art: RingArt; size: number }) {
     const turn = useSharedValue(0);
@@ -79,27 +77,60 @@ function makeKit(S: Skia) {
 
     const spin = useDerivedValue(() => [{ rotate: turn.value * Math.PI * 2 }]);
 
-    const centre = size / 2;
-    const radius = centre - size * BAND_INSET - (size * BAND_WIDTH) / 2;
+    const { box, offset, radius, strokeWidth } = ringLayer(size);
+
+    /* Room for the glow to fall off in. A canvas cut to the band alone
+       clips the blur into a hard edge, which reads as a second, uglier
+       ring. */
+    const pad = art.glow ? Math.ceil(art.glow.radius) : 1;
+    const canvas = box + pad * 2;
+    const centre = canvas / 2;
 
     return (
-      <Canvas style={{ width: size, height: size }} pointerEvents="none">
-        <Group origin={vec(centre, centre)} transform={spin}>
-          <Circle
-            cx={centre}
-            cy={centre}
-            r={radius}
-            style="stroke"
-            strokeWidth={size * BAND_WIDTH}
-          >
-            <SweepGradient
-              c={vec(centre, centre)}
-              colors={art.colors}
-              positions={art.positions}
-            />
-          </Circle>
-        </Group>
-      </Canvas>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: -(offset + pad),
+          left: -(offset + pad),
+          width: canvas,
+          height: canvas,
+        }}
+      >
+        <Canvas style={{ width: canvas, height: canvas }}>
+          {/* The website's `drop-shadow`, which Skia spells as a blurred
+              copy underneath. Static rather than spun with the band: a
+              blur this soft is the same shape at every angle, and one
+              fewer thing to animate on a roster of twelve. */}
+          {art.glow ? (
+            <Circle
+              cx={centre}
+              cy={centre}
+              r={radius}
+              style="stroke"
+              strokeWidth={strokeWidth}
+              color={art.glow.color}
+            >
+              <BlurMask blur={art.glow.radius} style="solid" />
+            </Circle>
+          ) : null}
+          <Group origin={vec(centre, centre)} transform={spin}>
+            <Circle
+              cx={centre}
+              cy={centre}
+              r={radius}
+              style="stroke"
+              strokeWidth={strokeWidth}
+            >
+              <SweepGradient
+                c={vec(centre, centre)}
+                colors={art.colors}
+                positions={art.positions}
+              />
+            </Circle>
+          </Group>
+        </Canvas>
+      </View>
     );
   }
 
@@ -109,6 +140,12 @@ function makeKit(S: Skia) {
    * One shared clock rather than one per particle. Each particle reads
    * the same value at its own offset, so an aura of sixteen is one
    * animation, not sixteen — which is what keeps a roster cheap.
+   *
+   * ORBITING OUTSIDE THE PICTURE, and drawn over the top of it. Both
+   * halves of that were wrong first time and the founder caught it: "I
+   * can kinda see the animated hearts on an avatar, but they're behind
+   * the avatar." They were orbiting at 0.44 of the avatar's width, well
+   * inside its own edge, underneath an opaque face.
    */
   function Aura({ art, size }: { art: AuraArt; size: number }) {
     const clock = useSharedValue(0);
@@ -124,24 +161,34 @@ function makeKit(S: Skia) {
       return () => cancelAnimation(clock);
     }, [art.seconds, clock]);
 
-    const centre = size / 2;
-    const orbit = centre * 0.88;
+    const { box, centre, offset, orbit } = auraLayer(size);
     const dot = Math.max(1.5, size * art.scale);
 
     return (
-      <Canvas style={{ width: size, height: size }} pointerEvents="none">
-        {Array.from({ length: art.count }, (_, index) => (
-          <Particle
-            key={index}
-            index={index}
-            art={art}
-            clock={clock}
-            centre={centre}
-            orbit={orbit}
-            dot={dot}
-          />
-        ))}
-      </Canvas>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: -offset,
+          left: -offset,
+          width: box,
+          height: box,
+        }}
+      >
+        <Canvas style={{ width: box, height: box }}>
+          {Array.from({ length: art.count }, (_, index) => (
+            <Particle
+              key={index}
+              index={index}
+              art={art}
+              clock={clock}
+              centre={centre}
+              orbit={orbit}
+              dot={dot}
+            />
+          ))}
+        </Canvas>
+      </View>
     );
   }
 
@@ -174,16 +221,25 @@ function makeKit(S: Skia) {
       switch (art.motion) {
         case "rise":
           /* Up the outside and away, which is what a spark does. */
-          return { x: centre + Math.cos(angle) * orbit, y: centre + orbit - t * orbit * 2 };
+          return {
+            x: centre + Math.cos(angle) * orbit,
+            y: centre + orbit - t * orbit * 2,
+          };
         case "fall":
-          return { x: centre + Math.cos(angle) * orbit, y: centre - orbit + t * orbit * 2 };
+          return {
+            x: centre + Math.cos(angle) * orbit,
+            y: centre - orbit + t * orbit * 2,
+          };
         case "drift": {
           const a = angle + t * Math.PI * 2;
           return { x: centre + Math.cos(a) * orbit, y: centre + Math.sin(a) * orbit };
         }
         default:
           /* Twinkle and flicker stay put and change opacity instead. */
-          return { x: centre + Math.cos(angle) * orbit, y: centre + Math.sin(angle) * orbit };
+          return {
+            x: centre + Math.cos(angle) * orbit,
+            y: centre + Math.sin(angle) * orbit,
+          };
       }
     });
 
@@ -232,40 +288,39 @@ export function getWornKit(): WornKit | null {
 }
 
 /**
- * The worn ring and aura, sized to an avatar.
+ * The worn ring, sized to an avatar and drawn UNDER it.
+ *
+ * Under, because the band sits outside the picture's edge and the
+ * website masks the picture out of the film anyway — "the ring kinda
+ * digs into the profile pic... please don't ever do that again with
+ * these". Z-order is how the app keeps that promise: whatever the band
+ * or its glow reaches, an opaque face is drawn over it.
  *
  * Returns null whenever there is nothing to draw — no slug, no art for
  * it, or no Skia — and the caller keeps whatever it was doing before.
  * That is what lets this land without touching the flat-colour path for
  * the two hundred cosmetics still waiting their turn.
  */
-export function WornCosmetics({
-  ring,
-  aura,
-  size,
-}: {
-  ring: string | null;
-  aura: string | null;
-  size: number;
-}) {
+export function WornRing({ ring, size }: { ring: string | null; size: number }) {
   const kit = getWornKit();
-  if (!kit) return null;
+  const art = ring ? RING_ART[ring] : undefined;
+  if (!kit || !art) return null;
 
-  const ringArt = ring ? RING_ART[ring] : undefined;
-  const auraArt = aura ? AURA_ART[aura] : undefined;
-  if (!ringArt && !auraArt) return null;
+  return <kit.Ring art={art} size={size} />;
+}
 
-  return (
-    <View
-      pointerEvents="none"
-      style={{ position: "absolute", width: size, height: size }}
-    >
-      {auraArt && <kit.Aura art={auraArt} size={size} />}
-      {ringArt && (
-        <View style={{ position: "absolute", width: size, height: size }}>
-          <kit.Ring art={ringArt} size={size} />
-        </View>
-      )}
-    </View>
-  );
+/**
+ * The worn aura, sized to an avatar and drawn OVER it.
+ *
+ * Over, because floating around somebody's picture is the entire point
+ * of an aura, and the particles orbit outside the picture's edge so
+ * "over" costs the face nothing. The web draws it over too. Same null
+ * rules as the ring.
+ */
+export function WornAura({ aura, size }: { aura: string | null; size: number }) {
+  const kit = getWornKit();
+  const art = aura ? AURA_ART[aura] : undefined;
+  if (!kit || !art) return null;
+
+  return <kit.Aura art={art} size={size} />;
 }

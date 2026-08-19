@@ -35,6 +35,13 @@ On a real phone, install **Expo Go** from the App Store and scan the QR
 code `npm start` prints. Note: push notifications need a development
 build (below), not Expo Go — everything else works in Expo Go.
 
+## Look at it
+
+`npx tsc --noEmit` and the unit tests cannot see a screen, and glitches
+have shipped because of it. [TESTING.md](./TESTING.md) has the three
+ways to actually look: Expo Go, the iOS Simulator, and the Maestro
+flows in [.maestro](./.maestro) that walk the app and screenshot it.
+
 ## Build for TestFlight (needs the Apple Developer account)
 
 Once enrollment clears:

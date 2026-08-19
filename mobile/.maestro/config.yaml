@@ -1,0 +1,5 @@
+# Which flows run, and in what order, when you point Maestro at this
+# folder. Numbered because a card zoom is easier to reach once the tabs
+# flow has already proved the app got past its splash screen.
+flows:
+  - "0*.yaml"

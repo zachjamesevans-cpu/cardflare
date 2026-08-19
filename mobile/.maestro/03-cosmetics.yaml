@@ -1,0 +1,38 @@
+# Profile borders and avatar effects, in the picker and on a face.
+#
+# Worth its own flow because this is where the app was lying: the
+# picker listed twenty-five profile borders as twenty-five lines of
+# text, and the avatar drew the ring underneath an opaque face. Both
+# looked exactly like a cosmetic that does not work.
+#
+# Screenshots rather than assertions, because "is it animating" is not
+# a thing Maestro can answer. What it can do is put the picker and the
+# profile in front of somebody who can.
+appId: gg.cardflare.app
+---
+- launchApp:
+    clearState: false
+- runFlow: sign-in.yaml
+
+- tapOn: "Profile"
+- tapOn: "Customize your profile"
+- assertVisible: "Customize profile"
+
+- assertVisible: "Profile borders"
+- takeScreenshot: shots/07-profile-borders
+
+- scrollUntilVisible:
+    element: "Avatar effects"
+    direction: DOWN
+    timeout: 5000
+- takeScreenshot: shots/08-avatar-effects
+
+# Back to the face the picker is dressing, so the last two screenshots
+# are the pair worth comparing: what the tile drew, and what the avatar
+# drew. They are the same two components now, so they should agree.
+#
+# Deliberately does NOT equip anything. A flow that changes what
+# somebody is wearing every time it runs is a flow nobody will run
+# twice; picking a border is a judgement, and it stays a person's.
+- back
+- takeScreenshot: shots/09-profile-worn

@@ -9,6 +9,8 @@ import {
   type CustomizeKind,
   type CustomizeSection,
 } from "../api";
+import { WornAura, WornRing } from "../cosmetic-worn";
+import { hasAuraArt, hasRingArt } from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -18,10 +20,20 @@ import { colors, radius, spacing } from "../theme";
  * it, tap again to take it off. Same sections, same wording, same
  * badges, per the parity rule.
  *
- * One honest difference, said on screen rather than papered over: the
- * new categories' art is drawn on the web profile today. Wearing
+ * One honest difference, said on screen rather than papered over: most
+ * of the new categories' art is drawn on the web profile today. Wearing
  * something here equips it everywhere — the tile just cannot show the
- * animation yet. The per-category native art pass is next.
+ * animation yet. The per-category native art pass is working through
+ * them, and profile borders and avatar effects are through it.
+ *
+ * WHICH IS WHY THOSE TWO NOW CARRY A PREVIEW. A picker that lists
+ * twenty-five profile borders as twenty-five lines of text is a picker
+ * where nobody can tell Inferno from Aurora, and it is most of why the
+ * founder reported "animated profile borders still aren't working on
+ * the app" after they had started working: there was nowhere in the app
+ * that drew one. The preview is the real `WornRing` and `WornAura`
+ * around a stand-in face, the same components the avatar uses, so a
+ * tile and a profile cannot show different things.
  */
 
 /** The two wands' menus, mirroring the website's EQUIP_AREAS split. */
@@ -61,6 +73,53 @@ const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
   title: { title: "Titles", blurb: "The line under your name." },
   badge: { title: "Badges", blurb: "The mark beside your name." },
 };
+
+/**
+ * What a profile border or an avatar effect actually looks like.
+ *
+ * A stand-in face rather than the player's own picture, because the
+ * customize payload does not carry one and a round trip for it would
+ * buy a nicer preview at the cost of a slower screen. The website's
+ * `.cfx-preview-face` makes the same trade for the same reason.
+ *
+ * The ring goes under and the effect goes over, the same order the
+ * avatar draws them in, so what a tile shows is what a profile shows.
+ */
+function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) {
+  const ring = kind === "ring" && hasRingArt(slug) ? slug : null;
+  const aura = kind === "aura" && hasAuraArt(slug) ? slug : null;
+
+  /* Nothing drawable: no empty circle standing in for art that is not
+     there, which would read as "this cosmetic is a grey dot". */
+  if (!ring && !aura) return null;
+
+  return (
+    <View
+      style={{
+        width: PREVIEW,
+        height: PREVIEW,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <WornRing ring={ring} size={PREVIEW} />
+      <View
+        style={{
+          width: PREVIEW,
+          height: PREVIEW,
+          borderRadius: PREVIEW / 2,
+          backgroundColor: colors.canvas,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+      />
+      <WornAura aura={aura} size={PREVIEW} />
+    </View>
+  );
+}
+
+/** Big enough to read a gradient off, small enough for a list row. */
+const PREVIEW = 36;
 
 function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
   return (
@@ -125,7 +184,11 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   if (!sections) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(6) }}>
-        {message ? <Muted>{message}</Muted> : <ActivityIndicator color={colors.accent} />}
+        {message ? (
+          <Muted>{message}</Muted>
+        ) : (
+          <ActivityIndicator color={colors.accent} />
+        )}
       </View>
     );
   }
@@ -157,9 +220,9 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       >
         <Ionicons name="information-circle" size={16} color={colors.textMuted} />
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
-          These categories, and any Rive file dropped into them, are drawn in full
-          on your web profile today. Wearing one here equips it everywhere; in-app
-          art for them is coming next.
+          {area === "profile"
+            ? "Profile borders and avatar effects are drawn here now. The rest of these, and any Rive file dropped into them, still draw in full only on your web profile. Wearing one here equips it everywhere."
+            : "These categories, and any Rive file dropped into them, are drawn in full on your web profile today. Wearing one here equips it everywhere; in-app art for them is coming next."}
         </Text>
       </View>
 
@@ -168,87 +231,90 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       {sections
         .filter((section) => AREA_KINDS[area].includes(section.kind))
         .map((section) => (
-        <Card key={section.kind} style={{ gap: spacing(3) }}>
-          <View style={{ gap: spacing(0.5) }}>
-            <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-              {SECTION_COPY[section.kind].title}
-            </Text>
-            <Muted>
-              {SECTION_COPY[section.kind].blurb} Tap to wear it; tap again to take it
-              off.
-            </Muted>
-          </View>
+          <Card key={section.kind} style={{ gap: spacing(3) }}>
+            <View style={{ gap: spacing(0.5) }}>
+              <Text
+                style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
+              >
+                {SECTION_COPY[section.kind].title}
+              </Text>
+              <Muted>
+                {SECTION_COPY[section.kind].blurb} Tap to wear it; tap again to take it
+                off.
+              </Muted>
+            </View>
 
-          <View style={{ gap: spacing(2) }}>
-            {section.items.map((item) => {
-              const on = (worn[section.kind] ?? null) === item.slug;
-              return (
-                <Tap
-                  key={item.slug}
-                  disabled={!item.owned}
-                  onPress={() => wear(section.kind, on ? null : item.slug)}
-                  accessibilityLabel={
-                    on ? `Take off ${item.name}` : `Wear ${item.name}`
-                  }
-                  style={{
-                    borderRadius: radius.control,
-                    borderWidth: 1,
-                    borderColor: on ? colors.accent : colors.border,
-                    backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.elevated,
-                    padding: spacing(3),
-                    gap: spacing(1),
-                    opacity: item.owned ? 1 : 0.45,
-                  }}
-                >
-                  <View
+            <View style={{ gap: spacing(2) }}>
+              {section.items.map((item) => {
+                const on = (worn[section.kind] ?? null) === item.slug;
+                return (
+                  <Tap
+                    key={item.slug}
+                    disabled={!item.owned}
+                    onPress={() => wear(section.kind, on ? null : item.slug)}
+                    accessibilityLabel={
+                      on ? `Take off ${item.name}` : `Wear ${item.name}`
+                    }
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(1.5),
+                      borderRadius: radius.control,
+                      borderWidth: 1,
+                      borderColor: on ? colors.accent : colors.border,
+                      backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.elevated,
+                      padding: spacing(3),
+                      gap: spacing(1),
+                      opacity: item.owned ? 1 : 0.45,
                     }}
                   >
-                    <Text
-                      numberOfLines={1}
+                    <View
                       style={{
-                        color: colors.textPrimary,
-                        fontWeight: "600",
-                        fontSize: 14,
-                        flex: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(1.5),
                       }}
                     >
-                      {item.name}
-                    </Text>
-                    {on && (
-                      <Ionicons name="checkmark" size={16} color={colors.accent} />
-                    )}
-                  </View>
-                  {item.description ? (
-                    <Text
-                      numberOfLines={2}
-                      style={{ color: colors.textSecondary, fontSize: 12 }}
+                      <CosmeticPreview kind={section.kind} slug={item.slug} />
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: colors.textPrimary,
+                          fontWeight: "600",
+                          fontSize: 14,
+                          flex: 1,
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                      {on && (
+                        <Ionicons name="checkmark" size={16} color={colors.accent} />
+                      )}
+                    </View>
+                    {item.description ? (
+                      <Text
+                        numberOfLines={2}
+                        style={{ color: colors.textSecondary, fontSize: 12 }}
+                      >
+                        {item.description}
+                      </Text>
+                    ) : null}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: spacing(1.5),
+                      }}
                     >
-                      {item.description}
-                    </Text>
-                  ) : null}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                      gap: spacing(1.5),
-                    }}
-                  >
-                    {item.status === "draft" && (
-                      <Pill label="unreleased" tone="neutral" />
-                    )}
-                    {!item.owned && <Pill label="not owned yet" tone="neutral" />}
-                    {on && <Pill label="wearing" tone="accent" />}
-                  </View>
-                </Tap>
-              );
-            })}
-          </View>
-        </Card>
-      ))}
+                      {item.status === "draft" && (
+                        <Pill label="unreleased" tone="neutral" />
+                      )}
+                      {!item.owned && <Pill label="not owned yet" tone="neutral" />}
+                      {on && <Pill label="wearing" tone="accent" />}
+                    </View>
+                  </Tap>
+                );
+              })}
+            </View>
+          </Card>
+        ))}
     </ScrollView>
   );
 }

@@ -131,12 +131,23 @@ describe("worn ring art never lands on the picture", () => {
     /* React Native has no CSS mask, so the app keeps the same promise
        by drawing the film UNDER an opaque face. Different mechanism,
        identical geometry - and if one side's number moves, this
-       fails. */
+       fails.
+
+       The constant lives in mobile/src/avatar-geometry.ts rather than
+       in the component, because a worn ring drawn from arithmetic
+       inside a component is exactly how the CATALOGUE rings ended up
+       stroked inside the avatar and invisible. Same reason, one file
+       later; see tests/unit/app-avatar-geometry.test.ts. */
+    const geometry = readFileSync(
+      join(process.cwd(), "mobile/src/avatar-geometry.ts"),
+      "utf8",
+    );
     const avatar = readFileSync(
       join(process.cwd(), "mobile/src/player-avatar.tsx"),
       "utf8",
     );
-    expect(avatar).toContain("const FILM_SCALE = 400 / 296");
+    expect(geometry).toContain("export const FILM_SCALE = 400 / 296");
+    expect(avatar).toContain('from "./avatar-geometry"');
     /* Drawn before the face in JSX, which is what puts it behind. */
     expect(avatar.indexOf("ringArt && (")).toBeLessThan(
       avatar.indexOf("{face}\n        {auraArt"),
