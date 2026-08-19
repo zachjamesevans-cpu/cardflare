@@ -164,9 +164,22 @@ describe("worn ring art never lands on the picture", () => {
      * an empty one blocks the art itself, which is what kept any ring
      * from appearing in the app at all - see the animated-avatar
      * tests, where that regression is pinned.
+     *
+     * There is now exactly one place scripting is on, and it is not
+     * uploaded art: `/cosmetic-player`, our own page, running our own
+     * bundle over a .riv file handed to it as data. A Rive cosmetic
+     * cannot be drawn any other way - it is played by a runtime rather
+     * than decoded like a picture - and the app used to return null for
+     * the whole kind, which is why a Rive ring animated on the website
+     * and left a bare avatar on a phone.
+     *
+     * `player` is null for svg and for html. So keying the prop on it,
+     * rather than on a constant, is what keeps the exception to one
+     * page we wrote.
      */
-    expect(film).toContain("javaScriptEnabled={false}");
+    expect(film).toContain("javaScriptEnabled={player !== null}");
     expect(film).not.toContain("javaScriptEnabled={true}");
+    expect(film).toMatch(/const player =[\s\S]{0,120}art\.kind === "rive"/);
     expect(film).toContain("domStorageEnabled={false}");
   });
 
