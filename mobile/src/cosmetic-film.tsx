@@ -98,20 +98,33 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
          */
         opaque={false}
         /*
-         * Our origin, and nothing else. An empty list here does not
-         * mean "deny navigation", it means "deny everything including
-         * the page you were asked to show" - the first cut had that,
-         * and it is why no ring appeared in the app at all.
+         * Our ORIGIN - no path, no "/*", and that is load-bearing in a
+         * way that shipped broken once. The library compares this list
+         * against the URL's EXTRACTED ORIGIN, "https://cardflare.gg",
+         * which has no trailing slash - so a pattern ending in "/*"
+         * compiles to a regex demanding a slash, matches nothing, and
+         * the library's answer to a non-whitelisted URL is not "block":
+         * it is Linking.openURL. Tapping Profile tore the founder out
+         * of the app into Safari with a cosmetic in a tab.
+         *
+         * An EMPTY list is the other cliff: it means "deny everything
+         * including the page you were asked to show", which is why no
+         * ring appeared in the app at all, once. Exactly this - the
+         * bare origin - and nothing fancier on either side.
          */
-        originWhitelist={[`${API_BASE}/*`]}
+        originWhitelist={[new URL(API_BASE).origin]}
         /*
          * Called for the FIRST load as well as later ones, so it has to
          * say yes to the player and no to wherever a file might try to
-         * send the view afterwards. The player's own subresources are
-         * not navigations and are not filtered here.
+         * send the view afterwards. By PREFIX, not equality: iOS may
+         * re-serialise the URL's query encoding, and an equality check
+         * against our own string would refuse our own page. The
+         * player's subresources are not navigations and are not
+         * filtered here.
          */
         onShouldStartLoadWithRequest={(request) =>
-          request.url === player || request.url === "about:blank"
+          request.url.startsWith(`${API_BASE}/cosmetic-player`) ||
+          request.url === "about:blank"
         }
         scrollEnabled={false}
         overScrollMode="never"
