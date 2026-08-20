@@ -32,6 +32,24 @@ export interface LocalStore {
   nextEventCode: string | null;
   /** True when the next event's board is already taking Flares. */
   earlyOpen: boolean;
+  /**
+   * The store's own clock.
+   *
+   * Carried so "Doors Friday 7pm" means the shop's Friday evening rather
+   * than UTC's. A board item has had this from the start; the Feed's
+   * upcoming item needs the same, and reading it off the same row is how
+   * the two cannot disagree.
+   */
+  timeZone: string;
+  /**
+   * True when the counter code opens a walk-in room.
+   *
+   * Carried so the Feed can say "walk in any time" without lying: a store
+   * with walk-ins switched off has a code that only works on event nights,
+   * and telling somebody to turn up on a Tuesday would send them to a shop
+   * that cannot let them in.
+   */
+  walkIn: boolean;
 }
 
 /** Remembers that this player goes to this store. Idempotent, silent. */
@@ -78,7 +96,9 @@ async function boardsForStores(
   const [{ data: stores }, { data: events }] = await Promise.all([
     getSupabaseAdmin()
       .from("stores")
-      .select("id, name, city, region, join_code, early_board_hours, timezone")
+      .select(
+        "id, name, city, region, join_code, early_board_hours, timezone, walk_in_enabled",
+      )
       .in("id", storeIds),
     /*
      * One query answers both "is a room live right now" (status open) and
@@ -147,6 +167,8 @@ async function boardsForStores(
         nextEventName: upcoming?.name ?? null,
         nextEventCode: upcoming?.joinCode ?? null,
         earlyOpen,
+        timeZone: store.timezone,
+        walkIn: store.walk_in_enabled,
       },
     ];
   });

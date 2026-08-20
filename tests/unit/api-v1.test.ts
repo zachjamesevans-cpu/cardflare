@@ -185,7 +185,15 @@ describe("GET /api/v1/me", () => {
     const response = await me.GET(request("GET"));
     const body = await response.json();
 
-    expect(body.player).toEqual({ id: "player-1", displayName: "Kaito" });
+    /* The picture and the balance ride along now: the app's home header
+       opens with a face and an Embers count, and /me is the "who am I"
+       call it already makes. Absent in this fixture, so both fall back. */
+    expect(body.player).toEqual({
+      id: "player-1",
+      displayName: "Kaito",
+      avatarUrl: null,
+      embersBalance: 0,
+    });
     expect(body.wants).toHaveLength(1);
     // The deck label rides the snapshot so the app can re-post the folder.
     expect(body.wants[0].deckLabel).toBe("RG Luffy");

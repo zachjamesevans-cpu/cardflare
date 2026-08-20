@@ -39,8 +39,13 @@ for (const method of [
   "gt",
   "lte",
   "neq",
+  "gte",
   "order",
   "limit",
+  /* Reads that end in one row rather than a list: the Embers balance the
+     evergreen items are measured against. Awaited like the rest, so it
+     comes back as "nothing" the same way. */
+  "maybeSingle",
 ]) {
   admin[method] = () => admin;
 }
@@ -88,6 +93,8 @@ function store(overrides: Record<string, unknown> = {}) {
     nextEventName: null,
     nextEventCode: null,
     earlyOpen: false,
+    timeZone: "America/Phoenix",
+    walkIn: true,
     ...overrides,
   };
 }
@@ -106,6 +113,67 @@ beforeEach(() => {
     id: "event-1",
     name: "Friday Night",
     storeTimeZone: "America/Phoenix",
+  });
+});
+
+describe("the Feed on a quiet Tuesday", () => {
+  /*
+   * Round two, and the bug that caused it. Measured on the founder's own
+   * account - a saved store, a want list, nothing live anywhere - the
+   * whole Feed came back with zero items. Every kind was gated on live or
+   * recent activity, and the two starters that would have filled the gap
+   * only appear while a player has NO store and NO wants. So the screen
+   * was empty for exactly the established player it was built to keep.
+   */
+  it("is not empty for a player with a store and a want list", async () => {
+    listLocals.mockResolvedValue([
+      store({ liveNow: false, nextEventAt: null, nextEventCode: null }),
+    ]);
+    listWants.mockResolvedValue([{ cardId: "card-1" }]);
+
+    const items = await listFeed("player-1", null);
+
+    expect(items.length).toBeGreaterThan(0);
+    /* And the thing it leads with is the store, not a shop tile: an
+       evergreen item may fill a gap, never take the top. */
+    expect(items[0].kind).toBe("upcoming");
+  });
+
+  it("says walk in when there is no night on the calendar", async () => {
+    listLocals.mockResolvedValue([
+      store({ liveNow: false, nextEventAt: null, nextEventCode: null }),
+    ]);
+
+    const items = await listFeed("player-1", null);
+    const upcoming = items.find((item) => item.kind === "upcoming");
+
+    expect(upcoming).toMatchObject({ walkIn: true, nextEventAt: null });
+  });
+
+  it("drops a store with neither a night nor walk-ins", async () => {
+    /* "Nothing is happening at four shops" is worse than a short feed. */
+    listLocals.mockResolvedValue([
+      store({
+        liveNow: false,
+        nextEventAt: null,
+        nextEventCode: null,
+        walkIn: false,
+      }),
+    ]);
+
+    const items = await listFeed("player-1", null);
+
+    expect(items.some((item) => item.kind === "upcoming")).toBe(false);
+  });
+
+  it("never lists a store twice, as a board and as upcoming", async () => {
+    /* A live store is already a board above; repeating it under a second
+       heading is the drift this set exists to prevent. */
+    listLocals.mockResolvedValue([store({ liveNow: true })]);
+
+    const items = await listFeed("player-1", null);
+
+    expect(items.some((item) => item.kind === "upcoming")).toBe(false);
   });
 });
 

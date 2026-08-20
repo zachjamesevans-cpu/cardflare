@@ -143,6 +143,33 @@ Three things CardFlare has that a general social app does not:
    and three people at a counter notice. Rings, showcases and Embers only make
    sense where people look at each other, and the Feed is that place.
 
+### Round two: something on a quiet Tuesday
+
+**Approved 2026-08-20.** The first cut was entirely derived, and derived from
+_live or recent_ activity: a board open now, a trade this week, a card added by
+somebody you follow. Measured on the founder's own account — a real account
+with a saved store and a want list — the Feed returned **zero items**. Every
+kind was gated, and on a pilot-size roster most days are quiet, so the screen
+taught "nothing happens here" on exactly the day it existed to answer.
+
+Two changes to the boundary, and the second is the scope change:
+
+**A store is news before it is live.** A saved store with a night on the
+calendar, or a counter code you can walk in on, earns a place whether or not
+anything is open right now. This is still place and time — "bring it Friday"
+is the spec's own example — it simply stops requiring that Friday be today.
+
+**Some items are evergreen.** Packs and cosmetics are things a player can act
+on with nobody else present, and PRODUCT.md already names "it gives the
+cosmetics somewhere to be seen" as one of three reasons the Feed earns its
+place. So the Feed may carry them. The guards that keep this from becoming a
+shop: they sit BELOW everything derived, they are capped at one item each, and
+they are never the reason a room goes unmentioned.
+
+What has not changed: no compose box, no photographs, no comments, no prices on
+cards, and no item that could be satisfied by post. A quiet Feed is allowed to
+be short. It is not allowed to be empty.
+
 ### The measure
 
 Not daily actives. **Trades and wants that trace back to a Feed item.** A Feed

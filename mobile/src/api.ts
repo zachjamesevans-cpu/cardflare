@@ -285,7 +285,21 @@ async function call<T>(
 /* ------------------------------------------------------------------ */
 
 export interface Me {
-  player: { id: string; displayName: string };
+  player: {
+    id: string;
+    displayName: string;
+    handle?: string;
+    /*
+     * For the home header, and OPTIONAL on purpose.
+     *
+     * A TestFlight build ships on its own clock and can be running
+     * against a server that has not deployed these two yet - or, after a
+     * rollback, one that has stopped sending them. The header falls back
+     * rather than rendering "undefined Embers" at somebody.
+     */
+    avatarUrl?: string | null;
+    embersBalance?: number;
+  };
   wants: {
     id: string;
     cardId: string;
@@ -1059,6 +1073,67 @@ export type FeedItem =
       cards: FeedCard[];
       total: number;
       youCanAnswer: number;
+    }
+  /**
+   * A store you have saved, with something to come.
+   *
+   * The item that answers a Tuesday: a board item needs a room open NOW,
+   * and most days there isn't one. A night on the calendar, or a counter
+   * code you can walk in on, is still place and time.
+   */
+  | {
+      kind: "upcoming";
+      storeId: string;
+      storeName: string;
+      city: string | null;
+      joinCode: string;
+      nextEventAt: string | null;
+      nextEventName: string | null;
+      nextEventCode: string | null;
+      /** The store's clock, so "Friday 7pm" is their Friday. */
+      timeZone: string;
+      walkIn: boolean;
+      /** Cards on your want list — what there is to go and ask about. */
+      wants: number;
+    }
+  /** A Flare somebody posted lately, wherever they posted it. */
+  | {
+      kind: "recent";
+      id: string;
+      playerSessionId: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      storeName: string;
+      city: string | null;
+      joinCode: string;
+      when: string;
+      /** Stated as words, never as a texture. See PRODUCT.md. */
+      direction: "want" | "showcase";
+      deckLabel: string | null;
+      cards: FeedCard[];
+      more: number;
+    }
+  /** A pack in the Embers store. Evergreen — true with nobody else here. */
+  | {
+      kind: "pack";
+      slug: string;
+      name: string;
+      description: string;
+      priceEmbers: number;
+      artUrl: string | null;
+      balance: number;
+    }
+  /** Cosmetics worth a look, and what they cost. Evergreen. */
+  | {
+      kind: "shop";
+      cosmetics: {
+        slug: string;
+        name: string;
+        description: string;
+        family: string;
+        costEmbers: number;
+      }[];
+      balance: number;
     };
 
 export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");

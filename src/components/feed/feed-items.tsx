@@ -5,6 +5,7 @@ import {
   MapPin,
   PackageCheck,
   Layers,
+  Sparkles,
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -37,6 +38,23 @@ function doorsAt(startsAt: string | null, timeZone: string): string {
     minute: "2-digit",
     timeZone,
   }).format(new Date(startsAt))}`;
+}
+
+/**
+ * How long ago, in the shortest true form.
+ *
+ * A Flare from this afternoon and one from Tuesday are different news, and
+ * a full date on every row is noise. Days are the coarsest unit that
+ * matters here because the item stops being shown after a week.
+ */
+function agoFrom(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 /** One card, at the size the feed shows cards. */
@@ -376,6 +394,148 @@ export function Item({ item }: { item: FeedItem }) {
             </Link>
           </div>
         ))}
+      </Card>
+    );
+  }
+
+  if (item.kind === "upcoming") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm font-medium text-accent">
+            {item.storeName}
+            {item.city ? ` · ${item.city}` : ""}
+          </p>
+          <p className="text-lg font-semibold text-text-primary">
+            {/* A night on the calendar is the headline. Without one, the
+                counter code is: a walk-in room has no name and needs
+                none, because the answer is "whenever you like". */}
+            {item.nextEventName ?? "Walk in any time"}
+          </p>
+          <p className="flex items-center gap-1.5 text-sm text-text-secondary">
+            <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
+            {item.nextEventAt
+              ? doorsAt(item.nextEventAt, item.timeZone)
+              : "The counter code is always open"}
+          </p>
+        </div>
+
+        {item.wants > 0 && (
+          <p className="text-sm text-text-secondary">
+            {/* What there is to do when you get there. A want list is the
+                reason to walk in, and the number is the size of it. */}
+            {item.wants} {item.wants === 1 ? "card" : "cards"} on your want list to ask
+            about
+          </p>
+        )}
+
+        <Link
+          href={`/e/${item.nextEventCode ?? item.joinCode}`}
+          className={buttonStyles("secondary", "sm")}
+        >
+          {item.nextEventCode ? "See the board" : "Open the room"}
+        </Link>
+      </Card>
+    );
+  }
+
+  if (item.kind === "recent") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <PlayerAvatar
+            displayName={item.displayName ?? "A player"}
+            seed={item.playerSessionId}
+            avatarUrl={item.avatarUrl}
+            frame={null}
+            size="md"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-text-primary">
+              {item.displayName ?? "A player"}
+            </p>
+            <p className="truncate text-xs text-text-muted">
+              {/* The direction in words, never a texture: PRODUCT.md is
+                  explicit that foil means rare, not available. */}
+              {item.direction === "showcase" ? "Letting go of" : "Hunting"}
+              {item.deckLabel ? ` · ${item.deckLabel}` : ""} · {item.storeName}
+            </p>
+          </div>
+          <p className="shrink-0 text-xs text-text-muted">{agoFrom(item.when)}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {item.cards.map((card) => (
+            <FeedTile
+              key={card.cardId}
+              imageUrl={card.imageUrl}
+              name={card.cardName}
+              match={card.match}
+            />
+          ))}
+          {item.more > 0 && (
+            <p className="text-xs text-text-muted">+{item.more} more</p>
+          )}
+        </div>
+
+        <Link href={`/e/${item.joinCode}`} className={buttonStyles("secondary", "sm")}>
+          See the board
+        </Link>
+      </Card>
+    );
+  }
+
+  if (item.kind === "pack") {
+    const affordable = item.balance >= item.priceEmbers;
+
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm font-medium text-accent">In the Embers store</p>
+          <p className="text-lg font-semibold text-text-primary">{item.name}</p>
+          <p className="text-sm text-text-secondary">{item.description}</p>
+        </div>
+
+        <p className="flex items-center gap-1.5 text-sm text-text-secondary">
+          <PackageCheck className="size-4 shrink-0 text-text-muted" aria-hidden />
+          {item.priceEmbers} Embers
+          {/* Only said when it changes what you can do about it. */}
+          {affordable ? "" : ` · you have ${item.balance}`}
+        </p>
+
+        <Link href="/profile/store" className={buttonStyles("secondary", "sm")}>
+          {affordable ? "Open a pack" : "See the store"}
+        </Link>
+      </Card>
+    );
+  }
+
+  if (item.kind === "shop") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="font-semibold text-text-primary">Worth spending Embers on</p>
+          <p className="text-xs text-text-muted">You have {item.balance} to spend.</p>
+        </div>
+
+        {item.cosmetics.map((cosmetic) => (
+          <div key={cosmetic.slug} className="flex items-center gap-3">
+            <Sparkles className="size-4 shrink-0 text-text-muted" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-text-primary">
+                {cosmetic.name}
+              </p>
+              <p className="truncate text-xs text-text-muted">{cosmetic.description}</p>
+            </div>
+            <p className="shrink-0 text-xs text-text-secondary">
+              {cosmetic.costEmbers}
+            </p>
+          </div>
+        ))}
+
+        <Link href="/profile/customize" className={buttonStyles("secondary", "sm")}>
+          See what you can wear
+        </Link>
       </Card>
     );
   }

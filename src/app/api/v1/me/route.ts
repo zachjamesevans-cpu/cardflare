@@ -2,6 +2,7 @@ import { apiPlayer, unauthorized } from "@/lib/api/auth";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,24 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [wants, sync, locals] = await Promise.all([
+  const [wants, sync, locals, account] = await Promise.all([
     listWants(player.playerId),
     collectionSyncFor(player.playerId),
     listLocals(player.playerId),
+    /*
+     * The picture and the balance, for the app's home header.
+     *
+     * Two columns off one indexed row rather than the whole profile: the
+     * home screen is the most-opened screen in the product and it needs a
+     * face and a number, not a wardrobe. The dressed avatar - rings,
+     * auras, worn files - stays on the Profile tab, which is the screen
+     * that already pays for it.
+     */
+    getSupabaseAdmin()
+      .from("players")
+      .select("avatar_url, embers_balance")
+      .eq("id", player.playerId)
+      .maybeSingle(),
   ]);
 
   return Response.json({
@@ -26,6 +41,8 @@ export async function GET(request: Request): Promise<Response> {
       id: player.playerId,
       displayName: player.displayName,
       handle: player.handle,
+      avatarUrl: account.data?.avatar_url ?? null,
+      embersBalance: account.data?.embers_balance ?? 0,
     },
     wants: wants.map((want) => ({
       id: want.id,
