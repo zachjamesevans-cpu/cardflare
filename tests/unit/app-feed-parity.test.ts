@@ -84,6 +84,19 @@ describe("the home screen's furniture", () => {
     expect(web).not.toContain("Scan a code");
   });
 
+  it("draws nothing for a kind the client has never heard of", () => {
+    /*
+     * The server ships on Vercel's clock and the app on TestFlight's, so
+     * a phone meets kinds newer than itself routinely. Both chains used to
+     * END in the board branch, which rendered an unknown kind AS a board -
+     * an undefined title over a button to an undefined room. That is how
+     * the two platforms came to show different feeds the week the new
+     * kinds landed, reported by the founder rather than caught here.
+     */
+    expect(items).toContain('if (item.kind !== "board") return null;');
+    expect(app).toContain('item.kind !== "board" ? null : (');
+  });
+
   it("hides the explainer once the screen has filled up", () => {
     expect(web).toContain("items.length < 3");
     expect(app).toContain("feed.length < 3");

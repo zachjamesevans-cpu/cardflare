@@ -335,9 +335,9 @@ export interface UpcomingItem {
  * the person is still looking for it. This is the same fact without the
  * requirement that the room still be running.
  *
- * Grouped by `posted_batch`, the same way the room's board groups a pasted
- * deck, so thirty cards from one paste arrive as one item rather than
- * thirty rows - the pile the grouping exists to prevent.
+ * One row per person per store per day, so a player working through a
+ * deck arrives as one answer to "who do I walk over to, and about what"
+ * rather than as one row per card.
  */
 export interface RecentItem {
   kind: "recent";
@@ -841,9 +841,21 @@ async function avatarsFor(playerIds: string[]): Promise<Map<string, string | nul
  * though they are still looking for it. This reads the Flares themselves
  * and asks only that they still be open, and recent.
  *
- * GROUPED BY BATCH, because a pasted deck is one act. The room's board
- * learned this the hard way - a pasted list nobody named "came out as
- * thirty loose rows" - and a feed row has less room than a board does.
+ * GROUPED BY PERSON, PLACE AND DAY, not by batch.
+ *
+ * Batch alone was the first cut and it was visibly wrong the moment real
+ * data arrived: one player's three separate Flares at one shop on one
+ * afternoon came out as three near-identical rows, same face, same store,
+ * same "4d ago", one small card each. The founder, looking at it: "it
+ * would look a little silly to have separate flares in the feed for each
+ * card someone needs, if theyre building a full deck."
+ *
+ * A batch only ever exists when somebody pasted a list, so grouping by it
+ * groups the one case that was already tidy and leaves the messy one
+ * alone. What a reader actually wants is the question the room's board
+ * asks: who do I walk over to, and about what. So one row per person per
+ * store per day - and per named hunt, because a player who named two
+ * decks meant two answers to that question, not one.
  *
  * The reader's own Flares are left out: you know what you posted, and a
  * feed that opens with your own words is a mirror rather than a room.
@@ -857,9 +869,7 @@ async function recentItems(
 
   const { data: flares, error } = await admin
     .from("flares")
-    .select(
-      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch",
-    )
+    .select("id, created_at, event_id, player_session_id, card_id, intent, deck_label")
     .eq("status", "open")
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
@@ -901,7 +911,17 @@ async function recentItems(
     const fact = facts.get(flare.card_id);
     if (!store || !fact) continue;
 
-    const key = `${flare.posted_batch ?? flare.id}:${flare.player_session_id}`;
+    /* The day in the store's own terms is overkill here: a Flare posted
+       either side of midnight is the same trip, and a UTC date is stable
+       and cheap. Deck label included, so two named hunts stay two rows. */
+    const day = flare.created_at.slice(0, 10);
+    const key = [
+      flare.player_session_id,
+      storeId,
+      flare.intent,
+      flare.deck_label ?? "",
+      day,
+    ].join(":");
     const card: FeedCard = {
       cardId: flare.card_id,
       ...fact,

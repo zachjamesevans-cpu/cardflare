@@ -540,6 +540,21 @@ export function Item({ item }: { item: FeedItem }) {
     );
   }
 
+  /*
+   * A kind this build has never heard of draws NOTHING.
+   *
+   * The server ships on Vercel's clock and the app on TestFlight's, so a
+   * phone meets item kinds newer than itself as a matter of routine - and
+   * this chain used to end in the board branch, which meant an unknown
+   * kind was rendered AS a board: a card with an undefined title and a
+   * button to an undefined room. That is how the website and the app came
+   * to show different feeds the week the new kinds landed.
+   *
+   * Skipping is the only honest answer, and it is what lets the server add
+   * a kind without waiting for every phone to catch up.
+   */
+  if (item.kind !== "board") return null;
+
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-col gap-0.5">

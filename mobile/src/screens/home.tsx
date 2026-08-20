@@ -345,6 +345,16 @@ export function HomeScreen() {
        * before places, because a board will still be there tomorrow and
        * somebody needing a card you are holding will not.
        */}
+      {/*
+       * A kind this build has never heard of draws NOTHING.
+       *
+       * The server ships on Vercel's clock and the app on TestFlight's, so
+       * a phone meets item kinds newer than itself as a matter of routine.
+       * This chain used to end in the board branch, so an unknown kind was
+       * rendered AS a board - a card with an undefined title and a button
+       * to an undefined room. That is how the website and the app came to
+       * show different feeds the week the new kinds landed.
+       */}
       {feed.map((item, index) =>
         item.kind === "announcement" ? (
           <Card key={`announcement-${index}`}>
@@ -731,7 +741,7 @@ export function HomeScreen() {
               onPress={() => navigation.navigate("Customize", { area: "profile" })}
             />
           </Card>
-        ) : (
+        ) : item.kind !== "board" ? null : (
           <Card key={`board-${index}`}>
             {/* A local needs no address — you drive there. A room
                 somewhere you have never been needs a place attached. */}
