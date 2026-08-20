@@ -5,11 +5,13 @@ import { ArrowLeft, UserRound } from "lucide-react";
 import { AdminPlayerRow } from "@/components/admin/admin-player-row";
 import { AvatarProbe } from "@/components/admin/avatar-probe";
 import { InvitePlayerForm } from "@/components/admin/invite-player-form";
+import { OrphanSessions } from "@/components/admin/orphan-sessions";
 import { PlayerSearch } from "@/components/admin/player-search";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { avatarDiagnostics } from "@/lib/admin/avatar-check";
 import { searchPlayers } from "@/lib/admin/grants";
+import { listOrphanSessions } from "@/lib/admin/orphan-sessions";
 import { listPlayersForAdmin, playerForUser } from "@/lib/players/accounts";
 
 export const metadata: Metadata = {
@@ -48,6 +50,9 @@ export default async function AdminPlayersPage({
 
   const params = await searchParams;
   const query = params.q ?? "";
+
+  /* Guest sessions carrying Flares, for the merge tool below the list. */
+  const orphans = await listOrphanSessions();
 
   /*
    * The picture check runs ON REQUEST now, never as part of an ordinary
@@ -130,6 +135,11 @@ export default async function AdminPlayersPage({
         </p>
 
         <PlayerSearch initial={query} />
+
+        {/* Flares stranded on a session with no account behind it. See
+            listOrphanSessions for why this cannot be repaired without a
+            human saying whose they are. */}
+        <OrphanSessions sessions={orphans} players={found} />
 
         {found.length === 0 && pending.length === 0 ? (
           <Card className="flex flex-col items-center gap-3 py-12 text-center">
