@@ -16,6 +16,12 @@ All three typechecked. All three shipped.
 
 This file is how to close that gap. Three options, cheapest first.
 
+## What to actually check
+
+[VISUAL-PASS.md](./VISUAL-PASS.md) is the standing checklist - every
+recent fix, what to look at, and what each failure looked like. A
+session on a Mac should work through it top to bottom.
+
 ## 1. Expo Go, on your own phone
 
 The fastest look at a change, and it needs no Xcode.
