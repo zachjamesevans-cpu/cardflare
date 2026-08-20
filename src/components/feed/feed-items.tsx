@@ -425,6 +425,60 @@ export function Item({ item }: { item: FeedItem }) {
     );
   }
 
+  if (item.kind === "wanted") {
+    return (
+      <Card className="flex flex-col gap-3 border-accent-muted/60 bg-gradient-to-b from-accent/5 to-transparent p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-lg font-semibold text-text-primary">
+            {/* The number is the item. It moves on its own, which is the
+                whole reason to open the app again. */}
+            {item.total} {item.total === 1 ? "player wants" : "players want"} a card
+            you&rsquo;re holding
+          </p>
+          <p className="text-xs text-text-muted">
+            Bring it and it&rsquo;s a trade. They already asked.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {item.entries.map((entry) => (
+            <div
+              key={`${entry.playerSessionId}-${entry.card.cardId}`}
+              className="flex items-center gap-3"
+            >
+              <FeedTile
+                imageUrl={entry.card.imageUrl}
+                name={entry.card.cardName}
+                match={entry.card.match}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-text-primary">
+                  {entry.card.cardName}
+                </p>
+                <p className="truncate text-xs text-text-muted">
+                  {entry.displayName ?? "A player"} · {entry.storeName} ·{" "}
+                  {agoFrom(entry.when)}
+                </p>
+              </div>
+              <Link
+                href={`/e/${entry.joinCode}`}
+                className={buttonStyles("secondary", "sm")}
+              >
+                Go
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {item.total > item.entries.length && (
+          <p className="text-xs text-text-muted">
+            +{item.total - item.entries.length} more across your stores
+          </p>
+        )}
+      </Card>
+    );
+  }
+
   if (item.kind === "upcoming") {
     return (
       <Card className="flex flex-col gap-3 p-4">

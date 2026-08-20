@@ -33,6 +33,7 @@ const appRoot = read("mobile/App.tsx");
 
 /** Every item kind the server can produce, from the union itself. */
 const KINDS = [
+  "wanted",
   "announcement",
   "board",
   "hunt",
@@ -97,6 +98,34 @@ describe("the home screen's furniture", () => {
      */
     expect(items).toContain('if (item.kind !== "board") return null;');
     expect(app).toContain('item.kind !== "board" ? null : (');
+  });
+
+  it("says why every item is on the screen, and where it belongs", () => {
+    /*
+     * The founder: "seeing a bunch of random cards posted just doesn't
+     * feel great." A feed that explains itself stops feeling arbitrary
+     * even when it is thin, and the ordering was always an argument
+     * about what is worth a tap - this is that argument said out loud.
+     *
+     * Both live on the server so the two platforms cannot word them
+     * differently, which is what a shared SECTION_TITLES is for.
+     */
+    const repo = read("src/lib/feed/repository.ts");
+
+    expect(repo).toContain("function reasonFor(item: FeedItem): string");
+    expect(repo).toContain("function sectionFor(item: FeedItem): FeedSection");
+    expect(repo).toContain("export const SECTION_TITLES");
+
+    expect(webPage).toContain("SECTION_TITLES[item.section]");
+    expect(app).toContain("SECTION_TITLES[item.section]");
+    expect(webPage).toContain("{item.reason}");
+    expect(app).toContain("{item.reason}");
+  });
+
+  it("lets the feed be asked for again", () => {
+    /* The most-reopened screen in the app had no pull to refresh, which
+       quietly teaches that reopening is pointless. */
+    expect(app).toContain("<RefreshControl");
   });
 
   it("hides the explainer once the screen has filled up", () => {

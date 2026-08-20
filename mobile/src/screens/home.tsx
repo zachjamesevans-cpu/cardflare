@@ -2,12 +2,20 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { Image, Linking, ScrollView, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 import type { StackParams } from "../../App";
 import {
   getFeed,
-  type FeedItem,
+  SECTION_TITLES,
+  type FeedEntry,
   getMe,
   joinRoom,
   postFlare,
@@ -138,44 +146,69 @@ export function HomeScreen() {
   const [me, setMe] = useState<Me | null>(null);
   /* What is on at the places you go, and who needs what you have. The
      website's Feed, from the same server answer. */
-  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [rsvping, setRsvping] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const locals = me?.locals ?? [];
+
+  /*
+   * One loader, shared by arriving at the screen and by pulling it down.
+   *
+   * `alive` rather than a bare boolean so a pull that resolves after the
+   * tab has been left does not set state on a gone screen - and so the
+   * two entry points cannot drift into two slightly different loads.
+   */
+  const load = useCallback(async (alive: () => boolean) => {
+    if (!(await storedAccessToken())) {
+      if (alive()) {
+        setMe(null);
+        setFeed([]);
+      }
+      return;
+    }
+
+    try {
+      const fresh = await getMe();
+      if (alive()) setMe(fresh);
+    } catch {
+      if (alive()) setMe(null);
+    }
+
+    /* Its own try: the feed is the screen's headline, but a feed that
+       failed must not take the locals list down with it. */
+    try {
+      const fresh = await getFeed();
+      if (alive()) setFeed(fresh.items);
+    } catch {
+      if (alive()) setFeed([]);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let live = true;
-
-      void (async () => {
-        if (!(await storedAccessToken())) {
-          if (live) {
-            setMe(null);
-            setFeed([]);
-          }
-          return;
-        }
-        try {
-          const fresh = await getMe();
-          if (live) setMe(fresh);
-        } catch {
-          if (live) setMe(null);
-        }
-
-        /* Its own try: the feed is the screen's headline, but a feed that
-           failed must not take the locals list down with it. */
-        try {
-          const fresh = await getFeed();
-          if (live) setFeed(fresh.items);
-        } catch {
-          if (live) setFeed([]);
-        }
-      })();
+      void load(() => live);
 
       return () => {
         live = false;
       };
-    }, []),
+    }, [load]),
   );
+
+  /*
+   * Pull to refresh, which the most-reopened screen in the app did not
+   * have. Without it there is no way to ask for new content, which
+   * quietly teaches that reopening is pointless - the exact opposite of
+   * what a feed is for.
+   */
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await load(() => true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
@@ -257,7 +290,16 @@ export function HomeScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={colors.textMuted}
+        />
+      }
+    >
       {/*
        * Who you are and what you have, before anything derived.
        *
@@ -377,8 +419,74 @@ export function HomeScreen() {
        * to an undefined room. That is how the website and the app came to
        * show different feeds the week the new kinds landed.
        */}
-      {feed.map((item, index) =>
-        item.kind === "announcement" ? (
+      {feed.map((item, index) => {
+        const body =
+        item.kind === "wanted" ? (
+          <Card
+            key={`wanted-${index}`}
+            style={{ borderColor: `${colors.accent}66` }}
+          >
+            {/* The number IS the item. It moves on its own, which is the
+                whole reason to open the app again on a Tuesday. */}
+            <Title>
+              {`${item.total} ${
+                item.total === 1 ? "player wants" : "players want"
+              } a card you're holding`}
+            </Title>
+            <Muted>Bring it and it&rsquo;s a trade. They already asked.</Muted>
+
+            <View style={{ gap: spacing(2.5) }}>
+              {item.entries.map((entry) => (
+                <View
+                  key={`${entry.playerSessionId}-${entry.card.cardId}`}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2.5),
+                  }}
+                >
+                  <CardImage
+                    imageUrl={entry.card.imageUrl}
+                    width={44}
+                    name={entry.card.cardName}
+                    cardNumber={entry.card.cardNumber}
+                    youHave={
+                      entry.card.match
+                        ? { kind: entry.card.match, count: 0 }
+                        : undefined
+                    }
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.textPrimary, fontWeight: "600" }}
+                    >
+                      {entry.card.cardName}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.textMuted, fontSize: 12 }}
+                    >
+                      {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
+                    </Text>
+                  </View>
+                  <Tap
+                    accessibilityLabel={`Go to ${entry.storeName}`}
+                    onPress={() => void enter(entry.joinCode)}
+                  >
+                    <Text style={{ color: colors.accent, fontWeight: "700" }}>Go</Text>
+                  </Tap>
+                </View>
+              ))}
+            </View>
+
+            {item.total > item.entries.length ? (
+              <Muted>
+                {`+${item.total - item.entries.length} more across your stores`}
+              </Muted>
+            ) : null}
+          </Card>
+        ) : item.kind === "announcement" ? (
           <Card key={`announcement-${index}`}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
@@ -805,8 +913,38 @@ export function HomeScreen() {
               onPress={() => void enter(item.code)}
             />
           </Card>
-        ),
-      )}
+          );
+
+        /* The heading, only where the section changes. The order was
+           always an argument about what is worth a tap; this is that
+           argument said out loud. */
+        const opensSection =
+          item.section !== undefined &&
+          (index === 0 || feed[index - 1].section !== item.section);
+
+        return (
+          <View key={`entry-${index}`} style={{ gap: spacing(2) }}>
+            {opensSection && item.section ? (
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  letterSpacing: 1.4,
+                  textTransform: "uppercase",
+                  marginTop: spacing(1),
+                }}
+              >
+                {SECTION_TITLES[item.section]}
+              </Text>
+            ) : null}
+            {body}
+            {/* Why this is on your screen. A feed that explains itself
+                stops feeling arbitrary even when it is thin. */}
+            {item.reason ? <Muted>{item.reason}</Muted> : null}
+          </View>
+        );
+      })}
 
       {locals.length > 0 && (
         <Card>
