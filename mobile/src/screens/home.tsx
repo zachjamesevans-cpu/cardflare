@@ -73,7 +73,7 @@ const STARTERS = {
 } as const;
 
 /**
- * The four things a player can always do, whatever the room is doing.
+ * The things a player can always do, whatever the room is doing.
  *
  * The founder, on opening the app and finding nothing: "the app should
  * have a great home menu with lots of call to actions or stuff to look
@@ -81,11 +81,14 @@ const STARTERS = {
  * on anybody else having posted anything, which is the whole trouble
  * with a feed on a quiet week.
  *
- * Scan leads because it is the one that starts the core loop, and it
- * lives on Room as well: this is a shortcut to it, not a second home.
+ * SCANNING IS DELIBERATELY NOT HERE. The first cut of this row had it,
+ * and it walked straight back into a decision the founder already made:
+ * "move the qr code scanner/code entry to Room. No need to have that in
+ * the feed." Scanning is what you do standing at a counter, which is the
+ * moment you are opening Room anyway. Three doors that go somewhere you
+ * cannot otherwise reach in a tap beats four with one in the wrong wall.
  */
 const ACTIONS = [
-  { key: "scan", icon: "qrcode-scan", label: "Scan a code" },
   { key: "wants", icon: "clipboard-list-outline", label: "Your wants" },
   { key: "store", icon: "fire", label: "Embers store" },
   { key: "dress", icon: "auto-fix", label: "Customize" },
@@ -287,42 +290,51 @@ export function HomeScreen() {
       {/* The call to actions. Always here, always the same four. */}
       <View style={{ flexDirection: "row", gap: spacing(2) }}>
         {ACTIONS.map((action) => (
-          <Tap
-            key={action.key}
-            accessibilityLabel={action.label}
-            onPress={() => {
-              if (action.key === "scan") navigation.navigate("Scan");
-              else if (action.key === "wants") navigation.navigate("Settings");
-              else if (action.key === "store") navigation.navigate("Store");
-              else navigation.navigate("Customize", { area: "profile" });
-            }}
-            style={{
-              flex: 1,
-              gap: spacing(1),
-              alignItems: "center",
-              paddingVertical: spacing(3),
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.elevated,
-            }}
-          >
-            <MaterialCommunityIcons
-              name={action.icon}
-              size={22}
-              color={colors.accent}
-            />
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontSize: 11,
-                textAlign: "center",
+          /*
+           * The flex lives on a wrapper, not on the Tap.
+           *
+           * `Tap` hands its `style` to the Animated.View INSIDE the
+           * Pressable, so `flex: 1` there sizes a child of a box that is
+           * still sizing itself to its content - the row came out half
+           * the width of the cards under it, left-aligned. Wrapping is
+           * the local fix; moving the style onto the Pressable would
+           * change every Tap in the app to fix one row.
+           */
+          <View key={action.key} style={{ flex: 1 }}>
+            <Tap
+              accessibilityLabel={action.label}
+              onPress={() => {
+                if (action.key === "wants") navigation.navigate("Settings");
+                else if (action.key === "store") navigation.navigate("Store");
+                else navigation.navigate("Customize", { area: "profile" });
               }}
-              numberOfLines={2}
+              style={{
+                gap: spacing(1),
+                alignItems: "center",
+                paddingVertical: spacing(3),
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.elevated,
+              }}
             >
-              {action.label}
-            </Text>
-          </Tap>
+              <MaterialCommunityIcons
+                name={action.icon}
+                size={22}
+                color={colors.accent}
+              />
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 11,
+                  textAlign: "center",
+                }}
+                numberOfLines={2}
+              >
+                {action.label}
+              </Text>
+            </Tap>
+          </View>
         ))}
       </View>
 
@@ -729,7 +741,9 @@ export function HomeScreen() {
                 : `${item.storeName} · ${item.city}`}
             </Muted>
             <Title>{item.eventName}</Title>
-            <Muted>{item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}</Muted>
+            <Muted>
+              {item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}
+            </Muted>
 
             {item.youCanAnswer > 0 && (
               <>
@@ -866,9 +880,8 @@ export function HomeScreen() {
         <Card>
           <Title>How it works</Title>
           <Body>
-            Post a Flare for the card you&rsquo;re hunting. When somebody in the
-            room has it, they raise a hand, and you go trade, in person, at the
-            table.
+            Post a Flare for the card you&rsquo;re hunting. When somebody in the room
+            has it, they raise a hand, and you go trade, in person, at the table.
           </Body>
         </Card>
       )}
