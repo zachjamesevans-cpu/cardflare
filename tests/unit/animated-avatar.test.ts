@@ -225,8 +225,11 @@ describe("where it is stored and how it is served", () => {
     expect(film).not.toContain("originWhitelist={[]}");
     expect(film).not.toContain("onShouldStartLoadWithRequest={() => false}");
     /* By prefix, not equality: iOS may re-serialise our own query
-       encoding, and an equality check would refuse our own page. */
-    expect(film).toContain("request.url.startsWith(`${API_BASE}/cosmetic-player`)");
+       encoding, and an equality check would refuse our own page. And
+       against every spelling of our host, because the apex 308s to www
+       and a redirect is a navigation the gate has to admit. */
+    expect(film).toContain("request.url.startsWith(`${origin}/cosmetic-player`)");
+    expect(film).toContain("siteOrigins().some((origin) =>");
     /* And iOS paints a white page behind a WebView without this. */
     expect(film).toContain("opaque={false}");
     /*

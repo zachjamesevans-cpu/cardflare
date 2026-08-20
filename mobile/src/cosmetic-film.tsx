@@ -43,6 +43,34 @@ export interface ArtFile {
 }
 
 /**
+ * Our site's origins: the one we are configured with, and the same host
+ * with `www.` added or taken away.
+ *
+ * BECAUSE ONE OF THEM REDIRECTS TO THE OTHER, and that killed a
+ * cosmetic in production. `API_BASE` is the apex, `https://cardflare.gg`,
+ * and the deployment answers it with a 308 to `https://www.cardflare.gg`.
+ * `fetch` does not care - it follows the redirect and every API call in
+ * the app works - but a WebView polices NAVIGATION by origin, and the
+ * redirect lands on a host that was not on the list. So the founder's
+ * profile border loaded nothing at all, while everything else about the
+ * app looked perfectly healthy.
+ *
+ * The server stamps art URLs with `siteUrl()`, which is the apex, so
+ * this cannot be fixed by pointing the app at `www` instead: that would
+ * only move the mismatch to the other side and make `playerUrl` reject
+ * our own files. Both spellings of our own host are us. Nothing else is.
+ *
+ * Still exactly two bare origins, no path and no "/*" - see the
+ * whitelist note below, which is load-bearing for a different reason.
+ */
+export function siteOrigins(): string[] {
+  const { protocol, host } = new URL(API_BASE);
+  const bare = host.startsWith("www.") ? host.slice(4) : host;
+
+  return [`${protocol}//${bare}`, `${protocol}//www.${bare}`];
+}
+
+/**
  * The page that draws this file, or null if the file is not ours.
  *
  * The player takes a PATH on our origin and refuses anything else, so
@@ -53,7 +81,7 @@ export function playerUrl(art: ArtFile): string | null {
   let path: string;
   try {
     const parsed = new URL(art.url);
-    if (parsed.origin !== new URL(API_BASE).origin) return null;
+    if (!siteOrigins().includes(parsed.origin)) return null;
     path = `${parsed.pathname}${parsed.search}`;
   } catch {
     return null;
@@ -98,9 +126,9 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
          */
         opaque={false}
         /*
-         * Our ORIGIN - no path, no "/*", and that is load-bearing in a
-         * way that shipped broken once. The library compares this list
-         * against the URL's EXTRACTED ORIGIN, "https://cardflare.gg",
+         * Our ORIGINS - bare, no path, no "/*", and that is load-bearing
+         * in a way that shipped broken once. The library compares this
+         * list against the URL's EXTRACTED ORIGIN, "https://cardflare.gg",
          * which has no trailing slash - so a pattern ending in "/*"
          * compiles to a regex demanding a slash, matches nothing, and
          * the library's answer to a non-whitelisted URL is not "block":
@@ -109,10 +137,15 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
          *
          * An EMPTY list is the other cliff: it means "deny everything
          * including the page you were asked to show", which is why no
-         * ring appeared in the app at all, once. Exactly this - the
-         * bare origin - and nothing fancier on either side.
+         * ring appeared in the app at all, once.
+         *
+         * And a list with only ONE of our two spellings is the third,
+         * which is why `siteOrigins` exists: the apex 308s to www, a
+         * redirect IS a navigation, and the founder's border drew
+         * nothing for it. Both spellings of our own host, and nothing
+         * fancier on any side.
          */
-        originWhitelist={[new URL(API_BASE).origin]}
+        originWhitelist={siteOrigins()}
         /*
          * Called for the FIRST load as well as later ones, so it has to
          * say yes to the player and no to wherever a file might try to
@@ -123,8 +156,9 @@ export function CosmeticFilm({ art, size }: { art: ArtFile; size: number }) {
          * filtered here.
          */
         onShouldStartLoadWithRequest={(request) =>
-          request.url.startsWith(`${API_BASE}/cosmetic-player`) ||
-          request.url === "about:blank"
+          siteOrigins().some((origin) =>
+            request.url.startsWith(`${origin}/cosmetic-player`),
+          ) || request.url === "about:blank"
         }
         scrollEnabled={false}
         overScrollMode="never"
