@@ -148,7 +148,10 @@ describe("the origin whitelist", () => {
      * library's answer to a URL that is not on the list is
      * Linking.openURL, the same cliff as the "/*" bug.
      */
-    const redirected = player.replace("https://cardflare.gg", "https://www.cardflare.gg");
+    const redirected = player.replace(
+      "https://cardflare.gg",
+      "https://www.cardflare.gg",
+    );
 
     expect(passes([new URL(API_BASE).origin], redirected)).toBe(false);
     expect(passes(ORIGINS, redirected)).toBe(true);

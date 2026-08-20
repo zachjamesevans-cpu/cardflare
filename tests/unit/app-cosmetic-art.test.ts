@@ -103,6 +103,39 @@ describe("the aura table", () => {
     expect(AURA_ART[slug].motion).toBe(rule![1]);
   });
 
+  it.each(slugsIn("aura"))("%s draws the shape the website scatters", (slug) => {
+    /*
+     * WHAT the particle is, not just how it moves. Every aura used to
+     * be the same filled circle in a different colour, so Hearts
+     * reached a real phone as a pink dot and Snow as a white one -
+     * eight cosmetics drawn as one speck. The shape now comes out of
+     * the stylesheet with the rest of the numbers, and the first
+     * `--cfa-p-*` layer is the one that names the effect.
+     */
+    const rule = new RegExp(
+      `\\.cfa-${slug}\\s+\\.cfx-aura-fx\\s*\\{[^}]*background-image:\\s*var\\(--cfa-p-([a-z-]+)\\)`,
+      "m",
+    ).exec(css);
+
+    expect(rule).not.toBeNull();
+    expect(AURA_ART[slug].shape).toBe(rule![1]);
+  });
+
+  it("has a drawn path for every shape in the table", () => {
+    /* The data can name a shape the renderer has never heard of, and
+       the fallback for that is the plain circle this whole change
+       exists to get rid of. The generator refuses an unknown shape;
+       this is the other half, read off the app's own source. */
+    const worn = readFileSync(
+      resolve(import.meta.dirname, "../../mobile/src/cosmetic-worn.tsx"),
+      "utf8",
+    );
+
+    for (const slug of slugsIn("aura")) {
+      expect(worn).toMatch(new RegExp(`\\b${AURA_ART[slug].shape}: \\{`));
+    }
+  });
+
   it.each(slugsIn("aura"))("%s draws a sensible number of particles", (slug) => {
     /* Every aura on screen is one shared clock, but the particles are
        still draw calls, and a room roster can hold a dozen avatars. */

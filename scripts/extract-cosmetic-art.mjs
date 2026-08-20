@@ -60,6 +60,27 @@ const OUT_PATH = resolve(root, "mobile/src/cosmetic-art-data.ts");
  * circles and has to be told. Tuned against the web at avatar size and
  * against what a room roster of a dozen can afford to draw.
  */
+/**
+ * The particle shapes the app can actually draw.
+ *
+ * NOT a curation - the shape itself is read out of the stylesheet, the
+ * same as every other number here. This is only the list of the ones
+ * `cosmetic-worn.tsx` has a Skia path for, so that a new `--cfa-p-*`
+ * arriving in an aura fails the generator instead of silently coming
+ * out as a plain dot on a phone. Every aura was a plain dot once, which
+ * is how "Hearts" reached a real profile as a pink circle.
+ */
+const AURA_SHAPES = new Set([
+  "heart",
+  "petal",
+  "spark",
+  "star",
+  "flake",
+  "bubble",
+  "bolt",
+  "shard",
+]);
+
 const AURA_CURATION = {
   "aura-sparks": { colors: ["#ffd27a", "#ff8c2e"], count: 14, scale: 0.035 },
   "aura-bubbles": { colors: ["#bfe4ff", "#eaf7ff"], count: 11, scale: 0.05 },
@@ -426,10 +447,28 @@ function auras() {
     const motion = motionOf(decl(fx, "animation"));
     if (!motion) throw new Error(`${slug} has no aura animation`);
 
+    /*
+     * WHAT the particle is, not just how it moves. The web layers two
+     * tiles - `var(--cfa-p-heart), var(--cfa-p-heart)` - and the first
+     * is the one that names the effect. Stars layer a star over a dot;
+     * the star is the point of it.
+     */
+    const layers = decl(fx, "background-image");
+    const shape = /var\(--cfa-p-([a-z-]+)\)/.exec(layers ?? "")?.[1] ?? null;
+    if (!shape) throw new Error(`${slug} has no particle image`);
+    if (!AURA_SHAPES.has(shape)) {
+      throw new Error(
+        `${slug} draws --cfa-p-${shape}, which the app has no path for. ` +
+          `Add one to PARTICLE in mobile/src/cosmetic-worn.tsx and list ` +
+          `it in AURA_SHAPES here, or it ships as a plain dot.`,
+      );
+    }
+
     out[slug] = {
       motion: motion.kind,
       seconds: motion.seconds,
       opacity: Number(decl(fx, "opacity") ?? 1),
+      shape,
       colors: curated.colors,
       count: curated.count,
       scale: curated.scale,
@@ -568,6 +607,17 @@ const body = `${banner}
 
 export type AuraMotion = "rise" | "fall" | "drift" | "twinkle" | "flicker";
 
+/** The particle shapes, one Skia path each in \`cosmetic-worn.tsx\`. */
+export type AuraShape =
+  | "heart"
+  | "petal"
+  | "spark"
+  | "star"
+  | "flake"
+  | "bubble"
+  | "bolt"
+  | "shard";
+
 /** One ring's art. \`spinSeconds\` null means it does not turn. */
 export interface RingArt {
   colors: string[];
@@ -581,6 +631,8 @@ export interface AuraArt {
   motion: AuraMotion;
   seconds: number;
   opacity: number;
+  /** WHAT is drawn: the \`--cfa-p-*\` the stylesheet scatters. */
+  shape: AuraShape;
   /** Drawn per particle. Two colours alternate, as the CSS layers two. */
   colors: [string, string];
   /** How many particles orbit the picture. */
