@@ -9,7 +9,7 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
-import { auraLayer, ringLayer } from "./avatar-geometry";
+import { auraClearance, auraLayer, ringLayer } from "./avatar-geometry";
 import { AURA_ART, RING_ART, type AuraArt, type RingArt } from "./cosmetic-art-data";
 
 /**
@@ -185,6 +185,7 @@ function makeKit(S: Skia) {
               centre={centre}
               orbit={orbit}
               dot={dot}
+              clear={auraClearance(size, dot)}
             />
           ))}
         </Canvas>
@@ -200,6 +201,7 @@ function makeKit(S: Skia) {
     centre,
     orbit,
     dot,
+    clear,
   }: {
     index: number;
     art: AuraArt;
@@ -207,6 +209,8 @@ function makeKit(S: Skia) {
     centre: number;
     orbit: number;
     dot: number;
+    /** The radius a rising or falling particle may not come inside. */
+    clear: number;
   }) {
     /* Deterministic scatter. A random start would make the same aura
        look different every time the screen mounted, and the web's is
@@ -220,16 +224,28 @@ function makeKit(S: Skia) {
 
       switch (art.motion) {
         case "rise":
-          /* Up the outside and away, which is what a spark does. */
+        case "fall": {
+          /* Up (or down) the OUTSIDE and away, which is what a spark
+             does, and which this always said it did. The lane is the
+             particle's own scatter until the sweep brings it level with
+             the picture; there it is pushed out to `clear`, so it rides
+             around the edge instead of across a face. */
+          const y =
+            art.motion === "rise"
+              ? centre + orbit - t * orbit * 2
+              : centre - orbit + t * orbit * 2;
+
+          const lane = Math.cos(angle) * orbit;
+          const blocked = clear * clear - (y - centre) * (y - centre);
+          const push = blocked > 0 ? Math.sqrt(blocked) : 0;
+
           return {
-            x: centre + Math.cos(angle) * orbit,
-            y: centre + orbit - t * orbit * 2,
+            x:
+              centre +
+              (Math.abs(lane) < push ? (lane < 0 ? -push : push) : lane),
+            y,
           };
-        case "fall":
-          return {
-            x: centre + Math.cos(angle) * orbit,
-            y: centre - orbit + t * orbit * 2,
-          };
+        }
         case "drift": {
           const a = angle + t * Math.PI * 2;
           return { x: centre + Math.cos(a) * orbit, y: centre + Math.sin(a) * orbit };
