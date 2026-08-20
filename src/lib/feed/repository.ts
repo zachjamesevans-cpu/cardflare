@@ -78,6 +78,19 @@ const OPEN_ANYWHERE = 3;
  * number of ITEMS wanted would return a single deck and call it a feed.
  */
 const RECENT_READ = 120;
+
+/**
+ * "Wanted from you": how many of the reader's cards to ask about, how
+ * many matching Flares to read, and how many to name in the item.
+ *
+ * A synced collection can be thousands of cards and Postgres has to be
+ * handed that list, so the ask is capped - the newest Flares against the
+ * first slice is a good answer, and a perfect one is not worth a query
+ * that grows with somebody's binder.
+ */
+const WANTED_CARDS_ASKED = 400;
+const WANTED_READ = 60;
+const WANTED_SHOWN = 4;
 const RECENT_SHOWN = 4;
 const RECENT_SAMPLE = 4;
 
@@ -293,6 +306,39 @@ export interface StartItem {
 }
 
 /**
+ * Open Flares, anywhere, that the reader's own collection answers.
+ *
+ * THE ITEM THE FEED WAS MISSING, and the reason it read as a log of
+ * strangers' cards. Nine of the eleven kinds before this one were a
+ * record of an event: true, inert, and identical whether you own the
+ * card or have never heard of the person. This one is a fact about the
+ * READER, it changes on its own, and its only resolution is a trade.
+ *
+ * It costs nobody anything to produce. The collection is already synced
+ * and already private - "matched quietly in every room and never
+ * listed" - so demand for somebody's cards is computable the moment they
+ * have a binder, with no have-list to publish and no extra input at all.
+ *
+ * Deliberately NOT limited to recent, unlike `recent` items: a Flare
+ * somebody posted a fortnight ago is still a card they want and you
+ * still have it. What ages out is the room, not the wanting.
+ */
+export interface WantedItem {
+  kind: "wanted";
+  /** Everything your binder answers, which may exceed what is listed. */
+  total: number;
+  entries: {
+    playerSessionId: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    storeName: string;
+    joinCode: string;
+    when: string;
+    card: FeedCard;
+  }[];
+}
+
+/**
  * A store you have saved, with something to come.
  *
  * THE ITEM THAT ANSWERS A TUESDAY. Every other board item requires a room
@@ -335,9 +381,9 @@ export interface UpcomingItem {
  * the person is still looking for it. This is the same fact without the
  * requirement that the room still be running.
  *
- * Grouped by `posted_batch`, the same way the room's board groups a pasted
- * deck, so thirty cards from one paste arrive as one item rather than
- * thirty rows - the pile the grouping exists to prevent.
+ * One row per person per store per day, so a player working through a
+ * deck arrives as one answer to "who do I walk over to, and about what"
+ * rather than as one row per card.
  */
 export interface RecentItem {
   kind: "recent";
@@ -402,6 +448,7 @@ export interface ShopItem {
 
 export type FeedItem =
   | AnnouncementItem
+  | WantedItem
   | BoardItem
   | HuntItem
   | UpcomingItem
@@ -430,6 +477,86 @@ async function embersBalance(playerId: string): Promise<number> {
 
   return data?.embers_balance ?? 0;
 }
+
+/**
+ * Which part of the screen an item belongs to.
+ *
+ * The order was always an argument - things that go stale above things
+ * that do not - and it was invisible, so the Feed read as one flat pile.
+ * Naming the argument turns the same list into a screen somebody can
+ * scan, and it means a quiet week reads as "nothing on tonight" rather
+ * than as an empty app.
+ */
+export type FeedSection = "wanted" | "tonight" | "people" | "store";
+
+/** The heading each section is drawn under, on both platforms. */
+export const SECTION_TITLES: Record<FeedSection, string> = {
+  wanted: "Wanted from you",
+  tonight: "Tonight",
+  people: "People you follow",
+  store: "New in the store",
+};
+
+function sectionFor(item: FeedItem): FeedSection {
+  switch (item.kind) {
+    case "wanted":
+      return "wanted";
+    case "announcement":
+    case "board":
+    case "upcoming":
+    case "start":
+      return "tonight";
+    case "hunt":
+    case "recent":
+    case "added":
+    case "traded":
+    case "suggest":
+      return "people";
+    default:
+      return "store";
+  }
+}
+
+/**
+ * Why this item is on this person's screen.
+ *
+ * The founder: "seeing a bunch of random cards posted just doesn't feel
+ * great." A feed that explains itself stops feeling arbitrary even when
+ * it is thin, and every one of these reasons was already known at the
+ * moment the item was built - it was simply never said out loud.
+ *
+ * Written as a fragment rather than a sentence, because it is drawn as a
+ * quiet line under the row and not as prose.
+ */
+function reasonFor(item: FeedItem): string {
+  switch (item.kind) {
+    case "wanted":
+      return "Because these are in your collection";
+    case "announcement":
+      return "From CardFlare";
+    case "board":
+      return item.yours ? "At a store you saved" : "A room open right now";
+    case "upcoming":
+      return "At a store you saved";
+    case "hunt":
+    case "added":
+      return "Because you follow them";
+    case "recent":
+      return `Posted at ${item.storeName}`;
+    case "traded":
+      return "At a store you go to";
+    case "suggest":
+      return "Their binders answer your wants";
+    case "pack":
+    case "shop":
+      return "Yours to spend Embers on";
+    case "start":
+      return "The Feed cannot answer this one for you";
+  }
+}
+
+/** One item, with the two things the screen needs to place it. */
+export type FeedEntry = FeedItem & { section: FeedSection; reason: string };
 
 /** ISO for "this many days ago", the cut both recent items share. */
 function since(days: number): string {
@@ -779,6 +906,105 @@ async function boardWithHunts(
 }
 
 /**
+ * Who wants what the reader is holding, everywhere, right now.
+ *
+ * One query in the OPPOSITE direction to every other item on this
+ * screen. The rest ask "what is on this board"; this asks "where am I
+ * wanted", which is the question somebody opens the app to have
+ * answered even when they could not have said so.
+ *
+ * Showcases are excluded: a card somebody is letting go of is not a
+ * card they want, and answering it with "you have one too" is noise.
+ * The reader's own Flares are excluded for the obvious reason.
+ */
+async function wantedItems(
+  ownSessionId: string | null,
+  held: ReturnType<typeof heldByCard>,
+): Promise<WantedItem[]> {
+  const cardIds = [...held.keys()];
+  if (cardIds.length === 0) return [];
+
+  const admin = getSupabaseAdmin();
+
+  const { data: flares, error } = await admin
+    .from("flares")
+    .select("id, created_at, event_id, player_session_id, card_id, printing_id")
+    .eq("status", "open")
+    .eq("intent", "want")
+    .in("card_id", cardIds.slice(0, WANTED_CARDS_ASKED))
+    .order("created_at", { ascending: false })
+    .limit(WANTED_READ);
+
+  if (error || !flares || flares.length === 0) {
+    if (error) console.error("Could not read who wants your cards", error);
+    return [];
+  }
+
+  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  if (usable.length === 0) return [];
+
+  /* Where each one is, so the item can end in a place like every other. */
+  const { data: events } = await admin
+    .from("events")
+    .select("id, store_id")
+    .in("id", [...new Set(usable.map((flare) => flare.event_id))]);
+  const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
+
+  const { data: stores } = await admin
+    .from("stores")
+    .select("id, name, join_code")
+    .in("id", [...new Set([...storeOf.values()])]);
+  const storeById = new Map((stores ?? []).map((store) => [store.id, store]));
+
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id, display_name, player_id")
+    .in("id", [...new Set(usable.map((flare) => flare.player_session_id))]);
+  const people = new Map((sessions ?? []).map((row) => [row.id, row]));
+
+  const [facts, avatars] = await Promise.all([
+    cardFacts(usable.map((flare) => flare.card_id)),
+    avatarsFor(
+      (sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : [])),
+    ),
+  ]);
+
+  const entries: WantedItem["entries"] = [];
+
+  for (const flare of usable) {
+    const storeId = storeOf.get(flare.event_id);
+    const store = storeId ? storeById.get(storeId) : undefined;
+    const fact = facts.get(flare.card_id);
+    if (!store || !fact) continue;
+
+    const person = people.get(flare.player_session_id);
+    entries.push({
+      playerSessionId: flare.player_session_id,
+      displayName: person?.display_name ?? null,
+      avatarUrl: person?.player_id ? (avatars.get(person.player_id) ?? null) : null,
+      storeName: store.name,
+      joinCode: store.join_code,
+      when: flare.created_at,
+      card: {
+        cardId: flare.card_id,
+        ...fact,
+        match: matchFor({ cardId: flare.card_id, printingId: flare.printing_id }, held),
+      },
+    });
+  }
+
+  if (entries.length === 0) return [];
+
+  return [
+    {
+      kind: "wanted",
+      total: entries.length,
+      entries: entries.slice(0, WANTED_SHOWN),
+    },
+  ];
+}
+
+/**
  * Stores you have saved that are worth knowing about, though nothing is
  * open at them right now.
  *
@@ -841,9 +1067,21 @@ async function avatarsFor(playerIds: string[]): Promise<Map<string, string | nul
  * though they are still looking for it. This reads the Flares themselves
  * and asks only that they still be open, and recent.
  *
- * GROUPED BY BATCH, because a pasted deck is one act. The room's board
- * learned this the hard way - a pasted list nobody named "came out as
- * thirty loose rows" - and a feed row has less room than a board does.
+ * GROUPED BY PERSON, PLACE AND DAY, not by batch.
+ *
+ * Batch alone was the first cut and it was visibly wrong the moment real
+ * data arrived: one player's three separate Flares at one shop on one
+ * afternoon came out as three near-identical rows, same face, same store,
+ * same "4d ago", one small card each. The founder, looking at it: "it
+ * would look a little silly to have separate flares in the feed for each
+ * card someone needs, if theyre building a full deck."
+ *
+ * A batch only ever exists when somebody pasted a list, so grouping by it
+ * groups the one case that was already tidy and leaves the messy one
+ * alone. What a reader actually wants is the question the room's board
+ * asks: who do I walk over to, and about what. So one row per person per
+ * store per day - and per named hunt, because a player who named two
+ * decks meant two answers to that question, not one.
  *
  * The reader's own Flares are left out: you know what you posted, and a
  * feed that opens with your own words is a mirror rather than a room.
@@ -857,9 +1095,7 @@ async function recentItems(
 
   const { data: flares, error } = await admin
     .from("flares")
-    .select(
-      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch",
-    )
+    .select("id, created_at, event_id, player_session_id, card_id, intent, deck_label")
     .eq("status", "open")
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
@@ -901,7 +1137,17 @@ async function recentItems(
     const fact = facts.get(flare.card_id);
     if (!store || !fact) continue;
 
-    const key = `${flare.posted_batch ?? flare.id}:${flare.player_session_id}`;
+    /* The day in the store's own terms is overkill here: a Flare posted
+       either side of midnight is the same trip, and a UTC date is stable
+       and cheap. Deck label included, so two named hunts stay two rows. */
+    const day = flare.created_at.slice(0, 10);
+    const key = [
+      flare.player_session_id,
+      storeId,
+      flare.intent,
+      flare.deck_label ?? "",
+      day,
+    ].join(":");
     const card: FeedCard = {
       cardId: flare.card_id,
       ...fact,
@@ -1026,7 +1272,7 @@ async function shopItem(playerId: string, balance: number): Promise<ShopItem[]> 
 export async function listFeed(
   playerId: string,
   sessionId: string | null,
-): Promise<FeedItem[]> {
+): Promise<FeedEntry[]> {
   const [locals, following, binder, wants, notices, balance] = await Promise.all([
     listLocals(playerId),
     listFollowing(playerId),
@@ -1118,6 +1364,10 @@ export async function listFeed(
     shopItem(playerId, balance),
   ]);
 
+  /* The lead item, and the one that needs nothing from anybody else
+     having posted this week. See wantedItems. */
+  const wantedFromYou = await wantedItems(sessionId, held);
+
   const upcoming = upcomingItems(locals, shown, wanted.size);
 
   /*
@@ -1134,7 +1384,8 @@ export async function listFeed(
    * And a suggestion is true until you act on it, so it waits at the
    * bottom where it is found rather than pushed.
    */
-  return [
+  const items: FeedItem[] = [
+    ...wantedFromYou,
     ...notices.map((notice): AnnouncementItem => ({
       kind: "announcement",
       id: notice.id,
@@ -1155,4 +1406,14 @@ export async function listFeed(
     ...pack,
     ...shop,
   ];
+
+  /*
+   * Every item leaves here knowing where it goes and why it is here.
+   * One place, so a new kind cannot ship without an answer to both.
+   */
+  return items.map((item) => ({
+    ...item,
+    section: sectionFor(item),
+    reason: reasonFor(item),
+  }));
 }

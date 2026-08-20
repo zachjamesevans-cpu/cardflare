@@ -313,6 +313,14 @@ export interface Me {
     deckLabel: string | null;
     /** Artwork, resolved server-side the way the Flare board resolves it. */
     imageUrl: string | null;
+    /**
+     * The store this card is live at, or null when it is only saved.
+     *
+     * The list's two states, in one field. Optional because an app build
+     * meets servers older than itself, and "not posted" is the safe read
+     * of a server that has not started saying.
+     */
+    postedAt?: string | null;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {
@@ -985,6 +993,17 @@ export interface FeedCard {
   match: "exact" | "other-printing" | null;
 }
 
+/** Which part of the screen an item belongs to. Mirrors the server. */
+export type FeedSection = "wanted" | "tonight" | "people" | "store";
+
+/** The heading each section is drawn under. Same words as the website. */
+export const SECTION_TITLES: Record<FeedSection, string> = {
+  wanted: "Wanted from you",
+  tonight: "Tonight",
+  people: "People you follow",
+  store: "New in the store",
+};
+
 export type FeedItem =
   /**
    * A notice from CardFlare. The only authored item on the Feed, and
@@ -1113,6 +1132,26 @@ export type FeedItem =
       cards: FeedCard[];
       more: number;
     }
+  /**
+   * Open Flares, anywhere, that your own collection answers.
+   *
+   * The item the Feed was missing. Every other kind is a record of an
+   * event - true whether or not you own the card. This one is a fact
+   * about YOU, it moves on its own, and its only resolution is a trade.
+   */
+  | {
+      kind: "wanted";
+      total: number;
+      entries: {
+        playerSessionId: string;
+        displayName: string | null;
+        avatarUrl: string | null;
+        storeName: string;
+        joinCode: string;
+        when: string;
+        card: FeedCard;
+      }[];
+    }
   /** A pack in the Embers store. Evergreen — true with nobody else here. */
   | {
       kind: "pack";
@@ -1136,7 +1175,16 @@ export type FeedItem =
       balance: number;
     };
 
-export const getFeed = () => call<{ items: FeedItem[] }>("GET", "/api/v1/feed");
+/**
+ * One item, with the two things the screen needs to place it.
+ *
+ * Optional on purpose: a TestFlight build meets servers older than
+ * itself, and a feed with no sections is a plain list rather than a
+ * broken one.
+ */
+export type FeedEntry = FeedItem & { section?: FeedSection; reason?: string };
+
+export const getFeed = () => call<{ items: FeedEntry[] }>("GET", "/api/v1/feed");
 
 /** A player found by name search: enough for a row and a door. */
 export interface FoundPlayer {

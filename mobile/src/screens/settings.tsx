@@ -1,6 +1,9 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
-import { ScrollView, View } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { ScrollView, Text, View } from "react-native";
+
+import type { StackParams } from "../../App";
 
 import { API_BASE } from "../config";
 import {
@@ -14,16 +17,20 @@ import {
   type Profile,
 } from "../api";
 import { HandleField, NameField } from "./profile";
-import { AsyncButton, Body, Card, Input, Muted, Title } from "../ui";
+import { AsyncButton, Body, Card, Input, Muted, Tap, Title } from "../ui";
 import { parseDeckList } from "../deck-list";
-import { spacing } from "../theme";
+import { colors, spacing } from "../theme";
 
 /**
  * Settings: what the Account tab used to be, now behind the profile's cog.
  *
  * Nothing here changed but where it lives — the founder's instruction was
- * exactly that. Your saved wants, your collection, and the connection
- * test that has earned its keep more than once.
+ * exactly that. Your name, your handle, your collection, the deck-list
+ * paste box, and the connection test that has earned its keep more than
+ * once.
+ *
+ * The wants list is deliberately NOT here any more: it was a second copy
+ * of the Flare tab's, which is the tab named after it.
  */
 
 /** GET and POST the no-auth ping; the verdict names where POSTs die. */
@@ -119,6 +126,7 @@ function ConnectionTest() {
 }
 
 export function SettingsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
   /*
    * Your name lives here rather than on the front of the profile.
@@ -222,35 +230,39 @@ export function SettingsScreen() {
         </Card>
       )}
 
+      {/*
+       * One list, not two.
+       *
+       * This was a second copy of the Flare tab's list - the founder:
+       * "the 'saved wants' section in the settings is kinda redundant,
+       * since it's just the flare section, jsut elsewhere." He is right,
+       * and two renderings of one list is how they drift: the tab learned
+       * to say which cards are live on a board and this one never would.
+       *
+       * The paste box stays, because pasting a deck is a settings-shaped
+       * act - done once, at home, with a keyboard - and it has nowhere
+       * better to live yet.
+       */}
       <Card>
-        <Title>Your saved wants</Title>
+        <Title>Paste a deck list</Title>
         <Body>
-          Saved automatically when you post a Flare, cleared when a trade finds the
-          card. Walk into any room and it offers to post these again.
+          Every card in it becomes a want. Walk into any room and it offers to
+          post the lot in one go.
         </Body>
 
-        {/* The fast way in, before a release. Pasting rather than
-            tapping through a search twenty-four times: a deck already
-            exists as text, and somewhere to put it is quicker than any
-            picker. */}
         <DeckListField />
-        {!me || me.wants.length === 0 ? (
-          <Muted>Nothing yet. Post a Flare and it will be waiting here.</Muted>
-        ) : (
-          me.wants.map((want) => (
-            <Card key={want.id}>
-              <Body>
-                {want.cardName}
-                {want.quantity > 1 ? ` ×${want.quantity}` : ""}
-              </Body>
-              <Muted>
-                {`${want.cardNumber} · ${want.printingLabel ?? "Any printing"}${
-                  want.deckLabel ? ` · ${want.deckLabel}` : ""
-                }`}
-              </Muted>
-            </Card>
-          ))
-        )}
+
+        <Tap
+          onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+          accessibilityLabel="Open your Flares"
+          style={{ paddingTop: spacing(1) }}
+        >
+          <Text style={{ color: colors.accent, fontWeight: "600" }}>
+            {me && me.wants.length > 0
+              ? `See all ${me.wants.length} on the Flare tab →`
+              : "Your Flares live on the Flare tab →"}
+          </Text>
+        </Tap>
       </Card>
 
       <Card>

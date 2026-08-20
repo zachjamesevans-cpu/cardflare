@@ -1,7 +1,7 @@
 import { apiPlayer, unauthorized } from "@/lib/api/auth";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
-import { listWants } from "@/lib/players/wants";
+import { listWants, postedCardStores } from "@/lib/players/wants";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [wants, sync, locals, account] = await Promise.all([
+  const [wants, sync, locals, account, posted] = await Promise.all([
     listWants(player.playerId),
     collectionSyncFor(player.playerId),
     listLocals(player.playerId),
@@ -34,6 +34,9 @@ export async function GET(request: Request): Promise<Response> {
       .select("avatar_url, embers_balance")
       .eq("id", player.playerId)
       .maybeSingle(),
+    /* Which of those cards are live on a board right now - the second of
+       the list's two states. See postedCardStores. */
+    postedCardStores(player.playerId),
   ]);
 
   return Response.json({
@@ -55,6 +58,8 @@ export async function GET(request: Request): Promise<Response> {
       note: want.note,
       deckLabel: want.deckLabel,
       imageUrl: want.imageUrl,
+      /* The store it is live at, or null for saved-but-not-posted. */
+      postedAt: posted.get(want.cardId) ?? null,
     })),
     collection: sync
       ? { cardsMatched: sync.cards_matched, syncedAt: sync.synced_at }

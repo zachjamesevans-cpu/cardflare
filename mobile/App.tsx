@@ -1,10 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
-import { DarkTheme, NavigationContainer, type Theme } from "@react-navigation/native";
+import {
+  DarkTheme,
+  NavigationContainer,
+  useNavigation,
+  type Theme,
+} from "@react-navigation/native";
 import {
   createBottomTabNavigator,
   type BottomTabBarButtonProps,
 } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationProp,
+} from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
@@ -23,6 +31,7 @@ import {
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { ProfileScreen } from "./src/screens/profile";
+import { FindPlayerScreen } from "./src/screens/find-player";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
@@ -36,7 +45,8 @@ import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, hasSeenWelcome } from "./src/screens/welcome";
 import { storedAccessToken } from "./src/api";
 import { firstBootError } from "./src/boot-errors";
-import { colors } from "./src/theme";
+import { colors, spacing } from "./src/theme";
+import { Tap } from "./src/ui";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -91,6 +101,8 @@ export type StackParams = {
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
+  /** Finding somebody by name, from the Feed's own header. */
+  FindPlayer: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -105,6 +117,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Store: "Profile",
   Customize: "Profile",
   PlayerProfile: "Back",
+  FindPlayer: "Feed",
   PostFlare: "Room",
 };
 
@@ -234,6 +247,29 @@ function TabButton({
   );
 }
 
+/**
+ * The Feed's one door out to other people.
+ *
+ * Its own component so it can ask for the STACK's navigation: the options
+ * callback hands you the tab navigator, which knows about five tabs and
+ * nothing else, so navigating to a stack screen from there does not
+ * typecheck - and casting it would have been a lie about which navigator
+ * owns the screen.
+ */
+function FindPlayerButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+
+  return (
+    <Tap
+      accessibilityLabel="Find a player"
+      onPress={() => navigation.navigate("FindPlayer")}
+      style={{ paddingLeft: spacing(4), paddingVertical: spacing(2) }}
+    >
+      <Ionicons name="search" size={20} color={colors.textSecondary} />
+    </Tap>
+  );
+}
+
 function Tabs() {
   return (
     <Tab.Navigator
@@ -270,7 +306,13 @@ function Tabs() {
       <Tab.Screen
         name="Feed"
         component={HomeScreen}
-        options={{ title: "CardFlare", tabBarLabel: "Feed" }}
+        /* The one door out to other people, top right of the main feed -
+           the same place the website puts it. */
+        options={{
+          title: "CardFlare",
+          tabBarLabel: "Feed",
+          headerRight: () => <FindPlayerButton />,
+        }}
       />
       <Tab.Screen name="Room" component={RoomTab} />
       {/* The tab keeps the product's name; the header says what the
@@ -456,6 +498,11 @@ export default function App() {
             name="PlayerProfile"
             component={PlayerProfileScreen}
             options={{ title: "Player", headerBackTitle: "Back" }}
+          />
+          <Stack.Screen
+            name="FindPlayer"
+            component={FindPlayerScreen}
+            options={{ title: "Find a player", headerBackTitle: "Feed" }}
           />
           <Stack.Screen
             name="PostFlare"

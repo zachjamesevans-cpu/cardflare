@@ -83,6 +83,25 @@ export function WantRow({
 
           {want.deckLabel ? <Muted>{want.deckLabel}</Muted> : null}
 
+          {/*
+           * The second of the list's two states.
+           *
+           * "The 'saved wants' section in the settings is kinda redundant,
+           * since it's just the flare section, jsut elsewhere." One list
+           * now, and this is what makes one list enough: a card saved at
+           * home and a card live on a board tonight are the same row in
+           * the database and completely different news.
+           */}
+          {want.postedAt ? (
+            <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}>
+              {`Live at ${want.postedAt}`}
+            </Text>
+          ) : (
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+              Saved — not on a board yet
+            </Text>
+          )}
+
           <View
             style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
           >

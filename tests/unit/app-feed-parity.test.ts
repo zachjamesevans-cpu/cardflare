@@ -28,9 +28,12 @@ const read = (path: string) =>
 const web = read("src/app/feed/page.tsx");
 const app = read("mobile/src/screens/home.tsx");
 const items = read("src/components/feed/feed-items.tsx");
+const webPage = read("src/app/feed/page.tsx");
+const appRoot = read("mobile/App.tsx");
 
 /** Every item kind the server can produce, from the union itself. */
 const KINDS = [
+  "wanted",
   "announcement",
   "board",
   "hunt",
@@ -84,9 +87,84 @@ describe("the home screen's furniture", () => {
     expect(web).not.toContain("Scan a code");
   });
 
+  it("draws nothing for a kind the client has never heard of", () => {
+    /*
+     * The server ships on Vercel's clock and the app on TestFlight's, so
+     * a phone meets kinds newer than itself routinely. Both chains used to
+     * END in the board branch, which rendered an unknown kind AS a board -
+     * an undefined title over a button to an undefined room. That is how
+     * the two platforms came to show different feeds the week the new
+     * kinds landed, reported by the founder rather than caught here.
+     */
+    expect(items).toContain('if (item.kind !== "board") return null;');
+    expect(app).toContain('item.kind !== "board" ? null : (');
+  });
+
+  it("says why every item is on the screen, and where it belongs", () => {
+    /*
+     * The founder: "seeing a bunch of random cards posted just doesn't
+     * feel great." A feed that explains itself stops feeling arbitrary
+     * even when it is thin, and the ordering was always an argument
+     * about what is worth a tap - this is that argument said out loud.
+     *
+     * Both live on the server so the two platforms cannot word them
+     * differently, which is what a shared SECTION_TITLES is for.
+     */
+    const repo = read("src/lib/feed/repository.ts");
+
+    expect(repo).toContain("function reasonFor(item: FeedItem): string");
+    expect(repo).toContain("function sectionFor(item: FeedItem): FeedSection");
+    expect(repo).toContain("export const SECTION_TITLES");
+
+    expect(webPage).toContain("SECTION_TITLES[item.section]");
+    expect(app).toContain("SECTION_TITLES[item.section]");
+    expect(webPage).toContain("{item.reason}");
+    expect(app).toContain("{item.reason}");
+  });
+
+  it("lets the feed be asked for again", () => {
+    /* The most-reopened screen in the app had no pull to refresh, which
+       quietly teaches that reopening is pointless. */
+    expect(app).toContain("<RefreshControl");
+  });
+
   it("hides the explainer once the screen has filled up", () => {
     expect(web).toContain("items.length < 3");
     expect(app).toContain("feed.length < 3");
+  });
+
+  it("sizes a card by how many are in the row, the same way on both", () => {
+    /* "It looks a little silly to have one single card on a thing." One
+       card gets a picture, a deck gets a strip, and the thresholds are
+       one product's, not two. */
+    const web = readFileSync(
+      resolve(import.meta.dirname, "../../src/components/feed/feed-items.tsx"),
+      "utf8",
+    );
+
+    expect(web).toContain("if (count <= 1) return");
+    expect(web).toContain("if (count <= 3) return");
+    expect(app).toContain("if (count <= 1) return 160;");
+    expect(app).toContain("if (count <= 3) return 96;");
+  });
+
+  it("puts finding a player on the feed, on both", () => {
+    /* "Let's make a search icon in the top right of the main feed." */
+    expect(webPage).toContain("<FeedSearch />");
+    expect(appRoot).toContain('navigation.navigate("FindPlayer")');
+  });
+
+  it("keeps one wants list, and lets it say which state a card is in", () => {
+    /* "The 'saved wants' section in the settings is kinda redundant." */
+    const settings = read("mobile/src/screens/settings.tsx");
+    const row = read("mobile/src/want-row.tsx");
+    const entries = read("src/components/players/want-entries.tsx");
+
+    /* The rendered heading, not the word: the file may well explain in a
+       comment why the list is no longer here. */
+    expect(settings).not.toContain("<Title>Your saved wants</Title>");
+    expect(row).toContain("want.postedAt");
+    expect(entries).toContain("want.postedAt");
   });
 
   it("says nothing rather than zero when a balance did not arrive", () => {

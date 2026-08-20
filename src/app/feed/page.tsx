@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ClipboardList, Flame, Wand2 } from "lucide-react";
 
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
+import { SECTION_TITLES } from "@/lib/feed/repository";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
@@ -128,8 +130,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-4 px-4 pt-6 pb-16"
       >
-        <div className="flex w-full max-w-2xl">
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">Feed</h1>
+        {/* The title, and the one door out to other people. Same place on
+            both platforms: top right of the main feed. */}
+        <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
+          <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
+            Feed
+          </h1>
+          <FeedSearch />
         </div>
 
         <div className="flex w-full max-w-2xl flex-col gap-3">{children}</div>
@@ -225,7 +232,22 @@ export default async function FeedPage() {
           </Link>
         </Card>
       ) : (
-        items.map((item, index) => <Item key={`${item.kind}-${index}`} item={item} />)
+        items.map((item, index) => (
+          <div key={`${item.kind}-${index}`} className="flex flex-col gap-3">
+            {/* The heading, only where the section changes. The order was
+                always an argument about what is worth a tap; this is the
+                argument said out loud. */}
+            {(index === 0 || items[index - 1].section !== item.section) && (
+              <h2 className="mt-2 text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+                {SECTION_TITLES[item.section]}
+              </h2>
+            )}
+            <Item item={item} />
+            {/* Why this is on your screen. A feed that explains itself
+                stops feeling arbitrary even when it is thin. */}
+            <p className="-mt-1 text-xs text-text-muted">{item.reason}</p>
+          </div>
+        ))
       )}
 
       {/*

@@ -288,3 +288,64 @@ export async function clearWantForFlare(flareId: string): Promise<void> {
 
   await clearWant(session.player_id, flare.card_id, flare.printing_id);
 }
+
+/**
+ * Which of a player's saved cards are currently on a board somewhere.
+ *
+ * The founder: "the 'saved wants' section in the settings is kinda
+ * redundant, since it's just the flare section, jsut elsewhere." It was,
+ * and the answer is one list rather than two - but a list is only worth
+ * merging into if it can say which of the two things each card is. A card
+ * you saved at home and a card that is live on a board tonight are the
+ * same row in `player_wants` and completely different news.
+ *
+ * So: the open Flares this account has posted, as a map from card to the
+ * store they are sitting in. One query for the lot, and an empty map for
+ * a player who has never joined a room - which is the common case and
+ * costs nothing to answer.
+ */
+export async function postedCardStores(playerId: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!isSupabaseConfigured()) return out;
+
+  const admin = getSupabaseAdmin();
+
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id")
+    .eq("player_id", playerId);
+
+  const sessionIds = (sessions ?? []).map((row) => row.id);
+  if (sessionIds.length === 0) return out;
+
+  const { data: flares } = await admin
+    .from("flares")
+    .select("card_id, event_id")
+    .in("player_session_id", sessionIds)
+    .eq("status", "open")
+    .eq("intent", "want");
+
+  if (!flares || flares.length === 0) return out;
+
+  const { data: events } = await admin
+    .from("events")
+    .select("id, store_id")
+    .in("id", [...new Set(flares.map((flare) => flare.event_id))]);
+
+  const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
+
+  const { data: stores } = await admin
+    .from("stores")
+    .select("id, name")
+    .in("id", [...new Set([...storeOf.values()])]);
+
+  const nameOf = new Map((stores ?? []).map((store) => [store.id, store.name]));
+
+  for (const flare of flares) {
+    const storeId = storeOf.get(flare.event_id);
+    const name = storeId ? nameOf.get(storeId) : undefined;
+    if (name && !out.has(flare.card_id)) out.set(flare.card_id, name);
+  }
+
+  return out;
+}
