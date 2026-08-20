@@ -400,7 +400,9 @@ export function Item({ item }: { item: FeedItem }) {
               displayName={person.displayName}
               seed={person.playerId}
               avatarUrl={person.avatarUrl}
-              frame={null}
+              frame={person.frame}
+              ring={person.ring}
+              aura={person.aura}
               size="md"
             />
             <div className="min-w-0 flex-1">
@@ -450,6 +452,18 @@ export function Item({ item }: { item: FeedItem }) {
                 imageUrl={entry.card.imageUrl}
                 name={entry.card.cardName}
                 match={entry.card.match}
+              />
+              {/* Whose it is. "Who do I walk over to" is half the
+                  question, and a name without a face is the half of it
+                  that nobody recognises across a shop. */}
+              <PlayerAvatar
+                displayName={entry.displayName ?? "A player"}
+                seed={entry.playerSessionId}
+                avatarUrl={entry.avatarUrl}
+                frame={entry.frame}
+                ring={entry.ring}
+                aura={entry.aura}
+                size="sm"
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-text-primary">
@@ -528,7 +542,9 @@ export function Item({ item }: { item: FeedItem }) {
             displayName={item.displayName ?? "A player"}
             seed={item.playerSessionId}
             avatarUrl={item.avatarUrl}
-            frame={null}
+            frame={item.frame}
+            ring={item.ring}
+            aura={item.aura}
             size="md"
           />
           <div className="min-w-0 flex-1">

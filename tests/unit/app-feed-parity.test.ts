@@ -122,6 +122,41 @@ describe("the home screen's furniture", () => {
     expect(app).toContain("{item.reason}");
   });
 
+  it("makes every picture in the answer absolute for a phone", () => {
+    /*
+     * A relative /api/avatars/... is meaningless to a device with no
+     * origin to resolve it against, so it draws as initials. The rule
+     * used to name ONE kind and every other face was quietly broken on
+     * the phone - the founder: "will has a profile pic but it's not
+     * visible". Keyed on the FIELD now, so the next item carrying a face
+     * cannot forget it.
+     */
+    const route = read("src/app/api/v1/feed/route.ts");
+
+    expect(route).toContain("function absoluteAvatars");
+    expect(route).not.toContain('item.kind === "hunt" && item.avatarUrl');
+  });
+
+  it("dresses every face in the feed", () => {
+    /*
+     * PRODUCT.md names "it gives the cosmetics somewhere to be seen" as
+     * a reason the Feed earns its place, and it showed bare circles.
+     * The founder: "steven b should show his gif he has selected and his
+     * avatar and ring effects."
+     */
+    const repo = read("src/lib/feed/repository.ts");
+
+    /* Through avatarPathFor, which is the one place that knows a GIF is
+       shown only while the tier allows it. */
+    expect(repo).toContain("avatarSrc(avatarPathFor(row))");
+    expect(repo).toContain("async function facesFor");
+
+    for (const source of [items, app]) {
+      expect(source).toMatch(/ring=\{(item|person|entry)\.ring\}/);
+      expect(source).toMatch(/aura=\{(item|person|entry)\.aura\}/);
+    }
+  });
+
   it("lets the feed be asked for again", () => {
     /* The most-reopened screen in the app had no pull to refresh, which
        quietly teaches that reopening is pointless. */

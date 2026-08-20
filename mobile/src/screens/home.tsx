@@ -456,6 +456,18 @@ export function HomeScreen() {
                         : undefined
                     }
                   />
+                  {/* Whose it is. "Who do I walk over to" is half the
+                      question, and a name without a face is the half of
+                      it nobody recognises across a shop. */}
+                  <PlayerAvatar
+                    displayName={entry.displayName ?? "A player"}
+                    seed={entry.playerSessionId}
+                    avatarUrl={entry.avatarUrl}
+                    frame={entry.frame}
+                    ring={entry.ring}
+                    aura={entry.aura}
+                    size={28}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text
                       numberOfLines={1}
@@ -772,6 +784,9 @@ export function HomeScreen() {
                 displayName={item.displayName ?? "A player"}
                 seed={item.playerSessionId}
                 avatarUrl={item.avatarUrl}
+                frame={item.frame}
+                ring={item.ring}
+                aura={item.aura}
                 size={36}
               />
               <View style={{ flex: 1 }}>
