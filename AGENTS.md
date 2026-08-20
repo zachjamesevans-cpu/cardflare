@@ -108,6 +108,29 @@ shipping as a flat band nobody notices. Every other family still shows
 its flat-colour stand-in on a phone, which is honest but is not what
 somebody paid Embers for.
 
+## Pushing and merging
+
+`.claude/settings.json` is checked in, so a session in this repo does not
+ask permission for the ordinary loop: status, diff, add, commit, fetch,
+pull, **push**, the test and build scripts, and the simulator tooling.
+JSON cannot carry comments, so the reasoning lives here.
+
+Three things are deliberately NOT in the allow list:
+
+- **Merging a pull request** (`gh pr merge`) prompts every time. Push is
+  cheap and lands on a branch nobody is running; a merge deploys the
+  website. The founder approves that one, always.
+- **Cutting a TestFlight build** (`eas build`, `eas submit`) prompts,
+  because it is forty minutes and an Apple submission, not a command.
+- **Force-pushing and `rm -rf`** are denied outright. Neither has a
+  legitimate use in this repo's flow, and a force-push over the
+  founder's branch is not recoverable from the app side.
+
+If a prompt appears for something routine that is missing from the list,
+the fix is to add the rule here rather than to approve it every time.
+Personal, per-machine overrides go in `.claude/settings.local.json`,
+which is gitignored.
+
 ## Conventions
 
 - Server Components by default. `"use client"` only where interactivity forces
