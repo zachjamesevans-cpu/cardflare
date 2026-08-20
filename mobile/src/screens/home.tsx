@@ -268,7 +268,19 @@ export function HomeScreen() {
                 : "No wants saved yet"}
             </Muted>
           </View>
-          <EmberBadge earned={me.player.embersBalance ?? 0} size="md" />
+          {/*
+           * ONLY when the server actually said a number.
+           *
+           * `?? 0` was worse than nothing: against a server that has not
+           * deployed this field yet - which is every TestFlight build
+           * that ships ahead of a web release - it drew a confident
+           * "0 Embers" at a player holding 8,760. A missing balance is
+           * not a zero balance, and the honest render of "I do not know"
+           * is to say nothing.
+           */}
+          {typeof me.player.embersBalance === "number" && (
+            <EmberBadge earned={me.player.embersBalance} size="md" />
+          )}
         </View>
       )}
 
