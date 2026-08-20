@@ -5,6 +5,8 @@ import { findEventByJoinCode } from "@/lib/events/repository";
 import { listRoomFlares, type ListEntry } from "@/lib/lists/repository";
 import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
+import { avatarWearFor } from "@/lib/players/equips";
+import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { listFollowing } from "@/lib/players/follows";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
@@ -261,6 +263,9 @@ export interface SuggestionItem {
     playerId: string;
     displayName: string;
     avatarUrl: string | null;
+    frame: string | null;
+    ring: string | null;
+    aura: string | null;
     /** How many cards on your want list they are carrying. */
     answers: number;
   }[];
@@ -331,6 +336,10 @@ export interface WantedItem {
     playerSessionId: string;
     displayName: string | null;
     avatarUrl: string | null;
+    /** Worn, so a ring somebody paid Embers for is seen here too. */
+    frame: string | null;
+    ring: string | null;
+    aura: string | null;
     storeName: string;
     joinCode: string;
     when: string;
@@ -392,6 +401,9 @@ export interface RecentItem {
   playerSessionId: string;
   displayName: string | null;
   avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
   storeName: string;
   city: string | null;
   joinCode: string;
@@ -749,13 +761,19 @@ async function suggestionItem(
 
   if (ranked.length === 0) return [];
 
-  const { data: players } = await admin
-    .from("players")
-    .select("id, display_name, avatar_url")
-    .in(
-      "id",
-      ranked.map(([id]) => id),
-    );
+  const [{ data: players }, faces] = await Promise.all([
+    admin
+      .from("players")
+      .select("id, display_name")
+      .in(
+        "id",
+        ranked.map(([id]) => id),
+      ),
+    /* Dressed, like every other face on this screen. A suggestion is a
+       person you might follow; showing them undressed is showing them
+       as less than they made themselves. */
+    facesFor(ranked.map(([id]) => id)),
+  ]);
 
   const byId = new Map((players ?? []).map((row) => [row.id, row]));
 
@@ -769,7 +787,7 @@ async function suggestionItem(
               {
                 playerId: id,
                 displayName: person.display_name,
-                avatarUrl: person.avatar_url,
+                ...(faces.get(id) ?? NO_FACE),
                 answers: cards.size,
               },
             ]
@@ -962,11 +980,9 @@ async function wantedItems(
     .in("id", [...new Set(usable.map((flare) => flare.player_session_id))]);
   const people = new Map((sessions ?? []).map((row) => [row.id, row]));
 
-  const [facts, avatars] = await Promise.all([
+  const [facts, faces] = await Promise.all([
     cardFacts(usable.map((flare) => flare.card_id)),
-    avatarsFor(
-      (sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : [])),
-    ),
+    facesFor((sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : []))),
   ]);
 
   const entries: WantedItem["entries"] = [];
@@ -978,10 +994,11 @@ async function wantedItems(
     if (!store || !fact) continue;
 
     const person = people.get(flare.player_session_id);
+    const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;
     entries.push({
       playerSessionId: flare.player_session_id,
       displayName: person?.display_name ?? null,
-      avatarUrl: person?.player_id ? (avatars.get(person.player_id) ?? null) : null,
+      ...face,
       storeName: store.name,
       joinCode: store.join_code,
       when: flare.created_at,
@@ -1044,17 +1061,64 @@ function upcomingItems(
 }
 
 /** Profile pictures for a batch of accounts. */
-async function avatarsFor(playerIds: string[]): Promise<Map<string, string | null>> {
-  const out = new Map<string, string | null>();
+interface FeedFace {
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+}
+
+const NO_FACE: FeedFace = {
+  avatarUrl: null,
+  frame: null,
+  ring: null,
+  aura: null,
+};
+
+/**
+ * The picture and what is worn around it, for a batch of accounts.
+ *
+ * DRESSED, not just the photograph. PRODUCT.md names "it gives the
+ * cosmetics somewhere to be seen" as one of three reasons the Feed earns
+ * its place, and until now it showed a bare circle: a player could buy a
+ * ring, wear it, and have it appear nowhere anybody else looks. The
+ * founder, off the deployed feed: "steven b should show his gif he has
+ * selected and his avatar and ring effects."
+ *
+ * Catalogue rings and auras only. A dropped-in art file is drawn by a
+ * WebView, and a feed row is not the place to mount four of them - the
+ * profile is where uploaded art gets its full size and its own render.
+ */
+async function facesFor(playerIds: string[]): Promise<Map<string, FeedFace>> {
+  const out = new Map<string, FeedFace>();
   const ids = [...new Set(playerIds)];
   if (ids.length === 0) return out;
 
-  const { data } = await getSupabaseAdmin()
-    .from("players")
-    .select("id, avatar_url")
-    .in("id", ids);
+  const [{ data }, wear] = await Promise.all([
+    getSupabaseAdmin()
+      .from("players")
+      .select("id, avatar_url, avatar_animated, tier, equipped_avatar_frame")
+      .in("id", ids),
+    avatarWearFor(ids),
+  ]);
 
-  for (const row of data ?? []) out.set(row.id, row.avatar_url);
+  for (const row of data ?? []) {
+    const worn = wear.get(row.id);
+    out.set(row.id, {
+      /*
+       * Through `avatarPathFor`, which is the one place that knows a GIF
+       * is only shown while the tier allows it - "every read of a
+       * player's picture goes through here". Reading `avatar_url`
+       * directly, as this did, is how a pro player's animated avatar
+       * came out as their still poster in the feed and nowhere else.
+       */
+      avatarUrl: avatarSrc(avatarPathFor(row)),
+      frame: row.equipped_avatar_frame,
+      ring: worn?.ring ?? null,
+      aura: worn?.aura ?? null,
+    });
+  }
+
   return out;
 }
 
@@ -1121,11 +1185,9 @@ async function recentItems(
     .in("id", [...new Set(usable.map((flare) => flare.player_session_id))]);
   const people = new Map((sessions ?? []).map((row) => [row.id, row]));
 
-  const [facts, avatars] = await Promise.all([
+  const [facts, faces] = await Promise.all([
     cardFacts(usable.map((flare) => flare.card_id)),
-    avatarsFor(
-      (sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : [])),
-    ),
+    facesFor((sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : []))),
   ]);
 
   /* One group per posting act: the batch if it had one, else the flare. */
@@ -1164,12 +1226,13 @@ async function recentItems(
     if (groups.size >= RECENT_SHOWN) continue;
 
     const person = people.get(flare.player_session_id);
+    const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;
     groups.set(key, {
       kind: "recent",
       id: key,
       playerSessionId: flare.player_session_id,
       displayName: person?.display_name ?? null,
-      avatarUrl: person?.player_id ? (avatars.get(person.player_id) ?? null) : null,
+      ...face,
       storeName: store.name,
       city: store.city,
       joinCode: store.joinCode,

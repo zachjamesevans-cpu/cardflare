@@ -1073,6 +1073,9 @@ export type FeedItem =
         playerId: string;
         displayName: string;
         avatarUrl: string | null;
+        frame: string | null;
+        ring: string | null;
+        aura: string | null;
         answers: number;
       }[];
     }
@@ -1122,6 +1125,10 @@ export type FeedItem =
       playerSessionId: string;
       displayName: string | null;
       avatarUrl: string | null;
+      /** Worn, so a ring somebody paid Embers for is seen here too. */
+      frame: string | null;
+      ring: string | null;
+      aura: string | null;
       storeName: string;
       city: string | null;
       joinCode: string;
@@ -1146,6 +1153,9 @@ export type FeedItem =
         playerSessionId: string;
         displayName: string | null;
         avatarUrl: string | null;
+        frame: string | null;
+        ring: string | null;
+        aura: string | null;
         storeName: string;
         joinCode: string;
         when: string;
