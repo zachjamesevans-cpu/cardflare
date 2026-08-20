@@ -8,6 +8,7 @@ import {
   FILM_SCALE,
   RING_BAND,
   RING_INSET,
+  auraClearance,
   auraLayer,
   filmLayer,
   ringLayer,
@@ -133,6 +134,46 @@ describe("the aura", () => {
        sideways, or Skia clips particles into a hard edge. */
     expect(centre + orbit).toBeLessThan(box);
     expect(centre - orbit).toBeGreaterThan(0);
+  });
+
+  it.each(SIZES)("at %ipx, keeps a rising particle off the picture", (size) => {
+    /*
+     * The orbit above is a CIRCLE, and rise and fall do not travel on
+     * it: they hold one x and sweep y through the layer, so the orbit
+     * being outside the picture says nothing about where those two go.
+     * Five of aura-hearts' ten particles crossed the founder's own
+     * profile picture in the simulator because of exactly that gap.
+     *
+     * The clearance is the radius they are pushed out to while the
+     * sweep has them level with the face. It has to clear the picture
+     * AND the particle's own body, or a speck lands half on somebody.
+     */
+    const dot = Math.max(1.5, size * 0.05);
+
+    expect(auraClearance(size, dot)).toBeGreaterThan(size / 2);
+    expect(auraClearance(size, dot)).toBeGreaterThanOrEqual(size / 2 + dot);
+  });
+
+  it("pushes rise and fall out to that clearance rather than across", () => {
+    /* The geometry can only offer the number; the path has to use it.
+       Read off the source, the way the z-order guard is - a phone is
+       the only place this can actually be seen, and that is the visual
+       pass in mobile/VISUAL-PASS.md. */
+    const worn = readFileSync(
+      resolve(import.meta.dirname, "../../mobile/src/cosmetic-worn.tsx"),
+      "utf8",
+    );
+
+    expect(worn).toMatch(/auraClearance/);
+
+    const rise = worn.indexOf('case "rise":');
+    expect(rise, "the rise path is gone").toBeGreaterThan(-1);
+
+    const block = worn.slice(rise, worn.indexOf('case "drift"', rise));
+
+    /* The push exists, and x is no longer the bare scatter it was. */
+    expect(block).toMatch(/clear \* clear/);
+    expect(block).not.toMatch(/x: centre \+ Math\.cos\(angle\) \* orbit,/);
   });
 
   it("stays in the band the website's mask leaves visible", () => {

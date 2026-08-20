@@ -9,8 +9,14 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
-import { auraLayer, ringLayer } from "./avatar-geometry";
-import { AURA_ART, RING_ART, type AuraArt, type RingArt } from "./cosmetic-art-data";
+import { auraClearance, auraLayer, ringLayer } from "./avatar-geometry";
+import {
+  AURA_ART,
+  RING_ART,
+  type AuraArt,
+  type AuraShape,
+  type RingArt,
+} from "./cosmetic-art-data";
 
 /**
  * A worn ring and a worn aura, drawn on a phone.
@@ -38,8 +44,120 @@ import { AURA_ART, RING_ART, type AuraArt, type RingArt } from "./cosmetic-art-d
 
 type Skia = typeof import("@shopify/react-native-skia");
 
+/**
+ * What each aura's particle actually looks like.
+ *
+ * The path data is the stylesheet's own, lifted out of the
+ * `--cfa-p-*` data URIs in `src/app/cosmetic-art.css` - a heart is the
+ * same heart on both platforms, not an approximation of one. Which
+ * shape belongs to which aura is NOT decided here: that comes from
+ * `AURA_ART[slug].shape`, which the generator reads out of the same
+ * stylesheet, so the two can never drift apart.
+ *
+ * THIS IS THE GAP IT CLOSES. Every aura used to be `<Circle r={dot} />`
+ * in a different colour, so Hearts was a pink dot, Snow was a white dot
+ * and Holo Shards was a blue one - eight cosmetics people had spent
+ * Embers on, all drawn as the same speck. The founder saw the hearts
+ * on a real phone and they were circles.
+ *
+ * Sizes are in each icon's own viewBox and normalised below, so these
+ * stay copy-paste comparable with the CSS rather than being re-scaled
+ * by hand into some other unit.
+ *
+ * The one thing not carried over is the petal's `rotate(24 32 32)`: on
+ * the web every tile is rotated alike, and here the particles are
+ * already scattered around a circle, so it would buy nothing.
+ */
+const SHAPES: Record<
+  AuraShape,
+  {
+    /** The mark, in its own viewBox. */
+    d: string;
+    /** Stroked at this width, in viewBox units, instead of filled. */
+    stroke?: number;
+    /** The second, brighter mark some of them carry on top. */
+    inner?: string;
+  }
+> = {
+  heart: {
+    d: "M32 40s-7-4.6-7-9.6c0-2.9 2-4.4 4-4.4 1.3 0 2.4.7 3 1.7.6-1 1.7-1.7 3-1.7 2 0 4 1.5 4 4.4 0 5-7 9.6-7 9.6z",
+  },
+  petal: { d: "M32 23c4 4.5 6 7 6 10a6 6 0 1 1-12 0c0-3 2-5.5 6-10z" },
+  star: { d: "M32 23l1.8 7.2 7.2 1.8-7.2 1.8L32 41l-1.8-7.2L23 32l7.2-1.8z" },
+  bolt: { d: "M34 20l-8 13h5l-1 11 9-15h-5z" },
+  shard: { d: "M29 23L36 26L35 40L27 36Z" },
+  /* An ember with a hotter core, and a bubble with a glint: two
+     circles each, exactly as the stylesheet layers them. */
+  spark: {
+    d: "M9.6 12a2.4 2.4 0 1 0 4.8 0 2.4 2.4 0 1 0-4.8 0z",
+    inner: "M10.9 12a1.1 1.1 0 1 0 2.2 0 1.1 1.1 0 1 0-2.2 0z",
+  },
+  bubble: {
+    d: "M25 32a7 7 0 1 0 14 0 7 7 0 1 0-14 0z",
+    stroke: 1.4,
+    inner: "M27.9 29.5a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0z",
+  },
+  flake: {
+    d: "M32 24v16M24 32h16M26.3 26.3l11.4 11.4M37.7 26.3L26.3 37.7",
+    stroke: 1.6,
+  },
+};
+
+/**
+ * The shapes as Skia paths, centred on the origin and sized so the
+ * particle's own radius is 1.
+ *
+ * Normalised from the path's MEASURED bounds rather than from the
+ * viewBox, because every one of these icons is a small mark floating in
+ * a large box - the heart occupies about fourteen units of sixty-four -
+ * and scaling by the box would draw them all far too small. The stroke
+ * is scaled by the same factor, and half of it counts towards the
+ * extent, or a stroked flake would be drawn wider than it measures.
+ *
+ * Built once per kit. A path per particle per frame would be sixteen
+ * allocations a tick on a roster that is already redrawing.
+ */
+function particlePaths(S: Skia) {
+  const out = {} as Record<
+    AuraShape,
+    { path: ReturnType<typeof S.Skia.Path.Make>; stroke?: number; inner?: ReturnType<typeof S.Skia.Path.Make> }
+  >;
+
+  for (const key of Object.keys(SHAPES) as AuraShape[]) {
+    const shape = SHAPES[key];
+    const path = S.Skia.Path.MakeFromSVGString(shape.d);
+    if (!path) continue;
+
+    const bounds = path.getBounds();
+    const half = shape.stroke ? shape.stroke / 2 : 0;
+    const cx = bounds.x + bounds.width / 2;
+    const cy = bounds.y + bounds.height / 2;
+    const reach = Math.max(bounds.width, bounds.height) / 2 + half;
+    const scale = reach > 0 ? 1 / reach : 1;
+
+    const place = S.Skia.Matrix();
+    place.scale(scale, scale);
+    place.translate(-cx, -cy);
+
+    path.transform(place);
+
+    const inner = shape.inner ? S.Skia.Path.MakeFromSVGString(shape.inner) : null;
+    if (inner) inner.transform(place);
+
+    out[key] = {
+      path,
+      stroke: shape.stroke ? shape.stroke * scale : undefined,
+      inner: inner ?? undefined,
+    };
+  }
+
+  return out;
+}
+
 function makeKit(S: Skia) {
-  const { BlurMask, Canvas, Circle, Group, SweepGradient, vec } = S;
+  const { BlurMask, Canvas, Circle, Group, Path, Skia, SweepGradient, vec } = S;
+
+  const PARTICLE = particlePaths(S);
 
   /**
    * The ring: a stroked circle filled with a turning sweep gradient.
@@ -185,6 +303,7 @@ function makeKit(S: Skia) {
               centre={centre}
               orbit={orbit}
               dot={dot}
+              clear={auraClearance(size, dot)}
             />
           ))}
         </Canvas>
@@ -200,6 +319,7 @@ function makeKit(S: Skia) {
     centre,
     orbit,
     dot,
+    clear,
   }: {
     index: number;
     art: AuraArt;
@@ -207,6 +327,8 @@ function makeKit(S: Skia) {
     centre: number;
     orbit: number;
     dot: number;
+    /** The radius a rising or falling particle may not come inside. */
+    clear: number;
   }) {
     /* Deterministic scatter. A random start would make the same aura
        look different every time the screen mounted, and the web's is
@@ -220,16 +342,28 @@ function makeKit(S: Skia) {
 
       switch (art.motion) {
         case "rise":
-          /* Up the outside and away, which is what a spark does. */
+        case "fall": {
+          /* Up (or down) the OUTSIDE and away, which is what a spark
+             does, and which this always said it did. The lane is the
+             particle's own scatter until the sweep brings it level with
+             the picture; there it is pushed out to `clear`, so it rides
+             around the edge instead of across a face. */
+          const y =
+            art.motion === "rise"
+              ? centre + orbit - t * orbit * 2
+              : centre - orbit + t * orbit * 2;
+
+          const lane = Math.cos(angle) * orbit;
+          const blocked = clear * clear - (y - centre) * (y - centre);
+          const push = blocked > 0 ? Math.sqrt(blocked) : 0;
+
           return {
-            x: centre + Math.cos(angle) * orbit,
-            y: centre + orbit - t * orbit * 2,
+            x:
+              centre +
+              (Math.abs(lane) < push ? (lane < 0 ? -push : push) : lane),
+            y,
           };
-        case "fall":
-          return {
-            x: centre + Math.cos(angle) * orbit,
-            y: centre - orbit + t * orbit * 2,
-          };
+        }
         case "drift": {
           const a = angle + t * Math.PI * 2;
           return { x: centre + Math.cos(a) * orbit, y: centre + Math.sin(a) * orbit };
@@ -265,7 +399,37 @@ function makeKit(S: Skia) {
       }
     });
 
-    return <Circle cx={cx} cy={cy} r={dot} color={colour} opacity={opacity} />;
+    /*
+     * The mark itself, scaled to the particle's radius and carried to
+     * where the motion put it. The fallback is the old plain circle,
+     * and only for a shape whose path would not build - better a speck
+     * than a hole where somebody's cosmetic should be.
+     */
+    const drawn = PARTICLE[art.shape];
+
+    const transform = useDerivedValue(() => [
+      { translateX: position.value.x },
+      { translateY: position.value.y },
+      { scale: dot },
+    ]);
+
+    if (!drawn) {
+      return <Circle cx={cx} cy={cy} r={dot} color={colour} opacity={opacity} />;
+    }
+
+    return (
+      <Group transform={transform} opacity={opacity}>
+        <Path
+          path={drawn.path}
+          color={colour}
+          style={drawn.stroke ? "stroke" : "fill"}
+          strokeWidth={drawn.stroke}
+          strokeCap="round"
+          strokeJoin="round"
+        />
+        {drawn.inner ? <Path path={drawn.inner} color={art.colors[1]} /> : null}
+      </Group>
+    );
   }
 
   return { Ring, Aura };

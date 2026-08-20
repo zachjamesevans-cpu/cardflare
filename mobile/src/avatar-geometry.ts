@@ -119,3 +119,32 @@ export function filmLayer(size: number): Layer {
 
   return { box, offset: (box - size) / 2 };
 }
+
+/**
+ * How close to the centre a RISING or FALLING particle may come.
+ *
+ * `AURA_ORBIT` puts a particle on a circle outside the picture, and for
+ * the auras that go round - drift, twinkle, flicker - that is the whole
+ * rule. Rise and fall do not go round. They hold one x and sweep y
+ * through the layer's full height, so a particle whose x happens to sit
+ * near the middle travels straight down somebody's face; with the
+ * golden-ratio scatter these use, five of aura-hearts' ten do exactly
+ * that, and it was visible on a real profile in the simulator.
+ *
+ * That is the rule the ring already keeps - "the ring kinda digs into
+ * the profile pic... please don't ever do that again with these" - and
+ * an aura is no more entitled to a face than a ring is. The website
+ * never had the fault because it masks the middle out of the particle
+ * layer; the app has no masks, so the path itself has to avoid the
+ * picture.
+ *
+ * This is the radius it has to clear: the picture's edge plus the
+ * particle's own radius, so a speck grazing the edge does not half-land
+ * on it. Callers slide x outward while |y - centre| is inside this,
+ * which leaves the scatter intact above and below the picture and hugs
+ * the edge across the middle - "up the outside and away", which is what
+ * those two motions always claimed to do.
+ */
+export function auraClearance(size: number, dot: number): number {
+  return size / 2 + dot;
+}

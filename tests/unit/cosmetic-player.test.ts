@@ -67,8 +67,12 @@ describe("the app's side of it", () => {
   });
 
   it("only ever builds a player URL on our own origin", () => {
+    /* Our own, in either spelling - the server stamps art with the
+       apex and the deployment redirects that to www, so a check
+       against one string alone rejected our own files. */
     expect(film).toContain("API_BASE");
-    expect(film).toMatch(/parsed\.origin !== new URL\(API_BASE\)\.origin/);
+    expect(film).toMatch(/!siteOrigins\(\)\.includes\(parsed\.origin\)/);
+    expect(film).not.toMatch(/parsed\.origin !== new URL\(API_BASE\)\.origin/);
   });
 
   it("draws nothing rather than pointing the player somewhere else", () => {
@@ -129,14 +133,47 @@ describe("the origin whitelist", () => {
     expect(passes([`${API_BASE}/*`], player)).toBe(false);
   });
 
+  /* Both spellings of our own host, which is what the app computes. */
+  const ORIGINS = [API_BASE, "https://www.cardflare.gg"];
+
+  it("proves one spelling of our host was the blank-ring bug", () => {
+    /*
+     * Found in the Simulator, on the founder's own profile: the border
+     * drew nothing at all while every other part of the app was fine.
+     *
+     * `API_BASE` is the apex and the deployment answers it with a 308
+     * to www. `fetch` follows that without comment, which is why the
+     * API never noticed - but a redirect IS a navigation, the WebView
+     * judges navigations by origin, and www was not on the list. The
+     * library's answer to a URL that is not on the list is
+     * Linking.openURL, the same cliff as the "/*" bug.
+     */
+    const redirected = player.replace(
+      "https://cardflare.gg",
+      "https://www.cardflare.gg",
+    );
+
+    expect(passes([new URL(API_BASE).origin], redirected)).toBe(false);
+    expect(passes(ORIGINS, redirected)).toBe(true);
+    /* And the apex still works, because the server stamps art with it. */
+    expect(passes(ORIGINS, player)).toBe(true);
+  });
+
   it("is the form the app actually ships", () => {
     const film = readFileSync(resolve(root, "mobile/src/cosmetic-film.tsx"), "utf8");
-    expect(film).toContain("originWhitelist={[new URL(API_BASE).origin]}");
+
+    /* Bare origins, computed in one place for the whitelist, the load
+       gate and playerUrl alike - three copies of a host rule is how one
+       of them ends up a redirect behind the others. */
+    expect(film).toContain("originWhitelist={siteOrigins()}");
     expect(film).not.toMatch(/originWhitelist=\{\[[^\]]*\/\*/);
+    expect(film).toContain("export function siteOrigins()");
+    expect(film).toContain("siteOrigins().includes(parsed.origin)");
+
     /* And the load gate matches by prefix, never equality: iOS may
        re-serialise our query encoding, and refusing our own page draws
        nothing forever. */
-    expect(film).toContain("request.url.startsWith(`${API_BASE}/cosmetic-player`)");
+    expect(film).toContain("request.url.startsWith(`${origin}/cosmetic-player`)");
   });
 });
 
