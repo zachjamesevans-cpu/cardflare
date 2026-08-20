@@ -8,6 +8,7 @@ import { sessionsForPlayers } from "@/lib/players/accounts";
 import { listFollowing } from "@/lib/players/follows";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
+import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
 import { listWants } from "@/lib/players/wants";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -67,6 +68,21 @@ const SUGGESTIONS = 3;
  * the Feed falls back on, not what it is for.
  */
 const OPEN_ANYWHERE = 3;
+
+/**
+ * Recent Flares: how many rows to read, how many groups to show, and how
+ * many cards to name inside one.
+ *
+ * Read wide and show narrow, because the read is grouped afterwards: one
+ * pasted deck can be thirty rows and is one item, so a limit set at the
+ * number of ITEMS wanted would return a single deck and call it a feed.
+ */
+const RECENT_READ = 120;
+const RECENT_SHOWN = 4;
+const RECENT_SAMPLE = 4;
+
+/** Cosmetics named in the shop item. Three is a look; twelve is a catalogue. */
+const SHOP_SAMPLE = 3;
 
 interface CardFacts {
   cardName: string;
@@ -276,14 +292,144 @@ export interface StartItem {
   topic: "store" | "deck";
 }
 
+/**
+ * A store you have saved, with something to come.
+ *
+ * THE ITEM THAT ANSWERS A TUESDAY. Every other board item requires a room
+ * to be open now or a board already taking Flares, which on a pilot-size
+ * roster is true on perhaps two evenings a week. Measured on the founder's
+ * own account - a saved store, a want list, nothing live - the whole Feed
+ * came back empty, which is the one thing PRODUCT.md says it may not be.
+ *
+ * So a store is news before it is live. A night on the calendar is "bring
+ * it Friday", which is the spec's own example of place and time; a counter
+ * code with nothing scheduled is "walk in whenever you like", which is what
+ * a Counter Code is for. Only ever for stores NOT already shown as a live
+ * board above, so a shop never appears twice.
+ */
+export interface UpcomingItem {
+  kind: "upcoming";
+  storeId: string;
+  storeName: string;
+  city: string | null;
+  /** The permanent counter code, for walking in without a QR. */
+  joinCode: string;
+  /** The next scheduled night, when the calendar has one. */
+  nextEventAt: string | null;
+  nextEventName: string | null;
+  nextEventCode: string | null;
+  /** The store's clock, so "Friday 7pm" is their Friday and not UTC's. */
+  timeZone: string;
+  /** True when the store takes walk-ins on its counter code. */
+  walkIn: boolean;
+  /** How many cards are on your want list — what there is to go and ask for. */
+  wants: number;
+}
+
+/**
+ * A Flare somebody posted lately, wherever they posted it.
+ *
+ * The founder, asking for this by name: "maybe most recent flares from
+ * people". The board items only ever show a room that is OPEN, so a card
+ * posted at a shop on Friday is invisible by Saturday morning even though
+ * the person is still looking for it. This is the same fact without the
+ * requirement that the room still be running.
+ *
+ * Grouped by `posted_batch`, the same way the room's board groups a pasted
+ * deck, so thirty cards from one paste arrive as one item rather than
+ * thirty rows - the pile the grouping exists to prevent.
+ */
+export interface RecentItem {
+  kind: "recent";
+  /** Stable per group: the batch, or the first flare's id. */
+  id: string;
+  playerSessionId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  storeName: string;
+  city: string | null;
+  joinCode: string;
+  /** When it was posted. */
+  when: string;
+  /** Which way the card points, the board's own word. */
+  direction: "want" | "showcase";
+  /** The named hunt this belonged to, when it had one. */
+  deckLabel: string | null;
+  cards: FeedCard[];
+  /** Cards in the group beyond the ones named. */
+  more: number;
+}
+
+/**
+ * A pack in the shop, and the Embers to open it with.
+ *
+ * Evergreen: true with nobody else in the product, which is the whole
+ * reason it is here. See PRODUCT.md's round-two note - it sits below
+ * everything derived, it is capped at one, and it never displaces a room.
+ */
+export interface PackItem {
+  kind: "pack";
+  slug: string;
+  name: string;
+  description: string;
+  priceEmbers: number;
+  artUrl: string | null;
+  /** What the reader has to spend, so the item knows if it is reachable. */
+  balance: number;
+}
+
+/**
+ * Cosmetics worth a look, with what they cost.
+ *
+ * PRODUCT.md names this as one of three reasons the Feed earns its place:
+ * "a player buys a ring today and three people at a counter notice. Rings,
+ * showcases and Embers only make sense where people look at each other,
+ * and the Feed is that place." Until there are people to notice, the Feed
+ * is at least where they are seen.
+ */
+export interface ShopItem {
+  kind: "shop";
+  cosmetics: {
+    slug: string;
+    name: string;
+    description: string;
+    /** ring, aura, border, and the rest - the section it lives under. */
+    family: string;
+    costEmbers: number;
+  }[];
+  balance: number;
+}
+
 export type FeedItem =
   | AnnouncementItem
   | BoardItem
   | HuntItem
+  | UpcomingItem
+  | RecentItem
   | TradedItem
   | AddedItem
+  | PackItem
+  | ShopItem
   | SuggestionItem
   | StartItem;
+
+/**
+ * What the reader has to spend.
+ *
+ * Only the two evergreen items use it, and only to say whether the thing
+ * they are showing is reachable today: an item that offers a pack somebody
+ * cannot afford is an advert, and one that knows the difference is a
+ * suggestion.
+ */
+async function embersBalance(playerId: string): Promise<number> {
+  const { data } = await getSupabaseAdmin()
+    .from("players")
+    .select("embers_balance")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  return data?.embers_balance ?? 0;
+}
 
 /** ISO for "this many days ago", the cut both recent items share. */
 function since(days: number): string {
@@ -633,6 +779,243 @@ async function boardWithHunts(
 }
 
 /**
+ * Stores you have saved that are worth knowing about, though nothing is
+ * open at them right now.
+ *
+ * The gate the first cut got wrong. `liveNow || earlyOpen` is a good rule
+ * for "which board do I show cards from" and a bad one for "is this shop
+ * worth a line", because a shop is worth a line on the four days a week it
+ * has nothing on - and those are most of them. Measured on the founder's
+ * own account, with a saved store and a want list, the entire Feed came
+ * back empty.
+ *
+ * A store with neither a night on the calendar nor walk-ins is genuinely
+ * not news and is dropped. "Nothing is happening at four shops" is worse
+ * than a short feed, which was true of the first cut and still is.
+ */
+function upcomingItems(
+  locals: LocalStore[],
+  alreadyShown: Set<string>,
+  wants: number,
+): UpcomingItem[] {
+  return locals
+    .filter((local) => !alreadyShown.has(local.storeId))
+    .filter((local) => local.nextEventAt !== null || local.walkIn)
+    .slice(0, LOCALS_SHOWN)
+    .map((local) => ({
+      kind: "upcoming" as const,
+      storeId: local.storeId,
+      storeName: local.name,
+      city: local.city,
+      joinCode: local.joinCode,
+      nextEventAt: local.nextEventAt,
+      nextEventName: local.nextEventName,
+      nextEventCode: local.nextEventCode,
+      timeZone: local.timeZone,
+      walkIn: local.walkIn,
+      wants,
+    }));
+}
+
+/** Profile pictures for a batch of accounts. */
+async function avatarsFor(playerIds: string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  const ids = [...new Set(playerIds)];
+  if (ids.length === 0) return out;
+
+  const { data } = await getSupabaseAdmin()
+    .from("players")
+    .select("id, avatar_url")
+    .in("id", ids);
+
+  for (const row of data ?? []) out.set(row.id, row.avatar_url);
+  return out;
+}
+
+/**
+ * Flares posted lately, wherever they were posted.
+ *
+ * Asked for by name: "maybe most recent flares from people". Every other
+ * card-bearing item on this screen reads through a board that is OPEN, so
+ * a card somebody posted on Friday has left the Feed by Saturday even
+ * though they are still looking for it. This reads the Flares themselves
+ * and asks only that they still be open, and recent.
+ *
+ * GROUPED BY BATCH, because a pasted deck is one act. The room's board
+ * learned this the hard way - a pasted list nobody named "came out as
+ * thirty loose rows" - and a feed row has less room than a board does.
+ *
+ * The reader's own Flares are left out: you know what you posted, and a
+ * feed that opens with your own words is a mirror rather than a room.
+ */
+async function recentItems(
+  ownSessionId: string | null,
+  held: ReturnType<typeof heldByCard>,
+  stores: Map<string, { name: string; city: string | null; joinCode: string }>,
+): Promise<RecentItem[]> {
+  const admin = getSupabaseAdmin();
+
+  const { data: flares, error } = await admin
+    .from("flares")
+    .select(
+      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch",
+    )
+    .eq("status", "open")
+    .gte("created_at", since(RECENT_DAYS))
+    .order("created_at", { ascending: false })
+    .limit(RECENT_READ);
+
+  if (error || !flares || flares.length === 0) {
+    if (error) console.error("Could not read recent flares", error);
+    return [];
+  }
+
+  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  if (usable.length === 0) return [];
+
+  const { data: events } = await admin
+    .from("events")
+    .select("id, store_id")
+    .in("id", [...new Set(usable.map((flare) => flare.event_id))]);
+  const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
+
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id, display_name, player_id")
+    .in("id", [...new Set(usable.map((flare) => flare.player_session_id))]);
+  const people = new Map((sessions ?? []).map((row) => [row.id, row]));
+
+  const [facts, avatars] = await Promise.all([
+    cardFacts(usable.map((flare) => flare.card_id)),
+    avatarsFor(
+      (sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : [])),
+    ),
+  ]);
+
+  /* One group per posting act: the batch if it had one, else the flare. */
+  const groups = new Map<string, RecentItem>();
+
+  for (const flare of usable) {
+    const storeId = storeOf.get(flare.event_id);
+    const store = storeId ? stores.get(storeId) : undefined;
+    const fact = facts.get(flare.card_id);
+    if (!store || !fact) continue;
+
+    const key = `${flare.posted_batch ?? flare.id}:${flare.player_session_id}`;
+    const card: FeedCard = {
+      cardId: flare.card_id,
+      ...fact,
+      match: matchFor({ cardId: flare.card_id, printingId: null }, held),
+    };
+
+    const existing = groups.get(key);
+    if (existing) {
+      if (existing.cards.length < RECENT_SAMPLE) existing.cards.push(card);
+      else existing.more += 1;
+      continue;
+    }
+
+    if (groups.size >= RECENT_SHOWN) continue;
+
+    const person = people.get(flare.player_session_id);
+    groups.set(key, {
+      kind: "recent",
+      id: key,
+      playerSessionId: flare.player_session_id,
+      displayName: person?.display_name ?? null,
+      avatarUrl: person?.player_id ? (avatars.get(person.player_id) ?? null) : null,
+      storeName: store.name,
+      city: store.city,
+      joinCode: store.joinCode,
+      when: flare.created_at,
+      direction: flare.intent === "showcase" ? "showcase" : "want",
+      deckLabel: flare.deck_label,
+      cards: [card],
+      more: 0,
+    });
+  }
+
+  return [...groups.values()];
+}
+
+/**
+ * A pack worth opening, and what the reader has to open it with.
+ *
+ * The first of the two evergreen items - see PRODUCT.md's round-two note.
+ * True with nobody else in the product, which is exactly why it is here
+ * and exactly why it sits at the bottom: a shop is what the Feed falls
+ * back on, never what it is for.
+ *
+ * The NEWEST live pack rather than the cheapest, because "there is a new
+ * one" is news and "there is a cheap one" is inventory.
+ */
+async function packItem(balance: number): Promise<PackItem[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("pack_series")
+    .select("slug, name, description, price_embers, art_path")
+    .eq("status", "live")
+    .order("set_number", { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    if (error) console.error("Could not read the pack shop for the feed", error);
+    return [];
+  }
+
+  const pack = data[0];
+
+  return [
+    {
+      kind: "pack",
+      slug: pack.slug,
+      name: pack.name,
+      description: pack.description,
+      priceEmbers: pack.price_embers,
+      artUrl: pack.art_path,
+      balance,
+    },
+  ];
+}
+
+/**
+ * Cosmetics to look at, with what they cost.
+ *
+ * PRODUCT.md's third reason the Feed earns its place is that it "gives the
+ * cosmetics somewhere to be seen". Until there are enough people around to
+ * see them on each other, this is where they are seen.
+ *
+ * Only ones the reader does not already own: a list of things somebody has
+ * already bought is a wardrobe, and they have one of those.
+ */
+async function shopItem(playerId: string, balance: number): Promise<ShopItem[]> {
+  const [catalogue, owned] = await Promise.all([
+    listCosmetics(),
+    ownedCosmetics(playerId),
+  ]);
+
+  const fresh = catalogue
+    .filter((row) => row.cost_embers > 0)
+    .filter((row) => !ownsCosmetic(row, owned))
+    .slice(0, SHOP_SAMPLE);
+
+  if (fresh.length === 0) return [];
+
+  return [
+    {
+      kind: "shop",
+      cosmetics: fresh.map((row) => ({
+        slug: row.slug,
+        name: row.name,
+        description: row.description,
+        family: row.kind,
+        costEmbers: row.cost_embers,
+      })),
+      balance,
+    },
+  ];
+}
+
+/**
  * Builds the feed for one player.
  *
  * `sessionId` is the room identity whose binder answers the boards — the
@@ -644,12 +1027,13 @@ export async function listFeed(
   playerId: string,
   sessionId: string | null,
 ): Promise<FeedItem[]> {
-  const [locals, following, binder, wants, notices] = await Promise.all([
+  const [locals, following, binder, wants, notices, balance] = await Promise.all([
     listLocals(playerId),
     listFollowing(playerId),
     sessionId ? listBinder(sessionId) : Promise.resolve([]),
     listWants(playerId),
     showingAnnouncements(),
+    embersBalance(playerId),
   ]);
 
   /* The want list as a set of cards, which is the question two of the item
@@ -709,11 +1093,32 @@ export async function listFeed(
    * The three that do not depend on a board being open, fetched together
    * because none of them needs anything the others produce.
    */
-  const [traded, added, suggested] = await Promise.all([
+  /*
+   * Where every store on this screen is, so a recent Flare can say which
+   * shop it was posted at. Locals and open-anywhere rooms both, because a
+   * Flare from a room you have never saved is still a Flare.
+   */
+  const stores = new Map(
+    [...locals, ...elsewhere].map((local) => [
+      local.storeId,
+      { name: local.name, city: local.city, joinCode: local.joinCode },
+    ]),
+  );
+
+  /* Stores already carrying a board above, so a shop is never listed
+     twice under two different headings. */
+  const shown = new Set([...live, ...elsewhere].map((local) => local.storeId));
+
+  const [traded, added, suggested, recent, pack, shop] = await Promise.all([
     tradedItems(locals.map((local) => local.storeId)),
     addedItems(followed, playerBySession, wanted),
     suggestionItem(playerId, wanted, new Set(followed.keys())),
+    recentItems(sessionId, held, stores),
+    packItem(balance),
+    shopItem(playerId, balance),
   ]);
+
+  const upcoming = upcomingItems(locals, shown, wanted.size);
 
   /*
    * The order is an argument about what is worth a tap, and it runs from
@@ -740,10 +1145,14 @@ export async function listFeed(
     })),
     ...boards.filter((item) => item.kind === "hunt"),
     ...boards.filter((item) => item.kind === "board" && item.yours),
+    ...upcoming,
     ...starters,
     ...boards.filter((item) => item.kind === "board" && !item.yours),
+    ...recent,
     ...added,
     ...traded,
     ...suggested,
+    ...pack,
+    ...shop,
   ];
 }

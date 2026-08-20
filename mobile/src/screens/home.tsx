@@ -17,6 +17,7 @@ import {
   type Me,
 } from "../api";
 import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
+import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { API_BASE } from "../config";
 import { colors, spacing } from "../theme";
@@ -70,6 +71,39 @@ const STARTERS = {
     label: "Paste a deck list",
   },
 } as const;
+
+/**
+ * The things a player can always do, whatever the room is doing.
+ *
+ * The founder, on opening the app and finding nothing: "the app should
+ * have a great home menu with lots of call to actions or stuff to look
+ * at". These are the call to actions - a fixed row that does not depend
+ * on anybody else having posted anything, which is the whole trouble
+ * with a feed on a quiet week.
+ *
+ * SCANNING IS DELIBERATELY NOT HERE. The first cut of this row had it,
+ * and it walked straight back into a decision the founder already made:
+ * "move the qr code scanner/code entry to Room. No need to have that in
+ * the feed." Scanning is what you do standing at a counter, which is the
+ * moment you are opening Room anyway. Three doors that go somewhere you
+ * cannot otherwise reach in a tap beats four with one in the wrong wall.
+ */
+const ACTIONS = [
+  { key: "wants", icon: "clipboard-list-outline", label: "Your wants" },
+  { key: "store", icon: "fire", label: "Embers store" },
+  { key: "dress", icon: "auto-fix", label: "Customize" },
+] as const;
+
+/** How long ago, in the shortest form that is still true. */
+function agoFrom(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  return `${Math.round(hours / 24)}d ago`;
+}
 
 /**
  * The mark is taller than it is wide — BRAND.md's one rule about it. It
@@ -202,6 +236,108 @@ export function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      {/*
+       * Who you are and what you have, before anything derived.
+       *
+       * The Feed can be short - on a quiet week it should be - and the
+       * screen still has to open with something that is true. A name and
+       * a balance are true every time, and the balance is what makes the
+       * two evergreen items at the bottom mean anything.
+       */}
+      {me && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+          }}
+        >
+          <PlayerAvatar
+            displayName={me.player.displayName}
+            seed={me.player.id}
+            avatarUrl={me.player.avatarUrl ?? null}
+            size={44}
+          />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 17 }}
+              numberOfLines={1}
+            >
+              {me.player.displayName}
+            </Text>
+            <Muted>
+              {me.wants.length > 0
+                ? `${me.wants.length} ${me.wants.length === 1 ? "card" : "cards"} on your want list`
+                : "No wants saved yet"}
+            </Muted>
+          </View>
+          {/*
+           * ONLY when the server actually said a number.
+           *
+           * `?? 0` was worse than nothing: against a server that has not
+           * deployed this field yet - which is every TestFlight build
+           * that ships ahead of a web release - it drew a confident
+           * "0 Embers" at a player holding 8,760. A missing balance is
+           * not a zero balance, and the honest render of "I do not know"
+           * is to say nothing.
+           */}
+          {typeof me.player.embersBalance === "number" && (
+            <EmberBadge earned={me.player.embersBalance} size="md" />
+          )}
+        </View>
+      )}
+
+      {/* The call to actions. Always here, always the same four. */}
+      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+        {ACTIONS.map((action) => (
+          /*
+           * The flex lives on a wrapper, not on the Tap.
+           *
+           * `Tap` hands its `style` to the Animated.View INSIDE the
+           * Pressable, so `flex: 1` there sizes a child of a box that is
+           * still sizing itself to its content - the row came out half
+           * the width of the cards under it, left-aligned. Wrapping is
+           * the local fix; moving the style onto the Pressable would
+           * change every Tap in the app to fix one row.
+           */
+          <View key={action.key} style={{ flex: 1 }}>
+            <Tap
+              accessibilityLabel={action.label}
+              onPress={() => {
+                if (action.key === "wants") navigation.navigate("Settings");
+                else if (action.key === "store") navigation.navigate("Store");
+                else navigation.navigate("Customize", { area: "profile" });
+              }}
+              style={{
+                gap: spacing(1),
+                alignItems: "center",
+                paddingVertical: spacing(3),
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.elevated,
+              }}
+            >
+              <MaterialCommunityIcons
+                name={action.icon}
+                size={22}
+                color={colors.accent}
+              />
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 11,
+                  textAlign: "center",
+                }}
+                numberOfLines={2}
+              >
+                {action.label}
+              </Text>
+            </Tap>
+          </View>
+        ))}
+      </View>
+
       {/*
        * The Feed leads. Everything here is derived - nobody posts to it -
        * so a pilot with six players still opens something worth reading.
@@ -461,6 +597,140 @@ export function HomeScreen() {
               onPress={() => void enter(item.code)}
             />
           </Card>
+        ) : item.kind === "upcoming" ? (
+          <Card key={`upcoming-${index}`}>
+            <Muted>
+              {item.city ? `${item.storeName} · ${item.city}` : item.storeName}
+            </Muted>
+            {/* A night on the calendar is the headline. Without one the
+                counter code is, because the answer is "whenever". */}
+            <Title>{item.nextEventName ?? "Walk in any time"}</Title>
+            <Muted>
+              {item.nextEventAt
+                ? doorsAt(item.nextEventAt, item.timeZone)
+                : "The counter code is always open"}
+            </Muted>
+
+            {item.wants > 0 ? (
+              <Body>
+                {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your want list to ask about.`}
+              </Body>
+            ) : null}
+
+            <Button
+              label={item.nextEventCode ? "See the board" : "Open the room"}
+              variant="secondary"
+              onPress={() => void enter(item.nextEventCode ?? item.joinCode)}
+            />
+          </Card>
+        ) : item.kind === "recent" ? (
+          <Card key={`recent-${item.id}`}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <PlayerAvatar
+                displayName={item.displayName ?? "A player"}
+                seed={item.playerSessionId}
+                avatarUrl={item.avatarUrl}
+                size={36}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{ color: colors.textPrimary, fontWeight: "700" }}
+                  numberOfLines={1}
+                >
+                  {item.displayName ?? "A player"}
+                </Text>
+                {/* The direction in words, never a texture - PRODUCT.md
+                    is explicit that foil means rare, not available. */}
+                <Text
+                  style={{ color: colors.textMuted, fontSize: 12 }}
+                  numberOfLines={1}
+                >
+                  {`${item.direction === "showcase" ? "Letting go of" : "Hunting"}${
+                    item.deckLabel ? ` · ${item.deckLabel}` : ""
+                  } · ${item.storeName}`}
+                </Text>
+              </View>
+              <Muted>{agoFrom(item.when)}</Muted>
+            </View>
+
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              {item.cards.map((card) => (
+                <CardImage
+                  key={card.cardId}
+                  imageUrl={card.imageUrl}
+                  width={48}
+                  name={card.cardName}
+                  cardNumber={card.cardNumber}
+                  youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+                />
+              ))}
+              {item.more > 0 ? <Muted>{`+${item.more} more`}</Muted> : null}
+            </View>
+
+            <Button
+              label="See the board"
+              variant="secondary"
+              onPress={() => void enter(item.joinCode)}
+            />
+          </Card>
+        ) : item.kind === "pack" ? (
+          <Card key={`pack-${index}`}>
+            <Muted>In the Embers store</Muted>
+            <Title>{item.name}</Title>
+            <Body>{item.description}</Body>
+            <Muted>
+              {item.balance >= item.priceEmbers
+                ? `${item.priceEmbers} Embers`
+                : `${item.priceEmbers} Embers · you have ${item.balance}`}
+            </Muted>
+            <Button
+              label={item.balance >= item.priceEmbers ? "Open a pack" : "See the store"}
+              variant="secondary"
+              onPress={() => navigation.navigate("Store")}
+            />
+          </Card>
+        ) : item.kind === "shop" ? (
+          <Card key={`shop-${index}`}>
+            <Title>Worth spending Embers on</Title>
+            <Muted>{`You have ${item.balance} to spend.`}</Muted>
+            <View style={{ gap: spacing(2) }}>
+              {item.cosmetics.map((cosmetic) => (
+                <View
+                  key={cosmetic.slug}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{ color: colors.textPrimary, fontWeight: "600" }}
+                      numberOfLines={1}
+                    >
+                      {cosmetic.name}
+                    </Text>
+                    <Text
+                      style={{ color: colors.textMuted, fontSize: 12 }}
+                      numberOfLines={1}
+                    >
+                      {cosmetic.description}
+                    </Text>
+                  </View>
+                  <Muted>{`${cosmetic.costEmbers}`}</Muted>
+                </View>
+              ))}
+            </View>
+            <Button
+              label="See what you can wear"
+              variant="secondary"
+              onPress={() => navigation.navigate("Customize", { area: "profile" })}
+            />
+          </Card>
         ) : (
           <Card key={`board-${index}`}>
             {/* A local needs no address — you drive there. A room
@@ -471,7 +741,9 @@ export function HomeScreen() {
                 : `${item.storeName} · ${item.city}`}
             </Muted>
             <Title>{item.eventName}</Title>
-            <Muted>{item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}</Muted>
+            <Muted>
+              {item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}
+            </Muted>
 
             {item.youCanAnswer > 0 && (
               <>
@@ -506,10 +778,14 @@ export function HomeScreen() {
 
       {locals.length > 0 && (
         <Card>
-          <Title>Your locals</Title>
+          {/* The MANAGING list, not the news. A saved store with a night
+              on it is an "upcoming" item further up now, so this exists
+              for the two things that item cannot do: say you will be
+              there, and stop following a shop you no longer go to. */}
+          <Title>Stores you&rsquo;ve saved</Title>
           <Muted>
-            Saved automatically when you join signed in. Tap one to walk in, no
-            QR needed.
+            Tap one to walk in, no QR needed. &ldquo;I&rsquo;ll be there&rdquo; posts
+            your wants to the board before you arrive.
           </Muted>
           {/* Divided rows, RSVP inside its own row - the web's list,
               exactly. The button carries the count so the tap never
@@ -592,13 +868,23 @@ export function HomeScreen() {
         </Card>
       )}
 
-      <Card>
-        <Title>How it works</Title>
-        <Body>
-          Post a Flare for the card you&rsquo;re hunting. When somebody in the room
-          has it, they raise a hand, and you go trade, in person, at the table.
-        </Body>
-      </Card>
+      {/*
+       * The explainer, for a screen that has not filled up yet.
+       *
+       * It was unconditional, which meant an established player read "how
+       * it works" under their own board every time they opened the app.
+       * Below three items the screen has room for it and a newcomer needs
+       * it; above three it is the least interesting thing present.
+       */}
+      {feed.length < 3 && (
+        <Card>
+          <Title>How it works</Title>
+          <Body>
+            Post a Flare for the card you&rsquo;re hunting. When somebody in the room
+            has it, they raise a hand, and you go trade, in person, at the table.
+          </Body>
+        </Card>
+      )}
     </ScrollView>
   );
 }
