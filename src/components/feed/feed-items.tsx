@@ -57,14 +57,40 @@ function agoFrom(iso: string): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/**
+ * How wide a card is drawn, given how many are in the row.
+ *
+ * The founder, looking at a lone Flare in the deployed feed: "it looks a
+ * little silly to have one single card on a thing." He was right - a
+ * thumbnail the size of a thumbnail, marooned in a full-width card, reads
+ * as a mistake rather than as one card.
+ *
+ * So the art carries the weight of what is actually in the row. One card
+ * gets a picture worth looking at, two or three get something in between,
+ * and a deck goes back to a strip of thumbnails because at that point the
+ * row is about the SIZE of the hunt rather than about any one card in it.
+ *
+ * Thresholds are duplicated in the app deliberately and pinned together by
+ * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
+ */
+export function tileWidth(count: number): "lg" | "md" | "sm" {
+  if (count <= 1) return "lg";
+  if (count <= 3) return "md";
+  return "sm";
+}
+
+const TILE_CLASS = { lg: "w-40", md: "w-24", sm: "w-14" } as const;
+
 /** One card, at the size the feed shows cards. */
 function FeedTile({
   imageUrl,
   name,
   match,
+  size = "sm",
 }: {
   imageUrl: string | null;
   name: string;
+  size?: "lg" | "md" | "sm";
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -87,7 +113,7 @@ function FeedTile({
       }
       /* The board's own mark for a card you are holding, so the feed and
          the room are not two dialects of the same fact. */
-      className={`relative block w-14 shrink-0 overflow-hidden rounded-[6px] border bg-elevated ${
+      className={`relative block ${TILE_CLASS[size]} shrink-0 overflow-hidden rounded-[6px] border bg-elevated ${
         match
           ? "border-border shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
           : "border-border"
@@ -248,6 +274,7 @@ export function Item({ item }: { item: FeedItem }) {
                   imageUrl={card.imageUrl}
                   name={card.cardName}
                   match={card.match}
+                  size={tileWidth(item.total)}
                 />
               ))}
               {item.total > item.cards.length && (
@@ -471,6 +498,7 @@ export function Item({ item }: { item: FeedItem }) {
               imageUrl={card.imageUrl}
               name={card.cardName}
               match={card.match}
+              size={tileWidth(item.cards.length + item.more)}
             />
           ))}
           {item.more > 0 && (

@@ -313,6 +313,14 @@ export interface Me {
     deckLabel: string | null;
     /** Artwork, resolved server-side the way the Flare board resolves it. */
     imageUrl: string | null;
+    /**
+     * The store this card is live at, or null when it is only saved.
+     *
+     * The list's two states, in one field. Optional because an app build
+     * meets servers older than itself, and "not posted" is the safe read
+     * of a server that has not started saying.
+     */
+    postedAt?: string | null;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {

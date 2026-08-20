@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ClipboardList, Flame, Wand2 } from "lucide-react";
 
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
@@ -128,8 +129,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-4 px-4 pt-6 pb-16"
       >
-        <div className="flex w-full max-w-2xl">
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">Feed</h1>
+        {/* The title, and the one door out to other people. Same place on
+            both platforms: top right of the main feed. */}
+        <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
+          <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
+            Feed
+          </h1>
+          <FeedSearch />
         </div>
 
         <div className="flex w-full max-w-2xl flex-col gap-3">{children}</div>

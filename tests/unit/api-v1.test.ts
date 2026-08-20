@@ -66,6 +66,9 @@ vi.mock("@/lib/players/accounts", () => ({
 }));
 vi.mock("@/lib/players/wants", () => ({
   listWants: (...a: unknown[]) => listWants(...a),
+  /* Which saved cards are live on a board. Nothing posted in these
+     fixtures, so every want reads as saved-only. */
+  postedCardStores: () => Promise.resolve(new Map<string, string>()),
 }));
 vi.mock("@/lib/players/collection", () => ({
   collectionSyncFor: (...a: unknown[]) => collectionSyncFor(...a),

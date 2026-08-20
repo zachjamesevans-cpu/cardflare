@@ -11,6 +11,16 @@ export interface OutstandingWant {
   quantity: number;
   note: string | null;
   deckLabel: string | null;
+  /**
+   * The store this card is live at, or null when it is only saved.
+   *
+   * The list's two states. "The 'saved wants' section in the settings is
+   * kinda redundant, since it's just the flare section, jsut elsewhere" -
+   * so there is one list now, and this is what makes one enough: a card
+   * saved at home and a card on a board tonight are the same row and
+   * completely different news.
+   */
+  postedAt?: string | null;
 }
 
 /**
@@ -76,6 +86,11 @@ export function WantEntries({
                   {want.printingLabel ?? "Any printing"}
                 </span>
                 {want.deckLabel && <span className="font-sans">{want.deckLabel}</span>}
+                <span
+                  className={`font-sans ${want.postedAt ? "font-semibold text-accent" : "text-text-muted"}`}
+                >
+                  {want.postedAt ? `Live at ${want.postedAt}` : "Saved"}
+                </span>
               </p>
 
               {want.note && (

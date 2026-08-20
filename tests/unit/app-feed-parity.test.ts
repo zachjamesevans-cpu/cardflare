@@ -28,6 +28,8 @@ const read = (path: string) =>
 const web = read("src/app/feed/page.tsx");
 const app = read("mobile/src/screens/home.tsx");
 const items = read("src/components/feed/feed-items.tsx");
+const webPage = read("src/app/feed/page.tsx");
+const appRoot = read("mobile/App.tsx");
 
 /** Every item kind the server can produce, from the union itself. */
 const KINDS = [
@@ -100,6 +102,40 @@ describe("the home screen's furniture", () => {
   it("hides the explainer once the screen has filled up", () => {
     expect(web).toContain("items.length < 3");
     expect(app).toContain("feed.length < 3");
+  });
+
+  it("sizes a card by how many are in the row, the same way on both", () => {
+    /* "It looks a little silly to have one single card on a thing." One
+       card gets a picture, a deck gets a strip, and the thresholds are
+       one product's, not two. */
+    const web = readFileSync(
+      resolve(import.meta.dirname, "../../src/components/feed/feed-items.tsx"),
+      "utf8",
+    );
+
+    expect(web).toContain("if (count <= 1) return");
+    expect(web).toContain("if (count <= 3) return");
+    expect(app).toContain("if (count <= 1) return 160;");
+    expect(app).toContain("if (count <= 3) return 96;");
+  });
+
+  it("puts finding a player on the feed, on both", () => {
+    /* "Let's make a search icon in the top right of the main feed." */
+    expect(webPage).toContain("<FeedSearch />");
+    expect(appRoot).toContain('navigation.navigate("FindPlayer")');
+  });
+
+  it("keeps one wants list, and lets it say which state a card is in", () => {
+    /* "The 'saved wants' section in the settings is kinda redundant." */
+    const settings = read("mobile/src/screens/settings.tsx");
+    const row = read("mobile/src/want-row.tsx");
+    const entries = read("src/components/players/want-entries.tsx");
+
+    /* The rendered heading, not the word: the file may well explain in a
+       comment why the list is no longer here. */
+    expect(settings).not.toContain("<Title>Your saved wants</Title>");
+    expect(row).toContain("want.postedAt");
+    expect(entries).toContain("want.postedAt");
   });
 
   it("says nothing rather than zero when a balance did not arrive", () => {

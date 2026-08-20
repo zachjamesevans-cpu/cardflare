@@ -12,7 +12,7 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { getPlayerSession } from "@/lib/players/session";
-import { listWants } from "@/lib/players/wants";
+import { listWants, postedCardStores } from "@/lib/players/wants";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -48,7 +48,9 @@ export default async function FlarePage() {
 
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
-  const wants = playerId ? await listWants(playerId) : null;
+  const [wants, posted] = playerId
+    ? await Promise.all([listWants(playerId), postedCardStores(playerId)])
+    : [null, new Map<string, string>()];
 
   return (
     <>
@@ -112,7 +114,10 @@ export default async function FlarePage() {
               ) : (
                 <WantEntries
                   code={room?.code ?? ""}
-                  wants={wants}
+                  wants={wants.map((want) => ({
+                    ...want,
+                    postedAt: posted.get(want.cardId) ?? null,
+                  }))}
                   imagesEnabled={images}
                 />
               )}

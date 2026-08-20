@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -182,6 +183,9 @@ export function PostFlareScreen({
    * board. Clearing the field is the way out of the deck.
    */
   const [deck, setDeck] = useState("");
+  /* Whether the group row is open. The NAME is what sticks; this is
+     only whether the field is showing before one has been typed. */
+  const [grouping, setGrouping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -295,6 +299,82 @@ export function PostFlareScreen({
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
+      {/*
+       * The group, before the cards rather than after them.
+       *
+       * The mechanism was already here - a deck name that sticks across
+       * posts and folds cards into one folder on the board - as an
+       * optional text box at the BOTTOM of a form you only see once you
+       * have expanded a card. So nobody found it, and the founder read
+       * the result as a missing feature: "it would look a little silly to
+       * have separate flares in the feed for each card someone needs, if
+       * theyre building a full deck. so give an option when posting a
+       * flare to have it in thee."
+       *
+       * Same field, moved to where the decision is actually made. Closed
+       * it is one line; open it names the group every card posted after it
+       * joins, until it is cleared.
+       */}
+      <Card>
+        {grouping || deck.trim().length > 0 ? (
+          <>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(2),
+              }}
+            >
+              <Text
+                style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}
+              >
+                {deck.trim().length > 0 ? "Posting into" : "Name the group"}
+              </Text>
+              <Tap
+                accessibilityLabel="Stop grouping"
+                onPress={() => {
+                  setDeck("");
+                  setGrouping(false);
+                }}
+              >
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>Clear</Text>
+              </Tap>
+            </View>
+            <Input
+              value={deck}
+              onChangeText={setDeck}
+              placeholder={'e.g. "RG Luffy"'}
+              maxLength={40}
+              autoCapitalize="words"
+            />
+            <Muted>
+              Every card you post from here joins this group, until you clear
+              it. The room shows them as one folder, and so does the Feed.
+            </Muted>
+          </>
+        ) : (
+          <Tap
+            accessibilityLabel="Start a group"
+            onPress={() => setGrouping(true)}
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+          >
+            <MaterialCommunityIcons
+              name="folder-plus-outline"
+              size={20}
+              color={colors.accent}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                Start a group
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                Building a deck? Post the cards as one thing.
+              </Text>
+            </View>
+          </Tap>
+        )}
+      </Card>
+
       <Card>
         <Title>What are you hunting?</Title>
         {/* Said up front, so nobody thinks a couch Flare reached a room. */}
@@ -523,20 +603,6 @@ export function PostFlareScreen({
                     placeholder="Note for the room (optional)"
                     maxLength={120}
                   />
-
-                  <Input
-                    value={deck}
-                    onChangeText={setDeck}
-                    placeholder={'Building a deck? e.g. "RG Luffy" (optional)'}
-                    maxLength={40}
-                    autoCapitalize="words"
-                  />
-                  {deck.trim().length > 0 && (
-                    <Muted>
-                      Cards with the same deck name group into one folder on the
-                      board. The name sticks for your next card.
-                    </Muted>
-                  )}
 
                   <ErrorLine message={error} />
 

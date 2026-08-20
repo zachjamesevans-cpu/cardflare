@@ -94,6 +94,28 @@ const ACTIONS = [
   { key: "dress", icon: "auto-fix", label: "Customize" },
 ] as const;
 
+/**
+ * How wide a card is drawn, given how many are in the row.
+ *
+ * The founder, looking at a lone Flare in the deployed feed: "it looks a
+ * little silly to have one single card on a thing." He was right - a
+ * thumbnail the size of a thumbnail, marooned in a full-width card, reads
+ * as a mistake rather than as one card.
+ *
+ * The art carries the weight of what is in the row. One card gets a
+ * picture worth looking at; two or three get something in between; a deck
+ * goes back to a strip, because at that point the row is about the SIZE of
+ * the hunt rather than about any one card in it.
+ *
+ * The same three numbers as the website's, pinned together by
+ * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
+ */
+function tileWidth(count: number): number {
+  if (count <= 1) return 160;
+  if (count <= 3) return 96;
+  return 48;
+}
+
 /** How long ago, in the shortest form that is still true. */
 function agoFrom(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -672,7 +694,7 @@ export function HomeScreen() {
                 <CardImage
                   key={card.cardId}
                   imageUrl={card.imageUrl}
-                  width={48}
+                  width={tileWidth(item.cards.length + item.more)}
                   name={card.cardName}
                   cardNumber={card.cardNumber}
                   youHave={card.match ? { kind: card.match, count: 0 } : undefined}
