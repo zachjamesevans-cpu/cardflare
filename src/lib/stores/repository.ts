@@ -114,7 +114,10 @@ export async function inviteStore(
    * than thrown: the store and invite rows are already written, the admin can
    * see the invite, and sign-in provisions on demand as a second chance.
    */
-  await ensureAuthUser(store.contact_email);
+  /* The validated input rather than the row: a store INVITED always has
+     an address, while the column is nullable for unclaimed listings that
+     never go through here. */
+  await ensureAuthUser(input.contactEmail);
 
   return { outcome: "invited", store };
 }

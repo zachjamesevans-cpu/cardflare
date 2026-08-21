@@ -16,7 +16,7 @@ import {
 export interface DirectoryStore {
   id: string;
   name: string;
-  contact_email: string;
+  contact_email: string | null;
   city: string | null;
   region: string | null;
   status: string;

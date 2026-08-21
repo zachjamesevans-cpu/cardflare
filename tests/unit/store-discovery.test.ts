@@ -289,3 +289,30 @@ describe("what the console reports after an import", () => {
     );
   });
 });
+
+describe("an unclaimed listing's contact email", () => {
+  it("is null rather than an empty string", () => {
+    /*
+     * Found by the import failing thirty-five times on
+     * `stores_contact_email_shape`. Nobody at an unclaimed shop has
+     * agreed to hear from us, so there is no address - and "" fails the
+     * check the column has carried since the first migration, while also
+     * reading as a real-but-blank address everywhere downstream.
+     */
+    const lib = readSource("src/lib/stores/discovery.ts");
+
+    expect(lib).toContain("contact_email: null,");
+    expect(lib).not.toContain('contact_email: "",');
+  });
+
+  it("is allowed through by the constraint the migration rewrites", () => {
+    const migration = readSource(
+      "supabase/migrations/20260924090000_unclaimed_stores_have_no_email.sql",
+    );
+
+    expect(migration).toContain("alter column contact_email drop not null");
+    expect(migration).toContain("contact_email is null");
+    /* And a non-null value is still checked for shape. */
+    expect(migration).toContain("[^@[:space:]]+@[^@[:space:]]+");
+  });
+});

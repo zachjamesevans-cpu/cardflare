@@ -47,7 +47,8 @@ export type StoreRow = {
   id: string;
   created_at: string;
   name: string;
-  contact_email: string;
+  /** Null for an unclaimed listing: nobody has told us one. */
+  contact_email: string | null;
   city: string | null;
   region: string | null;
   status: StoreStatus;
