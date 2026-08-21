@@ -33,8 +33,17 @@ export const editStoreSchema = z.object({
     .trim()
     .min(1, "Please enter the store's name.")
     .max(120, "Please keep the name under 120 characters."),
-  /** Where CardFlare writes. Not the same thing as a sign-in address. */
-  contactEmail: emailSchema,
+  /**
+   * Where CardFlare writes. Not the same thing as a sign-in address.
+   *
+   * OPTIONAL, because an unclaimed listing has nobody to write to and
+   * requiring one would make the admin invent an address to save a
+   * correction to a shop's phone number. Blank is stored as null; a
+   * value still has to look like an email.
+   */
+  contactEmail: z
+    .union([emailSchema, z.literal("")])
+    .transform((value) => value || null),
   city: optionalText(80),
   region: optionalText(80),
   /*

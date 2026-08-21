@@ -60,7 +60,8 @@ export function EditStoreForm({
   store: {
     id: string;
     name: string;
-    contactEmail: string;
+    /** Null for an unclaimed listing nobody has given one. */
+    contactEmail: string | null;
     city: string | null;
     region: string | null;
     addressLine: string | null;
@@ -100,7 +101,7 @@ export function EditStoreForm({
               type="email"
               inputMode="email"
               required
-              defaultValue={store.contactEmail}
+              defaultValue={store.contactEmail ?? ""}
             />
           </Field>
 

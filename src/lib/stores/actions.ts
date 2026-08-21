@@ -75,14 +75,14 @@ export async function inviteStoreAction(
    * and its fallback route — ask for a fresh link — is the flow every
    * invitation used before this one existed.
    */
-  const setupLink = await generateSetupLink(result.store.contact_email);
+  const setupLink = await generateSetupLink(parsed.data.contactEmail);
 
   // The store exists from here on. Email failure must not read as failure to
   // invite — the admin can resend, and the account is already provisioned.
   const email = await sendEmail(
     storeInviteEmail(
       result.store.name,
-      result.store.contact_email,
+      parsed.data.contactEmail,
       siteUrl(),
       setupLink,
       parsed.data.kind,

@@ -9,7 +9,7 @@ export type OperatorKindFilter = "all" | "lgs" | "vendor";
 
 export interface OperatorFacts {
   name: string;
-  contact_email: string;
+  contact_email: string | null;
   city: string | null;
   region: string | null;
   kind: string;
@@ -24,9 +24,15 @@ export function matchesOperator(store: OperatorFacts, rawQuery: string): boolean
   const query = rawQuery.trim().toLowerCase();
   if (!query) return true;
 
-  return [store.name, store.contact_email, store.city ?? "", store.region ?? ""].some(
-    (field) => field.toLowerCase().includes(query),
-  );
+  /* An unclaimed listing has no contact email, and searching for one
+     must not throw on the shops that are the whole point of the
+     directory. */
+  return [
+    store.name,
+    store.contact_email ?? "",
+    store.city ?? "",
+    store.region ?? "",
+  ].some((field) => field.toLowerCase().includes(query));
 }
 
 /**

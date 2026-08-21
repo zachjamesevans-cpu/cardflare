@@ -113,7 +113,7 @@ async function StoreDetailsSection({
   store: {
     id: string;
     name: string;
-    contact_email: string;
+    contact_email: string | null;
     city: string | null;
     region: string | null;
     /* The directory fields. Nullable throughout: a store that predates

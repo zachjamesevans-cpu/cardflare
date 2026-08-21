@@ -271,10 +271,17 @@ export async function importCandidates(
          * until the shop claims the row it is already attached to.
          */
         join_code: counterCode(),
-        /* No contact address is known for a shop that has not claimed
-           itself, and the column is not null. Empty rather than invented:
-           nothing should ever try to email an unclaimed listing. */
-        contact_email: "",
+        /*
+         * NULL, not "".
+         *
+         * Nobody at an unclaimed shop has agreed to hear from us, so
+         * there is no address and inventing one would be worse than
+         * having none. An empty string was the first answer and it was
+         * wrong twice: it fails the email-shape check the column has
+         * carried since the first migration, and had it passed it would
+         * read as a real-but-blank address everywhere downstream.
+         */
+        contact_email: null,
         city: candidate.city,
         region: candidate.region,
         address_line: candidate.addressLine,

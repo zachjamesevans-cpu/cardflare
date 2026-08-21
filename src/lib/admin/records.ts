@@ -64,7 +64,7 @@ export async function updateStoreRecord(
   storeId: string,
   fields: {
     name: string;
-    contactEmail: string;
+    contactEmail: string | null;
     city: string | null;
     region: string | null;
     addressLine?: string | null;
