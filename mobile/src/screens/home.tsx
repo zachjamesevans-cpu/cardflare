@@ -25,6 +25,8 @@ import {
   type Me,
 } from "../api";
 import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
+import { silentCoords } from "../location";
+import { NearbyLocationAsk } from "../nearby-location-ask";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { API_BASE } from "../config";
@@ -177,7 +179,17 @@ export function HomeScreen() {
     /* Its own try: the feed is the screen's headline, but a feed that
        failed must not take the locals list down with it. */
     try {
-      const fresh = await getFeed();
+      /*
+       * Silent: this reads a position we already have permission for
+       * and shows no dialog to anybody who has not granted one. The
+       * prompt belongs to a tap on the Nearby card, where the words
+       * beside it say what it is for - iOS gives one chance at that
+       * dialog forever, and spending it on a cold start spends it
+       * badly. A null simply sends no coordinates, and the server
+       * falls back to the player's ZIP.
+       */
+      const coords = await silentCoords();
+      const fresh = await getFeed(coords);
       if (alive()) setFeed(fresh.items);
     } catch {
       if (alive()) setFeed([]);
@@ -833,11 +845,38 @@ export function HomeScreen() {
             />
           </Card>
         ) : item.kind === "nearbyStores" ? (
+          /*
+           * Three states, and the two empty ones carry the feature. A
+           * section that vanishes when we do not know where somebody is
+           * teaches them nothing; a section that asks is how anybody
+           * finds out it exists. See nearbyStoreItems on the server.
+           */
+          item.needsLocation ? (
+            <Card key={`nearby-${index}`}>
+              <Title>Find stores near you</Title>
+              <NearbyLocationAsk onDone={() => void load(() => true)} />
+            </Card>
+          ) : (
           <Card key={`nearby-${index}`}>
             <Title>Stores near you</Title>
             <Muted>
               Shops CardFlare knows about, whether or not they use it yet.
             </Muted>
+
+            {/* Known position, nothing in range. Said out loud: an empty
+                list is indistinguishable from a broken one. */}
+            {item.stores.length === 0 ? (
+              <View style={{ gap: spacing(2.5) }}>
+                <Muted>
+                  No stores near you yet. We&rsquo;re adding shops city by city.
+                </Muted>
+                {/* A ZIP that found nothing might simply be the wrong
+                    ZIP, and this is the only place to change it. */}
+                {item.source === "postal" ? (
+                  <NearbyLocationAsk onDone={() => void load(() => true)} />
+                ) : null}
+              </View>
+            ) : null}
 
             <View style={{ gap: spacing(2.5) }}>
               {item.stores.map((store) => (
@@ -908,6 +947,7 @@ export function HomeScreen() {
               ))}
             </View>
           </Card>
+          )
         ) : item.kind === "pack" ? (
           <Card key={`pack-${index}`}>
             <Muted>In the Embers store</Muted>

@@ -92,7 +92,11 @@ export async function importStoresAction(
     `Created ${result.created} unclaimed ${result.created === 1 ? "listing" : "listings"}`,
   ];
   if (result.skipped > 0) parts.push(`skipped ${result.skipped} already in CardFlare`);
-  if (result.failed > 0) parts.push(`${result.failed} failed`);
+  /* Say WHY, not just how many. A count without the reason sent the
+     founder back to the console twice. */
+  if (result.failed > 0) {
+    parts.push(`${result.failed} failed: ${result.error ?? "unknown error"}`);
+  }
 
   return {
     status: result.failed > 0 ? "error" : "done",

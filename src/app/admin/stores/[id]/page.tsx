@@ -123,6 +123,8 @@ async function StoreDetailsSection({
     country: string | null;
     phone: string | null;
     website: string | null;
+    latitude: number | null;
+    longitude: number | null;
     listing_state: string;
     verified_at: string | null;
     tier: string;
@@ -169,6 +171,8 @@ async function StoreDetailsSection({
             country: store.country,
             phone: store.phone,
             website: store.website,
+            latitude: store.latitude,
+            longitude: store.longitude,
           }}
         />
       </Card>

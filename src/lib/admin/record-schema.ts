@@ -26,6 +26,19 @@ const emailSchema = z
   .pipe(z.email("Please enter a valid email address."))
   .transform((value) => value.toLowerCase());
 
+/** A decimal degree, or nothing. Blank stays blank; 0 is not a default. */
+function coordinate(min: number, max: number, label: string) {
+  return z
+    .string()
+    .trim()
+    .transform((value) => (value === "" ? null : Number(value)))
+    .refine(
+      (value) =>
+        value === null || (Number.isFinite(value) && value >= min && value <= max),
+      `Please enter a ${label} between ${min} and ${max}, or leave it blank.`,
+    );
+}
+
 export const editStoreSchema = z.object({
   storeId: z.guid(),
   name: z
@@ -60,6 +73,19 @@ export const editStoreSchema = z.object({
   country: optionalText(60),
   phone: optionalText(40),
   website: optionalText(200),
+  /*
+   * Where it is, which is what makes "2.1 miles away" possible.
+   *
+   * A store CardFlare already had has no coordinate - nobody was ever
+   * asked for one - so a player whose only saved shop is an old customer
+   * gets no Nearby section at all, whatever is published around them.
+   * This is where that gets fixed by hand until claiming collects it.
+   *
+   * Blank is null rather than 0: the Gulf of Guinea is a real place and
+   * every store with a missing coordinate must not appear to be in it.
+   */
+  latitude: coordinate(-90, 90, "latitude"),
+  longitude: coordinate(-180, 180, "longitude"),
 });
 
 export const editPlayerSchema = z.object({

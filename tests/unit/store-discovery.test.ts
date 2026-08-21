@@ -194,6 +194,27 @@ describe("the candidate snapshot the console imports from", () => {
     expect(source).not.toContain("process.cwd()");
   });
 
+  it("generates a counter code the constraint will accept", () => {
+    /*
+     * `stores_join_code_shape` is ^[0-9A-HJKMNP-TV-Z]{7}$ - every letter
+     * except I, L, O and U, the four a stranger confuses with 1, 1, 0
+     * and V. The first alphabet here reasoned "no vowels" instead of
+     * reading the constraint: it dropped A and E, which are allowed, and
+     * kept L, which is not. About one code in five contained an L, and
+     * five of thirty-five imports died on it.
+     */
+    const lib = readSource("src/lib/stores/discovery.ts");
+    const alphabet = /const CODE_ALPHABET = "([^"]+)"/.exec(lib)?.[1] ?? "";
+
+    expect(alphabet.length).toBeGreaterThan(0);
+    for (const character of alphabet) {
+      expect(character).toMatch(/[0-9A-HJKMNP-TV-Z]/);
+    }
+    for (const banned of ["I", "L", "O", "U"]) {
+      expect(alphabet).not.toContain(banned);
+    }
+  });
+
   it("carries the licence and attribution its records came with", () => {
     /* Overture Places is a mix of licences, so provenance is a property
        of the snapshot rather than a constant in the code. */

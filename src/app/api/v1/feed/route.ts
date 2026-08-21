@@ -2,6 +2,7 @@ import { apiPlayer, apiSession } from "@/lib/api/auth";
 import { listFeed } from "@/lib/feed/repository";
 import { sessionForPlayer } from "@/lib/players/accounts";
 import { siteUrl } from "@/lib/site";
+import { pointFromCoords } from "@/lib/geo/zip";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,21 @@ export async function GET(request: Request): Promise<Response> {
   const session =
     (await sessionForPlayer(account.playerId)) ?? (await apiSession(request));
 
-  const items = await listFeed(account.playerId, session?.id ?? null);
+  /*
+   * Where the phone is, if its owner granted permission. Query params
+   * rather than a stored column, and that is the privacy design rather
+   * than a shortcut: the coordinate exists for the length of this
+   * request and there is nowhere in the schema to put it. A player who
+   * refuses falls back to the ZIP on their profile, which the server
+   * reads itself - see originForPlayer.
+   */
+  const url = new URL(request.url);
+  const device = pointFromCoords(
+    url.searchParams.get("lat"),
+    url.searchParams.get("lng"),
+  );
+
+  const items = await listFeed(account.playerId, session?.id ?? null, device);
 
   return Response.json({ items: items.map(absoluteAvatars) });
 }

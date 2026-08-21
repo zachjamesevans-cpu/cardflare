@@ -197,12 +197,21 @@ describe("the Feed on day one", () => {
     const items = await listFeed("player-1", null);
 
     /* The notice, then the two questions, then the rooms that answer the
-       first of them. Nothing here needed anything from the player. */
+       first of them. Nothing here needed anything from the player.
+
+       And last, the third question: where are you. It ASKS rather than
+       vanishing, which is the whole point of it - a section that
+       disappears when we do not know where somebody is teaches them
+       nothing, and this is the only way a player discovers that
+       CardFlare knows about shops near them. Last because it is the one
+       item that needs a permission or a typed ZIP before it can pay
+       anybody back. */
     expect(items.map((item) => item.kind)).toEqual([
       "announcement",
       "start",
       "start",
       "board",
+      "nearbyStores",
     ]);
   });
 

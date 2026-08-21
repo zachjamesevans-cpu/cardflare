@@ -56,6 +56,8 @@ export async function updateStoreAction(
     country: text(formData, "country"),
     phone: text(formData, "phone"),
     website: text(formData, "website"),
+    latitude: text(formData, "latitude"),
+    longitude: text(formData, "longitude"),
   });
 
   if (!parsed.success) {

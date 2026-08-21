@@ -69,6 +69,8 @@ export function EditStoreForm({
     country: string | null;
     phone: string | null;
     website: string | null;
+    latitude: number | null;
+    longitude: number | null;
   };
 }) {
   const [state, formAction] = useActionState(updateStoreAction, RECORD_EDIT_IDLE);
@@ -163,6 +165,29 @@ export function EditStoreForm({
               {...fieldIds("website")}
               name="website"
               defaultValue={store.website ?? ""}
+            />
+          </Field>
+
+          {/* What makes "2.1 miles away" possible. A store CardFlare
+              already had has no coordinate, so a player whose only saved
+              shop is an old customer sees no Nearby section at all. */}
+          <Field name="latitude" label="Latitude">
+            <TextInput
+              {...fieldIds("latitude")}
+              name="latitude"
+              inputMode="decimal"
+              placeholder="44.0521"
+              defaultValue={store.latitude ?? ""}
+            />
+          </Field>
+
+          <Field name="longitude" label="Longitude">
+            <TextInput
+              {...fieldIds("longitude")}
+              name="longitude"
+              inputMode="decimal"
+              placeholder="-123.0868"
+              defaultValue={store.longitude ?? ""}
             />
           </Field>
         </div>

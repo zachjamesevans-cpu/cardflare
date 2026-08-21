@@ -12,7 +12,9 @@ import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/local
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
 import { listWants } from "@/lib/players/wants";
+import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
+import type { Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -454,6 +456,23 @@ export interface NearbyStoresItem {
     /** Nobody at the shop has claimed the listing yet. */
     unclaimed: boolean;
   }[];
+  /**
+   * True when we do not know where the player is, and the card should
+   * ask instead of listing. An empty section reads as broken; a
+   * question reads as a question, and is how anybody discovers the
+   * feature exists at all.
+   */
+  needsLocation?: boolean;
+  /**
+   * How we placed them - a granted device position, or the ZIP on
+   * their profile. Lets the card say "near 97477" rather than a bare
+   * "near you", so a wrong ZIP is visible rather than mysterious.
+   *
+   * Optional because a client on an older build predates it: the app
+   * and the server ship on different clocks, and a missing field has
+   * to mean "say nothing", never a crash.
+   */
+  source?: "device" | "postal";
 }
 
 /**
@@ -1292,22 +1311,32 @@ async function recentItems(
 }
 
 /**
- * Shops near the player's own stores.
+ * Shops near the player, wherever the player told us that is.
  *
- * The origin is a SAVED STORE rather than a device position: CardFlare
- * asks for no location permission today, and a player who has told us
- * where they play has already told us where they are, accurately enough
- * for "2.1 miles". Anything better waits for the permission prompt that
- * Phase 3 needs anyway.
+ * The origin comes from `originForPlayer`: a device coordinate this
+ * request carried, or the ZIP on their profile. It used to come from a
+ * store they had saved, which the founder rightly called the wrong
+ * model - "nothing to do with 'my store', because most of this is
+ * customer/player facing." A shop ticked months ago is not where
+ * somebody is standing, and most players have ticked none.
  *
- * Their own stores are excluded, because those already have items of
- * their own further up the screen.
+ * WITH NO ORIGIN THIS RETURNS AN ASK, NOT NOTHING. An empty Local
+ * section reads as a broken feature; a card that says "tell us roughly
+ * where you are" reads as a question, and is the only way a player ever
+ * finds out the section exists.
+ *
+ * Their own stores are still excluded, because those already have items
+ * of their own further up the screen.
  */
-async function nearbyStoreItems(locals: LocalStore[]): Promise<NearbyStoresItem[]> {
-  const origin = await originFromLocals(locals);
-  if (!origin) return [];
+async function nearbyStoreItems(
+  playerId: string,
+  locals: LocalStore[],
+  device: Point | null,
+): Promise<NearbyStoresItem[]> {
+  const origin = await originForPlayer(playerId, device);
+  if (!origin.point) return [{ kind: "nearbyStores", stores: [], needsLocation: true }];
 
-  const near = await storesNear(origin, NEARBY_RADIUS_MILES, NEARBY_SHOWN + 4);
+  const near = await storesNear(origin.point, NEARBY_RADIUS_MILES, NEARBY_SHOWN + 4);
   const own = new Set(locals.map((local) => local.storeId));
 
   const stores = near
@@ -1323,29 +1352,19 @@ async function nearbyStoreItems(locals: LocalStore[]): Promise<NearbyStoresItem[
       unclaimed: store.claimStatus === "unclaimed",
     }));
 
-  return stores.length === 0 ? [] : [{ kind: "nearbyStores", stores }];
-}
-
-/** The coordinate of the first saved store that has one. */
-async function originFromLocals(
-  locals: LocalStore[],
-): Promise<{ latitude: number; longitude: number } | null> {
-  if (locals.length === 0) return null;
-
-  const { data } = await getSupabaseAdmin()
-    .from("stores")
-    .select("latitude, longitude")
-    .in(
-      "id",
-      locals.map((local) => local.storeId),
-    )
-    .not("latitude", "is", null)
-    .limit(1);
-
-  const row = data?.[0];
-  if (!row || row.latitude === null || row.longitude === null) return null;
-
-  return { latitude: row.latitude, longitude: row.longitude };
+  /*
+   * Nothing within the radius is still worth a card when we know where
+   * they are, because "no stores near you yet" is information and an
+   * absent section is not. It carries the source so the reader can tell
+   * an empty map from a wrong ZIP.
+   */
+  return [
+    {
+      kind: "nearbyStores",
+      stores,
+      source: origin.source === "device" ? "device" : "postal",
+    },
+  ];
 }
 /**
  * A pack worth opening, and what the reader has to open it with.
@@ -1435,6 +1454,10 @@ async function shopItem(playerId: string, balance: number): Promise<ShopItem[]> 
 export async function listFeed(
   playerId: string,
   sessionId: string | null,
+  /* Coordinates this request carried from a phone that granted
+     permission. Optional so every existing caller keeps working, and
+     never persisted - see originForPlayer. */
+  device: Point | null = null,
 ): Promise<FeedEntry[]> {
   const [locals, following, binder, wants, notices, balance] = await Promise.all([
     listLocals(playerId),
@@ -1526,7 +1549,7 @@ export async function listFeed(
       recentItems(sessionId, held, stores),
       packItem(balance),
       shopItem(playerId, balance),
-      nearbyStoreItems(locals),
+      nearbyStoreItems(playerId, locals, device),
     ]);
 
   /* The lead item, and the one that needs nothing from anybody else

@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Flame, KeyRound, Library, Mail, Store } from "lucide-react";
+import {
+  ChevronLeft,
+  Flame,
+  KeyRound,
+  Library,
+  Mail,
+  MapPin,
+  Store,
+} from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
@@ -19,6 +27,8 @@ import {
 import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
+import { postalCodeForPlayer } from "@/lib/players/location";
+import { PostalAsk } from "@/components/feed/postal-ask";
 import { listWants } from "@/lib/players/wants";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { DeckListForm } from "@/components/players/deck-list-form";
@@ -69,6 +79,7 @@ export default async function ProfileSettingsPage() {
   const displayName = profile?.displayName ?? "";
   const handle = profile?.handle ?? "";
   const locals = playerId ? await listLocals(playerId) : [];
+  const postalCode = playerId ? await postalCodeForPlayer(playerId) : null;
 
   const sync = playerId ? await collectionSyncFor(playerId) : null;
   const lastSync = sync
@@ -122,6 +133,31 @@ export default async function ProfileSettingsPage() {
         </p>
       </div>
       <HandleForm handle={handle} />
+    </Card>
+  );
+
+  /*
+   * Where the player is, roughly, and the only place a saved ZIP can be
+   * changed once the Feed has stopped asking for it.
+   *
+   * A ZIP rather than a stored coordinate is the whole design: the
+   * device position the app can ask for is never written down, so this
+   * five-digit field is the entirety of what CardFlare keeps about
+   * where somebody is. Emptying it is how you take it back.
+   */
+  const locationCard = !playerId ? null : (
+    <Card key="location" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <MapPin className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Stores near you</p>
+          <p className="text-sm text-text-secondary">
+            Your ZIP code, used to list game stores and Flares within a few miles. It is
+            never shown to anyone and never used for anything else.
+          </p>
+        </div>
+      </div>
+      <PostalAsk defaultValue={postalCode ?? ""} />
     </Card>
   );
 
@@ -324,8 +360,24 @@ export default async function ProfileSettingsPage() {
 
   /* A player's own things lead; sign-in housekeeping follows. */
   const cards = isPlayerHome
-    ? [localsCard, wantsCard, collectionCard, nameCard, emailCard, passwordCard]
-    : [nameCard, emailCard, localsCard, wantsCard, collectionCard, passwordCard];
+    ? [
+        localsCard,
+        wantsCard,
+        collectionCard,
+        locationCard,
+        nameCard,
+        emailCard,
+        passwordCard,
+      ]
+    : [
+        nameCard,
+        emailCard,
+        locationCard,
+        localsCard,
+        wantsCard,
+        collectionCard,
+        passwordCard,
+      ];
 
   return (
     <>

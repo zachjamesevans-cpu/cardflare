@@ -72,6 +72,8 @@ export async function updateStoreRecord(
     country?: string | null;
     phone?: string | null;
     website?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   },
 ): Promise<RecordOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
@@ -88,6 +90,8 @@ export async function updateStoreRecord(
       country: fields.country ?? null,
       phone: fields.phone ?? null,
       website: fields.website ?? null,
+      latitude: fields.latitude ?? null,
+      longitude: fields.longitude ?? null,
     })
     .eq("id", storeId)
     .select("id")

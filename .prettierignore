@@ -14,3 +14,8 @@ tests/fixtures/
 
 # Generated from src/cosmetics by npm run cosmetics:svg.
 public/cosmetics/
+
+# The ZIP centroid table: 34k rows generated from a Census file, kept on
+# one line. Prettier would expand it to 170k lines of no interest to any
+# reader, and nobody edits it by hand. See data/geo/README.md.
+data/geo/
