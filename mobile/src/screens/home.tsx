@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Linking,
@@ -26,6 +26,8 @@ import {
 } from "../api";
 import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
 import { silentCoords } from "../location";
+import { FeedPerson, GuestChip } from "../feed-person";
+import { cachedPlayerId, readFeedCache, writeFeedCache } from "../feed-cache";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
@@ -154,6 +156,50 @@ export function HomeScreen() {
   const locals = me?.locals ?? [];
 
   /*
+   * Refs beside the state, because `load` is a stable useCallback with
+   * no dependencies — reading `feed` or `me` from its closure would
+   * read whatever they were when the screen mounted. These are only
+   * ever read, never rendered from.
+   */
+  const feedRef = useRef<FeedEntry[]>([]);
+  const meRef = useRef<Me | null>(null);
+
+  useEffect(() => {
+    feedRef.current = feed;
+    meRef.current = me;
+  }, [feed, me]);
+
+  /*
+   * The cached feed, painted once on the very first mount.
+   *
+   * Separate from `load` and deliberately fire-and-forget: it races the
+   * network on purpose and loses gracefully. If the real feed lands
+   * first, `feedRef` is no longer empty and this does nothing rather
+   * than replacing fresh content with old.
+   */
+  useEffect(() => {
+    let live = true;
+
+    void (async () => {
+      const token = await storedAccessToken();
+      if (!token || !live) return;
+
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+
+      const cached = await readFeedCache(id);
+      if (!cached || !live || feedRef.current.length > 0) return;
+
+      if (cached.me) setMe((current) => current ?? cached.me);
+      setFeed(cached.items);
+    })();
+
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  /*
    * One loader, shared by arriving at the screen and by pulling it down.
    *
    * `alive` rather than a bare boolean so a pull that resolves after the
@@ -169,10 +215,28 @@ export function HomeScreen() {
       return;
     }
 
+    /*
+     * Last open's feed, painted before this one has loaded.
+     *
+     * The founder: "it is quite disorienting opening the app and it
+     * slowly loads all of the elements and they all kinda pop down."
+     * The layout is settled before the network is, and the real load
+     * below overwrites it a moment later.
+     *
+     * Only when there is nothing on screen yet. A pull-to-refresh must
+     * never replace what somebody is looking at with an older copy of
+     * it, and neither must returning to the tab.
+     */
+    let cachedFor: string | null = null;
+
     try {
       const fresh = await getMe();
       if (alive()) setMe(fresh);
+      cachedFor = fresh.player.id;
     } catch {
+      /* Offline or mid-refresh. The cache still knows who it belongs
+         to, so a feed can be painted from it even when `me` failed —
+         which is the case where painting matters most. */
       if (alive()) setMe(null);
     }
 
@@ -191,8 +255,18 @@ export function HomeScreen() {
       const coords = await silentCoords();
       const fresh = await getFeed(coords);
       if (alive()) setFeed(fresh.items);
+
+      /* Written after a load that worked, so the cache can only ever
+         hold a feed that was real. */
+      if (cachedFor) void writeFeedCache(cachedFor, meRef.current, fresh.items);
     } catch {
-      if (alive()) setFeed([]);
+      /*
+       * A failed feed no longer empties the screen when there is
+       * something cached to keep. Blanking a feed somebody can see
+       * because the network blinked is the pop-in complaint in its
+       * worst form — it removes content rather than adding it late.
+       */
+      if (alive() && feedRef.current.length === 0) setFeed([]);
     }
   }, []);
 
@@ -483,15 +557,32 @@ export function HomeScreen() {
                   {/* Whose it is. "Who do I walk over to" is half the
                       question, and a name without a face is the half of
                       it nobody recognises across a shop. */}
-                  <PlayerAvatar
-                    displayName={entry.displayName ?? "A player"}
-                    seed={entry.playerSessionId}
-                    avatarUrl={entry.avatarUrl}
-                    frame={entry.frame}
-                    ring={entry.ring}
-                    aura={entry.aura}
-                    size={28}
-                  />
+                  {/* The CARD leads this row, not the person: it
+                      answers "which of my wants is out there", and the
+                      name is how you find them once you know. So it
+                      keeps its own layout — but the face still opens a
+                      profile, and a guest still says so on the line
+                      where the name actually appears. */}
+                  <Tap
+                    accessibilityLabel={`Open ${entry.displayName ?? "this player"}'s profile`}
+                    disabled={!entry.playerId}
+                    onPress={() =>
+                      entry.playerId &&
+                      navigation.navigate("PlayerProfile", {
+                        playerId: entry.playerId,
+                      })
+                    }
+                  >
+                    <PlayerAvatar
+                      displayName={entry.displayName ?? "A player"}
+                      seed={entry.playerId ?? entry.playerSessionId}
+                      avatarUrl={entry.avatarUrl}
+                      frame={entry.frame}
+                      ring={entry.ring}
+                      aura={entry.aura}
+                      size={28}
+                    />
+                  </Tap>
                   <View style={{ flex: 1 }}>
                     <Text
                       numberOfLines={1}
@@ -499,12 +590,21 @@ export function HomeScreen() {
                     >
                       {entry.card.cardName}
                     </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: colors.textMuted, fontSize: 12 }}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(1.5),
+                      }}
                     >
-                      {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
-                    </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={{ color: colors.textMuted, fontSize: 12, flexShrink: 1 }}
+                      >
+                        {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
+                      </Text>
+                      {entry.playerId === null ? <GuestChip /> : null}
+                    </View>
                   </View>
                   <Tap
                     accessibilityLabel={`Go to ${entry.storeName}`}
@@ -614,20 +714,17 @@ export function HomeScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              <PlayerAvatar
+              <FeedPerson
+                playerId={item.playerId}
                 displayName={item.displayName}
-                seed={item.playerId}
                 avatarUrl={item.avatarUrl}
                 frame={item.frame}
                 ring={item.ring}
-                size={40}
-              />
-              <View style={{ flexShrink: 1 }}>
-                <Title>{item.displayName}</Title>
-                <Muted>{`added ${item.total} ${
+                detail={`added ${item.total} ${
                   item.total === 1 ? "card" : "cards"
-                } to their binder`}</Muted>
-              </View>
+                } to their binder`}
+                onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+              />
             </View>
 
             <View style={{ flexDirection: "row", gap: spacing(2) }}>
@@ -690,22 +787,17 @@ export function HomeScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              <PlayerAvatar
+              <FeedPerson
+                playerId={item.playerId}
                 displayName={item.displayName}
-                seed={item.playerId}
                 avatarUrl={item.avatarUrl}
                 frame={item.frame}
                 ring={item.ring}
-                size={40}
+                detail={`${
+                  item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
+                }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
+                onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
               />
-              <View style={{ flexShrink: 1 }}>
-                <Title>{item.displayName}</Title>
-                <Muted>
-                  {`${
-                    item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-                  }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
-                </Muted>
-              </View>
             </View>
 
             {/* One card reads as a card; a deck reads as a row of them.
@@ -804,33 +896,21 @@ export function HomeScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              <PlayerAvatar
-                displayName={item.displayName ?? "A player"}
-                seed={item.playerSessionId}
+              {/* The direction in words, never a texture - PRODUCT.md
+                  is explicit that foil means rare, not available. */}
+              <FeedPerson
+                playerId={item.playerId}
+                displayName={item.displayName}
                 avatarUrl={item.avatarUrl}
                 frame={item.frame}
                 ring={item.ring}
                 aura={item.aura}
                 size={36}
+                detail={`${
+                  item.direction === "showcase" ? "Letting go of" : "Hunting"
+                }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.storeName}`}
+                onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
               />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{ color: colors.textPrimary, fontWeight: "700" }}
-                  numberOfLines={1}
-                >
-                  {item.displayName ?? "A player"}
-                </Text>
-                {/* The direction in words, never a texture - PRODUCT.md
-                    is explicit that foil means rare, not available. */}
-                <Text
-                  style={{ color: colors.textMuted, fontSize: 12 }}
-                  numberOfLines={1}
-                >
-                  {`${item.direction === "showcase" ? "Letting go of" : "Hunting"}${
-                    item.deckLabel ? ` · ${item.deckLabel}` : ""
-                  } · ${item.storeName}`}
-                </Text>
-              </View>
               <Muted>{agoFrom(item.when)}</Muted>
             </View>
 

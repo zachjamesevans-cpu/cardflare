@@ -43,7 +43,7 @@ export function Logo({
         className="shrink-0"
       />
       {!markOnly && (
-        <span className="text-lg font-bold tracking-tight text-text-primary">
+        <span className="font-display text-lg tracking-wide text-text-primary">
           Card<span className="text-accent">Flare</span>
         </span>
       )}

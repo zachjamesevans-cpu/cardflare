@@ -1,5 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
+import { clearFeedCache } from "./feed-cache";
+
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
 
@@ -41,6 +43,14 @@ async function storeAuth(access: string, refresh: string): Promise<void> {
 export async function signOut(): Promise<void> {
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
+
+  /*
+   * And the cached feed, which is the part that is easy to forget.
+   * Tokens are what stop the app talking to the server; the cache is
+   * what the NEXT person to open this phone would see painted on the
+   * screen before it ever tries. Signing out has to take both.
+   */
+  await clearFeedCache();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1124,6 +1134,20 @@ export type FeedItem =
       kind: "recent";
       id: string;
       playerSessionId: string;
+      /**
+       * The account behind the session, or null for a guest.
+       *
+       * Both answers in one field: a linked session has a profile worth
+       * opening, so the row navigates; an unlinked one IS a guest and
+       * says so instead, because a tap that goes nowhere is worse than
+       * no tap at all.
+       *
+       * OPTIONAL, because the app and the server ship on different
+       * clocks. An older server never sends it, and absent must mean
+       * "we do not know" rather than "guest" — labelling a real account
+       * a guest is a worse lie than showing no label.
+       */
+      playerId?: string | null;
       displayName: string | null;
       avatarUrl: string | null;
       /** Worn, so a ring somebody paid Embers for is seen here too. */
@@ -1152,6 +1176,20 @@ export type FeedItem =
       total: number;
       entries: {
         playerSessionId: string;
+        /**
+         * The account behind the session, or null for a guest.
+         *
+         * Both answers in one field: a linked session has a profile worth
+         * opening, so the row navigates; an unlinked one IS a guest and
+         * says so instead, because a tap that goes nowhere is worse than
+         * no tap at all.
+         *
+         * OPTIONAL, because the app and the server ship on different
+         * clocks. An older server never sends it, and absent must mean
+         * "we do not know" rather than "guest" — labelling a real account
+         * a guest is a worse lie than showing no label.
+         */
+        playerId?: string | null;
         displayName: string | null;
         avatarUrl: string | null;
         frame: string | null;
