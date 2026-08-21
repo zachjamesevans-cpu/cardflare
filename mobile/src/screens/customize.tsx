@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
@@ -10,6 +10,7 @@ import {
   type CustomizeSection,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
 import { WornAura, WornRing } from "../cosmetic-worn";
 import { hasAuraArt, hasRingArt } from "../cosmetic-art-data";
@@ -162,6 +163,12 @@ function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
   );
 }
 
+/** The wardrobe as it is kept between visits. */
+interface CachedWardrobe {
+  sections: CustomizeSection[];
+  equips: Record<string, string | null>;
+}
+
 export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   const [sections, setSections] = useState<CustomizeSection[] | null>(null);
   /* The worn slug per kind, flipped locally the moment a tile is
@@ -170,15 +177,60 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   const [worn, setWorn] = useState<Record<string, string | null>>({});
   const [message, setMessage] = useState<string | null>(null);
 
+  /* Read inside `load`, whose closure would otherwise hold whatever
+     `sections` was at mount. */
+  const sectionsRef = useRef<CustomizeSection[] | null>(null);
+
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
+
   const load = useCallback(async () => {
     try {
       const result = await getCustomize();
       setSections(result.sections);
       setWorn(result.equips);
       setMessage(null);
+
+      const id = await cachedPlayerId();
+      if (id)
+        void writeCache("customize", id, {
+          sections: result.sections,
+          equips: result.equips,
+        } satisfies CachedWardrobe);
     } catch {
-      setMessage("Could not load your wardrobe. Go back and try again.");
+      /* Only complain when there is nothing to look at. A wardrobe
+         already on screen is better than an error where it used to be. */
+      if (!sectionsRef.current) {
+        setMessage("Could not load your wardrobe. Go back and try again.");
+      }
     }
+  }, []);
+
+  /*
+   * Last visit's wardrobe, painted before this one has loaded.
+   *
+   * The heaviest screen in the app and the one that changes least
+   * between two visits — what somebody owns moves when they buy
+   * something, and buying something reloads this anyway.
+   */
+  useEffect(() => {
+    let live = true;
+
+    void (async () => {
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+
+      const cached = await readCache<CachedWardrobe>("customize", id);
+      if (!cached || !live || sectionsRef.current) return;
+
+      setSections(cached.sections);
+      setWorn(cached.equips);
+    })();
+
+    return () => {
+      live = false;
+    };
   }, []);
 
   useFocusEffect(

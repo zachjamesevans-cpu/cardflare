@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Text, View } from "react-native";
+
+import { RemoteImage } from "./remote-image";
 
 import { filmLayer } from "./avatar-geometry";
 import { hasAuraArt, hasRingArt } from "./cosmetic-art-data";
@@ -234,11 +236,10 @@ export function PlayerAvatar({
       }}
     >
       {avatarUrl && !broken ? (
-        <Image
-          source={{ uri: avatarUrl }}
+        <RemoteImage
+          uri={avatarUrl}
           onError={() => setBroken(true)}
           style={{ width: "100%", height: "100%" }}
-          resizeMode="cover"
         />
       ) : (
         <Text

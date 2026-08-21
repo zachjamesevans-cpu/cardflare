@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
-import { clearFeedCache } from "./feed-cache";
+import { clearCache } from "./cache";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
@@ -48,9 +48,10 @@ export async function signOut(): Promise<void> {
    * And the cached feed, which is the part that is easy to forget.
    * Tokens are what stop the app talking to the server; the cache is
    * what the NEXT person to open this phone would see painted on the
-   * screen before it ever tries. Signing out has to take both.
+   * screen before it ever tries — a feed, a profile, a wardrobe.
+   * Signing out has to take both.
    */
-  await clearFeedCache();
+  await clearCache();
 }
 
 /* ------------------------------------------------------------------ */

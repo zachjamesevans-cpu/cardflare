@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import {
   formatHandle,
   HANDLE_MAX,
@@ -75,10 +76,26 @@ const COVER_HEIGHT = 280;
  * Guests see the honest pitch rather than a wall: the whole room loop
  * works without any of this, and always will.
  */
+/**
+ * What a profile looks like on disk between visits.
+ *
+ * The three pieces the screen paints with, and deliberately not
+ * `following` — a follow list is small, fast, and the one thing on this
+ * screen somebody might change from another device. It loads normally.
+ */
+interface CachedProfile {
+  profile: Profile;
+  wardrobe: Wardrobe | null;
+  needsSetup: boolean;
+}
+
 export function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
+  /* Read inside `load`, which is a stable useCallback — its closure
+     would otherwise hold whatever `profile` was at mount. */
+  const profileRef = useRef<Profile | null>(null);
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [checked, setChecked] = useState(false);
   /* A fresh account finishes choosing a name before anything else -
@@ -135,16 +152,77 @@ export function ProfileScreen() {
       setWardrobe(result.wardrobe);
       setNeedsSetup(result.needsSetup);
       setLoadFailed(null);
+
+      /* Remembered for the next open. Written only after a load that
+         worked, so the cache can only ever hold a profile that was
+         real. See cache.ts. */
+      void writeCache(
+        "profile",
+        result.profile.playerId,
+        {
+          profile: result.profile,
+          wardrobe: result.wardrobe,
+          needsSetup: result.needsSetup,
+        } satisfies CachedProfile,
+      );
+
       getFollowing()
         .then((people) => setFollowing(people.following))
         .catch(() => {});
     } catch (caught) {
-      setProfile(null);
-      setLoadFailed(describeError(caught));
+      /*
+       * A failed load no longer empties a screen that already has
+       * something on it. Blanking a profile somebody can see because
+       * the network blinked takes content away rather than adding it
+       * late, which is the complaint in its worst form.
+       */
+      if (!profileRef.current) {
+        setProfile(null);
+        setLoadFailed(describeError(caught));
+      }
     } finally {
       setChecked(true);
     }
   }, []);
+
+  /*
+   * Last visit's profile, painted before this one has loaded.
+   *
+   * The founder: "it takes a full 7 seconds to load the full profile,
+   * such as card frames, effects, etc." The wardrobe is the heavy part
+   * and it is also the part that almost never changes between two
+   * visits, so it is exactly what a cache is for.
+   *
+   * Once, on first mount, and only if it wins the race with the
+   * network — painting over something fresher would be worse than not
+   * painting at all.
+   */
+  useEffect(() => {
+    let live = true;
+
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+
+      const cached = await readCache<CachedProfile>("profile", id);
+      if (!cached || !live || profileRef.current) return;
+
+      setProfile(cached.profile);
+      setWardrobe(cached.wardrobe);
+      setNeedsSetup(cached.needsSetup);
+      setChecked(true);
+    })();
+
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useFocusEffect(
     useCallback(() => {

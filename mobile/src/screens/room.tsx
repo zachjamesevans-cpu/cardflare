@@ -5,7 +5,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   LayoutAnimation,
   RefreshControl,
   ScrollView,
@@ -13,6 +12,8 @@ import {
   Text,
   View,
 } from "react-native";
+
+import { RemoteImage } from "../remote-image";
 
 import type { StackParams } from "../../App";
 import {
@@ -1490,9 +1491,9 @@ function CarouselFlare({
           ) : null}
           {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) =>
             flare.imageUrl ? (
-              <Image
+              <RemoteImage
                 key={depth}
-                source={{ uri: flare.imageUrl }}
+                uri={flare.imageUrl}
                 style={[styles.stackGhost, { left: depth * 4 }]}
               />
             ) : (

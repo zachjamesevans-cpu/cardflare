@@ -1,4 +1,6 @@
-import { Image, Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
+
+import { RemoteImage } from "./remote-image";
 
 import { CosmeticCard } from "./cosmetic-card";
 import { LinearGradient } from "expo-linear-gradient";
@@ -116,13 +118,13 @@ export function CoverBanner({
       pointerEvents="none"
     >
       {coverUrl ? (
-        <Image
-          source={{ uri: coverUrl }}
+        <RemoteImage
+          uri={coverUrl}
           blurRadius={blur}
           style={{ width: "100%", height: "100%" }}
           /* Top-anchored, so a face or a logo in the upper half of
              somebody's banner survives the crop. */
-          resizeMode="cover"
+          contentPosition="top"
         />
       ) : null}
       {/* A quiet darkening so light covers never wash out the text. */}
