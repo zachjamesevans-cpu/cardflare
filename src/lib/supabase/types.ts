@@ -881,6 +881,22 @@ type StoreClaimInsert = Omit<
   state?: StoreClaimState;
 };
 
+/**
+ * What an admin may change about a claim: the decision, and nothing else.
+ *
+ * A claimant writes the row once and never touches it again — the four
+ * columns here are the review, and every one of them is set behind
+ * `requireAdmin`. Insert deliberately cannot reach them, so a form post
+ * cannot arrive pre-approved; this is the other half of that split, the
+ * same shape `StoreUpdate` uses for `verified_at` and `tier`.
+ */
+type StoreClaimUpdate = {
+  state?: StoreClaimState;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  review_note?: string | null;
+};
+
 type StoreCandidateRejectionRow = {
   provider: string;
   provider_place_id: string;
@@ -1338,7 +1354,7 @@ export type Database = {
       player_equips: Table<PlayerEquipRow, PlayerEquipInsert>;
       pack_series: Table<PackSeriesRow, PackSeriesInsert>;
       store_sources: Table<StoreSourceRow, StoreSourceInsert>;
-      store_claims: Table<StoreClaimRow, StoreClaimInsert>;
+      store_claims: Table<StoreClaimRow, StoreClaimInsert, StoreClaimUpdate>;
       store_candidate_rejections: Table<
         StoreCandidateRejectionRow,
         StoreCandidateRejectionInsert

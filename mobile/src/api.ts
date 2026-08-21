@@ -1337,3 +1337,55 @@ export const saveDeckList = (list: string, deckLabel?: string | null) =>
  */
 export const savePostalCode = (postalCode: string) =>
   call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", { postalCode });
+
+/**
+ * A store as a player sees it — claimed or not.
+ *
+ * Mirrors the website's PublicStore exactly, privacy boundary included:
+ * no coordinates, no contact address, and no provenance beyond the
+ * attribution line the source licence requires.
+ */
+export interface PublicStore {
+  storeId: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  verified: boolean;
+  ultra: boolean;
+  unclaimed: boolean;
+  attribution: string | null;
+}
+
+export const getStore = (storeId: string) =>
+  call<{ store: PublicStore }>("GET", `/api/v1/stores/${encodeURIComponent(storeId)}`);
+
+/** What somebody at the shop tells us when claiming a listing. */
+export interface ClaimFields {
+  claimantName: string;
+  claimantEmail: string;
+  claimantRole: string;
+  businessEmail: string;
+  notes: string;
+}
+
+/**
+ * Claiming a listing. No account needed, on purpose — the person behind
+ * the counter has never heard of CardFlare, and a sign-in wall in front
+ * of "this shop is mine" defeats the whole directory.
+ */
+export const claimStore = (storeId: string, fields: ClaimFields) =>
+  call<{ ok: true }>(
+    "POST",
+    `/api/v1/stores/${encodeURIComponent(storeId)}/claim`,
+    fields,
+  );
+
+/** The roles the picker offers, matching the website's. */
+export const CLAIM_ROLES = [
+  "Owner",
+  "Manager",
+  "Staff",
+  "Event organiser",
+  "Other",
+] as const;

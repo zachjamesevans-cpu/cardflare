@@ -6,6 +6,8 @@ import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { StoreDirectory } from "@/components/admin/store-directory";
 import { StoreDiscovery } from "@/components/admin/store-discovery";
 import { DraftListings } from "@/components/admin/draft-listings";
+import { ClaimQueue } from "@/components/admin/claim-queue";
+import { listClaims, pendingClaimCount } from "@/lib/stores/claims";
 import type { DraftListing } from "@/components/admin/draft-listings";
 import type { DirectoryStore } from "@/components/admin/store-directory";
 import { Card } from "@/components/ui/card";
@@ -46,6 +48,13 @@ export default async function AdminStoresPage() {
      directory schema is missing rather than letting every import fail
      into a count. */
   const schemaReady = await directorySchemaReady();
+
+  /* Both in one pass, and only when the tables exist — before the
+     directory migration is applied these throw rather than returning
+     empty, and the red banner above is the answer to that, not a crash. */
+  const [claims, pendingClaims] = schemaReady
+    ? await Promise.all([listClaims(), pendingClaimCount()])
+    : [[], 0];
 
   const drafts: DraftListing[] = stores
     .filter((store) => store.listing_state === "draft")
@@ -155,6 +164,35 @@ export default async function AdminStoresPage() {
         <DraftListings drafts={drafts} />
 
         <StoreDiscovery />
+      </section>
+
+      {/*
+       * Shops asking for their own listing back.
+       *
+       * Its own section rather than a tab inside discovery, and above
+       * "Invite a store" on purpose: a claim is a shop that found
+       * CardFlare by itself, which is worth more attention than one we
+       * went looking for. The count is in the heading because a queue
+       * nobody can see the length of is a queue nobody works.
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="claims-heading">
+        <div className="flex flex-col gap-1.5">
+          <h3 id="claims-heading" className="text-lg font-bold text-text-primary">
+            Claim requests
+            {pendingClaims > 0 && (
+              <span className="ml-2 rounded-full bg-accent px-2 py-0.5 align-middle text-xs font-semibold text-accent-contrast tabular-nums">
+                {pendingClaims}
+              </span>
+            )}
+          </h3>
+          <p className="max-w-2xl text-sm text-text-secondary">
+            Somebody at the shop saying an unclaimed listing is theirs. Approving hands
+            over the listing and sets their address as the contact — it does not verify
+            them and does not change their tier.
+          </p>
+        </div>
+
+        <ClaimQueue claims={claims} />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">

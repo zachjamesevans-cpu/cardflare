@@ -1,4 +1,5 @@
 import { apiPlayer, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { postalCodeForPlayer, savePostalCode } from "@/lib/players/location";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,16 @@ export async function PUT(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const body = (await request.json().catch(() => null)) as {
-    postalCode?: unknown;
-  } | null;
+  /*
+   * `readJsonPayload`, NEVER `request.json()`. The app sends every write
+   * in the `x-cf-payload` header and no body at all - a field-found
+   * workaround for a network that kills bodied requests in transit. A
+   * route that reads the body directly gets `null` from the app and
+   * carries on as if the player had sent nothing, which here would have
+   * meant an empty string: silently CLEARING the ZIP they just typed
+   * instead of saving it, with a cheerful success message.
+   */
+  const body = (await readJsonPayload(request)) as { postalCode?: unknown } | null;
 
   const result = await savePostalCode(
     player.playerId,
