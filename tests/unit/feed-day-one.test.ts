@@ -40,6 +40,8 @@ for (const method of [
   "lte",
   "neq",
   "gte",
+  /* "has a coordinate at all", for the nearby-stores origin. */
+  "not",
   "order",
   "limit",
   /* Reads that end in one row rather than a list: the Embers balance the

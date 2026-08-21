@@ -51,6 +51,11 @@ export async function updateStoreAction(
     contactEmail: text(formData, "contactEmail"),
     city: text(formData, "city"),
     region: text(formData, "region"),
+    addressLine: text(formData, "addressLine"),
+    postalCode: text(formData, "postalCode"),
+    country: text(formData, "country"),
+    phone: text(formData, "phone"),
+    website: text(formData, "website"),
   });
 
   if (!parsed.success) {

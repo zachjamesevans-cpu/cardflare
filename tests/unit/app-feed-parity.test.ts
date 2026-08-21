@@ -34,6 +34,7 @@ const appRoot = read("mobile/App.tsx");
 /** Every item kind the server can produce, from the union itself. */
 const KINDS = [
   "wanted",
+  "nearbyStores",
   "announcement",
   "board",
   "hunt",
@@ -62,7 +63,10 @@ describe("the Feed's items", () => {
 
   it("has no kind the server sends and a client ignores", () => {
     const union = read("src/lib/feed/repository.ts");
-    const declared = [...union.matchAll(/^\s*kind: "([a-z]+)";$/gm)].map((m) => m[1]);
+    /* camelCase allowed: `nearbyStores` is one kind, not two words. */
+    const declared = [...union.matchAll(/^\s*kind: "([a-zA-Z]+)";$/gm)].map(
+      (m) => m[1],
+    );
 
     expect([...new Set(declared)].sort()).toEqual([...KINDS].sort());
   });
@@ -155,6 +159,46 @@ describe("the home screen's furniture", () => {
       expect(source).toMatch(/ring=\{(item|person|entry)\.ring\}/);
       expect(source).toMatch(/aura=\{(item|person|entry)\.aura\}/);
     }
+  });
+
+  it("keeps Verified and Ultra as two separate marks", () => {
+    /*
+     * Verified is trust - "CardFlare has confirmed this profile is
+     * controlled by the listed business" - and it is never for sale.
+     * Ultra is the product tier. A row may show one, both or neither,
+     * and no client may infer one from the other.
+     */
+    for (const source of [items, app]) {
+      expect(source).toContain("store.verified");
+      expect(source).toContain("store.ultra");
+    }
+
+    const repo = read("src/lib/feed/repository.ts");
+    expect(repo).toContain('ultra: store.tier === "ultra"');
+    expect(repo).toContain("verified: store.verified");
+  });
+
+  it("never carries a coordinate to a client", () => {
+    /* The privacy rule as a type: NearbyStore has no latitude and no
+       longitude, so a payload cannot leak one by omission. */
+    const nearby = read("src/lib/stores/nearby.ts");
+    const shape = nearby.slice(
+      nearby.indexOf("export interface NearbyStore"),
+      nearby.indexOf("const EARTH_MILES"),
+    );
+
+    expect(shape).not.toMatch(/\blatitude\b/);
+    expect(shape).not.toMatch(/\blongitude\b/);
+
+    for (const source of [items, app]) {
+      expect(source).not.toMatch(/store\.latitude/);
+      expect(source).not.toMatch(/store\.longitude/);
+    }
+  });
+
+  it("calls the tab Local on both", () => {
+    expect(appRoot).toContain('tabBarLabel: "Local"');
+    expect(read("src/components/players/player-tabs.tsx")).toContain('label: "Local"');
   });
 
   it("lets the feed be asked for again", () => {

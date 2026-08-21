@@ -832,6 +832,82 @@ export function HomeScreen() {
               onPress={() => void enter(item.joinCode)}
             />
           </Card>
+        ) : item.kind === "nearbyStores" ? (
+          <Card key={`nearby-${index}`}>
+            <Title>Stores near you</Title>
+            <Muted>
+              Shops CardFlare knows about, whether or not they use it yet.
+            </Muted>
+
+            <View style={{ gap: spacing(2.5) }}>
+              {item.stores.map((store) => (
+                <View
+                  key={store.storeId}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="map-marker-outline"
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(1),
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={{ color: colors.textPrimary, fontWeight: "600" }}
+                      >
+                        {store.name}
+                      </Text>
+                      {/* Two marks, never one inferred from the other:
+                          Verified is trust, Ultra is a product tier. */}
+                      {store.verified ? (
+                        <MaterialCommunityIcons
+                          name="check-decagram"
+                          size={14}
+                          color={colors.accent}
+                        />
+                      ) : null}
+                      {store.ultra ? (
+                        <Text
+                          style={{
+                            color: colors.textSecondary,
+                            fontSize: 9,
+                            fontWeight: "700",
+                            letterSpacing: 0.8,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 999,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                          }}
+                        >
+                          ULTRA
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.textMuted, fontSize: 12 }}
+                    >
+                      {`${store.miles} mi${store.city ? ` · ${store.city}` : ""}${
+                        store.unclaimed ? " · Unclaimed listing" : ""
+                      }`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
         ) : item.kind === "pack" ? (
           <Card key={`pack-${index}`}>
             <Muted>In the Embers store</Muted>

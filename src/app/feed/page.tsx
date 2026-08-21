@@ -16,7 +16,7 @@ import { listWants } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
-  title: "Feed",
+  title: "Local",
   robots: { index: false, follow: false },
 };
 
@@ -134,7 +134,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             both platforms: top right of the main feed. */}
         <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
           <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
-            Feed
+            Local
           </h1>
           <FeedSearch />
         </div>

@@ -67,6 +67,11 @@ export async function updateStoreRecord(
     contactEmail: string;
     city: string | null;
     region: string | null;
+    addressLine?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    phone?: string | null;
+    website?: string | null;
   },
 ): Promise<RecordOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
@@ -78,6 +83,11 @@ export async function updateStoreRecord(
       contact_email: fields.contactEmail,
       city: fields.city,
       region: fields.region,
+      address_line: fields.addressLine ?? null,
+      postal_code: fields.postalCode ?? null,
+      country: fields.country ?? null,
+      phone: fields.phone ?? null,
+      website: fields.website ?? null,
     })
     .eq("id", storeId)
     .select("id")

@@ -4,6 +4,7 @@ import { ArrowLeft, Store as StoreIcon } from "lucide-react";
 
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { StoreDirectory } from "@/components/admin/store-directory";
+import { StoreDiscovery } from "@/components/admin/store-discovery";
 import type { DirectoryStore } from "@/components/admin/store-directory";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -52,6 +53,11 @@ export default async function AdminStoresPage() {
       invitePending: store.invitePending,
       liveRoomName: live ? room.name : null,
       flares: live ? (flareCounts.get(room.eventId) ?? 0) : null,
+      /* The directory funnel, at a glance. Verified and Ultra are two
+         separate marks and neither implies the other. */
+      claimStatus: store.claim_status,
+      verified: store.verified_at !== null,
+      ultra: store.tier === "ultra",
     };
   });
 
@@ -90,6 +96,29 @@ export default async function AdminStoresPage() {
         ) : (
           <StoreDirectory stores={directory} />
         )}
+      </section>
+
+      {/*
+       * Finding shops that are not customers yet.
+       *
+       * Below the operator list on purpose: this page is for the stores
+       * CardFlare already works with, and discovery is the occasional act
+       * of widening the map. Nothing here publishes anything - an import
+       * creates unclaimed drafts, and a draft is invisible to players.
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="discover-heading">
+        <div className="flex flex-col gap-1.5">
+          <h3 id="discover-heading" className="text-lg font-bold text-text-primary">
+            Store directory
+          </h3>
+          <p className="max-w-2xl text-sm text-text-secondary">
+            A shop can exist in CardFlare before it is a customer. Discovered stores
+            land as unclaimed drafts; they become visible to players only when you
+            publish them, and Verified and Ultra are set by hand afterwards.
+          </p>
+        </div>
+
+        <StoreDiscovery />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="invite-heading">

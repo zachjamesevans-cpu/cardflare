@@ -12,6 +12,7 @@ import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/local
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
 import { listWants } from "@/lib/players/wants";
+import { storesNear } from "@/lib/stores/nearby";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -98,6 +99,10 @@ const RECENT_SAMPLE = 4;
 
 /** Cosmetics named in the shop item. Three is a look; twelve is a catalogue. */
 const SHOP_SAMPLE = 3;
+
+/** How far a "nearby store" may be, and how many to name. */
+const NEARBY_RADIUS_MILES = 25;
+const NEARBY_SHOWN = 4;
 
 interface CardFacts {
   cardName: string;
@@ -419,6 +424,39 @@ export interface RecentItem {
 }
 
 /**
+ * Shops near the player, whether or not they are CardFlare customers.
+ *
+ * The half of "CardFlare knows where cards are" that works with nobody
+ * else present. A store listing is true on the quietest Tuesday in the
+ * emptiest market, which is exactly the cold start this is for - and the
+ * founder's rule holds: real shops only, never an invented one.
+ *
+ * VERIFIED AND ULTRA TRAVEL SEPARATELY, because they mean different
+ * things. Verified is "CardFlare confirmed this profile is controlled by
+ * the listed business"; Ultra is a product tier. A row may show one,
+ * both, or neither, and nothing here infers one from the other.
+ *
+ * No coordinate reaches this item. `storesNear` drops latitude and
+ * longitude at the edge of the server and hands back rounded miles.
+ */
+export interface NearbyStoresItem {
+  kind: "nearbyStores";
+  stores: {
+    storeId: string;
+    name: string;
+    city: string | null;
+    /** Rounded to a tenth. A distance, never a position. */
+    miles: number;
+    /** True once an admin has confirmed who controls the profile. */
+    verified: boolean;
+    /** The commercial tier, kept apart from verification. */
+    ultra: boolean;
+    /** Nobody at the shop has claimed the listing yet. */
+    unclaimed: boolean;
+  }[];
+}
+
+/**
  * A pack in the shop, and the Embers to open it with.
  *
  * Evergreen: true with nobody else in the product, which is the whole
@@ -469,6 +507,7 @@ export type FeedItem =
   | AddedItem
   | PackItem
   | ShopItem
+  | NearbyStoresItem
   | SuggestionItem
   | StartItem;
 
@@ -499,13 +538,14 @@ async function embersBalance(playerId: string): Promise<number> {
  * scan, and it means a quiet week reads as "nothing on tonight" rather
  * than as an empty app.
  */
-export type FeedSection = "wanted" | "tonight" | "people" | "store";
+export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  nearby: "Nearby stores",
   store: "New in the store",
 };
 
@@ -524,6 +564,8 @@ function sectionFor(item: FeedItem): FeedSection {
     case "traded":
     case "suggest":
       return "people";
+    case "nearbyStores":
+      return "nearby";
     default:
       return "store";
   }
@@ -559,6 +601,8 @@ function reasonFor(item: FeedItem): string {
       return "At a store you go to";
     case "suggest":
       return "Their binders answer your wants";
+    case "nearbyStores":
+      return "Shops near the ones you have saved";
     case "pack":
     case "shop":
       return "Yours to spend Embers on";
@@ -1248,6 +1292,62 @@ async function recentItems(
 }
 
 /**
+ * Shops near the player's own stores.
+ *
+ * The origin is a SAVED STORE rather than a device position: CardFlare
+ * asks for no location permission today, and a player who has told us
+ * where they play has already told us where they are, accurately enough
+ * for "2.1 miles". Anything better waits for the permission prompt that
+ * Phase 3 needs anyway.
+ *
+ * Their own stores are excluded, because those already have items of
+ * their own further up the screen.
+ */
+async function nearbyStoreItems(locals: LocalStore[]): Promise<NearbyStoresItem[]> {
+  const origin = await originFromLocals(locals);
+  if (!origin) return [];
+
+  const near = await storesNear(origin, NEARBY_RADIUS_MILES, NEARBY_SHOWN + 4);
+  const own = new Set(locals.map((local) => local.storeId));
+
+  const stores = near
+    .filter((store) => !own.has(store.storeId))
+    .slice(0, NEARBY_SHOWN)
+    .map((store) => ({
+      storeId: store.storeId,
+      name: store.name,
+      city: store.city,
+      miles: store.miles,
+      verified: store.verified,
+      ultra: store.tier === "ultra",
+      unclaimed: store.claimStatus === "unclaimed",
+    }));
+
+  return stores.length === 0 ? [] : [{ kind: "nearbyStores", stores }];
+}
+
+/** The coordinate of the first saved store that has one. */
+async function originFromLocals(
+  locals: LocalStore[],
+): Promise<{ latitude: number; longitude: number } | null> {
+  if (locals.length === 0) return null;
+
+  const { data } = await getSupabaseAdmin()
+    .from("stores")
+    .select("latitude, longitude")
+    .in(
+      "id",
+      locals.map((local) => local.storeId),
+    )
+    .not("latitude", "is", null)
+    .limit(1);
+
+  const row = data?.[0];
+  if (!row || row.latitude === null || row.longitude === null) return null;
+
+  return { latitude: row.latitude, longitude: row.longitude };
+}
+/**
  * A pack worth opening, and what the reader has to open it with.
  *
  * The first of the two evergreen items - see PRODUCT.md's round-two note.
@@ -1418,14 +1518,16 @@ export async function listFeed(
      twice under two different headings. */
   const shown = new Set([...live, ...elsewhere].map((local) => local.storeId));
 
-  const [traded, added, suggested, recent, pack, shop] = await Promise.all([
-    tradedItems(locals.map((local) => local.storeId)),
-    addedItems(followed, playerBySession, wanted),
-    suggestionItem(playerId, wanted, new Set(followed.keys())),
-    recentItems(sessionId, held, stores),
-    packItem(balance),
-    shopItem(playerId, balance),
-  ]);
+  const [traded, added, suggested, recent, pack, shop, nearbyStores] =
+    await Promise.all([
+      tradedItems(locals.map((local) => local.storeId)),
+      addedItems(followed, playerBySession, wanted),
+      suggestionItem(playerId, wanted, new Set(followed.keys())),
+      recentItems(sessionId, held, stores),
+      packItem(balance),
+      shopItem(playerId, balance),
+      nearbyStoreItems(locals),
+    ]);
 
   /* The lead item, and the one that needs nothing from anybody else
      having posted this week. See wantedItems. */
@@ -1466,6 +1568,7 @@ export async function listFeed(
     ...added,
     ...traded,
     ...suggested,
+    ...nearbyStores,
     ...pack,
     ...shop,
   ];

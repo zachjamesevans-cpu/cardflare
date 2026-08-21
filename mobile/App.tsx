@@ -117,7 +117,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Store: "Profile",
   Customize: "Profile",
   PlayerProfile: "Back",
-  FindPlayer: "Feed",
+  FindPlayer: "Local",
   PostFlare: "Room",
 };
 
@@ -310,7 +310,9 @@ function Tabs() {
            the same place the website puts it. */
         options={{
           title: "CardFlare",
-          tabBarLabel: "Feed",
+          /* Local, not Feed: the screen is about what is happening
+             around you rather than about a stream of posts. */
+          tabBarLabel: "Local",
           headerRight: () => <FindPlayerButton />,
         }}
       />
@@ -502,7 +504,7 @@ export default function App() {
           <Stack.Screen
             name="FindPlayer"
             component={FindPlayerScreen}
-            options={{ title: "Find a player", headerBackTitle: "Feed" }}
+            options={{ title: "Find a player", headerBackTitle: "Local" }}
           />
           <Stack.Screen
             name="PostFlare"

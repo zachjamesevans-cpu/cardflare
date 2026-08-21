@@ -6,6 +6,7 @@ import {
   PackageCheck,
   Layers,
   Sparkles,
+  BadgeCheck,
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -579,6 +580,54 @@ export function Item({ item }: { item: FeedItem }) {
         <Link href={`/e/${item.joinCode}`} className={buttonStyles("secondary", "sm")}>
           See the board
         </Link>
+      </Card>
+    );
+  }
+
+  if (item.kind === "nearbyStores") {
+    return (
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="font-semibold text-text-primary">Stores near you</p>
+          <p className="text-xs text-text-muted">
+            Shops CardFlare knows about, whether or not they use it yet.
+          </p>
+        </div>
+
+        {item.stores.map((store) => (
+          <div key={store.storeId} className="flex items-center gap-3">
+            <MapPin className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-text-primary">
+                {store.name}
+                {/* Verified is trust and Ultra is a product tier: two
+                    marks, never one inferred from the other. */}
+                {store.verified && (
+                  <BadgeCheck
+                    className="size-4 shrink-0 text-accent"
+                    aria-label="CardFlare Verified"
+                  />
+                )}
+                {store.ultra && (
+                  <span className="shrink-0 rounded-full border border-border-strong px-1.5 text-[10px] font-medium tracking-wide text-text-secondary uppercase">
+                    Ultra
+                  </span>
+                )}
+              </p>
+              <p className="truncate text-xs text-text-muted">
+                {store.miles} mi
+                {store.city ? ` · ${store.city}` : ""}
+                {store.unclaimed ? " · Unclaimed listing" : ""}
+              </p>
+            </div>
+            <Link
+              href={`/s/${store.storeId}`}
+              className={buttonStyles("secondary", "sm")}
+            >
+              View
+            </Link>
+          </div>
+        ))}
       </Card>
     );
   }

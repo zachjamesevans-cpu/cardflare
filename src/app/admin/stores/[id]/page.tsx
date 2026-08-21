@@ -115,6 +115,13 @@ async function StoreDetailsSection({
     contact_email: string;
     city: string | null;
     region: string | null;
+    /* The directory fields. Nullable throughout: a store that predates
+       the directory has never been asked for any of them. */
+    address_line: string | null;
+    postal_code: string | null;
+    country: string | null;
+    phone: string | null;
+    website: string | null;
   };
 }) {
   const members = await listStoreMembers(store.id);
@@ -129,6 +136,13 @@ async function StoreDetailsSection({
           Edited in place: the counter code, the singles they have uploaded and every
           past room stay exactly where they are.
         </p>
+        {/*
+         * The store id, because it is the thing that survives everything
+         * else. A discovered listing, the claim that follows it and the
+         * account that eventually signs in all point at this row - so a
+         * store never re-enters what CardFlare already knows about it.
+         */}
+        <p className="font-mono text-xs text-text-muted">Store ID {store.id}</p>
       </div>
 
       <Card>
@@ -139,6 +153,11 @@ async function StoreDetailsSection({
             contactEmail: store.contact_email,
             city: store.city,
             region: store.region,
+            addressLine: store.address_line,
+            postalCode: store.postal_code,
+            country: store.country,
+            phone: store.phone,
+            website: store.website,
           }}
         />
       </Card>

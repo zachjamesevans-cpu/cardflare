@@ -6,7 +6,11 @@ import { Flame, SearchX } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import { Select, TextInput } from "@/components/ui/controls";
-import { filterOperators, type OperatorKindFilter } from "@/lib/stores/directory";
+import {
+  filterOperators,
+  pageOf,
+  type OperatorKindFilter,
+} from "@/lib/stores/directory";
 
 /** Everything a directory row needs, already serialised by the page. */
 export interface DirectoryStore {
@@ -23,6 +27,12 @@ export interface DirectoryStore {
   liveRoomName: string | null;
   /** Open Flares in the live room; null when no room is live. */
   flares: number | null;
+  /** Unclaimed, pending, or claimed — the directory funnel. */
+  claimStatus: string;
+  /** CardFlare has confirmed who controls the profile. */
+  verified: boolean;
+  /** The commercial tier, separate from verification. */
+  ultra: boolean;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -40,8 +50,12 @@ const KIND_LABEL: Record<string, string> = {
 export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<OperatorKindFilter>("all");
+  const [page, setPage] = useState(1);
 
   const shown = filterOperators(stores, query, kind);
+  /* Clamped inside pageOf, so a filter that shortens the list while
+     somebody is on page four shows page one rather than nothing. */
+  const current = pageOf(shown, page);
 
   return (
     <div className="flex flex-col gap-4">
@@ -55,7 +69,13 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
             type="search"
             placeholder="Search by name, email or city…"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            /* Back to page one with the search, in the handler rather
+               than an effect: staying on page four of a different result
+               set reads as a broken filter. */
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
           />
         </div>
 
@@ -66,7 +86,10 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
           <Select
             id="operator-kind"
             value={kind}
-            onChange={(event) => setKind(event.target.value as OperatorKindFilter)}
+            onChange={(event) => {
+              setKind(event.target.value as OperatorKindFilter);
+              setPage(1);
+            }}
           >
             <option value="all">All operators</option>
             <option value="lgs">Game stores</option>
@@ -79,6 +102,7 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
         {shown.length === stores.length
           ? `${stores.length} ${stores.length === 1 ? "operator" : "operators"}`
           : `${shown.length} of ${stores.length} operators`}
+        {current.pages > 1 && ` · page ${current.page} of ${current.pages}`}
       </p>
 
       {shown.length === 0 ? (
@@ -90,11 +114,37 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
           </p>
         </Card>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {shown.map((store) => (
-            <DirectoryRow key={store.id} store={store} />
-          ))}
-        </ul>
+        <>
+          <ul className="flex flex-col gap-3">
+            {current.rows.map((store) => (
+              <DirectoryRow key={store.id} store={store} />
+            ))}
+          </ul>
+
+          {current.pages > 1 && (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setPage((n) => n - 1)}
+                disabled={current.page === 1}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-text-muted tabular-nums">
+                {current.page} / {current.pages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((n) => n + 1)}
+                disabled={current.page === current.pages}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -113,7 +163,9 @@ function DirectoryRow({ store }: { store: DirectoryStore }) {
           {store.name}
         </Link>
         <p className="truncate text-sm text-text-muted">
-          {store.contact_email}
+          {/* An unclaimed listing has no contact address yet, and saying
+              so beats printing an empty gap. */}
+          {store.contact_email || "No email yet"}
           {location && ` · ${location}`}
         </p>
       </div>
@@ -122,6 +174,9 @@ function DirectoryRow({ store }: { store: DirectoryStore }) {
           on a phone that plus the status badges cannot share one line. */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{KIND_LABEL[store.kind] ?? store.kind}</Badge>
+        {store.claimStatus === "unclaimed" && <Badge tone="neutral">Unclaimed</Badge>}
+        {store.verified && <Badge>Verified</Badge>}
+        {store.ultra && <Badge tone="neutral">Ultra</Badge>}
         {store.liveRoomName && (
           <Badge>
             <span className="size-1.5 rounded-full bg-accent" />

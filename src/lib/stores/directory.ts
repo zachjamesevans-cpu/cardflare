@@ -46,3 +46,41 @@ export function filterOperators<T extends OperatorFacts>(
     .filter((store) => matchesOperator(store, query))
     .toSorted((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
 }
+
+/**
+ * How many operators fit on one page of the console.
+ *
+ * The directory was written when every store was a customer and the list
+ * was a dozen names. A discovered directory is hundreds, and a page that
+ * renders all of them is a page nobody can find anything on - so the
+ * search stays the primary tool and this keeps the rendering honest.
+ */
+export const OPERATORS_PER_PAGE = 25;
+
+export interface Page<T> {
+  rows: T[];
+  page: number;
+  pages: number;
+  total: number;
+}
+
+/**
+ * One page of results, clamped.
+ *
+ * The page number is clamped rather than trusted, because it survives in
+ * component state across a change of search - and a filter that empties
+ * the list while somebody is on page four must show them page one rather
+ * than nothing at all.
+ */
+export function pageOf<T>(rows: T[], page: number, size = OPERATORS_PER_PAGE): Page<T> {
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const current = Math.min(Math.max(1, page), pages);
+  const start = (current - 1) * size;
+
+  return {
+    rows: rows.slice(start, start + size),
+    page: current,
+    pages,
+    total: rows.length,
+  };
+}

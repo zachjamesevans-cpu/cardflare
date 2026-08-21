@@ -27,7 +27,7 @@ const TABS = [
   /* Feed, not Join. Join was a tab used four times a month, on the days
      somebody stands in a shop; scanning is a button on the Feed now, which
      is fewer taps than the tab it replaced. See PRODUCT.md. */
-  { href: "/feed", label: "Feed", icon: Home },
+  { href: "/feed", label: "Local", icon: Home },
   { href: "/room", label: "Room", icon: Users },
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },
