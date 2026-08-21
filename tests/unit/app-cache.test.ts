@@ -30,15 +30,44 @@ describe("the store", () => {
     expect(cache).toContain("Date.now() - envelope.at > CACHE_TTL[kind]");
   });
 
-  it("keeps the live kinds shorter than the settled ones", async () => {
-    const { CACHE_TTL } = await import("../../mobile/src/cache");
+  it("keeps the live kinds shorter than the settled ones", () => {
+    /*
+     * Read from the source rather than imported, and that is a
+     * deployment fact rather than a style choice. The website's tsconfig
+     * excludes `mobile`, but a real `import` from a test drags the file
+     * back into the type graph — and `cache.ts` imports AsyncStorage,
+     * which only exists in mobile/node_modules. Vercel installs the
+     * root package.json and nothing else, so the website's build failed
+     * on a React Native dependency it has no reason to have.
+     *
+     * The other app modules tests import (handle, deck-list,
+     * avatar-geometry) are pure TypeScript and resolve anywhere. This
+     * one is not, so it is parsed instead.
+     */
+    const table = cache.slice(
+      cache.indexOf("export const CACHE_TTL"),
+      cache.indexOf("} as const"),
+    );
 
-    expect(CACHE_TTL.room).toBeLessThan(CACHE_TTL.feed);
-    expect(CACHE_TTL.feed).toBeLessThan(CACHE_TTL.profile);
+    const ttl: Record<string, number> = {};
+    for (const [, name, expr] of table.matchAll(/^\s*(\w+):\s*([^,]+),/gm)) {
+      /* The values are written as arithmetic — "6 * 60 * 60 * 1000" —
+         so that a reader can see the hours. Multiply them out. */
+      ttl[name] = expr
+        .split("*")
+        .map((part) => Number(part.trim()))
+        .reduce((a, b) => a * b, 1);
+    }
+
+    expect(Object.keys(ttl).length).toBeGreaterThanOrEqual(5);
+    expect(ttl.room).toBeLessThan(ttl.feed);
+    expect(ttl.feed).toBeLessThan(ttl.profile);
+
     /* Nothing survives a day. Past that a returning player is being
        shown a different week. */
-    for (const ttl of Object.values(CACHE_TTL)) {
-      expect(ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+    for (const value of Object.values(ttl)) {
+      expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
     }
   });
 
