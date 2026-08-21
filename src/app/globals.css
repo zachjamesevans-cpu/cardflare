@@ -10,8 +10,18 @@
  * never hardcode a literal brand colour in a component.
  */
 @theme {
-  /* Surfaces — deep charcoal-navy, sampled around the logo's badge. */
-  --color-canvas: #0e1116;
+  /*
+   * Surfaces — deep charcoal-navy, sampled around the logo's badge.
+   *
+   * The canvas is the one exception, and a deliberate one. The founder:
+   * "I want the background to be full black. will look much cleaner."
+   * True black rather than the sampled charcoal, with every surface
+   * above it left exactly where it was — so cards, controls and
+   * hairlines now sit on a darker ground and read as raised rather than
+   * as a slightly different shade of the same thing. Nothing else in
+   * this block moved.
+   */
+  --color-canvas: #000000;
   --color-surface: #151a21;
   --color-elevated: #1d242d;
   --color-border: #2a323d;

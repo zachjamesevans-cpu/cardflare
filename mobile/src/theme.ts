@@ -5,7 +5,16 @@
  * the app should feel like the room page, not like a second product.
  */
 export const colors = {
-  canvas: "#0e1116",
+  /*
+   * True black, matching the website's --color-canvas. The founder:
+   * "I want the background to be full black. will look much cleaner."
+   * Every surface above it is unchanged, so a Card reads as raised off
+   * the page instead of as a slightly lighter shade of it.
+   *
+   * accentContrast stays #0e1116 — that is ink on a lime fill, not a
+   * background, and pure black on that lime is harsher.
+   */
+  canvas: "#000000",
   surface: "#151a21",
   elevated: "#1d242d",
   border: "#2a323d",

@@ -56,7 +56,7 @@ Sampled from the approved logo. Defined once in the `@theme` block of
 
 | Token                     | Value     | Use                       |
 | ------------------------- | --------- | ------------------------- |
-| `--color-canvas`          | `#0e1116` | Page background           |
+| `--color-canvas`          | `#000000` | Page background           |
 | `--color-surface`         | `#151a21` | Section and card surfaces |
 | `--color-elevated`        | `#1d242d` | Raised controls           |
 | `--color-border`          | `#2a323d` | Hairlines                 |
@@ -73,6 +73,14 @@ Sampled from the approved logo. Defined once in the `@theme` block of
 
 Every text-on-surface pairing meets WCAG AA (≥ 4.5:1) and is enforced by
 `tests/unit/design-tokens.test.ts`.
+
+**The canvas is true black on purpose.** It was `#0e1116`, sampled from
+the logo's badge, until the founder asked for "full black — will look
+much cleaner". Everything above it stayed: `--color-surface` and
+`--color-elevated` are unchanged, so a card now reads as raised off the
+page rather than as a slightly lighter shade of it. `--color-accent-contrast`
+is still `#0e1116` and should stay — it is the ink on a lime fill, not a
+background, and pure black on that lime is harsher than the charcoal.
 
 ### Player avatar hues
 
