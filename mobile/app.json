@@ -14,7 +14,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "CardFlare uses the camera only to scan the QR code on a store's counter.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared."
+        "NSLocationWhenInUseUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+        "NSLocationAlwaysUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared."
       }
     },
     "android": {
@@ -51,7 +53,6 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
           "locationWhenInUsePermission": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
