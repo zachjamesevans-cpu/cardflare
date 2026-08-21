@@ -686,6 +686,19 @@ export type PlayerRow = {
   onboarded_at: string | null;
   /** Membership tier: free, pro, ultra or max. Admin-set for now. */
   tier: string;
+  /**
+   * Five digits, or null, and the fallback for "where is this player".
+   *
+   * A device coordinate is asked for first and never stored — it rides
+   * one request and is gone. This is what a refusal falls back on, what
+   * the website uses instead of a browser prompt, and what somebody who
+   * would rather type than grant a permission gets to type.
+   *
+   * Coarse on purpose: it resolves to the centroid of an area that can
+   * be miles across. It is not an address and there is nowhere here to
+   * put one.
+   */
+  postal_code: string | null;
 };
 
 export type PlayerInsert = Omit<
@@ -705,6 +718,7 @@ export type PlayerInsert = Omit<
   | "cosmetics_unlocked"
   | "cosmetics_unlocked_draft"
   | "onboarded_at"
+  | "postal_code"
 > & {
   id?: string;
   created_at?: string;
@@ -717,6 +731,7 @@ export type PlayerInsert = Omit<
   equipped_holo?: string | null;
   equipped_effect?: string | null;
   equipped_avatar_frame?: string | null;
+  postal_code?: string | null;
   cosmetics_unlocked?: boolean;
   cosmetics_unlocked_draft?: boolean;
   onboarded_at?: string | null;

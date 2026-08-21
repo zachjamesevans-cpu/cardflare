@@ -19,9 +19,7 @@
       "longitude": -123.3529052734375,
       "website": "http://accardworld.com/",
       "phone": "+15413938816",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.48997601866722107,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -39,9 +37,7 @@
       "longitude": -123.10645294189453,
       "website": null,
       "phone": "+15416063100",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.5823965668678284,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -59,9 +55,7 @@
       "longitude": -122.9942855834961,
       "website": "http://www.discord.com/Grm4jzD",
       "phone": "+15416545172",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -79,9 +73,7 @@
       "longitude": -123.01752471923828,
       "website": "http://castleofgames.com",
       "phone": "+15416545172",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -99,9 +91,7 @@
       "longitude": -123.0807876586914,
       "website": "http://www.emeraldcitycomicseugene.com",
       "phone": "(541) 345-2568",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -119,9 +109,7 @@
       "longitude": -123.02527618408203,
       "website": "http://moxvalleygames.com/",
       "phone": "+14582394112",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -139,9 +127,7 @@
       "longitude": -123.09600830078125,
       "website": "http://www.nostalgiacollectibleseugene.com/",
       "phone": "+15414849202",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -159,9 +145,7 @@
       "longitude": -123.20232391357422,
       "website": "https://www.ebay.com/usr/savage-comics",
       "phone": "+15415175718",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -179,9 +163,7 @@
       "longitude": -122.72900390625,
       "website": "https://youtube.com/@truetatogaming9940?si=ekK5Pu3gD6BnoAmL",
       "phone": "+15412207994",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -199,9 +181,7 @@
       "longitude": -123.06244659423828,
       "website": null,
       "phone": "+15416491330",
-      "categories": [
-        "gift_shop"
-      ],
+      "categories": ["gift_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -219,9 +199,7 @@
       "longitude": -123.30341339111328,
       "website": "https://applegateartguild.wixsite.com/website",
       "phone": "+15415251903",
-      "categories": [
-        "art_gallery"
-      ],
+      "categories": ["art_gallery"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -239,9 +217,7 @@
       "longitude": -123.0943374633789,
       "website": "https://books-with-pictures-eugene.myshopify.com",
       "phone": "(541) 485-1048",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -259,9 +235,7 @@
       "longitude": -123.08856964111328,
       "website": "https://linktr.ee/bwp_eug",
       "phone": "+15414851048",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -279,9 +253,7 @@
       "longitude": -123.12245178222656,
       "website": "https://discord.gg/69uT8f56GS",
       "phone": "+15417996875",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.4936591684818268,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -299,9 +271,7 @@
       "longitude": -123.0081558227539,
       "website": "http://www.ci.creswell.or.us",
       "phone": "+15418952913",
-      "categories": [
-        "airport"
-      ],
+      "categories": ["airport"],
       "confidence": 0.9548353922367097,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -319,9 +289,7 @@
       "longitude": -123.13201904296875,
       "website": "http://dare-2-dream-collectibles.square.site/",
       "phone": "+15413574079",
-      "categories": [
-        "gift_shop"
-      ],
+      "categories": ["gift_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -339,9 +307,7 @@
       "longitude": -123.06208801269531,
       "website": "https://www.delightinthegrove.com/pages/calendar",
       "phone": "+15419463132",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -359,9 +325,7 @@
       "longitude": -123.01911163330078,
       "website": "http://www.elitegamespot.com/",
       "phone": "+15416585327",
-      "categories": [
-        "video_game_store"
-      ],
+      "categories": ["video_game_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -379,9 +343,7 @@
       "longitude": -123.15078735351562,
       "website": "http://www.eugenetextilecenter.com",
       "phone": "(541) 688-1565",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -399,9 +361,7 @@
       "longitude": -123.09211730957031,
       "website": "http://www.eugenetoyandhobby.com",
       "phone": "+15413442117",
-      "categories": [
-        "toy_store"
-      ],
+      "categories": ["toy_store"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -419,9 +379,7 @@
       "longitude": -123.09222412109375,
       "website": "http://www.brewabeer.com",
       "phone": "(541) 484-3322",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.77,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -439,9 +397,7 @@
       "longitude": -123.08956909179688,
       "website": null,
       "phone": "+15415058207",
-      "categories": [
-        "toy_store"
-      ],
+      "categories": ["toy_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -459,9 +415,7 @@
       "longitude": -123.14720153808594,
       "website": "http://www.entertainmenteugene.com/",
       "phone": "+15416072485",
-      "categories": [
-        "sports_bar"
-      ],
+      "categories": ["sports_bar"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -479,9 +433,7 @@
       "longitude": -123.1050033569336,
       "website": null,
       "phone": null,
-      "categories": [
-        "toy_store"
-      ],
+      "categories": ["toy_store"],
       "confidence": 0.954,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -499,9 +451,7 @@
       "longitude": -123.13660430908203,
       "website": "https://www.GoldRushNuggetBucket.com/",
       "phone": "+18005519707",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -519,9 +469,7 @@
       "longitude": -123.20218658447266,
       "website": null,
       "phone": "+18312254008",
-      "categories": [
-        "comic_books_store"
-      ],
+      "categories": ["comic_books_store"],
       "confidence": 0.25177955627441406,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -539,9 +487,7 @@
       "longitude": -123.11088562011719,
       "website": "https://branches.guildmortgage.com/or/eugene/ladelle-white-198-eulw.html",
       "phone": "+15413431995",
-      "categories": [
-        "mortgage_broker"
-      ],
+      "categories": ["mortgage_broker"],
       "confidence": 0.799653947353363,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -577,9 +523,7 @@
       "longitude": -123.09288024902344,
       "website": "https://branches.guildmortgage.com/or/eugene/elena-connelly-198-euec.html",
       "phone": "5415438536",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -633,9 +577,7 @@
       "longitude": -123.0931396484375,
       "website": "https://branches.guildmortgage.com/or/eugene/jake-white-198-eujwh.html",
       "phone": "",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -653,9 +595,7 @@
       "longitude": -123.09288024902344,
       "website": "https://branches.guildmortgage.com/or/eugene/ladelle-white-198-eulw.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -673,9 +613,7 @@
       "longitude": -123.08942413330078,
       "website": "https://branches.guildmortgage.com/or/eugene/ladelle-white-198-eulw.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -729,9 +667,7 @@
       "longitude": -123.09288024902344,
       "website": "https://branches.guildmortgage.com/or/eugene/rhonda-stickney-198-eurs.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -749,9 +685,7 @@
       "longitude": -123.08942413330078,
       "website": "https://branches.guildmortgage.com/or/eugene/rhonda-stickney-198-eurs.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -769,9 +703,7 @@
       "longitude": -123.09288024902344,
       "website": "https://branches.guildmortgage.com/or/eugene/risa-monroe-198-eurm.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -789,9 +721,7 @@
       "longitude": -123.08942413330078,
       "website": "https://branches.guildmortgage.com/or/eugene/risa-monroe-198-eurm.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -809,9 +739,7 @@
       "longitude": -123.09288024902344,
       "website": "https://branches.guildmortgage.com/or/eugene/trevor-nissen-198-eutn.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -829,9 +757,7 @@
       "longitude": -123.27960205078125,
       "website": "https://branches.guildmortgage.com/or/junctioncity/owen-or-junction-city-230.html",
       "phone": "5419159143",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -849,9 +775,7 @@
       "longitude": -123.08942413330078,
       "website": "https://branches.guildmortgage.com/or/eugene/eugene-198.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.85,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -869,9 +793,7 @@
       "longitude": -123.08709716796875,
       "website": "http://branches.guildmortgage.com/or/eugene/360-e--10th-ave.html",
       "phone": "5413431995",
-      "categories": [
-        "mortgage_lender"
-      ],
+      "categories": ["mortgage_lender"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -889,9 +811,7 @@
       "longitude": -123.09031677246094,
       "website": "http://www.HarlequinBeads.com/",
       "phone": "+15416835903",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9277553558349609,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -909,9 +829,7 @@
       "longitude": -123.04498291015625,
       "website": "https://www.hobbylobby.com/stores/search/659",
       "phone": "+15417269771",
-      "categories": [
-        "arts_crafts_and_hobby_store"
-      ],
+      "categories": ["arts_crafts_and_hobby_store"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -929,9 +847,7 @@
       "longitude": -123.1607666015625,
       "website": "http://www.lampworksupply.com/",
       "phone": "+19852679675",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -949,9 +865,7 @@
       "longitude": -123.35295867919922,
       "website": "https://www.lockandkeyguild.com",
       "phone": "(458) 207-9499",
-      "categories": [
-        "toy_store"
-      ],
+      "categories": ["toy_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -969,9 +883,7 @@
       "longitude": -122.99494171142578,
       "website": "http://oregonracecar.com/",
       "phone": "+15419130707",
-      "categories": [
-        "gift_shop"
-      ],
+      "categories": ["gift_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -989,9 +901,7 @@
       "longitude": -123.06304931640625,
       "website": "https://multiVRse.games/",
       "phone": "+15412215172",
-      "categories": [
-        "arcade"
-      ],
+      "categories": ["arcade"],
       "confidence": 0.9464596509933472,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1009,9 +919,7 @@
       "longitude": -123.1315689086914,
       "website": null,
       "phone": null,
-      "categories": [
-        "art_gallery"
-      ],
+      "categories": ["art_gallery"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1029,9 +937,7 @@
       "longitude": -123.2005386352539,
       "website": "https://superior-rc.com/",
       "phone": "+15415903988",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9722161889076233,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1049,9 +955,7 @@
       "longitude": -123.1262435913086,
       "website": "http://www.TheForgeWHS.com/",
       "phone": "+15416898435",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1069,9 +973,7 @@
       "longitude": -123.06210327148438,
       "website": "http://theguildinthegrove.com/",
       "phone": "+15419463132",
-      "categories": [
-        "education"
-      ],
+      "categories": ["education"],
       "confidence": 0.5518023371696472,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -1089,9 +991,7 @@
       "longitude": -123.0199966430664,
       "website": "http://www.trash-n-treasures.com",
       "phone": "+15417269656",
-      "categories": [
-        "antique_store"
-      ],
+      "categories": ["antique_store"],
       "confidence": 0.9525049465894699,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -1109,9 +1009,7 @@
       "longitude": -123.00288391113281,
       "website": "http://untappedmarket.games/",
       "phone": "+15413216628",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.2946295738220215,
       "operatingStatus": null,
       "license": "CDLA-Permissive-2.0",
@@ -1129,9 +1027,7 @@
       "longitude": -122.99111938476562,
       "website": "https://vape-game.com",
       "phone": "15415059265",
-      "categories": [
-        "smoke_and_vape_store"
-      ],
+      "categories": ["smoke_and_vape_store"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1149,9 +1045,7 @@
       "longitude": -123.0028305053711,
       "website": "http://vape-game.com",
       "phone": "(541) 515-6680",
-      "categories": [
-        "shopping"
-      ],
+      "categories": ["shopping"],
       "confidence": 0.77,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1169,9 +1063,7 @@
       "longitude": -123.02466583251953,
       "website": "http://www.twitter.com/VGHQ",
       "phone": "+15417441015",
-      "categories": [
-        "video_game_store"
-      ],
+      "categories": ["video_game_store"],
       "confidence": 0.9902192950248718,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1189,9 +1081,7 @@
       "longitude": -123.0732192993164,
       "website": "http://stores.warhammer.com/",
       "phone": "+14582614099",
-      "categories": [
-        "hobby_shop"
-      ],
+      "categories": ["hobby_shop"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",
@@ -1209,9 +1099,7 @@
       "longitude": -123.14402770996094,
       "website": "https://www.wagwag.org",
       "phone": "15413453566",
-      "categories": [
-        "veterinarian"
-      ],
+      "categories": ["veterinarian"],
       "confidence": 0.9199122190475464,
       "operatingStatus": "open",
       "license": "CDLA-Permissive-2.0",

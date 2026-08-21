@@ -1182,6 +1182,15 @@ export type FeedItem =
         ultra: boolean;
         unclaimed: boolean;
       }[];
+      /**
+       * We do not know where the player is, so the card asks instead of
+       * listing. Optional because the app and the server ship on
+       * different clocks: an older server never sends it, and absent
+       * has to mean "we know where they are", never a crash.
+       */
+      needsLocation?: boolean;
+      /** How we placed them, so a wrong ZIP is visible rather than mysterious. */
+      source?: "device" | "postal";
     }
   /** A pack in the Embers store. Evergreen — true with nobody else here. */
   | {
@@ -1215,7 +1224,20 @@ export type FeedItem =
  */
 export type FeedEntry = FeedItem & { section?: FeedSection; reason?: string };
 
-export const getFeed = () => call<{ items: FeedEntry[] }>("GET", "/api/v1/feed");
+/**
+ * The Feed, optionally saying where the phone is.
+ *
+ * Coordinates ride the request and are never stored - not here, not on
+ * the server. A player who has not granted permission simply sends
+ * nothing, and the server falls back to the ZIP on their profile.
+ */
+export const getFeed = (coords?: { latitude: number; longitude: number } | null) => {
+  const query = coords
+    ? `?lat=${encodeURIComponent(coords.latitude)}&lng=${encodeURIComponent(coords.longitude)}`
+    : "";
+
+  return call<{ items: FeedEntry[] }>("GET", `/api/v1/feed${query}`);
+};
 
 /** A player found by name search: enough for a row and a door. */
 export interface FoundPlayer {
@@ -1305,3 +1327,13 @@ export const saveDeckList = (list: string, deckLabel?: string | null) =>
     unreadable: string[];
     atCap: boolean;
   }>("POST", "/api/v1/wants", { list, deckLabel: deckLabel || null });
+
+/**
+ * Saving the ZIP a player typed, when they will not grant location.
+ *
+ * Five digits, or an empty string to clear it. Coarse on purpose: it
+ * places somebody within a few miles, which is all a list of nearby
+ * shops needs and is a long way from an address.
+ */
+export const savePostalCode = (postalCode: string) =>
+  call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", { postalCode });

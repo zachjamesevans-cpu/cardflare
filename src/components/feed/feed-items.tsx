@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
@@ -585,6 +586,28 @@ export function Item({ item }: { item: FeedItem }) {
   }
 
   if (item.kind === "nearbyStores") {
+    /*
+     * Three states, and the two empty ones are the point. A section that
+     * simply vanishes when we do not know where somebody is teaches them
+     * nothing; a section that asks is how anybody discovers the feature
+     * exists. See nearbyStoreItems.
+     */
+    if (item.needsLocation) {
+      return (
+        <Card className="flex flex-col gap-3 p-4">
+          <div className="flex flex-col gap-0.5">
+            <p className="font-semibold text-text-primary">Find stores near you</p>
+            <p className="text-xs text-text-muted">
+              CardFlare knows about shops whether or not they use it yet. Tell us
+              roughly where you are and we&rsquo;ll list the close ones.
+            </p>
+          </div>
+
+          <PostalAsk />
+        </Card>
+      );
+    }
+
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-0.5">
@@ -593,6 +616,18 @@ export function Item({ item }: { item: FeedItem }) {
             Shops CardFlare knows about, whether or not they use it yet.
           </p>
         </div>
+
+        {/* Known position, nothing in range. Said out loud, because an
+            empty list is indistinguishable from a broken one - and the
+            way out is to change the ZIP, which needs to be right here. */}
+        {item.stores.length === 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-text-secondary">
+              No stores near you yet. We&rsquo;re adding shops city by city.
+            </p>
+            {item.source === "postal" && <PostalAsk />}
+          </div>
+        )}
 
         {item.stores.map((store) => (
           <div key={store.storeId} className="flex items-center gap-3">
