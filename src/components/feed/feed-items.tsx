@@ -12,6 +12,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import type { FeedItem } from "@/lib/feed/repository";
@@ -222,23 +223,16 @@ export function Item({ item }: { item: FeedItem }) {
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          <PlayerAvatar
+          <FeedPerson
+            playerId={item.playerId}
             displayName={item.displayName}
-            seed={item.playerId}
             avatarUrl={item.avatarUrl}
             frame={item.frame}
             ring={item.ring}
-            size="md"
+            detail={`${
+              item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
+            }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
           />
-          <div className="flex min-w-0 flex-col">
-            <p className="truncate font-semibold text-text-primary">
-              {item.displayName}
-            </p>
-            <p className="truncate text-xs text-text-muted">
-              {item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`}
-              {item.deckLabel ? ` · ${item.deckLabel}` : ""} · {item.eventName}
-            </p>
-          </div>
         </div>
 
         {/* One card reads as a card; a deck reads as a row of them. The
@@ -334,22 +328,16 @@ export function Item({ item }: { item: FeedItem }) {
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          <PlayerAvatar
+          <FeedPerson
+            playerId={item.playerId}
             displayName={item.displayName}
-            seed={item.playerId}
             avatarUrl={item.avatarUrl}
             frame={item.frame}
             ring={item.ring}
-            size="md"
+            detail={`added ${item.total} ${
+              item.total === 1 ? "card" : "cards"
+            } to their binder`}
           />
-          <div className="flex min-w-0 flex-col">
-            <p className="truncate font-semibold text-text-primary">
-              {item.displayName}
-            </p>
-            <p className="text-xs text-text-muted">
-              added {item.total} {item.total === 1 ? "card" : "cards"} to their binder
-            </p>
-          </div>
         </div>
 
         <div className="flex gap-2">
@@ -458,24 +446,37 @@ export function Item({ item }: { item: FeedItem }) {
               {/* Whose it is. "Who do I walk over to" is half the
                   question, and a name without a face is the half of it
                   that nobody recognises across a shop. */}
-              <PlayerAvatar
-                displayName={entry.displayName ?? "A player"}
-                seed={entry.playerSessionId}
-                avatarUrl={entry.avatarUrl}
-                frame={entry.frame}
-                ring={entry.ring}
-                aura={entry.aura}
-                size="sm"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-text-primary">
-                  {entry.card.cardName}
-                </p>
-                <p className="truncate text-xs text-text-muted">
-                  {entry.displayName ?? "A player"} · {entry.storeName} ·{" "}
-                  {agoFrom(entry.when)}
-                </p>
-              </div>
+              {/*
+               * The CARD leads this row, not the person: it answers
+               * "which of my wants is out there", and the name is how
+               * you find them once you know. So this keeps its own
+               * layout rather than using FeedPerson — but the face and
+               * the name still open a profile, and a guest still says
+               * so, on the line where the name actually appears.
+               */}
+              <PersonLink playerId={entry.playerId}>
+                <PlayerAvatar
+                  displayName={entry.displayName ?? "A player"}
+                  seed={entry.playerId ?? entry.playerSessionId}
+                  avatarUrl={entry.avatarUrl}
+                  frame={entry.frame}
+                  ring={entry.ring}
+                  aura={entry.aura}
+                  size="sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-text-primary">
+                    {entry.card.cardName}
+                  </p>
+                  <p className="flex items-center gap-1.5 truncate text-xs text-text-muted">
+                    <span className="truncate">
+                      {entry.displayName ?? "A player"} · {entry.storeName} ·{" "}
+                      {agoFrom(entry.when)}
+                    </span>
+                    {!entry.playerId && <GuestChip />}
+                  </p>
+                </div>
+              </PersonLink>
               <Link
                 href={`/e/${entry.joinCode}`}
                 className={buttonStyles("secondary", "sm")}
@@ -540,26 +541,19 @@ export function Item({ item }: { item: FeedItem }) {
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          <PlayerAvatar
-            displayName={item.displayName ?? "A player"}
-            seed={item.playerSessionId}
+          <FeedPerson
+            playerId={item.playerId}
+            displayName={item.displayName}
             avatarUrl={item.avatarUrl}
             frame={item.frame}
             ring={item.ring}
             aura={item.aura}
-            size="md"
+            /* The direction in words, never a texture: PRODUCT.md is
+               explicit that foil means rare, not available. */
+            detail={`${item.direction === "showcase" ? "Letting go of" : "Hunting"}${
+              item.deckLabel ? ` · ${item.deckLabel}` : ""
+            } · ${item.storeName}`}
           />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-text-primary">
-              {item.displayName ?? "A player"}
-            </p>
-            <p className="truncate text-xs text-text-muted">
-              {/* The direction in words, never a texture: PRODUCT.md is
-                  explicit that foil means rare, not available. */}
-              {item.direction === "showcase" ? "Letting go of" : "Hunting"}
-              {item.deckLabel ? ` · ${item.deckLabel}` : ""} · {item.storeName}
-            </p>
-          </div>
           <p className="shrink-0 text-xs text-text-muted">{agoFrom(item.when)}</p>
         </div>
 

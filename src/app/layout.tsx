@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Chakra_Petch, Inter, JetBrains_Mono } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { SITE, siteUrl } from "@/lib/site";
@@ -14,6 +14,25 @@ const sans = Inter({
 const mono = JetBrains_Mono({
   variable: "--font-brand-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+/**
+ * The wordmark's face, and the app's.
+ *
+ * The founder, after seeing it on the phone: "I like that font. make
+ * that the font for the website too. like the logo that's displayed up
+ * top." The name at the top of the site is TEXT beside the mark — the
+ * mark itself is `public/brand/cardflare-mark.png` and is untouched, as
+ * BRAND.md requires.
+ *
+ * One weight, because that is all a wordmark needs and every extra
+ * weight is a font file a first visit has to wait for.
+ */
+const display = Chakra_Petch({
+  variable: "--font-brand-display",
+  subsets: ["latin"],
+  weight: "700",
   display: "swap",
 });
 
@@ -59,7 +78,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <a

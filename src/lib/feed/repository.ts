@@ -341,6 +341,22 @@ export interface WantedItem {
   total: number;
   entries: {
     playerSessionId: string;
+    /**
+     * The account behind the session, or null for a guest.
+     *
+     * Two things at once, and deliberately one field. A session linked
+     * to an account has a profile worth opening, so the row becomes a
+     * link; a session that is not IS A GUEST — somebody who scanned the
+     * counter code and typed a name without signing up — and a guest
+     * has no profile to open, so it says so rather than looking like a
+     * link that does nothing.
+     *
+     * The founder asked for both in one breath: "make sure that we are
+     * able in the feed to click on profiles", and "if someone joins a
+     * room as a guest, it should have 'guest' written after their
+     * profile guest name". Null answers both.
+     */
+    playerId: string | null;
     displayName: string | null;
     avatarUrl: string | null;
     /** Worn, so a ring somebody paid Embers for is seen here too. */
@@ -406,6 +422,22 @@ export interface RecentItem {
   /** Stable per group: the batch, or the first flare's id. */
   id: string;
   playerSessionId: string;
+  /**
+   * The account behind the session, or null for a guest.
+   *
+   * Two things at once, and deliberately one field. A session linked
+   * to an account has a profile worth opening, so the row becomes a
+   * link; a session that is not IS A GUEST — somebody who scanned the
+   * counter code and typed a name without signing up — and a guest
+   * has no profile to open, so it says so rather than looking like a
+   * link that does nothing.
+   *
+   * The founder asked for both in one breath: "make sure that we are
+   * able in the feed to click on profiles", and "if someone joins a
+   * room as a guest, it should have 'guest' written after their
+   * profile guest name". Null answers both.
+   */
+  playerId: string | null;
   displayName: string | null;
   avatarUrl: string | null;
   frame: string | null;
@@ -1068,6 +1100,7 @@ async function wantedItems(
     const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;
     entries.push({
       playerSessionId: flare.player_session_id,
+      playerId: person?.player_id ?? null,
       displayName: person?.display_name ?? null,
       ...face,
       storeName: store.name,
@@ -1302,6 +1335,7 @@ async function recentItems(
       kind: "recent",
       id: key,
       playerSessionId: flare.player_session_id,
+      playerId: person?.player_id ?? null,
       displayName: person?.display_name ?? null,
       ...face,
       storeName: store.name,

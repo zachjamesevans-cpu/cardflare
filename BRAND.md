@@ -93,8 +93,17 @@ background, and pure black on that lime is harsher than the charcoal.
 | `--color-avatar-5` | `#ffadad` |
 | `--color-avatar-6` | `#7fe3d4` |
 
-Assigned to a player by hashing their session id, so nobody reviews the pairing
-before it appears next to their name. Each one therefore has to clear AA on
+Assigned to a player by hashing **their player id**, so nobody reviews the pairing
+before it appears next to their name.
+
+It used to be the _session_ id, and the Feed disagreed with itself about
+which: `hunt` and `added` seeded on the player id while `recent` and
+`wanted` seeded on the session, so the same person wore two different
+colours depending on which kind of card they turned up in. It is the
+player id everywhere now, which also means somebody's colour follows
+their account rather than resetting with a session. A guest has no
+account, so their name is the seed — stable for as long as they use the
+same one, which is as stable as a guest gets. Each one therefore has to clear AA on
 canvas, surface **and** elevated, and the design-token test checks all
 eighteen combinations plus that the token count matches `AVATAR_HUE_COUNT`.
 
