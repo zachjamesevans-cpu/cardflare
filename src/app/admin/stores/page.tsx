@@ -53,6 +53,11 @@ export default async function AdminStoresPage() {
       invitePending: store.invitePending,
       liveRoomName: live ? room.name : null,
       flares: live ? (flareCounts.get(room.eventId) ?? 0) : null,
+      /* The directory funnel, at a glance. Verified and Ultra are two
+         separate marks and neither implies the other. */
+      claimStatus: store.claim_status,
+      verified: store.verified_at !== null,
+      ultra: store.tier === "ultra",
     };
   });
 

@@ -14,7 +14,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { scoreRelevance } from "../src/lib/places/relevance";
@@ -77,9 +77,17 @@ function main(): void {
         name: row.name,
         categories,
         address: [row.address_line, row.city, row.region].filter(Boolean).join(", "),
+        addressLine: row.address_line,
+        city: row.city,
+        region: row.region,
+        postalCode: row.postal_code,
+        country: row.country,
+        latitude: row.lat,
+        longitude: row.lon,
         website: row.website,
         phone: row.phone,
         confidence: row.confidence,
+        operatingStatus: row.operating_status,
         relevance: scoreRelevance({
           name: row.name,
           categories,
@@ -109,6 +117,64 @@ function main(): void {
     console.log("");
   }
 
+  /*
+   * The snapshot the console reads.
+   *
+   * Discovery runs here, in a terminal, because Overture is a parquet
+   * dataset rather than an API - but IMPORT is a decision made in the
+   * admin console, so the candidates have to get there. This writes them
+   * as a reviewed set; the console's snapshot provider serves whatever is
+   * in this directory. Nothing in the file is published, and nothing in
+   * it exists in CardFlare until somebody presses Import.
+   */
+  const out = resolve(
+    import.meta.dirname,
+    "..",
+    "data",
+    "store-candidates",
+    `${area
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")}.json`,
+  );
+
+  mkdirSync(resolve(out, ".."), { recursive: true });
+  writeFileSync(
+    out,
+    `${JSON.stringify(
+      {
+        area,
+        radiusMiles: Number(radius),
+        provider: "overture",
+        release: "2026-08-19.0",
+        license: "CDLA-Permissive-2.0 / Apache-2.0 / CC0-1.0 (Places is a mix)",
+        attribution: "Overture Maps Foundation, overturemaps.org",
+        searchedAt: new Date().toISOString(),
+        candidates: scored.map((row) => ({
+          providerPlaceId: row.id,
+          name: row.name,
+          addressLine: row.addressLine,
+          city: row.city,
+          region: row.region,
+          postalCode: row.postalCode,
+          country: row.country,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          website: row.website,
+          phone: row.phone,
+          categories: row.categories,
+          confidence: row.confidence,
+          operatingStatus: row.operatingStatus,
+          license: "CDLA-Permissive-2.0",
+          attribution: "Overture Maps Foundation, overturemaps.org",
+        })),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  console.log(`Snapshot written to ${out}`);
   console.log("Nothing has been imported. Import is a decision in the console.\n");
 }
 

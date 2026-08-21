@@ -37,6 +37,20 @@ export const editStoreSchema = z.object({
   contactEmail: emailSchema,
   city: optionalText(80),
   region: optionalText(80),
+  /*
+   * The directory fields.
+   *
+   * All optional, because a store that predates the directory has never
+   * been asked for any of them and editing its name must not demand an
+   * address. `contactEmail` is where a discovered listing gets one: an
+   * imported store is created with none, and this is how it gets the
+   * address CardFlare writes to before anybody claims it.
+   */
+  addressLine: optionalText(160),
+  postalCode: optionalText(20),
+  country: optionalText(60),
+  phone: optionalText(40),
+  website: optionalText(200),
 });
 
 export const editPlayerSchema = z.object({

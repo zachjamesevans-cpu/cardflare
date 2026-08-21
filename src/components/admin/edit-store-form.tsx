@@ -63,6 +63,11 @@ export function EditStoreForm({
     contactEmail: string;
     city: string | null;
     region: string | null;
+    addressLine: string | null;
+    postalCode: string | null;
+    country: string | null;
+    phone: string | null;
+    website: string | null;
   };
 }) {
   const [state, formAction] = useActionState(updateStoreAction, RECORD_EDIT_IDLE);
@@ -112,6 +117,51 @@ export function EditStoreForm({
               {...fieldIds("region")}
               name="region"
               defaultValue={store.region ?? ""}
+            />
+          </Field>
+
+          {/*
+           * The directory fields. A discovered listing arrives with an
+           * address and no contact email; this is where it gets one, and
+           * where anything the provider had wrong gets corrected.
+           */}
+          <Field name="addressLine" label="Street address">
+            <TextInput
+              {...fieldIds("addressLine")}
+              name="addressLine"
+              defaultValue={store.addressLine ?? ""}
+            />
+          </Field>
+
+          <Field name="postalCode" label="Postal code">
+            <TextInput
+              {...fieldIds("postalCode")}
+              name="postalCode"
+              defaultValue={store.postalCode ?? ""}
+            />
+          </Field>
+
+          <Field name="country" label="Country">
+            <TextInput
+              {...fieldIds("country")}
+              name="country"
+              defaultValue={store.country ?? ""}
+            />
+          </Field>
+
+          <Field name="phone" label="Phone">
+            <TextInput
+              {...fieldIds("phone")}
+              name="phone"
+              defaultValue={store.phone ?? ""}
+            />
+          </Field>
+
+          <Field name="website" label="Website">
+            <TextInput
+              {...fieldIds("website")}
+              name="website"
+              defaultValue={store.website ?? ""}
             />
           </Field>
         </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { scoreRelevance } from "@/lib/places/relevance";
 import { boundingBox, milesBetween } from "@/lib/stores/nearby";
+import { OPERATORS_PER_PAGE, pageOf } from "@/lib/stores/directory";
 
 /**
  * Judging a candidate store, and keeping a coordinate on the server.
@@ -151,3 +152,21 @@ function readSource(path: string): string {
   const { resolve } = require("node:path") as typeof import("node:path");
   return readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
 }
+
+describe("the console's list of operators", () => {
+  it("shows a page at a time, and clamps a page that no longer exists", () => {
+    /*
+     * The directory was written when every store was a customer and the
+     * list was a dozen names. A discovered directory is hundreds. A
+     * filter that shortens the list while somebody is on page four must
+     * show them page one rather than nothing at all.
+     */
+    const rows = Array.from({ length: 60 }, (_, i) => i);
+
+    expect(pageOf(rows, 1).rows).toHaveLength(OPERATORS_PER_PAGE);
+    expect(pageOf(rows, 3).pages).toBe(3);
+    expect(pageOf(rows, 99).page).toBe(3);
+    expect(pageOf(rows, 0).page).toBe(1);
+    expect(pageOf([], 4)).toMatchObject({ page: 1, pages: 1, total: 0 });
+  });
+});

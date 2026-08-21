@@ -1,6 +1,7 @@
 import "server-only";
 
 import { FixturePlacesProvider } from "@/lib/places/fixtures";
+import { SnapshotPlacesProvider, snapshots } from "@/lib/places/snapshot";
 import { scoreRelevance, type Relevance } from "@/lib/places/relevance";
 import type { PlaceCandidate, PlacesProvider } from "@/lib/places/provider";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -21,7 +22,17 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * purpose - the founder approves the first one.
  */
 export function placesProvider(): PlacesProvider {
-  return new FixturePlacesProvider();
+  /*
+   * A real discovery run, when one has been done.
+   *
+   * The search happens in a terminal because Overture is parquet rather
+   * than an API; the console imports from what it found. With no snapshot
+   * on disk the fixtures answer instead, so the review flow is always
+   * exercisable without a real dataset.
+   */
+  return snapshots().length > 0
+    ? new SnapshotPlacesProvider()
+    : new FixturePlacesProvider();
 }
 
 export type DuplicateState = "new" | "already-in-cardflare" | "possible-duplicate";
