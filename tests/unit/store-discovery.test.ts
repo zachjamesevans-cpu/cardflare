@@ -170,3 +170,47 @@ describe("the console's list of operators", () => {
     expect(pageOf([], 4)).toMatchObject({ page: 1, pages: 1, total: 0 });
   });
 });
+
+describe("the candidate snapshot the console imports from", () => {
+  it("is bundled by an import, never read off the disk at runtime", () => {
+    /*
+     * A DEPLOYMENT fact, not a style choice. Next.js traces the files a
+     * serverless function needs by analysing the source, and it cannot
+     * see through a dynamic directory read - so `readdirSync` over
+     * `process.cwd()/data` works locally and is simply absent on Vercel.
+     * `snapshots()` would return nothing, the provider would fall back to
+     * the FIXTURES, and the console's Import button would write
+     * "Dragon's Hoard Games" and "Walmart Supercenter" into the live
+     * database as real stores.
+     */
+    /* Comments stripped, so the paragraph explaining the bug cannot trip
+       the guard against it. */
+    const source = readSource("src/lib/places/snapshot.ts")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+
+    expect(source).toContain("data/store-candidates/austin-tx.json");
+    expect(source).not.toContain("readdirSync");
+    expect(source).not.toContain("process.cwd()");
+  });
+
+  it("carries the licence and attribution its records came with", () => {
+    /* Overture Places is a mix of licences, so provenance is a property
+       of the snapshot rather than a constant in the code. */
+    const snapshot = JSON.parse(readSource("data/store-candidates/austin-tx.json")) as {
+      provider: string;
+      release: string;
+      attribution: string;
+      candidates: { providerPlaceId: string; name: string }[];
+    };
+
+    expect(snapshot.provider).toBe("overture");
+    expect(snapshot.release).toBe("2026-08-19.0");
+    expect(snapshot.attribution).toContain("Overture Maps Foundation");
+    expect(snapshot.candidates.length).toBeGreaterThan(0);
+    for (const candidate of snapshot.candidates.slice(0, 20)) {
+      expect(candidate.providerPlaceId).toBeTruthy();
+      expect(candidate.name).toBeTruthy();
+    }
+  });
+});
