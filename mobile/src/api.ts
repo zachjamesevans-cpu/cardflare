@@ -994,13 +994,14 @@ export interface FeedCard {
 }
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
-export type FeedSection = "wanted" | "tonight" | "people" | "store";
+export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
 
 /** The heading each section is drawn under. Same words as the website. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  nearby: "Nearby stores",
   store: "New in the store",
 };
 
@@ -1160,6 +1161,26 @@ export type FeedItem =
         joinCode: string;
         when: string;
         card: FeedCard;
+      }[];
+    }
+  /**
+   * Shops near you, whether or not they use CardFlare yet.
+   *
+   * Verified and Ultra travel separately and mean different things:
+   * Verified is "CardFlare confirmed this profile is controlled by the
+   * listed business", Ultra is a product tier. Never infer one from the
+   * other. No coordinate reaches here — miles only.
+   */
+  | {
+      kind: "nearbyStores";
+      stores: {
+        storeId: string;
+        name: string;
+        city: string | null;
+        miles: number;
+        verified: boolean;
+        ultra: boolean;
+        unclaimed: boolean;
       }[];
     }
   /** A pack in the Embers store. Evergreen — true with nobody else here. */
