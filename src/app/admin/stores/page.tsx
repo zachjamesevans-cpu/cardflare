@@ -5,6 +5,8 @@ import { ArrowLeft, Store as StoreIcon } from "lucide-react";
 import { InviteStoreForm } from "@/components/admin/invite-store-form";
 import { StoreDirectory } from "@/components/admin/store-directory";
 import { StoreDiscovery } from "@/components/admin/store-discovery";
+import { DraftListings } from "@/components/admin/draft-listings";
+import type { DraftListing } from "@/components/admin/draft-listings";
 import type { DirectoryStore } from "@/components/admin/store-directory";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -36,6 +38,17 @@ export default async function AdminStoresPage() {
    * summary is read-only and does not know it, and a walk-in room at a
    * store that turned walk-ins off is the one the scan path would close.
    */
+  /* Imported and not yet released. Listed on their own because an import
+     creates dozens at once and every one is invisible until published. */
+  const drafts: DraftListing[] = stores
+    .filter((store) => store.listing_state === "draft")
+    .map((store) => ({
+      id: store.id,
+      name: store.name,
+      city: store.city,
+      region: store.region,
+    }));
+
   const liveByStore = new Map(liveRooms.map((room) => [room.storeId, room] as const));
   const directory: DirectoryStore[] = stores.map((store) => {
     const room = liveByStore.get(store.id);
@@ -117,6 +130,8 @@ export default async function AdminStoresPage() {
             publish them, and Verified and Ultra are set by hand afterwards.
           </p>
         </div>
+
+        <DraftListings drafts={drafts} />
 
         <StoreDiscovery />
       </section>

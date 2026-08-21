@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-store-form";
+import { StoreListingControls } from "@/components/admin/store-listing-controls";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
 import { listStoreMembers } from "@/lib/admin/records";
 import { RoomRoster } from "@/components/events/room-roster";
@@ -122,6 +123,9 @@ async function StoreDetailsSection({
     country: string | null;
     phone: string | null;
     website: string | null;
+    listing_state: string;
+    verified_at: string | null;
+    tier: string;
   };
 }) {
   const members = await listStoreMembers(store.id);
@@ -144,6 +148,13 @@ async function StoreDetailsSection({
          */}
         <p className="font-mono text-xs text-text-muted">Store ID {store.id}</p>
       </div>
+
+      <StoreListingControls
+        storeId={store.id}
+        published={store.listing_state === "published"}
+        verified={store.verified_at !== null}
+        ultra={store.tier === "ultra"}
+      />
 
       <Card>
         <EditStoreForm

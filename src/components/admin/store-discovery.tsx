@@ -11,6 +11,7 @@ import {
   discoverStoresAction,
   importStoresAction,
 } from "@/lib/stores/discovery-actions";
+import { pageOf } from "@/lib/stores/directory";
 import {
   DISCOVER_IDLE,
   IMPORT_IDLE,
@@ -83,6 +84,7 @@ export function StoreDiscovery() {
   );
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
+  const [page, setPage] = useState(1);
 
   const selectable = useMemo(
     () => found.candidates.filter((c) => c.duplicate !== "already-in-cardflare"),
@@ -93,6 +95,13 @@ export function StoreDiscovery() {
     () => selectable.filter((c) => picked.has(c.providerPlaceId)),
     [selectable, picked],
   );
+
+  /* Ten to a page. A search of one metro comes back in the hundreds, and
+     a single list with the Import button under it means scrolling past
+     every result to act on the first one. Selection is held by id, so it
+     survives paging - "select all likely" still means all of them, not
+     the ones currently on screen. */
+  const shown = pageOf(found.candidates, page, 10);
 
   const toggle = (id: string) =>
     setPicked((current) => {
@@ -124,6 +133,7 @@ export function StoreDiscovery() {
             <span className="text-text-secondary">Location</span>
             <TextInput
               name="area"
+              onChange={() => setPage(1)}
               defaultValue={found.area || "Austin, TX"}
               placeholder="Austin, TX"
               aria-label="City or area"
@@ -172,6 +182,7 @@ export function StoreDiscovery() {
           <div className="flex flex-wrap items-center gap-3">
             <p className="flex-1 text-sm text-text-secondary">
               {selected.length} of {selectable.length} selected
+              {shown.pages > 1 && " · across all pages"}
             </p>
             {/* Selects only. Importing is the separate button below. */}
             <Button
@@ -200,8 +211,47 @@ export function StoreDiscovery() {
             </Button>
           </div>
 
+          <form action={importAction} className="flex flex-col gap-3">
+            <input
+              type="hidden"
+              name="selected"
+              value={JSON.stringify(selected)}
+              readOnly
+            />
+
+            {confirming ? (
+              <div className="flex flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-4">
+                <p className="text-sm text-text-primary">
+                  You are about to create {selected.length} unclaimed CardFlare store{" "}
+                  {selected.length === 1 ? "listing" : "listings"}. They will be drafts
+                  until you publish them.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <ImportButton count={selected.length} />
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                disabled={selected.length === 0}
+                onClick={() => setConfirming(true)}
+              >
+                <ShieldCheck className="size-4" aria-hidden="true" />
+                Import selected stores
+              </Button>
+            )}
+          </form>
+
           <ul className="flex flex-col divide-y divide-border">
-            {found.candidates.map((candidate) => {
+            {shown.rows.map((candidate) => {
               const known = candidate.duplicate === "already-in-cardflare";
 
               return (
@@ -255,44 +305,31 @@ export function StoreDiscovery() {
             })}
           </ul>
 
-          <form action={importAction} className="flex flex-col gap-3">
-            <input
-              type="hidden"
-              name="selected"
-              value={JSON.stringify(selected)}
-              readOnly
-            />
-
-            {confirming ? (
-              <div className="flex flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-4">
-                <p className="text-sm text-text-primary">
-                  You are about to create {selected.length} unclaimed CardFlare store{" "}
-                  {selected.length === 1 ? "listing" : "listings"}. They will be drafts
-                  until you publish them.
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setConfirming(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <ImportButton count={selected.length} />
-                </div>
-              </div>
-            ) : (
+          {shown.pages > 1 && (
+            <div className="flex items-center justify-between gap-3">
               <Button
                 type="button"
-                disabled={selected.length === 0}
-                onClick={() => setConfirming(true)}
+                variant="secondary"
+                size="sm"
+                disabled={shown.page === 1}
+                onClick={() => setPage((n) => n - 1)}
               >
-                <ShieldCheck className="size-4" aria-hidden="true" />
-                Import selected stores
+                Previous
               </Button>
-            )}
-          </form>
+              <span className="text-sm text-text-muted tabular-nums">
+                Page {shown.page} of {shown.pages} · {shown.total} candidates
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={shown.page === shown.pages}
+                onClick={() => setPage((n) => n + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </Card>
       )}
     </div>

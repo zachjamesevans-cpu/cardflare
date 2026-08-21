@@ -131,6 +131,22 @@ export type StoreInsert = Omit<
   is_pilot?: boolean;
 };
 
+/**
+ * What an admin may change about a store after it exists.
+ *
+ * Everything an insert may set, plus the three an insert may NOT:
+ * `listing_state` publishes a discovered draft, `verified_at` records
+ * that CardFlare confirmed who controls the profile, and `tier` is the
+ * commercial product. All three are set by a person, behind
+ * `requireAdmin`, and never accepted from a client payload.
+ */
+export type StoreUpdate = Partial<Omit<StoreInsert, "verified_at" | "verified_by">> & {
+  listing_state?: StoreListingState;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  tier?: StoreTier;
+};
+
 export type StoreMemberRow = {
   store_id: string;
   user_id: string;
@@ -1222,10 +1238,20 @@ export type AdminUserRow = {
   note: string | null;
 };
 
-type Table<Row, Insert> = {
+/**
+ * `Update` defaults to a partial insert, and stores override it.
+ *
+ * Verification must be unreachable from a CREATE - nothing that makes a
+ * store may decide it is verified - which is why `StoreInsert` types
+ * those columns as `never`. But an admin action has to be able to set
+ * them, and a partial of that insert cannot. So the update shape is its
+ * own parameter: the ban stays where it belongs, on creation, instead of
+ * being loosened everywhere to unblock one screen.
+ */
+type Table<Row, Insert, Update = Partial<Insert>> = {
   Row: Row;
   Insert: Insert;
-  Update: Partial<Insert>;
+  Update: Update;
   Relationships: [];
 };
 
@@ -1273,7 +1299,7 @@ export type Database = {
   public: {
     Tables: {
       waitlist_signups: Table<WaitlistSignupRow, WaitlistSignupInsert>;
-      stores: Table<StoreRow, StoreInsert>;
+      stores: Table<StoreRow, StoreInsert, StoreUpdate>;
       store_members: Table<StoreMemberRow, StoreMemberInsert>;
       store_invites: Table<StoreInviteRow, StoreInviteInsert>;
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;

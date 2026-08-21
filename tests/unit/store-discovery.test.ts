@@ -214,3 +214,48 @@ describe("the candidate snapshot the console imports from", () => {
     }
   });
 });
+
+describe("publishing, verifying and Ultra", () => {
+  const actions = readSource("src/lib/stores/listing-actions.ts");
+
+  it("keeps them three separate decisions", () => {
+    /*
+     * Publishing says a discovered record is real enough to show.
+     * Verifying says CardFlare confirmed who controls the profile - trust,
+     * never for sale. Ultra is the commercial tier. One control implying
+     * they move together is the confusion the schema exists to prevent.
+     */
+    expect(actions).toContain("export async function setListingStateAction");
+    expect(actions).toContain("export async function setVerifiedAction");
+    expect(actions).toContain("export async function setTierAction");
+  });
+
+  it("never lets buying Ultra imply verification", () => {
+    const tier = actions.slice(actions.indexOf("export async function setTierAction"));
+
+    expect(tier).toContain("tier: ultra");
+    expect(tier).not.toContain("verified_at");
+  });
+
+  it("records when a business was verified, not merely that it was", () => {
+    /* "Verified when" is the first question of any dispute. */
+    expect(actions).toContain(
+      "verified_at: verified ? new Date().toISOString() : null",
+    );
+    expect(actions).toContain("verified_by: verified ? user.id : null");
+  });
+
+  it("puts every one behind the admin guard", () => {
+    /* These are the only writes to those columns in the product, and a
+       client must never send `verified = true` and be believed. */
+    const guards = actions.match(/requireAdmin\(\)/g) ?? [];
+    expect(guards.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("has no publish-everything switch", () => {
+    /* Bulk publish names its ids, so it stays a selection somebody made
+       rather than a switch somebody flipped. */
+    expect(actions).toContain('String(form.get("storeIds")');
+    expect(actions).not.toMatch(/update\(\{ listing_state: "published" \}\)\s*;/);
+  });
+});
