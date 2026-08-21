@@ -1,6 +1,7 @@
 import "server-only";
 
 import austinTx from "@/../data/store-candidates/austin-tx.json";
+import eugeneOr from "@/../data/store-candidates/eugene-or.json";
 
 import type { PlaceCandidate, PlacesProvider, PlacesSearch } from "./provider";
 
@@ -42,7 +43,7 @@ export interface Snapshot {
 }
 
 /** Every reviewed snapshot in the repository, newest search first. */
-const SNAPSHOTS: Snapshot[] = [austinTx as Snapshot];
+const SNAPSHOTS: Snapshot[] = [austinTx as Snapshot, eugeneOr as Snapshot];
 
 export function snapshots(): Snapshot[] {
   return [...SNAPSHOTS].sort((a, b) => b.searchedAt.localeCompare(a.searchedAt));

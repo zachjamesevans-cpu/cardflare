@@ -46,8 +46,19 @@ export interface StoreCandidate extends PlaceCandidate {
   rejected: boolean;
 }
 
-/** The counter-code alphabet: no vowels, so nothing spells a word. */
-const CODE_ALPHABET = "0123456789BCDFGHJKLMNPQRSTVWXYZ";
+/**
+ * The counter-code alphabet, copied from the constraint that checks it.
+ *
+ * `stores_join_code_shape` is `^[0-9A-HJKMNP-TV-Z]{7}$`: digits plus every
+ * letter except I, L, O and U - the four that a stranger reading a code
+ * off a counter confuses with 1, 1, 0 and V.
+ *
+ * The first version of this list reasoned "no vowels" instead of reading
+ * the constraint, which dropped A and E (allowed) and kept L (not). Any
+ * code containing an L failed the check - about one in five - and five of
+ * thirty-five imports died on it.
+ */
+const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function counterCode(): string {
   let out = "";
