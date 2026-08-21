@@ -177,7 +177,32 @@ export async function discover(
 
 export interface ImportResult {
   created: number;
+  /** Already in CardFlare, matched by provider id. Not a problem. */
   skipped: number;
+  /** Tried and failed. A problem, and never to be reported as a skip. */
+  failed: number;
+  /** The first failure's message, so the console can say what broke. */
+  error: string | null;
+}
+
+/**
+ * Whether the store-directory schema is actually there.
+ *
+ * Deploying the app and applying the migrations are two different acts in
+ * this project - there is no CI that runs `supabase db push` - so the
+ * console can be live against a database that has never heard of
+ * `store_sources`. Without this check every insert fails on an unknown
+ * column, and the only feedback is a count.
+ */
+export async function directorySchemaReady(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("store_sources")
+    .select("store_id")
+    .limit(1);
+
+  return !error;
 }
 
 /**
@@ -199,13 +224,24 @@ export async function importCandidates(
   importedBy: string | null,
 ): Promise<ImportResult> {
   if (!isSupabaseConfigured() || candidates.length === 0) {
-    return { created: 0, skipped: candidates.length };
+    return { created: 0, skipped: candidates.length, failed: 0, error: null };
+  }
+
+  if (!(await directorySchemaReady())) {
+    return {
+      created: 0,
+      skipped: 0,
+      failed: candidates.length,
+      error: "The store directory migration has not been applied to this database.",
+    };
   }
 
   const admin = getSupabaseAdmin();
   const provider = placesProvider().name;
   let created = 0;
   let skipped = 0;
+  let failed = 0;
+  let firstError: string | null = null;
 
   for (const candidate of candidates) {
     const { data: existing } = await admin
@@ -256,8 +292,18 @@ export async function importCandidates(
       .single();
 
     if (error || !store) {
+      /*
+       * A FAILURE, counted as one.
+       *
+       * This used to add to `skipped`, and the console reported the total
+       * as "already known" - so thirty-five inserts failing on a database
+       * without the directory migration read as thirty-five stores that
+       * were already there. A count that cannot tell success from failure
+       * is worse than no count.
+       */
       console.error("Could not create the store listing", error);
-      skipped += 1;
+      failed += 1;
+      firstError ??= error?.message ?? "The insert failed.";
       continue;
     }
 
@@ -275,7 +321,7 @@ export async function importCandidates(
     created += 1;
   }
 
-  return { created, skipped };
+  return { created, skipped, failed, error: firstError };
 }
 
 /** Remembers a "no", so the same junk stops coming back every search. */

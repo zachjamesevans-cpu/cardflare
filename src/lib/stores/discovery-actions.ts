@@ -76,11 +76,27 @@ export async function importStoresAction(
   const result = await importCandidates(candidates, user.id);
   revalidatePath("/admin/stores");
 
+  /* A failure is reported as a failure. The first cut folded these into
+     "skipped ... already known", so a database missing the migration
+     told the founder his stores were already there. */
+  if (result.created === 0 && result.failed > 0) {
+    return {
+      status: "error",
+      message: `Nothing was created. ${result.failed} ${
+        result.failed === 1 ? "listing" : "listings"
+      } failed: ${result.error ?? "unknown error"}`,
+    };
+  }
+
+  const parts = [
+    `Created ${result.created} unclaimed ${result.created === 1 ? "listing" : "listings"}`,
+  ];
+  if (result.skipped > 0) parts.push(`skipped ${result.skipped} already in CardFlare`);
+  if (result.failed > 0) parts.push(`${result.failed} failed`);
+
   return {
-    status: "done",
-    message: `Created ${result.created} unclaimed ${
-      result.created === 1 ? "listing" : "listings"
-    }${result.skipped > 0 ? `, skipped ${result.skipped} already known` : ""}. They are drafts until you publish them.`,
+    status: result.failed > 0 ? "error" : "done",
+    message: `${parts.join(", ")}. They are drafts until you publish them.`,
   };
 }
 

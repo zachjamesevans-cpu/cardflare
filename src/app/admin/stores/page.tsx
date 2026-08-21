@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
 import { listStores } from "@/lib/stores/repository";
+import { directorySchemaReady } from "@/lib/stores/discovery";
 
 export const metadata: Metadata = {
   title: "Stores",
@@ -40,6 +41,12 @@ export default async function AdminStoresPage() {
    */
   /* Imported and not yet released. Listed on their own because an import
      creates dozens at once and every one is invisible until published. */
+  /* Deploying the app and applying the migrations are two different acts
+     here - there is no CI that runs them - so say plainly when the
+     directory schema is missing rather than letting every import fail
+     into a count. */
+  const schemaReady = await directorySchemaReady();
+
   const drafts: DraftListing[] = stores
     .filter((store) => store.listing_state === "draft")
     .map((store) => ({
@@ -130,6 +137,20 @@ export default async function AdminStoresPage() {
             publish them, and Verified and Ultra are set by hand afterwards.
           </p>
         </div>
+
+        {!schemaReady && (
+          <Card className="flex flex-col gap-2 border-danger/50 p-4">
+            <p className="font-semibold text-danger">
+              The store directory migration has not been applied
+            </p>
+            <p className="text-sm text-text-secondary">
+              This database has no <code>store_sources</code> table, so importing a
+              store fails and nothing can be published. Apply{" "}
+              <code>supabase/migrations/20260923090000_store_directory.sql</code> —
+              deploying the app does not run migrations.
+            </p>
+          </Card>
+        )}
 
         <DraftListings drafts={drafts} />
 

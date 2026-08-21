@@ -259,3 +259,33 @@ describe("publishing, verifying and Ultra", () => {
     expect(actions).not.toMatch(/update\(\{ listing_state: "published" \}\)\s*;/);
   });
 });
+
+describe("what the console reports after an import", () => {
+  const lib = readSource("src/lib/stores/discovery.ts");
+  const actions = readSource("src/lib/stores/discovery-actions.ts");
+
+  it("counts a failure as a failure, never as a skip", () => {
+    /*
+     * The bug this exists for. A failed insert used to add to `skipped`,
+     * and the console printed the total as "already known" - so on a
+     * database missing the directory migration, thirty-five inserts
+     * failing read back as thirty-five stores that were already there.
+     * A count that cannot tell success from failure is worse than none.
+     */
+    expect(lib).toContain("failed: number");
+    expect(lib).toContain("failed += 1;");
+    expect(lib).not.toMatch(
+      /console\.error\("Could not create the store listing"[\s\S]{0,80}skipped \+= 1/,
+    );
+    expect(actions).toContain("Nothing was created.");
+  });
+
+  it("says plainly when the migration has not been applied", () => {
+    /* Deploying the app and applying the migrations are two acts in this
+       project, and nothing runs the second one automatically. */
+    expect(lib).toContain("export async function directorySchemaReady");
+    expect(lib).toContain(
+      "The store directory migration has not been applied to this database.",
+    );
+  });
+});
