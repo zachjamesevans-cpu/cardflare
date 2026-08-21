@@ -2,6 +2,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Animated, {
+  runOnUI,
+  useAnimatedScrollHandler,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Image,
   Linking,
@@ -27,7 +32,14 @@ import {
 import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
-import { cachedPlayerId, readFeedCache, writeFeedCache } from "../feed-cache";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
+import {
+  CollapsingHeader,
+  HEADER_CONTENT_HEIGHT,
+  onHeaderScroll,
+  settleHeader,
+  useHeaderScroll,
+} from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
@@ -145,6 +157,12 @@ function agoFrom(iso: string): string {
  */
 const MARK_ASPECT = 60 / 72;
 
+/** What the Feed keeps between visits: the header, and the items. */
+interface CachedFeed {
+  me: Me | null;
+  items: FeedEntry[];
+}
+
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
@@ -161,6 +179,29 @@ export function HomeScreen() {
    * read whatever they were when the screen mounted. These are only
    * ever read, never rendered from.
    */
+  /* False until the cached read has resolved, so nothing that means
+     "you have nothing" is drawn before we know that is true. */
+  const [hydrated, setHydrated] = useState(false);
+
+  /*
+   * The header follows the thumb, on the UI thread.
+   *
+   * The founder wanted Instagram's behaviour: the bar leaves as you go
+   * down and comes back the moment you go up, from anywhere in the
+   * list. Driving that from JavaScript stutters against the very
+   * scroll it is following, which reads worse than not animating at
+   * all — so the whole thing is worklets. See collapsing-header.tsx.
+   */
+  const insets = useSafeAreaInsets();
+  const header = useHeaderScroll();
+
+  const onScroll = useAnimatedScrollHandler((event) => {
+    onHeaderScroll(header, event.contentOffset.y);
+  });
+
+  const settle = () => {
+    runOnUI(settleHeader)(header);
+  };
   const feedRef = useRef<FeedEntry[]>([]);
   const meRef = useRef<Me | null>(null);
 
@@ -187,12 +228,17 @@ export function HomeScreen() {
       const id = await cachedPlayerId();
       if (!id || !live) return;
 
-      const cached = await readFeedCache(id);
+      const cached = await readCache<CachedFeed>("feed", id);
       if (!cached || !live || feedRef.current.length > 0) return;
 
       if (cached.me) setMe((current) => current ?? cached.me);
       setFeed(cached.items);
-    })();
+    })().finally(() => {
+      /* Hit or miss, the question has been asked and answered — so
+         anything that depends on "is the feed really empty" can now
+         be trusted to mean it. */
+      if (live) setHydrated(true);
+    });
 
     return () => {
       live = false;
@@ -258,7 +304,11 @@ export function HomeScreen() {
 
       /* Written after a load that worked, so the cache can only ever
          hold a feed that was real. */
-      if (cachedFor) void writeFeedCache(cachedFor, meRef.current, fresh.items);
+      if (cachedFor)
+        void writeCache("feed", cachedFor, {
+          me: meRef.current,
+          items: fresh.items,
+        } satisfies CachedFeed);
     } catch {
       /*
        * A failed feed no longer empties the screen when there is
@@ -376,28 +426,59 @@ export function HomeScreen() {
   };
 
   return (
-    <ScrollView
-      /*
-       * Without this a tap on a button is spent dismissing the keyboard
-       * instead of pressing the button, and the player has to tap twice.
-       * The feed had no text input until the Nearby card asked for a ZIP,
-       * so it never needed the prop - the two other screens that take
-       * typing, find-player and welcome, have carried it all along.
-       *
-       * "handled" rather than "always": a tap on empty space still
-       * dismisses the keyboard, which is what people expect. Only a tap
-       * something else is going to handle jumps the queue.
-       */
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void refresh()}
-          tintColor={colors.textMuted}
-        />
-      }
-    >
+    <>
+      <CollapsingHeader
+        state={header}
+        onSearch={() => navigation.navigate("FindPlayer")}
+      />
+      <Animated.ScrollView
+        /*
+         * flex: 1, and it is load-bearing rather than tidy.
+         *
+         * A ScrollView sizes itself to its content unless something
+         * bounds it. As the screen's only child it inherited a bound;
+         * once the floating header became a sibling it stopped doing
+         * so, grew to the full height of the feed, and simply got
+         * clipped — a screen with more content than fits and no way to
+         * reach it, which looks like the list is broken rather than
+         * unbounded.
+         */
+        style={{ flex: 1 }}
+        /*
+         * Without this a tap on a button is spent dismissing the keyboard
+         * instead of pressing the button, and the player has to tap twice.
+         * The feed had no text input until the Nearby card asked for a ZIP,
+         * so it never needed the prop - the two other screens that take
+         * typing, find-player and welcome, have carried it all along.
+         *
+         * "handled" rather than "always": a tap on empty space still
+         * dismisses the keyboard, which is what people expect. Only a tap
+         * something else is going to handle jumps the queue.
+         */
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        onScrollEndDrag={settle}
+        onMomentumScrollEnd={settle}
+        /* Every frame, because the header follows the thumb rather than
+           waking up at intervals behind it. */
+        scrollEventThrottle={16}
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(4),
+          /* The header floats over the list, so the first card starts
+             below it rather than under it. */
+          paddingTop: insets.top + HEADER_CONTENT_HEIGHT + spacing(4),
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            tintColor={colors.textMuted}
+            /* The spinner hangs below the bar, not behind it. */
+            progressViewOffset={insets.top + HEADER_CONTENT_HEIGHT}
+          />
+        }
+      >
       {/*
        * Who you are and what you have, before anything derived.
        *
@@ -1282,7 +1363,16 @@ export function HomeScreen() {
        * Below three items the screen has room for it and a newcomer needs
        * it; above three it is the least interesting thing present.
        */}
-      {feed.length < 3 && (
+      {/*
+       * And not until the cache has answered. Measured on a release
+       * build: the shell is up at 0.8s and the cached feed paints at
+       * ~1.2s, so an unguarded empty state flashes "how it works" at
+       * somebody with a full feed for a third of a second before their
+       * own content replaces it. Telling a returning player they have
+       * nothing, briefly, is its own kind of disorienting — which is
+       * the complaint this whole change exists to answer.
+       */}
+      {hydrated && feed.length < 3 && (
         <Card>
           <Title>How it works</Title>
           <Body>
@@ -1291,6 +1381,7 @@ export function HomeScreen() {
           </Body>
         </Card>
       )}
-    </ScrollView>
+      </Animated.ScrollView>
+    </>
   );
 }

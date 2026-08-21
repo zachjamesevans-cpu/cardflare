@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -16,6 +15,8 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
+
+import { RemoteImage } from "./remote-image";
 
 import { youHaveLabel } from "./held-label";
 import { colors, radius, spacing } from "./theme";
@@ -274,7 +275,7 @@ export function CardImage({
           setOpen(true);
         }}
       >
-        <Image source={{ uri: ownImageUrl }} style={frame} resizeMode="cover" />
+        <RemoteImage uri={ownImageUrl} style={frame} />
       </Tap>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>
@@ -429,15 +430,15 @@ export function CardImage({
               </View>
               {/* A sibling can be a card with no art of its own; the
                   panel shows the empty frame rather than a broken box. */}
-              <Image
-                source={{ uri: imageUrl ?? undefined }}
+              <RemoteImage
+                uri={imageUrl}
+                contentFit="contain"
                 style={{
                   width: large,
                   height: Math.round((large * 88) / 63),
                   borderRadius: radius.control,
                   backgroundColor: colors.canvas,
                 }}
-                resizeMode="contain"
               />
               <Text style={styles.muted}>Tap anywhere to close</Text>
             </Animated.View>

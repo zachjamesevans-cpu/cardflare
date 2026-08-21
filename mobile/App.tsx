@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
   NavigationContainer,
-  useNavigation,
   type Theme,
 } from "@react-navigation/native";
 import {
@@ -33,7 +32,6 @@ import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
-import { BRAND_FONT, useBrandFont } from "./src/brand-font";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
@@ -256,75 +254,6 @@ function TabButton({
   );
 }
 
-/**
- * The Feed's one door out to other people.
- *
- * Its own component so it can ask for the STACK's navigation: the options
- * callback hands you the tab navigator, which knows about five tabs and
- * nothing else, so navigating to a stack screen from there does not
- * typecheck - and casting it would have been a lie about which navigator
- * owns the screen.
- */
-/**
- * The product's name, in the product's face.
- *
- * The founder: "choose a cooler font for cardflare for the top
- * 'CardFlare' text in the feed, as that bar is also going to be black."
- * Chakra Petch — angular, technical, and still legible at the size a
- * navigation title gets.
- *
- * The wordmark and nothing else. Inter still carries every word a
- * person actually reads; a display face used twice stops being a mark
- * and starts being a theme.
- *
- * Loads without blocking: system bold for the few frames before the
- * file arrives, then a swap. A font is never worth a blank screen.
- */
-function BrandTitle() {
-  const loaded = useBrandFont();
-
-  return (
-    <Text
-      style={{
-        color: colors.textPrimary,
-        fontSize: 20,
-        fontFamily: loaded ? BRAND_FONT : undefined,
-        fontWeight: loaded ? "normal" : "700",
-        /* The face is angular and a little tight; a hair of tracking
-           stops the capitals from touching at header size. */
-        letterSpacing: loaded ? 0.5 : 0,
-      }}
-    >
-      CardFlare
-    </Text>
-  );
-}
-
-function FindPlayerButton() {
-  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-
-  return (
-    <Tap
-      accessibilityLabel="Find a player"
-      onPress={() => navigation.navigate("FindPlayer")}
-      /*
-       * paddingRight, which was missing: without it the icon sat hard
-       * against the screen edge and iOS clipped the right side of the
-       * magnifier clean off. 16pt puts its edge on the same margin as
-       * every card below it, so it lines up with the Embers pill rather
-       * than hanging past it.
-       */
-      style={{
-        paddingLeft: spacing(4),
-        paddingRight: spacing(4),
-        paddingVertical: spacing(2),
-      }}
-    >
-      <Ionicons name="search" size={20} color={colors.textSecondary} />
-    </Tap>
-  );
-}
-
 function Tabs() {
   return (
     <Tab.Navigator
@@ -373,11 +302,26 @@ function Tabs() {
            the same place the website puts it. */
         options={{
           title: "CardFlare",
-          headerTitle: () => <BrandTitle />,
+          /*
+           * The Feed draws its OWN header, and the navigator's is off.
+           *
+           * The founder: "the 'card flare' text at top doesn't need to
+           * be glued to the top ... the goal is to have maximized
+           * viewing space." A navigator header cannot do that — it is a
+           * fixed strip above the screen, and the content simply starts
+           * underneath it. So the Feed floats a translucent bar over
+           * its own list and moves it with the scroll. See
+           * src/collapsing-header.tsx.
+           *
+           * Only this tab. Room, Flare, Inbox and Profile are screens
+           * you arrive at to do one thing rather than lists you fall
+           * down, and a header that hides on a short screen is a
+           * header that flickers.
+           */
+          headerShown: false,
           /* Local, not Feed: the screen is about what is happening
              around you rather than about a stream of posts. */
           tabBarLabel: "Local",
-          headerRight: () => <FindPlayerButton />,
         }}
       />
       <Tab.Screen name="Room" component={RoomTab} />

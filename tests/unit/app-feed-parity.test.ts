@@ -230,7 +230,14 @@ describe("the home screen's furniture", () => {
   it("puts finding a player on the feed, on both", () => {
     /* "Let's make a search icon in the top right of the main feed." */
     expect(webPage).toContain("<FeedSearch />");
-    expect(appRoot).toContain('navigation.navigate("FindPlayer")');
+
+    /* It lives on the Feed screen now rather than in the navigator: the
+       app's header floats over its own list so it can get out of the
+       way on scroll, which a navigator header cannot do. Same place on
+       screen, different owner. */
+    expect(read("mobile/src/screens/home.tsx")).toContain(
+      'navigation.navigate("FindPlayer")',
+    );
   });
 
   it("keeps one wants list, and lets it say which state a card is in", () => {

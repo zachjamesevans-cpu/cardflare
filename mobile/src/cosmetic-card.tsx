@@ -2,6 +2,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 
+import { RemoteImage } from "./remote-image";
+
 import {
   CardEdge,
   EDGE,
@@ -172,11 +174,7 @@ export function CosmeticCard({
   const face = (w: number, h: number) => (
     <>
       {imageUrl && !foilDrawsArt ? (
-        <Image
-          source={{ uri: imageUrl }}
-          style={{ width: "100%", height: "100%" }}
-          resizeMode="cover"
-        />
+        <RemoteImage uri={imageUrl} style={{ width: "100%", height: "100%" }} />
       ) : null}
 
       {foilDrawsArt && imageUrl !== null ? (
