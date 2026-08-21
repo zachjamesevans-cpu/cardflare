@@ -892,8 +892,16 @@ export function HomeScreen() {
 
             <View style={{ gap: spacing(2.5) }}>
               {item.stores.map((store) => (
-                <View
+                /* Tappable, because the website has put a "View" button
+                   on every one of these rows since the day the Nearby
+                   card shipped and the phone showed the same shops as
+                   dead text. A chevron says so without a button's
+                   weight in a list of five. */
+                <Tap
                   key={store.storeId}
+                  onPress={() =>
+                    navigation.navigate("StoreProfile", { storeId: store.storeId })
+                  }
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -955,7 +963,12 @@ export function HomeScreen() {
                       }`}
                     </Text>
                   </View>
-                </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={20}
+                    color={colors.textMuted}
+                  />
+                </Tap>
               ))}
             </View>
           </Card>

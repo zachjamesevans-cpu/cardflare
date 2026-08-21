@@ -32,6 +32,7 @@ import {
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
+import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
@@ -103,6 +104,13 @@ export type StackParams = {
   PlayerProfile: { playerId: string };
   /** Finding somebody by name, from the Feed's own header. */
   FindPlayer: undefined;
+  /**
+   * A shop, from a Nearby row — the website's /s/[storeId].
+   *
+   * Native rather than a link out: the founder, on a tab that threw him
+   * into Safari, and it is also where an owner claims their listing.
+   */
+  StoreProfile: { storeId: string };
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -501,6 +509,12 @@ export default function App() {
             component={PlayerProfileScreen}
             options={{ title: "Player", headerBackTitle: "Back" }}
           />
+          <Stack.Screen
+            name="StoreProfile"
+            options={{ title: "Store", headerBackTitle: "Back" }}
+          >
+            {({ route }) => <StoreProfileScreen storeId={route.params.storeId} />}
+          </Stack.Screen>
           <Stack.Screen
             name="FindPlayer"
             component={FindPlayerScreen}
