@@ -25,24 +25,27 @@ export interface Relevance {
 /**
  * Categories that mean a game shop nearly every time.
  *
- * Matched as substrings against the provider's own category strings,
- * because taxonomies differ between providers and between releases and a
- * fixed enum would rot on the first schema change.
+ * MATCHED EXACTLY, not as substrings, and that is a correction made
+ * against real data. The first cut matched substrings so a taxonomy
+ * rename would not break it - and on the real Austin extract that pulled
+ * in `cardiology` for "card" and `garbage_collection_service` for
+ * "collect". A provider's category is a controlled value; treating it as
+ * prose finds nonsense.
+ *
+ * These are Overture `taxonomy.primary` values, which is where the real
+ * signal lives. `basic_category` is a ~280-value coarse label and is far
+ * too blunt: Austin's best-known game store is not under it at all, and
+ * `toys_and_games_store` there is mostly actual toy shops.
  */
 const STRONG_CATEGORIES = [
   "hobby_shop",
-  "hobby shop",
+  "comic_books_store",
+  "comic_book_store",
   "game_store",
-  "game store",
-  "gaming_store",
-  "trading_card",
-  "trading card",
-  "collectible",
-  "comic_book",
-  "comic book",
-  "board_game",
-  "board game",
-  "tabletop",
+  "board_game_store",
+  "trading_card_store",
+  "collectibles_store",
+  "tabletop_game_store",
 ];
 
 /** Words in a shop's own name that say what it is. */
@@ -88,30 +91,51 @@ const MASS_RETAILERS = [
   "kroger",
 ];
 
-/** Categories that are adjacent but usually not organised play. */
+/**
+ * Adjacent, and usually not organised play.
+ *
+ * `arts_crafts_and_hobby_store` earns its place here from the data: 150
+ * of them in one metro, nearly all craft shops. `cards_and_stationery_store`
+ * is greeting cards. Neither is a reason to reject on its own - a shop can
+ * be both - but neither is evidence on its own either.
+ */
 const WEAK_CATEGORIES = [
-  "video_game",
-  "video game",
+  "video_game_store",
+  "video_and_video_game_rental",
+  "game_publisher",
   "arcade",
   "casino",
   "toy_store",
-  "toy store",
-  "sports_memorabilia",
-  "sports memorabilia",
-  "antique",
-  "pawn",
+  "toys_and_games_store",
+  "arts_crafts_and_hobby_store",
+  "cards_and_stationery_store",
+  "sports_memorabilia_store",
+  "antique_store",
+  "pawn_shop",
 ];
 
 const normalise = (value: string) => value.trim().toLowerCase();
 
+/** Exact matches only. See the note on STRONG_CATEGORIES. */
 const hits = (haystack: string[], needles: string[]) =>
-  needles.filter((needle) => haystack.some((item) => item.includes(needle)));
+  needles.filter((needle) => haystack.includes(needle));
 
 export function scoreRelevance(candidate: {
   name: string;
   categories: string[];
   website: string | null;
   confidence: number | null;
+  /**
+   * The provider's own operating status, when it has one.
+   *
+   * A CORRECTION. The published Places field list does not mention this,
+   * and the first cut of these rules said flatly that Overture has no
+   * operating status and refused to print one. The release schema HAS
+   * `operating_status`, so the honest thing is to repeat what the
+   * provider said and attribute it - not to invent a status, and not to
+   * pretend one is unavailable when it is right there.
+   */
+  operatingStatus?: string | null;
 }): Relevance {
   const name = normalise(candidate.name);
   const categories = candidate.categories.map(normalise);
@@ -135,9 +159,7 @@ export function scoreRelevance(candidate: {
    * category once, weak first, is the fix: "video game" wins over "game
    * store" because it is the more specific description of the same word.
    */
-  const weak = categories.filter((category) =>
-    WEAK_CATEGORIES.some((pattern) => category.includes(pattern)),
-  );
+  const weak = categories.filter((category) => WEAK_CATEGORIES.includes(category));
   const strongCategories = hits(
     categories.filter((category) => !weak.includes(category)),
     STRONG_CATEGORIES,
@@ -160,10 +182,13 @@ export function scoreRelevance(candidate: {
     reasons.push("Website on record");
   }
   /*
-   * Said as what it is. Overture publishes no operating status, so this
-   * is a statement about the RECORD and printing it as "likely open"
-   * would be inventing a fact the provider never claimed.
+   * Both said as what they are: quoted from the provider, never dressed
+   * up. `confidence` is a statement about the RECORD rather than about
+   * the shop's front door, so it is labelled as the provider's.
    */
+  if (candidate.operatingStatus) {
+    reasons.push(`Provider says ${candidate.operatingStatus}`);
+  }
   if (candidate.confidence !== null) {
     reasons.push(`Provider confidence ${candidate.confidence.toFixed(2)}`);
   }

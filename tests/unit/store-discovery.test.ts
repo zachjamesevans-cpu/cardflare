@@ -74,25 +74,33 @@ describe("is this a game store", () => {
     ).toBe("likely");
   });
 
-  it("never claims a place is open", () => {
+  it("quotes the provider on status rather than deciding one", () => {
     /*
-     * Overture Places publishes no operating status. `confidence` is a
-     * statement about the RECORD, and printing it as "likely operating"
-     * would invent a fact the provider never claimed.
+     * A correction made against the real release. Overture's published
+     * field list omits `operating_status`; the schema has it. So the
+     * rules repeat what the provider said, attributed - and say nothing
+     * at all when it said nothing, rather than inferring from confidence.
      */
-    const scored = scoreRelevance({
+    const quiet = scoreRelevance({
       name: "Riverside Collectibles",
       categories: [],
       website: null,
       confidence: 0.31,
     });
 
-    expect(scored.reasons.join(" ")).toContain("confidence");
+    expect(quiet.reasons.join(" ")).toContain("confidence");
+    expect(quiet.reasons.join(" ").toLowerCase()).not.toContain("open");
 
-    for (const reason of scored.reasons) {
-      expect(reason.toLowerCase()).not.toContain("operating");
-      expect(reason.toLowerCase()).not.toContain("open");
-    }
+    const known = scoreRelevance({
+      name: "Riverside Collectibles",
+      categories: [],
+      website: null,
+      confidence: 0.31,
+      operatingStatus: "open",
+    });
+
+    /* Attributed, every time. CardFlare never says a shop is open. */
+    expect(known.reasons.join(" ")).toContain("Provider says open");
   });
 });
 

@@ -49,12 +49,18 @@ export interface PlaceCandidate {
   /**
    * The provider's own confidence that the place exists, 0 to 1.
    *
-   * NOT an operating status. Overture Places has no open/closed field -
-   * this is the nearest thing it publishes, and it is a statement about
-   * the record rather than about the shop's front door. Nothing in
-   * CardFlare should print "likely operating" from it alone.
+   * A statement about the RECORD, not about the shop's front door, and
+   * never to be printed as "likely operating".
    */
   confidence: number | null;
+  /**
+   * The provider's own operating status, quoted rather than interpreted.
+   *
+   * Overture's published field list omits this; the release schema has
+   * it. Repeated verbatim and attributed to the provider - CardFlare
+   * does not decide whether a shop is open.
+   */
+  operatingStatus: string | null;
   /** Which licence this individual record carries. Places is a mix. */
   license: string | null;
   /** The line that has to travel with the record if it is shown. */
