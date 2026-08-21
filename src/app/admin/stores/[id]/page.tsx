@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-store-form";
+import { DeletePanel } from "@/components/admin/delete-panel";
 import { StoreListingControls } from "@/components/admin/store-listing-controls";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
 import { listStoreMembers } from "@/lib/admin/records";
@@ -93,6 +94,20 @@ export default async function AdminStorePage({
       <StoreDetailsSection store={store} />
 
       {isVendor ? <VendorSections storeId={store.id} /> : <LgsSections store={store} />}
+
+      {/*
+       * Last on the page, and that is where a destructive control
+       * belongs: an admin scrolling past everything they can safely do
+       * has already had every chance to do it. Closed until asked, and
+       * it prints what the delete would take with it before offering a
+       * button.
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="danger-heading">
+        <h2 id="danger-heading" className="text-xl font-bold text-text-primary">
+          Danger zone
+        </h2>
+        <DeletePanel kind="store" id={store.id} name={store.name} />
+      </section>
     </div>
   );
 }
