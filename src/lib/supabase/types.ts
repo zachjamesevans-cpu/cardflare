@@ -60,6 +60,25 @@ export type StoreRow = {
   kind: StoreKind;
   /** Hours before start that a scheduled board accepts Flares. 0 = off. */
   early_board_hours: number;
+  /* Where it is. Null on every row that predates the directory, and on
+     any customer never asked. Precise coordinates never leave the
+     server - distance is computed and rounded server-side. */
+  address_line: string | null;
+  postal_code: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  website: string | null;
+  /** Where it sits in the funnel. An existing customer is `claimed`. */
+  claim_status: StoreClaimStatus;
+  /** The commercial tier, kept apart from verification on purpose. */
+  tier: StoreTier;
+  /** Draft keeps an imported candidate away from players until approved. */
+  listing_state: StoreListingState;
+  /** Trust. Admin-only, never for sale, never inferred from `tier`. */
+  verified_at: string | null;
+  verified_by: string | null;
 };
 
 /** Columns with database defaults are optional on insert. */
@@ -73,7 +92,35 @@ export type StoreInsert = Omit<
   | "timezone"
   | "kind"
   | "early_board_hours"
+  /* Everything the directory added. All defaulted in the migration, so
+     an insert that predates the directory stays valid. */
+  | "address_line"
+  | "postal_code"
+  | "country"
+  | "latitude"
+  | "longitude"
+  | "phone"
+  | "website"
+  | "claim_status"
+  | "tier"
+  | "listing_state"
+  | "verified_at"
+  | "verified_by"
 > & {
+  address_line?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  phone?: string | null;
+  website?: string | null;
+  claim_status?: StoreClaimStatus;
+  tier?: StoreTier;
+  listing_state?: StoreListingState;
+  /* Deliberately absent from the insert shape as writable-by-anything:
+     verification is set by an admin action, never by a create. */
+  verified_at?: never;
+  verified_by?: never;
   walk_in_enabled?: boolean;
   timezone?: string;
   kind?: StoreKind;
@@ -745,7 +792,76 @@ export type PlayerGameInsert = Omit<PlayerGameRow, "created_at"> & {
   created_at?: string;
 };
 
-export type PackSeriesRow = {
+export type StoreClaimStatus = "unclaimed" | "pending" | "claimed";
+export type StoreTier = "free" | "ultra";
+export type StoreListingState = "draft" | "published";
+export type StoreClaimState = "pending" | "approved" | "rejected" | "more-info";
+
+/**
+ * Where a store record came from, kept forever and shown to nobody.
+ *
+ * One row per provider record rather than columns on the store, so a shop
+ * re-found in a later release gains a second row instead of overwriting
+ * the first. `license` is per row because Overture Places is a MIX -
+ * CDLA Permissive 2.0, Apache 2.0 and CC0 1.0 depending on the source of
+ * the individual place - and the attribution that has to travel with a
+ * record depends on which one it came from.
+ */
+type StoreSourceRow = {
+  id: string;
+  store_id: string;
+  provider: string;
+  provider_place_id: string;
+  license: string | null;
+  attribution: string | null;
+  imported_at: string;
+  imported_by: string | null;
+  last_verified_at: string | null;
+  last_synced_at: string | null;
+};
+
+type StoreSourceInsert = Omit<StoreSourceRow, "id" | "imported_at"> & {
+  id?: string;
+  imported_at?: string;
+};
+
+type StoreClaimRow = {
+  id: string;
+  created_at: string;
+  store_id: string;
+  claimant_name: string;
+  claimant_email: string;
+  claimant_role: string | null;
+  business_email: string | null;
+  notes: string | null;
+  state: StoreClaimState;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_note: string | null;
+};
+
+type StoreClaimInsert = Omit<
+  StoreClaimRow,
+  "id" | "created_at" | "state" | "reviewed_at" | "reviewed_by" | "review_note"
+> & {
+  id?: string;
+  created_at?: string;
+  state?: StoreClaimState;
+};
+
+type StoreCandidateRejectionRow = {
+  provider: string;
+  provider_place_id: string;
+  rejected_at: string;
+  rejected_by: string | null;
+  reason: string | null;
+};
+
+type StoreCandidateRejectionInsert = Omit<StoreCandidateRejectionRow, "rejected_at"> & {
+  rejected_at?: string;
+};
+
+type PackSeriesRow = {
   slug: string;
   name: string;
   set_number: number;
@@ -1179,6 +1295,12 @@ export type Database = {
       cosmetics: Table<CosmeticRow, CosmeticRow>;
       player_equips: Table<PlayerEquipRow, PlayerEquipInsert>;
       pack_series: Table<PackSeriesRow, PackSeriesInsert>;
+      store_sources: Table<StoreSourceRow, StoreSourceInsert>;
+      store_claims: Table<StoreClaimRow, StoreClaimInsert>;
+      store_candidate_rejections: Table<
+        StoreCandidateRejectionRow,
+        StoreCandidateRejectionInsert
+      >;
       player_games: Table<PlayerGameRow, PlayerGameInsert>;
       pack_series_items: Table<PackSeriesItemRow, PackSeriesItemInsert>;
       player_cosmetics: Table<
