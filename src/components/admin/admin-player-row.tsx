@@ -16,6 +16,7 @@ import {
 
 import { EditPlayerTier } from "@/components/admin/edit-player-form";
 import { PlayerAccountControls } from "@/components/admin/player-account-controls";
+import { DeletePanel } from "@/components/admin/delete-panel";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -320,6 +321,15 @@ export function AdminPlayerRow({
               {said.message}
             </p>
           )}
+        </div>
+      )}
+      {open && (
+        /* Last inside the drawer, under everything an admin can safely
+           do. It loads what the delete would destroy only when opened,
+           so a list of a hundred players costs nothing for a button
+           almost nobody presses. */
+        <div className="pb-3">
+          <DeletePanel kind="player" id={playerId} name={displayName} />
         </div>
       )}
     </li>

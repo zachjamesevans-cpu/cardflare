@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const BASE =
@@ -17,6 +17,17 @@ const VARIANTS: Record<Variant, string> = {
   secondary:
     "bg-elevated text-text-primary border border-border hover:border-border-strong hover:bg-border/40",
   ghost: "text-text-secondary hover:text-text-primary hover:bg-elevated",
+  /*
+   * Outlined rather than filled, and that is a judgement about weight
+   * rather than a limitation. A destructive button should read as
+   * serious without being the loudest thing on a page — the filled
+   * accent belongs to the action somebody came to perform, and deleting
+   * a shop is never that. It still cannot be mistaken for anything
+   * else: it is the only control in the console wearing the danger
+   * colour.
+   */
+  danger:
+    "border border-danger/60 bg-danger/10 text-danger hover:border-danger hover:bg-danger/20",
 };
 
 /* Minimum 44px tall at md and above keeps mobile touch targets comfortable. */
