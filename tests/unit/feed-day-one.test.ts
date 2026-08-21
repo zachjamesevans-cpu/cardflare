@@ -215,6 +215,26 @@ describe("the Feed on day one", () => {
     ]);
   });
 
+  it("does not explain Nearby with a rule it stopped following", async () => {
+    /*
+     * The reason line under an item is the sentence a reader trusts to
+     * explain why they are looking at it, and this one went stale: it
+     * still read "Shops near the ones you have saved" after the origin
+     * had stopped being a saved store and become the player's own
+     * location. A reason that describes a rule we no longer follow is
+     * worse than no reason at all.
+     */
+    listOpenStores.mockResolvedValue([]);
+
+    const items = await listFeed("player-1", null);
+    const nearby = items.find((item) => item.kind === "nearbyStores");
+
+    expect(nearby).toBeDefined();
+    expect(nearby!.reason).not.toMatch(/saved/i);
+    /* Nothing is known about where they are, so it asks. */
+    expect(nearby!.reason).toBe("Tell us roughly where you are");
+  });
+
   it("wears the mark rather than a face — there is no CardFlare player", async () => {
     showingAnnouncements.mockResolvedValue([
       {
