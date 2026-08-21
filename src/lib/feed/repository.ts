@@ -621,7 +621,15 @@ function reasonFor(item: FeedItem): string {
     case "suggest":
       return "Their binders answer your wants";
     case "nearbyStores":
-      return "Shops near the ones you have saved";
+      /* The reason has to track the model, and this one did not: it
+         still said "shops near the ones you have saved" for a week
+         after the origin stopped being a saved store. A reason line
+         that describes a rule we no longer follow is worse than none,
+         because it is the sentence a reader trusts to explain why they
+         are looking at something. */
+      if (item.needsLocation) return "Tell us roughly where you are";
+
+      return item.source === "postal" ? "Near your ZIP code" : "Near you right now";
     case "pack":
     case "shop":
       return "Yours to spend Embers on";

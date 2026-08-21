@@ -303,6 +303,18 @@ export function HomeScreen() {
 
   return (
     <ScrollView
+      /*
+       * Without this a tap on a button is spent dismissing the keyboard
+       * instead of pressing the button, and the player has to tap twice.
+       * The feed had no text input until the Nearby card asked for a ZIP,
+       * so it never needed the prop - the two other screens that take
+       * typing, find-player and welcome, have carried it all along.
+       *
+       * "handled" rather than "always": a tap on empty space still
+       * dismisses the keyboard, which is what people expect. Only a tap
+       * something else is going to handle jumps the queue.
+       */
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
       refreshControl={
         <RefreshControl
