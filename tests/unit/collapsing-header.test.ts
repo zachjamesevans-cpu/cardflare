@@ -35,9 +35,7 @@ describe("what the header does", () => {
        anywhere in the list, which is the part that makes it feel like a
        surface rather than a rule. One clamped accumulator does both. */
     expect(header).toContain("const delta = y - state.lastY.value");
-    expect(header).toContain(
-      "Math.min(Math.max(next, 0), HEADER_CONTENT_HEIGHT)",
-    );
+    expect(header).toContain("Math.min(Math.max(next, 0), HEADER_CONTENT_HEIGHT)");
   });
 
   it("is always whole at the top of the list", () => {
@@ -99,9 +97,7 @@ describe("the list makes room for it", () => {
   });
 
   it("hangs the refresh spinner below the bar, not behind it", () => {
-    expect(home).toContain(
-      "progressViewOffset={insets.top + HEADER_CONTENT_HEIGHT}",
-    );
+    expect(home).toContain("progressViewOffset={insets.top + HEADER_CONTENT_HEIGHT}");
   });
 
   it("blurs the status bar too", () => {

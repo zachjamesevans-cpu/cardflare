@@ -107,9 +107,14 @@ export function DisplayScreen({
         <div
           className={`flex min-h-0 shrink-0 gap-[clamp(0.5rem,1vw,1.25rem)] overflow-hidden ${
             plan.flareShape === "board"
-              ? "h-[30%]"
+              ? /* Was 30%, and the timer panel above it was mostly empty
+                   air: a clock and a game name in half a television. The
+                   card is the thing people walk over to look at, so the
+                   board takes eight points back. The clock is still
+                   enormous. */
+                "h-[38%]"
               : plan.flareShape === "carousel"
-                ? "h-[26%]"
+                ? "h-[30%]"
                 : "h-[22%]"
           }`}
         >
