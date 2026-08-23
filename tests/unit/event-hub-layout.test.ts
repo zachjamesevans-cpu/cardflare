@@ -64,7 +64,9 @@ describe("allocating the screen", () => {
       layout: "single",
       columns: 1,
       flareShape: "board",
-      flareSlots: 4,
+      /* Six since the cards stand upright: a poster is narrower than
+         the full-width row it replaced, so the same band holds more. */
+      flareSlots: 6,
     });
   });
 
@@ -73,7 +75,7 @@ describe("allocating the screen", () => {
       layout: "split",
       columns: 2,
       flareShape: "carousel",
-      flareSlots: 3,
+      flareSlots: 4,
     });
   });
 

@@ -7,6 +7,7 @@ import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import type { LayoutChoice } from "./layout";
 import { listTimers, type HubDisplay } from "./repository";
+import { orderByAsker } from "./flare-groups";
 import type { HubTimer } from "./timer";
 
 /**
@@ -178,16 +179,24 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
 
   return {
     ...base,
-    flares: grouped.map((card) => ({
-      cardId: card.cardId,
-      cardName: card.cardName,
-      cardNumber: card.cardNumber,
-      imageUrl: card.imageUrl,
-      quantity: card.quantity,
-      people: card.askers.size,
-      askedBy: card.askers.size === 1 ? card.firstName : null,
-      storeMayHave: stocked.has(card.cardId),
-    })),
+    /*
+     * Ordered so one person's cards sit together BEFORE the display's
+     * rotation takes its slice. The window is only a few cards wide, so
+     * two cards from the same person at opposite ends of this list land
+     * in different windows and the board never gets to group them.
+     */
+    flares: orderByAsker(
+      grouped.map((card) => ({
+        cardId: card.cardId,
+        cardName: card.cardName,
+        cardNumber: card.cardNumber,
+        imageUrl: card.imageUrl,
+        quantity: card.quantity,
+        people: card.askers.size,
+        askedBy: card.askers.size === 1 ? card.firstName : null,
+        storeMayHave: stocked.has(card.cardId),
+      })),
+    ),
     /* Stamped last, after the reads, so the number is as close to "when
        the television receives this" as it can honestly be. */
     serverNow: Date.now(),

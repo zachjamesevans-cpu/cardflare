@@ -75,9 +75,13 @@ export function displayPlan(choice: LayoutChoice, timerCount: number): DisplayPl
     case "single":
       /* One tournament: the timer is enormous and the board gets real
          estate worth looking at from the back of the shop. */
-      return { layout, columns: 1, flareShape: "board", flareSlots: 4 };
+      /* Six, not four. A poster is narrower than the full-width row it
+         replaced, so the same band holds more of them - and the more of
+         the room that sees its own card on the wall, the more of the
+         room posts one. */
+      return { layout, columns: 1, flareShape: "board", flareSlots: 6 };
     case "split":
-      return { layout, columns: 2, flareShape: "carousel", flareSlots: 3 };
+      return { layout, columns: 2, flareShape: "carousel", flareSlots: 4 };
     case "grid":
       /*
        * Three tournaments go in a ROW, not in a 2x2 with a hole in it.
