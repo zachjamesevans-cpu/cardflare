@@ -11,6 +11,7 @@ import {
 
 import { peekPlayer, type PeekProfile } from "./api";
 import { CosmeticCard } from "./cosmetic-card";
+import { WornBadge, WornName } from "./worn-name";
 import { EmberBadge } from "./ember-badge";
 import { FollowButton } from "./follow-button";
 import { PlayerAvatar } from "./player-avatar";
@@ -167,17 +168,27 @@ export function PlayerPeekModal({
                     gap: spacing(2),
                   }}
                 >
-                  <Text
-                    numberOfLines={1}
+                  <View
                     style={{
-                      color: colors.textPrimary,
-                      fontWeight: "700",
-                      fontSize: 16,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(1.5),
                       flexShrink: 1,
                     }}
                   >
-                    {profile.displayName}
-                  </Text>
+                    <WornName
+                      name={profile.displayName}
+                      nameplate={profile.equips?.nameplate}
+                      fontSize={16}
+                      baseStyle={{
+                        color: colors.textPrimary,
+                        fontWeight: "700",
+                        fontSize: 16,
+                        flexShrink: 1,
+                      }}
+                    />
+                    <WornBadge badge={profile.equips?.badge} />
+                  </View>
                   <EmberBadge earned={profile.embersEarned} />
                 </View>
               </View>

@@ -575,9 +575,161 @@ function borders() {
 /* Emit                                                              */
 /* ---------------------------------------------------------------- */
 
+/**
+ * `text-shadow`'s layers, kept as data rather than judged here.
+ *
+ * A soft zero-offset layer is a glow; a hard offset layer is the web's
+ * way of drawing pixel-art depth or a manga outline. The app decides
+ * which is which at draw time - React Native's Text carries exactly one
+ * shadow, so what cannot be drawn is at least named.
+ */
+function textShadows(value) {
+  if (!value) return [];
+
+  return splitTop(value)
+    .map((layer) => {
+      const color = /(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(layer);
+      if (!color) return null;
+      const lengths = layer
+        .replace(color[0], " ")
+        .trim()
+        .split(/\s+/)
+        .map((token) => Number(token.replace("px", "")))
+        .filter((number) => !Number.isNaN(number));
+
+      return {
+        x: lengths[0] ?? 0,
+        y: lengths[1] ?? 0,
+        blur: lengths[2] ?? 0,
+        color: color[1],
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * How a name is filled: one colour, or a gradient clipped to the glyphs.
+ *
+ * The gradient case is the reason nameplates need Skia in the app -
+ * there is no `background-clip: text` in React Native, so the honest
+ * version draws the glyphs with a gradient shader.
+ */
+function names() {
+  const out = {};
+
+  for (const slug of slugsOf("name")) {
+    const sel = `.cfa-${slug}.cfx-name`;
+    const background = decl(sel, "background");
+    const gradient = background ? inside(background, "linear-gradient") : null;
+
+    let fill;
+    if (gradient) {
+      const tokens = splitTop(gradient);
+      const angle = angleOf(tokens[0]);
+      if (angle !== null) tokens.shift();
+      const stops = colorStops(tokens, "%");
+      const size = decl(sel, "background-size");
+      const spread = size ? Number(/([0-9.]+)%/.exec(size)?.[1] ?? 100) / 100 : 1;
+      fill = {
+        type: "gradient",
+        angle: angle ?? 180,
+        colors: stops.colors,
+        positions: stops.positions,
+        /* background-size 300% is what lets cfa-pan travel: the paint
+           is three names wide and slides. 1 for a gradient that just
+           sits. */
+        spread,
+      };
+    } else {
+      fill = { type: "solid", color: decl(sel, "color") ?? "#f2f5f7" };
+    }
+
+    /* A glow can arrive as text-shadow on a solid fill or drop-shadow
+       on a clipped one - clipped text has no text-shadow that follows
+       the glyphs, so the web uses filter there. Same answer either way. */
+    const layered = textShadows(decl(sel, "text-shadow"));
+    const filter = decl(sel, "filter");
+    const drop = filter ? inside(filter, "drop-shadow") : null;
+    if (drop) {
+      const parsed = textShadows(drop);
+      if (parsed.length) layered.push(parsed[0]);
+    }
+
+    const family = decl(sel, "font-family") ?? "";
+    const stroke = decl(sel, "-webkit-text-stroke");
+    const strokeMatch = stroke
+      ? /([0-9.]+)px\s+(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/.exec(stroke)
+      : null;
+
+    out[slug] = {
+      fill,
+      shadows: layered,
+      font: /monospace/.test(family) ? "mono" : /serif/.test(family) ? "serif" : "sans",
+      italic: (decl(sel, "font-style") ?? "") === "italic",
+      letterSpacingEm:
+        Number(/([0-9.]+)em/.exec(decl(sel, "letter-spacing") ?? "")?.[1] ?? 0) || null,
+      stroke: strokeMatch
+        ? { width: Number(strokeMatch[1]), color: strokeMatch[2] }
+        : null,
+      motion: motionOf(decl(sel, "animation")),
+    };
+  }
+  return out;
+}
+
+/** A badge: a gradient pill, its glow, and the ink on it. */
+function badges() {
+  const out = {};
+
+  for (const slug of slugsOf("badge")) {
+    const sel = `.cfa-${slug}.cfx-badge`;
+    const background = decl(sel, "background");
+    const gradient = background ? inside(background, "linear-gradient") : null;
+    if (!gradient) throw new Error(`${slug} has no gradient pill`);
+
+    const tokens = splitTop(gradient);
+    const angle = angleOf(tokens[0]);
+    if (angle !== null) tokens.shift();
+    const stops = colorStops(tokens, "%");
+    const { glow } = shadows(decl(sel, "box-shadow"));
+
+    out[slug] = {
+      angle: angle ?? 140,
+      colors: stops.colors,
+      positions: stops.positions,
+      glow,
+      /* The scaffold's dark ink unless the rule says otherwise - the
+         bronze badge is the one that does. */
+      textColor: decl(sel, "color"),
+    };
+  }
+  return out;
+}
+
+/** A title chip: the scaffold recoloured, occasionally glowing. */
+function titles() {
+  const out = {};
+
+  for (const slug of slugsOf("title")) {
+    const sel = `.cfa-${slug}.cfx-title-chip`;
+
+    out[slug] = {
+      borderColor: decl(sel, "border-color"),
+      color: decl(sel, "color"),
+      italic: (decl(sel, "font-style") ?? "") === "italic",
+      shadows: textShadows(decl(sel, "text-shadow")),
+      motion: motionOf(decl(sel, "animation")),
+    };
+  }
+  return out;
+}
+
 const RING = rings();
 const AURA = auras();
 const BORDER = borders();
+const NAME = names();
+const BADGE = badges();
+const TITLE = titles();
 
 /** JSON, but as the TypeScript literal prettier would have written. */
 const literal = (value) =>
@@ -699,6 +851,59 @@ export const AURA_ART: Record<string, AuraArt> = ${literal(AURA)};
 
 export const BORDER_ART: Record<string, BorderArt> = ${literal(BORDER)};
 
+/** One text-shadow layer. Zero-offset soft = glow; offset hard = depth. */
+export interface TextShadow {
+  x: number;
+  y: number;
+  blur: number;
+  color: string;
+}
+
+/** How a username is drawn when a name style is worn. */
+export interface NameArt {
+  fill:
+    | { type: "solid"; color: string }
+    | {
+        type: "gradient";
+        angle: number;
+        colors: string[];
+        positions: number[];
+        /** How many name-widths of paint there are; >1 means it pans. */
+        spread: number;
+      };
+  shadows: TextShadow[];
+  font: "sans" | "mono" | "serif";
+  italic: boolean;
+  letterSpacingEm: number | null;
+  stroke: { width: number; color: string } | null;
+  motion: BorderMotion | null;
+}
+
+/** A badge's pill: gradient, glow and ink. */
+export interface BadgeArt {
+  angle: number;
+  colors: string[];
+  positions: number[];
+  glow: { color: string; radius: number } | null;
+  /** Ink on the pill, or null for the scaffold's dark default. */
+  textColor: string | null;
+}
+
+/** A title chip's recolouring of the scaffold. */
+export interface TitleArt {
+  borderColor: string | null;
+  color: string | null;
+  italic: boolean;
+  shadows: TextShadow[];
+  motion: BorderMotion | null;
+}
+
+export const NAME_ART: Record<string, NameArt> = ${literal(NAME)};
+
+export const BADGE_ART: Record<string, BadgeArt> = ${literal(BADGE)};
+
+export const TITLE_ART: Record<string, TitleArt> = ${literal(TITLE)};
+
 /** Whether a phone can draw this slug rather than approximating it. */
 export function hasRingArt(slug: string | null): boolean {
   return Boolean(slug && slug in RING_ART);
@@ -711,11 +916,24 @@ export function hasAuraArt(slug: string | null): boolean {
 export function hasBorderArt(slug: string | null): boolean {
   return Boolean(slug && slug in BORDER_ART);
 }
+
+export function hasNameArt(slug: string | null): boolean {
+  return Boolean(slug && slug in NAME_ART);
+}
+
+export function hasBadgeArt(slug: string | null): boolean {
+  return Boolean(slug && slug in BADGE_ART);
+}
+
+export function hasTitleArt(slug: string | null): boolean {
+  return Boolean(slug && slug in TITLE_ART);
+}
 `;
 
 writeFileSync(OUT_PATH, body);
 console.log(
   `cosmetic art: ${Object.keys(RING).length} rings, ` +
-    `${Object.keys(AURA).length} auras, ${Object.keys(BORDER).length} borders ` +
-    `-> mobile/src/cosmetic-art-data.ts`,
+    `${Object.keys(AURA).length} auras, ${Object.keys(BORDER).length} borders, ` +
+    `${Object.keys(NAME).length} names, ${Object.keys(BADGE).length} badges, ` +
+    `${Object.keys(TITLE).length} titles -> mobile/src/cosmetic-art-data.ts`,
 );

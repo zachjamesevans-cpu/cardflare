@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { peekPlayer, type PeekProfile } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { WornBadge, WornName, WornTitle } from "../worn-name";
 import { EmberBadge } from "../ember-badge";
 import { FollowButton } from "../follow-button";
 import { formatHandle } from "../handle";
@@ -104,7 +105,15 @@ export function PlayerProfileScreen() {
             auraArt={profile.auraArt}
             size={96}
           />
-          <Title>{profile.displayName}</Title>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <WornName
+              name={profile.displayName}
+              nameplate={profile.equips?.nameplate}
+              baseStyle={{ color: colors.textPrimary, fontSize: 22, fontWeight: "800" }}
+            />
+            <WornBadge badge={profile.equips?.badge} />
+          </View>
+          <WornTitle title={profile.equips?.title} />
           {/* Under the name and quieter than it: the name is who they
               are, the handle is how you find them again. */}
           <Text style={{ color: colors.textMuted, fontSize: 14 }}>

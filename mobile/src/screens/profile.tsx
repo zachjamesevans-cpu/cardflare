@@ -40,6 +40,7 @@ import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
+import { WornBadge, WornName, WornTitle } from "../worn-name";
 import { CoverBanner } from "../showcase-zoom";
 import {
   AsyncButton,
@@ -542,7 +543,17 @@ export function ProfileScreen() {
             auraArt={profile.wear?.auraArt ?? null}
             size={96}
           />
-          <Title>{profile.displayName}</Title>
+          {/* The name wearing its style, the badge beside it, the
+              title under - the website's WornNameRow, natively. */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <WornName
+              name={profile.displayName}
+              nameplate={profile.equips?.nameplate}
+              baseStyle={{ color: colors.textPrimary, fontSize: 22, fontWeight: "800" }}
+            />
+            <WornBadge badge={profile.equips?.badge} />
+          </View>
+          <WornTitle title={profile.equips?.title} />
           <EmberBadge earned={profile.embersEarned} size="md" />
         </View>
 
