@@ -44,24 +44,34 @@ const LAST_ACCOUNT_KEY = `${PREFIX}.last`;
  * of date, and by how much" has one answer and it is this table.
  */
 export const CACHE_TTL = {
-  /* Tonight's rooms and this week's Flares. Short: the Feed makes
-     claims about right now, and a stale one is false rather than old. */
-  feed: 6 * 60 * 60 * 1000,
+  /*
+   * Three days, not six hours. The founder opened the app the morning
+   * after a session and everything was blank again: "opened it the next
+   * day and it seems the cached stuff went away - hold cached things
+   * for longer?" He is right about the trade: the paint is refreshed
+   * over the top within seconds either way, so the cost of an old paint
+   * is a moment of yesterday's rooms, and the cost of NO paint is a
+   * blank screen every single morning. The refresh is what keeps "right
+   * now" honest; the cache only has to keep the app from looking empty.
+   */
+  feed: 3 * 24 * 60 * 60 * 1000,
   /* A profile: name, picture, cosmetics, showcase. Changes rarely and
      visibly, and the founder's 7-second complaint is this screen. */
-  profile: 24 * 60 * 60 * 1000,
+  profile: 7 * 24 * 60 * 60 * 1000,
   /* The wardrobe. Big, slow, and almost never different between two
      visits — what somebody owns changes when they buy something, and
      buying something refreshes it anyway. */
-  customize: 24 * 60 * 60 * 1000,
-  /* Notifications: painted so the list has shape immediately, but the
-     unread state has to be right, so this is deliberately brief. */
-  inbox: 30 * 60 * 1000,
+  customize: 7 * 24 * 60 * 60 * 1000,
+  /* Notifications: painted so the list has shape immediately. The
+     unread state refreshes over the top like everything else, so a day
+     is fine where half an hour was cautious. */
+  inbox: 24 * 60 * 60 * 1000,
   /* A room is the most live thing in the product. Short enough to be
-     scaffolding and nothing more. */
+     scaffolding and nothing more — the one entry the founder's "hold it
+     longer" deliberately does not touch. */
   room: 5 * 60 * 1000,
   /* A shop's address and phone number. */
-  store: 24 * 60 * 60 * 1000,
+  store: 7 * 24 * 60 * 60 * 1000,
 } as const;
 
 export type CacheKind = keyof typeof CACHE_TTL;

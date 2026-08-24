@@ -520,6 +520,18 @@ export default async function JoinByCodePage({
             </Badge>
           </div>
         )}
+
+        {/* For the person deciding whether to sit down next week. A
+            scheduled event is a tournament night; a walk-in room is just
+            trading, where the question does not arise. */}
+        {event.kind !== "walk_in" && (
+          <Link
+            href="/tournaments"
+            className="w-fit text-sm font-medium text-accent hover:text-accent-hover"
+          >
+            New to tournaments? Here&rsquo;s how a night works &rarr;
+          </Link>
+        )}
       </Card>
 
       {inRoom && resumed && (

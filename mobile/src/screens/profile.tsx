@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
@@ -26,14 +26,12 @@ import {
   removeFromShowcase,
   renameProfile,
   searchCards,
-  searchPlayersByName,
   signOut,
   storedAccessToken,
   uploadAvatar,
   type CardHit,
   type CosmeticItem,
   type FollowedPlayer,
-  type FoundPlayer,
   type Profile,
   type ShowcaseCard,
   type Wardrobe,
@@ -115,29 +113,8 @@ export function ProfileScreen() {
   /* Who you follow - fetched with the profile, shown as People. */
   const [following, setFollowing] = useState<FollowedPlayer[]>([]);
 
-  /* Finding somebody by name. Debounced, and answers landing out of
-     order are dropped - same shape as the website's search box. */
-  const [playerQuery, setPlayerQuery] = useState("");
-  const [foundPlayers, setFoundPlayers] = useState<FoundPlayer[] | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchSeq = useRef(0);
-
-  const searchFor = async (text: string) => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    const trimmed = text.trim();
-    if (trimmed.length < 2) {
-      setFoundPlayers(null);
-      return;
-    }
-    const request = ++searchSeq.current;
-    searchTimer.current = setTimeout(() => {
-      searchPlayersByName(trimmed)
-        .then((result) => {
-          if (searchSeq.current === request) setFoundPlayers(result.players);
-        })
-        .catch(() => {});
-    }, 300);
-  };
+  /* The showcase explainer, folded behind its "?". */
+  const [showcaseHelp, setShowcaseHelp] = useState(false);
 
   const load = useCallback(async () => {
     const token = await storedAccessToken();
@@ -156,15 +133,11 @@ export function ProfileScreen() {
       /* Remembered for the next open. Written only after a load that
          worked, so the cache can only ever hold a profile that was
          real. See cache.ts. */
-      void writeCache(
-        "profile",
-        result.profile.playerId,
-        {
-          profile: result.profile,
-          wardrobe: result.wardrobe,
-          needsSetup: result.needsSetup,
-        } satisfies CachedProfile,
-      );
+      void writeCache("profile", result.profile.playerId, {
+        profile: result.profile,
+        wardrobe: result.wardrobe,
+        needsSetup: result.needsSetup,
+      } satisfies CachedProfile);
 
       getFollowing()
         .then((people) => setFollowing(people.following))
@@ -642,11 +615,39 @@ export function ProfileScreen() {
               gap: spacing(2),
             }}
           >
-            <Text
-              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
             >
-              Your showcase
-            </Text>
+              <Text
+                style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}
+              >
+                Your showcase
+              </Text>
+              <Tap
+                onPress={() => setShowcaseHelp((open) => !open)}
+                accessibilityLabel="What is a showcase?"
+                hitSlop={8}
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: showcaseHelp ? colors.accent : colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: showcaseHelp ? colors.accent : colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: "700",
+                  }}
+                >
+                  ?
+                </Text>
+              </Tap>
+            </View>
             <Tap
               onPress={() => navigation.navigate("Customize", { area: "showcase" })}
               accessibilityLabel="Customize your showcase"
@@ -664,10 +665,16 @@ export function ProfileScreen() {
               <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
             </Tap>
           </View>
-          <Muted>
-            Up to nine cards you are proud of. Tap a card to dress it. Not a trade list,
-            so nobody can pledge on it.
-          </Muted>
+          {/* The explanation read as clutter once you knew it - the
+              founder's call. It folds behind the "?" now: there for the
+              first visit, gone for every visit after. Same fold as the
+              website's. */}
+          {showcaseHelp && (
+            <Muted>
+              Up to nine cards you are proud of. Tap a card to dress it. Not a trade
+              list, so nobody can pledge on it.
+            </Muted>
+          )}
 
           {profile.showcase.length === 0 ? (
             <Muted>
@@ -769,72 +776,8 @@ export function ProfileScreen() {
         <Title>People</Title>
         <Body>
           Players you follow. When they follow you back, you are Trade partners. Follow
-          people from their profile popup in a room, or search for them by name right
-          here.
+          people from their profile popup in a room, or find them in the search bar.
         </Body>
-
-        {/* Finding somebody by name - the founder's ask: search a
-            username, see their profile, follow them there. */}
-        <Input
-          value={playerQuery}
-          onChangeText={(text) => {
-            setPlayerQuery(text);
-            void searchFor(text);
-          }}
-          placeholder="Find a player by name or @handle"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {foundPlayers !== null &&
-          (foundPlayers.length === 0 ? (
-            <Muted>Nobody by that name yet.</Muted>
-          ) : (
-            <View>
-              {foundPlayers.map((person, index) => (
-                <Tap
-                  key={person.playerId}
-                  onPress={() =>
-                    navigation.navigate("PlayerProfile", {
-                      playerId: person.playerId,
-                    })
-                  }
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(3),
-                    paddingVertical: spacing(2.5),
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: colors.border,
-                  }}
-                >
-                  <PlayerAvatar
-                    displayName={person.displayName}
-                    seed={person.playerId}
-                    avatarUrl={person.avatarUrl}
-                    frame={person.frame}
-                    size={32}
-                  />
-                  {/* Both, because a result list is exactly where two
-                      people called Zach turn up together and the handle
-                      is the only thing that tells them apart. */}
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: colors.textPrimary, fontWeight: "600" }}
-                    >
-                      {person.displayName}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: colors.textMuted, fontSize: 12 }}
-                    >
-                      {formatHandle(person.handle)}
-                    </Text>
-                  </View>
-                </Tap>
-              ))}
-            </View>
-          ))}
 
         {following.length === 0 ? (
           <Muted>
