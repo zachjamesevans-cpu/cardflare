@@ -9,7 +9,6 @@ import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
 import { ProfileCover } from "@/components/players/profile-cover";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { PlayerSearch } from "@/components/players/player-search";
 import { listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { EmberBadge } from "@/components/players/ember-badge";
@@ -221,12 +220,25 @@ export default async function ProfilePage() {
                   aria-hidden="true"
                 />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <p className="font-semibold text-text-primary">Your showcase</p>
-                  <p className="text-sm text-text-secondary">
-                    Up to nine cards you are proud of, wearing whatever you have
-                    unlocked. Not a trade list, so there is nothing to pledge on here.
-                    Tap a card to dress it.
-                  </p>
+                  {/* The founder: the explanation read as clutter once you
+                      knew it. It folds behind a "?" now - there for the
+                      first visit, gone for every visit after. */}
+                  <details className="group">
+                    <summary className="flex w-fit cursor-pointer list-none items-center gap-2 font-semibold text-text-primary [&::-webkit-details-marker]:hidden">
+                      Your showcase
+                      <span
+                        className="flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-text-muted group-open:border-accent group-open:text-accent"
+                        aria-label="What is a showcase?"
+                      >
+                        ?
+                      </span>
+                    </summary>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      Up to nine cards you are proud of, wearing whatever you have
+                      unlocked. Not a trade list, so there is nothing to pledge on here.
+                      Tap a card to dress it.
+                    </p>
+                  </details>
                 </div>
                 {/* The showcase's own wand: card borders, foils, motion
                     and the shelf background, in a menu of their own so
@@ -395,11 +407,9 @@ export default async function ProfilePage() {
               <p className="text-sm text-text-secondary">
                 Players you follow. When they follow you back, you are Trade partners.
                 Follow people from their profile popup in a room, from their profile
-                page, or search for them by name right here.
+                page, or find them in the search bar.
               </p>
             </div>
-
-            <PlayerSearch />
 
             {following.length === 0 ? (
               <p className="text-sm text-text-muted">

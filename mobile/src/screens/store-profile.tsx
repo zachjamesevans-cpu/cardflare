@@ -11,16 +11,8 @@ import {
   type PublicStore,
 } from "../api";
 import { colors, spacing } from "../theme";
-import {
-  AsyncButton,
-  Body,
-  Button,
-  Card,
-  ErrorLine,
-  Input,
-  Muted,
-  Title,
-} from "../ui";
+import { validateClaimFields, type ClaimErrors } from "../claim-validation";
+import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
 
 /**
  * A store, as a player sees it — claimed or not.
@@ -97,9 +89,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
       contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
     >
       <Card>
-        <View
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
           <MaterialCommunityIcons
             name="storefront-outline"
             size={22}
@@ -143,8 +133,8 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         <Card>
           <Title>Own or manage this store?</Title>
           <Muted>
-            CardFlare listed this shop from public map data so players could find
-            it. If you work there, tell us and we&rsquo;ll hand the listing over.
+            CardFlare listed this shop from public map data so players could find it. If
+            you work there, tell us and we&rsquo;ll hand the listing over.
           </Muted>
 
           {claiming ? (
@@ -161,9 +151,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
 
       {/* Attribution travels with the record. Overture Places is a mix
           of licences, so the line comes from the row, not a constant. */}
-      {store.attribution ? (
-        <Muted>{`Listing data: ${store.attribution}`}</Muted>
-      ) : null}
+      {store.attribution ? <Muted>{`Listing data: ${store.attribution}`}</Muted> : null}
     </ScrollView>
   );
 }
@@ -192,13 +180,28 @@ function ClaimForm({
     notes: "",
   });
   const [error, setError] = useState<string | null>(null);
+  /* Per field, drawn against the input it belongs to. One line at the
+     bottom is how a junk STORE email once read as the founder's own,
+     correct email being rejected. */
+  const [fieldErrors, setFieldErrors] = useState<ClaimErrors>({});
   const [sent, setSent] = useState(false);
 
-  const set = (key: keyof ClaimFields) => (value: string) =>
+  const set = (key: keyof ClaimFields) => (value: string) => {
     setFields((current) => ({ ...current, [key]: value }));
+    /* A field being retyped is a field being fixed. */
+    setFieldErrors((current) =>
+      current[key] ? { ...current, [key]: undefined } : current,
+    );
+  };
 
   const send = async () => {
     setError(null);
+
+    const problems = validateClaimFields(fields);
+    setFieldErrors(problems);
+    if (Object.keys(problems).some((key) => problems[key as keyof ClaimErrors])) {
+      return;
+    }
 
     try {
       await claimStore(storeId, fields);
@@ -227,8 +230,8 @@ function ClaimForm({
   return (
     <View style={{ gap: spacing(2.5) }}>
       <Muted>
-        A person at CardFlare reads this and emails you back. Nothing changes
-        until we&rsquo;ve confirmed you work there, and it stays free.
+        A person at CardFlare reads this and emails you back. Nothing changes until
+        we&rsquo;ve confirmed you work there, and it stays free.
       </Muted>
 
       <Input
@@ -238,6 +241,7 @@ function ClaimForm({
         autoCapitalize="words"
         accessibilityLabel="Your name"
       />
+      <ErrorLine message={fieldErrors.claimantName ?? null} />
       <Input
         value={fields.claimantEmail}
         onChangeText={set("claimantEmail")}
@@ -247,6 +251,7 @@ function ClaimForm({
         autoCorrect={false}
         accessibilityLabel="Your email"
       />
+      <ErrorLine message={fieldErrors.claimantEmail ?? null} />
 
       {/* A row of taps rather than a picker: five options fit, and a
           native picker on a phone is a modal for no reason. */}
@@ -286,11 +291,13 @@ function ClaimForm({
         autoCorrect={false}
         accessibilityLabel="Store email, optional"
       />
+      <ErrorLine message={fieldErrors.businessEmail ?? null} />
       <Muted>
-        An address at the shop&rsquo;s own domain is the fastest way for us to
-        confirm this. A personal one is fine too.
+        An address at the shop&rsquo;s own domain is the fastest way for us to confirm
+        this. A personal one is fine too.
       </Muted>
 
+      <ErrorLine message={fieldErrors.notes ?? null} />
       <Input
         value={fields.notes}
         onChangeText={set("notes")}

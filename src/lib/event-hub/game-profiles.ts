@@ -94,6 +94,15 @@ export interface GameProfile {
   defaultPresetId: string;
   swiss: OvertimeProcedure;
   elimination: OvertimeProcedure;
+  /**
+   * A first tournament, in a few sentences.
+   *
+   * Written for the player standing in a shop deciding whether to enter,
+   * not for a judge. Match format, what a round feels like, and the one
+   * thing about time they should not be surprised by. The founder's ask:
+   * "just a way where they feel comfortable [entering] tournaments."
+   */
+  beginnerTldr: readonly string[];
   officialRulesUrl: string;
   /** ISO date a human last checked this against the publisher. */
   rulesLastVerified: string;
@@ -112,6 +121,21 @@ export const RULES_DISCLAIMER =
   "Quick reference only. Current official tournament rules and event staff/judges control.";
 
 const MIN = 60;
+
+/**
+ * What a tournament night is, before any game's specifics.
+ *
+ * One list rather than five copies, because the things that make a
+ * first-timer comfortable are the same in every game: how you enter,
+ * what a round is, and the fact that nobody expects you to be good.
+ */
+export const NIGHT_BASICS: readonly string[] = [
+  "Turn up, tell the counter you are playing, and pay the entry if there is one. That is the whole sign-up.",
+  "Everyone plays every round - it is not a knockout. You get paired against someone new each round.",
+  "A round has a clock, and the big screen counts it down. When it hits zero you finish the turn you are in; the screen shows exactly what happens next.",
+  "Between rounds you are free: trade, buy singles, post a card you are hunting to the room board.",
+  "Nobody expects you to know everything. Tell your opponent it is your first event - it goes well.",
+];
 
 export const GAME_PROFILES: Record<GameId, GameProfile> = {
   "one-piece": {
@@ -183,6 +207,12 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
       timed: true,
       overtimeSeconds: 5 * MIN,
     },
+    beginnerTldr: [
+      "Bring a 50-card deck plus your Leader and 10 DON!! cards. Sleeves are worth it.",
+      "Matches are usually one game, about 35 minutes on the clock.",
+      "When time is called you finish the current turn plus three more. The screen walks everyone through it.",
+      "Casual store events expect nothing from you except your deck. Judges and opponents help new players constantly.",
+    ],
     officialRulesUrl: "https://en.onepiece-cardgame.com/rules/",
     rulesLastVerified: "2026-08-17",
     procedureVersion: "2026.08-store-tournament-vol1",
@@ -242,6 +272,12 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
       timed: true,
       overtimeSeconds: 15 * MIN,
     },
+    beginnerTldr: [
+      "Bring a 60-card deck. Write a deck list if the event asks; staff will help you with it.",
+      "Most locals are best-of-one, around 30 minutes, or best-of-three at 50.",
+      "When time is called you play a set number of extra turns, then the game state decides.",
+      "League nights are built for beginners. Losing rounds is normal and nobody tracks it.",
+    ],
     officialRulesUrl: "https://play.pokemon.com/en-us/resources/documents/",
     rulesLastVerified: "2026-08-17",
     procedureVersion: "2026.08-championship-end-of-round",
@@ -295,6 +331,12 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
       timed: false,
       overtimeSeconds: null,
     },
+    beginnerTldr: [
+      "Bring a 60-card deck of up to two ink colours.",
+      "Matches are usually best-of-one at 30 minutes, or best-of-three at 50. First to 20 lore wins.",
+      "When time is called you finish the turn plus extra turns, and lore decides if nobody got to 20.",
+      "Lorcana locals skew friendly and new-player heavy. Ask your opponent anything mid-game.",
+    ],
     officialRulesUrl:
       "https://files.disneylorcana.com/Tournament-Rules-7.14.2026_Update_EN.pdf",
     rulesLastVerified: "2026-08-17",
@@ -349,6 +391,12 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
       timed: false,
       overtimeSeconds: null,
     },
+    beginnerTldr: [
+      "Bring your main deck, your Legend, and your battlefield cards. The shop can check it's legal.",
+      "Matches at locals are typically best-of-one, about 40 minutes.",
+      "When time is called you finish the current turn plus extra turns; the procedure on the screen decides from there.",
+      "The game is new for everyone, so tables explain rules to each other all night.",
+    ],
     officialRulesUrl:
       "https://playriftbound.com/en-us/news/organizedplay/riftbound-tournament-rules/",
     rulesLastVerified: "2026-08-17",
@@ -424,6 +472,12 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
       timed: false,
       overtimeSeconds: null,
     },
+    beginnerTldr: [
+      "Bring a 60-card deck plus your hero, weapons and equipment - 80 cards total in Classic Constructed.",
+      "Matches are usually one game at 50 minutes. Life totals decide a lot, so track them carefully.",
+      "When time is called you finish the current turn plus extra turns, and remaining life decides a draw.",
+      "Armory nights exist specifically for learning. Say you are new and the whole table adjusts.",
+    ],
     officialRulesUrl: "https://rules.fabtcg.com/en/trp/03-tournament-logistics/",
     rulesLastVerified: "2026-08-17",
     procedureVersion: "2026.08-trp-logistics",

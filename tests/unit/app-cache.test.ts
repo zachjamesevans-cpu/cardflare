@@ -63,12 +63,21 @@ describe("the store", () => {
     expect(ttl.room).toBeLessThan(ttl.feed);
     expect(ttl.feed).toBeLessThan(ttl.profile);
 
-    /* Nothing survives a day. Past that a returning player is being
-       shown a different week. */
+    /*
+     * Nothing survives a WEEK. This pin used to say a day, and the
+     * founder overruled it from the field: "opened it the next day and
+     * it seems the cached stuff went away - hold cached things for
+     * longer?" The paint refreshes over the top within seconds either
+     * way, so the ceiling is about not showing a different MONTH, not
+     * about freshness - the refresh owns freshness.
+     */
     for (const value of Object.values(ttl)) {
       expect(value).toBeGreaterThan(0);
-      expect(value).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+      expect(value).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
     }
+
+    /* And the one truly live kind stays on a short leash. */
+    expect(ttl.room).toBeLessThanOrEqual(5 * 60 * 1000);
   });
 
   it("never throws its way into breaking the app", () => {

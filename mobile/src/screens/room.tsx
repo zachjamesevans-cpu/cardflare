@@ -53,6 +53,7 @@ import {
 } from "../ui";
 import { inRailOrder } from "../rail-order";
 import { OpenToTradesTag } from "../open-to-trades-tag";
+import { TournamentHelpModal } from "../tournament-help";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
 import { colors, radius, spacing } from "../theme";
@@ -95,8 +96,8 @@ export function RoomTab() {
         <Card>
           <Title>No room yet</Title>
           <Body>
-            Scan the code at your store&rsquo;s counter, or type it here. Either way
-            the room lives on this tab until you leave it.
+            Scan the code at your store&rsquo;s counter, or type it here. Either way the
+            room lives on this tab until you leave it.
           </Body>
 
           <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
@@ -146,6 +147,8 @@ function RoomScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  /* The first-tournament guide, folded behind its link. */
+  const [tournamentHelp, setTournamentHelp] = useState(false);
   const [wants, setWants] = useState<Me["wants"]>([]);
 
   /*
@@ -320,8 +323,8 @@ function RoomScreen({
           {state.store && <Muted>{state.store.name}</Muted>}
           <Title>Nothing on yet. Start the room</Title>
           <Body>
-            Trading is open here. Pick a name and you&rsquo;re in; the room opens
-            with you.
+            Trading is open here. Pick a name and you&rsquo;re in; the room opens with
+            you.
           </Body>
           <ErrorLine message={error} />
           {state.account ? (
@@ -509,7 +512,12 @@ function RoomScreen({
    * content-and-layout pair covers a rail that was never long enough to
    * scroll at all, which never fires a scroll event.
    */
-  const railMeasure = (sessionId: string, content: number, layout: number, offset: number) => {
+  const railMeasure = (
+    sessionId: string,
+    content: number,
+    layout: number,
+    offset: number,
+  ) => {
     const room = content - layout;
     setRailEnd(sessionId, room <= 1 || offset >= room - 1);
   };
@@ -534,7 +542,11 @@ function RoomScreen({
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={{ padding: spacing(4), gap: spacing(3), paddingBottom: spacing(24) }}
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(3),
+          paddingBottom: spacing(24),
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -557,7 +569,19 @@ function RoomScreen({
               flares.length === 1 ? "Flare" : "Flares"
             }`}
           </Muted>
+          {/* For the person deciding whether to sit down next week —
+              the same guide the website links from its event page. */}
+          <Tap onPress={() => setTournamentHelp(true)} hitSlop={6}>
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+              New to tournaments? Here&rsquo;s how a night works &rarr;
+            </Text>
+          </Tap>
         </Card>
+
+        <TournamentHelpModal
+          open={tournamentHelp}
+          onClose={() => setTournamentHelp(false)}
+        />
 
         {/* The same words the website uses, for the same moment. */}
         {resumed && (
@@ -767,19 +791,14 @@ function RoomScreen({
             lookingFor: f.quantity,
             direction: f.intent,
             stillNeeds:
-              f.offers.length > 0
-                ? pledgeTally(f.offers, f.quantity).remaining
-                : null,
+              f.offers.length > 0 ? pledgeTally(f.offers, f.quantity).remaining : null,
             pledges: f.offers.map((offer) => ({
               name: offer.displayName ?? "A player",
               quantity: offer.quantity,
             })),
-            youHave: f.match
-              ? { kind: f.match, count: f.heldCount ?? 0 }
-              : null,
+            youHave: f.match ? { kind: f.match, count: f.heldCount ?? 0 } : null,
           }));
           const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
-
 
           const rows = (list: RoomFlare[]) =>
             list.map((flare) => (
@@ -811,9 +830,7 @@ function RoomScreen({
                */}
               <Tap
                 onPress={() => {
-                  LayoutAnimation.configureNext(
-                    LayoutAnimation.Presets.easeInEaseOut,
-                  );
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                   setExpandedGroups((current) => ({
                     ...current,
                     [sessionId]: !current[sessionId],
@@ -936,7 +953,12 @@ function RoomScreen({
                       railLayout.current[sessionId] = event.nativeEvent.layout.width;
                       const content = railContent.current[sessionId];
                       if (content != null) {
-                        railMeasure(sessionId, content, event.nativeEvent.layout.width, 0);
+                        railMeasure(
+                          sessionId,
+                          content,
+                          event.nativeEvent.layout.width,
+                          0,
+                        );
                       }
                     }}
                     onContentSizeChange={(width) => {
@@ -1015,10 +1037,7 @@ function RoomScreen({
                   )}
 
                   {folders.map((folder) => (
-                    <View
-                      key={folder.label.toLowerCase()}
-                      style={{ gap: spacing(1) }}
-                    >
+                    <View key={folder.label.toLowerCase()} style={{ gap: spacing(1) }}>
                       <Text style={styles.folderLabel} numberOfLines={1}>
                         {`${folder.label} · ${folder.flares.length} ${
                           folder.flares.length === 1 ? "card" : "cards"
@@ -1543,9 +1562,7 @@ function CarouselFlare({
               quantity: offer.quantity,
             }))}
             youHave={
-              flare.match
-                ? { kind: flare.match, count: flare.heldCount ?? 0 }
-                : null
+              flare.match ? { kind: flare.match, count: flare.heldCount ?? 0 } : null
             }
             siblings={siblings}
             position={position}
@@ -1586,10 +1603,16 @@ function CarouselFlare({
               misalignment the founder photographed. */}
           {picking ? (
             <View style={styles.stepperPanel}>
-              <Tap onPress={() => setPicking(false)} hitSlop={6} style={styles.stepperClose}>
+              <Tap
+                onPress={() => setPicking(false)}
+                hitSlop={6}
+                style={styles.stepperClose}
+              >
                 <Text style={{ color: colors.textMuted, fontSize: 11 }}>✕</Text>
               </Tap>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
+              >
                 <Tap
                   onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
                   hitSlop={6}
@@ -1614,7 +1637,10 @@ function CarouselFlare({
                 hitSlop={6}
               >
                 <View
-                  style={[styles.stepperGo, offered && count === 0 && styles.stepperGoOff]}
+                  style={[
+                    styles.stepperGo,
+                    offered && count === 0 && styles.stepperGoOff,
+                  ]}
                 >
                   <Text
                     style={[
@@ -1680,7 +1706,9 @@ function CarouselFlare({
               hitSlop={4}
               style={styles.removeButton}
             >
-              <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}>
+              <Text
+                style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}
+              >
                 Remove
               </Text>
             </Tap>
@@ -1744,7 +1772,13 @@ function FlareRow({
       <View
         style={[styles.flare, removing && { opacity: 0.6, filter: [{ grayscale: 1 }] }]}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing(2) }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            gap: spacing(2),
+          }}
+        >
           {flare.imageUrl && (
             <CardImage
               imageUrl={flare.imageUrl}
@@ -1754,21 +1788,21 @@ function FlareRow({
               caption={flare.printingLabel ?? "Any printing"}
               note={flare.note}
               lookingFor={flare.quantity}
-            direction={flare.intent}
+              direction={flare.intent}
               stillNeeds={
                 flare.offers.length > 0
                   ? pledgeTally(flare.offers, flare.quantity).remaining
                   : null
               }
               youHave={
-                flare.match
-                  ? { kind: flare.match, count: flare.heldCount ?? 0 }
-                  : null
+                flare.match ? { kind: flare.match, count: flare.heldCount ?? 0 } : null
               }
             />
           )}
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}>
+            <Text
+              style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}
+            >
               {flare.cardName}
               {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
             </Text>
@@ -1860,7 +1894,9 @@ function FlareRow({
                   gap: spacing(3),
                 }}
               >
-                <Muted>{early ? "How many can you bring?" : "How many do you have?"}</Muted>
+                <Muted>
+                  {early ? "How many can you bring?" : "How many do you have?"}
+                </Muted>
                 <Button
                   label="−"
                   variant="secondary"
