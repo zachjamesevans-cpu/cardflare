@@ -44,8 +44,12 @@ export function Logo({
       />
       {!markOnly && (
         /* Lowercase and all one accent, matching the supplied wordmark
-           art. The two-tone Card/Flare split belonged to the old mark. */
-        <span className="font-display text-lg tracking-wide text-accent">
+           art. The two-tone Card/Flare split belonged to the old mark.
+           The text-stroke is the founder's "slightly bolder": Michroma
+           ships one weight, a hair lighter than the art, and a 0.017em
+           centred stroke (measured against the art, overlaid) closes
+           exactly that gap at every rendered size. */
+        <span className="font-display text-lg tracking-wide text-accent [-webkit-text-stroke:0.017em_currentColor]">
           cardflare
         </span>
       )}
