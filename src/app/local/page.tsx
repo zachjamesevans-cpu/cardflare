@@ -44,11 +44,11 @@ export default async function LocalPage() {
     return (
       <Shell>
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-text-primary">Cards near you</h2>
+          <h2 className="font-semibold text-text-primary">Flares near you</h2>
           <p className="text-sm text-text-secondary">
-            Local shows every card people are hunting at stores in your area, and lets
-            you message them when you have it. It needs an account, so the conversation
-            is with a real name.
+            Local shows every Flare posted near you, and lets you message the poster
+            when you have the card. It needs an account, so the conversation is with a
+            real name.
           </p>
           <Link href="/signup" className={buttonStyles("primary", "sm")}>
             Create an account

@@ -30,7 +30,21 @@ function SaveButton() {
   );
 }
 
-export function PostalAsk({ defaultValue = "" }: { defaultValue?: string }) {
+export function PostalAsk({
+  defaultValue = "",
+  /**
+   * Whether an emptied field may be submitted to take the location
+   * back. True only in settings, where that is the point. The ask
+   * cards leave it off, because there an empty submit is always the
+   * placeholder trap: the field LOOKED filled, the submit carried
+   * nothing, and the founder's saved ZIP was cleared with a cheerful
+   * "Location cleared." where his stores should have appeared.
+   */
+  allowClear = false,
+}: {
+  defaultValue?: string;
+  allowClear?: boolean;
+}) {
   const [state, action] = useActionState<PostalState, FormData>(
     savePostalCodeAction,
     POSTAL_IDLE,
@@ -44,10 +58,11 @@ export function PostalAsk({ defaultValue = "" }: { defaultValue?: string }) {
           <TextInput
             name="postalCode"
             defaultValue={defaultValue}
-            placeholder="97477"
+            placeholder="ZIP code"
             inputMode="numeric"
             autoComplete="postal-code"
             maxLength={10}
+            required={!allowClear}
             className="w-28"
             aria-label="ZIP code"
           />
@@ -56,8 +71,9 @@ export function PostalAsk({ defaultValue = "" }: { defaultValue?: string }) {
       </div>
 
       <p className="text-xs text-text-muted">
-        Just the ZIP — enough to find shops within a few miles, and nothing like an
-        address. Clear the field any time to stop.
+        {allowClear
+          ? "Just the ZIP. Enough to find shops within a few miles, and nothing like an address. Clear the field any time to stop."
+          : "Just the five digits. Nothing like an address."}
       </p>
 
       {state.message && (

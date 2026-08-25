@@ -157,7 +157,7 @@ export default async function ProfileSettingsPage() {
           </p>
         </div>
       </div>
-      <PostalAsk defaultValue={postalCode ?? ""} />
+      <PostalAsk defaultValue={postalCode ?? ""} allowClear />
     </Card>
   );
 
