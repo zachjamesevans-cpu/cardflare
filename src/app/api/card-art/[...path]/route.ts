@@ -4,7 +4,7 @@ import { cardArtContentType } from "@/lib/cards/art-storage";
 export const dynamic = "force-dynamic";
 
 /**
- * Card art CardFlare hosts itself, served from CardFlare's own domain.
+ * Card art cardflare hosts itself, served from cardflare's own domain.
  *
  * The same shape as `/api/avatars`, for the same field reason: something
  * between a phone on real wifi and a third-party host eats the request,

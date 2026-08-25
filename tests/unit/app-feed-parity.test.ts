@@ -163,7 +163,7 @@ describe("the home screen's furniture", () => {
 
   it("keeps Verified and Ultra as two separate marks", () => {
     /*
-     * Verified is trust - "CardFlare has confirmed this profile is
+     * Verified is trust - "cardflare has confirmed this profile is
      * controlled by the listed business" - and it is never for sale.
      * Ultra is the product tier. A row may show one, both or neither,
      * and no client may infer one from the other.

@@ -43,8 +43,10 @@ export function Logo({
         className="shrink-0"
       />
       {!markOnly && (
-        <span className="font-display text-lg tracking-wide text-text-primary">
-          Card<span className="text-accent">Flare</span>
+        /* Lowercase and all one accent, matching the supplied wordmark
+           art. The two-tone Card/Flare split belonged to the old mark. */
+        <span className="font-display text-lg tracking-wide text-accent">
+          cardflare
         </span>
       )}
     </span>

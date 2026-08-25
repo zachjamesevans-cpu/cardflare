@@ -27,7 +27,7 @@ export async function registerForPush(): Promise<void> {
 
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
-        name: "CardFlare",
+        name: "cardflare",
         importance: Notifications.AndroidImportance.HIGH,
       });
     }

@@ -410,7 +410,7 @@ function OvertimeOverlay({
         </p>
       )}
 
-      {/* On every overlay, every time. CardFlare is not a rules authority
+      {/* On every overlay, every time. cardflare is not a rules authority
           and must never read as one. */}
       <p className="shrink-0 text-[clamp(0.6rem,0.75vw,0.8rem)] text-text-muted">
         {RULES_DISCLAIMER}

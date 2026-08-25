@@ -1257,7 +1257,7 @@ const UNNAMED_BATCH = "Posted together";
  * What the poster will take, as the board says it.
  *
  * Mirrors `acceptsLabel` in src/lib/lists/schema.ts. Trade-only stays
- * silent: it is what CardFlare has always meant, and a badge on every
+ * silent: it is what cardflare has always meant, and a badge on every
  * row is furniture rather than information.
  */
 function acceptsLabel(flare: {

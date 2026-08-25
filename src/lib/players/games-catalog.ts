@@ -1,5 +1,5 @@
 /**
- * The games CardFlare knows about, in the founder's order.
+ * The games cardflare knows about, in the founder's order.
  *
  * Slugs are what `player_games` stores and the check constraint allows;
  * labels are what every screen shows. One list, imported by the website,

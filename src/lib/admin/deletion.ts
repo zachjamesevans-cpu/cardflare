@@ -245,7 +245,7 @@ export async function deleteStore(storeId: string): Promise<{
   error?: string;
 }> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: "CardFlare is not connected to its database." };
+    return { ok: false, error: "cardflare is not connected to its database." };
   }
 
   const { error } = await getSupabaseAdmin().from("stores").delete().eq("id", storeId);
@@ -274,7 +274,7 @@ export async function deletePlayer(playerId: string): Promise<{
   error?: string;
 }> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: "CardFlare is not connected to its database." };
+    return { ok: false, error: "cardflare is not connected to its database." };
   }
 
   const admin = getSupabaseAdmin();

@@ -3,7 +3,7 @@ import type { SeriesManifest } from "../manifest";
 /**
  * Set 1: Origin.
  *
- * The first CardFlare pack. Every cosmetic in the launch catalogue can
+ * The first cardflare pack. Every cosmetic in the launch catalogue can
  * pull here, weighted by rarity - the founder's rule: Galaxy foil is
  * the rarest thing in the set. Weights are percent and must sum to
  * exactly 100; a unit test enforces it, and another checks every slug

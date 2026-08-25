@@ -11,7 +11,7 @@ import { handleSeedFrom } from "@/lib/players/handle";
 export const dynamic = "force-dynamic";
 
 /**
- * Sign-in for the app, through CardFlare's own front door.
+ * Sign-in for the app, through cardflare's own front door.
  *
  * The app used to call Supabase's token endpoint directly, and that was
  * the ONE request in the whole app still carrying a JSON body — written

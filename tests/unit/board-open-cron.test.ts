@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * The doorbell's clock.
  *
- * Everything else in CardFlare fires off traffic; this route is the one
+ * Everything else in cardflare fires off traffic; this route is the one
  * scheduled thing, so what must hold is: the secret gate fails closed
  * (no CRON_SECRET configured means no run at all, not an open
  * endpoint), and only boards the shared open-time rule calls open get

@@ -103,11 +103,11 @@ describe("avatarObjectPath", () => {
 describe("avatarSrc", () => {
   /*
    * The founder's phone could not fetch the Supabase URL the server
-   * could. Serving from CardFlare's own origin is the fix, and this is
+   * could. Serving from cardflare's own origin is the fix, and this is
    * the function that decides it — so the important assertion is simply
    * that a stored path never comes back pointing at another host.
    */
-  it("serves a stored path from CardFlare's own domain", () => {
+  it("serves a stored path from cardflare's own domain", () => {
     expect(avatarSrc("player-1/1000.webp")).toBe("/api/avatars/player-1/1000.webp");
   });
 

@@ -19,7 +19,7 @@ import "server-only";
  * crawlers, no substituting another provider without approval.
  */
 
-/** One place as a provider describes it, before CardFlare judges it. */
+/** One place as a provider describes it, before cardflare judges it. */
 export interface PlaceCandidate {
   /**
    * The provider's own id. Overture's GERS id is stable across releases,
@@ -57,7 +57,7 @@ export interface PlaceCandidate {
    * The provider's own operating status, quoted rather than interpreted.
    *
    * Overture's published field list omits this; the release schema has
-   * it. Repeated verbatim and attributed to the provider - CardFlare
+   * it. Repeated verbatim and attributed to the provider - cardflare
    * does not decide whether a shop is open.
    */
   operatingStatus: string | null;

@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalisePostalCode, pointForPostalCode, type Point } from "@/lib/geo/zip";
 
 /**
- * Where a player is, and how CardFlare came to know.
+ * Where a player is, and how cardflare came to know.
  *
  * The founder's correction, on a first cut that anchored "nearby" on a
  * store the player had saved: "really it should be asking for location

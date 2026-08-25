@@ -39,7 +39,7 @@ export function ForStores() {
         id="for-stores-title"
         eyebrow="For Game Stores"
         title="Make your events the ones people travel for"
-        description="CardFlare runs alongside your event, not instead of it. Players post what they're hunting the moment they scan in, matches happen at your tables, and the trades stay in your store between the people standing in it."
+        description="cardflare runs alongside your event, not instead of it. Players post what they're hunting the moment they scan in, matches happen at your tables, and the trades stay in your store between the people standing in it."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">
@@ -63,7 +63,7 @@ export function ForStores() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          We are looking for a small number of stores to run the first CardFlare pilots
+          We are looking for a small number of stores to run the first cardflare pilots
           and help shape how it works.
         </p>
         <ButtonLink

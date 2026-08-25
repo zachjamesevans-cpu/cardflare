@@ -151,8 +151,8 @@ describe("game accents", () => {
     }
   });
 
-  it("keeps every game distinct from the CardFlare accent", () => {
-    /* A game colour must never be mistaken for a CardFlare control —
+  it("keeps every game distinct from the cardflare accent", () => {
+    /* A game colour must never be mistaken for a cardflare control —
        the same rule the avatar hues and the cosmetics follow. */
     const brand = token("accent");
 

@@ -20,7 +20,7 @@ describe("safeNextPath", () => {
 
   /*
    * An open redirect here would be a phishing page reached through a genuine
-   * cardflare.gg sign-in link, wearing CardFlare's credibility.
+   * cardflare.gg sign-in link, wearing cardflare's credibility.
    */
   it.each([
     ["absolute http", "http://evil.example"],

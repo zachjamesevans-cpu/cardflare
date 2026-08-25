@@ -142,7 +142,7 @@ export default async function ProfileSettingsPage() {
    *
    * A ZIP rather than a stored coordinate is the whole design: the
    * device position the app can ask for is never written down, so this
-   * five-digit field is the entirety of what CardFlare keeps about
+   * five-digit field is the entirety of what cardflare keeps about
    * where somebody is. Emptying it is how you take it back.
    */
   const locationCard = !playerId ? null : (
@@ -255,7 +255,7 @@ export default async function ProfileSettingsPage() {
             <p className="font-semibold text-text-primary">Your saved wants</p>
             <p className="text-sm text-text-secondary">
               Saved automatically when you post a Flare while signed in, cleared when a
-              trade finds the card. Walk into any CardFlare room and it offers to post
+              trade finds the card. Walk into any cardflare room and it offers to post
               these again.
             </p>
           </div>
@@ -388,7 +388,7 @@ export default async function ProfileSettingsPage() {
         description={
           isPlayerHome
             ? "Your wants, your collection, and how you sign in."
-            : "How you sign in to CardFlare."
+            : "How you sign in to cardflare."
         }
         areas={areas}
         currentArea={currentArea}

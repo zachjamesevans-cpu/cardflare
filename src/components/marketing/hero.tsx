@@ -21,7 +21,7 @@ export function Hero() {
 
           <p className="max-w-xl text-lg leading-relaxed text-pretty text-text-secondary">
             One hub for the whole room: the people hunting cards and the people selling
-            them. Players post what they need the moment they walk in, and CardFlare
+            them. Players post what they need the moment they walk in, and cardflare
             points them at whoever has it: another player at a game-store event, a
             vendor&rsquo;s booth at a show. Buyers stop searching. Sellers stop waiting.
           </p>

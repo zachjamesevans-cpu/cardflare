@@ -38,7 +38,7 @@ function OutcomeLine({ outcome }: { outcome: SyncOutcome }) {
  * The whole singles surface the store sees: one upload, one stat line.
  *
  * Deliberately not a list. A store's thousand singles are not "what you
- * brought" — the list lives in their TCGplayer seller portal, and CardFlare
+ * brought" — the list lives in their TCGplayer seller portal, and cardflare
  * only needs to know it so a Flare in their room can point at the counter.
  */
 export function SyncSinglesForm({
@@ -127,7 +127,7 @@ export function SyncSinglesForm({
 
         <p className="text-xs text-text-muted">
           Your TCGplayer inventory export (CSV). Prices in the file are ignored and
-          never stored. CardFlare keeps card names and quantities only, and players are
+          never stored. cardflare keeps card names and quantities only, and players are
           pointed to your counter, not to a price.
         </p>
       </form>

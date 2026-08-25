@@ -11,7 +11,7 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Create your account",
   description:
-    "Join CardFlare: post the cards you are hunting, see who in the room has them, and trade in person.",
+    "Join cardflare: post the cards you are hunting, see who in the room has them, and trade in person.",
 };
 
 export const dynamic = "force-dynamic";

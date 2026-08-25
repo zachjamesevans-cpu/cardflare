@@ -1,23 +1,25 @@
 import { useFonts } from "expo-font";
 
 /**
- * The CardFlare wordmark's face.
+ * The cardflare wordmark's face.
  *
- * Chakra Petch, the founder's ask: "choose a cooler font for cardflare
- * for the top 'CardFlare' text in the feed". Angular cuts and flat
- * terminals — it reads as competitive and technical without the sci-fi
- * costume of the usual gaming faces, and unlike most display types it
- * is still legible at the 17pt a navigation title gets.
+ * Audiowide, matched to the logo art the founder supplied with "make
+ * cardflare all lowercase... and make it this font" - wide, flat-topped
+ * and squared, and it ships exactly one weight, which is all a wordmark
+ * needs. It replaced Chakra Petch, which was matched to the previous
+ * mark. The website loads the same face through next/font, so the name
+ * is one face on both platforms.
  *
  * THE WORDMARK ONLY. Not body text, not headings, not buttons. Inter
  * carries everything a person actually reads; this is the product's
  * name and nothing else, which is what keeps it feeling like a mark
  * rather than a theme.
  *
- * Bundled under the SIL Open Font Licence — see assets/fonts/OFL.txt,
- * which ships beside the files because the licence requires it to.
+ * Bundled under the SIL Open Font Licence — see
+ * assets/fonts/OFL-Audiowide.txt, which ships beside the file because
+ * the licence requires it to.
  */
-export const BRAND_FONT = "ChakraPetch-Bold";
+export const BRAND_FONT = "Audiowide-Regular";
 
 /**
  * Loads it, and says when it is ready.
@@ -28,7 +30,7 @@ export const BRAND_FONT = "ChakraPetch-Bold";
  */
 export function useBrandFont(): boolean {
   const [loaded] = useFonts({
-    [BRAND_FONT]: require("../assets/fonts/ChakraPetch-Bold.ttf"),
+    [BRAND_FONT]: require("../assets/fonts/Audiowide-Regular.ttf"),
   });
 
   return loaded;

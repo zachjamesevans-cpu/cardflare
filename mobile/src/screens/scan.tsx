@@ -8,7 +8,7 @@ import { AsyncButton, Body, Card, Title } from "../ui";
 import { colors, spacing } from "../theme";
 
 /**
- * The QR scanner. A CardFlare code arrives as a URL (cardflare.gg/e/CODE)
+ * The QR scanner. A cardflare code arrives as a URL (cardflare.gg/e/CODE)
  * from the printed poster; anything else scanned is ignored rather than
  * guessed at. First scan wins — the camera keeps firing events after a
  * hit, and navigating twice would stack two room screens.

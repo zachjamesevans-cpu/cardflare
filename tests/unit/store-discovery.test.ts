@@ -100,7 +100,7 @@ describe("is this a game store", () => {
       operatingStatus: "open",
     });
 
-    /* Attributed, every time. CardFlare never says a shop is open. */
+    /* Attributed, every time. cardflare never says a shop is open. */
     expect(known.reasons.join(" ")).toContain("Provider says open");
   });
 });
@@ -242,7 +242,7 @@ describe("publishing, verifying and Ultra", () => {
   it("keeps them three separate decisions", () => {
     /*
      * Publishing says a discovered record is real enough to show.
-     * Verifying says CardFlare confirmed who controls the profile - trust,
+     * Verifying says cardflare confirmed who controls the profile - trust,
      * never for sale. Ultra is the commercial tier. One control implying
      * they move together is the confusion the schema exists to prevent.
      */

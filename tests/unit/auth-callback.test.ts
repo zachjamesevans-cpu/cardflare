@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *
  * The invitation's button is a Supabase action link and it expires — an hour
  * by default, while a shop owner reads their email the next morning. So the
- * likeliest single outcome of the most important message CardFlare sends is
+ * likeliest single outcome of the most important message cardflare sends is
  * that the button no longer works, and what happens then is not an edge case.
  *
  * It used to be `/login`, which is a dead end for exactly the person most

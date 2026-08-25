@@ -1,6 +1,6 @@
 /**
  * What to paste above a Figma Make prompt so what comes back drops
- * straight into CardFlare.
+ * straight into cardflare.
  *
  * The founder asked: "is there anything in figma i should put before my
  * prompt, that would make transferring the file [work]." There is, and

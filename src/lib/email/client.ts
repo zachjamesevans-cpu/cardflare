@@ -26,7 +26,7 @@ export interface EmailMessage {
   /**
    * Where a reply should go, when that is not the from address.
    *
-   * The contact form's whole point: the message arrives from CardFlare's
+   * The contact form's whole point: the message arrives from cardflare's
    * own sender (so it passes SPF and DKIM), and hitting reply reaches
    * the person who wrote it.
    */

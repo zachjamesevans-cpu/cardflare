@@ -1,5 +1,5 @@
 /**
- * The games CardFlare knows about - the app's copy of the website's
+ * The games cardflare knows about - the app's copy of the website's
  * `src/lib/players/games-catalog.ts`, kept identical on purpose. Slugs
  * are what the server stores; labels are what the picker shows.
  */

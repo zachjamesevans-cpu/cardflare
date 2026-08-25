@@ -708,7 +708,7 @@ export function HomeScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              {/* The mark, not a face. There is no CardFlare player and
+              {/* The mark, not a face. There is no cardflare player and
                   this is the item that has to look like it knows that. */}
               <View
                 style={{
@@ -729,7 +729,7 @@ export function HomeScreen() {
               </View>
               <View style={{ flexShrink: 1 }}>
                 <Title>{item.headline}</Title>
-                <Muted>CardFlare</Muted>
+                <Muted>cardflare</Muted>
               </View>
             </View>
 
@@ -1033,7 +1033,7 @@ export function HomeScreen() {
           <Card key={`nearby-${index}`}>
             <Title>Stores near you</Title>
             <Muted>
-              Shops CardFlare knows about, whether or not they use it yet.
+              Shops cardflare knows about, whether or not they use it yet.
             </Muted>
 
             {/* Known position, nothing in range. Said out loud: an empty

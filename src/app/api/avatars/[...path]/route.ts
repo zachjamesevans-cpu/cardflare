@@ -4,7 +4,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * Profile pictures, served from CardFlare's own domain.
+ * Profile pictures, served from cardflare's own domain.
  *
  * The browser never talks to the storage host. That is the whole point:
  * pointing an `<img>` at the Supabase public URL worked from the server

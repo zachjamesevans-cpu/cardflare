@@ -77,7 +77,7 @@ export async function getViewer(): Promise<Viewer> {
  *
  * A signed-in non-admin is sent to whatever they *can* use rather than to the
  * marketing site. The old destination was the landing page, which read as
- * "CardFlare signed me out" — and did so most often when a store owner's token
+ * "cardflare signed me out" — and did so most often when a store owner's token
  * had silently expired and they looked like a stranger to the `admin_users`
  * read below. The proxy fixed the expiry; this fixes the destination.
  *

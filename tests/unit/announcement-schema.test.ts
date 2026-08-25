@@ -64,7 +64,7 @@ describe("checkAnnouncement", () => {
 
     expect(checked.ok).toBe(false);
     if (checked.ok) return;
-    expect(checked.message).toContain("path on CardFlare");
+    expect(checked.message).toContain("path on cardflare");
   });
 
   it.each([

@@ -143,7 +143,7 @@ export function formatReport(
   }
 
   return [
-    `CardFlare spot check: ${entries.length} of ${catalogSize.toLocaleString()} cards`,
+    `cardflare spot check: ${entries.length} of ${catalogSize.toLocaleString()} cards`,
     "Compare each against the official One Piece card list.",
     "",
     ...entries.map(({ row, because }) =>

@@ -171,7 +171,7 @@ export function CollapsingHeader({
             letterSpacing: loaded ? 0.5 : 0,
           }}
         >
-          CardFlare
+          cardflare
         </Text>
 
         {/*

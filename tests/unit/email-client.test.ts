@@ -4,7 +4,7 @@ import { isEmailConfigured, sendEmail } from "@/lib/email/client";
 
 const MESSAGE = {
   to: "zach@example.com",
-  subject: "You're on the CardFlare waitlist",
+  subject: "You're on the cardflare waitlist",
   html: "<p>hi</p>",
   text: "hi",
 };
@@ -23,7 +23,7 @@ afterEach(() => {
 
 function configure() {
   process.env.RESEND_API_KEY = "re_test_key";
-  process.env.CARDFLARE_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+  process.env.CARDFLARE_FROM_EMAIL = "cardflare <hello@cardflare.gg>";
 }
 
 describe("isEmailConfigured", () => {
@@ -84,7 +84,7 @@ describe("sendEmail", () => {
 
     const body = JSON.parse(init.body);
     expect(body).toMatchObject({
-      from: "CardFlare <hello@cardflare.gg>",
+      from: "cardflare <hello@cardflare.gg>",
       to: ["zach@example.com"],
       subject: MESSAGE.subject,
       html: MESSAGE.html,

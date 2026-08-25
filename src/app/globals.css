@@ -3,7 +3,7 @@
 @import "./cosmetic-art.css";
 
 /*
- * CardFlare design tokens.
+ * cardflare design tokens.
  *
  * This block is the single source of truth for the brand's colour, radius,
  * shadow and motion scales. Changing the accent here changes it everywhere —
@@ -27,7 +27,7 @@
   --color-border: #2a323d;
   --color-border-strong: #3a4553;
 
-  /* Accent — the faded neon lime from the approved CardFlare mark. */
+  /* Accent — the faded neon lime from the approved cardflare mark. */
   --color-accent: #c6ee4f;
   --color-accent-hover: #d3fa5f;
   --color-accent-muted: #8ba635;
@@ -49,7 +49,7 @@
    * Only ever used as foreground text over a tint of themselves, the same way
    * Badge works, so each one has to clear AA against every surface.
    * tests/unit/design-tokens.test.ts enforces that. Deliberately not the
-   * accent: an avatar must never be mistaken for a CardFlare control.
+   * accent: an avatar must never be mistaken for a cardflare control.
    */
   --color-avatar-1: #8fd3ff;
   --color-avatar-2: #a8e6a1;
@@ -63,13 +63,13 @@
    *
    * Used as a thin rule above a panel and on the game's own name, never
    * as a panel background: a shop's television has to stay recognisably
-   * CardFlare rather than becoming five unrelated visual themes on one
+   * cardflare rather than becoming five unrelated visual themes on one
    * screen. Each clears AA against canvas, surface AND elevated, because
    * a timer panel is read from across a room by someone who is not
    * looking for it. tests/unit/design-tokens.test.ts enforces that.
    *
    * Deliberately not sampled from any publisher's brand: these are
-   * CardFlare's own colours, chosen to sit together.
+   * cardflare's own colours, chosen to sit together.
    */
   --color-game-one-piece: #ff7a6b;
   --color-game-pokemon: #f5d547;
@@ -104,7 +104,7 @@
    * carries every word anybody actually reads: a display face used
    * twice stops being a mark and starts being a theme.
    *
-   * Applied to the CardFlare name where it is drawn as TEXT. The mark
+   * Applied to the cardflare name where it is drawn as TEXT. The mark
    * itself is an image and BRAND.md says not to touch it.
    */
   --font-display: var(--font-brand-display), var(--font-brand-sans), sans-serif;
@@ -116,7 +116,7 @@
    * as everything else in this block: the wardrobe is part of the brand,
    * not a decoration bolted onto it, and "ember" has to mean one colour
    * everywhere it appears. Deliberately warm and deliberately NOT the
-   * accent: a bought frame must never be mistaken for a CardFlare
+   * accent: a bought frame must never be mistaken for a cardflare
    * control, the same rule the avatar hues follow.
    *
    * These are ornament, never a background for text, so the contrast
@@ -1184,7 +1184,7 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* CardFlare packs                                                             */
+/* cardflare packs                                                             */
 /* -------------------------------------------------------------------------- */
 
 /*

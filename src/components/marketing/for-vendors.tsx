@@ -39,7 +39,7 @@ export function ForVendors() {
         id="for-vendors-title"
         eyebrow="For Card Show Vendors"
         title="Every buyer in the room, pointed at you"
-        description="The moment someone scans in, CardFlare knows what they're hunting and sends them to the booth that has it. Buyers stop working the hall table by table, and you stop hoping the right one reaches yours."
+        description="The moment someone scans in, cardflare knows what they're hunting and sends them to the booth that has it. Buyers stop working the hall table by table, and you stop hoping the right one reaches yours."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">

@@ -219,7 +219,7 @@ describe("storeInviteEmail with a setup link", () => {
  * One function serves stores, card-show vendors and players, which is
  * the right shape — the account, the link and the expiry story are
  * identical — but the store's own sentence had leaked into all three.
- * A player was being told "Zach is in the CardFlare beta": the sentence
+ * A player was being told "Zach is in the cardflare beta": the sentence
  * a shop gets, with a person's name dropped into it.
  */
 describe("playerInviteEmail", () => {
@@ -227,14 +227,14 @@ describe("playerInviteEmail", () => {
 
   it("does not tell a person they are a store in the beta", () => {
     expect(sent.subject).not.toContain("beta");
-    expect(sent.html).not.toContain("is in the CardFlare beta");
-    expect(sent.text).not.toContain("is in the CardFlare beta");
+    expect(sent.html).not.toContain("is in the cardflare beta");
+    expect(sent.text).not.toContain("is in the cardflare beta");
   });
 
   it("tells them what actually happened", () => {
-    expect(sent.subject).toBe("Your CardFlare account is ready");
-    expect(sent.html).toContain("Your CardFlare account is ready, Zach.");
-    expect(sent.text).toContain("Your CardFlare account is ready, Zach.");
+    expect(sent.subject).toBe("Your cardflare account is ready");
+    expect(sent.html).toContain("Your cardflare account is ready, Zach.");
+    expect(sent.text).toContain("Your cardflare account is ready, Zach.");
   });
 
   it("says what an account is for, not what a store gets", () => {
@@ -259,7 +259,7 @@ describe("playerInviteEmail", () => {
       "shop@example.test",
       "https://cardflare.gg",
     );
-    expect(shop.subject).toBe("Test Cards is in the CardFlare beta");
-    expect(shop.html).toContain("Test Cards is in the CardFlare beta.");
+    expect(shop.subject).toBe("Test Cards is in the cardflare beta");
+    expect(shop.html).toContain("Test Cards is in the cardflare beta.");
   });
 });

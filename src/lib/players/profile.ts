@@ -700,7 +700,7 @@ export async function setAvatar(
    * at the storage host. That is what the founder saw fail: the server
    * could fetch the URL and their phone could not. Storing a path and
    * serving through `/api/avatars/...` means the browser only ever talks
-   * to CardFlare, and it takes "is the bucket public" out of the
+   * to cardflare, and it takes "is the bucket public" out of the
    * equation entirely — this row is now correct either way.
    */
   const { data: previous, error: readError } = await admin

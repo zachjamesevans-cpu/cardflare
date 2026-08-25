@@ -125,7 +125,7 @@ export function StoreScreen() {
       </View>
 
       <Card>
-        <Title>CardFlare packs</Title>
+        <Title>cardflare packs</Title>
         <Muted>
           Sealed packs of cosmetics, opened like the real thing. Every new
           account starts with one on the house.

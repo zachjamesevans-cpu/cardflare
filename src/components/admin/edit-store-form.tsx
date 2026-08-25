@@ -95,7 +95,7 @@ export function EditStoreForm({
           <Field
             name="contactEmail"
             label="Contact email"
-            hint="Where CardFlare writes. Not their sign-in address."
+            hint="Where cardflare writes. Not their sign-in address."
           >
             <TextInput
               {...fieldIds("contactEmail")}
@@ -168,7 +168,7 @@ export function EditStoreForm({
             />
           </Field>
 
-          {/* What makes "2.1 miles away" possible. A store CardFlare
+          {/* What makes "2.1 miles away" possible. A store cardflare
               already had has no coordinate, so a player whose only saved
               shop is an old customer sees no Nearby section at all. */}
           <Field name="latitude" label="Latitude">
@@ -203,7 +203,7 @@ export function EditStoreForm({
 /**
  * The other kind of email: the credential.
  *
- * Separated from the details form on purpose — changing where CardFlare
+ * Separated from the details form on purpose — changing where cardflare
  * writes is bookkeeping, and changing what somebody types to sign in is
  * account surgery. Confirmed immediately, so the store can use the new
  * address straight away without chasing a link.

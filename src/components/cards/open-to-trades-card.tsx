@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
  * placeholder in `card-thumbnail.tsx`, so on a board of real cards it reads as
  * part of the same family rather than as a stray icon. Deliberately *not* a
  * mock One Piece card: nothing here may be mistaken for real artwork or imply
- * a licence CardFlare does not have.
+ * a licence cardflare does not have.
  *
  * Two crossing arrows and nothing else. The row beside it says "Open to
  * trades" in words, and at the 56px this renders at on a phone, any text

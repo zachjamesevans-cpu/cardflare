@@ -289,7 +289,7 @@ export function WaitlistForm() {
         name="marketingConsent"
         label={
           <>
-            Optional: also email me CardFlare news, event announcements and trading
+            Optional: also email me cardflare news, event announcements and trading
             tips. We will not sell your information, and you can unsubscribe from any
             email.
           </>

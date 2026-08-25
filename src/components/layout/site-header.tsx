@@ -39,7 +39,7 @@ export function SiteHeader() {
           {/*
            * `Store sign-in`, not `Sign in`. Players have no account and must
            * never think they need one — naming the audience keeps a curious
-           * player from concluding CardFlare wants them to register. Quiet on
+           * player from concluding cardflare wants them to register. Quiet on
            * purpose: it shares a row with the waitlist CTA, which is the thing
            * the landing page is actually for.
            */}

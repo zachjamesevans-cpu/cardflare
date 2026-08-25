@@ -106,7 +106,7 @@ export function PackArt({
           fontSize: 14 * scale,
         }}
       >
-        CardFlare
+        cardflare
       </Text>
       <Text style={{ color: colors.textMuted, fontSize: 11 * scale }}>
         {name} · Set {setNumber}

@@ -14,7 +14,7 @@ test.describe("landing page", () => {
   test("loads with the core proposition and branding", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page).toHaveTitle(/CardFlare/);
+    await expect(page).toHaveTitle(/cardflare/);
     await expect(
       page.getByRole("heading", { level: 1, name: /find the card/i }),
     ).toBeVisible();
@@ -79,7 +79,7 @@ test.describe("landing page", () => {
 
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       "content",
-      /CardFlare/,
+      /cardflare/,
     );
     await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
       "content",

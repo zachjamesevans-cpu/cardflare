@@ -118,7 +118,7 @@ export class ProviderHttp {
             accept: "application/json",
             // Identifies the client honestly, so the operator can see who is
             // calling and get in touch rather than just blocking.
-            "user-agent": "CardFlare/1.0 (+https://cardflare.gg)",
+            "user-agent": "cardflare/1.0 (+https://cardflare.gg)",
           },
           signal: AbortSignal.timeout(this.timeoutMs),
         });

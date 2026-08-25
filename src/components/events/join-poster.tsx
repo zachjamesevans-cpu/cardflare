@@ -19,7 +19,7 @@ import mark from "@public/brand/cardflare-mark.png";
  * **Generic card anatomy, never One Piece trade dress.** The frame, the type
  * line and the text box are common to every TCG printed since 1993. Nothing
  * here copies Bandai's borders, colour language, cost bubbles or iconography,
- * and nothing may be mistaken for a real card or imply a licence CardFlare
+ * and nothing may be mistaken for a real card or imply a licence cardflare
  * does not have — the same line the artwork placeholder holds.
  *
  * Printed on white with a black QR regardless of the app's dark theme: a QR

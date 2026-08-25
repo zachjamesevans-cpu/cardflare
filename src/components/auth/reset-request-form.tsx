@@ -35,7 +35,7 @@ export function ResetRequestForm() {
         </span>
         <h2 className="text-xl font-bold text-text-primary">Check your email</h2>
         <p className="max-w-sm text-pretty text-text-secondary">
-          If that address belongs to a CardFlare account, a link to set a new password
+          If that address belongs to a cardflare account, a link to set a new password
           is on its way. The link works once and expires shortly.
         </p>
       </div>

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * exchanges a PKCE code, and the verifier for that code lives in the cookies
  * of whichever browser requested the link. An invitation is minted by the
  * admin's server, so *no* browser holds the verifier — the link must work on
- * a shop owner's phone that has never touched CardFlare. `verifyOtp` with the
+ * a shop owner's phone that has never touched cardflare. `verifyOtp` with the
  * hashed token asks Supabase directly and needs no prior contact.
  */
 

@@ -113,7 +113,7 @@ export interface GameProfile {
 /**
  * On every overtime overlay, every time.
  *
- * CardFlare is not a rules authority and must never read as one. The
+ * cardflare is not a rules authority and must never read as one. The
  * shop's judge is the authority; this is a reminder of what they already
  * know, sized to be read from the back of the room.
  */

@@ -3,7 +3,7 @@ import type { ContactSubmission } from "@/lib/contact/schema";
 import type { EmailMessage } from "./client";
 
 /**
- * A contact-form message, as it lands in the CardFlare inbox.
+ * A contact-form message, as it lands in the cardflare inbox.
  *
  * Written for the reader rather than the brand: this one goes to us, so
  * it is plain, the sender's details are at the top, and the reply-to is

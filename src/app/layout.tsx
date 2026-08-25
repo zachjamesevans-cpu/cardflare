@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Chakra_Petch, Inter, JetBrains_Mono } from "next/font/google";
+import { Audiowide, Inter, JetBrains_Mono } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { SITE, siteUrl } from "@/lib/site";
@@ -20,19 +20,18 @@ const mono = JetBrains_Mono({
 /**
  * The wordmark's face, and the app's.
  *
- * The founder, after seeing it on the phone: "I like that font. make
- * that the font for the website too. like the logo that's displayed up
- * top." The name at the top of the site is TEXT beside the mark — the
- * mark itself is `public/brand/cardflare-mark.png` and is untouched, as
+ * Audiowide, matched to the new logo art the founder supplied
+ * (2026-08-22) with "make cardflare all lowercase... and make it this
+ * font" - wide, flat-topped, squared bowls, and it only ships one
+ * weight, which is all a wordmark needs. It replaced Chakra Petch,
+ * which was matched to the previous mark. The name at the top of the
+ * site is TEXT beside the mark; the mark image itself is untouched, as
  * BRAND.md requires.
- *
- * One weight, because that is all a wordmark needs and every extra
- * weight is a font file a first visit has to wait for.
  */
-const display = Chakra_Petch({
+const display = Audiowide({
   variable: "--font-brand-display",
   subsets: ["latin"],
-  weight: "700",
+  weight: "400",
   display: "swap",
 });
 

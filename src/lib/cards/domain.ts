@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * CardFlare's own card model. No provider's vocabulary appears here.
+ * cardflare's own card model. No provider's vocabulary appears here.
  *
  * Every adapter normalises into these types, and nothing downstream — search,
  * the UI, later Flares and matching — ever learns which provider the data came
@@ -79,7 +79,7 @@ const optionalText = (max: number) =>
     .transform((value) => value ?? null);
 
 /**
- * A printing, as CardFlare stores it.
+ * A printing, as cardflare stores it.
  *
  * The four booleans are `null` when the provider did not classify the printing.
  * That is not the same as `false`, and collapsing the two would record a guess

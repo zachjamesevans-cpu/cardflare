@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Sign-up's last question, and the one that will pay off later: which
- * games somebody plays is how CardFlare will know which locals to tell
+ * games somebody plays is how cardflare will know which locals to tell
  * them about. The copy says exactly that - a question with a stated
  * reason gets answered; a mystery dropdown gets skipped.
  */
@@ -53,7 +53,7 @@ export default async function WelcomeGamesPage() {
             Which games do you play?
           </h1>
           <p className="text-text-secondary">
-            Last step. When locals near you go up on CardFlare, this is how we know
+            Last step. When locals near you go up on cardflare, this is how we know
             which ones are yours.
           </p>
         </div>

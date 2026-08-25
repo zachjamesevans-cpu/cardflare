@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * line the licence requires.
  *
  * No auth. An unclaimed listing exists so players can find a shop that
- * has never heard of CardFlare, and a page behind a sign-in would defeat
+ * has never heard of cardflare, and a page behind a sign-in would defeat
  * the point. A draft still 404s.
  */
 export async function GET(

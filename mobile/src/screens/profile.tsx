@@ -219,7 +219,7 @@ export function ProfileScreen() {
   const changePicture = async (kind: "avatar" | "cover" = "avatar") => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setMessage("CardFlare needs photo access to change your picture.");
+      setMessage("cardflare needs photo access to change your picture.");
       return;
     }
 
@@ -287,7 +287,7 @@ export function ProfileScreen() {
   const changeAnimatedPicture = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setMessage("CardFlare needs photo access to change your picture.");
+      setMessage("cardflare needs photo access to change your picture.");
       return;
     }
 
@@ -411,7 +411,7 @@ export function ProfileScreen() {
                    and the welcome flow is where both are chosen. It can
                    be changed in Settings straight after. */
                 () => chooseUsername(name, handleSeedFrom(name)),
-                "Welcome to CardFlare.",
+                "Welcome to cardflare.",
               )
             }
           />
@@ -435,7 +435,7 @@ export function ProfileScreen() {
         <Card>
           <Body>
             No account? Nothing changes. Scan any counter code and trade as a guest,
-            same as always. Accounts are invite-only while CardFlare is in its pilot.
+            same as always. Accounts are invite-only while cardflare is in its pilot.
           </Body>
         </Card>
       </ScrollView>

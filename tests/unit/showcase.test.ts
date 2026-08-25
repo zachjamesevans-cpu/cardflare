@@ -87,7 +87,7 @@ describe("the feature gate", () => {
 /**
  * What the poster will take, as the board says it.
  *
- * Trade-only stays silent on purpose: it is what CardFlare has always
+ * Trade-only stays silent on purpose: it is what cardflare has always
  * meant, and a badge on every single row is furniture. The label exists
  * to mark the rows that break that assumption.
  */

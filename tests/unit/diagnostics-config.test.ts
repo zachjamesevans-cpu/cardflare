@@ -150,7 +150,7 @@ describe("configGroups", () => {
 
   it("reports a complete email configuration as ok", () => {
     process.env.RESEND_API_KEY = "re_test";
-    process.env.CARDFLARE_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+    process.env.CARDFLARE_FROM_EMAIL = "cardflare <hello@cardflare.gg>";
 
     expect(groupStatus(emailGroup())).toBe("ok");
     expect(check("CARDFLARE_FROM_EMAIL").detail).toContain("hello@cardflare.gg");
@@ -159,7 +159,7 @@ describe("configGroups", () => {
   /*
    * A bare address sends perfectly well, so this is a warning rather than a
    * failure — but mail clients fall back to the local part, and the first
-   * emails CardFlare ever sent arrived from "hello" rather than "CardFlare".
+   * emails cardflare ever sent arrived from "hello" rather than "cardflare".
    */
   it("warns when the address carries no display name", () => {
     process.env.CARDFLARE_FROM_EMAIL = "hello@cardflare.gg";
@@ -167,19 +167,19 @@ describe("configGroups", () => {
     const result = check("CARDFLARE_FROM_EMAIL");
     expect(result.status).toBe("warn");
     expect(result.detail).toContain('"hello"');
-    expect(result.detail).toContain("CardFlare <hello@cardflare.gg>");
+    expect(result.detail).toContain("cardflare <hello@cardflare.gg>");
   });
 
   it("reports the display name when one is set", () => {
-    process.env.CARDFLARE_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+    process.env.CARDFLARE_FROM_EMAIL = "cardflare <hello@cardflare.gg>";
 
     const result = check("CARDFLARE_FROM_EMAIL");
     expect(result.status).toBe("ok");
-    expect(result.detail).toContain("CardFlare <hello@cardflare.gg>");
+    expect(result.detail).toContain("cardflare <hello@cardflare.gg>");
   });
 
   it("flags a malformed address rather than calling it configured", () => {
-    process.env.CARDFLARE_FROM_EMAIL = "CardFlare hello@cardflare.gg";
+    process.env.CARDFLARE_FROM_EMAIL = "cardflare hello@cardflare.gg";
 
     expect(check("CARDFLARE_FROM_EMAIL").status).toBe("warn");
   });
@@ -190,7 +190,7 @@ describe("configGroups", () => {
    * dashboard showed a value present. Nothing logged, nothing failed.
    */
   it("points at the old name when only the pre-rename variable is set", () => {
-    process.env.WAITLIST_FROM_EMAIL = "CardFlare <hello@cardflare.gg>";
+    process.env.WAITLIST_FROM_EMAIL = "cardflare <hello@cardflare.gg>";
 
     const result = check("CARDFLARE_FROM_EMAIL");
     expect(result.status).toBe("missing");

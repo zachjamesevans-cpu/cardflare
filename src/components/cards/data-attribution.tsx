@@ -4,7 +4,7 @@ import { SITE } from "@/lib/site";
  * Data source and trademark note.
  *
  * Shown wherever card data appears. Deliberately plain and unmissable rather
- * than buried: CardFlare must never read as official, and must never imply it
+ * than buried: cardflare must never read as official, and must never imply it
  * owns card artwork or card data.
  *
  * Names artwork explicitly, not just data. Once images render, a note that

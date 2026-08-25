@@ -435,7 +435,7 @@ function PackArtPanel({ slug, artUrl }: { slug: string; artUrl: string | null })
         />
       ) : (
         <div className="flex h-44 w-30 items-center justify-center rounded-[var(--radius-control)] border border-dashed border-border p-2 text-center text-xs text-text-muted">
-          Default CardFlare wrapper
+          Default cardflare wrapper
         </div>
       )}
 

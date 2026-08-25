@@ -79,7 +79,7 @@ export function EventRoomPreview({ className }: { className?: string }) {
   return (
     <PreviewFrame
       className={className}
-      label="Preview of the CardFlare app: a live event room at Grand Line Games with two active Flares and one Flare Match found for Sanji, available from another player at table 12."
+      label="Preview of the cardflare app: a live event room at Grand Line Games with two active Flares and one Flare Match found for Sanji, available from another player at table 12."
     >
       <EventHeader event={PREVIEW_EVENT} />
 

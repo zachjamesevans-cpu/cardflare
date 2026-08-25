@@ -17,7 +17,7 @@ describe("waitlistConfirmationEmail", () => {
     const message = waitlistConfirmationEmail("Zach", "zach@example.com", ORIGIN);
 
     expect(message.subject).toMatch(/waitlist/i);
-    expect(message.subject).toMatch(/CardFlare/);
+    expect(message.subject).toMatch(/cardflare/);
   });
 
   it("ships a plain-text alternative carrying the same substance", () => {

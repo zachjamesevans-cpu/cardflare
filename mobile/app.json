@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CardFlare",
+    "name": "cardflare",
     "slug": "cardflare",
     "scheme": "cardflare",
     "version": "0.1.0",
@@ -12,11 +12,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "gg.cardflare.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "CardFlare uses the camera only to scan the QR code on a store's counter.",
+        "NSCameraUsageDescription": "cardflare uses the camera only to scan the QR code on a store's counter.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
-        "NSLocationAlwaysUsageDescription": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared."
+        "NSLocationWhenInUseUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+        "NSLocationAlwaysUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared."
       }
     },
     "android": {
@@ -41,19 +41,19 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "CardFlare uses your photo library only when you choose a new profile picture."
+          "photosPermission": "cardflare uses your photo library only when you choose a new profile picture."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "CardFlare uses the camera only to scan the QR code on a store's counter."
+          "cameraPermission": "cardflare uses the camera only to scan the QR code on a store's counter."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "CardFlare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+          "locationWhenInUsePermission": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }

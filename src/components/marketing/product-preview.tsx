@@ -5,7 +5,7 @@ const FLOW = [
   { actor: "Players", text: "Scan the QR code at the counter and join the room." },
   { actor: "Player", text: "Sends a Flare for the card they still need." },
   { actor: "Player", text: "Another player lists that card on their Have List." },
-  { actor: "CardFlare", text: "Creates a Flare Match and notifies both players." },
+  { actor: "cardflare", text: "Creates a Flare Match and notifies both players." },
   { actor: "Both", text: "Meet at a table and complete the trade in person." },
 ] as const;
 
@@ -15,7 +15,7 @@ export function ProductPreview() {
       <SectionHeading
         id="product-preview-title"
         eyebrow="Product Preview"
-        title="What an event looks like on CardFlare"
+        title="What an event looks like on cardflare"
         description="One room, one evening, from setup to a completed trade."
       />
 

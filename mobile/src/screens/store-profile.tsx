@@ -133,7 +133,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         <Card>
           <Title>Own or manage this store?</Title>
           <Muted>
-            CardFlare listed this shop from public map data so players could find it. If
+            cardflare listed this shop from public map data so players could find it. If
             you work there, tell us and we&rsquo;ll hand the listing over.
           </Muted>
 
@@ -230,7 +230,7 @@ function ClaimForm({
   return (
     <View style={{ gap: spacing(2.5) }}>
       <Muted>
-        A person at CardFlare reads this and emails you back. Nothing changes until
+        A person at cardflare reads this and emails you back. Nothing changes until
         we&rsquo;ve confirmed you work there, and it stays free.
       </Muted>
 

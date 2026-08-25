@@ -14,7 +14,7 @@
  * event.
  *
  * No date library. `Intl` already carries the full IANA database, and the two
- * functions below are the whole of what CardFlare needs — a dependency here
+ * functions below are the whole of what cardflare needs — a dependency here
  * would be several hundred kilobytes to avoid forty lines that can be tested
  * exactly.
  *

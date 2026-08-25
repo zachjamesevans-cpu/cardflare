@@ -203,7 +203,7 @@ describe("the Feed on day one", () => {
        vanishing, which is the whole point of it - a section that
        disappears when we do not know where somebody is teaches them
        nothing, and this is the only way a player discovers that
-       CardFlare knows about shops near them. Last because it is the one
+       cardflare knows about shops near them. Last because it is the one
        item that needs a permission or a typed ZIP before it can pay
        anybody back. */
     expect(items.map((item) => item.kind)).toEqual([
@@ -235,7 +235,7 @@ describe("the Feed on day one", () => {
     expect(nearby!.reason).toBe("Tell us roughly where you are");
   });
 
-  it("wears the mark rather than a face — there is no CardFlare player", async () => {
+  it("wears the mark rather than a face — there is no cardflare player", async () => {
     showingAnnouncements.mockResolvedValue([
       {
         id: "notice-1",

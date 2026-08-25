@@ -199,7 +199,7 @@ export function avatarPathFor(row: {
 /**
  * Where the browser fetches an avatar from.
  *
- * CardFlare's own domain, never the storage host directly, and that is a
+ * cardflare's own domain, never the storage host directly, and that is a
  * correction rather than a preference. The first cut pointed an `<img>`
  * straight at the Supabase public URL; the server could fetch it and the
  * founder's phone could not, which is the same shape as the bug that

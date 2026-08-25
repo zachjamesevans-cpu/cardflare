@@ -62,7 +62,7 @@ test.describe("protected areas", () => {
       const body = (await response?.text()) ?? "";
 
       // The redirect must happen before any privileged content renders.
-      expect(body).not.toMatch(/Invite a store|CardFlare admin|Spot check/i);
+      expect(body).not.toMatch(/Invite a store|cardflare admin|Spot check/i);
     }
   });
 

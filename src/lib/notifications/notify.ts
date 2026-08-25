@@ -205,7 +205,7 @@ async function deliverByEmail(
       ${body ? `<p>${body}</p>` : ""}
       <p><a href="${link}">Open the room</a> for the latest board.</p>
       <p style="font-size: 12px; color: #777;">
-        CardFlare tells you when something needs you in a room. You got this
+        cardflare tells you when something needs you in a room. You got this
         because you posted or offered while signed in.
       </p>
     </div>

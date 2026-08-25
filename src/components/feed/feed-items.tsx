@@ -175,14 +175,14 @@ export function Item({ item }: { item: FeedItem }) {
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          {/* The mark, not a face. There is no CardFlare player and this
+          {/* The mark, not a face. There is no cardflare player and this
               is the item that has to look like it knows that. */}
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-elevated">
             <Logo size={20} markOnly />
           </span>
           <div className="flex min-w-0 flex-col">
             <p className="truncate font-semibold text-text-primary">{item.headline}</p>
-            <p className="text-xs text-text-muted">CardFlare</p>
+            <p className="text-xs text-text-muted">cardflare</p>
           </div>
         </div>
 
@@ -592,7 +592,7 @@ export function Item({ item }: { item: FeedItem }) {
           <div className="flex flex-col gap-0.5">
             <p className="font-semibold text-text-primary">Find stores near you</p>
             <p className="text-xs text-text-muted">
-              CardFlare knows about shops whether or not they use it yet. Tell us
+              cardflare knows about shops whether or not they use it yet. Tell us
               roughly where you are and we&rsquo;ll list the close ones.
             </p>
           </div>
@@ -607,7 +607,7 @@ export function Item({ item }: { item: FeedItem }) {
         <div className="flex flex-col gap-0.5">
           <p className="font-semibold text-text-primary">Stores near you</p>
           <p className="text-xs text-text-muted">
-            Shops CardFlare knows about, whether or not they use it yet.
+            Shops cardflare knows about, whether or not they use it yet.
           </p>
         </div>
 
@@ -634,7 +634,7 @@ export function Item({ item }: { item: FeedItem }) {
                 {store.verified && (
                   <BadgeCheck
                     className="size-4 shrink-0 text-accent"
-                    aria-label="CardFlare Verified"
+                    aria-label="cardflare Verified"
                   />
                 )}
                 {store.ultra && (
