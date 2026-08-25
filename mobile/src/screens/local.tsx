@@ -116,10 +116,10 @@ export function LocalScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
         <Card>
-          <Title>Cards near you</Title>
+          <Title>Flares near you</Title>
           <Body>
-            Local shows every card people are hunting at stores in your area, and
-            lets you message them when you have it. Sign in and it lights up.
+            Local shows every Flare posted near you, and lets you message the poster
+            when you have the card. Sign in and it lights up.
           </Body>
           <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
         </Card>
@@ -131,12 +131,13 @@ export function LocalScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
         <Card>
-          <Title>Where is local?</Title>
+          <Title>Flares near you</Title>
           <Body>
-            Local shows every card people are hunting at stores near you. It just
-            needs to know roughly where you are.
+            Local shows every Flare posted near you, and you can message the poster
+            when you have the card. It just needs to know roughly where you are,
+            once.
           </Body>
-          <NearbyLocationAsk onDone={() => void load()} />
+          <NearbyLocationAsk onDone={() => void load()} intro={null} />
         </Card>
       </View>
     );

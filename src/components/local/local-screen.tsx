@@ -26,6 +26,9 @@ import {
 import type { ThreadMessage, ThreadSummary } from "@/lib/local/threads";
 import { cn } from "@/lib/cn";
 
+/** One bit in the browser: "they chose device location here before". */
+const DEVICE_CHOICE_KEY = "cf-local-device";
+
 /**
  * The Local tab: the room's question, asked across your whole area.
  *
@@ -66,7 +69,7 @@ export function LocalScreen({
 
   const feed = deviceFeed ?? serverFeed;
 
-  function locate() {
+  const locate = useCallback(() => {
     if (!("geolocation" in navigator)) {
       setLocateError("This browser cannot share a location. The ZIP works.");
       return;
@@ -81,8 +84,22 @@ export function LocalScreen({
             position.coords.longitude,
           );
           setLocating(false);
-          if (found) setDeviceFeed(found);
-          else setLocateError("Could not look around from here. The ZIP works.");
+          if (found) {
+            setDeviceFeed(found);
+            /* Remember the CHOICE, never the place. The founder: "when
+               you do location it should cache it and save it." The
+               browser keeps the grant; this one bit is what lets the
+               next visit use it without another tap. Coordinates still
+               ride one request and are never written anywhere. */
+            try {
+              localStorage.setItem(DEVICE_CHOICE_KEY, "1");
+            } catch {
+              /* Storage blocked: the tap still worked, it just will not
+                 be remembered. */
+            }
+          } else {
+            setLocateError("Could not look around from here. The ZIP works.");
+          }
         })();
       },
       () => {
@@ -91,7 +108,46 @@ export function LocalScreen({
       },
       { enableHighAccuracy: false, timeout: 10_000 },
     );
-  }
+  }, []);
+
+  /*
+   * The remembered choice, honoured quietly — the app's exact manner:
+   * a permission already granted is used on open, and nobody who never
+   * granted one sees a prompt for merely arriving. The permissions API
+   * is asked first so a since-revoked grant cannot pop a dialog; where
+   * that API is missing or refuses to answer, the stored choice only
+   * exists because a grant once succeeded here, so trying is right.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    let remembered = false;
+    try {
+      remembered = localStorage.getItem(DEVICE_CHOICE_KEY) === "1";
+    } catch {
+      remembered = false;
+    }
+    if (!remembered || !("geolocation" in navigator)) return;
+
+    const attempt = () => {
+      if (!cancelled) locate();
+    };
+
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((status) => {
+          if (status.state === "granted") attempt();
+        })
+        .catch(attempt);
+    } else {
+      void Promise.resolve().then(attempt);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locate]);
 
   if (openThreadId) {
     return <ThreadView threadId={openThreadId} onBack={() => setOpenThreadId(null)} />;
@@ -100,19 +156,25 @@ export function LocalScreen({
   return (
     <div className="flex flex-col gap-6">
       {feed.source === "none" ? (
-        <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-text-primary">Where is local?</h2>
-          <p className="text-sm text-text-secondary">
-            Local shows every card people are hunting at stores near you. Share your
-            location once &mdash; it is used for this look and never stored &mdash; or
-            type a ZIP, which places you within a few miles and is nothing like an
-            address.
-          </p>
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
+              <MapPin className="size-5 text-accent" aria-hidden="true" />
+            </span>
+            <div className="flex flex-col gap-1">
+              <h2 className="font-semibold text-text-primary">Flares near you</h2>
+              <p className="text-sm text-text-secondary">
+                Local shows every Flare posted near you, and you can message the poster
+                when you have the card. It just needs to know roughly where you are,
+                once.
+              </p>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Button
               type="button"
-              size="sm"
-              className="self-start"
+              className="w-full sm:w-auto sm:self-start"
               onClick={locate}
               disabled={locating}
             >
@@ -123,13 +185,23 @@ export function LocalScreen({
               <p className="text-sm text-text-secondary">{locateError}</p>
             )}
           </div>
-          <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">
-            Or a ZIP code
-          </p>
+
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-xs font-semibold tracking-wide text-text-muted uppercase">
+              or
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <PostalAsk defaultValue={postalCode ?? ""} />
         </Card>
       ) : (
-        <RadiusRow current={feed.radius} onSaved={deviceFeed ? locate : undefined} />
+        <RadiusRow
+          current={feed.radius}
+          onSaved={deviceFeed ? locate : undefined}
+          usingDevice={deviceFeed !== null}
+        />
       )}
 
       {threads.length > 0 && (
@@ -186,11 +258,14 @@ export function LocalScreen({
 function RadiusRow({
   current,
   onSaved,
+  usingDevice = false,
 }: {
   current: number;
   /** Set when a browser location is in play: re-look there instead of
       reloading the ZIP's server render. */
   onSaved?: () => void;
+  /** Says quietly WHERE "within" is measured from. */
+  usingDevice?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -227,6 +302,12 @@ function RadiusRow({
       ))}
       {pending && (
         <Loader2 className="size-4 animate-spin text-text-muted" aria-hidden="true" />
+      )}
+      {usingDevice && !pending && (
+        <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+          <MapPin className="size-3" aria-hidden="true" />
+          your location
+        </span>
       )}
     </div>
   );

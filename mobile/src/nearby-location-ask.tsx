@@ -32,7 +32,19 @@ import { AsyncButton, ErrorLine, Input, Muted } from "./ui";
  * colours, and the note leads rather than trailing the fallback it is
  * introducing.
  */
-export function NearbyLocationAsk({ onDone }: { onDone: () => void }) {
+export function NearbyLocationAsk({
+  onDone,
+  /**
+   * The sentence above the buttons. The default suits the Feed's
+   * stores-near-you card; Local passes null because its own card has
+   * already said what the location buys, and two paragraphs saying it
+   * was the wall of text the founder asked to streamline.
+   */
+  intro = "cardflare knows about shops whether or not they use it yet. Tell us roughly where you are and we’ll list the close ones.",
+}: {
+  onDone: () => void;
+  intro?: string | null;
+}) {
   /* Calm: a refusal, or a device with Location Services off. */
   const [note, setNote] = useState<string | null>(null);
   /* Red: something actually went wrong. */
