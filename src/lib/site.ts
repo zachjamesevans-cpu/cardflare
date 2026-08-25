@@ -5,7 +5,7 @@ export const SITE = {
   domain: "cardflare.gg",
   tagline: "Find the card. Make the trade.",
   description:
-    "cardflare is the hub for in-person card trading, buying and selling. Players post the cards they need the moment they walk in, and the players, stores and vendors who have them get found first.",
+    "cardflare is the hub for in-person card trading, buying and selling. Post the cards you need and cardflare connects you with the people who have them: players near you, your local game store, vendors at card shows.",
   contactEmail: "hello@cardflare.gg",
   /**
    * Where the contact form delivers.

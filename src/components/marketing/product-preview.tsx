@@ -1,12 +1,15 @@
 import { Section, SectionHeading } from "@/components/ui/section";
 
 const FLOW = [
-  { actor: "Store", text: "Creates a live Event Room for tonight's tournament." },
-  { actor: "Players", text: "Scan the QR code at the counter and join the room." },
+  { actor: "Store", text: "Opens a room for tonight's locals, code on the counter." },
+  { actor: "Players", text: "Scan the QR code at the counter and they are in." },
   { actor: "Player", text: "Sends a Flare for the card they still need." },
-  { actor: "Player", text: "Another player lists that card on their Have List." },
-  { actor: "cardflare", text: "Creates a Flare Match and notifies both players." },
-  { actor: "Both", text: "Meet at a table and complete the trade in person." },
+  {
+    actor: "The room",
+    text: "Everyone trading tonight sees the Flare, phones and the store's screen alike.",
+  },
+  { actor: "Player", text: "Somebody who has the card raises a hand on the Flare." },
+  { actor: "Both", text: "Meet at a table, trade in person, earn Embers." },
 ] as const;
 
 export function ProductPreview() {
@@ -15,8 +18,8 @@ export function ProductPreview() {
       <SectionHeading
         id="product-preview-title"
         eyebrow="Product Preview"
-        title="What an event looks like on cardflare"
-        description="One room, one evening, from setup to a completed trade."
+        title="What a store night looks like on cardflare"
+        description="One of the places cardflare connects people: an event at your local game store, from setup to a completed trade."
       />
 
       <ol className="mt-14 grid gap-px overflow-hidden rounded-[var(--radius-panel)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">

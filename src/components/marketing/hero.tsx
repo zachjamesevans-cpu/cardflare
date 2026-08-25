@@ -20,10 +20,10 @@ export function Hero() {
           </h1>
 
           <p className="max-w-xl text-lg leading-relaxed text-pretty text-text-secondary">
-            One hub for the whole room: the people hunting cards and the people selling
-            them. Players post what they need the moment they walk in, and cardflare
-            points them at whoever has it: another player at a game-store event, a
-            vendor&rsquo;s booth at a show. Buyers stop searching. Sellers stop waiting.
+            No matter what cards you need, cardflare connects you with the people who
+            have them: a player near you, an event night at your local game store, a
+            vendor&rsquo;s booth at a card show. And it works both ways: the cards you
+            have find the people nearby hunting them.
           </p>
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">

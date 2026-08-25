@@ -201,8 +201,7 @@ function Splash({
           lineHeight: 24,
         }}
       >
-        The room can see what you are hunting.{"\n"}Post your wants. Trade face to
-        face.
+        The cards you need are near you.{"\n"}Post your wants. Trade face to face.
       </Text>
 
       <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(4) }}>
@@ -341,7 +340,7 @@ function AccountStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        Your address and a password, then who you are in a room. The only thing
+        Your address and a password, then who you are to other players. The only thing
         after this is which games you play.
       </Body>
       <Input
@@ -375,8 +374,8 @@ function AccountStep({ onDone }: { onDone: () => void }) {
       />
       <HandleAvailabilityLine status={availability} handle={handle} />
       <Muted>
-        Your name is what a room shows. Your handle is how people look you up, and
-        it is yours alone.
+        Your name is what people see next to your posts. Your handle is how they look
+        you up, and it is yours alone.
       </Muted>
       <ErrorLine message={error} />
       <AsyncButton

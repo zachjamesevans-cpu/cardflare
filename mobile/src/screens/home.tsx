@@ -1423,8 +1423,9 @@ export function HomeScreen() {
         <Card>
           <Title>How it works</Title>
           <Body>
-            Post a Flare for the card you&rsquo;re hunting. When somebody in the room
-            has it, they raise a hand, and you go trade, in person, at the table.
+            Post a Flare for the card you&rsquo;re hunting. When somebody near you has
+            it, at your store or around town, they raise a hand and you trade in
+            person.
           </Body>
         </Card>
       )}

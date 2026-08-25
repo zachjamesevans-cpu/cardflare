@@ -38,7 +38,7 @@ export function ForVendors() {
       <SectionHeading
         id="for-vendors-title"
         eyebrow="For Card Show Vendors"
-        title="Every buyer in the room, pointed at you"
+        title="Every buyer in the hall, pointed at you"
         description="The moment someone scans in, cardflare knows what they're hunting and sends them to the booth that has it. Buyers stop working the hall table by table, and you stop hoping the right one reaches yours."
       />
 
