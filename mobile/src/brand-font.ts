@@ -3,12 +3,13 @@ import { useFonts } from "expo-font";
 /**
  * The cardflare wordmark's face.
  *
- * Audiowide, matched to the logo art the founder supplied with "make
- * cardflare all lowercase... and make it this font" - wide, flat-topped
- * and squared, and it ships exactly one weight, which is all a wordmark
- * needs. It replaced Chakra Petch, which was matched to the previous
- * mark. The website loads the same face through next/font, so the name
- * is one face on both platforms.
+ * Bruno Ace, matched to the logo art the founder supplied with "make
+ * cardflare all lowercase... and make it this font" - chosen by
+ * rendering fifteen candidate faces against the art (see the layout.tsx
+ * note; Audiowide was the first guess and the founder called it off).
+ * It ships exactly one weight, which is all a wordmark needs. The
+ * website loads the same face through next/font, so the name is one
+ * face on both platforms.
  *
  * THE WORDMARK ONLY. Not body text, not headings, not buttons. Inter
  * carries everything a person actually reads; this is the product's
@@ -16,10 +17,10 @@ import { useFonts } from "expo-font";
  * rather than a theme.
  *
  * Bundled under the SIL Open Font Licence — see
- * assets/fonts/OFL-Audiowide.txt, which ships beside the file because
+ * assets/fonts/OFL-BrunoAce.txt, which ships beside the file because
  * the licence requires it to.
  */
-export const BRAND_FONT = "Audiowide-Regular";
+export const BRAND_FONT = "BrunoAce-Regular";
 
 /**
  * Loads it, and says when it is ready.
@@ -30,7 +31,7 @@ export const BRAND_FONT = "Audiowide-Regular";
  */
 export function useBrandFont(): boolean {
   const [loaded] = useFonts({
-    [BRAND_FONT]: require("../assets/fonts/Audiowide-Regular.ttf"),
+    [BRAND_FONT]: require("../assets/fonts/BrunoAce-Regular.ttf"),
   });
 
   return loaded;
