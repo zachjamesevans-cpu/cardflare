@@ -12,7 +12,7 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Get Matched",
-    description: "cardflare finds someone at the event who has it.",
+    description: "cardflare connects you with someone nearby who has it.",
   },
   {
     icon: Handshake,
@@ -28,7 +28,7 @@ export function HowItWorks() {
         id="how-it-works-title"
         eyebrow="How It Works"
         title="Three steps to a trade"
-        description="No shipping, no negotiating with strangers online. Just the people already in the room with you, at your local game store or a card show."
+        description="No shipping, no negotiating with strangers online. Just the people near you: around the corner, at your local game store, or across a card show floor."
       />
 
       <ol className="mt-14 grid gap-5 md:grid-cols-3">

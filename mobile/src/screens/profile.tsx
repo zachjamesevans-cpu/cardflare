@@ -396,8 +396,8 @@ export function ProfileScreen() {
         <Card>
           <Title>Pick your name</Title>
           <Body>
-            This is the name people see when you walk into a room. Spaces and capitals
-            are fine, and it does not have to be unique.
+            This is the name people see next to everything you post. Spaces and
+            capitals are fine, and it does not have to be unique.
           </Body>
           <NameField
             current={profile.displayName}

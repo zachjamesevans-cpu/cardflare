@@ -5,9 +5,9 @@ import { FlareComposerPreview } from "@/components/app-preview/flare-composer-pr
 import { Section, SectionHeading } from "@/components/ui/section";
 
 const BENEFITS = [
-  "Find missing cards before the next round starts.",
-  "Stop flipping through every binder in the room.",
-  "Discover trades you would otherwise walk right past.",
+  "Post a Flare and reach everyone near you, not just whoever you bump into.",
+  "See every hunt in your area on Local, and message people directly when you have the card.",
+  "Find missing cards before the next round starts at event night.",
   "Request an exact printing, or any printing that works.",
   "At card shows, search every vendor's booth from your phone, singles and slabs alike.",
   "Spend more time playing and less time searching.",
@@ -21,8 +21,8 @@ export function ForPlayers() {
           <SectionHeading
             id="for-players-title"
             eyebrow="For Players"
-            title="The room is full of the cards you need"
-            description="You just cannot see them. cardflare makes the binders around you searchable for the length of the event."
+            title="The cards you need are closer than you think"
+            description="Somebody near you has them: around the corner, at your local game store, at the next card show. Post what you are hunting and cardflare connects you; post what you have and it finds the people nearby looking for it."
             align="left"
           />
 

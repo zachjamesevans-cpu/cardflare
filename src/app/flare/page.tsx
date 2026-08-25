@@ -80,12 +80,17 @@ export default async function FlarePage() {
             <Card className="flex flex-col gap-3">
               <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
               <p className="text-text-secondary">
-                A Flare goes up in a room. Scan the code at your store&rsquo;s counter,
-                or enter it by hand, and this becomes the fastest way to say what you
-                are hunting.
+                A Flare says what card you are hunting, and the people who can help see
+                it: the room at a store event, players near that store on Local, and
+                everyone who follows you. Create a free account to start posting, or
+                scan the code at a store&rsquo;s counter to post into tonight&rsquo;s
+                event.
               </p>
-              <div>
-                <ButtonLink href="/join">Enter a code</ButtonLink>
+              <div className="flex flex-wrap gap-2">
+                <ButtonLink href="/signup">Create your free account</ButtonLink>
+                <ButtonLink href="/join" variant="secondary">
+                  Enter a code
+                </ButtonLink>
               </div>
             </Card>
           )}

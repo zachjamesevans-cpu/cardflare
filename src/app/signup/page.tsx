@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Flame, QrCode, Sparkles } from "lucide-react";
+import { Flame, MapPin, Radio } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { SignupForm } from "@/components/auth/signup-form";
@@ -13,7 +13,7 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Create your account",
   description:
-    "Join cardflare: post the cards you are hunting, see who in the room has them, and trade in person.",
+    "Join cardflare: post the cards you need and get connected with the people nearby who have them, then trade in person.",
 };
 
 export const dynamic = "force-dynamic";
@@ -41,27 +41,28 @@ export default async function SignupPage() {
 
       <div className="flex flex-col gap-3 text-center">
         <h1 className="text-3xl font-bold text-text-primary">
-          The room can see what you are hunting.
+          The cards you need are near you.
         </h1>
         <p className="text-text-secondary">
-          Post your wants, see who has them, trade face to face. Free, and your binder
-          follows you to every store.
+          Post your wants and cardflare connects you with the people who have them:
+          around the corner, at your local store, at a show. Free, and your binder
+          follows you everywhere.
         </p>
       </div>
 
       {/* The product in three true lines. */}
       <ul className="flex flex-col gap-2 text-sm text-text-secondary">
         <li className="flex items-center gap-2.5">
-          <QrCode className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          Scan the code on any counter and you are in the room.
+          <Radio className="size-4 shrink-0 text-accent" aria-hidden="true" />
+          Post a Flare for any card and the people near you see what you are hunting.
+        </li>
+        <li className="flex items-center gap-2.5">
+          <MapPin className="size-4 shrink-0 text-accent" aria-hidden="true" />
+          Local shows every hunt around you. Have the card? Message them.
         </li>
         <li className="flex items-center gap-2.5">
           <Flame className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          Earn Embers for every confirmed trade.
-        </li>
-        <li className="flex items-center gap-2.5">
-          <Sparkles className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          Open packs, dress your showcase, make your profile yours.
+          Earn Embers for every confirmed trade and spend them on your look.
         </li>
       </ul>
 

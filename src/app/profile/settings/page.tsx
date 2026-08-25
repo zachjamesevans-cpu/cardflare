@@ -116,7 +116,7 @@ export default async function ProfileSettingsPage() {
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold text-text-primary">Your name</h2>
         <p className="text-sm text-text-secondary">
-          What people see when you walk into a room. Spaces and capitals are fine, and
+          What people see next to everything you post. Spaces and capitals are fine, and
           it does not have to be unique.
         </p>
       </div>

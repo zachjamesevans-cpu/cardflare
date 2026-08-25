@@ -150,7 +150,7 @@ export function SignupForm() {
       <Field
         name="displayName"
         label="Your name"
-        hint="What people see when you walk into a room. Spaces and capitals are fine."
+        hint="What people see next to everything you post. Spaces and capitals are fine."
       >
         <TextInput
           {...fieldIds("displayName")}

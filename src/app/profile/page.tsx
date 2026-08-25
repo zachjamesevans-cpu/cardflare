@@ -134,7 +134,7 @@ export default async function ProfilePage() {
         area="Profile"
         email={viewer.user.email ?? ""}
         title="Your profile"
-        description="What other players see when your name comes up in a room."
+        description="What other players see wherever your name comes up."
         areas={areas}
         currentArea={currentArea}
       >

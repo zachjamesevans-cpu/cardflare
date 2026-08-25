@@ -181,15 +181,20 @@ export default async function FeedPage() {
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Start trading</h2>
           <p className="text-sm text-text-secondary">
-            The code at your store&rsquo;s counter gets you into the room, no account
-            needed. Sign in and your stores, the boards open tonight and the people you
-            follow all show up here.
+            Create a free account and the cards you hunt reach the people near you. At a
+            store right now? The code at the counter gets you into tonight&rsquo;s room,
+            no account needed.
           </p>
-          {/* Room holds the scanner now, and it is the tab you are already
-              opening when you are standing in a shop. */}
-          <Link href="/room" className={buttonStyles("primary", "sm")}>
-            Go to Room
-          </Link>
+          {/* Both doors, in the order the copy offers them. Room holds
+              the scanner for the person already standing in a shop. */}
+          <div className="flex flex-wrap gap-2">
+            <Link href="/signup" className={buttonStyles("primary", "sm")}>
+              Join free
+            </Link>
+            <Link href="/room" className={buttonStyles("secondary", "sm")}>
+              Go to Room
+            </Link>
+          </div>
         </Card>
       </Shell>
     );
@@ -291,8 +296,8 @@ export default async function FeedPage() {
         <Card className="flex flex-col gap-2">
           <h2 className="font-semibold text-text-primary">How it works</h2>
           <p className="text-sm text-text-secondary">
-            Post a Flare for the card you&rsquo;re hunting. When somebody in the room
-            has it, they raise a hand, and you go trade, in person, at the table.
+            Post a Flare for the card you&rsquo;re hunting. When somebody near you has
+            it, at your store or around town, they raise a hand and you trade in person.
           </p>
         </Card>
       )}

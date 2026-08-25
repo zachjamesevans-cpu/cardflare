@@ -199,7 +199,7 @@ export function SettingsScreen() {
         <Card>
           <Title>Your name</Title>
           <Body>
-            What people see when you walk into a room. Spaces and capitals are fine,
+            What people see next to everything you post. Spaces and capitals are fine,
             and it does not have to be unique.
           </Body>
           <NameField current={profile.displayName} busy={renaming} onSave={rename} />

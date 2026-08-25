@@ -117,7 +117,7 @@ function passwordOnly({ email, player = false }: { email: string; player?: boole
         savedTitle="You're all set"
         savedBody={
           player
-            ? "Your account is ready. Scan in at any cardflare store, and the cards you hunt will follow you between rooms."
+            ? "Your account is ready. Post the cards you hunt and they reach the people near you, wherever you take them: your area, event nights, card shows."
             : "Your store is ready. Print your counter code and you can start tonight."
         }
         continueLabel={player ? "Go to your account" : "Go to your store"}
