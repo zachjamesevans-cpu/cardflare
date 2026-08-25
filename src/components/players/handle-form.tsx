@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextInput } from "@/components/ui/controls";
 import { changeHandleAction } from "@/lib/players/profile-actions";
-import { HANDLE_MAX, handleFrom } from "@/lib/players/handle";
+import { HANDLE_MAX, handleWhileTyping } from "@/lib/players/handle";
 import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
 
 /**
@@ -47,7 +47,7 @@ export function HandleForm({ handle }: { handle: string }) {
             id="handle"
             name="handle"
             value={value}
-            onChange={(event) => setValue(handleFrom(event.target.value))}
+            onChange={(event) => setValue(handleWhileTyping(event.target.value))}
             maxLength={HANDLE_MAX}
             required
             autoComplete="username"

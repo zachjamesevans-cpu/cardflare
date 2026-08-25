@@ -12,8 +12,15 @@ import {
   View,
 } from "react-native";
 
-import { chooseUsername, describeError, setGames, signUp } from "../api";
-import { HANDLE_MAX, HANDLE_MIN, handleFrom, handleSeedFrom } from "../handle";
+import {
+  checkHandle,
+  chooseUsername,
+  describeError,
+  setGames,
+  signUp,
+  type HandleAvailability,
+} from "../api";
+import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { SignInScreen } from "./sign-in";
@@ -257,17 +264,79 @@ function StepShell({
  * walked his own sign-up on the website and named the seam: "this should
  * all be on one page." The app had the same split and the same fix.
  *
- * The handle writes itself from the name until it is touched by hand.
- * Somebody who has decided to be @stevo should not have it yanked back
- * to @steven_b by a later correction to their name.
+ * The handle used to write itself from the name. The founder ended
+ * that: "if someone puts in their name, eventually every single
+ * username of someone's first name will be taken" — so the field starts
+ * empty, and while it is typed the server is asked live whether the
+ * name is still free, same as the website.
  */
+type HandleStatus = "idle" | "checking" | HandleAvailability;
+
+function useHandleAvailability(handle: string): HandleStatus {
+  const tooShort = handle.length < HANDLE_MIN;
+
+  /* The last answer, held WITH the handle that produced it, so "still
+     checking" is derived rather than tracked — the website's exact
+     shape, and the reason a stale answer can never be pinned under a
+     fresher handle than the one it was asked about. */
+  const [settled, setSettled] = useState<{
+    handle: string;
+    verdict: HandleAvailability;
+  } | null>(null);
+
+  useEffect(() => {
+    if (tooShort) return;
+
+    let current = true;
+    const timer = setTimeout(() => {
+      void checkHandle(handle).then((verdict) => {
+        if (current) setSettled({ handle, verdict });
+      });
+    }, 400);
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [handle, tooShort]);
+
+  return tooShort ? "idle" : settled?.handle === handle ? settled.verdict : "checking";
+}
+
+function HandleAvailabilityLine({
+  status,
+  handle,
+}: {
+  status: HandleStatus;
+  handle: string;
+}) {
+  if (status === "checking") {
+    return <Muted>Checking…</Muted>;
+  }
+  if (status === "available") {
+    return (
+      <Text style={{ color: colors.success, fontSize: 14 }}>
+        {formatHandle(handle)} is available.
+      </Text>
+    );
+  }
+  if (status === "taken") {
+    return (
+      <Text style={{ color: colors.danger, fontSize: 14 }}>
+        That handle is taken. Try another one.
+      </Text>
+    );
+  }
+  return null;
+}
+
 function AccountStep({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
-  const [handleOwned, setHandleOwned] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const availability = useHandleAvailability(handle);
 
   return (
     <Card>
@@ -293,23 +362,18 @@ function AccountStep({ onDone }: { onDone: () => void }) {
       />
       <Input
         value={name}
-        onChangeText={(next) => {
-          setName(next);
-          if (!handleOwned) setHandle(handleSeedFrom(next));
-        }}
+        onChangeText={setName}
         placeholder="Your name, e.g. Steven B"
         autoCorrect={false}
         maxLength={40}
       />
       <HandleInput
         value={handle}
-        onChangeText={(next) => {
-          setHandleOwned(true);
-          setHandle(handleFrom(next));
-        }}
+        onChangeText={(next) => setHandle(handleWhileTyping(next))}
         placeholder="steven_b"
         maxLength={HANDLE_MAX}
       />
+      <HandleAvailabilityLine status={availability} handle={handle} />
       <Muted>
         Your name is what a room shows. Your handle is how people look you up, and
         it is yours alone.

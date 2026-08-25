@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
@@ -8,10 +8,16 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
-import { signUpWithPassword } from "@/lib/auth/actions";
+import { checkSignupHandleAction, signUpWithPassword } from "@/lib/auth/actions";
 import { PASSWORD_SIGN_IN_IDLE } from "@/lib/auth/state";
 import { PASSWORD_MIN } from "@/lib/auth/signup-schema";
-import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
+import {
+  formatHandle,
+  HANDLE_MAX,
+  HANDLE_MIN,
+  handleWhileTyping,
+  type HandleAvailability,
+} from "@/lib/players/handle";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -24,6 +30,46 @@ function SubmitButton() {
   );
 }
 
+/** What the availability line under the handle field can be showing. */
+type HandleStatus = "idle" | "checking" | HandleAvailability;
+
+/**
+ * Watches a handle being typed and asks the server whether it is free.
+ *
+ * The last answer is held WITH the handle that produced it, and "still
+ * checking" is derived by comparing that to what is currently typed —
+ * the same shape `ChooseUsernameForm` uses, for the same two reasons:
+ * nothing is set synchronously in the effect (a cascading render, and
+ * the lint rule says so), and a stale answer landing late cannot be
+ * pinned under a fresher handle than the one it was asked about.
+ */
+function useHandleAvailability(handle: string): HandleStatus {
+  const tooShort = handle.length < HANDLE_MIN;
+
+  const [settled, setSettled] = useState<{
+    handle: string;
+    verdict: HandleAvailability;
+  } | null>(null);
+
+  useEffect(() => {
+    if (tooShort) return;
+
+    let current = true;
+    const timer = setTimeout(() => {
+      void checkSignupHandleAction(handle).then((verdict) => {
+        if (current) setSettled({ handle, verdict });
+      });
+    }, 400);
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [handle, tooShort]);
+
+  return tooShort ? "idle" : settled?.handle === handle ? settled.verdict : "checking";
+}
+
 /**
  * Everything an account is, asked once.
  *
@@ -33,22 +79,26 @@ function SubmitButton() {
  * password, then there was a separate link to choose my username. this
  * should all be on one page."
  *
- * The old reasoning was that a short form at the door converts better.
- * That is true of a short form; it was not true of what this actually
- * was, which is the same questions with a door in the middle. Four
- * fields, one button, and the optional picture is the only thing left
- * after.
- *
- * The handle writes itself from the name until it is touched by hand,
- * exactly as it does in the setup flow this replaces.
+ * The handle used to write itself from the name. The founder ended
+ * that too: "if someone puts in their name, eventually every single
+ * username of someone's first name will be taken" — so the field starts
+ * empty, is shaped as it is typed, and reports live whether the name is
+ * free instead of waiting for the submit button to break the news.
  */
 export function SignupForm() {
   const [state, formAction] = useActionState(signUpWithPassword, PASSWORD_SIGN_IN_IDLE);
 
-  const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
-  /** Once they have edited it themselves, the name stops driving it. */
-  const [handleOwned, setHandleOwned] = useState(false);
+  const availability = useHandleAvailability(handle);
+
+  const availabilityLine =
+    availability === "checking"
+      ? { tone: "text-text-muted", text: "Checking…" }
+      : availability === "available"
+        ? { tone: "text-success", text: `${formatHandle(handle)} is available.` }
+        : availability === "taken"
+          ? { tone: "text-danger", text: "That handle is taken. Try another one." }
+          : null;
 
   return (
     <form
@@ -108,11 +158,6 @@ export function SignupForm() {
           autoComplete="nickname"
           maxLength={40}
           placeholder="Steven B"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            if (!handleOwned) setHandle(handleSeedFrom(event.target.value));
-          }}
           aria-describedby={describedBy("displayName", false, true)}
           required
         />
@@ -136,22 +181,25 @@ export function SignupForm() {
             {...fieldIds("handle")}
             name="handle"
             className="w-full pl-7"
-            autoComplete="username"
+            autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
             maxLength={HANDLE_MAX}
             placeholder="steven_b"
             value={handle}
-            onChange={(event) => {
-              setHandleOwned(true);
-              /* Typed straight into shape, so the field never shows
-                 something the server is about to refuse. */
-              setHandle(handleSeedFrom(event.target.value));
-            }}
+            onChange={(event) => setHandle(handleWhileTyping(event.target.value))}
             aria-describedby={describedBy("handle", false, true)}
             required
           />
         </div>
+        {/* Polite so a screen reader hears the verdict without being
+            interrupted mid-word on every keystroke. */}
+        <p
+          aria-live="polite"
+          className={`text-sm ${availabilityLine?.tone ?? "sr-only"}`}
+        >
+          {availabilityLine?.text ?? ""}
+        </p>
       </Field>
 
       <SubmitButton />

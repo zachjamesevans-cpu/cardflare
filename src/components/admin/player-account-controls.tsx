@@ -15,7 +15,7 @@ import {
   ADMIN_ACCOUNT_IDLE,
   type AdminAccountState,
 } from "@/lib/players/profile-schema";
-import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
+import { HANDLE_MAX, handleSeedFrom, handleWhileTyping } from "@/lib/players/handle";
 
 /**
  * The support desk for one player.
@@ -132,7 +132,7 @@ function IdentityForm({
             /* Typed straight into shape, the same as the player's own
                field, so the console never submits something the index is
                about to refuse. */
-            onChange={(event) => setTag(handleSeedFrom(event.target.value))}
+            onChange={(event) => setTag(handleWhileTyping(event.target.value))}
             maxLength={HANDLE_MAX}
             autoCapitalize="none"
             spellCheck={false}

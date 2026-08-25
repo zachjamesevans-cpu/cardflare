@@ -25,6 +25,21 @@ export function handleFrom(candidate: string): string {
     .replace(/_+$/g, "");
 }
 
+/**
+ * Shapes a handle AS IT IS BEING TYPED. Unlike `handleFrom` it keeps a
+ * trailing underscore — "steven_" is a legitimate moment on the way to
+ * "steven_b" — and it never invents a fallback, so an emptied field
+ * stays empty instead of refilling itself with "player".
+ */
+export function handleWhileTyping(candidate: string): string {
+  return candidate
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+/g, "")
+    .slice(0, HANDLE_MAX);
+}
+
 /** Deliberately boring: a handle that obviously wants changing. */
 export const HANDLE_FALLBACK = "player";
 

@@ -13,7 +13,12 @@ import {
   finishSetupAction,
 } from "@/lib/players/setup-actions";
 import { PASSWORD_MIN } from "@/lib/auth/schema";
-import { HANDLE_MAX, handleSeedFrom } from "@/lib/players/handle";
+import {
+  HANDLE_MAX,
+  handleFrom,
+  handleSeedFrom,
+  handleWhileTyping,
+} from "@/lib/players/handle";
 import { SETUP_IDLE, type SetupState } from "@/lib/players/profile-schema";
 
 /** Below this there is nothing worth asking the server about. */
@@ -132,7 +137,10 @@ export function ChooseUsernameForm({
           value={name}
           onChange={(event) => {
             setName(event.target.value);
-            if (!handleOwned) setHandle(handleSeedFrom(event.target.value));
+            /* Derives with `handleFrom`, not `handleSeedFrom`: a name
+               too short to derive from should leave the handle field
+               honestly short, not fill it with the word "player". */
+            if (!handleOwned) setHandle(handleFrom(event.target.value));
           }}
           required
           autoFocus
@@ -169,10 +177,11 @@ export function ChooseUsernameForm({
             onChange={(event) => {
               setHandleOwned(true);
               /* Typed straight into shape rather than rejected after the
-                 fact: a capital or a space becomes what it would have
-                 become anyway, so the field never shows something the
-                 server is about to refuse. */
-              setHandle(handleSeedFrom(event.target.value));
+                 fact — but with the TYPING shaper: the derivation one
+                 refilled "player" the moment backspacing went below
+                 three characters, and ate underscores as they were
+                 typed. */
+              setHandle(handleWhileTyping(event.target.value));
             }}
             required
             autoComplete="off"

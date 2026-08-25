@@ -12,8 +12,8 @@ import {
   formatHandle,
   HANDLE_MAX,
   HANDLE_MIN,
-  handleFrom,
   handleSeedFrom,
+  handleWhileTyping,
 } from "../handle";
 import {
   addToShowcase,
@@ -1026,9 +1026,9 @@ export function HandleField({
     <View style={{ gap: spacing(2) }}>
       <HandleInput
         value={value}
-        /* Typed straight into shape, so the field never shows something
-           the server is about to refuse. */
-        onChangeText={(next) => setValue(handleFrom(next))}
+        /* The TYPING shaper, so an underscore can actually be typed:
+           the stored-handle one strips it the moment it lands. */
+        onChangeText={(next) => setValue(handleWhileTyping(next))}
         maxLength={HANDLE_MAX}
         placeholder="steven_b"
       />

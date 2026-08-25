@@ -11,6 +11,8 @@ import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { clientKey } from "@/lib/request-context";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { handleAvailability } from "@/lib/players/handle-availability";
+import { HANDLE_MAX, type HandleAvailability } from "@/lib/players/handle";
 import { ensureAuthUser } from "./provision";
 import { isProviderEnabled } from "./providers";
 import { claimPendingInvite } from "./session";
@@ -513,4 +515,52 @@ export async function signOut(): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+/**
+ * Sign out and land back on the sign-up form.
+ *
+ * For the person who is on /signup while already signed in — usually
+ * the founder testing his own site, occasionally a store owner making a
+ * personal account. Plain `signOut` lands on the homepage, which for
+ * this one caller means clicking the very button that brought them here
+ * a second time.
+ */
+export async function signOutToSignup(): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  redirect("/signup");
+}
+
+/* Live availability is asked once per pause in typing, debounced on the
+   client — but the client's manners are not a limit, so the server has
+   one anyway. Generous: a person fiddling with variants of their name
+   stays well inside it. */
+const HANDLE_CHECK_MAX = 120;
+const HANDLE_CHECK_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * "Is @zach free?", answered while the sign-up form is still being
+ * typed — by somebody with no account, which is why this is not
+ * `setup-actions.ts`'s `checkHandleAction` (that one identifies its
+ * viewer to excuse their own current handle). Advisory only — the
+ * unique index decides at claim time — and "unknown" on any trouble,
+ * which the form shows as nothing rather than blocking an account over
+ * a courtesy check.
+ */
+export async function checkSignupHandleAction(
+  candidate: string,
+): Promise<HandleAvailability> {
+  if (typeof candidate !== "string" || candidate.length > HANDLE_MAX * 2) {
+    return "invalid";
+  }
+
+  const rate = checkRateLimit(
+    `handle-check:${await clientKey()}`,
+    HANDLE_CHECK_MAX,
+    HANDLE_CHECK_WINDOW_MS,
+  );
+  if (!rate.allowed) return "unknown";
+
+  return handleAvailability(candidate);
 }
