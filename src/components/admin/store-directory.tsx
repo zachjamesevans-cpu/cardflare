@@ -29,7 +29,7 @@ export interface DirectoryStore {
   flares: number | null;
   /** Unclaimed, pending, or claimed — the directory funnel. */
   claimStatus: string;
-  /** CardFlare has confirmed who controls the profile. */
+  /** cardflare has confirmed who controls the profile. */
   verified: boolean;
   /** The commercial tier, separate from verification. */
   ultra: boolean;

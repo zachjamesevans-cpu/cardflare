@@ -118,7 +118,7 @@ export type Accepts = z.infer<typeof acceptsSchema>;
  * How a card's terms read on the board, or null when there is nothing
  * worth saying.
  *
- * Trade-only is silent on purpose. It is what CardFlare has always
+ * Trade-only is silent on purpose. It is what cardflare has always
  * meant and what the overwhelming majority of Flares will be, and a
  * badge repeated on every row is furniture rather than information.
  * The badge earns its space only when the terms are not the default.

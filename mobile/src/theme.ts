@@ -1,5 +1,5 @@
 /**
- * CardFlare's design tokens, mirrored from the website's `@theme` block
+ * cardflare's design tokens, mirrored from the website's `@theme` block
  * (src/app/globals.css). The web tokens are the source of truth; when a
  * value changes there, it changes here. One dark look on both clients —
  * the app should feel like the room page, not like a second product.

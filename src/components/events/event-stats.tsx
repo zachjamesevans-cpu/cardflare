@@ -4,7 +4,7 @@ import type { EventStats } from "@/lib/trades/repository";
 /**
  * The numbers a store reads after a night.
  *
- * Counts only, and deliberately no prices — CardFlare is not a pricing
+ * Counts only, and deliberately no prices — cardflare is not a pricing
  * application, per PRODUCT.md. Trades are the number that answers "was
  * tonight worth hosting"; the funnel above it (players → Flares → offers)
  * says where the room stalls when it stalls. Totals only, never who traded

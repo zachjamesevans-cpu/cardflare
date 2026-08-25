@@ -17,7 +17,7 @@ import { z } from "zod";
  * they push people towards `Password1!` and are no longer recommended.
  *
  * The server-side floor is a Supabase project setting and has to be raised
- * there too; this only governs CardFlare's own forms. See docs/DEPLOYMENT.md.
+ * there too; this only governs cardflare's own forms. See docs/DEPLOYMENT.md.
  */
 export const PASSWORD_MIN = 10;
 

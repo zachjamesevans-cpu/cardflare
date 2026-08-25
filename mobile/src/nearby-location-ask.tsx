@@ -83,7 +83,7 @@ export function NearbyLocationAsk({ onDone }: { onDone: () => void }) {
   return (
     <View style={{ gap: spacing(2.5) }}>
       <Muted>
-        CardFlare knows about shops whether or not they use it yet. Tell us roughly
+        cardflare knows about shops whether or not they use it yet. Tell us roughly
         where you are and we&rsquo;ll list the close ones.
       </Muted>
 
@@ -117,7 +117,7 @@ export function NearbyLocationAsk({ onDone }: { onDone: () => void }) {
               onPress={() => void Linking.openSettings()}
             >
               {settings === "denied"
-                ? "Or allow location for CardFlare in Settings."
+                ? "Or allow location for cardflare in Settings."
                 : "Or turn on Location Services in Settings."}
             </Text>
           ) : null}

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * form, which asked for the address that email had just been sent to, so that
  * a *second* email could carry the link that actually did something. This
  * covers the replacement: a Supabase-minted token wrapped in our own URL,
- * carried by CardFlare's own invitation.
+ * carried by cardflare's own invitation.
  *
  * Supabase is mocked at the admin client rather than at `generateSetupLink`,
  * so the arguments we send Supabase are part of what is under test. Two
@@ -108,7 +108,7 @@ describe("generateSetupLink", () => {
    * The action link is the one Supabase makes look obvious, and it only hands
    * a session to the browser that requested it — which was the admin's
    * server, not the shop owner's phone. An emailed action link dies on any
-   * device that has never touched CardFlare, which is all of them.
+   * device that has never touched cardflare, which is all of them.
    */
   it("never emails the action link, even though Supabase returns one", async () => {
     const link = await generateSetupLink("owner@grandlinegames.com");

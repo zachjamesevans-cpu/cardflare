@@ -42,12 +42,28 @@ The on-page mark stays transparent, since the page is always dark.
   `Logo` component derives the ratio from the file itself, so a future master
   with different proportions stays correctly shaped. Never set both dimensions
   by hand.
-- Always pair the mark with the "CardFlare" wordmark unless space forbids it
+- Always pair the mark with the "cardflare" wordmark unless space forbids it
   (`<Logo markOnly />`).
 - Never stretch, recolour, rotate, or add effects to the mark.
 - Alt text: the mark is decorative when the wordmark is present
-  (`aria-hidden`), and labelled `"CardFlare logo"` when it stands alone. This is
+  (`aria-hidden`), and labelled `"cardflare logo"` when it stands alone. This is
   handled by the `Logo` component — do not hand-roll `<img>` tags for it.
+
+## The name
+
+**Always lowercase: "cardflare".** The founder (2026-08-22, with the
+current wordmark art): "make cardflare all lowercase. Website bar, etc
+... Even the app name will be lowercase." That covers the header, the
+footer, page titles, emails, the TV display, prose, and the app's
+home-screen name. There is no context where "CardFlare" is correct any
+more.
+
+**The wordmark face is Audiowide** (Google Fonts, one weight), matched
+to the same art. It is loaded as `--font-brand-display` on the web and
+bundled as `Audiowide-Regular.ttf` in the app, and it is for the NAME
+ONLY — body text, headings and buttons stay Inter. The wordmark is
+drawn in the accent colour, whole; the old two-tone Card/Flare split
+belonged to the previous mark.
 
 ## Colour
 

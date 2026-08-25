@@ -222,7 +222,7 @@ export function StoreDiscovery() {
             {confirming ? (
               <div className="flex flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-4">
                 <p className="text-sm text-text-primary">
-                  You are about to create {selected.length} unclaimed CardFlare store{" "}
+                  You are about to create {selected.length} unclaimed cardflare store{" "}
                   {selected.length === 1 ? "listing" : "listings"}. They will be drafts
                   until you publish them.
                 </p>
@@ -271,7 +271,7 @@ export function StoreDiscovery() {
                       <Badge tone={VERDICT_TONE[candidate.relevance.verdict]}>
                         {VERDICT_LABEL[candidate.relevance.verdict]}
                       </Badge>
-                      {known && <Badge tone="neutral">Already in CardFlare</Badge>}
+                      {known && <Badge tone="neutral">Already in cardflare</Badge>}
                       {candidate.duplicate === "possible-duplicate" && (
                         <Badge tone="neutral">Possible duplicate</Badge>
                       )}

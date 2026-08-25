@@ -52,7 +52,7 @@ describe("iOS permission strings", () => {
     ]) {
       const why = ios.infoPlist[key];
       expect(why, `${key} must be set`).toBeTypeOf("string");
-      expect(why as string).toContain("CardFlare");
+      expect(why as string).toContain("cardflare");
       expect((why as string).length).toBeGreaterThan(40);
     }
   });

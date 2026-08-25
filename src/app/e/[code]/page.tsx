@@ -650,7 +650,7 @@ export default async function JoinByCodePage({
            */}
           {!accountPlayerId && (
             <p className="text-center text-xs text-text-muted">
-              Have a CardFlare account?{" "}
+              Have a cardflare account?{" "}
               <Link
                 href={`/login?next=/e/${normalized}`}
                 className="text-text-secondary underline underline-offset-4 hover:text-text-primary"

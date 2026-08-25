@@ -25,7 +25,7 @@ export function FlareComposerPreview({ className }: { className?: string }) {
   return (
     <PreviewFrame
       className={className}
-      label="Preview of the CardFlare app: sending a Flare for Portgas D. Ace, OP02-013 manga rare, with the option to accept any printing selected and a quantity of one."
+      label="Preview of the cardflare app: sending a Flare for Portgas D. Ace, OP02-013 manga rare, with the option to accept any printing selected and a quantity of one."
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3.5">
         <Radio className="size-4 text-accent" />

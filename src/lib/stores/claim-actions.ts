@@ -10,7 +10,7 @@ import { readClaim, validateClaim, type ClaimState } from "@/lib/stores/claim-sc
  * A shop owner asking for their listing.
  *
  * Open to anybody, signed in or not, and that is the point: the person
- * behind the counter at an unclaimed shop has no CardFlare account, and
+ * behind the counter at an unclaimed shop has no cardflare account, and
  * making them create one before they can say "this is mine" is a wall
  * in front of the exact door this feature exists to open.
  *

@@ -88,7 +88,7 @@ export function checkAnnouncement(
   if (linkHref && (!linkHref.startsWith("/") || linkHref.startsWith("//"))) {
     return {
       ok: false,
-      message: "The link has to be a path on CardFlare, like /profile/settings.",
+      message: "The link has to be a path on cardflare, like /profile/settings.",
     };
   }
 

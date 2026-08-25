@@ -91,7 +91,7 @@ export async function importStoresAction(
   const parts = [
     `Created ${result.created} unclaimed ${result.created === 1 ? "listing" : "listings"}`,
   ];
-  if (result.skipped > 0) parts.push(`skipped ${result.skipped} already in CardFlare`);
+  if (result.skipped > 0) parts.push(`skipped ${result.skipped} already in cardflare`);
   /* Say WHY, not just how many. A count without the reason sent the
      founder back to the console twice. */
   if (result.failed > 0) {

@@ -8,7 +8,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * The shape is the privacy boundary: no coordinates, no contact email, no
  * provenance beyond the attribution line the licence requires. Everything
  * here is either the shop's own public contact information or something
- * CardFlare decided (verified, tier).
+ * cardflare decided (verified, tier).
  *
  * A DRAFT LISTING IS NOT VISIBLE. An imported candidate nobody approved
  * returns null and the page 404s, which keeps "nothing is published

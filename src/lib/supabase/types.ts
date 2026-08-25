@@ -137,7 +137,7 @@ export type StoreInsert = Omit<
  *
  * Everything an insert may set, plus the three an insert may NOT:
  * `listing_state` publishes a discovered draft, `verified_at` records
- * that CardFlare confirmed who controls the profile, and `tier` is the
+ * that cardflare confirmed who controls the profile, and `tier` is the
  * commercial product. All three are set by a person, behind
  * `requireAdmin`, and never accepted from a client payload.
  */
@@ -1068,7 +1068,7 @@ export type PlayerLocalInsert = Omit<PlayerLocalRow, "id" | "created_at"> & {
 };
 
 /**
- * A notice from CardFlare, shown on the Feed.
+ * A notice from cardflare, shown on the Feed.
  *
  * The only authored thing on a screen that is otherwise entirely
  * derived, and not a player: it wears the mark, cannot be followed, and

@@ -13,7 +13,7 @@ import {
  * A screen's data: last visit's copy immediately, this visit's shortly.
  *
  * The pattern every screen in the app now uses, and the answer to the
- * founder's complaint that opening CardFlare means watching it assemble
+ * founder's complaint that opening cardflare means watching it assemble
  * itself. Paint what we had, fetch what is true, swap. Instagram and
  * TikTok feel instant for exactly this reason and no other.
  *

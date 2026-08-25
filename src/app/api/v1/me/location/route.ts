@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 /**
  * The ZIP a player typed, when they will not grant device location.
  *
- * The app's fallback and the only position CardFlare ever writes down.
+ * The app's fallback and the only position cardflare ever writes down.
  * A granted coordinate is NOT stored - it rides the feed request as a
  * query param and is gone (see /api/v1/feed) - so this endpoint is the
  * whole of what persists, and it is five coarse digits.

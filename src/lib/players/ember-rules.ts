@@ -14,7 +14,7 @@
 /**
  * A trade with somebody you have not traded with before.
  *
- * The big one, because meeting a new person is the thing CardFlare is
+ * The big one, because meeting a new person is the thing cardflare is
  * actually for. Ten is chosen against the catalogue rather than in the
  * abstract: the cheapest paid cosmetic is 150, so a new player has
  * something to aim at after a handful of nights rather than after one.

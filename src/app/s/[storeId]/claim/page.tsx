@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
  * is a directory, not a product.
  *
  * NO ACCOUNT REQUIRED. The person behind the counter has never heard of
- * CardFlare; asking them to sign up before they can say "this is mine"
+ * cardflare; asking them to sign up before they can say "this is mine"
  * is a wall in front of the exact door this opens. They give a name and
  * an address, an admin reads it, and the account comes later if the
  * answer is yes.
@@ -59,7 +59,7 @@ export default async function ClaimStorePage({
             Claim {store.name}
           </h1>
           <p className="text-sm text-text-secondary">
-            CardFlare listed this shop from public map data so players could find it. If
+            cardflare listed this shop from public map data so players could find it. If
             you work there, tell us and we&rsquo;ll hand the listing over.
           </p>
           {store.address && <p className="text-xs text-text-muted">{store.address}</p>}
@@ -72,7 +72,7 @@ export default async function ClaimStorePage({
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-elevated p-4">
           <p className="text-sm font-semibold text-text-primary">What happens next</p>
           <ul className="flex flex-col gap-1.5 text-xs text-text-muted">
-            <li>A person at CardFlare reads this and emails you back.</li>
+            <li>A person at cardflare reads this and emails you back.</li>
             <li>
               Nothing about the listing changes until we&rsquo;ve confirmed you work
               there.

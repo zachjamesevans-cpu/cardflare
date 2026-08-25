@@ -60,7 +60,7 @@ test.describe("waitlist form", () => {
     await expect(page.getByText("Please enter your email address.")).toBeVisible();
 
     // The consent box is optional, so an empty form must not complain about it.
-    await expect(page.getByText(/CardFlare news, event announcements/i)).toBeVisible();
+    await expect(page.getByText(/cardflare news, event announcements/i)).toBeVisible();
     await expect(page.getByRole("checkbox")).not.toHaveAttribute("aria-invalid");
   });
 

@@ -161,7 +161,7 @@ async function StoreDetailsSection({
          * The store id, because it is the thing that survives everything
          * else. A discovered listing, the claim that follows it and the
          * account that eventually signs in all point at this row - so a
-         * store never re-enters what CardFlare already knows about it.
+         * store never re-enters what cardflare already knows about it.
          */}
         <p className="font-mono text-xs text-text-muted">Store ID {store.id}</p>
       </div>

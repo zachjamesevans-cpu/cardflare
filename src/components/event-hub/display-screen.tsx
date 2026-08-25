@@ -173,7 +173,7 @@ function Header({
             Reconnecting
           </span>
         )}
-        {/* CardFlare stays present without competing with the shop. */}
+        {/* cardflare stays present without competing with the shop. */}
         <Logo size={28} />
       </div>
     </header>

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * A shop owner asking for their listing, from the app.
  *
  * NO AUTH, deliberately, and the same reasoning as the website's form:
- * the person behind the counter at an unclaimed shop has no CardFlare
+ * the person behind the counter at an unclaimed shop has no cardflare
  * account, and making them create one before they can say "this is
  * mine" is a wall in front of the exact door this opens.
  *

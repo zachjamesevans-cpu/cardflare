@@ -106,7 +106,7 @@ export function AnnouncementForm() {
           {/* Said here as well as enforced in two other places, because
               the reason is not obvious from a rejection message. */}
           <p className="text-xs text-text-muted">
-            A path on CardFlare &mdash; links off our own origin are refused. Leave both
+            A path on cardflare &mdash; links off our own origin are refused. Leave both
             of these empty for a notice with no button.
           </p>
         </div>

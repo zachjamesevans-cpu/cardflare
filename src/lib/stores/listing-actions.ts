@@ -13,7 +13,7 @@ import type { ListingState } from "@/lib/stores/listing-schema";
  * THREE ACTIONS, NOT ONE, because they are three different decisions and
  * conflating them is exactly the mistake the schema was built to prevent.
  * Publishing says a discovered record is real enough to show. Verifying
- * says CardFlare confirmed who controls the profile - it is trust, and it
+ * says cardflare confirmed who controls the profile - it is trust, and it
  * is never for sale. Ultra is the commercial tier. A store can be
  * published and unverified, verified and free, or all three.
  *
@@ -89,7 +89,7 @@ export async function setVerifiedAction(
   return ok
     ? {
         status: "done",
-        message: verified ? "Marked CardFlare Verified." : "Verification removed.",
+        message: verified ? "Marked cardflare Verified." : "Verification removed.",
       }
     : { status: "error", message: "That did not save." };
 }

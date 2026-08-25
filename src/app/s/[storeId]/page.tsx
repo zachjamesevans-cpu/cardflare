@@ -17,9 +17,9 @@ export const dynamic = "force-dynamic";
 /**
  * A store, as a player sees it — claimed or not.
  *
- * The point of the directory: "I do NOT want the CardFlare store
+ * The point of the directory: "I do NOT want the cardflare store
  * experience to look empty just because an LGS has not personally signed
- * up." So this renders for a shop that has never heard of CardFlare, and
+ * up." So this renders for a shop that has never heard of cardflare, and
  * it is careful about what it says.
  *
  * FACTUAL INFORMATION ONLY on an unclaimed listing. No logo, no photos,
@@ -58,7 +58,7 @@ export default async function StoreProfilePage({
               {store.verified && (
                 <BadgeCheck
                   className="size-5 text-accent"
-                  aria-label="CardFlare Verified"
+                  aria-label="cardflare Verified"
                 />
               )}
               {store.ultra && (
@@ -70,7 +70,7 @@ export default async function StoreProfilePage({
 
             {store.verified ? (
               <p className="mt-1 text-xs text-text-muted">
-                CardFlare Verified means CardFlare has confirmed that this profile is
+                cardflare Verified means cardflare has confirmed that this profile is
                 controlled by the listed business. It is not an endorsement or guarantee
                 of the business.
               </p>
@@ -115,7 +115,7 @@ export default async function StoreProfilePage({
             </p>
             <p className="text-xs text-text-muted">
               Claiming lets you keep the details right and run rooms from your own
-              counter code. CardFlare confirms ownership before anything changes.
+              counter code. cardflare confirms ownership before anything changes.
             </p>
             <Link
               href={`/s/${store.storeId}/claim`}

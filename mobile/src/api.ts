@@ -173,7 +173,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     };
   }
 
-  return { ok: false, message: "Could not reach CardFlare. Try again." };
+  return { ok: false, message: "Could not reach cardflare. Try again." };
 }
 
 async function refreshAccessToken(): Promise<boolean> {
@@ -1018,7 +1018,7 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
 
 export type FeedItem =
   /**
-   * A notice from CardFlare. The only authored item on the Feed, and
+   * A notice from cardflare. The only authored item on the Feed, and
    * not a player: it wears the mark, cannot be followed, and carries
    * an expiry that takes it away without anybody remembering to.
    */
@@ -1203,10 +1203,10 @@ export type FeedItem =
       }[];
     }
   /**
-   * Shops near you, whether or not they use CardFlare yet.
+   * Shops near you, whether or not they use cardflare yet.
    *
    * Verified and Ultra travel separately and mean different things:
-   * Verified is "CardFlare confirmed this profile is controlled by the
+   * Verified is "cardflare confirmed this profile is controlled by the
    * listed business", Ultra is a product tier. Never infer one from the
    * other. No coordinate reaches here — miles only.
    */
@@ -1410,7 +1410,7 @@ export interface ClaimFields {
 
 /**
  * Claiming a listing. No account needed, on purpose — the person behind
- * the counter has never heard of CardFlare, and a sign-in wall in front
+ * the counter has never heard of cardflare, and a sign-in wall in front
  * of "this shop is mine" defeats the whole directory.
  */
 export const claimStore = (storeId: string, fields: ClaimFields) =>

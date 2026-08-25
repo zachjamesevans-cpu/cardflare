@@ -90,7 +90,7 @@ export default async function LoginPage(props: {
         <PasswordSignInForm next={next} />
 
         <p className="text-center text-sm text-text-muted">
-          New to CardFlare?{" "}
+          New to cardflare?{" "}
           <Link href="/signup" className="text-accent hover:underline">
             Create an account
           </Link>

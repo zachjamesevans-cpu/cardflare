@@ -22,7 +22,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="What CardFlare is">
+      <LegalSection heading="What cardflare is">
         <p>
           {SITE.name} is a discovery and coordination tool. It helps players at the same
           physical event find out who has the cards they are looking for, and helps them

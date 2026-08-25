@@ -166,7 +166,7 @@ export async function addToListAction(
     if (!hasFeature("showcase", tier)) {
       return {
         status: "error",
-        message: "Showcasing a card is a CardFlare Pro feature.",
+        message: "Showcasing a card is a cardflare Pro feature.",
       };
     }
   }

@@ -184,7 +184,7 @@ function Splash({
           letterSpacing: 0.5,
         }}
       >
-        CardFlare
+        cardflare
       </Text>
       <Text
         style={{
@@ -364,7 +364,7 @@ function GamesStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        When locals near you go up on CardFlare, this is how we know which ones are
+        When locals near you go up on cardflare, this is how we know which ones are
         yours. Pick any number.
       </Body>
 

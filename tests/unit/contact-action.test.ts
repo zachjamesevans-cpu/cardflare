@@ -35,7 +35,7 @@ function form(fields: Record<string, string>): FormData {
 const GOOD = {
   name: "Zach",
   email: "zach@example.com",
-  subject: "Running CardFlare at our locals",
+  subject: "Running cardflare at our locals",
   message: "We run One Piece on Fridays. How do we get set up?",
 };
 
@@ -57,7 +57,7 @@ describe("submitContact", () => {
 
     const [message] = sendEmail.mock.calls[0] as [Record<string, string>];
     expect(message.to).toBe("info@cardflare.gg");
-    expect(message.subject).toContain("Running CardFlare at our locals");
+    expect(message.subject).toContain("Running cardflare at our locals");
     expect(message.text).toContain("We run One Piece on Fridays");
     // Hitting reply must reach the person who wrote in.
     expect(message.replyTo).toBe("zach@example.com");

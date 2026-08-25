@@ -27,7 +27,7 @@ import type { PlaceCandidate, PlacesProvider, PlacesSearch } from "./provider";
  * change, which is right: a snapshot is a reviewed artifact, and the
  * review is the pull request that adds it.
  *
- * A snapshot is not a listing. Nothing in the file exists in CardFlare
+ * A snapshot is not a listing. Nothing in the file exists in cardflare
  * until somebody presses Import, and an import creates unclaimed drafts
  * that players cannot see either.
  */

@@ -13,7 +13,14 @@ import { CosmeticCard } from "../cosmetic-card";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
 import { WornAura, WornRing } from "../cosmetic-worn";
-import { hasAuraArt, hasRingArt } from "../cosmetic-art-data";
+import { WornBadge, WornName, WornTitle } from "../worn-name";
+import {
+  hasAuraArt,
+  hasBadgeArt,
+  hasNameArt,
+  hasRingArt,
+  hasTitleArt,
+} from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -89,6 +96,26 @@ const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
  * avatar draws them in, so what a tile shows is what a profile shows.
  */
 function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) {
+  /* A name style previews on a name - the same one the website uses. */
+  if (kind === "nameplate" && hasNameArt(slug)) {
+    return (
+      <WornName
+        name="CHUNC"
+        nameplate={slug}
+        fontSize={16}
+        baseStyle={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary }}
+      />
+    );
+  }
+
+  if (kind === "badge" && hasBadgeArt(slug)) {
+    return <WornBadge badge={slug} />;
+  }
+
+  if (kind === "title" && hasTitleArt(slug)) {
+    return <WornTitle title={slug} />;
+  }
+
   /* A card border previews on a card, because that is where it goes. */
   if (kind === "border" && drawsBorder(slug)) {
     return (
@@ -289,7 +316,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         <Ionicons name="information-circle" size={16} color={colors.textMuted} />
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
           {area === "profile"
-            ? "Profile borders and avatar effects are drawn here now. The rest of these, and any Rive file dropped into them, still draw in full only on your web profile. Wearing one here equips it everywhere."
+            ? "Profile borders, avatar effects, name styles, titles and badges are drawn here now. Profile effects, and any Rive file dropped in, still draw in full only on your web profile. Wearing one here equips it everywhere."
             : "Card borders are drawn here now. Holo patterns, card animations, showcase backgrounds and any Rive file dropped in still draw in full only on your web profile. Wearing one here equips it everywhere."}
         </Text>
       </View>

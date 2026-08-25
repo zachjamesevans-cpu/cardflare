@@ -13,7 +13,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * Two different things wear the word "email" here, and the split is
  * deliberate everywhere below:
  *
- * - **Contact email** — a column on `stores`. Where CardFlare writes to.
+ * - **Contact email** — a column on `stores`. Where cardflare writes to.
  * - **Sign-in email** — the Supabase auth user. What somebody types to
  *   get in. Changing one never changes the other, because a store whose
  *   billing address differs from the owner's login is normal, and

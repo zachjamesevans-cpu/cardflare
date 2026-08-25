@@ -23,7 +23,7 @@ import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/s
  *
  * Raw and slab are radios rather than a select: they change which fields
  * exist, and a choice that reshapes the form should not hide in a dropdown.
- * **No price field**, deliberately — per PRODUCT.md, CardFlare walks the
+ * **No price field**, deliberately — per PRODUCT.md, cardflare walks the
  * buyer to the booth; the sticker does the rest.
  */
 

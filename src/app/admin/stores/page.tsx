@@ -131,7 +131,7 @@ export default async function AdminStoresPage() {
        * Finding shops that are not customers yet.
        *
        * Below the operator list on purpose: this page is for the stores
-       * CardFlare already works with, and discovery is the occasional act
+       * cardflare already works with, and discovery is the occasional act
        * of widening the map. Nothing here publishes anything - an import
        * creates unclaimed drafts, and a draft is invisible to players.
        */}
@@ -141,7 +141,7 @@ export default async function AdminStoresPage() {
             Store directory
           </h3>
           <p className="max-w-2xl text-sm text-text-secondary">
-            A shop can exist in CardFlare before it is a customer. Discovered stores
+            A shop can exist in cardflare before it is a customer. Discovered stores
             land as unclaimed drafts; they become visible to players only when you
             publish them, and Verified and Ultra are set by hand afterwards.
           </p>
@@ -171,7 +171,7 @@ export default async function AdminStoresPage() {
        *
        * Its own section rather than a tab inside discovery, and above
        * "Invite a store" on purpose: a claim is a shop that found
-       * CardFlare by itself, which is worth more attention than one we
+       * cardflare by itself, which is worth more attention than one we
        * went looking for. The count is in the heading because a queue
        * nobody can see the length of is a queue nobody works.
        */}

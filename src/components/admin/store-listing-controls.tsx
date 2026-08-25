@@ -17,7 +17,7 @@ import { LISTING_IDLE, type ListingState } from "@/lib/stores/listing-schema";
  * Publish, verify, Ultra — three decisions, three controls.
  *
  * Deliberately not one "status" dropdown. Publishing says a discovered
- * record is real enough to show a player. Verifying says CardFlare
+ * record is real enough to show a player. Verifying says cardflare
  * confirmed who controls the profile, which is trust and is never for
  * sale. Ultra is the commercial tier. A single control implying they
  * move together is precisely the confusion the schema was built to stop.
@@ -103,7 +103,7 @@ export function StoreListingControls({
           />
           <span className="flex-1 text-sm text-text-secondary">
             {verified
-              ? "CardFlare Verified — confirmed the business controls this profile"
+              ? "cardflare Verified — confirmed the business controls this profile"
               : "Not verified"}
           </span>
           <Pending

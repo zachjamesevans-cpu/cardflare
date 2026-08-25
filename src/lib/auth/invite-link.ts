@@ -12,7 +12,7 @@ import { siteUrl } from "@/lib/site";
  * thing, and the first of them did nothing but point at a form.
  *
  * Supabase can mint the credential without sending anything, so it goes into
- * CardFlare's own invitation email — one message, our wording, and the store
+ * cardflare's own invitation email — one message, our wording, and the store
  * lands on a page with their address already filled in.
  *
  * **Built from `hashed_token`, never from `action_link`.** `generateLink`
@@ -22,7 +22,7 @@ import { siteUrl } from "@/lib/site";
  * *requested* the link is the one opening it — a URL fragment a server route
  * never sees, or a PKCE code whose verifier lives in a cookie only the
  * requester holds. Here the requester was the admin's server, and the opener
- * is a shop owner's phone that has never touched CardFlare. So the email
+ * is a shop owner's phone that has never touched cardflare. So the email
  * carries our own URL with the hashed token, and `/auth/confirm` redeems it
  * server-side with `verifyOtp`, which works no matter which device opens it.
  *

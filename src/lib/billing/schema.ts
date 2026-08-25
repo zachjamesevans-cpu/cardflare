@@ -1,8 +1,8 @@
 /**
  * The tiers, and what being paid means — pure, importable anywhere.
  *
- * Three tiers, two owner shapes: CardFlare Pro belongs to a player;
- * CardFlare Ultra and CardFlare Max belong to a store row, because a
+ * Three tiers, two owner shapes: cardflare Pro belongs to a player;
+ * cardflare Ultra and cardflare Max belong to a store row, because a
  * vendor IS a store with kind "vendor" (Milestone 9's one-switch
  * design). Every feature gate in the product asks this module, never a
  * payment provider: whichever of Stripe or Apple sold the subscription,
@@ -23,9 +23,9 @@ export function isTier(value: string): value is Tier {
 
 /** The names as marketing says them, the only place they are spelled. */
 export const TIER_LABELS: Record<Tier, string> = {
-  pro: "CardFlare Pro",
-  ultra: "CardFlare Ultra",
-  max: "CardFlare Max",
+  pro: "cardflare Pro",
+  ultra: "cardflare Ultra",
+  max: "cardflare Max",
 };
 
 /** Who a tier can belong to. */

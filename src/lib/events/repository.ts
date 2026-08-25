@@ -296,7 +296,7 @@ export function toPublicEvent(row: PublicRoomRow): PublicEvent {
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     storeId: row.store_id,
-    storeName: row.stores?.name ?? "A CardFlare store",
+    storeName: row.stores?.name ?? "A cardflare store",
     storeCity: row.stores?.city ?? null,
     storeRegion: row.stores?.region ?? null,
     // UTC is the column default, so it is also the right fallback when the

@@ -96,7 +96,7 @@ function fromAddressCheck(): ConfigCheck {
       label,
       variable,
       status: "warn",
-      detail: `"${raw}" is not a valid address. Expected "CardFlare <hello@example.com>" or "hello@example.com".`,
+      detail: `"${raw}" is not a valid address. Expected "cardflare <hello@example.com>" or "hello@example.com".`,
     };
   }
 
@@ -110,7 +110,7 @@ function fromAddressCheck(): ConfigCheck {
       label,
       variable,
       status: "warn",
-      detail: `Sending as ${address} with no display name, so inboxes will show "${address.split("@")[0]}" as the sender. Use "CardFlare <${address}>" instead.`,
+      detail: `Sending as ${address} with no display name, so inboxes will show "${address.split("@")[0]}" as the sender. Use "cardflare <${address}>" instead.`,
     };
   }
 
@@ -180,7 +180,7 @@ function cardImagesCheck(facts: ConfigFacts): ConfigCheck {
     detail:
       (on
         ? "On. Provider-supplied artwork is rendered where a URL exists."
-        : "Off. The CardFlare placeholder is shown and no third-party image is requested.") +
+        : "Off. The cardflare placeholder is shown and no third-party image is requested.") +
       supply,
   };
 }

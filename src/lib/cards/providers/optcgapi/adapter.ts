@@ -84,7 +84,7 @@ const CARD_GROUPS = [
  */
 export const DON_EXCLUSION =
   "DON!! cards are not imported: the provider's records carry no card number, " +
-  "and CardFlare does not invent one.";
+  "and cardflare does not invent one.";
 
 /** Sample mode caps per endpoint, chosen to land in the 75–150 band overall. */
 const SAMPLE_CAPS: Record<keyof typeof OPTCGAPI_ENDPOINTS, number> = {
@@ -201,7 +201,7 @@ export class OptcgApiProvider implements CardDataProvider {
   }
 
   /**
-   * Turns one provider record into a CardFlare card.
+   * Turns one provider record into a cardflare card.
    *
    * Failures are returned, never thrown: one malformed record in a bulk
    * response must not abandon the rest of the run. The record is carried on

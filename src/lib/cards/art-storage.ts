@@ -1,5 +1,5 @@
 /**
- * Where CardFlare's own card art lives, and what it is called.
+ * Where cardflare's own card art lives, and what it is called.
  *
  * Free of server-only imports so the path rules can be unit-tested, and
  * so the admin's browser can build the same paths it is about to upload

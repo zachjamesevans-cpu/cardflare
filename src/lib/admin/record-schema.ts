@@ -47,7 +47,7 @@ export const editStoreSchema = z.object({
     .min(1, "Please enter the store's name.")
     .max(120, "Please keep the name under 120 characters."),
   /**
-   * Where CardFlare writes. Not the same thing as a sign-in address.
+   * Where cardflare writes. Not the same thing as a sign-in address.
    *
    * OPTIONAL, because an unclaimed listing has nobody to write to and
    * requiring one would make the admin invent an address to save a
@@ -66,7 +66,7 @@ export const editStoreSchema = z.object({
    * been asked for any of them and editing its name must not demand an
    * address. `contactEmail` is where a discovered listing gets one: an
    * imported store is created with none, and this is how it gets the
-   * address CardFlare writes to before anybody claims it.
+   * address cardflare writes to before anybody claims it.
    */
   addressLine: optionalText(160),
   postalCode: optionalText(20),
@@ -76,7 +76,7 @@ export const editStoreSchema = z.object({
   /*
    * Where it is, which is what makes "2.1 miles away" possible.
    *
-   * A store CardFlare already had has no coordinate - nobody was ever
+   * A store cardflare already had has no coordinate - nobody was ever
    * asked for one - so a player whose only saved shop is an old customer
    * gets no Nearby section at all, whatever is published around them.
    * This is where that gets fixed by hand until claiming collects it.

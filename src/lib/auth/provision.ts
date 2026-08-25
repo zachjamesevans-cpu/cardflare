@@ -13,7 +13,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
  * no account, got no link, and could never sign in.
  *
  * The account is created here instead: deliberately, by an admin inviting a
- * store, which is the only place a CardFlare account should ever come from.
+ * store, which is the only place a cardflare account should ever come from.
  *
  * `email_confirm: true` because the invitation *is* the confirmation — an
  * admin typed this address in. Without it Supabase would want a separate

@@ -21,7 +21,7 @@ export function ForPlayers() {
             id="for-players-title"
             eyebrow="For Players"
             title="The room is full of the cards you need"
-            description="You just cannot see them. CardFlare makes the binders around you searchable for the length of the event."
+            description="You just cannot see them. cardflare makes the binders around you searchable for the length of the event."
             align="left"
           />
 

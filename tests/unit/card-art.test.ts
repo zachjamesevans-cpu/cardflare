@@ -20,7 +20,7 @@ import {
 } from "@/lib/cards/import-schema";
 
 /**
- * Card art CardFlare hosts itself.
+ * Card art cardflare hosts itself.
  *
  * The value in `card_printings.image_url` used to be one shape — a
  * provider's https URL — and is now two, because OP-17 has no provider

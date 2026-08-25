@@ -14,9 +14,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * That is fine for a magic link somebody requested ten seconds ago, and
  * useless for an invitation minted by an admin's server and opened on a shop
  * owner's phone. `verifyOtp` checks the hashed token with Supabase directly,
- * so no prior contact with CardFlare is needed.
+ * so no prior contact with cardflare is needed.
  *
- * `type` is pinned to `recovery` — the only kind of link CardFlare ever puts
+ * `type` is pinned to `recovery` — the only kind of link cardflare ever puts
  * in an email that lands here — rather than passed through from the query
  * string. The token decides whether verification succeeds; refusing other
  * types just keeps this route from becoming a general-purpose verifier with

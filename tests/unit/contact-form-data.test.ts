@@ -24,7 +24,7 @@ function form(fields: Record<string, string>): FormData {
 const GOOD = {
   name: "Zach",
   email: "Zach@Example.COM",
-  subject: "Running CardFlare at our locals",
+  subject: "Running cardflare at our locals",
   message: "We run One Piece on Fridays. How do we get set up?",
 };
 
@@ -37,7 +37,7 @@ describe("parseContactFormData", () => {
       data: {
         name: "Zach",
         email: "zach@example.com",
-        subject: "Running CardFlare at our locals",
+        subject: "Running cardflare at our locals",
         message: "We run One Piece on Fridays. How do we get set up?",
       },
     });

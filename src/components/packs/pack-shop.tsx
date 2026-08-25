@@ -101,7 +101,7 @@ export function PackArt({
         height={80}
         className="relative h-20 w-auto"
       />
-      <p className="relative font-bold tracking-wide text-text-primary">CardFlare</p>
+      <p className="relative font-bold tracking-wide text-text-primary">cardflare</p>
       <p className="relative text-xs text-text-muted">
         {name} · Set {setNumber}
       </p>

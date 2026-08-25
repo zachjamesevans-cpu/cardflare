@@ -26,9 +26,9 @@ describe("the tier table", () => {
 
   it("spells the names the way marketing does", () => {
     expect(TIER_LABELS).toEqual({
-      pro: "CardFlare Pro",
-      ultra: "CardFlare Ultra",
-      max: "CardFlare Max",
+      pro: "cardflare Pro",
+      ultra: "cardflare Ultra",
+      max: "cardflare Max",
     });
   });
 

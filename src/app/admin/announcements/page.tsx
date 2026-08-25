@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Notices from CardFlare, and the form that writes the next one.
+ * Notices from cardflare, and the form that writes the next one.
  *
  * The only surface in the product where an operator's words reach every
  * player. It is deliberately small: one notice shows at a time, every
@@ -54,8 +54,8 @@ export default async function AdminAnnouncementsPage() {
 
         <h2 className="text-xl font-bold text-text-primary">Announcements</h2>
         <p className="max-w-2xl text-sm text-text-secondary">
-          A notice from CardFlare, at the top of every player&rsquo;s Feed. It wears the
-          mark rather than a face &mdash; there is no CardFlare account and nobody can
+          A notice from cardflare, at the top of every player&rsquo;s Feed. It wears the
+          mark rather than a face &mdash; there is no cardflare account and nobody can
           follow it &mdash; and it leaves on its own when it expires. The newest one
           showing is the one they see.
         </p>

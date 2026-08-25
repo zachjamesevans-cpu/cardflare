@@ -51,7 +51,7 @@ describe("ProviderHttp", () => {
 
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect((init.headers as Record<string, string>)["user-agent"]).toContain(
-      "CardFlare",
+      "cardflare",
     );
   });
 

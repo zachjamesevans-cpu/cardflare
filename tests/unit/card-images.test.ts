@@ -20,7 +20,7 @@ afterEach(() => {
 
 describe("cardImagesEnabled", () => {
   /*
-   * Off unless explicitly switched on. CardFlare does not own card artwork, so
+   * Off unless explicitly switched on. cardflare does not own card artwork, so
    * an install that has made no decision must not be requesting third-party
    * images.
    */

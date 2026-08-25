@@ -8,7 +8,7 @@
  *
  * - **Prices are dropped at the door.** The export carries several price
  *   columns; nothing here reads them, and the output shape has nowhere to
- *   put one. PRODUCT.md: CardFlare shows no prices, so it stores none.
+ *   put one. PRODUCT.md: cardflare shows no prices, so it stores none.
  * - **Nothing is guessed.** A row without a recognisable card number or a
  *   positive quantity is reported as skipped, with its line number and a
  *   reason, rather than silently dropped or fuzzily matched. The store sees

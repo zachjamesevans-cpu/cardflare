@@ -4,7 +4,7 @@ import type { AnnouncementRow } from "@/lib/supabase/types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
- * Notices from CardFlare.
+ * Notices from cardflare.
  *
  * The one authored thing on the Feed. Everything else there is derived
  * — a board is open or it is not, a friend posted or they did not — and
@@ -12,7 +12,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * a quiet Tuesday opens nothing at all. A release week has something to
  * say, and this is the only way to say it.
  *
- * Not a player account, which was the other way to build it: a CardFlare
+ * Not a player account, which was the other way to build it: a cardflare
  * row in `players` would be followable, unfollowable, and a face on a
  * screen where every other face belongs to somebody who stood in a shop.
  * See the migration for the full argument.

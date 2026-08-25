@@ -8,11 +8,11 @@ import { cn } from "@/lib/cn";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 
 /**
- * CardFlare's own placeholder.
+ * cardflare's own placeholder.
  *
- * A generic card silhouette in CardFlare's palette. Deliberately not a mock
+ * A generic card silhouette in cardflare's palette. Deliberately not a mock
  * One Piece card — it must never be mistaken for real artwork or imply a
- * licence CardFlare does not have. Inline SVG so it costs no request and
+ * licence cardflare does not have. Inline SVG so it costs no request and
  * cannot itself fail to load.
  */
 function Placeholder({ className }: { className?: string }) {

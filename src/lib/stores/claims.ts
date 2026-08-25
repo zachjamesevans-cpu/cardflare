@@ -56,7 +56,7 @@ export async function submitClaim(
   fields: ClaimFields,
 ): Promise<{ ok: boolean; claimId?: string; error?: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: "CardFlare is not connected to its database." };
+    return { ok: false, error: "cardflare is not connected to its database." };
   }
 
   const admin = getSupabaseAdmin();
@@ -207,7 +207,7 @@ export function sameDomain(email: string, website: string | null): boolean {
  * contact address is a shop nobody can reach, which is the state this
  * whole feature exists to end.
  *
- * It does NOT verify and it does NOT change tier. CardFlare Verified is
+ * It does NOT verify and it does NOT change tier. cardflare Verified is
  * a separate decision about whether we confirmed who they are, and
  * Ultra is a commercial tier. Somebody who claims a listing has neither
  * until an admin says so, which is why they are three controls.
@@ -219,7 +219,7 @@ export async function decideClaim(
   reviewNote: string,
 ): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: "CardFlare is not connected to its database." };
+    return { ok: false, error: "cardflare is not connected to its database." };
   }
 
   const admin = getSupabaseAdmin();

@@ -30,8 +30,8 @@ export function WaitlistSuccess({ alreadyRegistered, onReset }: WaitlistSuccessP
 
         <p className="mx-auto max-w-md text-pretty text-text-secondary">
           {alreadyRegistered
-            ? "That email is already on the CardFlare waitlist, so there's nothing else to do. We'll keep you updated as we prepare for our first local-store pilots."
-            : "We'll keep you updated as CardFlare prepares for its first local-store pilots. Look out for an email when early testing opens up."}
+            ? "That email is already on the cardflare waitlist, so there's nothing else to do. We'll keep you updated as we prepare for our first local-store pilots."
+            : "We'll keep you updated as cardflare prepares for its first local-store pilots. Look out for an email when early testing opens up."}
         </p>
       </div>
 

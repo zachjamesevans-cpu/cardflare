@@ -4,6 +4,9 @@ import { cn } from "@/lib/cn";
 import { CosmeticFilm } from "@/components/players/cosmetic-film";
 import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import type { EquipKind } from "@/lib/players/equips";
+import { BADGE_MARK_FALLBACK, BADGE_MARKS, titleWords } from "@/lib/players/worn-words";
+
+export { titleWords };
 
 /**
  * The equipped catalogue, worn on a real profile.
@@ -25,30 +28,6 @@ export type WornArt = Partial<Record<EquipKind, CosmeticArtFileRef | null>>;
  * their face shows - rosters, popups, boards - and every one of those
  * already renders PlayerAvatar.
  */
-
-/**
- * What a title chip says.
- *
- * The seeded titles have wording of their own - "Your line here" is
- * not what `title-custom-tagline` would spell out - so the map wins
- * where it has an answer. Everything else reads its own slug, which is
- * built from the cosmetic's name in the first place.
- *
- * The fallback used to be the literal word "Title", which meant every
- * title dropped in through the console announced itself as "Title".
- * The founder hit exactly that with Founder.
- */
-export function titleWords(slug: string): string {
-  const known = TITLE_WORDS[slug];
-  if (known) return known;
-
-  return slug
-    .replace(/^title-/, "")
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 /** The name row: nameplate style, badge beside, title under. */
 export function WornNameRow({
@@ -73,7 +52,7 @@ export function WornNameRow({
         </span>
         {worn.badge && (
           <span className={cn("cfx-badge", `cfa-${worn.badge}`)}>
-            {BADGE_MARKS[worn.badge] ?? "✦"}
+            {BADGE_MARKS[worn.badge] ?? BADGE_MARK_FALLBACK}
           </span>
         )}
       </span>
@@ -192,24 +171,3 @@ export function WornBackdrop({ rive }: { rive?: WornArt }) {
 export function backgroundClass(worn: Worn): string | undefined {
   return worn.background ? `cfa-${worn.background}` : undefined;
 }
-
-const TITLE_WORDS: Record<string, string> = {
-  "title-founder": "Founder",
-  "title-custom-tagline": "Your line here",
-  "title-trade-milestone": "Trade milestone",
-  "title-collector": "Collector",
-  "title-closer": "Closer",
-  "title-regular": "Regular",
-};
-
-const BADGE_MARKS: Record<string, string> = {
-  "badge-founder": "✦",
-  "badge-beta-tester": "β",
-  "badge-vendor": "⚑",
-  "badge-lgs-staff": "♠",
-  "badge-tournament-organizer": "♛",
-  "badge-early-adopter": "☀",
-  "badge-100-trades": "100",
-  "badge-500-trades": "500",
-  "badge-1000-trades": "1K",
-};

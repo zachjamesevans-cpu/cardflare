@@ -13,7 +13,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * and returns candidates with a verdict and a duplicate check attached;
  * `importCandidates` writes rows, and only for ids an admin has named.
  * Nothing here publishes: an imported store lands as `draft`, which is
- * what keeps "nothing gets published without CardFlare admin approval"
+ * what keeps "nothing gets published without cardflare admin approval"
  * a fact about the database rather than a promise about the console.
  *
  * PHASE 1 USES FIXTURES. The provider is chosen here, in one line, and
@@ -188,7 +188,7 @@ export async function discover(
 
 export interface ImportResult {
   created: number;
-  /** Already in CardFlare, matched by provider id. Not a problem. */
+  /** Already in cardflare, matched by provider id. Not a problem. */
   skipped: number;
   /** Tried and failed. A problem, and never to be reported as a skip. */
   failed: number;

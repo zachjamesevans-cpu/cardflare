@@ -279,13 +279,13 @@ export interface SuggestionItem {
 }
 
 /**
- * A notice from CardFlare.
+ * A notice from cardflare.
  *
  * The only authored item on the Feed, and the only one that is not a
  * player: it wears the mark rather than a face, and there is nothing to
- * follow or unfollow. The founder floated an official CardFlare account
+ * follow or unfollow. The founder floated an official cardflare account
  * instead — "everyone has one following when they first load the app" —
- * and this is deliberately not that. A CardFlare row in `players` would
+ * and this is deliberately not that. A cardflare row in `players` would
  * be a fake person on a screen where every other face belongs to
  * somebody who stood in a shop.
  *
@@ -458,15 +458,15 @@ export interface RecentItem {
 }
 
 /**
- * Shops near the player, whether or not they are CardFlare customers.
+ * Shops near the player, whether or not they are cardflare customers.
  *
- * The half of "CardFlare knows where cards are" that works with nobody
+ * The half of "cardflare knows where cards are" that works with nobody
  * else present. A store listing is true on the quietest Tuesday in the
  * emptiest market, which is exactly the cold start this is for - and the
  * founder's rule holds: real shops only, never an invented one.
  *
  * VERIFIED AND ULTRA TRAVEL SEPARATELY, because they mean different
- * things. Verified is "CardFlare confirmed this profile is controlled by
+ * things. Verified is "cardflare confirmed this profile is controlled by
  * the listed business"; Ultra is a product tier. A row may show one,
  * both, or neither, and nothing here infers one from the other.
  *
@@ -638,7 +638,7 @@ function reasonFor(item: FeedItem): string {
     case "wanted":
       return "Because these are in your collection";
     case "announcement":
-      return "From CardFlare";
+      return "From cardflare";
     case "board":
       return item.yours ? "At a store you saved" : "A room open right now";
     case "upcoming":

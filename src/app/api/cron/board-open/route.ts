@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 /**
  * The clock the doorbell hangs on.
  *
- * Everything else in CardFlare is triggered lazily by traffic, and that
+ * Everything else in cardflare is triggered lazily by traffic, and that
  * is exactly why this route exists: the whole point of "the board is
  * open" is to reach people when nothing is happening yet. Vercel's cron
  * calls this hourly; each run finds scheduled draft events whose board

@@ -61,7 +61,7 @@ export function storeInviteEmail(
 
   /*
    * A player is not a store, and this message told them they were: the
-   * subject and the headline both read "Zach is in the CardFlare beta",
+   * subject and the headline both read "Zach is in the cardflare beta",
    * which is the sentence a shop gets with a person's name dropped into
    * it. Found by walking the invitation paths rather than by anybody
    * receiving one, which is the only reason it had not been reported.
@@ -123,10 +123,10 @@ export function storeInviteEmail(
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
         ${
           kind === "vendor"
-            ? "CardFlare helps card-show attendees find the exact cards they want, and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
+            ? "cardflare helps card-show attendees find the exact cards they want, and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
             : kind === "player"
-              ? "A CardFlare account makes your wants follow you: post a card once, and every CardFlare room you walk into offers to post it again until you find it. No account is ever needed just to trade; this one is for keeping your hunt across stores."
-              : "CardFlare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
+              ? "A cardflare account makes your wants follow you: post a card once, and every cardflare room you walk into offers to post it again until you find it. No account is ever needed just to trade; this one is for keeping your hunt across stores."
+              : "cardflare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
         }
       </p>
 
@@ -178,19 +178,19 @@ export function storeInviteEmail(
   const intro =
     kind === "player"
       ? [
-          "A CardFlare account makes your wants follow you: post a card once, and",
-          "every CardFlare room you walk into offers to post it again until you",
+          "A cardflare account makes your wants follow you: post a card once, and",
+          "every cardflare room you walk into offers to post it again until you",
           "find it. No account is needed just to trade - this one keeps your hunt",
           "across stores.",
         ]
       : kind === "vendor"
         ? [
-            "CardFlare helps card-show attendees find the exact cards they want -",
+            "cardflare helps card-show attendees find the exact cards they want -",
             "and walks them straight to your booth. Upload your inventory before",
             "the show, singles and slabs alike.",
           ]
         : [
-            "CardFlare helps players at your events find the cards they need from other",
+            "cardflare helps players at your events find the cards they need from other",
             "people already in the room. You're one of the first stores trying it.",
           ];
 
@@ -230,7 +230,7 @@ export function playerInviteEmail(
 /**
  * A fresh password link, sent by a human at the support desk.
  *
- * Deliberately not the invitation email. "Your CardFlare account is
+ * Deliberately not the invitation email. "Your cardflare account is
  * ready" is the wrong sentence for somebody who has had an account for
  * a month and cannot get into it, and an email whose words do not match
  * why it arrived is how people decide a message is phishing.

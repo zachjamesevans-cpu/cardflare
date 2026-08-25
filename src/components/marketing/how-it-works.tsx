@@ -12,7 +12,7 @@ const STEPS = [
   {
     icon: Sparkles,
     title: "Get Matched",
-    description: "CardFlare finds someone at the event who has it.",
+    description: "cardflare finds someone at the event who has it.",
   },
   {
     icon: Handshake,

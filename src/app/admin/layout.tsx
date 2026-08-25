@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <AppShell
       area="Admin"
       email={user.email ?? ""}
-      title="CardFlare admin"
+      title="cardflare admin"
       description="Manage the stores taking part in the beta."
       areas={areas}
       currentArea="/admin"
