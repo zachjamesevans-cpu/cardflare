@@ -58,12 +58,17 @@ footer, page titles, emails, the TV display, prose, and the app's
 home-screen name. There is no context where "CardFlare" is correct any
 more.
 
-**The wordmark face is Bruno Ace** (Google Fonts, one weight), matched
-to the same art. It is loaded as `--font-brand-display` on the web and
-bundled as `BrunoAce-Regular.ttf` in the app, and it is for the NAME
-ONLY — body text, headings and buttons stay Inter. The wordmark is
-drawn in the accent colour, whole; the old two-tone Card/Flare split
-belonged to the previous mark.
+**The wordmark face is Michroma** (Google Fonts, one weight), matched
+to the same art glyph by glyph — the founder judged three rounds by
+naming letters ("look at the L", "the E... a little blocky"), and
+Michroma is the face whose straight l, flat-cut e and flat-topped a the
+art actually has. It is loaded as `--font-brand-display` on the web and
+bundled as `Michroma-Regular.ttf` in the app, and it is for the NAME
+ONLY — body text, headings and buttons stay Inter. The web wordmark
+adds a 0.017em text-stroke, measured against the art, for the founder's
+"slightly bolder"; the app cannot stroke text and the sub-pixel gap is
+accepted. The wordmark is drawn in the accent colour, whole; the old
+two-tone Card/Flare split belonged to the previous mark.
 
 ## Colour
 

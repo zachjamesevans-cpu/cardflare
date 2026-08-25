@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bruno_Ace, Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Michroma } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { SITE, siteUrl } from "@/lib/site";
@@ -20,17 +20,20 @@ const mono = JetBrains_Mono({
 /**
  * The wordmark's face, and the app's.
  *
- * Bruno Ace, matched to the new logo art the founder supplied with
- * "make cardflare all lowercase... and make it this font". Matched by
- * RENDERING, not by eye alone: fifteen squared techno faces were drawn
- * as "cardflare" side by side against the supplied art, and Bruno Ace
- * is the one with its monoline weight, squared-spiral a, and open
- * squared e. (Audiowide was the first guess and the founder rightly
- * called it off - too heavy, too round.) One weight, which is all a
- * wordmark needs. The name at the top of the site is TEXT beside the
- * mark; the mark image itself is untouched, as BRAND.md requires.
+ * Michroma, matched to the logo art the founder supplied with "make
+ * cardflare all lowercase... and make it this font". Matched by
+ * RENDERING, not by eye alone - and it took three rounds, each ended by
+ * the founder naming a glyph: Audiowide ("a little off"), then Bruno
+ * Ace ("look at the L... slightly bolder... and the E, it's a little
+ * blocky in the render"). Michroma is the one whose l is a plain
+ * vertical, whose wide squared e cuts off flat, and whose a wears the
+ * art's flat top - the Eurostile Extended shapes the art actually has.
+ * It ships one weight, a touch lighter than the art, so the wordmark
+ * adds a hair of text-stroke (see logo.tsx) rather than faking bold.
+ * The name at the top of the site is TEXT beside the mark; the mark
+ * image itself is untouched, as BRAND.md requires.
  */
-const display = Bruno_Ace({
+const display = Michroma({
   variable: "--font-brand-display",
   subsets: ["latin"],
   weight: "400",
