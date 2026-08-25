@@ -1,7 +1,7 @@
 import type { UserType } from "./schema";
 
 /**
- * Anchors that jump to the waitlist and preselect a user type.
+ * Anchors that jump to the invite-request form and preselect a type.
  *
  * Ordinary links, so scrolling works with JavaScript disabled; the form reads
  * the fragment on mount and applies the preselection as an enhancement.
@@ -10,10 +10,10 @@ import type { UserType } from "./schema";
  * bare fragment does nothing when the link is rendered on a page that has no
  * such element.
  */
-export const WAITLIST_SECTION_ID = "waitlist";
-export const STORE_PILOT_ANCHOR_ID = "waitlist-store-pilot";
+export const INVITE_SECTION_ID = "request-invite";
+export const STORE_PILOT_ANCHOR_ID = "invite-store";
 export const STORE_PILOT_ANCHOR = `/#${STORE_PILOT_ANCHOR_ID}`;
-export const VENDOR_PILOT_ANCHOR_ID = "waitlist-vendor-pilot";
+export const VENDOR_PILOT_ANCHOR_ID = "invite-vendor";
 export const VENDOR_PILOT_ANCHOR = `/#${VENDOR_PILOT_ANCHOR_ID}`;
 
 const ANCHOR_USER_TYPES: Record<string, UserType> = {

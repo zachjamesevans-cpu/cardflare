@@ -32,27 +32,32 @@ test.describe("landing page", () => {
     ).toBeVisible();
   });
 
-  test("explains the product without claiming it has launched", async ({ page }) => {
+  test("says the product is live", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByText(/currently being built/i)).toBeVisible();
+    await expect(page.getByText(/live now/i).first()).toBeVisible();
+    /* The launch deleted every waitlist mention; one reappearing means a
+       beta-era component crept back in. */
+    await expect(page.getByText(/waitlist/i)).toHaveCount(0);
   });
 
-  test("primary hero CTA jumps to the waitlist form", async ({ page }) => {
+  test("primary hero CTA opens the free signup", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Join the Waitlist" }).first().click();
+    await page.getByRole("link", { name: "Create your free account" }).first().click();
 
-    await expect(page).toHaveURL(/#waitlist$/);
-    await expect(page.getByLabel("Email address")).toBeInViewport();
+    await expect(page).toHaveURL(/\/signup$/);
+    await expect(page.getByLabel(/email/i).first()).toBeVisible();
   });
 
-  test("store pilot CTA preselects the local game store user type", async ({
+  test("the store invite CTA preselects the local game store type", async ({
     page,
   }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Join the Store Pilot" }).click();
+    /* Several tiers say "Request an invite"; the store section's own CTA
+       is the one that must preselect the store type. */
+    await page.locator('[data-analytics-event="store_pilot_cta_clicked"]').click();
 
     await expect(page.getByLabel(/which best describes you/i)).toHaveValue("store");
   });
@@ -112,18 +117,17 @@ test.describe("legal pages", () => {
   });
 
   /*
-   * Stores are invited, so there is no signup to advertise — but an invited
-   * owner arriving at the landing page needs a way in that is not "remember
-   * the /login URL". In the header since the founder moved it up: an owner on
-   * a phone should not have to scroll the whole landing page to get in.
+   * One door for everyone since launch: the link stopped naming stores
+   * the day players had accounts too, and it must land on the sign-in
+   * page from the header on any device.
    */
-  test("the header offers a store sign-in", async ({ page, isMobile }) => {
+  test("the header's sign-in reaches the sign-in page", async ({ page, isMobile }) => {
     await page.goto("/");
     await openNav(page, isMobile);
 
     await page
       .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: /store sign-in/i })
+      .getByRole("link", { name: /^sign in$/i })
       .click();
 
     await expect(page).toHaveURL(/\/login$/);
@@ -141,14 +145,19 @@ test.describe("legal pages", () => {
   });
 
   /*
-   * Named for its audience on purpose. A player has no account and must never
-   * conclude they need one — scanning a code is the whole point.
+   * The launch reversal of an old rule. Through the beta this page had to
+   * HIDE sign-in from players, because they had nothing to sign into;
+   * accounts are open now, so the header carries one sign-in door for
+   * everyone and a join button that creates a free account.
    */
-  test("does not invite players to sign in or register", async ({ page }) => {
+  test("invites everyone through one sign-in door", async ({ page, isMobile }) => {
     await page.goto("/");
+    await openNav(page, isMobile);
 
-    await expect(page.getByRole("link", { name: /^sign in$/i })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /sign up|register/i })).toHaveCount(0);
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("link", { name: /^sign in$/i })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /join free/i })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /store sign-in/i })).toHaveCount(0);
   });
 
   /*
@@ -157,7 +166,7 @@ test.describe("legal pages", () => {
    * /privacy just rewrote the address bar and stranded the visitor.
    */
   for (const path of ["/privacy", "/terms"] as const) {
-    test(`header CTA on ${path} reaches the waitlist form`, async ({
+    test(`header CTA on ${path} reaches the signup page`, async ({
       page,
       isMobile,
     }) => {
@@ -166,11 +175,10 @@ test.describe("legal pages", () => {
 
       await page
         .getByRole("navigation", { name: "Main" })
-        .getByRole("link", { name: "Join the Waitlist" })
+        .getByRole("link", { name: "Join free" })
         .click();
 
-      await expect(page).toHaveURL(/\/#waitlist$/);
-      await expect(page.getByLabel("Email address")).toBeInViewport();
+      await expect(page).toHaveURL(/\/signup$/);
     });
 
     test(`section links on ${path} reach the landing page`, async ({

@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import { Check } from "lucide-react";
 
 import { FlareComposerPreview } from "@/components/app-preview/flare-composer-preview";
@@ -35,6 +36,15 @@ export function ForPlayers() {
               </li>
             ))}
           </ul>
+
+          <ButtonLink
+            href="/signup"
+            size="lg"
+            className="self-start"
+            data-analytics-event="player_signup_cta_clicked"
+          >
+            Create your free account
+          </ButtonLink>
         </div>
 
         <div className="flex justify-center md:justify-end">

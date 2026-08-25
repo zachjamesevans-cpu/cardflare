@@ -25,13 +25,13 @@ export function WaitlistSuccess({ alreadyRegistered, onReset }: WaitlistSuccessP
 
       <div className="flex flex-col gap-3">
         <h3 className="text-2xl font-bold text-text-primary">
-          {alreadyRegistered ? "You're already on the list." : "You're on the list."}
+          {alreadyRegistered ? "We already have your request." : "Request received."}
         </h3>
 
         <p className="mx-auto max-w-md text-pretty text-text-secondary">
           {alreadyRegistered
-            ? "That email is already on the cardflare waitlist, so there's nothing else to do. We'll keep you updated as we prepare for our first local-store pilots."
-            : "We'll keep you updated as cardflare prepares for its first local-store pilots. Look out for an email when early testing opens up."}
+            ? "That email already sent us a request, so there's nothing else to do. We'll be in touch to get you set up."
+            : "We'll reach out to get you set up. In the meantime a free player account works today, if you also play."}
         </p>
       </div>
 

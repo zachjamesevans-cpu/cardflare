@@ -26,7 +26,7 @@ function SubmitButton() {
   return (
     <Button type="submit" size="lg" disabled={pending} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-      {pending ? "Joining…" : "Join the Waitlist"}
+      {pending ? "Sending…" : "Request an invite"}
     </Button>
   );
 }
@@ -208,7 +208,10 @@ export function WaitlistForm() {
           <option value="" disabled>
             Select an option
           </option>
-          {USER_TYPES.map((type) => (
+          {/* No "Player" here: a player's account is free and self-serve
+              at /signup, and offering it as an invite to request would
+              send people the long way round to a button. */}
+          {USER_TYPES.filter((type) => type.value !== "player").map((type) => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>
@@ -218,7 +221,7 @@ export function WaitlistForm() {
 
       <fieldset className="flex flex-col gap-5 border-t border-border pt-6">
         <legend className="text-sm font-semibold text-text-muted">
-          Optional. It helps us plan the first pilots
+          Optional. It helps us set you up
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">
