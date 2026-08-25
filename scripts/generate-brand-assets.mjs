@@ -1,11 +1,19 @@
 /**
- * Regenerates optimized derivatives of the approved CardFlare logo.
+ * Regenerates optimized derivatives of the approved cardflare brand art.
  *
- * The approved master (public/brand/cardflare-logo.png) is never redrawn or
- * rewritten — it is only read. The master is a transparent PNG of the
- * card-and-flare mark, drawn on a square canvas with uneven padding, so the
- * derivatives trim to the artwork's own bounds and rebuild the padding
- * deliberately for each context. See BRAND.md.
+ * Two masters, both only ever read, never redrawn or rewritten:
+ *
+ * - public/brand/cardflare-logo.png — the card-and-flare mark, a
+ *   transparent PNG on a square canvas with uneven padding, so the
+ *   derivatives trim to the artwork's own bounds and rebuild the padding
+ *   deliberately for each context.
+ * - public/brand/cardflare-wordmark.png — the founder's wordmark art
+ *   ("Just put this everywhere", 2026-08-25). It was supplied flattened
+ *   on a white card, so the derivative CUTS the lettering out: alpha
+ *   from distance-to-white, colours un-composited so the soft glow keeps
+ *   its own green instead of dragging white onto a dark page.
+ *
+ * See BRAND.md.
  *
  * Usage: npm run brand:assets
  */
@@ -15,6 +23,7 @@ import sharp from "sharp";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const MASTER = resolve(ROOT, "public/brand/cardflare-logo.png");
+const WORDMARK_MASTER = resolve(ROOT, "public/brand/cardflare-wordmark.png");
 
 /**
  * Backdrop for the square app icons.
@@ -41,6 +50,55 @@ const png = { compressionLevel: 9, effort: 10 };
 function trimmedMark() {
   // threshold 1 trims on alpha, so only fully transparent padding is removed.
   return sharp(MASTER).trim({ threshold: 1 });
+}
+
+/**
+ * Letter interiors keep min(r,g,b) at or below this (measured off the
+ * master: the body is around rgb(222,250,28) shaded down to the high
+ * 20s, with the emboss highlights reaching the mid 80s). At or below it
+ * a pixel is solid ink; from there up to white, alpha ramps down so the
+ * glow fades out instead of snapping off.
+ */
+const WORDMARK_BODY_MIN = 85;
+
+/**
+ * The wordmark, cut off its white card.
+ *
+ * The founder's file is flattened on white, and laying white pixels on
+ * the dark site is not an option. Every pixel gets alpha from how far
+ * its dimmest channel sits from white, and the partially transparent
+ * ones are un-composited (C = fg·a + white·(1−a), solved for fg) so the
+ * halo around each letter stays the art's own light green rather than
+ * the white it was photographed on. Solid ink keeps its exact colour,
+ * emboss shading included.
+ */
+async function cutOutWordmark() {
+  const { data, info } = await sharp(WORDMARK_MASTER)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const out = Buffer.alloc((data.length / info.channels) * 4);
+
+  for (let i = 0, o = 0; i < data.length; i += info.channels, o += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    const a = Math.min(1, (255 - Math.min(r, g, b)) / (255 - WORDMARK_BODY_MIN));
+
+    // JPEG shimmer sits a count or two off pure white; cut it dead.
+    if (a < 8 / 255) continue;
+
+    const lift = 255 * (1 - a);
+    out[o] = Math.max(0, Math.min(255, Math.round((r - lift) / a)));
+    out[o + 1] = Math.max(0, Math.min(255, Math.round((g - lift) / a)));
+    out[o + 2] = Math.max(0, Math.min(255, Math.round((b - lift) / a)));
+    out[o + 3] = Math.round(a * 255);
+  }
+
+  return sharp(out, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  }).trim({ threshold: 10 });
 }
 
 /** Scales the trimmed mark to fit a square of `size`, leaving `margin` around it. */
@@ -77,6 +135,18 @@ async function main() {
     resolve(ROOT, "public/brand/cardflare-mark.png"),
     await trimmedMark().resize({ height: 512 }).png(png).toBuffer(),
   );
+
+  // The wordmark, cut out and trimmed, for every dark surface on both
+  // platforms. 256 tall keeps it crisp at three-times pixel density for
+  // any header the site or the app actually draws.
+  const wordmark = await (
+    await cutOutWordmark()
+  )
+    .resize({ height: 256 })
+    .png(png)
+    .toBuffer();
+  await write(resolve(ROOT, "public/brand/cardflare-wordmark-cut.png"), wordmark);
+  await write(resolve(ROOT, "mobile/assets/wordmark.png"), wordmark);
 
   // Favicon source. Square and backed, so it stays visible on any tab colour.
   // Padding is kept tight — at 16px every pixel of artwork counts.
