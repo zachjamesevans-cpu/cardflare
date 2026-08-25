@@ -59,6 +59,42 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
+ * Every source on this page answers inside a deadline or gets left out.
+ *
+ * The dashboard assembles seventeen independent numbers, and it used to
+ * await them with no limit — so the day ONE of them stalled, the whole
+ * console 504'd at Vercel's 60-second ceiling with nothing in the log
+ * but "task timed out" (2026-08-25, the founder, locked out of his own
+ * console). A page whose entire job is glanceable numbers must never be
+ * taken down by one number: a source that misses the deadline renders
+ * as its empty shape, and the log names it — "Dashboard source timed
+ * out: X" — which is precisely the diagnosis the 504 never gave.
+ */
+const SOURCE_DEADLINE_MS = 8_000;
+
+async function within<T>(label: string, fallback: T, work: Promise<T>): Promise<T> {
+  let bell: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<T>((resolve) => {
+    bell = setTimeout(() => {
+      console.error(`Dashboard source timed out: ${label}`);
+      resolve(fallback);
+    }, SOURCE_DEADLINE_MS);
+  });
+
+  try {
+    /* A loser keeps running after the race; in a serverless invocation
+       it dies with the response, which is the behaviour we want. */
+    return await Promise.race([work, deadline]);
+  } catch (error) {
+    console.error(`Dashboard source failed: ${label}`, error);
+    return fallback;
+  } finally {
+    clearTimeout(bell);
+  }
+}
+
+/**
  * The console's front page: tonight's numbers, then doors into the lists.
  *
  * Deliberately short. The old page stacked every store, every event and
@@ -69,9 +105,11 @@ export const maxDuration = 60;
 export default async function AdminPage() {
   await requireAdmin();
 
-  // Rooms close lazily; the console render is one of the moments that does
-  // it, so the numbers below describe now rather than the last scan.
-  await sweepStaleRooms();
+  // Rooms close lazily; the console render is one of the moments that
+  // does it, so the numbers below describe now rather than the last
+  // scan. Deadlined like everything else: the sweep is idempotent, so
+  // one it misses today closes on the next render instead.
+  await within("sweepStaleRooms", undefined, sweepStaleRooms());
 
   const [
     stores,
@@ -83,14 +121,14 @@ export default async function AdminPage() {
     lastRun,
     printingImages,
   ] = await Promise.all([
-    listStores(),
-    listAllEvents(),
-    listShows(),
-    listClaimableShows(),
-    listLiveRooms(),
-    countCards(),
-    latestSyncRun(),
-    countPrintingImages(),
+    within("listStores", [], listStores()),
+    within("listAllEvents", [], listAllEvents()),
+    within("listShows", [], listShows()),
+    within("listClaimableShows", [], listClaimableShows()),
+    within("listLiveRooms", [], listLiveRooms()),
+    within("countCards", 0, countCards()),
+    within("latestSyncRun", null, latestSyncRun()),
+    within("countPrintingImages", { total: 0, withImage: 0 }, countPrintingImages()),
   ]);
 
   /*
@@ -104,8 +142,12 @@ export default async function AdminPage() {
   );
 
   const [flareCounts, presence] = await Promise.all([
-    countOpenFlares(live.map((room) => room.eventId)),
-    countParticipants(live.map((room) => room.eventId)),
+    within("countOpenFlares", new Map(), countOpenFlares(live.map((r) => r.eventId))),
+    within(
+      "countParticipants",
+      new Map(),
+      countParticipants(live.map((r) => r.eventId)),
+    ),
   ]);
 
   const flaresOut = [...flareCounts.values()].reduce((sum, n) => sum + n, 0);
@@ -114,20 +156,29 @@ export default async function AdminPage() {
     0,
   );
 
-  const { players: playerAccounts } = await listPlayersForAdmin();
-  const playerCount = playerAccounts.length;
+  /* One batch, not a chain: these four used to run one after another,
+     which multiplied any slowness by four. */
+  const [{ players: playerAccounts }, catalogue, imported, notices] = await Promise.all(
+    [
+      within(
+        "listPlayersForAdmin",
+        { players: [], pending: [] },
+        listPlayersForAdmin(),
+      ),
+      within("catalogForConsole", [], catalogForConsole()),
+      within("listImportedSets", [], listImportedSets()),
+      within("listAnnouncements", [], listAnnouncements()),
+    ],
+  );
 
+  const playerCount = playerAccounts.length;
   /* The catalogue at a glance: what is on sale, and what is waiting. */
-  const catalogue = await catalogForConsole();
   const liveCosmetics = catalogue.filter((item) => item.status === "live").length;
   /* Sets that came in by hand rather than from a provider. */
-  const importedSets = (await listImportedSets()).length;
-
+  const importedSets = imported.length;
   /* Notices on the Feed. The number that matters is how many are showing,
      because that is what a player is reading right now. */
-  const showingNotices = (await listAnnouncements()).filter(
-    (notice) => notice.showing,
-  ).length;
+  const showingNotices = notices.filter((notice) => notice.showing).length;
   const draftCosmetics = catalogue.length - liveCosmetics;
 
   const gameStores = stores.filter((store) => store.kind === "lgs").length;
@@ -138,8 +189,14 @@ export default async function AdminPage() {
 
   // Depends on which run was last, so it cannot join the batch above.
   const [setCoverage, failures] = await Promise.all([
-    catalogBySet(),
-    lastRun ? failuresForRun(lastRun.id) : { groups: [], total: 0, truncated: false },
+    within("catalogBySet", { sets: [], truncated: true }, catalogBySet()),
+    within(
+      "failuresForRun",
+      { groups: [], total: 0, truncated: false },
+      lastRun
+        ? failuresForRun(lastRun.id)
+        : Promise.resolve({ groups: [], total: 0, truncated: false }),
+    ),
   ]);
 
   return (

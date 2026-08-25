@@ -252,8 +252,14 @@ export async function writeImportedSet(
      * classified anything, so they stay null — but the official card
      * list's `_pN` suffix is a statement both ways: a suffixed entry IS
      * a parallel, and an unsuffixed entry on the official list IS the
-     * set's regular printing. What KIND of parallel — manga, special —
+     * set's regular printing. What KIND of parallel — Manga, SP —
      * is still a person's call, made on the review screen.
+     *
+     * A parallel's words land in variant_type, NOT printing_label. The
+     * chip renders label-or-set-code first, so a label here would push
+     * the set code out and an imported alt art would read "Alt art · L"
+     * beside a synced one's "OP-16 · L · Alternate Art" — which is the
+     * founder's screenshot, and the reason for this split.
      */
     const isParallel = card.parallel !== undefined;
 
@@ -263,8 +269,8 @@ export async function writeImportedSet(
       provider_external_id: externalId,
       set_code: manifest.setCode,
       set_name: manifest.setName,
-      printing_label: card.printingLabel ?? null,
-      variant_type: null,
+      printing_label: isParallel ? null : (card.printingLabel ?? null),
+      variant_type: isParallel ? (card.printingLabel ?? "Alternate Art") : null,
       rarity: card.rarity ?? null,
       printing_name: card.name,
       image_id: null,

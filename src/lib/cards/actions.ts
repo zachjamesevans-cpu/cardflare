@@ -3,7 +3,7 @@
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { parseCardQuery } from "./query";
-import { cardQuerySchema, type CardResult } from "./schema";
+import { cardQuerySchema, floatAskedVariants, type CardResult } from "./schema";
 import { countCards, searchCards, type CardSearchFilters } from "./search";
 
 /**
@@ -96,6 +96,11 @@ export async function searchCardsAction(
 
     // Only asked when nothing matched, so the common path is still one query.
     const poolEmpty = results.length === 0 ? (await countCards()) === 0 : false;
+
+    /* "Zoro sp": the cards that have an SP lead the page. The rows
+       themselves read the same word out of the query to front that
+       version's art. */
+    results = floatAskedVariants(results, typed.filters.variant);
 
     /* The query comes back as whatever actually ran, so the results
        highlight the words they were matched on. */

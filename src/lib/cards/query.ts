@@ -17,11 +17,21 @@
  * same reason `src/lib/waitlist/form-data.ts` is.
  */
 
+/**
+ * A version word: "zoro manga" means show me the manga art, "zoro sp"
+ * the SP. It never narrows WHICH cards come back — a Zoro without an SP
+ * still appears, because hiding it answers a question nobody asked —
+ * it steers which printing fronts each result and floats the cards
+ * that have one to the top.
+ */
+export type VariantAsk = "alt" | "manga" | "sp" | "promo";
+
 /** Narrowing pulled out of a typed query. Null means "not asked for". */
 export interface CardQueryFilters {
   setCode: string | null;
   cardType: string | null;
   color: string | null;
+  variant: VariantAsk | null;
 }
 
 export interface ParsedCardQuery {
@@ -49,7 +59,27 @@ const COLORS = new Set(["red", "green", "blue", "purple", "black", "yellow"]);
  */
 const SET_CODE = /^[a-z]{2,3}\d{2}$/;
 
-const EMPTY: CardQueryFilters = { setCode: null, cardType: null, color: null };
+/**
+ * The words players use for versions, mapped to one ask each. "Art"
+ * after any of them is part of the phrase ("alt art", "manga art") and
+ * gets swallowed with it.
+ */
+const VARIANT_WORDS: Record<string, VariantAsk> = {
+  alt: "alt",
+  alternate: "alt",
+  parallel: "alt",
+  manga: "manga",
+  sp: "sp",
+  promo: "promo",
+  promos: "promo",
+};
+
+const EMPTY: CardQueryFilters = {
+  setCode: null,
+  cardType: null,
+  color: null,
+  variant: null,
+};
 
 export function parseCardQuery(raw: string): ParsedCardQuery {
   const words = raw.trim().split(/\s+/).filter(Boolean);
@@ -67,7 +97,8 @@ export function parseCardQuery(raw: string): ParsedCardQuery {
   const filters: CardQueryFilters = { ...EMPTY };
   const rest: string[] = [];
 
-  for (const word of words) {
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
     const key = word.toLowerCase();
 
     /*
@@ -91,6 +122,13 @@ export function parseCardQuery(raw: string): ParsedCardQuery {
       continue;
     }
 
+    if (filters.variant === null && key in VARIANT_WORDS) {
+      filters.variant = VARIANT_WORDS[key];
+      /* "alt art", "manga art": the second word is the same ask. */
+      if (/^arts?$/i.test(words[index + 1] ?? "")) index += 1;
+      continue;
+    }
+
     rest.push(word);
   }
 
@@ -107,7 +145,10 @@ export function parseCardQuery(raw: string): ParsedCardQuery {
   }
 
   const narrowed =
-    filters.cardType !== null || filters.color !== null || filters.setCode !== null;
+    filters.cardType !== null ||
+    filters.color !== null ||
+    filters.setCode !== null ||
+    filters.variant !== null;
 
   return { text: narrowed ? text : raw.trim(), filters, narrowed };
 }

@@ -32,6 +32,7 @@ describe("parseCardQuery", () => {
       cardType: "leader",
       color: "red",
       setCode: "OP01",
+      variant: null,
     });
   });
 
@@ -66,7 +67,12 @@ describe("parseCardQuery", () => {
 
     expect(parsed.text).toBe("red leader");
     expect(parsed.narrowed).toBe(false);
-    expect(parsed.filters).toEqual({ cardType: null, color: null, setCode: null });
+    expect(parsed.filters).toEqual({
+      cardType: null,
+      color: null,
+      setCode: null,
+      variant: null,
+    });
   });
 
   it("does not touch a query with no keywords in it", () => {
@@ -106,7 +112,7 @@ describe("parseCardQuery", () => {
   it("returns something usable for an empty query", () => {
     expect(parseCardQuery("")).toEqual({
       text: "",
-      filters: { cardType: null, color: null, setCode: null },
+      filters: { cardType: null, color: null, setCode: null, variant: null },
       narrowed: false,
     });
   });

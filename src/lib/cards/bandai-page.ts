@@ -320,13 +320,15 @@ export function impliedSetCode(cards: readonly BandaiCard[]): string | null {
 /**
  * What a parallel printing is called until a human classifies it.
  *
- * "Alt art", numbered past the first, mirroring how players already
- * talk about them. The admin console's review screen is where "manga"
- * or "special" gets decided; the page does not say and this does not
- * guess.
+ * "Alternate Art", numbered past the first — the words the provider
+ * sync uses, letter for letter, so an imported chip reads exactly like
+ * a synced one ("OP-14 · SR · Alternate Art"). Whether a parallel is
+ * really the Manga or SP rarity is decided by eyes on the picture, in
+ * the admin console's review screen; the page does not say and this
+ * does not guess.
  */
 export function parallelLabel(parallel: number): string {
-  return parallel > 1 ? `Alt art ${parallel}` : "Alt art";
+  return parallel > 1 ? `Alternate Art ${parallel}` : "Alternate Art";
 }
 
 /** The image file name the collector saves a card under. */

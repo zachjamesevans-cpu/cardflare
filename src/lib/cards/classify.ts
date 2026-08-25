@@ -13,11 +13,20 @@ import { z } from "zod";
  * can render the choices without pulling server code into the bundle.
  */
 
+/**
+ * The words are the PROVIDER'S words, letter for letter. The founder,
+ * with two search results side by side: a synced alt art reads
+ * "OP-16 · L · Alternate Art" while an imported one read "Alt art · L"
+ * — "make sure the naming structure when searching things is the
+ * same". So a classification writes `variant_type` ("Alternate Art",
+ * "SP", "Manga") and leaves `printing_label` alone, which keeps the
+ * set code first in every chip exactly as the sync's printings render.
+ */
 export const PRINTING_CLASSIFICATIONS = [
   "base",
   "alt-art",
   "manga",
-  "special",
+  "sp",
   "promo",
   "reprint",
   "unclassified",
@@ -27,9 +36,9 @@ export type PrintingClassification = (typeof PRINTING_CLASSIFICATIONS)[number];
 
 export const CLASSIFICATION_LABELS: Record<PrintingClassification, string> = {
   base: "Base art",
-  "alt-art": "Alt art",
-  manga: "Manga art",
-  special: "Special art",
+  "alt-art": "Alternate Art",
+  manga: "Manga",
+  sp: "SP",
   promo: "Promo",
   reprint: "Reprint",
   unclassified: "Not classified",
@@ -37,8 +46,12 @@ export const CLASSIFICATION_LABELS: Record<PrintingClassification, string> = {
 
 /** What each choice writes. Booleans follow the schema's three-valued rule. */
 export interface PrintingClassificationColumns {
-  /** What players see in the printing chip, or null to fall back to the set code. */
-  printing_label: string | null;
+  /**
+   * Always null: the chip's first part must stay the set code, exactly
+   * as the sync's printings render. The variant word rides in
+   * `variant_type`, which the chip prints after the rarity.
+   */
+  printing_label: null;
   variant_type: string | null;
   is_alternate_art: boolean | null;
   is_parallel: boolean | null;
@@ -63,12 +76,14 @@ export function classificationColumns(
   choice: PrintingClassification,
   label?: string | null,
 ): PrintingClassificationColumns {
-  const custom = label?.trim() || null;
+  /* An override changes the WORD, never the structure: it lands in
+     variant_type on the choices that have one. */
+  const word = (usual: string) => label?.trim() || usual;
 
   switch (choice) {
     case "base":
       return {
-        printing_label: custom,
+        printing_label: null,
         variant_type: null,
         is_alternate_art: false,
         is_parallel: false,
@@ -77,8 +92,8 @@ export function classificationColumns(
       };
     case "alt-art":
       return {
-        printing_label: custom ?? "Alt art",
-        variant_type: null,
+        printing_label: null,
+        variant_type: word("Alternate Art"),
         is_alternate_art: true,
         is_parallel: true,
         is_promo: false,
@@ -86,17 +101,17 @@ export function classificationColumns(
       };
     case "manga":
       return {
-        printing_label: custom ?? "Manga art",
-        variant_type: "manga",
+        printing_label: null,
+        variant_type: word("Manga"),
         is_alternate_art: true,
         is_parallel: true,
         is_promo: false,
         is_reprint: null,
       };
-    case "special":
+    case "sp":
       return {
-        printing_label: custom ?? "Special art",
-        variant_type: "special",
+        printing_label: null,
+        variant_type: word("SP"),
         is_alternate_art: true,
         is_parallel: true,
         is_promo: false,
@@ -104,7 +119,7 @@ export function classificationColumns(
       };
     case "promo":
       return {
-        printing_label: custom ?? "Promo",
+        printing_label: null,
         variant_type: null,
         is_alternate_art: null,
         is_parallel: null,
@@ -113,7 +128,7 @@ export function classificationColumns(
       };
     case "reprint":
       return {
-        printing_label: custom,
+        printing_label: null,
         variant_type: null,
         is_alternate_art: null,
         is_parallel: null,
@@ -122,7 +137,7 @@ export function classificationColumns(
       };
     case "unclassified":
       return {
-        printing_label: custom,
+        printing_label: null,
         variant_type: null,
         is_alternate_art: null,
         is_parallel: null,
@@ -143,11 +158,14 @@ export function classificationOf(row: {
   is_promo: boolean | null;
   is_reprint: boolean | null;
 }): PrintingClassification {
-  if (row.variant_type === "manga") return "manga";
-  if (row.variant_type === "special") return "special";
+  const variant = row.variant_type?.toLowerCase() ?? "";
+  if (variant.startsWith("manga")) return "manga";
+  if (variant === "sp" || variant.startsWith("special")) return "sp";
   if (row.is_promo) return "promo";
   if (row.is_reprint) return "reprint";
-  if (row.is_alternate_art || row.is_parallel) return "alt-art";
+  if (row.is_alternate_art || row.is_parallel || variant.startsWith("alternate")) {
+    return "alt-art";
+  }
   if (row.is_alternate_art === false || row.is_parallel === false) return "base";
   return "unclassified";
 }

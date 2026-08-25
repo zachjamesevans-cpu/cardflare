@@ -17,6 +17,7 @@ import {
   PRINTING_CLASSIFICATIONS,
 } from "@/lib/cards/classify";
 import { importManifestSchema } from "@/lib/cards/import-schema";
+import { printingLabel } from "@/lib/cards/schema";
 
 /**
  * The Bandai card list, as the parser understands it.
@@ -213,7 +214,9 @@ describe("the collected manifest", () => {
     const ace = manifest.cards.filter((card) => card.cardNumber === "OP14-029");
     expect(ace[0].parallel).toBeUndefined();
     expect(ace[1].parallel).toBe(1);
-    expect(ace[1].printingLabel).toBe("Alt art");
+    /* The provider sync's words, so an imported chip reads like a
+       synced one: "OP-14 · SR · Alternate Art". */
+    expect(ace[1].printingLabel).toBe("Alternate Art");
   });
 
   it("names each picture after its slug, so parallels never collide", () => {
@@ -243,9 +246,9 @@ describe("the pieces on their own", () => {
     expect(splitSlug("OP14-029")).toEqual({ cardNumber: "OP14-029", parallel: null });
   });
 
-  it("numbers alt art labels past the first", () => {
-    expect(parallelLabel(1)).toBe("Alt art");
-    expect(parallelLabel(2)).toBe("Alt art 2");
+  it("numbers alternate art labels past the first", () => {
+    expect(parallelLabel(1)).toBe("Alternate Art");
+    expect(parallelLabel(2)).toBe("Alternate Art 2");
   });
 
   it("keeps a jpg a jpg", () => {
@@ -269,23 +272,56 @@ describe("classifying a printing", () => {
     }
   });
 
-  it("says what a human choice actually claims", () => {
+  it("says what a human choice actually claims, in the provider's words", () => {
+    /* The founder, comparing an import against a synced set: the words
+       have to match what optcgapi lands, so search reads one way. The
+       chip is label-or-set-code first, so the variant word must ride in
+       variant_type and printing_label must stay null. */
     const manga = classificationColumns("manga");
-    expect(manga.printing_label).toBe("Manga art");
-    expect(manga.variant_type).toBe("manga");
+    expect(manga.printing_label).toBeNull();
+    expect(manga.variant_type).toBe("Manga");
     expect(manga.is_alternate_art).toBe(true);
     /* Classifying an art says nothing about reprints; null stays null. */
     expect(manga.is_reprint).toBeNull();
 
+    expect(classificationColumns("alt-art").variant_type).toBe("Alternate Art");
+    expect(classificationColumns("sp").variant_type).toBe("SP");
+
     const base = classificationColumns("base");
     expect(base.is_alternate_art).toBe(false);
     expect(base.printing_label).toBeNull();
+    expect(base.variant_type).toBeNull();
   });
 
-  it("lets a custom label override the default without changing the claim", () => {
-    const special = classificationColumns("special", "25th Anniversary");
-    expect(special.printing_label).toBe("25th Anniversary");
-    expect(special.variant_type).toBe("special");
+  it("lets a custom label override the word without changing the claim", () => {
+    const special = classificationColumns("sp", "25th Anniversary");
+    expect(special.variant_type).toBe("25th Anniversary");
+    expect(special.printing_label).toBeNull();
+    expect(special.is_alternate_art).toBe(true);
+  });
+
+  it("renders an imported chip exactly like a synced one", () => {
+    /* The founder, two search results side by side: the synced set read
+       "OP-16 · L · Alternate Art" and the import read "Alt art · L".
+       "Make sure the naming structure when searching things is the
+       same." This is that, pinned end to end. */
+    const columns = classificationColumns("alt-art");
+    const chip = printingLabel(
+      {
+        id: "p1",
+        setCode: "OP-17",
+        setName: "Set",
+        printingLabel: columns.printing_label,
+        variantType: columns.variant_type,
+        rarity: "L",
+        printingName: "Edward.Newgate",
+        isPromo: columns.is_promo,
+        imageUrl: null,
+      },
+      "Edward.Newgate",
+    );
+
+    expect(chip).toBe("OP-17 · L · Alternate Art");
   });
 
   it("returns to all-null when unclassified, the honest undo", () => {
