@@ -42,6 +42,7 @@ export const DECK_LINE_MAX_QUANTITY = 20;
  *
  *   OP17-001            a card
  *   4x OP17-001         a count in front, the usual export
+ *   4xOP17-001          the same glued, the simulator's export
  *   4 OP17-001          the same without the x
  *   OP17-001 x4         a count behind, which some builders do
  *   4x OP17-001 Luffy   a name after the number, which most do
@@ -51,10 +52,19 @@ export const DECK_LINE_MAX_QUANTITY = 20;
  * names is worse than one that says plainly what it could not find.
  */
 export function parseDeckLine(line: string): DeckLine | null {
-  const trimmed = line.trim();
+  const pasted = line.trim();
 
   /* Comments and section headers, which builders emit freely. */
-  if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//")) return null;
+  if (!pasted || pasted.startsWith("#") || pasted.startsWith("//")) return null;
+
+  /*
+   * "1xOP14-020" — the count glued straight onto the number, which is
+   * what the simulator and the deck sites export. Un-glued before
+   * scanning, because otherwise the x reads as the set code's first
+   * letter: the number regex matched "XOP14-020", a card that exists in
+   * no catalogue, and the founder's whole paste came back unknown.
+   */
+  const trimmed = pasted.replace(/^(\d{1,2})\s*[xX](?=[A-Za-z])/, "$1 ");
 
   const number = /[A-Za-z]{2,4}\d{2}-\d{2,3}/.exec(trimmed);
   if (!number) return null;

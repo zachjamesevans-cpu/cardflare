@@ -15,6 +15,7 @@ import { addFlareBatch } from "@/lib/lists/repository";
 import { deckLabelSchema } from "@/lib/lists/schema";
 import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
+import { previewDeckList, type DeckPreviewEntry } from "./deck-list-preview";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { accountRoomIdentity } from "@/lib/players/room-identity";
@@ -378,6 +379,29 @@ export async function saveWantAction(
     kind: "flare",
     cardName: text(formData, "cardName").slice(0, 200),
   };
+}
+
+/** What the paste-a-deck confirmation screen renders. */
+export interface DeckPreviewResult {
+  entries: DeckPreviewEntry[];
+  unreadable: string[];
+}
+
+/**
+ * The pasted list, looked up with names and art BEFORE anything saves.
+ *
+ * The founder's ask after a bad paste went through silently: "have a
+ * loading screen that loads all cards, with images, for confirmation
+ * that they are the cards someone wants." This is that screen's data.
+ * Read-only — the save is still `importDeckListAction`, which re-parses
+ * the text itself rather than trusting anything echoed back.
+ */
+export async function previewDeckListAction(list: string): Promise<DeckPreviewResult> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId || typeof list !== "string") return { entries: [], unreadable: [] };
+
+  const { lines, unreadable } = parseDeckList(list.slice(0, 20_000));
+  return { entries: await previewDeckList(lines), unreadable };
 }
 
 /**

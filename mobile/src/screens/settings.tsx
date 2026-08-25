@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 
@@ -10,9 +10,11 @@ import {
   describeError,
   getMe,
   getProfile,
+  previewDeckList,
   renameProfile,
   saveDeckList,
   setHandle,
+  type DeckPreviewEntry,
   type Me,
   type Profile,
 } from "../api";
@@ -292,6 +294,42 @@ function DeckListField() {
 
   const { lines } = parseDeckList(list);
 
+  /*
+   * The looked-up preview, held WITH the text that produced it, so
+   * "still loading" is derived by comparison — the website form's exact
+   * shape. The founder's ask: "have a loading screen that loads all
+   * cards, with images, for confirmation that they are the cards
+   * someone wants." Null entries mean the lookup itself failed; the
+   * save is not blocked over a courtesy, but the screen says so.
+   */
+  const [settled, setSettled] = useState<{
+    list: string;
+    entries: DeckPreviewEntry[] | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (parseDeckList(list).lines.length === 0) return;
+
+    let current = true;
+    const timer = setTimeout(() => {
+      previewDeckList(list)
+        .then((result) => {
+          if (current) setSettled({ list, entries: result.entries });
+        })
+        .catch(() => {
+          if (current) setSettled({ list, entries: null });
+        });
+    }, 500);
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [list]);
+
+  const preview = settled?.list === list ? settled.entries : undefined;
+  const loading = lines.length > 0 && preview === undefined;
+
   return (
     <View style={{ gap: spacing(2) }}>
       <Input
@@ -300,7 +338,7 @@ function DeckListField() {
           setList(next);
           setSaid(null);
         }}
-        placeholder={"Paste a deck list\n4x OP17-001\n2x OP17-005"}
+        placeholder={"Paste a deck list\n4x OP17-001\n2xOP17-005"}
         multiline
         numberOfLines={5}
         autoCapitalize="characters"
@@ -314,13 +352,88 @@ function DeckListField() {
         maxLength={40}
       />
       <Muted>
-        One card per line. Counts in front or behind both work, and anything after
-        the number is ignored.
+        One card per line. Counts in front or behind both work, with or without a
+        space, and anything after the number is ignored.
       </Muted>
+
+      {loading && <Muted>Loading your cards…</Muted>}
+      {preview === null && lines.length > 0 && (
+        <Muted>Could not load the previews. You can still save.</Muted>
+      )}
+
+      {preview && preview.length > 0 && (
+        <View style={{ gap: spacing(2) }}>
+          <Muted>Check the faces, then save.</Muted>
+          {preview.map((entry) => (
+            <View
+              key={entry.cardNumber}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(2),
+              }}
+            >
+              {/* The confirmation IS the picture. An empty slot where
+                  one should be is itself the message: this number
+                  matched nothing. */}
+              <View
+                style={{
+                  width: 40,
+                  height: 56,
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.canvas,
+                }}
+              >
+                {entry.imageUrl ? (
+                  <Image
+                    source={{ uri: entry.imageUrl }}
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="cover"
+                  />
+                ) : null}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: entry.name ? colors.textPrimary : colors.danger,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  {entry.name ?? "Not in the catalogue yet"}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {entry.cardNumber}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: "700",
+                }}
+              >
+                ×{entry.quantity}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       <AsyncButton
-        label={lines.length === 0 ? "Paste a list first" : `Save ${lines.length}`}
+        label={
+          lines.length === 0
+            ? "Paste a list first"
+            : loading
+              ? "Loading your cards…"
+              : `These are right, save ${lines.length}`
+        }
         pendingLabel="Saving…"
-        disabled={lines.length === 0}
+        disabled={lines.length === 0 || loading}
         onPress={async () => {
           setSaid(null);
           try {
