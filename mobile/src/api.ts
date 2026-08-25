@@ -1428,3 +1428,108 @@ export const CLAIM_ROLES = [
   "Event organiser",
   "Other",
 ] as const;
+
+/* -------------------------------------------------------------------------- */
+/* Local: Flares near you, and the conversations they start                   */
+/* -------------------------------------------------------------------------- */
+
+/** One Flare on the Local list, as the server shaped it. */
+export interface LocalFlare {
+  flareId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  printingLabel: string | null;
+  quantity: number;
+  note: string | null;
+  intent: string;
+  acceptsTrade: boolean;
+  acceptsCash: boolean;
+  postedAt: string;
+  storeName: string;
+  storeCity: string | null;
+  /** Rounded server-side; no coordinate ever reaches the app. */
+  miles: number;
+  poster: { name: string; playerId: string | null; handle: string | null };
+  canMessage: boolean;
+  isYours: boolean;
+}
+
+export interface LocalFeed {
+  /** Where the origin came from: device, postal, or none (show the ask). */
+  source: "device" | "postal" | "none";
+  radius: number;
+  flares: LocalFlare[];
+}
+
+/**
+ * The Local list. Coordinates ride this one request and are never
+ * stored — the same promise the Feed makes.
+ */
+export const getLocal = (coords?: { latitude: number; longitude: number } | null) => {
+  const query = coords
+    ? `?lat=${encodeURIComponent(coords.latitude)}&lng=${encodeURIComponent(coords.longitude)}`
+    : "";
+
+  return call<LocalFeed>("GET", `/api/v1/local${query}`);
+};
+
+export const setLocalRadius = (radius: number) =>
+  call<{ ok: boolean }>("PUT", "/api/v1/local", { radius });
+
+/** One conversation on the Messages list. */
+export interface LocalThread {
+  threadId: string;
+  flareId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  withName: string;
+  withPlayerId: string;
+  role: "author" | "responder";
+  lastMessageAt: string;
+  lastMessagePreview: string | null;
+  unread: number;
+  closed: boolean;
+}
+
+export interface LocalThreadMessage {
+  id: string;
+  body: string;
+  sentAt: string;
+  yours: boolean;
+}
+
+export const listLocalThreads = () =>
+  call<{ threads: LocalThread[] }>("GET", "/api/v1/local/threads");
+
+/** "I have this": opens the Flare's thread with a first message. */
+export const openLocalThread = (flareId: string, body: string) =>
+  call<{ ok: boolean; threadId?: string; message?: string }>(
+    "POST",
+    "/api/v1/local/threads",
+    { flareId, body },
+  );
+
+/** Reading a thread is what marks it read. */
+export const readLocalThread = (threadId: string) =>
+  call<{
+    ok: boolean;
+    closed: boolean;
+    cardName: string | null;
+    withName: string | null;
+    messages: LocalThreadMessage[];
+  }>("GET", `/api/v1/local/threads/${encodeURIComponent(threadId)}`);
+
+export const sendLocalMessage = (threadId: string, body: string) =>
+  call<{ ok: boolean }>(
+    "POST",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
+    { body },
+  );
+
+export const closeLocalThread = (threadId: string) =>
+  call<{ ok: boolean }>(
+    "DELETE",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
+  );

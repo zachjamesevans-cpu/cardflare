@@ -93,7 +93,8 @@ async function record(entry: {
     | "early-board"
     | "board-open"
     | "new-follower"
-    | "room-flare";
+    | "room-flare"
+    | "message-received";
   title: string;
   body: string | null;
   url: string;
@@ -813,5 +814,64 @@ export async function notifyTradeConfirmed(
     }
   } catch (error) {
     console.error("Could not notify the trade partner", error);
+  }
+}
+
+/**
+ * A message landed in a Flare thread — the Local tab's conversations.
+ *
+ * ONE NOTICE PER THREAD PER SITTING, not one per message. The dedupe
+ * key is thread + recipient, so the first unread message rings and the
+ * rest of the burst arrives silently behind it; reading the thread
+ * deletes the notice (see readThread), which is what lets the NEXT
+ * message ring again. A conversation should interrupt somebody once,
+ * not once per sentence.
+ *
+ * Push and inbox, no email: messages move at chat speed, and chat over
+ * email is how a sender gets marked as spam.
+ */
+export async function notifyMessageReceived(
+  threadId: string,
+  senderId: string,
+  recipientId: string,
+  body: string,
+  context?: { flareCardId?: string },
+): Promise<void> {
+  if (!isSupabaseConfigured() || senderId === recipientId) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+
+    const [{ data: sender }, card] = await Promise.all([
+      admin.from("players").select("display_name").eq("id", senderId).maybeSingle(),
+      context?.flareCardId
+        ? admin
+            .from("cards")
+            .select("exact_name")
+            .eq("id", context.flareCardId)
+            .maybeSingle()
+            .then((result) => result.data)
+        : Promise.resolve(null),
+    ]);
+
+    const name = sender?.display_name ?? "A player";
+    const title = card?.exact_name
+      ? `${name} messaged about ${card.exact_name}`
+      : `${name} sent a message`;
+    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
+    const path = "/local";
+
+    const id = await record({
+      playerId: recipientId,
+      kind: "message-received",
+      title,
+      body: preview,
+      url: path,
+      dedupeKey: `message:${threadId}:${recipientId}`,
+    });
+
+    if (id) await deliverByPush(recipientId, title, preview, path);
+  } catch (error) {
+    console.error("Could not announce the message", error);
   }
 }

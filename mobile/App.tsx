@@ -36,7 +36,9 @@ import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { PostFlareScreen } from "./src/screens/post-flare";
+import { LocalScreen } from "./src/screens/local";
 import { RoomTab } from "./src/screens/room";
+import { ThreadScreen } from "./src/screens/thread";
 import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { StoreScreen } from "./src/screens/store";
@@ -82,7 +84,7 @@ try {
 
 export type TabParams = {
   Feed: undefined;
-  Room: undefined;
+  Local: undefined;
   Flare: undefined;
   Inbox: undefined;
   Profile: undefined;
@@ -90,6 +92,11 @@ export type TabParams = {
 
 export type StackParams = {
   Tabs: { screen?: keyof TabParams } | undefined;
+  /** The live room. A stack screen now: its tab slot went to Local, and
+      the Feed's banner is the door on event nights. */
+  Room: undefined;
+  /** One conversation about one Flare, from Local or the Inbox. */
+  LocalThread: { threadId: string };
   SignIn: undefined;
   Scan: undefined;
   Settings: undefined;
@@ -124,8 +131,10 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Store: "Profile",
   Customize: "Profile",
   PlayerProfile: "Back",
-  FindPlayer: "Local",
+  FindPlayer: "Feed",
   PostFlare: "Room",
+  Room: "Back",
+  LocalThread: "Local",
 };
 
 /**
@@ -170,7 +179,7 @@ const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>
   /* Home-shaped, the founder's call: this is the screen you open by
      habit, and scanning moved to a button on it. */
   Feed: "home-outline",
-  Room: "people-outline",
+  Local: "location-outline",
   Inbox: "notifications-outline",
   Profile: "person-circle-outline",
 };
@@ -319,12 +328,18 @@ function Tabs() {
            * header that flickers.
            */
           headerShown: false,
-          /* Local, not Feed: the screen is about what is happening
-             around you rather than about a stream of posts. */
-          tabBarLabel: "Local",
+          tabBarLabel: "Feed",
         }}
       />
-      <Tab.Screen name="Room" component={RoomTab} />
+      {/* Room's old slot. The live room moved to the Feed's banner and a
+          stack screen; the bar's four-nights-a-month tab became the
+          every-day one: Flares near you, and the conversations they
+          start. */}
+      <Tab.Screen
+        name="Local"
+        component={LocalScreen}
+        options={{ title: "Local" }}
+      />
       {/* The tab keeps the product's name; the header says what the
           hub holds now: your standing list, not just the post form. */}
       <Tab.Screen
@@ -471,6 +486,16 @@ export default function App() {
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
           <Stack.Screen
+            name="Room"
+            component={RoomTab}
+            options={{ title: "Room", headerBackTitle: "Back" }}
+          />
+          <Stack.Screen
+            name="LocalThread"
+            component={ThreadScreen}
+            options={{ title: "Conversation", headerBackTitle: "Local" }}
+          />
+          <Stack.Screen
             name="SignIn"
             options={{ title: "Sign in", headerBackTitle: "Back" }}
           >
@@ -483,9 +508,7 @@ export default function App() {
             options={{ title: "Scan", headerBackTitle: "Back" }}
           >
             {({ navigation }) => (
-              <ScanScreen
-                onCode={() => navigation.navigate("Tabs", { screen: "Room" })}
-              />
+              <ScanScreen onCode={() => navigation.navigate("Room")} />
             )}
           </Stack.Screen>
           <Stack.Screen

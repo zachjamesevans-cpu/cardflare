@@ -12,11 +12,12 @@ import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser, sessionForPlayer } from "@/lib/players/accounts";
 import { listFeed } from "@/lib/feed/repository";
+import { listLocals } from "@/lib/players/locals";
 import { listWants } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
-  title: "Local",
+  title: "Feed",
   robots: { index: false, follow: false },
 };
 
@@ -134,7 +135,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             both platforms: top right of the main feed. */}
         <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
           <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
-            Local
+            Feed
           </h1>
           <FeedSearch />
         </div>
@@ -195,7 +196,7 @@ export default async function FeedPage() {
   }
 
   const session = await sessionForPlayer(playerId);
-  const [items, wants, account] = await Promise.all([
+  const [items, wants, account, locals] = await Promise.all([
     listFeed(playerId, session?.id ?? null),
     listWants(playerId),
     /* The face and the balance the header opens with. Two columns off an
@@ -205,7 +206,12 @@ export default async function FeedPage() {
       .select("display_name, avatar_url, embers_balance")
       .eq("id", playerId)
       .maybeSingle(),
+    /* For the live-room banner below. Room lost its tab to Local, so
+       the Feed is where a live room announces itself now. */
+    listLocals(playerId),
   ]);
+
+  const liveLocal = locals.find((local) => local.liveNow) ?? null;
 
   return (
     <Shell>
@@ -217,6 +223,29 @@ export default async function FeedPage() {
           wants={wants.length}
           balance={account.data.embers_balance ?? null}
         />
+      )}
+
+      {/* The Room tab's job, as a banner: gone from the bar, never gone
+          from reach. Shows the moment a room is open at one of your
+          stores and takes you straight onto its board. */}
+      {liveLocal && (
+        <Link
+          href={`/e/${liveLocal.joinCode}`}
+          className="flex w-full max-w-2xl items-center gap-3 rounded-[var(--radius-card)] border border-accent bg-elevated p-4 hover:border-accent-hover"
+        >
+          <span className="relative flex size-3 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+            <span className="relative inline-flex size-3 rounded-full bg-accent" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold text-text-primary">
+              Room open at {liveLocal.name}
+            </span>
+            <span className="block text-sm text-text-secondary">
+              Tap to jump onto the board.
+            </span>
+          </span>
+        </Link>
       )}
 
       {items.length === 0 ? (
