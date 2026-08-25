@@ -210,4 +210,9 @@ async function main() {
   );
 }
 
-await main();
+/* No top-level await: tsx transpiles these scripts to CommonJS, and the
+   founder's first run died on exactly that. Same shape as sync-onepiece. */
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});
