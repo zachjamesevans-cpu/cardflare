@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { VariantAsk } from "./query";
+
 /**
  * Shortest query worth running. One character matches most of the pool and
  * tells the player nothing.
@@ -80,6 +82,9 @@ export const CARD_SEARCH_IDLE: CardSearchState = { status: "idle" };
  * yields "SPR". Falls back to the whole name when it is not a clean suffix,
  * because a truncated name is worse than a long one.
  */
+/** "EB04-007", "OP01-024b": the shape of a printed number, not a word. */
+const CARD_NUMBER_SHAPE = /^[a-z]{1,4}\d{2,}-\d+[a-z]*$/i;
+
 export function printingVariantMark(
   printing: CardPrinting,
   cardName: string,
@@ -87,16 +92,34 @@ export function printingVariantMark(
   const name = printing.printingName?.trim();
   if (!name || name === cardName) return null;
 
-  if (name.startsWith(cardName)) {
-    const suffix = name.slice(cardName.length).trim();
-    // Unwrap a single wrapping bracket: "(SPR)" reads better than "SPR" does
-    // not — but "(Premium Card Collection -Best Selection Vol. 4-)" is worse
-    // with the brackets than without.
-    const unwrapped = suffix.replace(/^\(([\s\S]*)\)$/, "$1").trim();
-    if (unwrapped) return unwrapped;
-  }
+  if (!name.startsWith(cardName)) return name;
 
-  return name;
+  const suffix = name.slice(cardName.length).trim();
+
+  /*
+   * The provider appends bracket groups to the base name, and not only
+   * variant words: "Roronoa Zoro (EB04-007) (Alternate Art)" carries
+   * the card number AND the variant. The old code unwrapped one
+   * wrapping bracket, which across two groups produced the mangled
+   * "EB04-007) (Alternate Art" the founder screenshotted — and left the
+   * number in, where it made the base printing look like a variant. So:
+   * every group is read on its own, groups that are just a card number
+   * go (the chip already says the number), and what remains joins back
+   * up. No groups left means no mark, which is what makes the base
+   * printing recognisable as base.
+   */
+  const groups = [...suffix.matchAll(/\(([^()]*)\)/g)].map((m) => m[1].trim());
+  const outside = suffix
+    .replace(/\(([^()]*)\)/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const kept = [outside, ...groups].filter(
+    (part) => part.length > 0 && !CARD_NUMBER_SHAPE.test(part),
+  );
+
+  return kept.length > 0 ? kept.join(" ") : null;
 }
 
 /**
@@ -182,6 +205,59 @@ function rarityRank(rarity: string | null): number {
 }
 
 /**
+ * Whether a printing is the version a typed variant word asks for.
+ *
+ * Reads every place a variant identifies itself — the classification's
+ * `variantType`, the provider's rarity codes ("SP", "SP CARD"), the
+ * name mark ("(Alternate Art)"), and an import's label — because the
+ * same fact lives in a different field depending on where the printing
+ * came from, and a player typing "zoro sp" does not care which.
+ */
+export function printingMatchesAsk(
+  printing: CardPrinting,
+  cardName: string,
+  ask: VariantAsk,
+): boolean {
+  if (ask === "promo") return printing.isPromo === true;
+
+  const said = [
+    printing.variantType,
+    printing.rarity,
+    printing.printingLabel,
+    printingVariantMark(printing, cardName),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (ask === "sp") return /\bsp\b/.test(said);
+  if (ask === "manga") return said.includes("manga");
+  return /\b(alt|alternate|parallel)\b/.test(said);
+}
+
+/**
+ * Results reordered so cards that HAVE the asked-for version lead.
+ *
+ * "Zoro sp" should read as a page of SPs — but a Zoro with no SP still
+ * appears below them, because a version word is a preference, not a
+ * gate, and an empty page teaches people the search is broken. The
+ * sort is stable, so the ranking's order survives inside each half.
+ */
+export function floatAskedVariants(
+  results: CardResult[],
+  ask: VariantAsk | null,
+): CardResult[] {
+  if (!ask) return results;
+
+  const has = (card: CardResult) =>
+    card.printings.some((printing) =>
+      printingMatchesAsk(printing, card.exactName, ask),
+    );
+
+  return [...results].sort((a, b) => Number(has(b)) - Number(has(a)));
+}
+
+/**
  * The printing to show when someone will take any version of a card.
  *
  * "Any printing" used to render no artwork at all, which is the one case where
@@ -194,17 +270,21 @@ function rarityRank(rarity: string | null): number {
  *    shows nothing, which is the problem being fixed. A picture of a different
  *    version of the right card beats no picture, and the row says "Any
  *    printing" beside it either way.
- * 2. **Not a promo.** A promo of a card is the least ordinary version of it.
- * 3. **Named exactly like the card.** The provider marks a variant by
- *    appending to the base name, so the printing whose name matches is the
- *    base one. This is the strongest signal available and the only one that
- *    works for Leaders, where every printing shares a rarity.
- * 4. **Plainest rarity**, then **earliest set code**, so the result is stable
+ * 2. **The version the query asked for**, when it asked: "zoro manga"
+ *    should front the manga art of every Zoro that has one.
+ * 3. **Not a promo.** A promo of a card is the least ordinary version of it.
+ * 4. **Carrying no variant signal.** The provider marks a variant by
+ *    appending to the base name and the console marks one in
+ *    `variantType`; the printing with neither is the base one. This is
+ *    the strongest signal available and the only one that works for
+ *    Leaders, where every printing shares a rarity.
+ * 5. **Plainest rarity**, then **earliest set code**, so the result is stable
  *    rather than dependent on row order.
  */
 export function pickBasePrinting(
   printings: CardPrinting[],
   cardName: string,
+  ask: VariantAsk | null = null,
 ): CardPrinting | null {
   if (printings.length === 0) return null;
 
@@ -212,11 +292,21 @@ export function pickBasePrinting(
     const byImage = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
     if (byImage !== 0) return byImage;
 
+    if (ask) {
+      const byAsk =
+        Number(printingMatchesAsk(b, cardName, ask)) -
+        Number(printingMatchesAsk(a, cardName, ask));
+      if (byAsk !== 0) return byAsk;
+    }
+
     const byPromo = Number(a.isPromo === true) - Number(b.isPromo === true);
     if (byPromo !== 0) return byPromo;
 
     const marked = (printing: CardPrinting) =>
-      Number(printingVariantMark(printing, cardName) !== null);
+      Number(
+        printing.variantType !== null ||
+          printingVariantMark(printing, cardName) !== null,
+      );
     const byMark = marked(a) - marked(b);
     if (byMark !== 0) return byMark;
 

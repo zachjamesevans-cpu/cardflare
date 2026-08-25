@@ -1,5 +1,9 @@
 import { parseCardQuery } from "@/lib/cards/query";
-import { pickBasePrinting, printingLabel } from "@/lib/cards/schema";
+import {
+  floatAskedVariants,
+  pickBasePrinting,
+  printingLabel,
+} from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +31,11 @@ export async function GET(request: Request): Promise<Response> {
     cards = await searchCards(query);
   }
 
+  /* Same variant steering as the website: "zoro sp" floats the cards
+     that have an SP and fronts each one's SP art. */
+  const ask = typed.filters.variant;
+  cards = floatAskedVariants(cards, ask);
+
   return Response.json({
     cards: cards.map((card) => ({
       id: card.id,
@@ -40,9 +49,10 @@ export async function GET(request: Request): Promise<Response> {
       life: card.life,
       power: card.power,
       counter: card.counter,
-      // The website leads with the base printing's art, not whichever
-      // set code sorted first; the app must lead with the same one.
-      basePrintingId: pickBasePrinting(card.printings, card.exactName)?.id ?? null,
+      // The website leads with the base printing's art — or the version
+      // the query asked for — never whichever set code sorted first; the
+      // app must lead with the same one.
+      basePrintingId: pickBasePrinting(card.printings, card.exactName, ask)?.id ?? null,
       printings: card.printings.map((printing) => ({
         id: printing.id,
         // The website's exact wording for a version — set code, rarity,

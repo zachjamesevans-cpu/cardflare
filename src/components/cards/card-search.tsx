@@ -7,6 +7,7 @@ import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { searchCardsAction } from "@/lib/cards/actions";
+import { parseCardQuery } from "@/lib/cards/query";
 import {
   highlightParts,
   MAX_QUERY_LENGTH,
@@ -187,9 +188,12 @@ function Row({
   /*
    * The headline is the base printing, not whichever set code sorted first —
    * otherwise a card whose alternate art happens to come from an earlier set
-   * leads with the alternate art.
+   * leads with the alternate art. Unless the QUERY asked for a version:
+   * "zoro manga" fronts each card's manga art, which is what the person
+   * typing it is trying to look at.
    */
-  const printing = pickBasePrinting(card.printings, card.exactName);
+  const ask = parseCardQuery(term).filters.variant;
+  const printing = pickBasePrinting(card.printings, card.exactName, ask);
   const label = printing ? printingLabel(printing, card.exactName) : null;
   const manyPrintings = card.printings.length > 1;
 
