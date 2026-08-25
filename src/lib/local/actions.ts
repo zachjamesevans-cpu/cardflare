@@ -2,7 +2,7 @@
 
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { saveLocalRadius } from "./feed";
+import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
 import {
   closeThread,
@@ -27,6 +27,9 @@ async function viewerPlayerId(): Promise<string | null> {
 }
 
 export type LocalActionResult = { ok: true } | { ok: false; message: string };
+
+/** Null when signed out or the coordinates were nonsense. */
+export type LocalFeedResult = LocalFeed | null;
 
 const SIGN_IN = "Sign in to use Local.";
 const GENERIC = "Something went wrong. Please try again in a moment.";
@@ -100,4 +103,32 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
   }
 
   return readThread(threadId, playerId);
+}
+
+/**
+ * The Local list, measured from where the browser says the player is.
+ *
+ * The website's answer to "enable location access": the browser's own
+ * permission prompt, granted, hands coordinates that ride this ONE
+ * action call and are never written anywhere — the same promise the
+ * app's device path makes. The ZIP field stays beside it for everybody
+ * who would rather type five digits than grant a prompt.
+ */
+export async function localFeedAtAction(
+  latitude: number,
+  longitude: number,
+): Promise<LocalFeedResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return null;
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  ) {
+    return null;
+  }
+
+  return localFeed(playerId, { latitude, longitude });
 }
