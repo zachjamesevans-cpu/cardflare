@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 import { buttonStyles } from "@/components/ui/button";
-import { NAV_LINKS, WAITLIST_ANCHOR } from "@/lib/site";
+import { NAV_LINKS } from "@/lib/site";
 
 /**
  * Mobile navigation disclosure.
@@ -82,15 +82,15 @@ export function MobileNav() {
             onClick={() => setOpen(false)}
             className="rounded-[var(--radius-control)] px-3 py-3.5 text-base font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:bg-elevated hover:text-text-primary"
           >
-            Store sign-in
+            Sign in
           </a>
 
           <a
-            href={WAITLIST_ANCHOR}
+            href="/signup"
             onClick={() => setOpen(false)}
             className={`${buttonStyles("primary", "lg")} mt-3 w-full`}
           >
-            Join the Waitlist
+            Join free
           </a>
         </nav>
       </div>

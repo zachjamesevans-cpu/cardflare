@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { ButtonLink } from "@/components/ui/button";
-import { NAV_LINKS, SITE, WAITLIST_ANCHOR } from "@/lib/site";
+import { NAV_LINKS, SITE } from "@/lib/site";
 import { MobileNav } from "./mobile-nav";
 
 /**
@@ -37,11 +37,12 @@ export function SiteHeader() {
             </a>
           ))}
           {/*
-           * `Store sign-in`, not `Sign in`. Players have no account and must
-           * never think they need one — naming the audience keeps a curious
-           * player from concluding cardflare wants them to register. Quiet on
-           * purpose: it shares a row with the waitlist CTA, which is the thing
-           * the landing page is actually for.
+           * One door for everyone. This said "Store sign-in" through the
+           * beta, when players had nothing to sign into; accounts are
+           * open now and /login routes each kind where it belongs, so
+           * naming an audience would just turn players away at the
+           * handle. Quiet on purpose: it shares a row with the join CTA,
+           * which is the thing the landing page is actually for.
            */}
           <Link
             href="/contact"
@@ -53,10 +54,10 @@ export function SiteHeader() {
             href="/login"
             className="rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:text-text-primary"
           >
-            Store sign-in
+            Sign in
           </Link>
-          <ButtonLink href={WAITLIST_ANCHOR} size="sm" className="ml-3">
-            Join the Waitlist
+          <ButtonLink href="/signup" size="sm" className="ml-3">
+            Join free
           </ButtonLink>
         </nav>
 

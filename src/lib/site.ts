@@ -49,7 +49,8 @@ export const ANCHORS = {
   forPlayers: "/#for-players",
   forVendors: "/#for-vendors",
   forStores: "/#for-stores",
-  waitlist: "/#waitlist",
+  pricing: "/#pricing",
+  invite: "/#request-invite",
 } as const;
 
 export const NAV_LINKS = [
@@ -57,6 +58,5 @@ export const NAV_LINKS = [
   { href: ANCHORS.forPlayers, label: "For Players" },
   { href: ANCHORS.forVendors, label: "For Vendors" },
   { href: ANCHORS.forStores, label: "For Stores" },
+  { href: ANCHORS.pricing, label: "Pricing" },
 ] as const;
-
-export const WAITLIST_ANCHOR = ANCHORS.waitlist;

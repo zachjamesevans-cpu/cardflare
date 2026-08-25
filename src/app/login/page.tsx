@@ -43,7 +43,7 @@ export default async function LoginPage(props: {
   /*
    * Somebody already signed in does not want a sign-in form.
    *
-   * The footer's "Store sign-in" link points here unconditionally, because the
+   * The footer's "Sign in" link points here unconditionally, because the
    * landing page is statically prerendered and asking who the visitor is would
    * turn every visit to the marketing site into a round trip to the auth
    * server. So the question is answered here instead, on a page that is
@@ -72,7 +72,9 @@ export default async function LoginPage(props: {
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">
             Sign in to {SITE.name}
           </h1>
-          <p className="text-text-secondary">For stores taking part in the beta.</p>
+          <p className="text-text-secondary">
+            Players, stores and vendors all sign in here.
+          </p>
         </div>
 
         {error && (

@@ -1,7 +1,7 @@
 import { EventRoomPreview } from "@/components/app-preview/event-room-preview";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
-import { ANCHORS, WAITLIST_ANCHOR } from "@/lib/site";
+import { ANCHORS } from "@/lib/site";
 
 export function Hero() {
   return (
@@ -10,7 +10,7 @@ export function Hero() {
         <div className="flex flex-col items-start gap-6">
           <Badge>
             <span className="size-1.5 rounded-full bg-accent" />
-            Now building &middot; One Piece Card Game first
+            Live now &middot; One Piece Card Game first
           </Badge>
 
           <h1 className="text-4xl font-bold tracking-tight text-balance text-text-primary sm:text-5xl lg:text-6xl">
@@ -28,12 +28,12 @@ export function Hero() {
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <ButtonLink
-              href={WAITLIST_ANCHOR}
+              href="/signup"
               size="lg"
               className="w-full sm:w-auto"
               data-analytics-event="primary_cta_clicked"
             >
-              Join the Waitlist
+              Create your free account
             </ButtonLink>
             <ButtonLink
               href={ANCHORS.howItWorks}

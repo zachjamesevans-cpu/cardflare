@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Check, ChevronLeft, Loader2, MessageCircle, Send } from "lucide-react";
+import { Check, ChevronLeft, Loader2, MapPin, MessageCircle, Send } from "lucide-react";
 
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
 import {
   closeThreadAction,
+  localFeedAtAction,
   openThreadAction,
   readThreadAction,
   sendMessageAction,
@@ -42,7 +43,7 @@ import { cn } from "@/lib/cn";
  */
 
 export function LocalScreen({
-  feed,
+  feed: serverFeed,
   threads,
   postalCode,
 }: {
@@ -51,6 +52,46 @@ export function LocalScreen({
   postalCode: string | null;
 }) {
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+
+  /*
+   * The browser-location override. The server rendered the ZIP's view;
+   * "Use my location" asks the browser, hands the coordinates to ONE
+   * action call — never stored, same promise as the app — and shows
+   * what came back. State rather than a reload because a reload would
+   * ask the browser all over again.
+   */
+  const [deviceFeed, setDeviceFeed] = useState<LocalFeed | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+
+  const feed = deviceFeed ?? serverFeed;
+
+  function locate() {
+    if (!("geolocation" in navigator)) {
+      setLocateError("This browser cannot share a location. The ZIP works.");
+      return;
+    }
+    setLocating(true);
+    setLocateError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void (async () => {
+          const found = await localFeedAtAction(
+            position.coords.latitude,
+            position.coords.longitude,
+          );
+          setLocating(false);
+          if (found) setDeviceFeed(found);
+          else setLocateError("Could not look around from here. The ZIP works.");
+        })();
+      },
+      () => {
+        setLocating(false);
+        setLocateError("No problem. A ZIP code works just as well.");
+      },
+      { enableHighAccuracy: false, timeout: 10_000 },
+    );
+  }
 
   if (openThreadId) {
     return <ThreadView threadId={openThreadId} onBack={() => setOpenThreadId(null)} />;
@@ -62,14 +103,33 @@ export function LocalScreen({
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Where is local?</h2>
           <p className="text-sm text-text-secondary">
-            Local shows every card people are hunting at stores near you. A ZIP code is
-            all it needs &mdash; enough to place you within a few miles, nothing like an
+            Local shows every card people are hunting at stores near you. Share your
+            location once &mdash; it is used for this look and never stored &mdash; or
+            type a ZIP, which places you within a few miles and is nothing like an
             address.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              className="self-start"
+              onClick={locate}
+              disabled={locating}
+            >
+              <MapPin className="size-4" aria-hidden="true" />
+              {locating ? "Looking around…" : "Use my location"}
+            </Button>
+            {locateError && (
+              <p className="text-sm text-text-secondary">{locateError}</p>
+            )}
+          </div>
+          <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">
+            Or a ZIP code
           </p>
           <PostalAsk defaultValue={postalCode ?? ""} />
         </Card>
       ) : (
-        <RadiusRow current={feed.radius} />
+        <RadiusRow current={feed.radius} onSaved={deviceFeed ? locate : undefined} />
       )}
 
       {threads.length > 0 && (
@@ -123,7 +183,15 @@ export function LocalScreen({
 }
 
 /** The distances Local offers, as chips. Saving reloads the list. */
-function RadiusRow({ current }: { current: number }) {
+function RadiusRow({
+  current,
+  onSaved,
+}: {
+  current: number;
+  /** Set when a browser location is in play: re-look there instead of
+      reloading the ZIP's server render. */
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [choosing, setChoosing] = useState(current);
@@ -132,7 +200,9 @@ function RadiusRow({ current }: { current: number }) {
     setChoosing(radius);
     startTransition(async () => {
       const result = await setLocalRadiusAction(radius);
-      if (result.ok) router.refresh();
+      if (!result.ok) return;
+      if (onSaved) onSaved();
+      else router.refresh();
     });
   }
 

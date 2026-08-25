@@ -5,20 +5,20 @@ import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: `The terms that apply to the ${SITE.name} website and pre-launch waitlist.`,
+  description: `The terms that apply to the ${SITE.name} website, accounts and invite requests.`,
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "30 July 2026";
+const LAST_UPDATED = "25 August 2026";
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" lastUpdated={LAST_UPDATED}>
       <LegalSection heading="About these terms">
         <p>
-          These terms apply to the {SITE.domain} website and the {SITE.name} waitlist.
-          The {SITE.name} application itself is still being built; when it launches, it
-          will have its own terms that you will be asked to accept.
+          These terms apply to the {SITE.domain} website, {SITE.name} accounts, and the
+          invite requests stores and vendors send us. The mobile app is the same product
+          and the same terms.
         </p>
       </LegalSection>
 
@@ -52,11 +52,17 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="Using the waitlist">
+      <LegalSection heading="Accounts and invite requests">
         <p>
           Sign up with your own email address and give accurate information. Do not
-          submit other people&rsquo;s details, and do not use automated tools to submit
-          entries. We may remove entries that look like spam or abuse.
+          submit other people&rsquo;s details, and do not use automated tools to create
+          accounts or send requests. We may remove accounts or requests that look like
+          spam or abuse, and we may close an account that breaks these terms.
+        </p>
+        <p>
+          Messages you send to other players through {SITE.name} must stay about trading
+          cards and stay civil. We can end a conversation or an account over harassment
+          or scams.
         </p>
       </LegalSection>
 
@@ -86,8 +92,8 @@ export default function TermsPage() {
 
       <LegalSection heading="Availability and changes">
         <p>
-          This is a pre-launch site. We may change, pause or remove features, including
-          the waitlist, at any time and without notice.
+          We may change, pause or remove features at any time and without notice, and we
+          may update prices for paid tiers with notice before you are charged.
         </p>
       </LegalSection>
 

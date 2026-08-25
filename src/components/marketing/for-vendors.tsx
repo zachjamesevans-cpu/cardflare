@@ -63,15 +63,15 @@ export function ForVendors() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          Bringing a case to a show soon? We are looking for a few vendors to run the
-          first card-show pilots and help shape how it works.
+          Bringing a case to a show soon? Max is set up with us, booth by booth. Tell us
+          where you sell and we will get you on the floor.
         </p>
         <ButtonLink
           href={VENDOR_PILOT_ANCHOR}
           size="lg"
           data-analytics-event="vendor_pilot_cta_clicked"
         >
-          Join the Vendor Pilot
+          Request an invite
         </ButtonLink>
       </div>
     </Section>

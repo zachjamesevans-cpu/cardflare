@@ -63,15 +63,15 @@ export function ForStores() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          We are looking for a small number of stores to run the first cardflare pilots
-          and help shape how it works.
+          Ultra is set up with us, store by store: counter code, Event Hub, the TV on
+          the wall. Tell us about your shop and we will get you running.
         </p>
         <ButtonLink
           href={STORE_PILOT_ANCHOR}
           size="lg"
           data-analytics-event="store_pilot_cta_clicked"
         >
-          Join the Store Pilot
+          Request an invite
         </ButtonLink>
       </div>
     </Section>

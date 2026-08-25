@@ -21,19 +21,19 @@ async function settleFillWindow(page: Page) {
 }
 
 async function fillValidForm(page: Page, email: string) {
-  await page.goto("/#waitlist");
+  await page.goto("/#request-invite");
 
   await page.getByLabel("First name").fill("Zach");
   await page.getByLabel("Email address").fill(email);
-  await page.getByLabel(/which best describes you/i).selectOption("player");
+  await page.getByLabel(/which best describes you/i).selectOption("store");
   await page.getByRole("checkbox").check();
 
   await settleFillWindow(page);
 }
 
-test.describe("waitlist form", () => {
+test.describe("invite request form", () => {
   test("is keyboard accessible and properly labelled", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
 
     for (const label of [
       "First name",
@@ -51,10 +51,10 @@ test.describe("waitlist form", () => {
   });
 
   test("shows useful messages for an empty submission", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
     await settleFillWindow(page);
 
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     await expect(page.getByText("Please enter your first name.")).toBeVisible();
     await expect(page.getByText("Please enter your email address.")).toBeVisible();
@@ -73,30 +73,30 @@ test.describe("waitlist form", () => {
    * shared rate-limit budget that a valid submission would.
    */
   test("does not complain about an unticked consent box", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("player");
+    await page.getByLabel(/which best describes you/i).selectOption("store");
     await expect(page.getByRole("checkbox")).not.toBeChecked();
 
     await settleFillWindow(page);
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
     await expect(page.getByRole("checkbox")).not.toHaveAttribute("aria-invalid");
   });
 
   test("rejects a malformed email with an inline message", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("player");
+    await page.getByLabel(/which best describes you/i).selectOption("store");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
 
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
   });
@@ -104,7 +104,7 @@ test.describe("waitlist form", () => {
   test("keeps everything else the user typed when one field is invalid", async ({
     page,
   }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
@@ -115,7 +115,7 @@ test.describe("waitlist form", () => {
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
 
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
 
     await expect(page.getByLabel("First name")).toHaveValue("Zach");
@@ -129,30 +129,30 @@ test.describe("waitlist form", () => {
   });
 
   test("a quick correction is not mistaken for a bot", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("player");
+    await page.getByLabel(/which best describes you/i).selectOption("store");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
 
     // Fix and resubmit immediately — well inside the minimum-fill window. The
     // form must not silently swallow this as a bot submission.
     await page.getByLabel("Email address").fill("quick-fix@cardflare.test");
     await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     await expect(page.getByText("Please enter a valid email address.")).toBeHidden();
   });
 
   test("marks invalid fields for assistive technology", async ({ page }) => {
-    await page.goto("/#waitlist");
+    await page.goto("/#request-invite");
     await settleFillWindow(page);
 
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     const email = page.getByLabel("Email address");
     await expect(email).toHaveAttribute("aria-invalid", "true");
@@ -172,12 +172,12 @@ test.describe("waitlist form", () => {
     const email = `e2e-${Date.now()}@cardflare.test`;
     await fillValidForm(page, email);
 
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
-    await expect(page.getByRole("status")).toContainText("You're on the list.");
+    await expect(page.getByRole("status")).toContainText("Request received.");
   });
 
-  test("tells a returning signup they are already on the list", async ({ page }) => {
+  test("tells a returning requester their request is already in", async ({ page }) => {
     test.skip(
       !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY,
       "Supabase is not configured in this environment.",
@@ -186,13 +186,13 @@ test.describe("waitlist form", () => {
     const email = `e2e-dupe-${Date.now()}@cardflare.test`;
 
     await fillValidForm(page, email);
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
     await expect(page.getByRole("status")).toBeVisible();
 
     await fillValidForm(page, email);
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
-    await expect(page.getByRole("status")).toContainText("already on the list");
+    await expect(page.getByRole("status")).toContainText("already have your request");
   });
 
   test("surfaces a safe error when the backend is unavailable", async ({ page }) => {
@@ -202,7 +202,7 @@ test.describe("waitlist form", () => {
     );
 
     await fillValidForm(page, "backend-down@cardflare.test");
-    await page.getByRole("button", { name: /join the waitlist/i }).click();
+    await page.getByRole("button", { name: /request an invite/i }).click();
 
     const alert = page.getByRole("alert").filter({ hasText: /went wrong/i });
     await expect(alert).toBeVisible();

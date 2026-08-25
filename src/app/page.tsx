@@ -5,8 +5,9 @@ import { ForStores } from "@/components/marketing/for-stores";
 import { ForVendors } from "@/components/marketing/for-vendors";
 import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
+import { Pricing } from "@/components/marketing/pricing";
 import { ProductPreview } from "@/components/marketing/product-preview";
-import { WaitlistSection } from "@/components/marketing/waitlist-section";
+import { RequestInviteSection } from "@/components/marketing/request-invite-section";
 import { SITE, siteUrl } from "@/lib/site";
 
 /**
@@ -59,7 +60,8 @@ export default function HomePage() {
         <ForVendors />
         <ForStores />
         <ProductPreview />
-        <WaitlistSection />
+        <Pricing />
+        <RequestInviteSection />
       </main>
 
       <SiteFooter />
