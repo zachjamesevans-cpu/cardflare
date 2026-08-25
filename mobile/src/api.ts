@@ -1393,6 +1393,26 @@ export const setCustomizeEquip = (kind: CustomizeKind, slug: string | null) =>
  * as ONE batch when the player walks in — one notification, one Feed
  * item, however many cards.
  */
+/** One pasted line, looked up: the confirmation screen's row. */
+export interface DeckPreviewEntry {
+  cardNumber: string;
+  quantity: number;
+  /** Null when the number is not in the catalogue (yet). */
+  name: string | null;
+  imageUrl: string | null;
+}
+
+/**
+ * The pasted list with names and art, nothing saved — what the
+ * confirmation screen shows before `saveDeckList` writes anything.
+ */
+export const previewDeckList = (list: string) =>
+  call<{ ok: true; entries: DeckPreviewEntry[]; unreadable: string[] }>(
+    "POST",
+    "/api/v1/wants",
+    { list, preview: true },
+  );
+
 export const saveDeckList = (list: string, deckLabel?: string | null) =>
   call<{
     ok: true;

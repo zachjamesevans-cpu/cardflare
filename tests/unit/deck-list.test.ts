@@ -36,8 +36,47 @@ describe("parseDeckLine", () => {
     ["1x ST01-001 Leader", "ST01-001", 1],
     ["  2x   OP17-013  ", "OP17-013", 2],
     ["op17-001", "OP17-001", 1],
+    /* The count glued straight onto the number — the simulator's and
+       the deck sites' export, and the founder's bug report: the x read
+       as the set code's first letter, "XOP14-020" matched nothing, and
+       a whole paste came back unknown. */
+    ["1xOP14-020", "OP14-020", 1],
+    ["4xST32-002", "ST32-002", 4],
+    ["2xST24-004", "ST24-004", 2],
+    ["10xOP17-001", "OP17-001", 10],
+    ["4XOP07-022", "OP07-022", 4],
   ])("reads %j", (line, cardNumber, quantity) => {
     expect(parseDeckLine(line)).toEqual({ cardNumber, quantity });
+  });
+
+  it("reads the founder's simulator paste, every line", () => {
+    const pasted = [
+      "1xOP14-020",
+      "2xST24-004",
+      "4xOP13-031",
+      "4xST32-002",
+      "4xOP12-034",
+      "4xST32-001",
+      "4xOP07-022",
+      "4xOP12-023",
+      "4xOP06-038",
+      "2xOP13-040",
+      "1xOP12-037",
+      "3xOP01-055",
+      "1xOP14-039",
+      "1xST30-011",
+      "4xOP06-033",
+      "4xOP17-031",
+      "4xOP17-022",
+    ].join("\n");
+
+    const { lines, unreadable } = parseDeckList(pasted);
+    expect(unreadable).toEqual([]);
+    expect(lines).toHaveLength(17);
+    expect(lines[0]).toEqual({ cardNumber: "OP14-020", quantity: 1 });
+    expect(lines.at(-1)).toEqual({ cardNumber: "OP17-022", quantity: 4 });
+    /* Not one line may come back wearing the x. */
+    for (const line of lines) expect(line.cardNumber).toMatch(/^(OP|ST)\d{2}-\d{3}$/);
   });
 
   it("does not read a card's own digits as a quantity", () => {
@@ -149,6 +188,8 @@ describe("the app parses a deck list the same way", () => {
     "4x OP17-001 Monkey D. Luffy",
     "op17-001",
     "99x OP17-001",
+    "1xOP14-020",
+    "4XST32-002",
     "# Leader",
     "nothing here",
   ];

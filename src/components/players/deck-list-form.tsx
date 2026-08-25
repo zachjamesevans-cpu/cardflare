@@ -1,18 +1,25 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import Image from "next/image";
 import { Check, ClipboardList, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea, TextInput } from "@/components/ui/controls";
+import { isRenderableImageUrl } from "@/lib/cards/images";
 import {
   DECK_IMPORT_IDLE,
   DECK_LIST_MAX,
   parseDeckList,
   type DeckImportState,
 } from "@/lib/players/deck-list";
-import { importDeckListAction } from "@/lib/players/account-actions";
+import {
+  importDeckListAction,
+  previewDeckListAction,
+  type DeckPreviewResult,
+} from "@/lib/players/account-actions";
+import type { DeckPreviewEntry } from "@/lib/players/deck-list-preview";
 
 /**
  * Paste a deck, get a want list.
@@ -25,6 +32,13 @@ import { importDeckListAction } from "@/lib/players/account-actions";
  * exists as text. It comes out of a builder, a Discord message or a
  * friend's screenshot as a list of numbers, and somewhere to put that is
  * faster than twenty-four perfect checkboxes.
+ *
+ * Between the paste and the save now sits a confirmation: every line
+ * looked up and shown WITH its art. The founder's ask, after a paste in
+ * the simulator's format went wrong quietly: "have a loading screen
+ * that loads all cards, with images, for confirmation that they are the
+ * cards someone wants." A wall of numbers is write-only to a human; a
+ * column of card faces is checkable at a glance.
  *
  * What lands here are WANTS, not Flares. A deck is written at home and
  * posted at a counter, often days apart; the room's "still hunting
@@ -43,6 +57,37 @@ export function DeckListForm() {
      before a round trip rather than after one. */
   const { lines, unreadable } = parseDeckList(list);
 
+  /*
+   * The looked-up preview, held WITH the text that produced it, so
+   * "still loading" is derived by comparison rather than tracked as a
+   * second flag — the same settled-value shape the sign-up handle check
+   * and the card search use, and for the same reason: a stale answer
+   * landing late must not be pinned under a fresher paste.
+   */
+  const [settled, setSettled] = useState<{
+    list: string;
+    result: DeckPreviewResult;
+  } | null>(null);
+
+  useEffect(() => {
+    if (parseDeckList(list).lines.length === 0) return;
+
+    let current = true;
+    const timer = setTimeout(() => {
+      void previewDeckListAction(list).then((result) => {
+        if (current) setSettled({ list, result });
+      });
+    }, 500);
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [list]);
+
+  const preview = settled?.list === list ? settled.result : null;
+  const loading = lines.length > 0 && preview === null;
+
   return (
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
@@ -58,12 +103,12 @@ export function DeckListForm() {
           value={list}
           onChange={(event) => setList(event.target.value)}
           className="font-mono text-xs"
-          placeholder={"4x OP17-001\n2x OP17-005\nOP17-013"}
+          placeholder={"4x OP17-001\n2xOP17-005\nOP17-013"}
         />
         <p className="text-xs text-text-muted">
-          One card per line. Counts in front or behind both work, and anything after the
-          number is ignored, so a list copied straight out of a deck builder goes in as
-          it is.
+          One card per line. Counts in front or behind both work, with or without a
+          space, and anything after the number is ignored, so a list copied straight out
+          of a deck builder or simulator goes in as it is.
         </p>
       </div>
 
@@ -78,22 +123,37 @@ export function DeckListForm() {
           placeholder="Red Luffy"
         />
         <p className="text-xs text-text-muted">
-          Groups these on a board and in the Feed, so the room sees one hunt rather than
-          a pile of loose cards.
+          Groups these on a board and in the Feed, so people see one hunt rather than a
+          pile of loose cards.
         </p>
       </div>
 
-      {lines.length > 0 && (
-        <p className="text-sm text-text-secondary tabular-nums">
-          {lines.length} card{lines.length === 1 ? "" : "s"} read
-          {lines.length >= DECK_LIST_MAX ? ` (the most one paste takes)` : ""}
-          {unreadable.length > 0
-            ? ` · ${unreadable.length} line${unreadable.length === 1 ? "" : "s"} with no card number`
-            : ""}
+      {loading && (
+        <p
+          role="status"
+          className="flex items-center gap-2 text-sm text-text-secondary"
+        >
+          <Loader2 className="size-4 animate-spin text-accent" aria-hidden="true" />
+          Loading your cards…
         </p>
       )}
 
-      <SaveButton count={lines.length} />
+      {preview !== null && preview.entries.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-text-secondary tabular-nums">
+            {preview.entries.length} card{preview.entries.length === 1 ? "" : "s"} read
+            {lines.length >= DECK_LIST_MAX ? " (the most one paste takes)" : ""}
+            {unreadable.length > 0
+              ? ` · ${unreadable.length} line${unreadable.length === 1 ? "" : "s"} with no card number`
+              : ""}
+            . Check the faces, then save.
+          </p>
+
+          <DeckPreviewList entries={preview.entries} />
+        </div>
+      )}
+
+      <SaveButton count={lines.length} loading={loading} />
 
       {state.status === "error" && (
         <p role="status" className="text-sm text-danger">
@@ -133,21 +193,71 @@ export function DeckListForm() {
   );
 }
 
-function SaveButton({ count }: { count: number }) {
+/**
+ * The confirmation itself: one row per pasted line, face first.
+ *
+ * A grey slot where a picture should be is itself the message — this
+ * number matched nothing — and the name line says so in words beside it.
+ */
+export function DeckPreviewList({ entries }: { entries: DeckPreviewEntry[] }) {
+  return (
+    <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-[var(--radius-control)] border border-border">
+      {entries.map((entry) => (
+        <li
+          key={entry.cardNumber}
+          className="flex items-center gap-3 bg-elevated px-3 py-2"
+        >
+          <span className="relative h-14 w-10 shrink-0 overflow-hidden rounded-[4px] border border-border bg-canvas">
+            {isRenderableImageUrl(entry.imageUrl) && (
+              <Image
+                src={entry.imageUrl}
+                alt=""
+                fill
+                sizes="40px"
+                className="object-cover"
+              />
+            )}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span
+              className={`truncate text-sm font-medium ${
+                entry.name ? "text-text-primary" : "text-danger"
+              }`}
+            >
+              {entry.name ?? "Not in the catalogue yet"}
+            </span>
+            <span className="text-xs text-text-muted">{entry.cardNumber}</span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-text-secondary tabular-nums">
+            ×{entry.quantity}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SaveButton({ count, loading }: { count: number; loading: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending || count === 0} className="w-fit">
-      {pending ? (
+    <Button
+      type="submit"
+      disabled={pending || loading || count === 0}
+      className="w-fit"
+    >
+      {pending || loading ? (
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
       ) : (
         <ClipboardList className="size-4" aria-hidden="true" />
       )}
       {pending
         ? "Saving…"
-        : count === 0
-          ? "Paste a list first"
-          : `Save ${count} to my list`}
+        : loading
+          ? "Loading your cards…"
+          : count === 0
+            ? "Paste a list first"
+            : `These are right, save ${count}`}
     </Button>
   );
 }

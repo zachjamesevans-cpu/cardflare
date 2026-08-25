@@ -4,12 +4,25 @@ import { addEntrySchema } from "@/lib/lists/schema";
 import { saveWant } from "@/lib/players/wants";
 import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList } from "@/lib/players/deck-list";
+import { previewDeckList } from "@/lib/players/deck-list-preview";
+import { absoluteImageUrls } from "@/lib/api/absolute";
 import { z } from "zod";
 
 /** The pasted-list shape, told apart from a single card by `list`. */
 const deckListSchema = z.object({
   list: z.string().min(1).max(20_000),
   deckLabel: z.string().trim().max(40).nullish(),
+});
+
+/**
+ * The same paste, asked about rather than saved: the app's confirmation
+ * screen. Checked BEFORE the save shape, because zod strips the keys it
+ * does not know — a preview body would otherwise match `deckListSchema`
+ * and save the list it was only supposed to show.
+ */
+const deckPreviewSchema = z.object({
+  list: z.string().min(1).max(20_000),
+  preview: z.literal(true),
 });
 
 export const dynamic = "force-dynamic";
@@ -31,6 +44,18 @@ export async function POST(request: Request): Promise<Response> {
   if (!player) return unauthorized();
 
   const body = await readJsonPayload(request);
+
+  /*
+   * "Are these the cards I meant?" — the pasted list looked up with
+   * names and art, nothing written. The phone shows the faces and only
+   * then offers the save below.
+   */
+  const asPreview = deckPreviewSchema.safeParse(body);
+  if (asPreview.success) {
+    const { lines, unreadable } = parseDeckList(asPreview.data.list);
+    const entries = await previewDeckList(lines);
+    return Response.json(absoluteImageUrls({ ok: true, entries, unreadable }));
+  }
 
   /*
    * A pasted deck list, which is the app's half of "post multiple flares
