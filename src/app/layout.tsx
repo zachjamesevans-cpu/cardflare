@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Audiowide, Inter, JetBrains_Mono } from "next/font/google";
+import { Bruno_Ace, Inter, JetBrains_Mono } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { SITE, siteUrl } from "@/lib/site";
@@ -20,15 +20,17 @@ const mono = JetBrains_Mono({
 /**
  * The wordmark's face, and the app's.
  *
- * Audiowide, matched to the new logo art the founder supplied
- * (2026-08-22) with "make cardflare all lowercase... and make it this
- * font" - wide, flat-topped, squared bowls, and it only ships one
- * weight, which is all a wordmark needs. It replaced Chakra Petch,
- * which was matched to the previous mark. The name at the top of the
- * site is TEXT beside the mark; the mark image itself is untouched, as
- * BRAND.md requires.
+ * Bruno Ace, matched to the new logo art the founder supplied with
+ * "make cardflare all lowercase... and make it this font". Matched by
+ * RENDERING, not by eye alone: fifteen squared techno faces were drawn
+ * as "cardflare" side by side against the supplied art, and Bruno Ace
+ * is the one with its monoline weight, squared-spiral a, and open
+ * squared e. (Audiowide was the first guess and the founder rightly
+ * called it off - too heavy, too round.) One weight, which is all a
+ * wordmark needs. The name at the top of the site is TEXT beside the
+ * mark; the mark image itself is untouched, as BRAND.md requires.
  */
-const display = Audiowide({
+const display = Bruno_Ace({
   variable: "--font-brand-display",
   subsets: ["latin"],
   weight: "400",

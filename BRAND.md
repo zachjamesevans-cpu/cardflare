@@ -58,9 +58,9 @@ footer, page titles, emails, the TV display, prose, and the app's
 home-screen name. There is no context where "CardFlare" is correct any
 more.
 
-**The wordmark face is Audiowide** (Google Fonts, one weight), matched
+**The wordmark face is Bruno Ace** (Google Fonts, one weight), matched
 to the same art. It is loaded as `--font-brand-display` on the web and
-bundled as `Audiowide-Regular.ttf` in the app, and it is for the NAME
+bundled as `BrunoAce-Regular.ttf` in the app, and it is for the NAME
 ONLY — body text, headings and buttons stay Inter. The wordmark is
 drawn in the accent colour, whole; the old two-tone Card/Flare split
 belonged to the previous mark.
