@@ -117,7 +117,10 @@ function PrintingRow({ printing }: { printing: ReviewPrinting }) {
           <p className="font-mono text-xs text-text-muted">
             {printing.cardNumber}
             {printing.rarity ? ` · ${printing.rarity}` : ""}
-            {printing.printingLabel ? ` · ${printing.printingLabel}` : ""}
+            {/* The variant word, shown as the search chip shows it. */}
+            {(printing.printingLabel ?? printing.variantType)
+              ? ` · ${printing.printingLabel ?? printing.variantType}`
+              : ""}
           </p>
         </div>
 
