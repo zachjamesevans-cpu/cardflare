@@ -157,11 +157,16 @@ export async function writeImportedSet(
    * alternate art are two printings of one card, and `cards` is keyed on
    * the number. Deduplicated here rather than by the upsert, because
    * PostgreSQL refuses an ON CONFLICT batch that hits the same key twice
-   * within a single statement.
+   * within a single statement. The BASE printing speaks for the card
+   * when the manifest has one — a parallel's page entry sometimes states
+   * less than its base does.
    */
   const byNumber = new Map<string, ImportCard>();
   for (const card of manifest.cards) {
-    if (!byNumber.has(card.cardNumber)) byNumber.set(card.cardNumber, card);
+    const held = byNumber.get(card.cardNumber);
+    if (!held || (held.parallel !== undefined && card.parallel === undefined)) {
+      byNumber.set(card.cardNumber, card);
+    }
   }
 
   const cardRows = [...byNumber.values()].map((card) => ({
@@ -172,23 +177,25 @@ export async function writeImportedSet(
     provider_key: manifest.provider,
     provider_external_id: card.cardNumber,
     /*
-     * Gameplay fields are written EXPLICITLY null rather than left off.
-     * A scrape has a picture and a number; writing a guessed cost would
-     * put something in the catalogue that nothing later tells apart from
-     * a fact. Spelling them out also means a column added tomorrow fails
+     * Gameplay fields are written EXPLICITLY, absent ones as null. A
+     * field in the manifest was read off a source that stated it — the
+     * official card list states them all — and a field the source did
+     * not state stays null rather than being guessed, so nothing in the
+     * catalogue is indistinguishable from a fact without being one.
+     * Spelling every column out also means a column added tomorrow fails
      * the typecheck here rather than being quietly skipped.
      */
-    card_type: null,
-    colors: [],
-    traits: [],
-    cost: null,
-    power: null,
-    counter: null,
-    life: null,
+    card_type: card.cardType ?? null,
+    colors: card.colors ?? [],
+    traits: card.traits ?? [],
+    cost: card.cost ?? null,
+    power: card.power ?? null,
+    counter: card.counter ?? null,
+    life: card.life ?? null,
     rarity: card.rarity ?? null,
-    attribute: null,
-    effect_text: null,
-    trigger_text: null,
+    attribute: card.attribute ?? null,
+    effect_text: card.effectText ?? null,
+    trigger_text: card.triggerText ?? null,
     raw_metadata: { source: manifest.provider, setCode: manifest.setCode },
     provider_updated_at: null,
     updated_at: now,
@@ -220,6 +227,13 @@ export async function writeImportedSet(
 
   const printingRows = [];
 
+  /*
+   * Whether this manifest's source records parallels at all. Decided
+   * over the whole manifest, not per card: "no suffix" only means "the
+   * regular printing" on a source that writes suffixes.
+   */
+  const statesParallels = manifest.cards.some((entry) => entry.parallel !== undefined);
+
   for (const card of manifest.cards) {
     const cardId = idByNumber.get(card.cardNumber);
     if (!cardId) {
@@ -233,6 +247,16 @@ export async function writeImportedSet(
     if (objectPath) withArt += 1;
     else missing.push(card.cardNumber);
 
+    /*
+     * Variant flags stay three-valued. For most manifests nobody has
+     * classified anything, so they stay null — but the official card
+     * list's `_pN` suffix is a statement both ways: a suffixed entry IS
+     * a parallel, and an unsuffixed entry on the official list IS the
+     * set's regular printing. What KIND of parallel — manga, special —
+     * is still a person's call, made on the review screen.
+     */
+    const isParallel = card.parallel !== undefined;
+
     printingRows.push({
       card_id: cardId,
       provider_key: manifest.provider,
@@ -245,11 +269,9 @@ export async function writeImportedSet(
       printing_name: card.name,
       image_id: null,
       provider_source: "import",
-      /* Three-valued on purpose in the schema: null means nobody
-         classified this printing, which is the truth for a scrape. */
-      is_alternate_art: null,
+      is_alternate_art: statesParallels ? isParallel : null,
       is_promo: null,
-      is_parallel: null,
+      is_parallel: statesParallels ? isParallel : null,
       is_reprint: null,
       language: "en",
       image_url: objectPath ? cardArtSrc(objectPath) : null,

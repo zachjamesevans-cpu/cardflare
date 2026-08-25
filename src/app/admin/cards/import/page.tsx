@@ -18,11 +18,14 @@ export const dynamic = "force-dynamic";
 /**
  * Bringing in a set no provider carries yet.
  *
- * OP-17 exists as spoilers on fan sites months before any API has it,
- * and a board with no artwork for the set everybody is actually hunting
- * is a board nobody opens. This is the door for that, and the page is
- * honest about what comes through it: a picture and a number, with every
- * gameplay field left empty until a provider supplies one.
+ * OP-17 existed as spoilers on fan sites months before any API had it,
+ * and the official Bandai card list publishes every set weeks ahead of
+ * the providers — a board with no artwork for the set everybody is
+ * actually hunting is a board nobody opens. This is the door for both,
+ * and the page is honest about what comes through it: exactly what the
+ * manifest's source stated, nothing guessed. The review screen behind
+ * each set is where a person classifies alt arts and fills what the
+ * source could not say.
  */
 export default async function ImportSetPage() {
   // The layout guards too. Duplicated deliberately: a layout is not a
@@ -44,10 +47,11 @@ export default async function ImportSetPage() {
 
         <h2 className="text-xl font-bold text-text-primary">Import a set</h2>
         <p className="max-w-2xl text-sm text-text-secondary">
-          For sets no provider carries yet. Cards land with a number, a name and a
-          picture; cost, power, colours and effect stay empty until a real provider
-          ships the set, because a guessed value is indistinguishable from a fact once
-          it is in the catalogue.
+          For sets no provider carries yet. Cards land with whatever the manifest can
+          honestly state: the official Bandai card list brings full stats and effects, a
+          spoiler scrape brings a number and a picture. Nothing is ever guessed to fill
+          a gap &mdash; open a set below to classify alt arts and finish any missing
+          stats by hand.
         </p>
       </div>
 
@@ -92,6 +96,12 @@ export default async function ImportSetPage() {
                     {set.printings} printing{set.printings === 1 ? "" : "s"} ·{" "}
                     {set.withArt} with art
                   </span>
+                  <Link
+                    href={`/admin/cards/import/${set.providerKey}/${encodeURIComponent(set.setCode)}`}
+                    className="text-sm font-semibold text-accent hover:text-accent-hover"
+                  >
+                    Review
+                  </Link>
                   <DeleteImportedSet
                     provider={set.providerKey}
                     setCode={set.setCode}
