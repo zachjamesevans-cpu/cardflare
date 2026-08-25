@@ -5,12 +5,14 @@ import {
   formatHandle as appFormatHandle,
   handleFrom as appHandleFrom,
   handleSeedFrom as appHandleSeedFrom,
+  handleWhileTyping as appHandleWhileTyping,
 } from "../../mobile/src/handle";
 import {
   formatHandle,
   handleFrom,
   handleSchema,
   handleSeedFrom,
+  handleWhileTyping,
   handleWithSuffix,
   HANDLE_FALLBACK,
   HANDLE_MAX,
@@ -83,6 +85,63 @@ describe("handleSeedFrom", () => {
       expect(handleSchema.safeParse({ handle: handleSeedFrom(input) }).success).toBe(
         true,
       );
+    }
+  });
+});
+
+/**
+ * What each keystroke leaves in the field, walked as a list so the two
+ * shipped bugs stay named: `handleSeedFrom` on a keystroke refilled
+ * "player" the moment backspacing went below three characters, and
+ * `handleFrom` ate the underscore of "steven_b" as it was typed.
+ */
+const TYPING_CASES: [input: string, expected: string][] = [
+  /* The founder's bug: emptied must STAY empty, never "player". */
+  ["", ""],
+  ["p", "p"],
+  ["pl", "pl"],
+  /* The trailing underscore survives — "steven_b" has to be typeable. */
+  ["steven_", "steven_"],
+  ["steven_b", "steven_b"],
+  /* Everything else is still typed straight into shape. */
+  ["Steven B", "steven_b"],
+  ["Steven ", "steven_"],
+  ["ZACH", "zach"],
+  ["a---b", "a_b"],
+  ["__zach", "zach"],
+  ["a__b", "a_b"],
+  ["!!!", ""],
+  ["A Very Long Name Indeed That Runs On", "a_very_long_name_ind"],
+];
+
+describe("handleWhileTyping", () => {
+  it.each(TYPING_CASES)("leaves %j in the field as %j", (input, expected) => {
+    expect(handleWhileTyping(input)).toBe(expected);
+  });
+
+  it("never invents the fallback for a short or emptied field", () => {
+    /* `handleSeedFrom` answers these with "player"; the typing shaper
+       must not, or the field refills itself under the backspace key. */
+    expect(handleWhileTyping("")).toBe("");
+    expect(handleWhileTyping("p")).toBe("p");
+    expect(handleWhileTyping("!!")).toBe("");
+    expect(handleSeedFrom("")).toBe(HANDLE_FALLBACK);
+  });
+
+  it("only ever shows characters the server accepts", () => {
+    for (const [input] of TYPING_CASES) {
+      const shown = handleWhileTyping(input);
+      expect(shown.length).toBeLessThanOrEqual(HANDLE_MAX);
+      if (shown.length > 0) expect(shown).toMatch(/^[a-z0-9_]+$/);
+    }
+  });
+
+  it("settles to what handleFrom would store, once trailing separators go", () => {
+    /* A finished handle typed through the live shaper must be the same
+       string the derivation would have produced — the two must not be
+       able to disagree about a handle that is actually submittable. */
+    for (const [input] of CASES) {
+      expect(handleWhileTyping(input).replace(/_+$/g, "")).toBe(handleFrom(input));
     }
   });
 });
@@ -167,6 +226,11 @@ describe("the app derives handles the same way", () => {
   it("agrees on the fallback", () => {
     expect(appHandleSeedFrom("!!!")).toBe(handleSeedFrom("!!!"));
     expect(appHandleSeedFrom("ab")).toBe(handleSeedFrom("ab"));
+  });
+
+  it.each(TYPING_CASES)("agrees while %j is being typed", (input, expected) => {
+    expect(appHandleWhileTyping(input)).toBe(expected);
+    expect(appHandleWhileTyping(input)).toBe(handleWhileTyping(input));
   });
 
   it("agrees on how one is written", () => {

@@ -7,6 +7,7 @@ import { clientKey } from "@/lib/request-context";
 import { openSignup } from "@/lib/auth/signup";
 import { starterNameFromEmail } from "@/lib/auth/signup-schema";
 import { handleSeedFrom } from "@/lib/players/handle";
+import { handleAvailability } from "@/lib/players/handle-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,13 @@ const schema = z.discriminatedUnion("action", [
     action: z.literal("refresh"),
     refreshToken: z.string().min(1).max(2000),
   }),
+  /* "Is @zach free?", asked while the sign-up form is still being
+     typed. Loose bound on purpose: shaping is the checker's job, and a
+     malformed handle is an answer ("invalid"), not a 400. */
+  z.object({
+    action: z.literal("check-handle"),
+    handle: z.string().max(60),
+  }),
 ]);
 
 const SIGN_IN_MAX = 10;
@@ -63,6 +71,11 @@ const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 const SIGN_UP_MAX = 5;
 const SIGN_UP_WINDOW_MS = 60 * 60 * 1000;
 
+/* Mirrors `checkHandleAction` on the website, key and all: one person
+   typing on both surfaces is still one person. */
+const HANDLE_CHECK_MAX = 120;
+const HANDLE_CHECK_WINDOW_MS = 10 * 60 * 1000;
+
 export async function POST(request: Request): Promise<Response> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -72,6 +85,25 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest("Unrecognised auth action");
 
   const body = parsed.data;
+
+  /*
+   * Availability answers and leaves before the grant machinery below:
+   * there is nothing to sign in. Advisory — the unique index still
+   * decides at claim time — and rate-limited beyond what the client's
+   * debounce already promises, because a public endpoint's manners are
+   * set here, not in the app.
+   */
+  if (body.action === "check-handle") {
+    const rate = checkRateLimit(
+      `handle-check:${await clientKey()}`,
+      HANDLE_CHECK_MAX,
+      HANDLE_CHECK_WINDOW_MS,
+    );
+    const availability = rate.allowed
+      ? await handleAvailability(body.handle)
+      : "unknown";
+    return Response.json({ availability });
+  }
 
   /*
    * Sign-up runs first and then FALLS THROUGH to the password grant:
@@ -96,9 +128,13 @@ export async function POST(request: Request): Promise<Response> {
       handle: body.handle?.trim().toLowerCase() || handleSeedFrom(name),
     });
     if (!outcome.ok) {
+      /* Both collisions are 409s the phone can explain; the error word
+         tells it WHICH field to send its owner back to. */
       return outcome.reason === "already-registered"
         ? Response.json({ error: "already-registered" }, { status: 409 })
-        : Response.json({ error: "signup-failed" }, { status: 500 });
+        : outcome.reason === "handle-taken"
+          ? Response.json({ error: "handle-taken" }, { status: 409 })
+          : Response.json({ error: "signup-failed" }, { status: 500 });
     }
   }
 

@@ -52,6 +52,38 @@ export function handleFrom(candidate: string): string {
 }
 
 /**
+ * Shapes a handle AS IT IS BEING TYPED, which is a different job from
+ * `handleFrom` in two ways that both shipped as bugs before this split.
+ *
+ * A trailing underscore survives, because the person halfway through
+ * typing "steven_b" is entitled to see "steven_" on the way there —
+ * `handleFrom` strips it (a STORED handle must not end on one) and so a
+ * field wired through it could never take an underscore from a keyboard.
+ *
+ * And there is no fallback. `handleSeedFrom` answers "this name left
+ * nothing, invent something" — the right answer for a derivation, and
+ * exactly the wrong one for a keystroke: wired to a field it refilled
+ * "player" the moment backspacing went below three characters, and the
+ * founder found the field impossible to empty. Here, emptied stays
+ * empty; too short is the submit button's problem.
+ */
+export function handleWhileTyping(candidate: string): string {
+  return candidate
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+/g, "")
+    .slice(0, HANDLE_MAX);
+}
+
+/**
+ * What a handle lookup can come back with. Lives here rather than with
+ * the server-only query so client components can import the type
+ * without dragging the admin client toward a bundle.
+ */
+export type HandleAvailability = "available" | "taken" | "invalid" | "unknown";
+
+/**
  * The fallback when a name derives to nothing usable.
  *
  * Deliberately boring. A handle built from a row id would be unique and

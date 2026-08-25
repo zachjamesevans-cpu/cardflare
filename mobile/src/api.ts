@@ -74,6 +74,11 @@ async function authRequest(payload: unknown): Promise<{
   status: number;
   accessToken: string | null;
   refreshToken: string;
+  /* The server's one-word reason on a refusal ("handle-taken",
+     "already-registered"), and its one-word answer to check-handle.
+     Absent on the grants that only carry tokens. */
+  errorCode: string | null;
+  availability: string | null;
 }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
@@ -88,15 +93,25 @@ async function authRequest(payload: unknown): Promise<{
     const body = (await response.json().catch(() => ({}))) as {
       accessToken?: string;
       refreshToken?: string;
+      error?: string;
+      availability?: string;
     };
 
     return {
       status: response.status,
       accessToken: body.accessToken ?? null,
       refreshToken: body.refreshToken ?? "",
+      errorCode: body.error ?? null,
+      availability: body.availability ?? null,
     };
   } catch {
-    return { status: 0, accessToken: null, refreshToken: "" };
+    return {
+      status: 0,
+      accessToken: null,
+      refreshToken: "",
+      errorCode: null,
+      availability: null,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -132,7 +147,10 @@ export async function signUp(
   if (result.status === 409) {
     return {
       ok: false,
-      message: "That address already has an account. Sign in instead.",
+      message:
+        result.errorCode === "handle-taken"
+          ? "That handle is taken. Try another one."
+          : "That address already has an account. Sign in instead.",
     };
   }
 
@@ -144,6 +162,23 @@ export async function signUp(
   }
 
   return { ok: false, message: "Could not create the account. Try again." };
+}
+
+export type HandleAvailability = "available" | "taken" | "invalid" | "unknown";
+
+/**
+ * "Is @zach free?", asked while the sign-up form is still being typed.
+ * Advisory — the unique index still decides at claim time — and any
+ * trouble reads as "unknown", which the form shows as nothing rather
+ * than standing between a person and the create button.
+ */
+export async function checkHandle(handle: string): Promise<HandleAvailability> {
+  const result = await authRequest({ action: "check-handle", handle });
+  return result.availability === "available" ||
+    result.availability === "taken" ||
+    result.availability === "invalid"
+    ? result.availability
+    : "unknown";
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {

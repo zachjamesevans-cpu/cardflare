@@ -5,7 +5,9 @@ import { Flame, QrCode, Sparkles } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { SignupForm } from "@/components/auth/signup-form";
-import { getViewer } from "@/lib/auth/session";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { signOutToSignup } from "@/lib/auth/actions";
+import { getViewer, type Viewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -29,7 +31,7 @@ export const dynamic = "force-dynamic";
 export default async function SignupPage() {
   const viewer = await getViewer();
   if (viewer.kind === "player") redirect("/profile");
-  if (viewer.kind !== "anonymous") redirect("/");
+  if (viewer.kind !== "anonymous") return <AlreadySignedIn viewer={viewer} />;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-8 px-4 py-10 sm:py-14">
@@ -64,6 +66,59 @@ export default async function SignupPage() {
       </ul>
 
       <SignupForm />
+    </main>
+  );
+}
+
+/**
+ * The page a signed-in visitor sees instead of the form.
+ *
+ * This used to be a silent `redirect("/")`, and the founder — signed in
+ * as admin on his own site, as he always is — pressed "Join free",
+ * landed back where he started and reasonably reported the button
+ * "leads nowhere". A page that will not do the thing its button
+ * promised has to say so and offer the two honest ways forward: carry
+ * on as who you are, or sign out and come back as somebody new.
+ */
+function AlreadySignedIn({
+  viewer,
+}: {
+  viewer: Extract<Viewer, { kind: "admin" | "store" | "unaffiliated" }>;
+}) {
+  const [homeHref, homeLabel] =
+    viewer.kind === "admin"
+      ? ["/admin", "Go to the admin console"]
+      : viewer.kind === "store"
+        ? ["/store", "Go to your store dashboard"]
+        : ["/", "Back to the homepage"];
+
+  return (
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-8 px-4 py-10 sm:py-14">
+      <Link href="/" aria-label={`${SITE.name} home`} className="self-center">
+        <Logo />
+      </Link>
+
+      <div className="flex flex-col gap-3 text-center">
+        <h1 className="text-3xl font-bold text-text-primary">
+          You are already signed in.
+        </h1>
+        <p className="text-text-secondary">
+          This page creates a new player account, and you are signed in as{" "}
+          <span className="font-semibold text-text-primary">{viewer.user.email}</span>.
+          To make a fresh account, sign out first and this form will be waiting.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <ButtonLink href={homeHref} size="lg" className="w-full">
+          {homeLabel}
+        </ButtonLink>
+        <form action={signOutToSignup}>
+          <Button type="submit" size="lg" variant="secondary" className="w-full">
+            Sign out and create a new account
+          </Button>
+        </form>
+      </div>
     </main>
   );
 }
