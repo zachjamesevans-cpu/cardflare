@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Michroma } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { SITE, siteUrl } from "@/lib/site";
@@ -17,28 +17,13 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
-/**
- * The wordmark's face, and the app's.
- *
- * Michroma, matched to the logo art the founder supplied with "make
- * cardflare all lowercase... and make it this font". Matched by
- * RENDERING, not by eye alone - and it took three rounds, each ended by
- * the founder naming a glyph: Audiowide ("a little off"), then Bruno
- * Ace ("look at the L... slightly bolder... and the E, it's a little
- * blocky in the render"). Michroma is the one whose l is a plain
- * vertical, whose wide squared e cuts off flat, and whose a wears the
- * art's flat top - the Eurostile Extended shapes the art actually has.
- * It ships one weight, a touch lighter than the art, so the wordmark
- * adds a hair of text-stroke (see logo.tsx) rather than faking bold.
- * The name at the top of the site is TEXT beside the mark; the mark
- * image itself is untouched, as BRAND.md requires.
+/*
+ * There is deliberately NO display face any more. Three rounds of
+ * matching a font to the founder's wordmark art ended with him
+ * supplying the art itself ("Just put this everywhere", 2026-08-25),
+ * so the name is drawn as his image - see components/brand/logo.tsx -
+ * and no font can drift from it.
  */
-const display = Michroma({
-  variable: "--font-brand-display",
-  subsets: ["latin"],
-  weight: "400",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -82,7 +67,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${sans.variable} ${mono.variable} ${display.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <a

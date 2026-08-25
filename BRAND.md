@@ -58,17 +58,26 @@ footer, page titles, emails, the TV display, prose, and the app's
 home-screen name. There is no context where "CardFlare" is correct any
 more.
 
-**The wordmark face is Michroma** (Google Fonts, one weight), matched
-to the same art glyph by glyph — the founder judged three rounds by
-naming letters ("look at the L", "the E... a little blocky"), and
-Michroma is the face whose straight l, flat-cut e and flat-topped a the
-art actually has. It is loaded as `--font-brand-display` on the web and
-bundled as `Michroma-Regular.ttf` in the app, and it is for the NAME
-ONLY — body text, headings and buttons stay Inter. The web wordmark
-adds a 0.017em text-stroke, measured against the art, for the founder's
-"slightly bolder"; the app cannot stroke text and the sub-pixel gap is
-accepted. The wordmark is drawn in the accent colour, whole; the old
-two-tone Card/Flare split belonged to the previous mark.
+**The wordmark is the founder's artwork, not a font.** Three rounds of
+matching a face to his logo art (Chakra Petch, Audiowide, Bruno Ace,
+Michroma) each ended with him naming a letter that was still wrong, and
+he settled it by supplying the drawn wordmark itself: "Just put this
+everywhere" (2026-08-25). So the name is an IMAGE wherever it is drawn
+as a lockup — no font can drift from art.
+
+- **Master**: `public/brand/cardflare-wordmark.png`, kept exactly as
+  supplied (it arrived flattened on a white card; the pixels are his).
+  Like the logo master, it is read and never rewritten.
+- **Derivatives**: `npm run brand:assets` cuts the lettering off the
+  white card (alpha from distance-to-white, colours un-composited so
+  the glow keeps its green) into
+  `public/brand/cardflare-wordmark-cut.png` for the web and
+  `mobile/assets/wordmark.png` for the app. The `Logo` component and
+  the app header draw those; nothing else should.
+- **In prose, titles and the app's home-screen name** the word is still
+  TEXT — always lowercase "cardflare", set in whatever face the copy
+  around it uses. There is no display font any more; body text,
+  headings and buttons are Inter everywhere.
 
 ## Colour
 

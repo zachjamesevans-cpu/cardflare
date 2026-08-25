@@ -97,17 +97,12 @@
   --font-sans: var(--font-brand-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-brand-mono), ui-monospace, monospace;
   /*
-   * The wordmark's face, and the wordmark's only.
-   *
-   * Chakra Petch — angular cuts and flat terminals, technical without
-   * the sci-fi costume the obvious gaming faces wear. Inter still
-   * carries every word anybody actually reads: a display face used
-   * twice stops being a mark and starts being a theme.
-   *
-   * Applied to the cardflare name where it is drawn as TEXT. The mark
-   * itself is an image and BRAND.md says not to touch it.
+   * There is no display face. The wordmark is the founder's ARTWORK,
+   * drawn by components/brand/logo.tsx from the cut-out derivative of
+   * public/brand/cardflare-wordmark.png; setting the name in a font
+   * again would drift from it. Inter carries every word anybody
+   * actually reads.
    */
-  --font-display: var(--font-brand-display), var(--font-brand-sans), sans-serif;
 
   /*
    * Cosmetics — the colours Embers buy.

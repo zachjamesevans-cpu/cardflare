@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, View } from "react-native";
+import { Image, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -10,9 +10,23 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { BRAND_FONT, useBrandFont } from "./brand-font";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
+
+/**
+ * The name is the founder's ARTWORK, not text in a font. He supplied
+ * the drawn wordmark after three rounds of font-matching and said
+ * "Just put this everywhere" (2026-08-25); the file is the same
+ * cut-out derivative the website draws, generated from the master by
+ * `npm run brand:assets`. The image carries its own glow padding -
+ * roughly a sixth of its height above and below the lettering - so it
+ * renders taller than the letters look; 24 points puts the lettering
+ * where the old 20-point text sat.
+ */
+const wordmark = require("../assets/wordmark.png");
+const WORDMARK_HEIGHT = 24;
+const WORDMARK_SOURCE = Image.resolveAssetSource(wordmark);
+const WORDMARK_ASPECT = WORDMARK_SOURCE.width / WORDMARK_SOURCE.height;
 
 /**
  * A header that gets out of the way, the way Instagram's does.
@@ -107,7 +121,6 @@ export function CollapsingHeader({
   onSearch: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const loaded = useBrandFont();
 
   const bar = useAnimatedStyle(() => ({
     transform: [{ translateY: -state.hidden.value }],
@@ -162,17 +175,15 @@ export function CollapsingHeader({
           borderBottomColor: colors.border,
         }}
       >
-        <Text
+        <Image
+          source={wordmark}
+          accessibilityLabel="cardflare"
           style={{
-            color: colors.textPrimary,
-            fontSize: 20,
-            fontFamily: loaded ? BRAND_FONT : undefined,
-            fontWeight: loaded ? "normal" : "700",
-            letterSpacing: loaded ? 0.5 : 0,
+            height: WORDMARK_HEIGHT,
+            width: WORDMARK_HEIGHT * WORDMARK_ASPECT,
+            resizeMode: "contain",
           }}
-        >
-          cardflare
-        </Text>
+        />
 
         {/*
           * The positioning lives on this wrapper, NOT on the Tap.

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
 import mark from "@public/brand/cardflare-mark.png";
+import wordmark from "@public/brand/cardflare-wordmark-cut.png";
 
 /**
  * The mark is taller than it is wide, so it is sized by height and its width
@@ -11,6 +12,21 @@ import mark from "@public/brand/cardflare-mark.png";
  * correctly shaped without touching this component.
  */
 const ASPECT = mark.width / mark.height;
+const WORDMARK_ASPECT = wordmark.width / wordmark.height;
+
+/**
+ * The wordmark image's height relative to the mark's.
+ *
+ * The name is ARTWORK now, not text: the founder supplied the drawn
+ * wordmark after three rounds of font-matching and said "Just put this
+ * everywhere" (2026-08-25), so every place the name used to be set in a
+ * display face draws his file instead. The image carries its own glow
+ * padding — about a sixth of its height above and below the lettering —
+ * so it renders taller than the letters look; 0.62 puts the visible
+ * lettering at the height the old text sat at, riding alongside a mark
+ * of any size.
+ */
+const WORDMARK_SCALE = 0.62;
 
 interface LogoProps {
   /** Rendered height of the mark in pixels. Width follows the artwork. */
@@ -43,15 +59,17 @@ export function Logo({
         className="shrink-0"
       />
       {!markOnly && (
-        /* Lowercase and all one accent, matching the supplied wordmark
-           art. The two-tone Card/Flare split belonged to the old mark.
-           The text-stroke is the founder's "slightly bolder": Michroma
-           ships one weight, a hair lighter than the art, and a 0.017em
-           centred stroke (measured against the art, overlaid) closes
-           exactly that gap at every rendered size. */
-        <span className="font-display text-lg tracking-wide text-accent [-webkit-text-stroke:0.017em_currentColor]">
-          cardflare
-        </span>
+        /* The name, in the founder's own artwork. The alt carries the
+           product name so the lockup still reads "cardflare" to a
+           screen reader and to the header link's accessible name. */
+        <Image
+          src={wordmark}
+          alt={SITE.name}
+          width={Math.round(size * WORDMARK_SCALE * WORDMARK_ASPECT)}
+          height={Math.round(size * WORDMARK_SCALE)}
+          priority={priority}
+          className="shrink-0"
+        />
       )}
     </span>
   );
