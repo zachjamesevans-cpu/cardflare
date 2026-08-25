@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Home, UserCircle2, Users } from "lucide-react";
+import { Bell, Home, MapPin, UserCircle2 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
@@ -27,8 +27,8 @@ const TABS = [
   /* Feed, not Join. Join was a tab used four times a month, on the days
      somebody stands in a shop; scanning is a button on the Feed now, which
      is fewer taps than the tab it replaced. See PRODUCT.md. */
-  { href: "/feed", label: "Local", icon: Home },
-  { href: "/room", label: "Room", icon: Users },
+  { href: "/feed", label: "Feed", icon: Home },
+  { href: "/local", label: "Local", icon: MapPin },
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },
   { href: "/profile", label: "Profile", icon: UserCircle2 },
@@ -51,7 +51,7 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
            */
           const active =
             pathname === tab.href ||
-            (tab.href === "/room" && pathname.startsWith("/e/"));
+            (tab.href === "/feed" && pathname.startsWith("/e/"));
 
           const Icon = tab.icon;
 

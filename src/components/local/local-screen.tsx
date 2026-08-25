@@ -1,0 +1,469 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { Check, ChevronLeft, Loader2, MessageCircle, Send } from "lucide-react";
+
+import { PostalAsk } from "@/components/feed/postal-ask";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/controls";
+import {
+  closeThreadAction,
+  openThreadAction,
+  readThreadAction,
+  sendMessageAction,
+  setLocalRadiusAction,
+} from "@/lib/local/actions";
+import type { LocalFeed, LocalFlare } from "@/lib/local/feed";
+import {
+  LOCAL_RADII,
+  MESSAGE_MAX_LENGTH,
+  agoLabel,
+  milesLabel,
+} from "@/lib/local/shared";
+import type { ThreadMessage, ThreadSummary } from "@/lib/local/threads";
+import { cn } from "@/lib/cn";
+
+/**
+ * The Local tab: the room's question, asked across your whole area.
+ *
+ * Two halves on one screen, because they are one loop: the Flares
+ * people near you have posted, and the conversations those Flares
+ * started. "I have this" is the hinge — it opens a thread tied to that
+ * exact card, so every conversation begins with its subject already on
+ * the table. There is deliberately no other way to message anybody.
+ *
+ * Distance is a number the server computed; no coordinate ever reaches
+ * this component. When the player has given no location at all, the
+ * whole screen is the ask — a Local tab that quietly shows nothing
+ * would read as broken, and the ask says exactly what the five digits
+ * buy.
+ */
+
+export function LocalScreen({
+  feed,
+  threads,
+  postalCode,
+}: {
+  feed: LocalFeed;
+  threads: ThreadSummary[];
+  postalCode: string | null;
+}) {
+  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+
+  if (openThreadId) {
+    return <ThreadView threadId={openThreadId} onBack={() => setOpenThreadId(null)} />;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {feed.source === "none" ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-text-primary">Where is local?</h2>
+          <p className="text-sm text-text-secondary">
+            Local shows every card people are hunting at stores near you. A ZIP code is
+            all it needs &mdash; enough to place you within a few miles, nothing like an
+            address.
+          </p>
+          <PostalAsk defaultValue={postalCode ?? ""} />
+        </Card>
+      ) : (
+        <RadiusRow current={feed.radius} />
+      )}
+
+      {threads.length > 0 && (
+        <section className="flex flex-col gap-3" aria-label="Messages">
+          <h2 className="text-sm font-semibold tracking-wide text-text-secondary uppercase">
+            Messages
+          </h2>
+          <Card className="flex flex-col p-0">
+            {threads.map((thread) => (
+              <ThreadRow
+                key={thread.threadId}
+                thread={thread}
+                onOpen={() => setOpenThreadId(thread.threadId)}
+              />
+            ))}
+          </Card>
+        </section>
+      )}
+
+      {feed.source !== "none" && (
+        <section className="flex flex-col gap-3" aria-label="Wanted near you">
+          <h2 className="text-sm font-semibold tracking-wide text-text-secondary uppercase">
+            Wanted near you
+          </h2>
+
+          {feed.flares.length === 0 ? (
+            <Card className="flex flex-col gap-2">
+              <p className="font-semibold text-text-primary">
+                Nothing on the boards within {feed.radius} miles
+              </p>
+              <p className="text-sm text-text-secondary">
+                Flares land here the moment somebody posts one in a room at a store near
+                you. Widen the range, or check back after event night.
+              </p>
+            </Card>
+          ) : (
+            <Card className="flex flex-col p-0">
+              {feed.flares.map((flare) => (
+                <FlareRow
+                  key={flare.flareId}
+                  flare={flare}
+                  onThreadOpened={setOpenThreadId}
+                />
+              ))}
+            </Card>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** The distances Local offers, as chips. Saving reloads the list. */
+function RadiusRow({ current }: { current: number }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [choosing, setChoosing] = useState(current);
+
+  function choose(radius: number) {
+    setChoosing(radius);
+    startTransition(async () => {
+      const result = await setLocalRadiusAction(radius);
+      if (result.ok) router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-text-secondary">Within</span>
+      {LOCAL_RADII.map((radius) => (
+        <button
+          key={radius}
+          type="button"
+          disabled={pending}
+          onClick={() => choose(radius)}
+          className={cn(
+            "rounded-full border px-3 py-1 text-sm font-semibold",
+            choosing === radius
+              ? "border-accent bg-accent text-accent-contrast"
+              : "border-border-strong text-text-secondary hover:text-text-primary",
+          )}
+        >
+          {radius} mi
+        </button>
+      ))}
+      {pending && (
+        <Loader2 className="size-4 animate-spin text-text-muted" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+function ThreadRow({ thread, onOpen }: { thread: ThreadSummary; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 border-t border-border p-3 text-left first:border-t-0 hover:bg-elevated"
+    >
+      <Thumb imageUrl={thread.imageUrl} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-semibold text-text-primary">
+          {thread.withName}
+          <span className="font-normal text-text-muted"> · {thread.cardName}</span>
+        </span>
+        <span className="block truncate text-sm text-text-secondary">
+          {thread.closed ? "Conversation ended" : (thread.lastMessagePreview ?? "")}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-xs text-text-muted">
+          {agoLabel(thread.lastMessageAt)}
+        </span>
+        {thread.unread > 0 && (
+          <span className="min-w-5 rounded-full bg-accent px-1.5 text-center text-xs leading-5 font-bold text-accent-contrast">
+            {thread.unread}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+function FlareRow({
+  flare,
+  onThreadOpened,
+}: {
+  flare: LocalFlare;
+  onThreadOpened: (threadId: string) => void;
+}) {
+  const [composing, setComposing] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border p-3 first:border-t-0">
+      <div className="flex items-start gap-3">
+        <Thumb imageUrl={flare.imageUrl} />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-text-primary">
+            {flare.cardName}
+            {flare.quantity > 1 && (
+              <span className="text-accent"> ×{flare.quantity}</span>
+            )}
+          </p>
+          <p className="truncate font-mono text-xs text-text-muted">
+            {flare.cardNumber}
+            {flare.printingLabel ? ` · ${flare.printingLabel}` : ""}
+          </p>
+          <p className="mt-1 truncate text-sm text-text-secondary">
+            {flare.poster.name}
+            {flare.isYours ? " (you)" : ""} · {flare.storeName} ·{" "}
+            {milesLabel(flare.miles)} · {agoLabel(flare.postedAt)}
+          </p>
+          {flare.note && (
+            <p className="mt-1 line-clamp-2 text-sm text-text-secondary">
+              {flare.note}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-text-muted">
+            {flare.intent === "showcase" ? "Trading away" : "Hunting"} ·{" "}
+            {flare.acceptsTrade && flare.acceptsCash
+              ? "trade or cash"
+              : flare.acceptsCash
+                ? "cash"
+                : "trade"}
+          </p>
+        </div>
+
+        {flare.canMessage && !composing && (
+          <Button type="button" size="sm" onClick={() => setComposing(true)}>
+            <MessageCircle className="size-4" aria-hidden="true" />I have this
+          </Button>
+        )}
+      </div>
+
+      {composing && (
+        <OpenThreadComposer
+          flare={flare}
+          onCancel={() => setComposing(false)}
+          onOpened={onThreadOpened}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The first message. Sending it is what creates the conversation. */
+function OpenThreadComposer({
+  flare,
+  onCancel,
+  onOpened,
+}: {
+  flare: LocalFlare;
+  onCancel: () => void;
+  onOpened: (threadId: string) => void;
+}) {
+  const [body, setBody] = useState(`I have ${flare.cardName}. `);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function send() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await openThreadAction(flare.flareId, body);
+      if (result.ok) onOpened(result.threadId);
+      else setMessage(result.message);
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
+      <Textarea
+        rows={2}
+        maxLength={MESSAGE_MAX_LENGTH}
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        aria-label={`Message ${flare.poster.name}`}
+      />
+      <div className="flex items-center gap-2">
+        <Button type="button" size="sm" onClick={send} disabled={pending}>
+          {pending ? "Sending…" : "Send"}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        {message && <p className="text-sm text-danger">{message}</p>}
+      </div>
+      <p className="text-xs text-text-muted">
+        Goes to {flare.poster.name} only. Meet at the store; never send money to
+        somebody you have not met.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * One conversation. Loaded fresh on open — reading is the receipt —
+ * and refreshed after every send. No live socket in v1; the Refresh
+ * button is the honest version of one.
+ */
+function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void }) {
+  const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
+  const [cardName, setCardName] = useState<string | null>(null);
+  const [withName, setWithName] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const load = useCallback(() => {
+    startTransition(async () => {
+      const thread = await readThreadAction(threadId);
+      if (!thread.ok) {
+        onBack();
+        return;
+      }
+      setMessages(thread.messages);
+      setCardName(thread.cardName);
+      setWithName(thread.withName);
+      setClosed(thread.closed);
+    });
+    /* onBack is stable enough for a mount effect; re-running on its
+       identity would reload the thread on every parent render. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  function send() {
+    const body = draft.trim();
+    if (!body) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await sendMessageAction(threadId, body);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setDraft("");
+      const thread = await readThreadAction(threadId);
+      if (thread.ok) setMessages(thread.messages);
+    });
+  }
+
+  function end() {
+    startTransition(async () => {
+      await closeThreadAction(threadId);
+      setClosed(true);
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+        >
+          <ChevronLeft className="size-4" aria-hidden="true" />
+          Local
+        </button>
+        <div className="min-w-0 flex-1 text-center">
+          <p className="truncate font-semibold text-text-primary">
+            {withName ?? "Conversation"}
+          </p>
+          {cardName && <p className="truncate text-xs text-text-muted">{cardName}</p>}
+        </div>
+        <Button type="button" size="sm" variant="ghost" onClick={load}>
+          Refresh
+        </Button>
+      </div>
+
+      <Card className="flex min-h-64 flex-col gap-2">
+        {messages === null ? (
+          <p className="py-8 text-center text-text-muted">Loading…</p>
+        ) : messages.length === 0 ? (
+          <p className="py-8 text-center text-text-muted">No messages yet.</p>
+        ) : (
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn(
+                "max-w-[85%] rounded-[var(--radius-control)] px-3 py-2 text-sm",
+                message.yours
+                  ? "self-end bg-accent text-accent-contrast"
+                  : "self-start bg-elevated text-text-primary",
+              )}
+            >
+              <p className="break-words whitespace-pre-wrap">{message.body}</p>
+              <p
+                className={cn(
+                  "mt-1 text-[10px]",
+                  message.yours ? "text-accent-contrast/70" : "text-text-muted",
+                )}
+              >
+                {agoLabel(message.sentAt)}
+              </p>
+            </div>
+          ))
+        )}
+      </Card>
+
+      {closed ? (
+        <p className="flex items-center gap-2 text-sm text-text-secondary">
+          <Check className="size-4" aria-hidden="true" />
+          This conversation was ended. Ended conversations stay ended.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end gap-2">
+            <Textarea
+              rows={2}
+              maxLength={MESSAGE_MAX_LENGTH}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              aria-label="Message"
+              className="flex-1"
+            />
+            <Button type="button" size="sm" onClick={send} disabled={pending}>
+              <Send className="size-4" aria-hidden="true" />
+              Send
+            </Button>
+          </div>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <button
+            type="button"
+            onClick={end}
+            className="self-start text-xs text-text-muted hover:text-text-secondary"
+          >
+            End this conversation
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Thumb({ imageUrl }: { imageUrl: string | null }) {
+  return (
+    <span className="block w-12 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
+      <span className="block aspect-[60/84] w-full">
+        {imageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        )}
+      </span>
+    </span>
+  );
+}

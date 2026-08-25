@@ -196,9 +196,19 @@ describe("the home screen's furniture", () => {
     }
   });
 
-  it("calls the tab Local on both", () => {
-    expect(appRoot).toContain('tabBarLabel: "Local"');
-    expect(read("src/components/players/player-tabs.tsx")).toContain('label: "Local"');
+  it("names the tabs the same on both: Feed is Feed, Local is its own", () => {
+    /* The founder's second pass on the bar: the Feed tab keeps its name,
+       Room's slot becomes Local — area Flares and their conversations —
+       and the live room rides the Feed as a banner. Both platforms, one
+       arrangement. */
+    expect(appRoot).toContain('tabBarLabel: "Feed"');
+    expect(appRoot).toContain('name="Local"');
+    expect(appRoot).not.toContain('<Tab.Screen name="Room"');
+
+    const webTabs = read("src/components/players/player-tabs.tsx");
+    expect(webTabs).toContain('label: "Feed"');
+    expect(webTabs).toContain('label: "Local"');
+    expect(webTabs).not.toContain('label: "Room"');
   });
 
   it("lets the feed be asked for again", () => {

@@ -6,7 +6,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { getNotifications, markRead, type InboxItem } from "../api";
-import { Button, Card, Muted } from "../ui";
+import { Button, Card, Muted, Tap } from "../ui";
 import { colors, spacing } from "../theme";
 
 /**
@@ -70,8 +70,15 @@ export function InboxScreen() {
         <Card>
           <View>
             {items.map((item, index) => (
-              <View
+              /*
+               * A notice that names a screen the app has is a door to
+               * it. Messages land on Local, where the conversation is
+               * one row down; everything else stays a note, honestly.
+               */
+              <Tap
                 key={item.id}
+                disabled={item.url !== "/local"}
+                onPress={() => navigation.navigate("Tabs", { screen: "Local" })}
                 style={{
                   gap: spacing(1),
                   paddingVertical: spacing(3),
@@ -125,7 +132,7 @@ export function InboxScreen() {
                     {item.body}
                   </Text>
                 ) : null}
-              </View>
+              </Tap>
             ))}
           </View>
         </Card>

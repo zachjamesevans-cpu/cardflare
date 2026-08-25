@@ -699,6 +699,61 @@ export type PlayerRow = {
    * put one.
    */
   postal_code: string | null;
+  /**
+   * How far Local reaches from the player's origin, in miles.
+   *
+   * One of the offered steps (10, 25, 50, 100) — the database check
+   * repeats the list in src/lib/local/shared.ts.
+   */
+  local_radius_miles: number;
+};
+
+/**
+ * One conversation about one Flare — the Local tab's messaging.
+ *
+ * Accounts on both ends, resolved at open time, so the thread outlives
+ * the 30-day session that posted the Flare. Closing is final: either
+ * side can end it and an ended thread takes no more messages.
+ */
+export type FlareThreadRow = {
+  id: string;
+  created_at: string;
+  flare_id: string;
+  author_player_id: string;
+  responder_player_id: string;
+  last_message_at: string;
+  closed_at: string | null;
+  closed_by: string | null;
+};
+
+export type FlareThreadInsert = Omit<
+  FlareThreadRow,
+  "id" | "created_at" | "last_message_at" | "closed_at" | "closed_by"
+> & {
+  id?: string;
+  created_at?: string;
+  last_message_at?: string;
+  closed_at?: string | null;
+  closed_by?: string | null;
+};
+
+/** One message in a Flare thread. read_at is the other party's receipt. */
+export type FlareMessageRow = {
+  id: string;
+  created_at: string;
+  thread_id: string;
+  sender_player_id: string;
+  body: string;
+  read_at: string | null;
+};
+
+export type FlareMessageInsert = Omit<
+  FlareMessageRow,
+  "id" | "created_at" | "read_at"
+> & {
+  id?: string;
+  created_at?: string;
+  read_at?: string | null;
 };
 
 export type PlayerInsert = Omit<
@@ -719,6 +774,7 @@ export type PlayerInsert = Omit<
   | "cosmetics_unlocked_draft"
   | "onboarded_at"
   | "postal_code"
+  | "local_radius_miles"
 > & {
   id?: string;
   created_at?: string;
@@ -732,6 +788,7 @@ export type PlayerInsert = Omit<
   equipped_effect?: string | null;
   equipped_avatar_frame?: string | null;
   postal_code?: string | null;
+  local_radius_miles?: number;
   cosmetics_unlocked?: boolean;
   cosmetics_unlocked_draft?: boolean;
   onboarded_at?: string | null;
@@ -1205,7 +1262,8 @@ export type NotificationRow = {
     | "early-board"
     | "board-open"
     | "new-follower"
-    | "room-flare";
+    | "room-flare"
+    | "message-received";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */
@@ -1336,6 +1394,8 @@ export type Database = {
       store_invites: Table<StoreInviteRow, StoreInviteInsert>;
       admin_users: Table<AdminUserRow, Partial<AdminUserRow>>;
       player_sessions: Table<PlayerSessionRow, PlayerSessionInsert>;
+      flare_threads: Table<FlareThreadRow, FlareThreadInsert>;
+      flare_messages: Table<FlareMessageRow, FlareMessageInsert>;
       player_session_tokens: Table<PlayerSessionTokenRow, PlayerSessionTokenInsert>;
       events: Table<EventRow, EventInsert>;
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;

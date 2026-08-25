@@ -49,6 +49,7 @@ export async function savePostalCodeAction(
      otherwise somebody types their ZIP, the form says "saved", and the
      section above it still asks the question. */
   revalidatePath("/feed");
+  revalidatePath("/local");
   revalidatePath("/profile/settings");
 
   return {

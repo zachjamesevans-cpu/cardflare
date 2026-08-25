@@ -348,7 +348,7 @@ export function HomeScreen() {
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
-    navigation.navigate("Tabs", { screen: "Room" });
+    navigation.navigate("Room");
   };
 
   /*
@@ -366,7 +366,11 @@ export function HomeScreen() {
       return;
     }
     if (href === "/room") {
-      navigation.navigate("Tabs", { screen: "Room" });
+      navigation.navigate("Room");
+      return;
+    }
+    if (href === "/local") {
+      navigation.navigate("Tabs", { screen: "Local" });
       return;
     }
     if (href === "/profile/settings") {
@@ -404,7 +408,7 @@ export function HomeScreen() {
         }).catch(() => {});
       }
       await rememberRoom(local.nextEventCode);
-      navigation.navigate("Tabs", { screen: "Room" });
+      navigation.navigate("Room");
     } catch {
       // The Room tab shows the truthful state; nothing to add here.
     } finally {
@@ -528,6 +532,49 @@ export function HomeScreen() {
             <EmberBadge earned={me.player.embersBalance} size="md" />
           )}
         </View>
+      )}
+
+      {/*
+       * The Room tab's job, as a banner: gone from the bar, never gone
+       * from reach. The moment a room is open at one of your stores it
+       * pins here, above everything derived, and one tap lands on the
+       * board. The website's Feed wears the same banner.
+       */}
+      {me?.locals.some((local) => local.liveNow) && (
+        <Tap
+          onPress={() => {
+            const live = me.locals.find((local) => local.liveNow);
+            if (live) void enter(live.code);
+          }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.accent,
+            backgroundColor: colors.elevated,
+            padding: spacing(3),
+          }}
+        >
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: colors.accent,
+            }}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textPrimary, fontWeight: "700" }}
+            >
+              Room open at {me.locals.find((local) => local.liveNow)?.name}
+            </Text>
+            <Muted>Tap to jump onto the board.</Muted>
+          </View>
+        </Tap>
       )}
 
       {/* The call to actions. Always here, always the same four. */}
@@ -777,7 +824,7 @@ export function HomeScreen() {
               label={STARTERS[item.topic].label}
               onPress={() =>
                 item.topic === "store"
-                  ? navigation.navigate("Tabs", { screen: "Room" })
+                  ? navigation.navigate("Room")
                   : navigation.navigate("Settings")
               }
             />
