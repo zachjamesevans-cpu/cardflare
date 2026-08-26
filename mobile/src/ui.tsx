@@ -576,8 +576,16 @@ export function Input(props: TextInputProps) {
   return (
     <TextInput
       placeholderTextColor={colors.textMuted}
-      style={styles.input}
       {...props}
+      /*
+       * After the spread and merged, never before it. A caller that
+       * only wants a taller box — the deck-list paste field asks for
+       * minHeight and top-aligned text — used to replace this whole
+       * style, and the field lost its border, its background and its
+       * padding: a placeholder floating on the card with nothing round
+       * it. HandleInput has always done it this way; now so does this.
+       */
+      style={[styles.input, props.style]}
     />
   );
 }
