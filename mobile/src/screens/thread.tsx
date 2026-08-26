@@ -1,14 +1,17 @@
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
@@ -42,6 +45,39 @@ export function ThreadScreen() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<LocalThreadMessage>>(null);
+
+  /*
+   * How far down the screen this view starts. KeyboardAvoidingView
+   * measures its own frame with onLayout, which is RELATIVE TO ITS
+   * PARENT, so a screen sitting under a navigation header reads its own
+   * top as zero and pads the keyboard by exactly the header's height too
+   * little. The offset is the correction, and it is the header's real
+   * height — 88 was the pre-notch guess, and on every modern iPhone it
+   * left the composer's last row buried under the keyboard.
+   */
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
+
+  /* The home indicator's strip is ours to leave clear — but only while
+     the keyboard is down, because the keyboard covers it itself and the
+     inset would then read as a gap floating over the keys. */
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardWillShow", () => {
+      setKeyboardUp(true);
+      /* The list loses height as the keyboard takes the bottom of the
+         screen, and a FlatList keeps its offset — so the newest message
+         slides in behind the composer unless it is followed down. */
+      requestAnimationFrame(() => list.current?.scrollToEnd({ animated: true }));
+    });
+    const hidden = Keyboard.addListener("keyboardWillHide", () =>
+      setKeyboardUp(false),
+    );
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
 
   const load = useCallback(
     async (isCurrent: () => boolean = () => true) => {
@@ -105,7 +141,7 @@ export function ThreadScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.canvas }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
     >
       {cardName && (
         <View
@@ -126,6 +162,10 @@ export function ThreadScreen() {
         contentContainerStyle={{ padding: spacing(4), gap: spacing(2) }}
         data={messages ?? []}
         keyExtractor={(message) => message.id}
+        /* A conversation opens on its newest message, not its oldest.
+           The website gets this from the page scrolling to its own end;
+           a fixed-height list has to be told. */
+        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
           <Text
             style={{
@@ -173,6 +213,7 @@ export function ThreadScreen() {
       <View
         style={{
           padding: spacing(3),
+          paddingBottom: spacing(3) + (keyboardUp ? 0 : insets.bottom),
           gap: spacing(2),
           borderTopWidth: 1,
           borderTopColor: colors.border,
