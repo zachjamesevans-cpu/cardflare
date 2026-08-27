@@ -33,6 +33,7 @@ import {
   adjust,
   callTime,
   complete,
+  impliedOvertimeMs,
   pause,
   reset,
   setRulesDismissed,
@@ -298,18 +299,17 @@ export async function timerControlAction(formData: FormData): Promise<void> {
       patch = adjust(timer, -60_000, now);
       break;
     case "call-time":
-      patch = callTime(timer);
+      patch = callTime(timer, now);
       break;
-    case "start-overtime":
-      /* The procedure decides the length, not the form. A turn-counted
-         procedure gets null, and the display shows turns instead of a
-         countdown it was never supposed to have. */
-      patch = startOvertime(
-        timer,
-        now,
-        procedure.timed ? procedure.overtimeSeconds : null,
-      );
+    case "start-overtime": {
+      /* The procedure decides the length, not the form — preset-aware,
+         so Top Cut gets its 10:00. A turn-counted procedure gets null,
+         and the display shows turns instead of a countdown it was never
+         supposed to have. */
+      const impliedMs = impliedOvertimeMs(timer);
+      patch = startOvertime(timer, now, impliedMs === null ? null : impliedMs / 1000);
       break;
+    }
     case "next-turn":
       patch = advanceTurn(timer, procedure.additionalTurns, 1, now);
       break;

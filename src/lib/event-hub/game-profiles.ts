@@ -69,6 +69,15 @@ export interface OvertimeProcedure {
   steps: string[];
   /** Ordered tiebreak comparisons, shown smaller. */
   tiebreak?: string[];
+  /**
+   * The one instruction line above the tiebreaks during EXTRA TIME.
+   *
+   * Extra time gets a compact card — the founder: "it's just showing
+   * tiebreakers in order explained quickly" — and this is the only
+   * sentence of procedure on it. Lives here, not in a component, for
+   * the same reason as every other string in this file.
+   */
+  extraTimeLine?: string;
   /** Additional turns, for the staff turn tracker. Zero disables it. */
   additionalTurns: number;
   /** Whether staff may start a countdown for this procedure. */
@@ -183,6 +192,8 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
         "Most Characters in the Character area",
         "Whoever most recently removed a card from their Life",
       ],
+      extraTimeLine:
+        "Finish the current turn, then play 3 more. Nobody has won? Compare in order:",
       additionalTurns: 3,
       timed: true,
       overtimeSeconds: 5 * MIN,
@@ -203,6 +214,8 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
         "Most Characters in the Character area",
         "Whoever most recently removed a card from their Life",
       ],
+      extraTimeLine:
+        "Finish the current turn, then play 3 more. No draws. Nobody has won? Compare in order:",
       additionalTurns: 3,
       timed: true,
       overtimeSeconds: 5 * MIN,

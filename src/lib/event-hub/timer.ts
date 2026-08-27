@@ -1,4 +1,10 @@
-import type { Bracket, GameId } from "./game-profiles";
+import {
+  GAME_PROFILES,
+  procedureFor,
+  timerPreset,
+  type Bracket,
+  type GameId,
+} from "./game-profiles";
 
 /**
  * The timer, as arithmetic on timestamps.
@@ -130,15 +136,80 @@ export function remainingMs(timer: HubTimer, now: number): number | null {
   }
 }
 
+/**
+ * The extra time this round's procedure implies, in ms.
+ *
+ * The preset speaks first because it is more specific — One Piece Top
+ * Cut runs 10:00 where the store procedure says 5:00, and a preset that
+ * deliberately carries null (Pokémon prerelease: "follow your event's
+ * own end-of-round rules") means NO clock, not "borrow the
+ * championship's". Null everywhere the game counts turns instead.
+ */
+export function impliedOvertimeMs(timer: HubTimer): number | null {
+  const procedure = procedureFor(GAME_PROFILES[timer.game], timer.bracket);
+  if (!procedure.timed) return null;
+
+  const preset = timerPreset(timer.game, timer.presetId);
+  const seconds = preset ? preset.overtimeSeconds : procedure.overtimeSeconds;
+  return seconds === null ? null : seconds * 1000;
+}
+
+/** The instant regulation ended, for a row that carries a start stamp. */
+function regulationEndAt(timer: HubTimer): number | null {
+  if (timer.durationSeconds === null) return null;
+  const started = stamp(timer.startedAt);
+  if (started === null) return null;
+  return started + timer.durationSeconds * 1000;
+}
+
+/**
+ * What the extra-time clock is climbing toward, in ms.
+ *
+ * From the row when staff started overtime by hand; implied by the
+ * procedure when regulation rolled straight over. Null means there is
+ * no clock — the procedure counts turns.
+ */
+export function overtimeCapMs(timer: HubTimer, now: number): number | null {
+  if (timer.status === "overtime") {
+    return timer.overtimeDurationSeconds === null
+      ? null
+      : timer.overtimeDurationSeconds * 1000;
+  }
+
+  if (timer.status === "running") {
+    const left = remainingMs(timer, now);
+    if (left !== null && left <= 0) return impliedOvertimeMs(timer);
+  }
+
+  return null;
+}
+
+/**
+ * Extra time, counting UP.
+ *
+ * The founder, running real rounds: "count UP to 5:00 for one piece and
+ * other TCG's instead of counting down." Up is how a judge reads extra
+ * time — it answers "how far into it are we" — and clamping at the cap
+ * means the wall settles on 5:00 rather than ticking into nonsense.
+ */
+export function overtimeElapsedMs(timer: HubTimer, now: number): number | null {
+  const cap = overtimeCapMs(timer, now);
+  if (cap === null) return null;
+
+  if (timer.status === "overtime") {
+    const started = stamp(timer.overtimeStartedAt);
+    return started === null ? 0 : Math.min(cap, Math.max(0, now - started));
+  }
+
+  const end = regulationEndAt(timer);
+  return end === null ? 0 : Math.min(cap, Math.max(0, now - end));
+}
+
 /** Overtime left, or null when the procedure counts turns instead. */
 export function overtimeRemainingMs(timer: HubTimer, now: number): number | null {
-  if (timer.status !== "overtime") return null;
-  if (timer.overtimeDurationSeconds === null) return null;
-
-  const started = stamp(timer.overtimeStartedAt);
-  if (started === null) return timer.overtimeDurationSeconds * 1000;
-
-  return Math.max(0, timer.overtimeDurationSeconds * 1000 - (now - started));
+  const cap = overtimeCapMs(timer, now);
+  const up = overtimeElapsedMs(timer, now);
+  return cap === null || up === null ? null : Math.max(0, cap - up);
 }
 
 /**
@@ -168,9 +239,26 @@ export function timerPhase(timer: HubTimer, now: number): TimerPhase {
 
   if (timer.status === "running") {
     const left = remainingMs(timer, now);
-    /* Zero is TIME, derived rather than written — see the note on
-       TimerPhase. An untimed round (`left === null`) never gets here. */
-    return left !== null && left <= 0 ? "time_called" : "running";
+    /* An untimed round (`left === null`) never leaves "running". */
+    if (left === null || left > 0) return "running";
+
+    /*
+     * Regulation is over. A timed procedure rolls STRAIGHT into extra
+     * time — the founder, judging real rounds: "it forces me to go back
+     * to the event screen to start the 5 min timer again. That's
+     * redundant. Immediately start the 5 min overtime timer." Derived,
+     * not written, exactly like TIME IN ROUND always was: the wall
+     * flips at the instant regulation ends whether or not any phone is
+     * awake, and the extra-time clock is arithmetic on the same start
+     * stamp. Turn-counted procedures still read TIME IN ROUND, because
+     * for them there is no clock to start.
+     */
+    const cap = impliedOvertimeMs(timer);
+    if (cap === null) return "time_called";
+
+    const end = regulationEndAt(timer);
+    const up = end === null ? 0 : now - end;
+    return up >= cap ? "overtime_expired" : "overtime";
   }
 
   return timer.status;
@@ -288,7 +376,11 @@ export function start(timer: HubTimer, now: number): TimerPatch | null {
 }
 
 export function pause(timer: HubTimer, now: number): TimerPatch | null {
-  if (timer.status !== "running") return null;
+  /* Keyed off the PHASE: a row still saying "running" whose regulation
+     has ended is showing extra time or TIME on the wall, and pausing it
+     would store zero and quietly restart overtime on resume. Publishers
+     do not pause extra time, and neither does this. */
+  if (timerPhase(timer, now) !== "running") return null;
 
   return {
     status: "paused",
@@ -374,9 +466,12 @@ export function adjust(
 }
 
 /** Calls time by hand, before the clock gets there. */
-export function callTime(timer: HubTimer): TimerPatch | null {
-  if (timer.status === "time_called" || timer.status === "overtime") return null;
-  if (timer.status === "complete") return null;
+export function callTime(timer: HubTimer, now: number = Date.now()): TimerPatch | null {
+  /* By phase, so a round already showing derived extra time cannot be
+     yanked back to TIME IN ROUND by a stale control tab. */
+  const phase = timerPhase(timer, now);
+  if (phase === "time_called" || phase === "overtime") return null;
+  if (phase === "overtime_expired" || phase === "complete") return null;
 
   return { status: "time_called", rulesDismissed: false };
 }
@@ -395,6 +490,12 @@ export function startOvertime(
   seconds: number | null,
 ): TimerPatch | null {
   if (timer.status === "overtime" || timer.status === "complete") return null;
+
+  /* And by phase: regulation rolling straight into DERIVED extra time
+     leaves the row saying "running", and a tap on a stale START
+     OVERTIME button must not restart a clock that is two minutes in. */
+  const phase = timerPhase(timer, now);
+  if (phase === "overtime" || phase === "overtime_expired") return null;
 
   return {
     status: "overtime",
