@@ -96,8 +96,11 @@ as $function$
     from public.cards c
     cross join params p
     where p.term <> ''
-      -- The room's game, when the scan said which one. Null is every game.
-      and (filter_game is null or c.game = filter_game)
+      -- The room's game, when the scan said which one. Null is every
+      -- game. Cast because `cards.game` is the `game` enum and the
+      -- argument is text; comparing as text also means an unknown slug
+      -- is an empty result, never a 22P02 invalid-enum error.
+      and (filter_game is null or c.game::text = filter_game)
       and (filter_card_type is null or c.card_type = lower(filter_card_type))
       and (filter_color is null or lower(filter_color) = any (c.colors))
       and (
