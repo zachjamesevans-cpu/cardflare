@@ -591,8 +591,10 @@ export default async function JoinByCodePage({
           {/* Offers land while people wander; the room re-reads itself. */}
           <RoomTicker />
 
-          {/* The wall's clocks, for a seat that cannot see the wall. */}
-          <RoomTimers timers={roomTimers} />
+          {/* The wall's clocks, for a seat that cannot see the wall.
+              Self-polling, so a reset or a fresh tournament shows up
+              without anybody refreshing anything. */}
+          <RoomTimers initial={roomTimers} code={normalized} />
 
           {outstandingWants.length > 0 && (
             <RepostWants code={normalized} count={outstandingWants.length}>

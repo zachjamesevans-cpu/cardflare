@@ -64,9 +64,15 @@ export default async function EventHubPage({
     areasForUser(viewer.user.id, viewer.kind === "admin"),
   ]);
 
-  const display = displays[0] ?? null;
-  const payload = display ? await displayPayload(display) : null;
-  const displayUrl = display ? `${siteUrl()}/display/${display.token}` : null;
+  /*
+   * ALL of them, not `displays[0]`. That indexing was the bug behind
+   * "it literally just deletes the timer": splitting a tournament to
+   * its own screen created display #2 and moved the timer there — and
+   * this page never showed a second display, so the timer vanished
+   * with no trace of where it went. Every screen now gets its section,
+   * link included, so a split lands somewhere you can see and open.
+   */
+  const payloads = await Promise.all(displays.map((d) => displayPayload(d)));
 
   return (
     <AppShell
@@ -85,7 +91,7 @@ export default async function EventHubPage({
         Back to your store
       </Link>
 
-      {!display || !payload ? (
+      {displays.length === 0 ? (
         <section className="flex flex-col gap-5" aria-labelledby="create-heading">
           <div className="flex flex-col gap-1">
             <h2 id="create-heading" className="text-xl font-bold text-text-primary">
@@ -125,96 +131,94 @@ export default async function EventHubPage({
         </section>
       ) : (
         <>
-          <section className="flex flex-col gap-5" aria-labelledby="tv-heading">
-            <div className="flex flex-col gap-1">
-              <h2 id="tv-heading" className="text-xl font-bold text-text-primary">
-                Open it on the television
-              </h2>
-              <p className="max-w-2xl text-sm text-text-secondary">
-                Paste this into the browser on whatever drives your TV, then press Enter
-                Fullscreen once. Nothing here asks anyone to sign in, and the link can
-                only ever read this display.
-              </p>
-            </div>
+          {displays.map((display, index) => {
+            const payload = payloads[index];
+            if (!payload) return null;
+            const displayUrl = `${siteUrl()}/display/${display.token}`;
 
-            <Card className="flex flex-col gap-3">
-              <p className="font-mono text-sm break-all text-text-secondary">
-                {displayUrl}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={`/display/${display.token}`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className={buttonStyles("primary", "sm")}
-                >
-                  <Tv className="size-4" aria-hidden="true" />
-                  Open TV display
-                </a>
-                <a
-                  href={`/display/${display.token}`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className={buttonStyles("secondary", "sm")}
-                >
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                  Preview
-                </a>
-                {displayUrl && <CopyLink url={displayUrl} />}
-              </div>
-            </Card>
-          </section>
+            return (
+              <section
+                key={display.id}
+                className={`flex flex-col gap-5 ${
+                  index > 0 ? "border-t border-border pt-8" : ""
+                }`}
+                aria-label={display.name}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-xl font-bold text-text-primary">
+                    {display.name}
+                  </h2>
+                  <span className="text-sm text-text-muted tabular-nums">
+                    {payload.timers.length} of {MAX_TIMERS} tournaments
+                  </span>
+                </div>
 
-          <section className="flex flex-col gap-5" aria-labelledby="running-heading">
-            <div className="flex items-center justify-between gap-4">
-              <h2 id="running-heading" className="text-xl font-bold text-text-primary">
-                Running now
-              </h2>
-              <span className="text-sm text-text-muted tabular-nums">
-                {payload.timers.length} of {MAX_TIMERS}
-              </span>
-            </div>
+                <Card className="flex flex-col gap-3">
+                  <p className="text-sm text-text-secondary">
+                    Open this link on whatever drives that television, then press Enter
+                    Fullscreen once. It asks nobody to sign in.
+                  </p>
+                  <p className="font-mono text-xs break-all text-text-muted">
+                    {displayUrl}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`/display/${display.token}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className={buttonStyles("primary", "sm")}
+                    >
+                      <Tv className="size-4" aria-hidden="true" />
+                      Open TV display
+                    </a>
+                    <a
+                      href={`/display/${display.token}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className={buttonStyles("secondary", "sm")}
+                    >
+                      <ExternalLink className="size-4" aria-hidden="true" />
+                      Preview
+                    </a>
+                    <CopyLink url={displayUrl} />
+                  </div>
+                </Card>
 
-            {/* Live from here down: the same polled payload the television
-                reads, so a second staff phone's pause shows up here too. */}
-            <ControlPanel initial={payload} token={display.token} />
-          </section>
+                {/* Live from here down: the same polled payload the
+                    television reads, so a second staff phone's pause
+                    shows up here too. */}
+                <ControlPanel initial={payload} token={display.token} />
 
-          {payload.timers.length < MAX_TIMERS && (
-            <section className="flex flex-col gap-5" aria-labelledby="add-heading">
-              <div className="flex flex-col gap-1">
-                <h2 id="add-heading" className="text-xl font-bold text-text-primary">
-                  Add a tournament
-                </h2>
-                <p className="max-w-2xl text-sm text-text-secondary">
-                  Pick the game and the preset knows the round length and what happens
-                  when time is called. Run up to {MAX_TIMERS} at once.
-                </p>
-              </div>
+                {payload.timers.length < MAX_TIMERS && (
+                  <details className="group rounded-[var(--radius-card)] border border-border bg-surface">
+                    <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-text-primary select-none">
+                      Add a tournament to this screen
+                    </summary>
+                    <div className="border-t border-border p-4">
+                      <AddTimerForm displayId={display.id} />
+                    </div>
+                  </details>
+                )}
 
-              <Card>
-                <AddTimerForm displayId={display.id} />
-              </Card>
-            </section>
-          )}
-
-          <section className="flex flex-col gap-5" aria-labelledby="settings-heading">
-            <h2 id="settings-heading" className="text-xl font-bold text-text-primary">
-              What the display shows
-            </h2>
-
-            <Card>
-              <DisplaySettings
-                displayId={display.id}
-                nightTitle={display.nightTitle}
-                layout={display.layout}
-                announcement={display.announcement}
-                showFlares={display.showFlares}
-                showQr={display.showQr}
-                soundEnabled={display.soundEnabled}
-              />
-            </Card>
-          </section>
+                <details className="group rounded-[var(--radius-card)] border border-border bg-surface">
+                  <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-text-primary select-none">
+                    What this screen shows
+                  </summary>
+                  <div className="border-t border-border p-4">
+                    <DisplaySettings
+                      displayId={display.id}
+                      nightTitle={display.nightTitle}
+                      layout={display.layout}
+                      announcement={display.announcement}
+                      showFlares={display.showFlares}
+                      showQr={display.showQr}
+                      soundEnabled={display.soundEnabled}
+                    />
+                  </div>
+                </details>
+              </section>
+            );
+          })}
 
           <section className="flex flex-col gap-3" aria-labelledby="rules-heading">
             <h2 id="rules-heading" className="text-xl font-bold text-text-primary">

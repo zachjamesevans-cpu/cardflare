@@ -161,7 +161,6 @@ export function TimerPanel({
      means exactly one thing. */
   const inOvertime = phase === "overtime" || phase === "overtime_expired";
   const atTime = inOvertime || phase === "time_called";
-  const otCap = overtimeCapMs(timer, now);
 
   const clock =
     inOvertime && otUp !== null
@@ -251,25 +250,9 @@ export function TimerPanel({
             <p className={`mt-2 text-text-muted ${META_SIZE[layout]}`}>Untimed round</p>
           )}
 
-          {/* The one line a player needs at time, without the card:
-              "+3 TURNS · 5:00". The full procedure is beginner mode.
-              The cap is appended only where the headline does not
-              already carry it — Top Cut runs 10:00 under a headline
-              written for the store round's 5:00. */}
-          {atTime &&
-            (() => {
-              const headline = procedureFor(profile, timer.bracket).headline;
-              const cap = inOvertime && otCap !== null ? formatClock(otCap) : null;
-              const capShown = cap ? cap.replace(/^0/, "") : null;
-              return (
-                <p
-                  className={`mt-2 font-bold text-danger ${META_SIZE[layout]} tracking-wide`}
-                >
-                  {headline}
-                  {capShown && !headline.includes(capShown) ? ` · of ${capShown}` : ""}
-                </p>
-              );
-            })()}
+          {/* Nothing else. The founder: "just keep the timer to the
+              clock itself on all games for now" — turns and procedure
+              live behind the show-rules toggle, not under the digits. */}
         </div>
 
         <footer className="flex items-center justify-between gap-3">
