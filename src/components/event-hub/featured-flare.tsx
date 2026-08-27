@@ -51,15 +51,19 @@ export function FeaturedFlare({
         {overview ? (
           <Overview flares={flares} />
         ) : (
-          <Featured flare={flares[position]} />
+          <FeaturedCard flare={flares[position]} />
         )}
       </div>
     </section>
   );
 }
 
-/** One card, as large as the column allows, with the ask under it. */
-function Featured({ flare }: { flare: DisplayFlare }) {
+/**
+ * One card, as large as the column allows, with the ask under it.
+ * Exported because the Auto Mode intermission features the same card at
+ * even larger sizes — one renderer, so the two can never drift.
+ */
+export function FeaturedCard({ flare }: { flare: DisplayFlare }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center gap-[clamp(0.4rem,0.9vw,1.1rem)]">
       <div className="relative flex min-h-0 flex-1 items-center justify-center">

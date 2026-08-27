@@ -86,8 +86,14 @@ export function ScreenCard({
             return (
               <div key={row.id} className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-text-primary">
-                    {row.gameName}
+                  <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
+                    <span className="truncate">{row.gameName}</span>
+                    {/* The founder's indicator, small and obvious. */}
+                    {row.autoMode && (
+                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-accent uppercase">
+                        Auto
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-xs text-text-muted">{row.eventName}</p>
                 </div>

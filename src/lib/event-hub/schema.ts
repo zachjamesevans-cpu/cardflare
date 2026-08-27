@@ -110,6 +110,31 @@ export function checkTimerDraft(input: {
   };
 }
 
+/**
+ * The between-rounds window, out of a form.
+ *
+ * `choice` is one of the offered minute counts or "custom";
+ * `customMinutes` only matters for "custom". Anything unreadable lands
+ * on the recommended default rather than an error — a mis-typed
+ * intermission is not worth losing the rest of the tournament form over.
+ */
+export function checkIntermissionSeconds(
+  choice: string,
+  customMinutes: string,
+): number {
+  const fallback = 180;
+
+  if (choice === "custom") {
+    const minutes = Number(customMinutes.trim());
+    if (!Number.isFinite(minutes) || minutes <= 0) return fallback;
+    return Math.min(3600, Math.max(30, Math.round(minutes * 60)));
+  }
+
+  const minutes = Number(choice);
+  if (!Number.isFinite(minutes) || minutes <= 0) return fallback;
+  return Math.min(3600, Math.max(30, Math.round(minutes * 60)));
+}
+
 export function checkLayout(value: string): LayoutChoice {
   return LAYOUT_CHOICES.includes(value as LayoutChoice)
     ? (value as LayoutChoice)

@@ -87,6 +87,24 @@ export interface HubTimer {
    * overtime is the clock itself, counting up in red.
    */
   beginnerMode: boolean;
+  /**
+   * Auto Mode: when time hits, a between-rounds countdown runs and the
+   * next round starts itself. Off by default, per tournament — off
+   * means the timer behaves exactly as it always has. The intermission
+   * itself is DERIVED (see `auto-mode.ts`); these columns hold only
+   * what somebody chose.
+   */
+  autoMode: boolean;
+  /** Whether zero starts the round, or waits for a person. */
+  autoStart: boolean;
+  /** The between-rounds window. */
+  intermissionSeconds: number;
+  /** Every +2 MIN and held span, folded into one number. */
+  intermissionExtendedMs: number;
+  /** Set while the organizer has pressed HOLD. */
+  autoHeldAt: string | null;
+  /** When time was called by hand — can be earlier than the clock. */
+  timeCalledAt: string | null;
   updatedAt: string;
 }
 
@@ -95,6 +113,7 @@ export type TimerPatch = Partial<
   Pick<
     HubTimer,
     | "status"
+    | "round"
     | "startedAt"
     | "pausedAt"
     | "remainingMsWhenPaused"
@@ -104,6 +123,12 @@ export type TimerPatch = Partial<
     | "rulesDismissed"
     | "beginnerMode"
     | "durationSeconds"
+    | "autoMode"
+    | "autoStart"
+    | "intermissionSeconds"
+    | "intermissionExtendedMs"
+    | "autoHeldAt"
+    | "timeCalledAt"
   >
 >;
 
@@ -165,7 +190,7 @@ export function impliedOvertimeMs(timer: HubTimer): number | null {
 }
 
 /** The instant regulation ended, for a row that carries a start stamp. */
-function regulationEndAt(timer: HubTimer): number | null {
+export function regulationEndAt(timer: HubTimer): number | null {
   if (timer.durationSeconds === null) return null;
   const started = stamp(timer.startedAt);
   if (started === null) return null;
@@ -385,6 +410,11 @@ export function start(timer: HubTimer, now: number): TimerPatch | null {
     startedAt: new Date(now).toISOString(),
     pausedAt: null,
     remainingMsWhenPaused: null,
+    /* A fresh start is a fresh round: whatever the last one left behind
+       — an early call's stamp, a hold, an extension — is over. */
+    timeCalledAt: null,
+    autoHeldAt: null,
+    intermissionExtendedMs: 0,
   };
 }
 
@@ -419,6 +449,11 @@ export function reset(timer: HubTimer): TimerPatch | null {
     overtimeDurationSeconds: null,
     overtimeTurn: 0,
     rulesDismissed: false,
+    /* The between-rounds remnants clear too, or a reset mid-intermission
+       would leave a stale hold waiting to freeze the NEXT round's window. */
+    timeCalledAt: null,
+    autoHeldAt: null,
+    intermissionExtendedMs: 0,
   };
 }
 
@@ -466,12 +501,24 @@ export function adjust(
     const started = stamp(timer.startedAt) ?? now;
     const left = remainingMs(timer, now) ?? 0;
     const shift = Math.max(deltaMs, -left);
+    const revived = left + shift > 0;
 
     return {
       /* Adding time to a round that already hit zero puts it back on the
          clock, which is what "give them one more minute" means. */
-      status: left + shift > 0 ? "running" : timer.status,
+      status: revived ? "running" : timer.status,
       startedAt: new Date(started + shift).toISOString(),
+      /*
+       * A round put back on the clock will END AGAIN, later — so the old
+       * ending's remnants must not survive it. Left in place, a hand
+       * call's stamp anchored the next intermission minutes in the past
+       * (a round that auto-started with no break at all), and a stale
+       * hold froze a countdown nobody was holding. `start` and `reset`
+       * already treat revival as a fresh ending; so does this.
+       */
+      ...(revived
+        ? { timeCalledAt: null, autoHeldAt: null, intermissionExtendedMs: 0 }
+        : {}),
     };
   }
 
@@ -486,7 +533,13 @@ export function callTime(timer: HubTimer, now: number = Date.now()): TimerPatch 
   if (phase === "time_called" || phase === "overtime") return null;
   if (phase === "overtime_expired" || phase === "complete") return null;
 
-  return { status: "time_called", rulesDismissed: false };
+  return {
+    status: "time_called",
+    rulesDismissed: false,
+    /* The instant is kept because an early call can beat the clock, and
+       Auto Mode's intermission anchors on when time ACTUALLY hit. */
+    timeCalledAt: new Date(now).toISOString(),
+  };
 }
 
 /**

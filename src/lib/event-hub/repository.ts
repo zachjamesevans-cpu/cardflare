@@ -68,6 +68,14 @@ function toTimer(row: EventHubTimerRow): HubTimer {
     /* Older rows predate the column; absent reads as off, which is the
        default the founder chose anyway. */
     beginnerMode: row.beginner_mode ?? false,
+    /* Same story for the whole Auto Mode block: absent reads as the
+       defaults, and the defaults mean "behave exactly as before". */
+    autoMode: row.auto_mode ?? false,
+    autoStart: row.auto_start ?? true,
+    intermissionSeconds: row.intermission_seconds ?? 180,
+    intermissionExtendedMs: Number(row.intermission_extended_ms ?? 0),
+    autoHeldAt: row.auto_held_at ?? null,
+    timeCalledAt: row.time_called_at ?? null,
     updatedAt: row.updated_at,
   };
 }
@@ -237,6 +245,10 @@ export async function addTimer(input: {
   durationSeconds: number | null;
   /** Show the rules card at time. Off unless asked for at creation. */
   beginnerMode?: boolean;
+  /** Auto Mode, chosen at creation. Off unless asked for. */
+  autoMode?: boolean;
+  autoStart?: boolean;
+  intermissionSeconds?: number;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "The database isn't configured." };
@@ -269,6 +281,9 @@ export async function addTimer(input: {
       preset_id: input.presetId,
       duration_seconds: input.durationSeconds,
       beginner_mode: input.beginnerMode ?? false,
+      auto_mode: input.autoMode ?? false,
+      auto_start: input.autoStart ?? true,
+      intermission_seconds: input.intermissionSeconds ?? 180,
     });
 
   if (error) {
@@ -279,39 +294,51 @@ export async function addTimer(input: {
   return { ok: true };
 }
 
+/** A `TimerPatch`, as column names. Shared by every timer write below. */
+function toRowPatch(patch: TimerPatch): Partial<EventHubTimerRow> {
+  return {
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.round !== undefined ? { round: patch.round } : {}),
+    ...(patch.startedAt !== undefined ? { started_at: patch.startedAt } : {}),
+    ...(patch.pausedAt !== undefined ? { paused_at: patch.pausedAt } : {}),
+    ...(patch.remainingMsWhenPaused !== undefined
+      ? { remaining_ms_when_paused: patch.remainingMsWhenPaused }
+      : {}),
+    ...(patch.overtimeStartedAt !== undefined
+      ? { overtime_started_at: patch.overtimeStartedAt }
+      : {}),
+    ...(patch.overtimeDurationSeconds !== undefined
+      ? { overtime_duration_seconds: patch.overtimeDurationSeconds }
+      : {}),
+    ...(patch.overtimeTurn !== undefined ? { overtime_turn: patch.overtimeTurn } : {}),
+    ...(patch.rulesDismissed !== undefined
+      ? { rules_dismissed: patch.rulesDismissed }
+      : {}),
+    ...(patch.beginnerMode !== undefined ? { beginner_mode: patch.beginnerMode } : {}),
+    ...(patch.durationSeconds !== undefined
+      ? { duration_seconds: patch.durationSeconds }
+      : {}),
+    ...(patch.autoMode !== undefined ? { auto_mode: patch.autoMode } : {}),
+    ...(patch.autoStart !== undefined ? { auto_start: patch.autoStart } : {}),
+    ...(patch.intermissionSeconds !== undefined
+      ? { intermission_seconds: patch.intermissionSeconds }
+      : {}),
+    ...(patch.intermissionExtendedMs !== undefined
+      ? { intermission_extended_ms: patch.intermissionExtendedMs }
+      : {}),
+    ...(patch.autoHeldAt !== undefined ? { auto_held_at: patch.autoHeldAt } : {}),
+    ...(patch.timeCalledAt !== undefined ? { time_called_at: patch.timeCalledAt } : {}),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 /** Applies a transition's patch. `updated_at` is stamped for every write. */
 export async function patchTimer(id: string, patch: TimerPatch): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
 
   const { error } = await getSupabaseAdmin()
     .from("event_hub_timers")
-    .update({
-      ...(patch.status !== undefined ? { status: patch.status } : {}),
-      ...(patch.startedAt !== undefined ? { started_at: patch.startedAt } : {}),
-      ...(patch.pausedAt !== undefined ? { paused_at: patch.pausedAt } : {}),
-      ...(patch.remainingMsWhenPaused !== undefined
-        ? { remaining_ms_when_paused: patch.remainingMsWhenPaused }
-        : {}),
-      ...(patch.overtimeStartedAt !== undefined
-        ? { overtime_started_at: patch.overtimeStartedAt }
-        : {}),
-      ...(patch.overtimeDurationSeconds !== undefined
-        ? { overtime_duration_seconds: patch.overtimeDurationSeconds }
-        : {}),
-      ...(patch.overtimeTurn !== undefined
-        ? { overtime_turn: patch.overtimeTurn }
-        : {}),
-      ...(patch.rulesDismissed !== undefined
-        ? { rules_dismissed: patch.rulesDismissed }
-        : {}),
-      ...(patch.beginnerMode !== undefined
-        ? { beginner_mode: patch.beginnerMode }
-        : {}),
-      ...(patch.durationSeconds !== undefined
-        ? { duration_seconds: patch.durationSeconds }
-        : {}),
-      updated_at: new Date().toISOString(),
-    })
+    .update(toRowPatch(patch))
     .eq("id", id);
 
   if (error) {
@@ -320,6 +347,58 @@ export async function patchTimer(id: string, patch: TimerPatch): Promise<boolean
   }
 
   return true;
+}
+
+/**
+ * Applies a patch only if the row has not changed since it was read.
+ *
+ * The write behind every round start Auto Mode makes. The guard is
+ * `updated_at`: every other write stamps it, so of two devices that both
+ * computed "start round four" — two TVs polling, a TV and a phone, a
+ * phone and a stale tab — exactly one lands and the rest quietly read
+ * the winner's row on their next poll. This is what keeps "the round
+ * started twice" and "the round number jumped two" impossible rather
+ * than merely unlikely.
+ */
+export async function patchTimerIfUnchanged(
+  id: string,
+  expectedUpdatedAt: string,
+  patch: TimerPatch,
+): Promise<HubTimer | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("event_hub_timers")
+    .update(toRowPatch(patch))
+    .eq("id", id)
+    .eq("updated_at", expectedUpdatedAt)
+    .select("*");
+
+  if (error) {
+    console.error("Could not advance the timer", error);
+    return null;
+  }
+
+  const row = data?.[0];
+  return row ? toTimer(row) : null;
+}
+
+/**
+ * One line of Auto Mode history. Best-effort on purpose: a log insert
+ * failing must never stop a round from starting.
+ */
+export async function logTimerEvent(
+  timerId: string,
+  kind: string,
+  detail?: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { error } = await getSupabaseAdmin()
+    .from("event_hub_timer_log")
+    .insert({ timer_id: timerId, kind, detail: detail ?? null });
+
+  if (error) console.error("Could not log the timer event", error);
 }
 
 /** Renames, re-rounds, re-brackets. The parts a person types. */
@@ -376,7 +455,13 @@ export async function moveTimerToDisplay(
 
   const { error } = await getSupabaseAdmin()
     .from("event_hub_timers")
-    .update({ display_id: displayId, position: 0 })
+    /* Stamped like every other timer write, because the guarded writes
+       rely on "any change bumps updated_at" being true without holes. */
+    .update({
+      display_id: displayId,
+      position: 0,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", timerId);
 
   if (error) {

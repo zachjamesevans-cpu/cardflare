@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Minimize, WifiOff } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { intermissionFor } from "@/lib/event-hub/auto-mode";
 import type { DisplayPayload } from "@/lib/event-hub/display-payload";
 import { displayPlan } from "@/lib/event-hub/layout";
 import { rotationWindow } from "@/lib/event-hub/rotation";
 import { remainingMs, timerPhase, type HubTimer } from "@/lib/event-hub/timer";
 import { FeaturedFlare } from "./featured-flare";
 import { FlareBoard } from "./flare-board";
+import { IntermissionBody } from "./intermission-screen";
 import { TimerPanel } from "./timer-panel";
 import { useDisplayClock } from "./display-clock";
 
@@ -65,19 +67,74 @@ export function DisplayScreen({
    */
   const focus = plan.layout === "single" && timers.length > 0 && payload.showFlares;
 
+  /*
+   * Auto Mode's between-rounds takeover, on a screen a tournament has
+   * to itself. Derived every tick from the same row every other device
+   * reads, so a refresh mid-intermission lands exactly where it should.
+   */
+  const intermission =
+    plan.layout === "single" && timers.length > 0
+      ? intermissionFor(timers[0], at)
+      : null;
+  const inIntermission = intermission !== null;
+
+  /* What the intermission rotates: every Flare, plus the announcement. */
+  const intermissionSlides =
+    (payload.showFlares ? payload.flares.length : 0) + (payload.announcement ? 1 : 0);
+
   useEffect(() => {
-    /* Focus rotates whenever there is more than one thing to feature;
-       the strip layouts rotate only once the window is full. */
-    const rotates = focus
-      ? payload.flares.length > 1
-      : payload.showFlares && payload.flares.length > plan.flareSlots;
+    /* The intermission rotates its slides; focus rotates whenever there
+       is more than one thing to feature; the strip layouts rotate only
+       once the window is full. */
+    const rotates = inIntermission
+      ? intermissionSlides > 1
+      : focus
+        ? payload.flares.length > 1
+        : payload.showFlares && payload.flares.length > plan.flareSlots;
     if (!rotates) return;
 
     const rotate = setInterval(() => setTick((value) => value + 1), ROTATE_MS);
     return () => clearInterval(rotate);
-  }, [focus, payload.showFlares, payload.flares.length, plan.flareSlots]);
+  }, [
+    focus,
+    inIntermission,
+    intermissionSlides,
+    payload.showFlares,
+    payload.flares.length,
+    plan.flareSlots,
+  ]);
 
   useChimes(timers, payload.soundEnabled, at);
+
+  if (intermission) {
+    return (
+      <main
+        id="main"
+        className="flex h-dvh w-full flex-col gap-[clamp(0.4rem,0.9vw,1.25rem)] overflow-hidden bg-canvas p-[clamp(0.6rem,1.2vw,1.75rem)]"
+      >
+        <Header
+          storeName={payload.storeName}
+          nightTitle={payload.nightTitle}
+          connected={connected}
+        />
+
+        <IntermissionBody
+          payload={payload}
+          timer={timers[0]}
+          intermission={intermission}
+          now={at}
+          tick={tick}
+          join={
+            payload.showQr && qrSvg && payload.joinCode ? (
+              <JoinPanel code={payload.joinCode} qrSvg={qrSvg} />
+            ) : null
+          }
+        />
+
+        <FullscreenControl />
+      </main>
+    );
+  }
 
   if (focus) {
     return (
@@ -423,11 +480,18 @@ function useChimes(timers: HubTimer[], enabled: boolean, now: number) {
       const phase = timerPhase(timer, now);
       const left = remainingMs(timer, now);
 
+      /*
+       * Marks are per ROUND, not per timer: an Auto Mode tournament
+       * starts its next round without ever passing through "ready", and
+       * timer-scoped marks left the display silent from round two on.
+       */
+      const key = (mark: string) => `${timer.id}:${timer.round ?? 0}:${mark}`;
+
       /* A reset puts the timer back to ready, which is where the marks
          for this round are forgotten. */
       if (phase === "ready") {
         for (const mark of ["ten", "five", "one", "time"]) {
-          fired.current.delete(`${timer.id}:${mark}`);
+          fired.current.delete(key(mark));
         }
         continue;
       }
@@ -447,9 +511,8 @@ function useChimes(timers: HubTimer[], enabled: boolean, now: number) {
 
       if (!mark) continue;
 
-      const key = `${timer.id}:${mark}`;
-      if (fired.current.has(key)) continue;
-      fired.current.add(key);
+      if (fired.current.has(key(mark))) continue;
+      fired.current.add(key(mark));
 
       chime(context.current, mark === "time" ? 2 : 1);
     }

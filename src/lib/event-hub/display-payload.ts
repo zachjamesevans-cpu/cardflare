@@ -5,8 +5,14 @@ import { resolveCode } from "@/lib/events/rooms";
 import { joinUrl } from "@/lib/events/qr";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
+import { intermissionFor, startNextRound } from "./auto-mode";
 import type { LayoutChoice } from "./layout";
-import { listTimers, type HubDisplay } from "./repository";
+import {
+  listTimers,
+  logTimerEvent,
+  patchTimerIfUnchanged,
+  type HubDisplay,
+} from "./repository";
 import { orderByAsker } from "./flare-groups";
 import type { HubTimer } from "./timer";
 
@@ -96,11 +102,49 @@ const FLARE_LIMIT = 24;
  * distinction matters here more than anywhere — a television left on
  * overnight must not be able to start a trading room by looking at it.
  */
+/**
+ * Materialises the round starts Auto Mode has already scheduled.
+ *
+ * The one deliberate exception to "building a payload writes nothing".
+ * An intermission that reached zero with everything safe means the next
+ * round has LOGICALLY started — every device derives that from the same
+ * row — and this write merely persists it, the same way staff confirming
+ * TIME IN ROUND persists what every screen already agreed on. It has to
+ * live on the poll because the poll is the only thing guaranteed awake:
+ * the whole feature is the organizer's phone staying in their pocket,
+ * and the television is what keeps the room honest.
+ *
+ * A display token gains no control from this. The transition is decided
+ * entirely by store-configured state and the guarded write in the
+ * repository — polling harder cannot start anything early, twice, or at
+ * all unless the store scheduled it.
+ */
+async function settleAutoRounds(timers: HubTimer[]): Promise<HubTimer[]> {
+  const now = Date.now();
+
+  return Promise.all(
+    timers.map(async (timer) => {
+      if (intermissionFor(timer, now)?.state !== "due") return timer;
+
+      const patch = startNextRound(timer, now);
+      if (!patch) return timer;
+
+      const advanced = await patchTimerIfUnchanged(timer.id, timer.updatedAt, patch);
+      if (!advanced) return timer;
+
+      void logTimerEvent(timer.id, "round-started", `auto · round ${advanced.round}`);
+      return advanced;
+    }),
+  );
+}
+
 export async function displayPayload(display: HubDisplay): Promise<DisplayPayload> {
-  const [store, timers] = await Promise.all([
+  const [store, rawTimers] = await Promise.all([
     findStoreById(display.storeId),
     listTimers(display.id),
   ]);
+
+  const timers = await settleAutoRounds(rawTimers);
 
   /** The one game this screen is running, or null for a mixed wall. */
   function singleGameOf(list: { game: string }[]): string | null {

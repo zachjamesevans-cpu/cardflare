@@ -20,10 +20,14 @@ export const dynamic = "force-dynamic";
  * not heard from us in a minute is still counting down accurately, and
  * one that has been asleep for an hour catches up on its first poll.
  *
- * GET only, and it writes nothing. A display token names a display and
- * can do nothing else with it: there is no POST here, no action reads
- * this token, and the body is assembled by `displayPayload` rather than
- * being a row of a table.
+ * GET only. A display token names a display and can do nothing else
+ * with it: there is no POST here, no action reads this token, and the
+ * body is assembled by `displayPayload` rather than being a row of a
+ * table. The one write that can happen under a poll is `displayPayload`
+ * materialising a round start Auto Mode already scheduled — decided
+ * entirely by store-configured state behind a guarded update, so the
+ * token holder cannot cause, hasten, or repeat it. See
+ * `settleAutoRounds` for why it lives on the poll.
  */
 
 /** Read-only and short-lived. A shop's television is not a CDN customer. */

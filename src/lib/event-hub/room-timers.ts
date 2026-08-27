@@ -1,3 +1,4 @@
+import { intermissionFor } from "./auto-mode";
 import { GAME_PROFILES, procedureFor } from "./game-profiles";
 import { listDisplays, listTimers } from "./repository";
 import {
@@ -43,6 +44,8 @@ export interface ScreenCardRow {
   id: string;
   gameName: string;
   eventName: string;
+  /** The tournament runs its own between-rounds countdown. */
+  autoMode: boolean;
   wire: RoomTimerWire | null;
 }
 
@@ -56,6 +59,7 @@ export async function screenRows(
     id: timer.id,
     gameName: GAME_PROFILES[timer.game].shortName,
     eventName: timer.eventName,
+    autoMode: timer.autoMode,
     wire: timerWire(timer, now),
   }));
 }
@@ -69,6 +73,13 @@ export function timerWire(timer: HubTimer, now: number): RoomTimerWire | null {
   if (phase === "ready" || phase === "complete") return null;
 
   const profile = GAME_PROFILES[timer.game];
+
+  /* Auto Mode's countdown reaches the phones too, but only while it is
+     actually counting: a hold or an overtime block is the organizer's
+     business, and the phone falls back to the round's own state. */
+  const intermission = intermissionFor(timer, now);
+  const counting = intermission?.state === "counting";
+
   const base: RoomTimerWire = {
     id: timer.id,
     game: timer.game,
@@ -82,6 +93,8 @@ export function timerWire(timer: HubTimer, now: number): RoomTimerWire | null {
     overtimeCapMs: null,
     untimedSinceAt: null,
     staticMs: null,
+    nextRoundAt: counting ? new Date(intermission.deadline).toISOString() : null,
+    nextRound: counting ? intermission.nextRound : null,
   };
 
   if (timer.status === "overtime") {

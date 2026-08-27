@@ -1,6 +1,11 @@
 "use client";
 
 import {
+  intermissionFor,
+  TAKEOVER_MS,
+  type Intermission,
+} from "@/lib/event-hub/auto-mode";
+import {
   GAME_PROFILES,
   nameRepeatsGame,
   procedureFor,
@@ -169,6 +174,25 @@ export function TimerPanel({
         ? formatClock(up)
         : formatClock(left);
 
+  /*
+   * Auto Mode's between-rounds face, for a tournament SHARING a screen.
+   * Only this panel changes — the founder: "Do not let one tournament's
+   * intermission obscure another active tournament." A screen the
+   * tournament has to itself gets the full takeover in
+   * `intermission-screen.tsx` instead, and never reaches this.
+   *
+   * The first seconds stay on the classic time face — red clock, and
+   * the rules card for a beginner-mode tournament — exactly like the
+   * focus takeover, so TIME IN ROUND is seen before the countdown
+   * moves in.
+   */
+  const intermission = intermissionFor(timer, now);
+  if (intermission && now - intermission.anchor >= TAKEOVER_MS) {
+    return (
+      <PanelIntermission timer={timer} intermission={intermission} layout={layout} />
+    );
+  }
+
   return (
     <section
       /* The one place a game's colour is set. Everything below reads it
@@ -286,6 +310,107 @@ export function TimerPanel({
       {showsOvertimeRules(timer, now) && (
         <OvertimeOverlay timer={timer} layout={layout} now={now} />
       )}
+    </section>
+  );
+}
+
+/**
+ * The between-rounds panel: the next round's countdown where the clock
+ * was, the same header, and nothing that spills past this panel's edge.
+ */
+function PanelIntermission({
+  timer,
+  intermission,
+  layout,
+}: {
+  timer: HubTimer;
+  intermission: Intermission;
+  layout: ResolvedLayout;
+}) {
+  const profile = GAME_PROFILES[timer.game];
+  const procedure = procedureFor(profile, timer.bracket);
+  const repeats = nameRepeatsGame(profile, timer.eventName);
+  const counting = intermission.state === "counting";
+
+  return (
+    <section
+      style={{ ["--game" as string]: `var(${profile.accentToken})` }}
+      className="relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 border-border bg-surface"
+      aria-label={`${profile.displayName}, ${timer.eventName}, intermission`}
+    >
+      <span aria-hidden="true" className="h-1.5 w-full shrink-0 bg-[var(--game)]" />
+
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-2 p-[clamp(0.75rem,1.6vw,2rem)]">
+        <header className="flex items-baseline justify-between gap-4">
+          <div className="flex min-w-0 flex-col">
+            <h2
+              className={`truncate font-bold tracking-tight text-[var(--game)] uppercase ${GAME_SIZE[layout]} leading-none`}
+            >
+              {profile.shortName}
+            </h2>
+            {!repeats && (
+              <p
+                className={`truncate pt-1 font-semibold text-text-secondary ${META_SIZE[layout]}`}
+              >
+                {timer.eventName}
+              </p>
+            )}
+          </div>
+
+          <p
+            className={`shrink-0 font-semibold text-text-secondary tabular-nums ${ROUND_SIZE[layout]}`}
+          >
+            Round {intermission.nextRound}
+          </p>
+        </header>
+
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1">
+          {counting ? (
+            <>
+              <p
+                className={`font-semibold tracking-[0.14em] text-accent uppercase ${META_SIZE[layout]}`}
+              >
+                Round {intermission.nextRound} in
+              </p>
+              <p
+                role="timer"
+                aria-label={`Round ${intermission.nextRound} starts in ${speakClock(intermission.remainingMs)}`}
+                className={`font-mono leading-none font-bold text-text-primary tabular-nums ${CLOCK_SIZE[layout]}`}
+              >
+                {formatClock(intermission.remainingMs)}
+              </p>
+            </>
+          ) : (
+            <p
+              className={`text-center leading-tight font-bold text-text-primary uppercase ${
+                layout === "grid"
+                  ? "text-[clamp(1rem,1.8vw,1.8rem)]"
+                  : "text-[clamp(1.4rem,2.8vw,3rem)]"
+              }`}
+            >
+              Waiting for organizer
+            </p>
+          )}
+        </div>
+
+        <footer className="flex items-center justify-between gap-3">
+          <span
+            className={`rounded-full bg-elevated px-3 py-1 font-semibold tracking-wide text-text-secondary uppercase ${META_SIZE[layout]}`}
+          >
+            Intermission
+          </span>
+
+          {/* The procedure stays readable as a line, never as the
+              opaque rules card: that card would sit over this panel for
+              the WHOLE intermission and bury the countdown it exists
+              beside. Beginners saw the full card at the takeover. */}
+          <span
+            className={`truncate font-bold text-[var(--game)] ${META_SIZE[layout]}`}
+          >
+            {procedure.headline}
+          </span>
+        </footer>
+      </div>
     </section>
   );
 }
