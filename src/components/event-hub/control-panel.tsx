@@ -8,6 +8,7 @@ import {
   EyeOff,
   Flag,
   Minus,
+  MonitorUp,
   Pause,
   Play,
   Plus,
@@ -27,6 +28,7 @@ import {
 import {
   moveTimerAction,
   removeTimerAction,
+  splitTimerAction,
   timerControlAction,
 } from "@/lib/event-hub/actions";
 import type { DisplayPayload } from "@/lib/event-hub/display-payload";
@@ -41,6 +43,7 @@ import {
   pause,
   remainingMs,
   reset,
+  setBeginnerMode,
   setRulesDismissed,
   start,
   startOvertime,
@@ -323,15 +326,34 @@ function TimerCard({
                 </>
               )}
 
+              {/* The rules card is opt-in — the founder: "default to
+                  not showing them". Beginner mode is the opt-in, and
+                  the in-the-moment hide only exists once it is on. */}
               <Control
-                label={timer.rulesDismissed ? "Show the rules again" : "Hide the rules"}
-                icon={timer.rulesDismissed ? Eye : EyeOff}
+                label={
+                  timer.beginnerMode ? "Beginner mode is on" : "Beginner mode is off"
+                }
+                icon={timer.beginnerMode ? Eye : EyeOff}
                 onClick={() =>
-                  timer.rulesDismissed
-                    ? onRun(timer, "reopen-rules", setRulesDismissed(timer, false))
-                    : onRun(timer, "dismiss-rules", setRulesDismissed(timer, true))
+                  timer.beginnerMode
+                    ? onRun(timer, "beginner-off", setBeginnerMode(timer, false))
+                    : onRun(timer, "beginner-on", setBeginnerMode(timer, true))
                 }
               />
+
+              {timer.beginnerMode && (
+                <Control
+                  label={
+                    timer.rulesDismissed ? "Show the rules again" : "Hide the rules"
+                  }
+                  icon={timer.rulesDismissed ? Eye : EyeOff}
+                  onClick={() =>
+                    timer.rulesDismissed
+                      ? onRun(timer, "reopen-rules", setRulesDismissed(timer, false))
+                      : onRun(timer, "dismiss-rules", setRulesDismissed(timer, true))
+                  }
+                />
+              )}
 
               <Control
                 label="Mark complete"
@@ -398,6 +420,16 @@ function TimerCard({
             <Button variant="ghost" size="sm" type="submit" disabled={last}>
               <ChevronDown className="size-4" aria-hidden="true" />
               Move down
+            </Button>
+          </form>
+
+          {/* One press, one television. The new screen runs only this
+              game, so its QR scans players in game-scoped. */}
+          <form action={splitTimerAction}>
+            <input type="hidden" name="timerId" value={timer.id} />
+            <Button variant="ghost" size="sm" type="submit">
+              <MonitorUp className="size-4" aria-hidden="true" />
+              Its own screen
             </Button>
           </form>
 

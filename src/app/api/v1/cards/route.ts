@@ -15,8 +15,17 @@ export const dynamic = "force-dynamic";
  * work the instant a guest starts typing.
  */
 export async function GET(request: Request): Promise<Response> {
-  const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  const params = new URL(request.url).searchParams;
+  const query = params.get("q")?.trim() ?? "";
   if (query.length < 2) return Response.json({ cards: [] });
+
+  /*
+   * The room's TCG, when the scan that opened the room said which one.
+   * A scope, never a guess: it survives the no-results fallback below,
+   * because "no One Piece card matches" must not answer with Lorcana.
+   */
+  const gameParam = params.get("game") ?? "";
+  const game = /^[a-z][a-z0-9-]{1,30}$/.test(gameParam) ? gameParam : null;
 
   /*
    * Same keyword narrowing the website's picker does, including the
@@ -25,10 +34,10 @@ export async function GET(request: Request): Promise<Response> {
    * up with fewer results than it had before.
    */
   const typed = parseCardQuery(query);
-  let cards = await searchCards(typed.text, typed.filters);
+  let cards = await searchCards(typed.text, { ...typed.filters, game });
 
   if (cards.length === 0 && typed.narrowed) {
-    cards = await searchCards(query);
+    cards = await searchCards(query, { game });
   }
 
   /* Same variant steering as the website: "zoro sp" floats the cards

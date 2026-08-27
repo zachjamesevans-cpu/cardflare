@@ -344,6 +344,22 @@
   }
 }
 
+/*
+ * Extra time's face on the wall: "a glowing and slow flashing red hue",
+ * the founder's words. Slow on purpose — a shop is a room people are
+ * concentrating in, and this breathes rather than strobes.
+ */
+@keyframes cf-overtime-glow {
+  from {
+    box-shadow: 0 0 24px -12px var(--color-danger);
+    border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 64px -8px var(--color-danger);
+    border-color: var(--color-danger);
+  }
+}
+
 @keyframes cf-flare-in {
   from {
     opacity: 0;

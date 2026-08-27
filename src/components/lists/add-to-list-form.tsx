@@ -469,12 +469,15 @@ export function AddToListForm({
   code,
   kind,
   imagesEnabled,
+  game = null,
   target = "room",
   footer,
 }: {
   code: string;
   kind: ListKind;
   imagesEnabled: boolean;
+  /** The room's TCG, when the scan said which one. Scopes the search. */
+  game?: string | null;
   /**
    * Where the card lands. "room" is the board in front of you; "list"
    * is the account's saved wants, for a player with no room open — the
@@ -643,6 +646,7 @@ export function AddToListForm({
          */
         <CardSearch
           imagesEnabled={imagesEnabled}
+          game={game}
           onSelect={(card: CardResult, printing?: CardPrinting) => {
             const key = printing ? `${card.id}:${printing.id}` : card.id;
             /* Tapping the row that is already open closes it. */
@@ -672,6 +676,7 @@ export function AddToListForm({
       ) : !picked ? (
         <CardSearch
           imagesEnabled={imagesEnabled}
+          game={game}
           onSelect={(card: CardResult, printing?: CardPrinting) =>
             setPicked({ card, printingId: printing?.id ?? "" })
           }

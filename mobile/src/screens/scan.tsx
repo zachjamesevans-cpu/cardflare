@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { rememberRoom } from "../api";
+import { rememberRoom, rememberRoomGame } from "../api";
 
 import { AsyncButton, Body, Card, Title } from "../ui";
 import { colors, spacing } from "../theme";
@@ -47,9 +47,15 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
           const code = match?.[1] ?? (/^[A-Za-z0-9]{4,10}$/.test(data) ? data : null);
           if (!code) return;
 
+          /* A tournament screen's code carries its game (?g=one-piece),
+             and card search in that room narrows to it. Absent means
+             the counter's universal code — and clears any old scope. */
+          const game = /[?&]g=([a-z][a-z0-9-]{1,30})/.exec(data)?.[1] ?? null;
+
           fired.current = true;
           // Remembered before navigating so the Room tab finds it.
-          void rememberRoom(code.toUpperCase()).then(() => onCode(code.toUpperCase()));
+          void Promise.all([rememberRoom(code.toUpperCase()), rememberRoomGame(game)])
+            .then(() => onCode(code.toUpperCase()));
         }}
       />
       <View style={styles.hint}>

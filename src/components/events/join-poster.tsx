@@ -132,7 +132,13 @@ export function JoinPoster({
            * On a counter that reads as a leftover printout rather than as
            * signage.
            */
-          className="mx-auto flex max-w-md flex-col rounded-[16px] bg-black p-[3mm] text-black print-exact print:max-w-[170mm]"
+          /*
+           * Wider on screen than it used to be (max-w-md), because the
+           * founder read the events tab on a phone and the QR came out
+           * small: "QR code should be a little bigger". Print keeps its
+           * own width below, so the sheet is unchanged.
+           */
+          className="mx-auto flex w-full max-w-xl flex-col rounded-[16px] bg-black p-[3mm] text-black print-exact print:max-w-[170mm]"
         >
           <div className="flex flex-col gap-[3mm] rounded-[10px] border border-neutral-300 bg-white p-[4mm]">
             {/* ---- Name bar ------------------------------------------- */}
@@ -180,7 +186,9 @@ export function JoinPoster({
               ))}
 
               <div
-                className="mx-auto w-full max-w-[105mm]"
+                /* On screen the code fills the window; the printed cap
+                   stays at 105mm, which already scans across a counter. */
+                className="mx-auto w-full max-w-[140mm] print:max-w-[105mm]"
                 /*
                  * Generated server-side by the `qrcode` package from a URL this
                  * app built — never from user input — so there is no untrusted

@@ -10,6 +10,7 @@ import {
   touchParticipation,
 } from "@/lib/events/participants";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
+import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import {
   heldByCard,
   heldCountByCard,
@@ -158,11 +159,14 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     });
   }
 
-  const [participants, flares, binder, offers] = await Promise.all([
+  const [participants, flares, binder, offers, timers] = await Promise.all([
     listParticipants(room.id),
     listRoomFlares(room.id),
     listBinder(session.id),
     listRoomOffers(room.id),
+    /* The tournament clocks, for a phone that stepped away from the
+       wall. Instants, not countdowns — the phone ticks them itself. */
+    roomTimersForStore(room.storeId),
   ]);
 
   const held = heldByCard(binder);
@@ -192,6 +196,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   return Response.json({
     ...base,
     joined: true,
+    timers,
     you: { sessionId: session.id, displayName: session.display_name },
     /*
      * Present when a bearer token is on the request. The app's join

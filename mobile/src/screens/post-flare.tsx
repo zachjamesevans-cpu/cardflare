@@ -6,6 +6,7 @@ import { ScrollView, Text, View } from "react-native";
 import {
   ApiError,
   describeError,
+  lastRoomGame,
   postFlare,
   saveToList,
   searchCards,
@@ -210,6 +211,23 @@ export function PostFlareScreen({
     }
   }, [resetSignal]);
 
+  /*
+   * The scanned room's TCG, when the code came off a tournament's own
+   * screen. Loaded once: posting INTO a room searches only that game's
+   * cards, while the couch path stays universal.
+   */
+  const [roomGame, setRoomGame] = useState<string | null>(null);
+  useEffect(() => {
+    if (target.kind !== "room") return;
+    let current = true;
+    void lastRoomGame().then((game) => {
+      if (current) setRoomGame(game);
+    });
+    return () => {
+      current = false;
+    };
+  }, [target.kind]);
+
   // Debounced search: a keystroke pause is the request, not every letter.
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -218,13 +236,13 @@ export function PostFlareScreen({
     }
 
     const timer = setTimeout(() => {
-      void searchCards(query.trim())
+      void searchCards(query.trim(), target.kind === "room" ? roomGame : null)
         .then((result) => setHits(result.cards))
         .catch(() => setHits([]));
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, roomGame, target.kind]);
 
   /** Unfold a card with a fresh form, or fold it back up. */
   const toggle = (hit: CardHit) => {

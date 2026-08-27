@@ -1208,6 +1208,8 @@ export type EventHubTimerRow = {
   overtime_duration_seconds: number | null;
   overtime_turn: number;
   rules_dismissed: boolean;
+  /** The procedure card at time is opt-in; the clock is the default. */
+  beginner_mode: boolean;
 };
 
 export type EventHubTimerInsert = Pick<
@@ -1457,6 +1459,7 @@ export type Database = {
           filter_set_code?: string | null;
           filter_card_type?: string | null;
           filter_color?: string | null;
+          filter_game?: string | null;
         };
         Returns: CardSearchRow[];
       };
