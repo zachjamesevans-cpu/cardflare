@@ -10,7 +10,8 @@ import type { ResolvedLayout } from "@/lib/event-hub/layout";
 import {
   elapsedMs,
   formatClock,
-  overtimeRemainingMs,
+  overtimeCapMs,
+  overtimeElapsedMs,
   remainingMs,
   showsOvertimeRules,
   speakClock,
@@ -151,7 +152,9 @@ export function TimerPanel({
 
   const left = remainingMs(timer, now);
   const up = elapsedMs(timer, now);
-  const otLeft = overtimeRemainingMs(timer, now);
+  /* Extra time counts UP toward its cap — the founder: "count UP to
+     5:00 for one piece and other TCG's instead of counting down." */
+  const otUp = overtimeElapsedMs(timer, now);
 
   /* Overtime borrows the game's own colour rather than the warning
      amber: at this point the panel is showing that game's procedure, and
@@ -159,8 +162,8 @@ export function TimerPanel({
   const inOvertime = phase === "overtime" || phase === "overtime_expired";
 
   const clock =
-    inOvertime && otLeft !== null
-      ? formatClock(otLeft)
+    inOvertime && otUp !== null
+      ? formatClock(otUp)
       : untimed
         ? formatClock(up)
         : formatClock(left);
@@ -229,7 +232,9 @@ export function TimerPanel({
             aria-label={
               untimed
                 ? `${PHASE_WORD[phase]}, untimed`
-                : `${PHASE_WORD[phase]}, ${speakClock(inOvertime ? otLeft : left)}`
+                : inOvertime
+                  ? `${PHASE_WORD[phase]}, ${formatClock(otUp)} elapsed`
+                  : `${PHASE_WORD[phase]}, ${speakClock(left)}`
             }
             className={`font-mono leading-none font-bold tabular-nums ${
               CLOCK_SIZE[layout]
@@ -297,8 +302,20 @@ function OvertimeOverlay({
 }) {
   const profile = GAME_PROFILES[timer.game];
   const procedure = procedureFor(profile, timer.bracket);
-  const otLeft = overtimeRemainingMs(timer, now);
-  const running = timer.status === "overtime";
+  const phase = timerPhase(timer, now);
+  const inOvertime = phase === "overtime" || phase === "overtime_expired";
+  const otUp = overtimeElapsedMs(timer, now);
+  const otCap = overtimeCapMs(timer, now);
+
+  /*
+   * Two shapes of card. During EXTRA TIME the founder's instruction is
+   * the layout: "it's just showing tiebreakers in order explained
+   * quickly" — a count-up clock, the turn tracker, one instruction
+   * line, the tiebreakers. The full step-by-step procedure belongs to
+   * TIME IN ROUND on the turn-counted games (and a manual early call),
+   * where the steps ARE the whole answer.
+   */
+  const compact = inOvertime && (procedure.tiebreak?.length ?? 0) > 0;
 
   /* Tighter in a grid cell, because four panels on a 1080p television
      leave a procedure about six lines of room and a rule that scrolls
@@ -343,7 +360,11 @@ function OvertimeOverlay({
                 : "text-[clamp(2rem,4vw,4rem)]"
           }`}
         >
-          TIME IN ROUND
+          {phase === "overtime_expired"
+            ? "EXTRA TIME OVER"
+            : inOvertime
+              ? "EXTRA TIME"
+              : "TIME IN ROUND"}
         </h3>
 
         {/* The headline the room reads first: "+5 TURNS", "+3 TURNS · 5:00". */}
@@ -358,13 +379,15 @@ function OvertimeOverlay({
         </p>
       </div>
 
-      {/* The countdown and the turn tracker share a row. Stacked, they
-          cost enough height that a six-step procedure got clipped, and a
+      {/* The clock and the turn tracker share a row. Stacked, they cost
+          enough height that a six-step procedure got clipped, and a
           procedure the room cannot finish reading is not a procedure.
-          A countdown appears only where a publisher specifies one. */}
-      {(running && otLeft !== null) || procedure.additionalTurns > 0 ? (
-        <div className="flex items-center justify-between gap-3">
-          {running && otLeft !== null ? (
+          The clock counts UP and appears only where a publisher
+          specifies extra time. */}
+      {(inOvertime && otUp !== null && otCap !== null) ||
+      procedure.additionalTurns > 0 ? (
+        <div className="flex items-baseline justify-between gap-3">
+          {inOvertime && otUp !== null && otCap !== null ? (
             <p
               className={`font-mono leading-none font-bold text-[var(--game)] tabular-nums ${
                 layout === "grid"
@@ -374,7 +397,19 @@ function OvertimeOverlay({
                     : "text-[clamp(2.5rem,6vw,6rem)]"
               }`}
             >
-              {formatClock(otLeft)}
+              {formatClock(otUp)}
+              <span
+                className={`text-text-muted ${
+                  layout === "grid"
+                    ? "text-[clamp(0.75rem,1.2vw,1.1rem)]"
+                    : layout === "split"
+                      ? "text-[clamp(0.95rem,1.6vw,1.6rem)]"
+                      : "text-[clamp(1.2rem,2.4vw,2.4rem)]"
+                }`}
+              >
+                {" "}
+                / {formatClock(otCap)}
+              </span>
             </p>
           ) : (
             <span />
@@ -390,24 +425,49 @@ function OvertimeOverlay({
         </div>
       ) : null}
 
-      <ol
-        className={`flex min-h-0 flex-1 flex-col justify-start gap-[clamp(0.1rem,0.3vw,0.4rem)] overflow-hidden text-text-secondary ${step}`}
-      >
-        {procedure.steps.map((instruction, index) => (
-          <li key={instruction} className="flex gap-2">
-            <span className="shrink-0 font-bold text-[var(--game)] tabular-nums">
-              {index + 1}.
-            </span>
-            <span className="min-w-0">{instruction}</span>
-          </li>
-        ))}
-      </ol>
+      {compact ? (
+        /* Extra time: the tiebreakers, in order, and nothing slower. */
+        <div
+          className={`flex min-h-0 flex-1 flex-col justify-start gap-[clamp(0.1rem,0.3vw,0.4rem)] overflow-hidden ${step}`}
+        >
+          {procedure.extraTimeLine && (
+            <p className="text-text-secondary">{procedure.extraTimeLine}</p>
+          )}
+          <ol className="flex flex-col gap-[clamp(0.1rem,0.3vw,0.4rem)] text-text-primary">
+            {(procedure.tiebreak ?? []).map((rule, index) => (
+              <li key={rule} className="flex gap-2 font-semibold">
+                <span className="shrink-0 font-bold text-[var(--game)] tabular-nums">
+                  {index + 1}.
+                </span>
+                <span className="min-w-0">{rule}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <>
+          <ol
+            className={`flex min-h-0 flex-1 flex-col justify-start gap-[clamp(0.1rem,0.3vw,0.4rem)] overflow-hidden text-text-secondary ${step}`}
+          >
+            {procedure.steps.map((instruction, index) => (
+              <li key={instruction} className="flex gap-2">
+                <span className="shrink-0 font-bold text-[var(--game)] tabular-nums">
+                  {index + 1}.
+                </span>
+                <span className="min-w-0">{instruction}</span>
+              </li>
+            ))}
+          </ol>
 
-      {procedure.tiebreak && layout !== "grid" && (
-        <p className={`text-text-muted ${step}`}>
-          <span className="font-semibold text-text-secondary">Compare in order:</span>{" "}
-          {procedure.tiebreak.join(" · ")}
-        </p>
+          {procedure.tiebreak && layout !== "grid" && (
+            <p className={`text-text-muted ${step}`}>
+              <span className="font-semibold text-text-secondary">
+                Compare in order:
+              </span>{" "}
+              {procedure.tiebreak.join(" · ")}
+            </p>
+          )}
+        </>
       )}
 
       {/* On every overlay, every time. cardflare is not a rules authority

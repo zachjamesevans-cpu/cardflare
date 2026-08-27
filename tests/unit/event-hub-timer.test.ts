@@ -7,6 +7,8 @@ import {
   complete,
   elapsedMs,
   formatClock,
+  overtimeCapMs,
+  overtimeElapsedMs,
   overtimeRemainingMs,
   pause,
   remainingMs,
@@ -173,7 +175,7 @@ describe("adding and taking away time", () => {
 
   it("puts a round that already hit zero back on the clock", () => {
     let t = apply(timer(), start(timer(), T0));
-    expect(timerPhase(t, T0 + 35 * MIN)).toBe("time_called");
+    expect(timerPhase(t, T0 + 35 * MIN)).toBe("overtime");
 
     t = apply(t, adjust(t, 2 * MIN, T0 + 35 * MIN));
     expect(timerPhase(t, T0 + 35 * MIN)).toBe("running");
@@ -182,14 +184,50 @@ describe("adding and taking away time", () => {
 });
 
 describe("phases and urgency", () => {
-  it("calls time at zero without anybody writing a row", () => {
+  it("rolls a timed procedure straight into extra time at zero", () => {
     const running = apply(timer(), start(timer(), T0));
 
     /* The reason this is derived: a staff phone may be asleep at 19:35,
-       and the television still has to say TIME IN ROUND at 19:35. */
+       and the television still has to flip at 19:35. The founder's
+       correction is WHAT it flips to — "Immediately start the 5 min
+       overtime timer", not TIME IN ROUND with a button to press. */
     expect(timerPhase(running, T0 + 34 * MIN)).toBe("running");
-    expect(timerPhase(running, T0 + 35 * MIN)).toBe("time_called");
+    expect(timerPhase(running, T0 + 35 * MIN)).toBe("overtime");
     expect(running.status).toBe("running");
+  });
+
+  it("still calls TIME at zero where the procedure counts turns", () => {
+    const lorcana = timer({ game: "lorcana", presetId: "swiss" });
+    const running = apply(lorcana, start(lorcana, T0));
+
+    /* Lorcana has no extra-time clock to start, so zero is still TIME
+       IN ROUND and the steps card. */
+    expect(timerPhase(running, T0 + 35 * MIN)).toBe("time_called");
+  });
+
+  it("does not invent a clock for a preset that declines one", () => {
+    /* Pokémon prerelease deliberately carries no overtime — "follow
+       your event's own end-of-round rules" — even though the
+       championship procedure is timed. */
+    const prerelease = timer({
+      game: "pokemon",
+      presetId: "prerelease-bo1",
+      durationSeconds: 30 * 60,
+    });
+    const running = apply(prerelease, start(prerelease, T0));
+
+    expect(timerPhase(running, T0 + 30 * MIN)).toBe("time_called");
+    expect(overtimeCapMs(running, T0 + 30 * MIN)).toBeNull();
+  });
+
+  it("takes the preset's own overtime length over the procedure's", () => {
+    /* Top Cut runs 10:00 extra where the store procedure says 5:00. */
+    const topCut = timer({ presetId: "top-cut", durationSeconds: 60 * 60 });
+    const running = apply(topCut, start(topCut, T0));
+
+    expect(timerPhase(running, T0 + 66 * MIN)).toBe("overtime");
+    expect(overtimeCapMs(running, T0 + 66 * MIN)).toBe(10 * MIN);
+    expect(timerPhase(running, T0 + 70 * MIN)).toBe("overtime_expired");
   });
 
   it.each([
@@ -235,24 +273,55 @@ describe("phases and urgency", () => {
 });
 
 describe("overtime", () => {
-  it("runs a timed overtime clock of its own", () => {
-    let t = apply(timer(), start(timer(), T0));
-    t = apply(t, startOvertime(t, T0 + 35 * MIN, 5 * 60));
+  it("counts extra time UP from the instant regulation ended", () => {
+    /* Nothing written, no button pressed — the whole point. And UP, not
+       down: "count UP to 5:00 for one piece and other TCG's". */
+    const t = apply(timer(), start(timer(), T0));
 
-    expect(t.status).toBe("overtime");
-    expect(overtimeRemainingMs(t, T0 + 35 * MIN)).toBe(5 * MIN);
+    expect(overtimeElapsedMs(t, T0 + 35 * MIN)).toBe(0);
+    expect(overtimeElapsedMs(t, T0 + 36 * MIN)).toBe(MIN);
+    expect(overtimeCapMs(t, T0 + 36 * MIN)).toBe(5 * MIN);
     expect(overtimeRemainingMs(t, T0 + 38 * MIN)).toBe(2 * MIN);
+    /* Clamped at the cap: the wall settles on 5:00, never 5:01. */
+    expect(overtimeElapsedMs(t, T0 + 45 * MIN)).toBe(5 * MIN);
     expect(timerPhase(t, T0 + 40 * MIN)).toBe("overtime_expired");
+  });
+
+  it("runs a hand-started clock after an early time call", () => {
+    let t = apply(timer(), start(timer(), T0));
+    t = apply(t, callTime(t, T0 + 30 * MIN));
+    expect(t.status).toBe("time_called");
+
+    t = apply(t, startOvertime(t, T0 + 30 * MIN, 5 * 60));
+    expect(t.status).toBe("overtime");
+    expect(overtimeElapsedMs(t, T0 + 32 * MIN)).toBe(2 * MIN);
+    expect(overtimeRemainingMs(t, T0 + 32 * MIN)).toBe(3 * MIN);
   });
 
   it("never restarts a clock that is already running", () => {
     let t = apply(timer(), start(timer(), T0));
-    t = apply(t, startOvertime(t, T0 + 35 * MIN, 5 * 60));
+    t = apply(t, callTime(t, T0 + 30 * MIN));
+    t = apply(t, startOvertime(t, T0 + 30 * MIN, 5 * 60));
 
     /* The guard that matters: two staff phones, both tapping START
        OVERTIME, must not put five minutes back on a clock with two left. */
-    expect(startOvertime(t, T0 + 38 * MIN, 5 * 60)).toBeNull();
-    expect(overtimeRemainingMs(t, T0 + 38 * MIN)).toBe(2 * MIN);
+    expect(startOvertime(t, T0 + 33 * MIN, 5 * 60)).toBeNull();
+    expect(overtimeRemainingMs(t, T0 + 33 * MIN)).toBe(2 * MIN);
+  });
+
+  it("refuses START OVERTIME on a clock that rolled over by itself", () => {
+    /* Derived extra time leaves the row saying "running"; a stale
+       control tab's button must not restart a clock two minutes in. */
+    const t = apply(timer(), start(timer(), T0));
+    expect(timerPhase(t, T0 + 37 * MIN)).toBe("overtime");
+    expect(startOvertime(t, T0 + 37 * MIN, 5 * 60)).toBeNull();
+    expect(overtimeElapsedMs(t, T0 + 37 * MIN)).toBe(2 * MIN);
+  });
+
+  it("cannot be paused or called back once extra time is running", () => {
+    const t = apply(timer(), start(timer(), T0));
+    expect(pause(t, T0 + 36 * MIN)).toBeNull();
+    expect(callTime(t, T0 + 36 * MIN)).toBeNull();
   });
 
   it("has no clock at all when the procedure counts turns", () => {
@@ -301,7 +370,7 @@ describe("overtime", () => {
     const atTime = T0 + 36 * MIN;
 
     expect(running.status).toBe("running");
-    expect(timerPhase(running, atTime)).toBe("time_called");
+    expect(timerPhase(running, atTime)).toBe("overtime");
 
     expect(advanceTurn(running, 3, 1, atTime)).toEqual({ overtimeTurn: 1 });
   });
@@ -366,7 +435,7 @@ describe("two tournaments at once", () => {
 
     const at = T0 + 35 * MIN;
 
-    expect(timerPhase(onePiece, at)).toBe("time_called");
+    expect(timerPhase(onePiece, at)).toBe("overtime");
     expect(showsOvertimeRules(onePiece, at)).toBe(true);
 
     expect(timerPhase(fab, at)).toBe("running");
@@ -375,16 +444,16 @@ describe("two tournaments at once", () => {
   });
 
   it("keeps one timer's overtime out of the other's row entirely", () => {
-    const onePiece = apply(
-      apply(timer(), start(timer(), T0)),
-      startOvertime(apply(timer(), start(timer(), T0)), T0 + 35 * MIN, 5 * 60),
-    );
+    /* Derived extra time writes NOTHING, so there is nothing that could
+       leak into the other row in the first place. */
+    const onePiece = apply(timer(), start(timer(), T0));
     const fab = apply(
       timer({ id: "timer-2", durationSeconds: 55 * 60 }),
       start(timer({ id: "timer-2", durationSeconds: 55 * 60 }), T0),
     );
 
-    expect(onePiece.status).toBe("overtime");
+    expect(timerPhase(onePiece, T0 + 36 * MIN)).toBe("overtime");
+    expect(onePiece.overtimeStartedAt).toBeNull();
     expect(fab.status).toBe("running");
     expect(fab.overtimeStartedAt).toBeNull();
   });
@@ -445,9 +514,9 @@ describe("reading the clock", () => {
 
   it("calls time by hand before the clock gets there", () => {
     const running = apply(timer(), start(timer(), T0));
-    const called = apply(running, callTime(running));
+    const called = apply(running, callTime(running, T0 + 5 * MIN));
 
     expect(timerPhase(called, T0 + 5 * MIN)).toBe("time_called");
-    expect(callTime(called)).toBeNull();
+    expect(callTime(called, T0 + 5 * MIN)).toBeNull();
   });
 });

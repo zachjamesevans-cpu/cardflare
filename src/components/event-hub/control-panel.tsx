@@ -36,7 +36,8 @@ import {
   callTime,
   complete,
   formatClock,
-  overtimeRemainingMs,
+  impliedOvertimeMs,
+  overtimeElapsedMs,
   pause,
   remainingMs,
   reset,
@@ -178,7 +179,8 @@ function TimerCard({
   const profile = GAME_PROFILES[timer.game];
   const procedure = procedureFor(profile, timer.bracket);
   const phase = timerPhase(timer, now);
-  const otLeft = overtimeRemainingMs(timer, now);
+  /* Counts UP, matching the wall. */
+  const otUp = overtimeElapsedMs(timer, now);
   const left = remainingMs(timer, now);
 
   const inOvertime = phase === "overtime" || phase === "overtime_expired";
@@ -212,8 +214,8 @@ function TimerCard({
           </div>
 
           <p className="shrink-0 font-mono text-3xl font-bold text-text-primary tabular-nums">
-            {inOvertime && otLeft !== null
-              ? formatClock(otLeft)
+            {inOvertime && otUp !== null
+              ? formatClock(otUp)
               : timer.durationSeconds === null
                 ? "--:--"
                 : formatClock(left)}
@@ -251,7 +253,7 @@ function TimerCard({
           <Control
             label="Call time"
             icon={Flag}
-            onClick={() => onRun(timer, "call-time", callTime(timer))}
+            onClick={() => onRun(timer, "call-time", callTime(timer, now))}
           />
         </div>
 
@@ -271,23 +273,24 @@ function TimerCard({
               {!inOvertime && (
                 <Control
                   label={
-                    procedure.timed && procedure.overtimeSeconds
-                      ? `Start ${formatClock(procedure.overtimeSeconds * 1000)} overtime`
+                    impliedOvertimeMs(timer) !== null
+                      ? `Start ${formatClock(impliedOvertimeMs(timer))} overtime`
                       : "Start overtime"
                   }
                   icon={TimerIcon}
                   variant="primary"
-                  onClick={() =>
+                  onClick={() => {
+                    const impliedMs = impliedOvertimeMs(timer);
                     onRun(
                       timer,
                       "start-overtime",
                       startOvertime(
                         timer,
                         now,
-                        procedure.timed ? procedure.overtimeSeconds : null,
+                        impliedMs === null ? null : impliedMs / 1000,
                       ),
-                    )
-                  }
+                    );
+                  }}
                 />
               )}
 
