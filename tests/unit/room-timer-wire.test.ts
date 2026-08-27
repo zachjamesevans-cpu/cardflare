@@ -33,6 +33,8 @@ function wire(overrides: Partial<RoomTimerWire> = {}): RoomTimerWire {
     overtimeCapMs: null,
     untimedSinceAt: null,
     staticMs: null,
+    nextRoundAt: null,
+    nextRound: null,
     ...overrides,
   };
 }
@@ -116,6 +118,36 @@ describe("readRoomTimer", () => {
     expect(later.clock).toBe("07:00");
     expect(later.label).toBe("Paused");
   });
+
+  it("counts down to the next round during an Auto Mode intermission", () => {
+    /* Regulation over at 35:00, next round targeted three minutes on. */
+    const between = wire({
+      endsAt: new Date(T0 + 35 * MIN).toISOString(),
+      overtimeCapMs: 5 * MIN,
+      nextRoundAt: new Date(T0 + 38 * MIN).toISOString(),
+      nextRound: 4,
+    });
+
+    const reading = readRoomTimer(between, T0 + 36 * MIN);
+    expect(reading.clock).toBe("02:00");
+    expect(reading.label).toBe("Round 4 in");
+    expect(reading.atTime).toBe(false);
+  });
+
+  it("falls back to the round's own state past the target", () => {
+    const between = wire({
+      endsAt: new Date(T0 + 35 * MIN).toISOString(),
+      overtimeCapMs: 5 * MIN,
+      nextRoundAt: new Date(T0 + 38 * MIN).toISOString(),
+      nextRound: 4,
+    });
+
+    /* The target passed and nothing has advanced yet — the phone shows
+       extra time again rather than a countdown stuck at zero. */
+    const reading = readRoomTimer(between, T0 + 39 * MIN);
+    expect(reading.label).toBe("Extra time");
+    expect(reading.atTime).toBe(true);
+  });
 });
 
 describe("the app reads the wire the same way", () => {
@@ -140,6 +172,26 @@ describe("the app reads the wire the same way", () => {
     ],
     ["untimed", wire({ untimedSinceAt: new Date(T0).toISOString() }), T0 + 12 * MIN],
     ["paused", wire({ phase: "paused", staticMs: 7 * MIN }), T0 + 30 * MIN],
+    [
+      "an Auto Mode intermission",
+      wire({
+        endsAt: new Date(T0 + 35 * MIN).toISOString(),
+        overtimeCapMs: 5 * MIN,
+        nextRoundAt: new Date(T0 + 38 * MIN).toISOString(),
+        nextRound: 4,
+      }),
+      T0 + 36 * MIN,
+    ],
+    [
+      "a lapsed intermission target",
+      wire({
+        endsAt: new Date(T0 + 35 * MIN).toISOString(),
+        overtimeCapMs: 5 * MIN,
+        nextRoundAt: new Date(T0 + 38 * MIN).toISOString(),
+        nextRound: 4,
+      }),
+      T0 + 39 * MIN,
+    ],
   ];
 
   it.each(CASES)("agrees at %s", (_label, sample, at) => {

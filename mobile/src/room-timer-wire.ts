@@ -38,6 +38,15 @@ export interface RoomTimerWire {
   untimedSinceAt: string | null;
   /** A clock that is not moving: paused, or time called with no extra clock. */
   staticMs: number | null;
+  /**
+   * Auto Mode's between-rounds target, while the countdown is running.
+   * The phone counts down to it: "Round 4 in 2:34". Absent while held,
+   * waiting, or blocked — those are conversations for the organizer,
+   * not the room.
+   */
+  nextRoundAt: string | null;
+  /** The round that target starts. */
+  nextRound: number | null;
 }
 
 export interface RoomTimerReading {
@@ -68,6 +77,19 @@ function stamp(iso: string | null): number | null {
 
 /** What this phone should show right now, from its own clock. */
 export function readRoomTimer(wire: RoomTimerWire, now: number): RoomTimerReading {
+  /* The between-rounds countdown speaks first: once time has hit and
+     Auto Mode is counting toward the next round, "Round 4 in 2:34" is
+     the answer a player between matches actually wants. Past the target
+     the phone falls through to whatever the round itself is showing. */
+  const nextRoundAt = stamp(wire.nextRoundAt);
+  if (nextRoundAt !== null && nextRoundAt > now) {
+    return {
+      clock: fmt(nextRoundAt - now),
+      label: wire.nextRound !== null ? `Round ${wire.nextRound} in` : "Next round in",
+      atTime: false,
+    };
+  }
+
   const overtimeSince = stamp(wire.overtimeSinceAt);
   if (overtimeSince !== null) {
     const raw = Math.max(0, now - overtimeSince);

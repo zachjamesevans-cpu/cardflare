@@ -1210,6 +1210,18 @@ export type EventHubTimerRow = {
   rules_dismissed: boolean;
   /** The procedure card at time is opt-in; the clock is the default. */
   beginner_mode: boolean;
+  /** Auto Mode: the between-rounds countdown runs this tournament. */
+  auto_mode: boolean;
+  /** Whether zero starts the next round, or waits for a person. */
+  auto_start: boolean;
+  /** The between-rounds window, in seconds. */
+  intermission_seconds: number;
+  /** Every +2 MIN and held span, folded into one number. */
+  intermission_extended_ms: number;
+  /** Set while the organizer has pressed HOLD. */
+  auto_held_at: string | null;
+  /** When time was called by hand — can beat the clock. */
+  time_called_at: string | null;
 };
 
 export type EventHubTimerInsert = Pick<
@@ -1217,6 +1229,18 @@ export type EventHubTimerInsert = Pick<
   "display_id" | "game" | "event_name" | "preset_id"
 > &
   Partial<Omit<EventHubTimerRow, "display_id" | "game" | "event_name" | "preset_id">>;
+
+/** One meaningful Auto Mode transition. Never a tick, never a poll. */
+export type EventHubTimerLogRow = {
+  id: string;
+  created_at: string;
+  timer_id: string;
+  kind: string;
+  detail: string | null;
+};
+
+export type EventHubTimerLogInsert = Pick<EventHubTimerLogRow, "timer_id" | "kind"> &
+  Partial<Omit<EventHubTimerLogRow, "timer_id" | "kind">>;
 
 export type PlayerWantRow = {
   id: string;
@@ -1435,6 +1459,7 @@ export type Database = {
       announcements: Table<AnnouncementRow, AnnouncementInsert>;
       event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;
       event_hub_timers: Table<EventHubTimerRow, EventHubTimerInsert>;
+      event_hub_timer_log: Table<EventHubTimerLogRow, EventHubTimerLogInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;

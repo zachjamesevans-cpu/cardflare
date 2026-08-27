@@ -26,6 +26,8 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
   const [game, setGame] = useState<GameId>("one-piece");
   const [presetId, setPresetId] = useState(GAME_PROFILES["one-piece"].defaultPresetId);
   const [bracket, setBracket] = useState<Bracket>("swiss");
+  const [autoMode, setAutoMode] = useState(false);
+  const [intermissionChoice, setIntermissionChoice] = useState("3");
 
   const profile = GAME_PROFILES[game];
   const preset = profile.presets.find((option) => option.id === presetId);
@@ -154,6 +156,66 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
         name="showRules"
         label="Show the rules on screen when time is called (beginner mode)"
       />
+
+      {/* Auto Mode: the other opt-in. Off is exactly today's behaviour;
+          on means the round runs itself into an intermission at time
+          and starts the next one when the countdown hits zero. */}
+      <Checkbox
+        id={`auto-mode-${displayId}`}
+        name="autoMode"
+        checked={autoMode}
+        onChange={(event) => setAutoMode(event.target.checked)}
+        label="Auto Mode: run the next round automatically after a break"
+      />
+
+      {autoMode && (
+        <div className="grid gap-4 rounded-[var(--radius-control)] border border-border bg-elevated p-3 sm:grid-cols-2">
+          <Field
+            label="Break between rounds"
+            htmlFor={`intermission-${displayId}`}
+            hint="Time for you to enter results and post pairings. The display counts it down."
+          >
+            <Select
+              id={`intermission-${displayId}`}
+              name="intermissionChoice"
+              value={intermissionChoice}
+              onChange={(event) => setIntermissionChoice(event.target.value)}
+            >
+              <option value="2">2 minutes</option>
+              <option value="3">3 minutes (recommended)</option>
+              <option value="5">5 minutes</option>
+              <option value="custom">Custom</option>
+            </Select>
+          </Field>
+
+          {intermissionChoice === "custom" && (
+            <Field
+              label="Custom break (minutes)"
+              htmlFor={`intermission-custom-${displayId}`}
+            >
+              <TextInput
+                id={`intermission-custom-${displayId}`}
+                name="intermissionCustom"
+                type="number"
+                min={1}
+                max={60}
+                placeholder="4"
+              />
+            </Field>
+          )}
+
+          <div className="sm:col-span-2">
+            <input type="hidden" name="autoStart" value="off" />
+            <Checkbox
+              id={`auto-start-${displayId}`}
+              name="autoStart"
+              value="on"
+              defaultChecked
+              label="Start the next round automatically at zero. Unticked, the display waits for you at zero instead."
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label="Add tournament" pendingLabel="Adding…" />

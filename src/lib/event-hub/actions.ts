@@ -16,8 +16,10 @@ import {
   findDisplay,
   findTimer,
   listTimers,
+  logTimerEvent,
   moveTimerToDisplay,
   patchTimer,
+  patchTimerIfUnchanged,
   removeTimer,
   reorderTimers,
   updateDisplay,
@@ -26,10 +28,20 @@ import {
 import {
   checkAnnouncement,
   checkDisplayName,
+  checkIntermissionSeconds,
   checkLayout,
   checkNightTitle,
   checkTimerDraft,
 } from "./schema";
+import {
+  extendAuto,
+  holdAuto,
+  resumeAuto,
+  setAutoMode,
+  setAutoStart,
+  setIntermissionSeconds,
+  startNextRound,
+} from "./auto-mode";
 import {
   advanceTurn,
   adjust,
@@ -196,6 +208,16 @@ export async function addTimerAction(formData: FormData): Promise<void> {
        first time." Unchecked, the wall answers time with the clock
        alone. */
     beginnerMode: text(formData, "showRules") === "on",
+    /* Auto Mode, per tournament, off unless asked for — and unchecked
+       boxes leave the other two at their defaults, so a store that
+       never touches this ships exactly yesterday's behaviour. */
+    autoMode: text(formData, "autoMode") === "on",
+    autoStart:
+      !formData.has("autoStart") || formData.getAll("autoStart").includes("on"),
+    intermissionSeconds: checkIntermissionSeconds(
+      text(formData, "intermissionChoice"),
+      text(formData, "intermissionCustom"),
+    ),
   });
 
   revalidatePath(CONTROL_PANEL);
@@ -355,6 +377,16 @@ export async function timerControlAction(formData: FormData): Promise<void> {
 
   let patch: TimerPatch | null = null;
 
+  /*
+   * The between-rounds ops race the automatic round start on every
+   * polling television, so their writes are GUARDED like the start
+   * itself: computed against the row as read, refused if anything
+   * landed in between. Without this, a HOLD pressed at 0:01 could lose
+   * the race and stamp its hold onto the freshly started next round —
+   * invisible until that round's own intermission is born frozen.
+   */
+  let guarded = false;
+
   switch (op) {
     case "start":
       patch = start(timer, now);
@@ -404,13 +436,105 @@ export async function timerControlAction(formData: FormData): Promise<void> {
     case "complete":
       patch = complete(timer);
       break;
+
+    /*
+     * Auto Mode. Every op is computed from the row as it is NOW — a
+     * stale tab sends only an intention, and an intention that no
+     * longer applies (hold a round that already started, resume a
+     * countdown nobody held) computes to null and writes nothing.
+     */
+    case "auto-on":
+      patch = setAutoMode(timer, true);
+      if (patch) void logTimerEvent(timer.id, "auto-on");
+      break;
+    case "auto-off":
+      patch = setAutoMode(timer, false);
+      if (patch) void logTimerEvent(timer.id, "auto-off");
+      break;
+    case "auto-start-on":
+      patch = setAutoStart(timer, true);
+      break;
+    case "auto-start-off":
+      patch = setAutoStart(timer, false);
+      break;
+    case "auto-intermission":
+      patch = setIntermissionSeconds(
+        timer,
+        checkIntermissionSeconds(
+          text(formData, "intermissionChoice"),
+          text(formData, "intermissionCustom"),
+        ),
+      );
+      break;
+    case "auto-hold":
+      patch = holdAuto(timer, now);
+      guarded = true;
+      break;
+    case "auto-resume":
+      patch = resumeAuto(timer, now);
+      guarded = true;
+      break;
+    case "auto-extend":
+      patch = extendAuto(timer, now);
+      guarded = true;
+      break;
+
+    /*
+     * START NOW is the one op that goes through the GUARDED write: it
+     * races the automatic start on every polling television, and of the
+     * two computed transitions exactly one may land. The loser's guard
+     * fails on `updated_at` and the round is simply already running.
+     */
+    case "auto-start-now": {
+      const startPatch = startNextRound(timer, now);
+      if (!startPatch) return;
+
+      const advanced = await patchTimerIfUnchanged(
+        timer.id,
+        timer.updatedAt,
+        startPatch,
+      );
+      if (advanced) {
+        void logTimerEvent(
+          timer.id,
+          "round-started",
+          `manual · round ${advanced.round}`,
+        );
+      }
+
+      revalidatePath(CONTROL_PANEL);
+      return;
+    }
+
     default:
       return;
   }
 
   if (!patch) return;
 
-  await patchTimer(timer.id, patch);
+  if (guarded) {
+    /* Refused-on-conflict is the right outcome: whatever landed first
+       is fresher than this intention, and the next poll shows it. The
+       log line only exists when the write actually did. */
+    const landed = await patchTimerIfUnchanged(timer.id, timer.updatedAt, patch);
+    if (landed) {
+      void logTimerEvent(
+        timer.id,
+        op === "auto-hold"
+          ? "auto-held"
+          : op === "auto-resume"
+            ? "auto-resumed"
+            : "auto-extended",
+        op === "auto-hold"
+          ? "by organizer"
+          : op === "auto-extend"
+            ? "+2 min"
+            : undefined,
+      );
+    }
+  } else {
+    await patchTimer(timer.id, patch);
+  }
 
   revalidatePath(CONTROL_PANEL);
 }

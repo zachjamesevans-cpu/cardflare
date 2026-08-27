@@ -58,6 +58,12 @@ function timer(overrides: Partial<HubTimer> = {}): HubTimer {
     overtimeTurn: 0,
     rulesDismissed: false,
     beginnerMode: false,
+    autoMode: false,
+    autoStart: true,
+    intermissionSeconds: 180,
+    intermissionExtendedMs: 0,
+    autoHeldAt: null,
+    timeCalledAt: null,
     updatedAt: new Date(T0).toISOString(),
     ...overrides,
   };
