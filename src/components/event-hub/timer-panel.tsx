@@ -370,7 +370,7 @@ function PanelIntermission({
               <p
                 className={`font-semibold tracking-[0.14em] text-accent uppercase ${META_SIZE[layout]}`}
               >
-                Round {intermission.nextRound} in
+                Round {intermission.nextRound} starting soon
               </p>
               <p
                 role="timer"
