@@ -634,6 +634,21 @@ export async function lastRoom(): Promise<string | null> {
 }
 
 /**
+ * Forgetting the last room — the way back out of a code that led nowhere.
+ *
+ * A typed code is remembered before the room answers, because the screen
+ * needs something to load. When the answer is "no such room" that stored
+ * code would otherwise reopen the same dead end on every visit, with
+ * only a Try again button pointed at the same 404. The game scope goes
+ * with it: a scope without its room is a stale filter waiting to narrow
+ * the wrong night's search.
+ */
+export async function forgetRoom(): Promise<void> {
+  await SecureStore.deleteItemAsync(LAST_ROOM_KEY);
+  await SecureStore.deleteItemAsync(LAST_ROOM_GAME_KEY);
+}
+
+/**
  * The TCG the scanned code was scoped to, when it came off a
  * tournament's own screen (`?g=one-piece` in the QR's URL). Kept beside
  * the room code so card search inside that room only offers that
@@ -1390,15 +1405,16 @@ export interface CustomizeItem {
   owned: boolean;
   equipped: boolean;
   /**
-   * A dropped-in Rive file, when the cosmetic is one of those.
+   * A dropped-in file, when the cosmetic is one of those — the same
+   * `art` the profile route sends, drawn by the same CosmeticFilm.
    *
-   * Carried but not yet drawn: playing it needs the native Rive
-   * runtime, which is its own milestone (a native module lands in the
-   * build, and this app has been crashed by one before - it gets a
-   * round of its own). Equipping works today and the file plays on the
-   * web profile.
+   * The name matters: this used to be declared as `rive`, which the
+   * server stopped sending when art files grew past Rive into SVG and
+   * HTML. A field that is never present reads as "no art" forever, so
+   * the founder's own uploaded ring sat in the picker as a name with a
+   * blank space beside it while every catalogue ring turned.
    */
-  rive: { url: string; artboard: string | null; stateMachine: string | null } | null;
+  art: ArtFile | null;
 }
 
 export interface CustomizeSection {

@@ -94,10 +94,7 @@ export function NearbyLocationAsk({
 
   return (
     <View style={{ gap: spacing(2.5) }}>
-      <Muted>
-        cardflare knows about shops whether or not they use it yet. Tell us roughly
-        where you are and we&rsquo;ll list the close ones.
-      </Muted>
+      {intro ? <Muted>{intro}</Muted> : null}
 
       {/* Above the field it introduces, not below the fallback link. */}
       {note ? <Muted>{note}</Muted> : null}

@@ -13,6 +13,8 @@ import {
   View,
 } from "react-native";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { RemoteImage } from "../remote-image";
 
 import type { StackParams } from "../../App";
@@ -22,6 +24,7 @@ import {
   type TradeRecord,
   confirmTrade,
   dropWant,
+  forgetRoom,
   getMe,
   getRoom,
   joinRoom,
@@ -97,8 +100,8 @@ export function RoomTab() {
         <Card>
           <Title>No room yet</Title>
           <Body>
-            Scan the code at your store&rsquo;s counter, or type it here. Either way the
-            room lives on this tab until you leave it.
+            Scan the code at your store&rsquo;s counter, or type it here. Either way
+            cardflare reopens the room where you left it.
           </Body>
 
           <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
@@ -131,22 +134,37 @@ export function RoomTab() {
     );
   }
 
-  return <RoomScreen code={code} onSwitch={setCode} />;
+  return (
+    <RoomScreen
+      code={code}
+      onSwitch={setCode}
+      onForget={() => {
+        void forgetRoom();
+        setCode(null);
+      }}
+    />
+  );
 }
 
 function RoomScreen({
   code,
   onSwitch,
+  onForget,
 }: {
   code: string;
   /** Jump this tab to another room — how an early board is stepped into. */
   onSwitch: (code: string) => void;
+  /** Drop the remembered code and go back to the way in. */
+  onForget: () => void;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const insets = useSafeAreaInsets();
   const [state, setState] = useState<RoomState | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* The room answered "no such code", as opposed to not answering. */
+  const [dead, setDead] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   /* The first-tournament guide, folded behind its link. */
   const [tournamentHelp, setTournamentHelp] = useState(false);
@@ -239,8 +257,10 @@ function RoomScreen({
         }
       }
     } catch (caught) {
+      const missing = caught instanceof ApiError && caught.status === 404;
+      setDead(missing);
       setError(
-        caught instanceof ApiError && caught.status === 404
+        missing
           ? "That code does not point at a room."
           : "Could not reach the room. Check your connection and pull to retry.",
       );
@@ -302,16 +322,34 @@ function RoomScreen({
 
   if (!state) {
     return (
-      <View style={{ padding: spacing(4), gap: spacing(3) }}>
-        <ErrorLine message={error} />
-        {!error && <Muted>Loading the room…</Muted>}
-        {error && (
-          <AsyncButton
-            label="Try again"
-            pendingLabel="Retrying…"
-            onPress={() => refresh()}
-          />
-        )}
+      <View style={{ padding: spacing(4) }}>
+        <Card>
+          {error ? <Title>No room on that code</Title> : null}
+          <ErrorLine message={error} />
+          {!error && <Muted>Loading the room…</Muted>}
+          {error && (
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => refresh()}
+            />
+          )}
+          {/*
+           * A typo used to be permanent: the code is remembered before
+           * the room answers, so a dead one reopened this same screen
+           * every visit and Try again only asked it again. This is the
+           * way back to the field — offered only when the room is
+           * genuinely not there, because forgetting a good code over a
+           * dropped connection would be the worse mistake.
+           */}
+          {dead && (
+            <Button
+              label="Use a different code"
+              variant="secondary"
+              onPress={onForget}
+            />
+          )}
+        </Card>
       </View>
     );
   }
@@ -546,7 +584,7 @@ function RoomScreen({
         contentContainerStyle={{
           padding: spacing(4),
           gap: spacing(3),
-          paddingBottom: spacing(24),
+          paddingBottom: spacing(24) + insets.bottom,
         }}
         refreshControl={
           <RefreshControl
@@ -1209,8 +1247,10 @@ function RoomScreen({
         }}
       />
 
-      {/* The action bar: the two things a thumb reaches for in a room. */}
-      <View style={styles.actionBar}>
+      {/* The action bar: the two things a thumb reaches for in a room.
+          Its own padding plus the home indicator's strip, so the buttons
+          stop above the swipe area rather than sitting inside it. */}
+      <View style={[styles.actionBar, { paddingBottom: spacing(3) + insets.bottom }]}>
         <View style={{ flex: 1 }}>
           <Button
             label="Post a Flare"

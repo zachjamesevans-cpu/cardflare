@@ -189,7 +189,7 @@ export function LocalScreen() {
           case "empty":
             return (
               <Card>
-                <Title>Nothing on the boards yet</Title>
+                <Title>Nothing on the boards within {feed!.radius} miles</Title>
                 <Body>
                   Flares land here the moment somebody posts one in a room at a
                   store near you. Widen the range, or check back after event night.

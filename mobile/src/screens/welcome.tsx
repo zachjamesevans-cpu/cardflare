@@ -81,7 +81,11 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
         />
       )}
       {step === "account" && (
-        <StepShell step={1} title="Create your account">
+        <StepShell
+          step={1}
+          title="Create your account"
+          onBack={() => setStep("splash")}
+        >
           <AccountStep onDone={() => setStep("games")} />
         </StepShell>
       )}
@@ -91,7 +95,7 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
         </StepShell>
       )}
       {step === "signin" && (
-        <ScrollView contentContainerStyle={{ paddingTop: spacing(10) }}>
+        <ScrollView contentContainerStyle={{ paddingTop: spacing(14) }}>
           <SignInScreen onSignedIn={done} />
           <Tap onPress={() => setStep("splash")}>
             <Text
@@ -226,16 +230,25 @@ function Splash({
 function StepShell({
   step,
   title,
+  onBack,
   children,
 }: {
   step: number;
   title: string;
+  /**
+   * The way back out, when there is one. Step 1 has it: tapping "Create
+   * my account" on the splash used to be a one-way door, and somebody
+   * who already has an account and tapped the wrong button was left
+   * with a sign-up form and no sign-in anywhere on it. Step 2 has none
+   * on purpose — the account exists by then, and back would be a lie.
+   */
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "android" ? "height" : undefined}
     >
       <ScrollView
         contentContainerStyle={{
@@ -244,7 +257,20 @@ function StepShell({
           gap: spacing(3),
         }}
         keyboardShouldPersistTaps="handled"
+        /*
+         * iOS insets the scroll for the keyboard itself, and scrolls the
+         * focused field into view with it. The padding behaviour this
+         * used to lean on only SHRANK the view, which left "Create my
+         * account" — the one button on the app's first screen — sitting
+         * under the keys with nothing saying it was there.
+         */
+        automaticallyAdjustKeyboardInsets
       >
+        {onBack ? (
+          <Tap onPress={onBack} hitSlop={8}>
+            <Text style={{ color: colors.accent, fontWeight: "600" }}>‹ Back</Text>
+          </Tap>
+        ) : null}
         <Muted>Step {step} of 2</Muted>
         <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: "800" }}>
           {title}
