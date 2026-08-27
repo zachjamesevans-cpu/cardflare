@@ -8,6 +8,7 @@ import type { DisplayPayload } from "@/lib/event-hub/display-payload";
 import { displayPlan } from "@/lib/event-hub/layout";
 import { rotationWindow } from "@/lib/event-hub/rotation";
 import { remainingMs, timerPhase, type HubTimer } from "@/lib/event-hub/timer";
+import { FeaturedFlare } from "./featured-flare";
 import { FlareBoard } from "./flare-board";
 import { TimerPanel } from "./timer-panel";
 import { useDisplayClock } from "./display-clock";
@@ -56,14 +57,72 @@ export function DisplayScreen({
   const plan = displayPlan(payload.layout, timers.length);
   const visibleFlares = rotationWindow(payload.flares, plan.flareSlots, tick);
 
+  /*
+   * FOCUS: one tournament owns the screen, and the Flare board stops
+   * being a strip along the bottom — it becomes a full-height column
+   * featuring one card at a time. The founder's brief: "ONE tournament
+   * per screen should produce the richest/best experience."
+   */
+  const focus = plan.layout === "single" && timers.length > 0 && payload.showFlares;
+
   useEffect(() => {
-    if (!payload.showFlares || payload.flares.length <= plan.flareSlots) return;
+    /* Focus rotates whenever there is more than one thing to feature;
+       the strip layouts rotate only once the window is full. */
+    const rotates = focus
+      ? payload.flares.length > 1
+      : payload.showFlares && payload.flares.length > plan.flareSlots;
+    if (!rotates) return;
 
     const rotate = setInterval(() => setTick((value) => value + 1), ROTATE_MS);
     return () => clearInterval(rotate);
-  }, [payload.showFlares, payload.flares.length, plan.flareSlots]);
+  }, [focus, payload.showFlares, payload.flares.length, plan.flareSlots]);
 
   useChimes(timers, payload.soundEnabled, at);
+
+  if (focus) {
+    return (
+      <main
+        id="main"
+        className="flex h-dvh w-full flex-col gap-[clamp(0.4rem,0.9vw,1.25rem)] overflow-hidden bg-canvas p-[clamp(0.6rem,1.2vw,1.75rem)]"
+      >
+        <Header
+          storeName={payload.storeName}
+          nightTitle={payload.nightTitle}
+          connected={connected}
+        />
+
+        <div className="flex min-h-0 flex-1 gap-[clamp(0.5rem,1vw,1.25rem)]">
+          {/* The timer keeps the widest column — hierarchy rule #1 —
+              and the Featured Flare column is tall enough that a
+              portrait card finally gets to be BIG. Grid, because a grid
+              item stretches to the full track by default where a flex
+              child would sit at its content height. */}
+          <div className="grid min-h-0 flex-[5] [&>*]:min-h-0">
+            <TimerPanel timer={timers[0]} layout="single" now={at} />
+          </div>
+
+          <div className="flex min-h-0 flex-[3] flex-col gap-[clamp(0.5rem,1vw,1.25rem)]">
+            <div className="min-h-0 flex-1">
+              <FeaturedFlare flares={payload.flares} tick={tick} />
+            </div>
+            {payload.showQr && qrSvg && payload.joinCode && (
+              <div className="flex shrink-0 justify-center">
+                <JoinPanel code={payload.joinCode} qrSvg={qrSvg} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {payload.announcement && (
+          <p className="shrink-0 truncate rounded-[var(--radius-card)] border border-accent/30 bg-accent/10 px-[clamp(0.6rem,1.2vw,1.5rem)] py-[clamp(0.35rem,0.7vw,0.9rem)] text-[clamp(0.9rem,1.7vw,1.9rem)] font-semibold text-accent">
+            {payload.announcement}
+          </p>
+        )}
+
+        <FullscreenControl />
+      </main>
+    );
+  }
 
   return (
     <main

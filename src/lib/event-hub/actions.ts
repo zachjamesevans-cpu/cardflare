@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { GAME_PROFILES, nameRepeatsGame, procedureFor } from "./game-profiles";
+import { MAX_TIMERS } from "./layout";
 import type { Bracket, GameId } from "./game-profiles";
 import {
   addTimer,
@@ -125,6 +126,7 @@ export async function updateDisplayAction(formData: FormData): Promise<void> {
    * `formData.has` is the only honest way to tell "absent" from "empty".
    */
   await updateDisplay(display.id, {
+    ...(formData.has("name") ? { name: checkDisplayName(text(formData, "name")) } : {}),
     ...(formData.has("nightTitle")
       ? { nightTitle: checkNightTitle(text(formData, "nightTitle")) }
       : {}),
@@ -246,6 +248,30 @@ export async function removeTimerAction(formData: FormData): Promise<void> {
 }
 
 /** Moves one panel along the wall. `direction` is -1 or 1. */
+/**
+ * Moves a tournament to a different SCREEN, clock untouched.
+ *
+ * The brief's "assign to screen": a store with One Piece on the main
+ * TV and an empty projector reassigns without recreating anything. The
+ * target must belong to the same store — a display id is a suggestion
+ * until both ends have been authorised — and must have a free slot.
+ */
+export async function moveTimerToScreenAction(formData: FormData): Promise<void> {
+  const found = await authorizedTimer(text(formData, "timerId"));
+  if (!found) return;
+
+  const target = await findDisplay(text(formData, "targetDisplayId"));
+  if (!target || target.storeId !== found.display.storeId) return;
+  if (target.id === found.display.id) return;
+
+  const siblings = await listTimers(target.id);
+  if (siblings.length >= MAX_TIMERS) return;
+
+  await moveTimerToDisplay(found.timer.id, target.id);
+
+  revalidatePath(CONTROL_PANEL);
+}
+
 export async function moveTimerAction(formData: FormData): Promise<void> {
   const found = await authorizedTimer(text(formData, "timerId"));
   if (!found) return;
