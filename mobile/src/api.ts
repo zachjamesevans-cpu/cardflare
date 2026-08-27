@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
 import { clearCache } from "./cache";
+import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
@@ -456,6 +457,11 @@ export interface RoomState {
   };
   you?: { sessionId: string; displayName: string };
   /**
+   * The store's live tournament clocks, as instants the phone ticks on
+   * its own — see `room-timer-wire.ts`. Present once joined.
+   */
+  timers?: RoomTimerWire[];
+  /**
    * The signed-in account, when there is one.
    *
    * Present so the join screen can stop asking for a name: a signed-in
@@ -633,10 +639,35 @@ export async function lastRoom(): Promise<string | null> {
  * A typed code is remembered before the room answers, because the screen
  * needs something to load. When the answer is "no such room" that stored
  * code would otherwise reopen the same dead end on every visit, with
- * only a Try again button pointed at the same 404.
+ * only a Try again button pointed at the same 404. The game scope goes
+ * with it: a scope without its room is a stale filter waiting to narrow
+ * the wrong night's search.
  */
 export async function forgetRoom(): Promise<void> {
   await SecureStore.deleteItemAsync(LAST_ROOM_KEY);
+  await SecureStore.deleteItemAsync(LAST_ROOM_GAME_KEY);
+}
+
+/**
+ * The TCG the scanned code was scoped to, when it came off a
+ * tournament's own screen (`?g=one-piece` in the QR's URL). Kept beside
+ * the room code so card search inside that room only offers that
+ * game's cards. Cleared whenever a scan carries no game — the counter
+ * code is universal, and a stale scope from last week's screen must
+ * not narrow tonight's search.
+ */
+const LAST_ROOM_GAME_KEY = "cf-room-game";
+
+export async function rememberRoomGame(game: string | null): Promise<void> {
+  if (game && /^[a-z][a-z0-9-]{1,30}$/.test(game)) {
+    await SecureStore.setItemAsync(LAST_ROOM_GAME_KEY, game);
+  } else {
+    await SecureStore.deleteItemAsync(LAST_ROOM_GAME_KEY);
+  }
+}
+
+export async function lastRoomGame(): Promise<string | null> {
+  return SecureStore.getItemAsync(LAST_ROOM_GAME_KEY);
 }
 
 export interface CardHit {
@@ -654,8 +685,13 @@ export interface CardHit {
   printings: { id: string; label: string | null; imageUrl: string | null }[];
 }
 
-export const searchCards = (query: string) =>
-  call<{ cards: CardHit[] }>("GET", `/api/v1/cards?q=${encodeURIComponent(query)}`);
+export const searchCards = (query: string, game?: string | null) =>
+  call<{ cards: CardHit[] }>(
+    "GET",
+    `/api/v1/cards?q=${encodeURIComponent(query)}${
+      game ? `&game=${encodeURIComponent(game)}` : ""
+    }`,
+  );
 
 /** One trade, as the room renders it for one viewer - the web's shape. */
 export interface TradeRecord {

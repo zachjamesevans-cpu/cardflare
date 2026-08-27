@@ -65,6 +65,9 @@ function toTimer(row: EventHubTimerRow): HubTimer {
     overtimeDurationSeconds: row.overtime_duration_seconds,
     overtimeTurn: row.overtime_turn,
     rulesDismissed: row.rules_dismissed,
+    /* Older rows predate the column; absent reads as off, which is the
+       default the founder chose anyway. */
+    beginnerMode: row.beginner_mode ?? false,
     updatedAt: row.updated_at,
   };
 }
@@ -296,6 +299,9 @@ export async function patchTimer(id: string, patch: TimerPatch): Promise<boolean
       ...(patch.rulesDismissed !== undefined
         ? { rules_dismissed: patch.rulesDismissed }
         : {}),
+      ...(patch.beginnerMode !== undefined
+        ? { beginner_mode: patch.beginnerMode }
+        : {}),
       ...(patch.durationSeconds !== undefined
         ? { duration_seconds: patch.durationSeconds }
         : {}),
@@ -344,6 +350,32 @@ export async function editTimer(
 
   if (error) {
     console.error("Could not edit the timer", error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Re-homes a timer onto another display.
+ *
+ * The "own screen" move: a tournament leaves the shared wall for a
+ * television of its own, state intact — the clock never notices,
+ * because everything it is IS the row.
+ */
+export async function moveTimerToDisplay(
+  timerId: string,
+  displayId: string,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("event_hub_timers")
+    .update({ display_id: displayId, position: 0 })
+    .eq("id", timerId);
+
+  if (error) {
+    console.error("Could not move the timer to its own display", error);
     return false;
   }
 

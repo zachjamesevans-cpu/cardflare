@@ -73,6 +73,7 @@ describe("searchCardsAction", () => {
       setCode: null,
       cardType: null,
       color: null,
+      game: null,
     });
   });
 
@@ -83,6 +84,7 @@ describe("searchCardsAction", () => {
       setCode: "OP01",
       cardType: null,
       color: "red",
+      game: null,
     });
   });
 
@@ -163,6 +165,7 @@ describe("searchCardsAction: narrowing from keywords", () => {
       setCode: null,
       cardType: "leader",
       color: null,
+      game: null,
     });
     expect(result).toMatchObject({ status: "ok", query: "luffy" });
   });
@@ -176,6 +179,7 @@ describe("searchCardsAction: narrowing from keywords", () => {
       setCode: "OP01",
       cardType: null,
       color: "red",
+      game: null,
     });
   });
 
@@ -193,11 +197,13 @@ describe("searchCardsAction: narrowing from keywords", () => {
       setCode: null,
       cardType: null,
       color: "black",
+      game: null,
     });
     expect(searchCards).toHaveBeenNthCalledWith(2, "black maria", {
       setCode: null,
       cardType: null,
       color: null,
+      game: null,
     });
     expect(result).toMatchObject({ status: "ok", query: "black maria" });
     expect((result as { results: unknown[] }).results).toHaveLength(1);

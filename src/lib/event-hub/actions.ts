@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
-import { GAME_PROFILES, procedureFor } from "./game-profiles";
+import { GAME_PROFILES, nameRepeatsGame, procedureFor } from "./game-profiles";
 import type { Bracket, GameId } from "./game-profiles";
 import {
   addTimer,
@@ -15,6 +15,7 @@ import {
   findDisplay,
   findTimer,
   listTimers,
+  moveTimerToDisplay,
   patchTimer,
   removeTimer,
   reorderTimers,
@@ -36,6 +37,7 @@ import {
   impliedOvertimeMs,
   pause,
   reset,
+  setBeginnerMode,
   setRulesDismissed,
   start,
   startOvertime,
@@ -259,6 +261,43 @@ export async function moveTimerAction(formData: FormData): Promise<void> {
 }
 
 /**
+ * Splits one tournament out to a screen of its own.
+ *
+ * The founder: "Option to 'split' timers so it can be on a full screen
+ * on a different tv." One press makes a new display named after the
+ * tournament, moves the timer onto it with its clock untouched, and —
+ * because that screen then runs exactly one game — its QR comes out
+ * game-scoped, so scanning the One Piece TV searches One Piece cards.
+ * The store opens the new display's link on the other television from
+ * the same screens list they already use.
+ */
+export async function splitTimerAction(formData: FormData): Promise<void> {
+  const found = await authorizedTimer(text(formData, "timerId"));
+  if (!found) return;
+
+  const viewer = await getViewer();
+  const profile = GAME_PROFILES[found.timer.game as GameId];
+
+  const display = await createDisplay({
+    storeId: found.display.storeId,
+    createdBy: viewer.kind === "anonymous" ? null : viewer.user.id,
+    /* Named so the screens list reads like the room: the tournament if
+       it has its own name, the game otherwise. */
+    name: checkDisplayName(
+      nameRepeatsGame(profile, found.timer.eventName)
+        ? profile.shortName
+        : found.timer.eventName,
+    ),
+    nightTitle: found.display.nightTitle,
+  });
+  if (!display) return;
+
+  await moveTimerToDisplay(found.timer.id, display.id);
+
+  revalidatePath(CONTROL_PANEL);
+}
+
+/**
  * Every transport control, in one action.
  *
  * One entry point rather than eleven, because the interesting part is
@@ -321,6 +360,12 @@ export async function timerControlAction(formData: FormData): Promise<void> {
       break;
     case "reopen-rules":
       patch = setRulesDismissed(timer, false);
+      break;
+    case "beginner-on":
+      patch = setBeginnerMode(timer, true);
+      break;
+    case "beginner-off":
+      patch = setBeginnerMode(timer, false);
       break;
     case "complete":
       patch = complete(timer);

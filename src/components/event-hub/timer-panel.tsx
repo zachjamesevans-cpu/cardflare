@@ -156,10 +156,12 @@ export function TimerPanel({
      5:00 for one piece and other TCG's instead of counting down." */
   const otUp = overtimeElapsedMs(timer, now);
 
-  /* Overtime borrows the game's own colour rather than the warning
-     amber: at this point the panel is showing that game's procedure, and
-     the accent is what ties the two together. */
+  /* Extra time wears red, glowing and slowly flashing — the founder's
+     spec verbatim — because at a glance across a shop, red on a clock
+     means exactly one thing. */
   const inOvertime = phase === "overtime" || phase === "overtime_expired";
+  const atTime = inOvertime || phase === "time_called";
+  const otCap = overtimeCapMs(timer, now);
 
   const clock =
     inOvertime && otUp !== null
@@ -174,7 +176,9 @@ export function TimerPanel({
          from here, so a panel is never five hardcoded classes. */
       style={{ ["--game" as string]: `var(${profile.accentToken})` }}
       className={`relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 bg-surface ${
-        inOvertime ? "border-[var(--game)]" : URGENCY_RING[band]
+        atTime
+          ? "border-danger motion-safe:animate-[cf-overtime-glow_2.4s_ease-in-out_infinite_alternate]"
+          : URGENCY_RING[band]
       }`}
       aria-label={`${profile.displayName}, ${timer.eventName}, ${PHASE_WORD[phase]}`}
     >
@@ -238,7 +242,7 @@ export function TimerPanel({
             }
             className={`font-mono leading-none font-bold tabular-nums ${
               CLOCK_SIZE[layout]
-            } ${inOvertime ? "text-[var(--game)]" : URGENCY_DIGITS[band]}`}
+            } ${atTime ? "text-danger" : URGENCY_DIGITS[band]}`}
           >
             {phase === "time_called" ? "0:00" : clock}
           </p>
@@ -246,6 +250,26 @@ export function TimerPanel({
           {untimed && phase !== "ready" && (
             <p className={`mt-2 text-text-muted ${META_SIZE[layout]}`}>Untimed round</p>
           )}
+
+          {/* The one line a player needs at time, without the card:
+              "+3 TURNS · 5:00". The full procedure is beginner mode.
+              The cap is appended only where the headline does not
+              already carry it — Top Cut runs 10:00 under a headline
+              written for the store round's 5:00. */}
+          {atTime &&
+            (() => {
+              const headline = procedureFor(profile, timer.bracket).headline;
+              const cap = inOvertime && otCap !== null ? formatClock(otCap) : null;
+              const capShown = cap ? cap.replace(/^0/, "") : null;
+              return (
+                <p
+                  className={`mt-2 font-bold text-danger ${META_SIZE[layout]} tracking-wide`}
+                >
+                  {headline}
+                  {capShown && !headline.includes(capShown) ? ` · of ${capShown}` : ""}
+                </p>
+              );
+            })()}
         </div>
 
         <footer className="flex items-center justify-between gap-3">
@@ -255,8 +279,8 @@ export function TimerPanel({
                 ? "bg-elevated text-text-secondary"
                 : phase === "complete"
                   ? "bg-elevated text-text-muted"
-                  : inOvertime || phase === "time_called"
-                    ? "bg-[var(--game)] text-canvas"
+                  : atTime
+                    ? "bg-danger text-canvas"
                     : "bg-elevated text-text-secondary"
             }`}
           >

@@ -102,6 +102,12 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
     listTimers(display.id),
   ]);
 
+  /** The one game this screen is running, or null for a mixed wall. */
+  function singleGameOf(list: { game: string }[]): string | null {
+    const games = [...new Set(list.map((timer) => timer.game))];
+    return games.length === 1 ? games[0] : null;
+  }
+
   const base: DisplayPayload = {
     displayId: display.id,
     storeName: store?.name ?? "",
@@ -112,7 +118,10 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
     showQr: display.showQr,
     soundEnabled: display.soundEnabled,
     joinCode: store?.join_code ?? null,
-    joinUrl: store?.join_code ? joinUrl(store.join_code) : null,
+    /* A screen running exactly one game scans in game-scoped: the QR
+       carries `?g=<game>` and the room narrows its card search to that
+       TCG. A mixed screen stays universal, like the counter. */
+    joinUrl: store?.join_code ? joinUrl(store.join_code, singleGameOf(timers)) : null,
     timers,
     flares: [],
     serverNow: Date.now(),

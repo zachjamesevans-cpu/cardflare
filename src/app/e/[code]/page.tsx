@@ -12,6 +12,7 @@ import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
 import { RoomTicker } from "@/components/events/room-ticker";
+import { RoomTimers } from "@/components/event-hub/room-timers";
 import { ShowSearch } from "@/components/shows/show-search";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { TradedTonight } from "@/components/trades/traded-tonight";
@@ -46,6 +47,8 @@ import {
   offersByFlare,
 } from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
+import { gameProfile } from "@/lib/event-hub/game-profiles";
+import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import { listMyTrades } from "@/lib/trades/repository";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -126,7 +129,7 @@ export default async function JoinByCodePage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ resumed?: string }>;
+  searchParams: Promise<{ resumed?: string; g?: string }>;
 }) {
   const { code } = await params;
   /*
@@ -135,7 +138,17 @@ export default async function JoinByCodePage({
    * the point: a join that appears to do nothing is exactly what a duplicate
    * used to look like from the inside.
    */
-  const resumed = (await searchParams).resumed === "1";
+  const params_ = await searchParams;
+  const resumed = params_.resumed === "1";
+
+  /*
+   * The scan's game, when the code came off a tournament's own screen.
+   * `?g=one-piece` narrows this room's card search to that TCG — the
+   * counter code stays universal, and the per-tournament QR is where
+   * the scope comes from. Validated against the five real profiles, so
+   * a crafted URL degrades to no filter rather than an empty search.
+   */
+  const scannedGame = gameProfile(params_.g ?? "")?.id ?? null;
 
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
@@ -316,6 +329,10 @@ export default async function JoinByCodePage({
         listMyTrades(event.id, session!.id),
       ])
     : [[], [], [], [], []];
+
+  /* The tournament clocks, for anyone who cannot see the wall from
+     their seat — or stepped outside with the room in their pocket. */
+  const roomTimers = inRoom ? await roomTimersForStore(event.storeId) : [];
 
   /*
    * The counter check: which of the board's cards the store's synced
@@ -574,6 +591,9 @@ export default async function JoinByCodePage({
           {/* Offers land while people wander; the room re-reads itself. */}
           <RoomTicker />
 
+          {/* The wall's clocks, for a seat that cannot see the wall. */}
+          <RoomTimers timers={roomTimers} />
+
           {outstandingWants.length > 0 && (
             <RepostWants code={normalized} count={outstandingWants.length}>
               <WantEntries
@@ -600,6 +620,7 @@ export default async function JoinByCodePage({
               code={normalized}
               kind="flare"
               imagesEnabled={images}
+              game={scannedGame}
               footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
             />
 

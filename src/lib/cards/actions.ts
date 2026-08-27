@@ -71,11 +71,19 @@ export async function searchCardsAction(
      * An explicit filter from the caller beats one read out of the text:
      * a UI control is a decision, a typed word is a guess.
      */
+    /* The room's game rides every branch below: it is a scan's decision,
+       not a guess read out of prose, so the no-results fallback must not
+       drop it. Shaped, because it arrives from a URL. */
+    const game = /^[a-z][a-z0-9-]{1,30}$/.test(filters.game ?? "")
+      ? filters.game
+      : null;
+
     let query = typed.text;
     let results = await searchCards(query, {
       setCode: filters.setCode ?? typed.filters.setCode,
       cardType: filters.cardType ?? typed.filters.cardType,
       color: filters.color ?? typed.filters.color,
+      game,
     });
 
     /*
@@ -91,6 +99,7 @@ export async function searchCardsAction(
         setCode: filters.setCode ?? null,
         cardType: filters.cardType ?? null,
         color: filters.color ?? null,
+        game,
       });
     }
 

@@ -10,6 +10,8 @@ export interface CardSearchFilters {
   setCode?: string | null;
   cardType?: string | null;
   color?: string | null;
+  /** The room's TCG, when a scan said which one. Never parsed from text. */
+  game?: string | null;
 }
 
 interface SearchRow {
@@ -56,6 +58,7 @@ export async function searchCards(
     filter_set_code: filters.setCode ?? null,
     filter_card_type: filters.cardType ?? null,
     filter_color: filters.color ?? null,
+    filter_game: filters.game ?? null,
   });
 
   if (error) {

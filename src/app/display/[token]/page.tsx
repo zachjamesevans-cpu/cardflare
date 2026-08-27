@@ -42,7 +42,12 @@ export default async function DisplayPage({
 
   /* Encoded here, once. The store's counter code does not change while a
      television is switched on. */
-  const qrSvg = payload.joinCode ? await joinQrSvg(payload.joinCode) : null;
+  /* A screen running one game hands out a game-scoped code; a mixed
+     wall's code stays universal, same rule as the payload's joinUrl. */
+  const games = [...new Set(payload.timers.map((timer) => timer.game))];
+  const qrSvg = payload.joinCode
+    ? await joinQrSvg(payload.joinCode, games.length === 1 ? games[0] : null)
+    : null;
 
   return <DisplayScreen initial={payload} token={token} qrSvg={qrSvg} />;
 }

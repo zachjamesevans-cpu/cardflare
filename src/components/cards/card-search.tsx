@@ -332,6 +332,12 @@ export interface CardSearchProps {
   /** Resolved on the server from NEXT_PUBLIC_ENABLE_CARD_IMAGES. */
   imagesEnabled: boolean;
   /**
+   * The room's TCG, when the scan said which one. A player who scanned
+   * the One Piece tournament's screen searches One Piece cards and
+   * nothing else — the whole point of a per-tournament code.
+   */
+  game?: string | null;
+  /**
    * Supplied when the search is being used to pick a card. The printing is
    * present only when a specific version was tapped from the expanded list —
    * a plain row tap means "any printing", which stays the default ask.
@@ -373,6 +379,7 @@ export interface CardSearchProps {
  */
 export function CardSearch({
   imagesEnabled,
+  game = null,
   onSelect,
   autoFocus = false,
   composer = null,
@@ -457,7 +464,7 @@ export function CardSearch({
     const id = ++requestId.current;
 
     const timer = setTimeout(async () => {
-      const response = await searchCardsAction(trimmed);
+      const response = await searchCardsAction(trimmed, { game });
 
       // A response from a superseded keystroke is discarded.
       if (id !== requestId.current) return;
@@ -487,7 +494,7 @@ export function CardSearch({
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmed, tooShort]);
+  }, [trimmed, tooShort, game]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {

@@ -78,6 +78,15 @@ export interface HubTimer {
   overtimeDurationSeconds: number | null;
   overtimeTurn: number;
   rulesDismissed: boolean;
+  /**
+   * Whether the procedure card appears at time at all.
+   *
+   * Off by default — the founder: "Stop displaying the rules, and
+   * maybe just have a 'beginner' mode toggle which does show the rules
+   * for people if it goes to time." The wall's default face for
+   * overtime is the clock itself, counting up in red.
+   */
+  beginnerMode: boolean;
   updatedAt: string;
 }
 
@@ -93,6 +102,7 @@ export type TimerPatch = Partial<
     | "overtimeDurationSeconds"
     | "overtimeTurn"
     | "rulesDismissed"
+    | "beginnerMode"
     | "durationSeconds"
   >
 >;
@@ -266,6 +276,9 @@ export function timerPhase(timer: HubTimer, now: number): TimerPhase {
 
 /** Whether the overtime overlay belongs on this panel. */
 export function showsOvertimeRules(timer: HubTimer, now: number): boolean {
+  /* Opt-in per timer. Without beginner mode the wall's answer to time
+     is the clock itself — same size, counting up, glowing red. */
+  if (!timer.beginnerMode) return false;
   if (timer.rulesDismissed) return false;
 
   const phase = timerPhase(timer, now);
@@ -549,6 +562,17 @@ export function setRulesDismissed(
 ): TimerPatch | null {
   if (timer.rulesDismissed === dismissed) return null;
   return { rulesDismissed: dismissed };
+}
+
+/** Turns the procedure card at time on or off for this tournament. */
+export function setBeginnerMode(
+  timer: HubTimer,
+  beginnerMode: boolean,
+): TimerPatch | null {
+  if (timer.beginnerMode === beginnerMode) return null;
+  /* Turning it on un-dismisses too: "show the rules" pressed once
+     should not need a second press to undo an old dismissal. */
+  return beginnerMode ? { beginnerMode, rulesDismissed: false } : { beginnerMode };
 }
 
 export function complete(timer: HubTimer): TimerPatch | null {

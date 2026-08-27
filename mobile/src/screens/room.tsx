@@ -55,6 +55,7 @@ import {
   Title,
 } from "../ui";
 import { inRailOrder } from "../rail-order";
+import { RoomTimersCard } from "../room-timers";
 import { OpenToTradesTag } from "../open-to-trades-tag";
 import { TournamentHelpModal } from "../tournament-help";
 import { PlayerAvatar } from "../player-avatar";
@@ -620,6 +621,10 @@ function RoomScreen({
           open={tournamentHelp}
           onClose={() => setTournamentHelp(false)}
         />
+
+        {/* The wall's clocks, for a seat that cannot see the wall — or
+            somebody who stepped out with the room in their pocket. */}
+        <RoomTimersCard timers={state.timers} />
 
         {/* The same words the website uses, for the same moment. */}
         {resumed && (

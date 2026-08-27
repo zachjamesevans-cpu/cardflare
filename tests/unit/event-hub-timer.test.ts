@@ -13,6 +13,7 @@ import {
   pause,
   remainingMs,
   reset,
+  setBeginnerMode,
   setRulesDismissed,
   showsOvertimeRules,
   speakClock,
@@ -56,6 +57,7 @@ function timer(overrides: Partial<HubTimer> = {}): HubTimer {
     overtimeDurationSeconds: null,
     overtimeTurn: 0,
     rulesDismissed: false,
+    beginnerMode: false,
     updatedAt: new Date(T0).toISOString(),
     ...overrides,
   };
@@ -251,8 +253,16 @@ describe("phases and urgency", () => {
     expect(urgency(t, T0 + 40 * MIN)).toBe("none");
   });
 
-  it("shows the rules card from time until staff put it away", () => {
-    let t = apply(timer(), start(timer(), T0));
+  it("keeps the rules card off the wall by default", () => {
+    /* The founder: "Stop displaying the rules... default to not
+       showing them." Time on the wall is the clock, in red. */
+    const t = apply(timer(), start(timer(), T0));
+    expect(showsOvertimeRules(t, T0 + 35 * MIN)).toBe(false);
+  });
+
+  it("shows the rules card in beginner mode, until staff put it away", () => {
+    const beginner = timer({ beginnerMode: true });
+    let t = apply(beginner, start(beginner, T0));
     expect(showsOvertimeRules(t, T0 + 35 * MIN)).toBe(true);
 
     t = apply(t, setRulesDismissed(t, true));
@@ -260,6 +270,16 @@ describe("phases and urgency", () => {
 
     t = apply(t, setRulesDismissed(t, false));
     expect(showsOvertimeRules(t, T0 + 35 * MIN)).toBe(true);
+  });
+
+  it("un-dismisses when beginner mode is switched on", () => {
+    /* Staff pressing "show the rules" must not need a second press to
+       undo an old dismissal. */
+    const dismissed = timer({ rulesDismissed: true });
+    const t = apply(dismissed, setBeginnerMode(dismissed, true));
+
+    expect(t.beginnerMode).toBe(true);
+    expect(t.rulesDismissed).toBe(false);
   });
 
   it("marks complete and stops showing anything", () => {
@@ -398,7 +418,8 @@ describe("overtime", () => {
   it("hides the rules card at time, before overtime has been started", () => {
     /* The other half of the same report. Hiding has to work while the
        row still says "running", which is when staff first reach for it. */
-    const running = apply(timer(), start(timer(), T0));
+    const beginner = timer({ beginnerMode: true });
+    const running = apply(beginner, start(beginner, T0));
     const atTime = T0 + 36 * MIN;
 
     expect(showsOvertimeRules(running, atTime)).toBe(true);
@@ -427,7 +448,8 @@ describe("two tournaments at once", () => {
   it("lets one reach overtime while the other carries on", () => {
     /* The vertical slice, as arithmetic. One Piece at 35 minutes and
        Flesh and Blood at 55, both started together. */
-    const onePiece = apply(timer(), start(timer(), T0));
+    const beginner = timer({ beginnerMode: true });
+    const onePiece = apply(beginner, start(beginner, T0));
     const fab = apply(
       timer({ id: "timer-2", game: "flesh-and-blood", durationSeconds: 55 * 60 }),
       start(timer({ id: "timer-2", durationSeconds: 55 * 60 }), T0),
