@@ -186,7 +186,15 @@ export async function addTimerAction(formData: FormData): Promise<void> {
 
   if (!checked.ok) return;
 
-  await addTimer({ displayId: display.id, ...checked.value });
+  await addTimer({
+    displayId: display.id,
+    ...checked.value,
+    /* The founder: "anything involving extra turns will be in the
+       'show rules at time' toggle when posting the timer for the
+       first time." Unchecked, the wall answers time with the clock
+       alone. */
+    beginnerMode: text(formData, "showRules") === "on",
+  });
 
   revalidatePath(CONTROL_PANEL);
 }

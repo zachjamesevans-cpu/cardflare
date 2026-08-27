@@ -4,20 +4,58 @@ import { useEffect, useState } from "react";
 import { TimerIcon } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { roomTimersAction } from "@/lib/event-hub/room-timer-actions";
 import { readRoomTimer, type RoomTimerWire } from "@/lib/event-hub/room-timer-wire";
 
 /**
  * The wall's clocks, in a pocket.
  *
  * The founder: "if you step out or can't see the screen, you can
- * quickly check the timer on your phone." The wire carries instants,
- * so this ticks on the phone's own clock — right between refreshes,
- * and it rolls into extra time by itself, red and pulsing, exactly
- * when the television does.
+ * quickly check the timer on your phone... it should refresh live
+ * along with how the flare refreshes work." So this card polls for
+ * itself, on the room's own cadence — staff resetting a timer or
+ * starting a new one shows up here within seconds with no refresh,
+ * and somebody who joined an early board and stayed all day sees the
+ * clock POP UP the moment staff start it. Between polls the wire's
+ * instants tick on the phone's own clock, so the digits are always
+ * right and roll into red extra time at the same second the wall does.
  */
-export function RoomTimers({ timers }: { timers: RoomTimerWire[] }) {
+export function RoomTimers({
+  initial,
+  code,
+}: {
+  initial: RoomTimerWire[];
+  code: string;
+}) {
+  const [timers, setTimers] = useState(initial);
   const [now, setNow] = useState(() => Date.now());
 
+  /* The poll. Runs whether or not anything is showing — an empty list
+     is exactly the state that has to notice a tournament starting. */
+  useEffect(() => {
+    let current = true;
+
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      void roomTimersAction(code).then((next) => {
+        if (current) setTimers(next);
+      });
+    };
+
+    const id = setInterval(poll, 12_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      current = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [code]);
+
+  /* The tick, only while there are digits to move. */
   useEffect(() => {
     if (timers.length === 0) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -58,9 +96,7 @@ export function RoomTimers({ timers }: { timers: RoomTimerWire[] }) {
                     reading.atTime ? "font-semibold text-danger" : "text-text-muted"
                   }`}
                 >
-                  {reading.atTime
-                    ? `${reading.label} · ${wire.headline}`
-                    : reading.label}
+                  {reading.label}
                 </p>
               </div>
             </div>

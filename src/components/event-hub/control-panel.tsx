@@ -45,6 +45,7 @@ import {
   reset,
   setBeginnerMode,
   setRulesDismissed,
+  showsOvertimeRules,
   start,
   startOvertime,
   timerPhase,
@@ -159,6 +160,7 @@ export function ControlPanel({
           now={at}
           first={index === 0}
           last={index === timers.length - 1}
+          solo={timers.length === 1}
           onRun={run}
         />
       ))}
@@ -171,12 +173,15 @@ function TimerCard({
   now,
   first,
   last,
+  solo,
   onRun,
 }: {
   timer: HubTimer;
   now: number;
   first: boolean;
   last: boolean;
+  /** Alone on its display: nothing to reorder, nothing to split off. */
+  solo: boolean;
   onRun: (timer: HubTimer, op: string, patch: TimerPatch | null) => void;
 }) {
   const profile = GAME_PROFILES[timer.game];
@@ -328,18 +333,22 @@ function TimerCard({
 
               {/* The rules card is opt-in — the founder: "default to
                   not showing them". Beginner mode is the opt-in, and
-                  the in-the-moment hide only exists once it is on. */}
-              <Control
-                label={
-                  timer.beginnerMode ? "Beginner mode is on" : "Beginner mode is off"
-                }
-                icon={timer.beginnerMode ? Eye : EyeOff}
-                onClick={() =>
-                  timer.beginnerMode
-                    ? onRun(timer, "beginner-off", setBeginnerMode(timer, false))
-                    : onRun(timer, "beginner-on", setBeginnerMode(timer, true))
-                }
-              />
+                  the in-the-moment hide only exists once it is on. A
+                  full row on a phone, because its label is the longest
+                  in the grid. */}
+              <div className="col-span-2 sm:col-span-1">
+                <Control
+                  label={
+                    timer.beginnerMode ? "Beginner mode is on" : "Beginner mode is off"
+                  }
+                  icon={timer.beginnerMode ? Eye : EyeOff}
+                  onClick={() =>
+                    timer.beginnerMode
+                      ? onRun(timer, "beginner-off", setBeginnerMode(timer, false))
+                      : onRun(timer, "beginner-on", setBeginnerMode(timer, true))
+                  }
+                />
+              </div>
 
               {timer.beginnerMode && (
                 <Control
@@ -372,12 +381,16 @@ function TimerCard({
              */}
             <p
               className={`text-xs font-semibold ${
-                timer.rulesDismissed ? "text-text-muted" : "text-[var(--game)]"
+                showsOvertimeRules(timer, now)
+                  ? "text-[var(--game)]"
+                  : "text-text-muted"
               }`}
             >
-              {timer.rulesDismissed
-                ? "Rules hidden. The display shows the timer."
-                : "Rules are on the display now."}
+              {showsOvertimeRules(timer, now)
+                ? "Rules are on the display now."
+                : timer.beginnerMode
+                  ? "Rules hidden. The display shows the timer."
+                  : "The display shows the clock, in red. Beginner mode adds the rules card."}
             </p>
 
             <p className="text-xs text-text-muted">{RULES_DISCLAIMER}</p>
@@ -394,48 +407,81 @@ function TimerCard({
           </div>
         )}
 
-        {/* Housekeeping, kept away from the controls used mid-round. */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        {/* Housekeeping, kept away from the controls used mid-round.
+            A two-column grid on a phone — the free-wrapping row read
+            as "quite bad" on the founder's screen — and a plain row
+            once there is width for one. */}
+        <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 sm:flex sm:flex-wrap sm:items-center">
           <Button
             variant="ghost"
             size="sm"
+            className="w-full justify-center sm:w-auto"
             onClick={() => onRun(timer, "reset", reset(timer))}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             Reset
           </Button>
 
-          <form action={moveTimerAction}>
-            <input type="hidden" name="timerId" value={timer.id} />
-            <input type="hidden" name="direction" value="up" />
-            <Button variant="ghost" size="sm" type="submit" disabled={first}>
-              <ChevronUp className="size-4" aria-hidden="true" />
-              Move up
-            </Button>
-          </form>
+          {/* Reorder only means something with a neighbour to swap. */}
+          {!solo && (
+            <>
+              <form action={moveTimerAction} className="w-full sm:w-auto">
+                <input type="hidden" name="timerId" value={timer.id} />
+                <input type="hidden" name="direction" value="up" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="submit"
+                  disabled={first}
+                  className="w-full justify-center sm:w-auto"
+                >
+                  <ChevronUp className="size-4" aria-hidden="true" />
+                  Move up
+                </Button>
+              </form>
 
-          <form action={moveTimerAction}>
-            <input type="hidden" name="timerId" value={timer.id} />
-            <input type="hidden" name="direction" value="down" />
-            <Button variant="ghost" size="sm" type="submit" disabled={last}>
-              <ChevronDown className="size-4" aria-hidden="true" />
-              Move down
-            </Button>
-          </form>
+              <form action={moveTimerAction} className="w-full sm:w-auto">
+                <input type="hidden" name="timerId" value={timer.id} />
+                <input type="hidden" name="direction" value="down" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="submit"
+                  disabled={last}
+                  className="w-full justify-center sm:w-auto"
+                >
+                  <ChevronDown className="size-4" aria-hidden="true" />
+                  Move down
+                </Button>
+              </form>
 
-          {/* One press, one television. The new screen runs only this
-              game, so its QR scans players in game-scoped. */}
-          <form action={splitTimerAction}>
-            <input type="hidden" name="timerId" value={timer.id} />
-            <Button variant="ghost" size="sm" type="submit">
-              <MonitorUp className="size-4" aria-hidden="true" />
-              Its own screen
-            </Button>
-          </form>
+              {/* One press, one television. The tournament moves to a
+                  new screen further down this page, link and all, and
+                  that screen's QR scans players in game-scoped. Hidden
+                  for a timer already alone on its screen. */}
+              <form action={splitTimerAction} className="w-full sm:w-auto">
+                <input type="hidden" name="timerId" value={timer.id} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="submit"
+                  className="w-full justify-center sm:w-auto"
+                >
+                  <MonitorUp className="size-4" aria-hidden="true" />
+                  Its own screen
+                </Button>
+              </form>
+            </>
+          )}
 
-          <form action={removeTimerAction} className="ml-auto">
+          <form action={removeTimerAction} className="w-full sm:ml-auto sm:w-auto">
             <input type="hidden" name="timerId" value={timer.id} />
-            <Button variant="ghost" size="sm" type="submit">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="submit"
+              className="w-full justify-center sm:w-auto"
+            >
               <Trash2 className="size-4" aria-hidden="true" />
               End tournament
             </Button>
@@ -461,7 +507,10 @@ function Control({
   return (
     <Button variant={variant} size="lg" onClick={onClick} className="w-full">
       <Icon className="size-5 shrink-0" aria-hidden="true" />
-      <span className="truncate">{label}</span>
+      {/* Wraps rather than truncates: "Beginner mode is off" cut to
+          "Begi…" on a phone is a button nobody can read, and these sit
+          two to a row on exactly that screen. */}
+      <span className="text-left leading-tight whitespace-normal">{label}</span>
     </Button>
   );
 }

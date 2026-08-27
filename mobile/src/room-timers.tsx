@@ -58,9 +58,7 @@ export function RoomTimersCard({ timers }: { timers: RoomTimerWire[] | undefined
                   fontWeight: reading.atTime ? "700" : "400",
                 }}
               >
-                {reading.atTime
-                  ? `${reading.label} · ${wire.headline}`
-                  : reading.label}
+                {reading.label}
               </Text>
             </View>
 

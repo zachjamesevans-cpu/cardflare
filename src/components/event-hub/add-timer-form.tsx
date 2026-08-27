@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Select, TextInput } from "@/components/ui/controls";
+import { Checkbox, Select, TextInput } from "@/components/ui/controls";
 import { addTimerAction } from "@/lib/event-hub/actions";
 import {
   allProfiles,
@@ -144,6 +144,16 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
           />
         </Field>
       </div>
+
+      {/* The wall's default answer to time is the clock alone, red and
+          counting up. This is the opt-in for the full procedure card —
+          the founder: "a 'beginner' mode toggle which does show the
+          rules for people if it goes to time." */}
+      <Checkbox
+        id={`show-rules-${displayId}`}
+        name="showRules"
+        label="Show the rules on screen when time is called (beginner mode)"
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label="Add tournament" pendingLabel="Adding…" />

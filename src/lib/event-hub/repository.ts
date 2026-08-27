@@ -235,6 +235,8 @@ export async function addTimer(input: {
   bracket: Bracket;
   presetId: string;
   durationSeconds: number | null;
+  /** Show the rules card at time. Off unless asked for at creation. */
+  beginnerMode?: boolean;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "The database isn't configured." };
@@ -254,17 +256,20 @@ export async function addTimer(input: {
     };
   }
 
-  const { error } = await getSupabaseAdmin().from("event_hub_timers").insert({
-    display_id: input.displayId,
-    position: existing.length,
-    game: input.game,
-    event_name: input.eventName,
-    round: input.round,
-    format: input.format,
-    bracket: input.bracket,
-    preset_id: input.presetId,
-    duration_seconds: input.durationSeconds,
-  });
+  const { error } = await getSupabaseAdmin()
+    .from("event_hub_timers")
+    .insert({
+      display_id: input.displayId,
+      position: existing.length,
+      game: input.game,
+      event_name: input.eventName,
+      round: input.round,
+      format: input.format,
+      bracket: input.bracket,
+      preset_id: input.presetId,
+      duration_seconds: input.durationSeconds,
+      beginner_mode: input.beginnerMode ?? false,
+    });
 
   if (error) {
     console.error("Could not add the timer", error);
