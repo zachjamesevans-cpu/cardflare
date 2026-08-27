@@ -1,44 +1,40 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, Tv } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { CopyLink } from "@/components/events/copy-link";
-import { AddTimerForm } from "@/components/event-hub/add-timer-form";
-import { ControlPanel } from "@/components/event-hub/control-panel";
-import { DisplaySettings } from "@/components/event-hub/display-settings";
+import { ScreenCard } from "@/components/event-hub/screen-card";
 import { Card } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { buttonStyles } from "@/components/ui/button";
+import { TextInput } from "@/components/ui/controls";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { createDisplayAction } from "@/lib/event-hub/actions";
-import { displayPayload } from "@/lib/event-hub/display-payload";
+import { RULES_DISCLAIMER } from "@/lib/event-hub/game-profiles";
 import { listDisplays } from "@/lib/event-hub/repository";
-import { MAX_TIMERS } from "@/lib/event-hub/layout";
-import { siteUrl } from "@/lib/site";
+import { screenRows } from "@/lib/event-hub/room-timers";
 
 export const metadata: Metadata = {
-  title: "Event Hub",
+  title: "FlareCast",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The Event Hub's control panel.
+ * FlareCast's front page: the store's physical screens, as cards.
  *
- * Lives in the store area rather than being its own app, because it is
- * the same account, the same store switcher and the same authorisation
- * every other store screen uses. What it is NOT is the display: nothing
- * on this page appears on the television, and nothing on the television
- * can reach anything here.
- *
- * Built to be used on a phone behind a counter with the television
- * across the room, which is where a Friday night actually happens.
+ * The founder's brief, after running real nights on the old page: each
+ * display repeated a full block of link instructions, URL, controls and
+ * settings, and two screens made "an extremely long repetitive mobile
+ * page". So this page now answers exactly one question — WHAT IS ON MY
+ * SCREENS — and everything about one screen lives on that screen's own
+ * manage page, one tap away. No URLs here, no instructions, and the
+ * general explanation appears once at the bottom instead of under
+ * every television.
  */
-export default async function EventHubPage({
+export default async function FlareCastPage({
   searchParams,
 }: {
   searchParams: Promise<{ as?: string }>;
@@ -64,22 +60,19 @@ export default async function EventHubPage({
     areasForUser(viewer.user.id, viewer.kind === "admin"),
   ]);
 
-  /*
-   * ALL of them, not `displays[0]`. That indexing was the bug behind
-   * "it literally just deletes the timer": splitting a tournament to
-   * its own screen created display #2 and moved the timer there — and
-   * this page never showed a second display, so the timer vanished
-   * with no trace of where it went. Every screen now gets its section,
-   * link included, so a split lands somewhere you can see and open.
-   */
-  const payloads = await Promise.all(displays.map((d) => displayPayload(d)));
+  const screens = await Promise.all(
+    displays.map(async (display) => ({
+      display,
+      rows: await screenRows(display.id),
+    })),
+  );
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
-      title="Event Hub"
-      description="Your tournament timers, your Flare board and your counter code, on the television."
+      title="FlareCast"
+      description="Your screens: tournament timers, the room's Flares and your counter code, on every television."
       areas={areas}
       currentArea={`/store?as=${storeId}`}
     >
@@ -91,149 +84,79 @@ export default async function EventHubPage({
         Back to your store
       </Link>
 
-      {displays.length === 0 ? (
-        <section className="flex flex-col gap-5" aria-labelledby="create-heading">
-          <div className="flex flex-col gap-1">
-            <h2 id="create-heading" className="text-xl font-bold text-text-primary">
-              Set up your display
-            </h2>
-            <p className="max-w-2xl text-sm text-text-secondary">
-              One link, opened on whatever is plugged into your television. It shows
-              your tournament timers, what the room is looking for and your counter code
-              &mdash; and it needs nobody to sign in.
-            </p>
-          </div>
+      <section className="flex flex-col gap-5" aria-labelledby="screens-heading">
+        <h2 id="screens-heading" className="text-xl font-bold text-text-primary">
+          Your screens
+        </h2>
 
-          <Card>
-            <form action={createDisplayAction} className="flex flex-col gap-4">
+        {screens.length === 0 && (
+          <p className="max-w-2xl text-sm text-text-secondary">
+            A screen is one physical television or projector. Add your first one below,
+            open its link on that TV, and it runs all night: timers, the room&rsquo;s
+            Flares and your counter code.
+          </p>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {screens.map(({ display, rows }) => (
+            <ScreenCard
+              key={display.id}
+              name={display.name}
+              rows={rows}
+              manageHref={`/store/event-hub/${display.id}?as=${storeId}`}
+            />
+          ))}
+
+          {/* Adding a television is one field. The link and token are
+              generated on create; they live on the manage page. */}
+          <Card className="flex flex-col justify-center gap-3 border-dashed">
+            <form action={createDisplayAction} className="flex flex-col gap-3">
               <input type="hidden" name="storeId" value={storeId} />
-              <input type="hidden" name="name" value="Main display" />
-
-              <div className="flex flex-col gap-1.5">
-                <label
-                  htmlFor="nightTitle"
-                  className="text-sm font-medium text-text-secondary"
-                >
-                  Event night title (optional)
-                </label>
-                <input
-                  id="nightTitle"
-                  name="nightTitle"
-                  maxLength={60}
-                  placeholder="Monday TCG Night"
-                  className="h-11 rounded-[var(--radius-control)] border border-border bg-canvas px-3.5 text-text-primary placeholder:text-text-muted focus-visible:border-accent focus-visible:outline-none"
-                />
-              </div>
-
-              <SubmitButton label="Create the display" pendingLabel="Creating…" />
+              <label
+                htmlFor="new-screen-name"
+                className="flex items-center gap-2 font-semibold text-text-primary"
+              >
+                <Plus className="size-4 text-accent" aria-hidden="true" />
+                Add a screen
+              </label>
+              <TextInput
+                id="new-screen-name"
+                name="name"
+                maxLength={40}
+                placeholder={screens.length === 0 ? "Main TV" : "Back TV"}
+              />
+              <SubmitButton label="Create" pendingLabel="Creating…" size="sm" />
             </form>
           </Card>
-        </section>
-      ) : (
-        <>
-          {displays.map((display, index) => {
-            const payload = payloads[index];
-            if (!payload) return null;
-            const displayUrl = `${siteUrl()}/display/${display.token}`;
+        </div>
+      </section>
 
-            return (
-              <section
-                key={display.id}
-                className={`flex flex-col gap-5 ${
-                  index > 0 ? "border-t border-border pt-8" : ""
-                }`}
-                aria-label={display.name}
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-xl font-bold text-text-primary">
-                    {display.name}
-                  </h2>
-                  <span className="text-sm text-text-muted tabular-nums">
-                    {payload.timers.length} of {MAX_TIMERS} tournaments
-                  </span>
-                </div>
-
-                <Card className="flex flex-col gap-3">
-                  <p className="text-sm text-text-secondary">
-                    Open this link on whatever drives that television, then press Enter
-                    Fullscreen once. It asks nobody to sign in.
-                  </p>
-                  <p className="font-mono text-xs break-all text-text-muted">
-                    {displayUrl}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={`/display/${display.token}`}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className={buttonStyles("primary", "sm")}
-                    >
-                      <Tv className="size-4" aria-hidden="true" />
-                      Open TV display
-                    </a>
-                    <a
-                      href={`/display/${display.token}`}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className={buttonStyles("secondary", "sm")}
-                    >
-                      <ExternalLink className="size-4" aria-hidden="true" />
-                      Preview
-                    </a>
-                    <CopyLink url={displayUrl} />
-                  </div>
-                </Card>
-
-                {/* Live from here down: the same polled payload the
-                    television reads, so a second staff phone's pause
-                    shows up here too. */}
-                <ControlPanel initial={payload} token={display.token} />
-
-                {payload.timers.length < MAX_TIMERS && (
-                  <details className="group rounded-[var(--radius-card)] border border-border bg-surface">
-                    <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-text-primary select-none">
-                      Add a tournament to this screen
-                    </summary>
-                    <div className="border-t border-border p-4">
-                      <AddTimerForm displayId={display.id} />
-                    </div>
-                  </details>
-                )}
-
-                <details className="group rounded-[var(--radius-card)] border border-border bg-surface">
-                  <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-text-primary select-none">
-                    What this screen shows
-                  </summary>
-                  <div className="border-t border-border p-4">
-                    <DisplaySettings
-                      displayId={display.id}
-                      nightTitle={display.nightTitle}
-                      layout={display.layout}
-                      announcement={display.announcement}
-                      showFlares={display.showFlares}
-                      showQr={display.showQr}
-                      soundEnabled={display.soundEnabled}
-                    />
-                  </div>
-                </details>
-              </section>
-            );
-          })}
-
-          <section className="flex flex-col gap-3" aria-labelledby="rules-heading">
-            <h2 id="rules-heading" className="text-xl font-bold text-text-primary">
-              About the rules summaries
-            </h2>
-            <p className="max-w-2xl text-sm text-text-secondary">
-              The end-of-round instructions on the display are a quick reference for the
-              room, not an authority. Current official tournament rules and your event
-              staff or judges control. Each game&rsquo;s card links to the
-              publisher&rsquo;s own documentation, and shows the date we last checked
-              it.
-            </p>
-          </section>
-        </>
-      )}
+      {/* Everything general, said ONCE — the founder: "'What this screen
+          shows' and general FlareCast explanations should NOT repeat
+          under every display." */}
+      <section className="flex flex-col gap-3" aria-labelledby="about-heading">
+        <h2 id="about-heading" className="text-xl font-bold text-text-primary">
+          About FlareCast
+        </h2>
+        <div className="max-w-2xl space-y-2 text-sm text-text-secondary">
+          <p>
+            Each screen has its own private link. Open it in the browser on whatever
+            drives that television, press Enter Fullscreen once, and leave it — it needs
+            nobody to sign in and keeps counting through wifi hiccups. The link lives on
+            each screen&rsquo;s manage page.
+          </p>
+          <p>
+            A screen running a single game shows a QR scoped to that game: players who
+            scan the One Piece screen search One Piece cards. The counter code stays
+            universal.
+          </p>
+          <p>
+            One tournament per screen looks best. A screen holds up to four, and the
+            layout adapts on its own.
+          </p>
+          <p className="text-text-muted">{RULES_DISCLAIMER}</p>
+        </div>
+      </section>
     </AppShell>
   );
 }

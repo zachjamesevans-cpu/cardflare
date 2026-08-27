@@ -20,6 +20,7 @@ import { ANNOUNCEMENT_MAX, NIGHT_TITLE_MAX } from "@/lib/event-hub/schema";
  */
 export function DisplaySettings({
   displayId,
+  name,
   nightTitle,
   layout,
   announcement,
@@ -28,6 +29,7 @@ export function DisplaySettings({
   soundEnabled,
 }: {
   displayId: string;
+  name: string;
   nightTitle: string | null;
   layout: LayoutChoice;
   announcement: string | null;
@@ -69,6 +71,25 @@ export function DisplaySettings({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label
+              htmlFor="screen-name"
+              className="text-sm font-medium text-text-secondary"
+            >
+              Screen name
+            </label>
+            <TextInput
+              id="screen-name"
+              name="name"
+              maxLength={40}
+              defaultValue={name}
+              placeholder="Main TV"
+            />
+            <p className="text-xs text-text-muted">
+              What the screens list calls this television.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
               htmlFor="nightTitle"
               className="text-sm font-medium text-text-secondary"
             >
@@ -88,11 +109,13 @@ export function DisplaySettings({
             <label htmlFor="layout" className="text-sm font-medium text-text-secondary">
               Layout
             </label>
+            {/* The founder's names for the three shapes. The stored
+                values predate them, so the labels translate. */}
             <Select id="layout" name="layout" defaultValue={layout}>
               <option value="auto">Auto</option>
-              <option value="single">Single</option>
+              <option value="single">Focus (one tournament)</option>
               <option value="split">Split (two)</option>
-              <option value="grid">Grid (three or four)</option>
+              <option value="grid">Wallboard (three or four)</option>
             </Select>
             <p className="text-xs text-text-muted">
               Auto picks from what is running. A layout too small for the tournaments on

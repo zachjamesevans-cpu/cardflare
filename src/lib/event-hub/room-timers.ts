@@ -31,11 +31,40 @@ export async function roomTimersForStore(
   ).flat();
 
   return timers
-    .map((timer) => wireFor(timer, now))
+    .map((timer) => timerWire(timer, now))
     .filter((wire): wire is RoomTimerWire => wire !== null);
 }
 
-function wireFor(timer: HubTimer, now: number): RoomTimerWire | null {
+/**
+ * One tournament as the screens overview shows it: what it is, and a
+ * wire for its clock (null until somebody starts it).
+ */
+export interface ScreenCardRow {
+  id: string;
+  gameName: string;
+  eventName: string;
+  wire: RoomTimerWire | null;
+}
+
+/** Everything on one screen, shaped for its overview card. */
+export async function screenRows(
+  displayId: string,
+  now: number = Date.now(),
+): Promise<ScreenCardRow[]> {
+  const timers = await listTimers(displayId);
+  return timers.map((timer) => ({
+    id: timer.id,
+    gameName: GAME_PROFILES[timer.game].shortName,
+    eventName: timer.eventName,
+    wire: timerWire(timer, now),
+  }));
+}
+
+/**
+ * One timer as a wire. Exported for the controller's screens overview,
+ * which shows the same ticking clock on each screen card.
+ */
+export function timerWire(timer: HubTimer, now: number): RoomTimerWire | null {
   const phase = timerPhase(timer, now);
   if (phase === "ready" || phase === "complete") return null;
 
