@@ -4,6 +4,7 @@ import { listDisplays, listTimers } from "./repository";
 import {
   elapsedMs,
   impliedOvertimeMs,
+  isStaleTimer,
   overtimeCapMs,
   remainingMs,
   timerPhase,
@@ -71,6 +72,11 @@ export async function screenRows(
 export function timerWire(timer: HubTimer, now: number): RoomTimerWire | null {
   const phase = timerPhase(timer, now);
   if (phase === "ready" || phase === "complete") return null;
+
+  /* The overnight failsafe: last night's never-closed timer must not
+     greet tomorrow's first scan with "Extra time over". Derived, so the
+     room is clean even before the console's lazy reset has run. */
+  if (isStaleTimer(timer, now)) return null;
 
   const profile = GAME_PROFILES[timer.game];
 

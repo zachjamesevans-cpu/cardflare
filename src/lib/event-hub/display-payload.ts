@@ -14,7 +14,7 @@ import {
   type HubDisplay,
 } from "./repository";
 import { orderByAsker } from "./flare-groups";
-import type { HubTimer } from "./timer";
+import { isStaleTimer, reset, type HubTimer } from "./timer";
 
 /**
  * Everything the television is allowed to know, and nothing else.
@@ -124,6 +124,25 @@ async function settleAutoRounds(timers: HubTimer[]): Promise<HubTimer[]> {
 
   return Promise.all(
     timers.map(async (timer) => {
+      /*
+       * The overnight failsafe comes first: a round that ended six hours
+       * ago is not a round anybody is coming back to, so it resets to
+       * Ready rather than greeting tomorrow's staff — or worse, handing
+       * Auto Mode a stale state to reason about. Guarded exactly like
+       * the round start, so a store member pressing something at the
+       * same instant wins.
+       */
+      if (isStaleTimer(timer, now)) {
+        const patch = reset(timer);
+        if (!patch) return timer;
+
+        const cleared = await patchTimerIfUnchanged(timer.id, timer.updatedAt, patch);
+        if (!cleared) return timer;
+
+        void logTimerEvent(timer.id, "stale-reset", "overnight failsafe");
+        return cleared;
+      }
+
       if (intermissionFor(timer, now)?.state !== "due") return timer;
 
       const patch = startNextRound(timer, now);

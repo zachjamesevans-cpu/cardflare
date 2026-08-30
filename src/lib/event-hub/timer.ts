@@ -299,6 +299,59 @@ export function timerPhase(timer: HubTimer, now: number): TimerPhase {
   return timer.status;
 }
 
+/**
+ * How long a finished-but-never-closed round may linger.
+ *
+ * Six hours: safely past any real round's ending, safely inside "the
+ * store went home without pressing anything".
+ */
+export const STALE_TIMER_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * The overnight failsafe.
+ *
+ * The founder, opening a room four days later: the previous event's
+ * timer was still on the screen, red, at "Extra time over". Nobody
+ * closes timers out at the end of a night — that is exactly the kind
+ * of housekeeping this product exists to remove — so a timer that has
+ * been sitting at time, paused, or counting an untimed round for six
+ * hours is DERIVED as stale: the room stops showing it immediately,
+ * and the console resets it to Ready on its next read.
+ *
+ * A timed round still counting down is never stale — the duration cap
+ * is eight hours, and hiding a live countdown would be the worse bug.
+ */
+export function isStaleTimer(timer: HubTimer, now: number): boolean {
+  const phase = timerPhase(timer, now);
+
+  if (phase === "ready" || phase === "complete") return false;
+
+  if (phase === "paused") {
+    const since = stamp(timer.pausedAt) ?? stamp(timer.updatedAt);
+    return since !== null && now - since > STALE_TIMER_MS;
+  }
+
+  if (phase === "running") {
+    /* Timed and still counting down: live, whatever its age. Untimed
+       counts up forever, so its age IS its staleness. */
+    if (timer.durationSeconds !== null) return false;
+    const started = stamp(timer.startedAt);
+    return started !== null && now - started > STALE_TIMER_MS;
+  }
+
+  /* At time, one way or another. Measured from when time actually hit:
+     the hand call when there was one, the overtime clock's start for an
+     explicit overtime, regulation's own end otherwise — and updatedAt
+     as the backstop for a hand-edited row with none of them. */
+  const anchor =
+    stamp(timer.timeCalledAt) ??
+    (timer.status === "overtime" ? stamp(timer.overtimeStartedAt) : null) ??
+    regulationEndAt(timer) ??
+    stamp(timer.updatedAt);
+
+  return anchor !== null && now - anchor > STALE_TIMER_MS;
+}
+
 /** Whether the overtime overlay belongs on this panel. */
 export function showsOvertimeRules(timer: HubTimer, now: number): boolean {
   /* Opt-in per timer. Without beginner mode the wall's answer to time
