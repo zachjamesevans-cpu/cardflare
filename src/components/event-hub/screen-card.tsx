@@ -6,7 +6,13 @@ import { ChevronRight, MonitorPlay } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
-import { readRoomTimer } from "@/lib/event-hub/room-timer-wire";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { timerControlAction } from "@/lib/event-hub/actions";
+import {
+  readRoomTimer,
+  type RoomTimerReading,
+  type RoomTimerWire,
+} from "@/lib/event-hub/room-timer-wire";
 import type { ScreenCardRow } from "@/lib/event-hub/room-timers";
 
 /**
@@ -16,9 +22,33 @@ import type { ScreenCardRow } from "@/lib/event-hub/room-timers";
  * FlareCast and immediately understand: these are my physical screens.
  * I tap one screen and manage what is on it." So a card carries the
  * four things a glance wants — the screen's name, whether it is live,
- * what is on it, and the clock — and nothing it does not: no URL, no
- * instructions, no settings. All of that lives one tap away.
+ * what is on it, and the clock — plus exactly ONE button per
+ * tournament: whatever that clock needs next. The founder again, a
+ * round later: "not intuitive to have to click into 'manage' just to
+ * go to next round." Everything else still lives one tap away.
  */
+
+/**
+ * The one thing this tournament's clock wants pressed right now.
+ * Null for states with no single obvious next step.
+ */
+function rowControl(
+  wire: RoomTimerWire | null,
+  reading: RoomTimerReading | null,
+): { op: string; label: string } | null {
+  if (!wire) return { op: "start", label: "Start" };
+  if (reading?.label === "Paused") return { op: "start", label: "Resume" };
+
+  /* At time, or counting Auto Mode's intermission: the next step is the
+     next round, and it goes through the same guarded transition the
+     automatic start uses. */
+  const nextAt = wire.nextRoundAt ? Date.parse(wire.nextRoundAt) : NaN;
+  if (reading?.atTime || Number.isFinite(nextAt)) {
+    return { op: "next-round", label: "Next round" };
+  }
+
+  return { op: "pause", label: "Pause" };
+}
 
 export type ScreenStatus = "live" | "ready" | "empty";
 
@@ -82,6 +112,7 @@ export function ScreenCard({
         <div className="flex flex-col gap-2">
           {rows.map((row) => {
             const reading = row.wire ? readRoomTimer(row.wire, now) : null;
+            const control = rowControl(row.wire, reading);
 
             return (
               <div key={row.id} className="flex items-center justify-between gap-3">
@@ -97,18 +128,34 @@ export function ScreenCard({
                   </p>
                   <p className="truncate text-xs text-text-muted">{row.eventName}</p>
                 </div>
-                <p
-                  suppressHydrationWarning
-                  className={`shrink-0 font-mono text-lg font-bold tabular-nums ${
-                    reading?.atTime
-                      ? "text-danger motion-safe:animate-pulse"
-                      : reading
-                        ? "text-text-primary"
-                        : "text-text-muted"
-                  }`}
-                >
-                  {reading ? reading.clock : "Ready"}
-                </p>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <p
+                    suppressHydrationWarning
+                    className={`font-mono text-lg font-bold tabular-nums ${
+                      reading?.atTime
+                        ? "text-danger motion-safe:animate-pulse"
+                        : reading
+                          ? "text-text-primary"
+                          : "text-text-muted"
+                    }`}
+                  >
+                    {reading ? reading.clock : "Ready"}
+                  </p>
+
+                  {control && (
+                    <form action={timerControlAction}>
+                      <input type="hidden" name="timerId" value={row.id} />
+                      <input type="hidden" name="op" value={control.op} />
+                      <SubmitButton
+                        label={control.label}
+                        pendingLabel="…"
+                        variant="secondary"
+                        size="sm"
+                      />
+                    </form>
+                  )}
+                </div>
               </div>
             );
           })}

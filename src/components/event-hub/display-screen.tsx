@@ -6,6 +6,7 @@ import { Maximize, Minimize, WifiOff } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { intermissionFor } from "@/lib/event-hub/auto-mode";
 import type { DisplayPayload } from "@/lib/event-hub/display-payload";
+import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
 import { displayPlan } from "@/lib/event-hub/layout";
 import { rotationWindow } from "@/lib/event-hub/rotation";
 import { remainingMs, timerPhase, type HubTimer } from "@/lib/event-hub/timer";
@@ -105,6 +106,19 @@ export function DisplayScreen({
   ]);
 
   useChimes(timers, payload.soundEnabled, at);
+
+  /*
+   * The tab keeps naming its game as the night changes. The server set
+   * the first title; a screen that gains or loses a game between polls
+   * renames itself here, so a browser full of FlareCast tabs always
+   * reads "One Piece · Riftbound · Pokémon" at a glance.
+   */
+  useEffect(() => {
+    const games = [...new Set(timers.map((timer) => timer.game))];
+    if (games.length === 1) {
+      document.title = GAME_PROFILES[games[0]].shortName;
+    }
+  }, [timers]);
 
   if (intermission) {
     return (
