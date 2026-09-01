@@ -1120,13 +1120,20 @@ export interface FeedCard {
 }
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
-export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
+export type FeedSection =
+  | "wanted"
+  | "tonight"
+  | "people"
+  | "walkin"
+  | "nearby"
+  | "store";
 
 /** The heading each section is drawn under. Same words as the website. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
 };

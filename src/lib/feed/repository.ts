@@ -589,13 +589,15 @@ async function embersBalance(playerId: string): Promise<number> {
  * scan, and it means a quiet week reads as "nothing on tonight" rather
  * than as an empty app.
  */
-export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
+export type FeedSection =
+  "wanted" | "tonight" | "people" | "walkin" | "nearby" | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
 };
@@ -606,9 +608,23 @@ function sectionFor(item: FeedItem): FeedSection {
       return "wanted";
     case "announcement":
     case "board":
-    case "upcoming":
     case "start":
       return "tonight";
+    /*
+     * A night on the calendar is news; a shop that merely accepts
+     * walk-ins is a place.
+     *
+     * Both arrived here as "upcoming" and both were filed under Tonight,
+     * so a Feed with nothing actually on opened with two identical "Walk
+     * in any time" cards beneath a heading promising an event. The
+     * founder, looking at exactly that: "seeing two rooms that you can
+     * open on the main feed maybe isn't the first thing that should be
+     * showing." It is not. A store with a real date keeps its place at
+     * the top; one without drops to its own quieter heading further
+     * down, beside the other places.
+     */
+    case "upcoming":
+      return item.nextEventAt ? "tonight" : "walkin";
     case "hunt":
     case "recent":
     case "added":
@@ -1643,13 +1659,16 @@ export async function listFeed(
     })),
     ...boards.filter((item) => item.kind === "hunt"),
     ...boards.filter((item) => item.kind === "board" && item.yours),
-    ...upcoming,
+    ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
     ...boards.filter((item) => item.kind === "board" && !item.yours),
     ...recent,
     ...added,
     ...traded,
     ...suggested,
+    /* The walk-in-only stores, down here with the other places rather
+       than at the top pretending to be tonight. */
+    ...upcoming.filter((item) => item.nextEventAt === null),
     ...nearbyStores,
     ...pack,
     ...shop,
