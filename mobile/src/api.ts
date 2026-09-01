@@ -1594,6 +1594,10 @@ export const postAreaFlare = (input: {
   intent?: "want" | "showcase";
   acceptsTrade?: boolean;
   acceptsCash?: boolean;
+  /* Where the phone is, when it has permission. Rides this one request
+     and anchors the Flare to a ZIP; the position is never stored. */
+  latitude?: number;
+  longitude?: number;
 }) =>
   call<{ ok: boolean; flareId?: string; error?: string; message?: string }>(
     "POST",

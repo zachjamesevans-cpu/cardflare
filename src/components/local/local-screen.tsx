@@ -67,6 +67,19 @@ export function LocalScreen({
    * ask the browser all over again.
    */
   const [deviceFeed, setDeviceFeed] = useState<LocalFeed | null>(null);
+  /*
+   * The coordinate behind that feed, held for as long as the tab is open.
+   *
+   * Posting needs an origin too, and until now it could only use the
+   * profile's ZIP — so somebody who had granted the browser the more
+   * precise thing was told to go and type the less precise one. Still
+   * never persisted: this lives beside the feed it produced and dies with
+   * the page.
+   */
+  const [deviceAt, setDeviceAt] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const router = useRouter();
@@ -90,6 +103,10 @@ export function LocalScreen({
           setLocating(false);
           if (found) {
             setDeviceFeed(found);
+            setDeviceAt({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
             /* Remember the CHOICE, never the place. The founder: "when
                you do location it should cache it and save it." The
                browser keeps the grant; this one bit is what lets the
@@ -243,7 +260,7 @@ export function LocalScreen({
       {/* Posting comes before reading: somebody opening Local with a card
           in mind should not have to scroll past other people's to say so. */}
       {feed.source !== "none" && (
-        <PostAreaFlare imagesEnabled={imagesEnabled} onPosted={reload} />
+        <PostAreaFlare imagesEnabled={imagesEnabled} at={deviceAt} onPosted={reload} />
       )}
 
       {feed.source !== "none" && (

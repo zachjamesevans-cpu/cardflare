@@ -1,5 +1,6 @@
 "use server";
 
+import { pointFromCoords } from "@/lib/geo/zip";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { postAreaFlare, withdrawAreaFlare, type AreaFlareInput } from "./area";
@@ -27,7 +28,19 @@ async function viewerPlayerId(): Promise<string | null> {
   return (await playerForUser(viewer.user.id))?.id ?? null;
 }
 
-export type LocalActionResult = { ok: true } | { ok: false; message: string };
+export type LocalActionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      message: string;
+      /**
+       * What kind of refusal, when the caller can do something specific
+       * about it. Named rather than sniffed out of the message: a screen
+       * that decides what to render by searching the copy for the word
+       * "ZIP" breaks the first time somebody rewrites the sentence.
+       */
+      reason?: "sign-in" | "no-postal-code" | "already-posted";
+    };
 
 /** Null when signed out or the coordinates were nonsense. */
 export type LocalFeedResult = LocalFeed | null;
@@ -144,21 +157,29 @@ export async function localFeedAtAction(
  */
 export async function postAreaFlareAction(
   input: AreaFlareInput,
+  /* The browser's coordinate, when Local is being read from one. Rides
+     this call, anchors the Flare to a ZIP, and is never written. */
+  at?: { latitude: number; longitude: number } | null,
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
 
-  const result = await postAreaFlare(playerId, input);
+  const result = await postAreaFlare(
+    playerId,
+    input,
+    pointFromCoords(at?.latitude, at?.longitude),
+  );
   if (result.ok) return { ok: true };
 
   if (result.reason === "no-postal-code") {
     return {
       ok: false,
-      message: "Add your ZIP code first so people know roughly where you are.",
+      reason: "no-postal-code",
+      message: "Tell us roughly where you are and the card goes up.",
     };
   }
   if (result.reason === "already-posted") {
-    return { ok: false, message: "That card is already up." };
+    return { ok: false, reason: "already-posted", message: "That card is already up." };
   }
 
   return { ok: false, message: GENERIC };

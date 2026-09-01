@@ -57,7 +57,11 @@ function leadArt(hit: CardHit): string | null {
  * the choice and the alternatives at the same time, which a switch
  * does not.
  */
-function Pill({
+/**
+ * The board's own toggle, exported so Local's composer is literally the
+ * same control rather than one that merely looks like it.
+ */
+export function Pill({
   label,
   active,
   onPress,

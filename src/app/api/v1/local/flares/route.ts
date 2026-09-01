@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
+import { pointFromCoords } from "@/lib/geo/zip";
 import { readJsonPayload } from "@/lib/api/payload";
 import { postAreaFlare, withdrawAreaFlare } from "@/lib/local/area";
 
@@ -21,6 +22,10 @@ const postSchema = z.object({
   intent: z.enum(["want", "showcase"]).optional(),
   acceptsTrade: z.boolean().optional(),
   acceptsCash: z.boolean().optional(),
+  /* The phone's coordinate, when it has permission. Same bargain as the
+     Local feed's: it rides this request and is never stored. */
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -30,7 +35,12 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = postSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("Unrecognised Flare");
 
-  const result = await postAreaFlare(player.playerId, parsed.data);
+  const { latitude, longitude, ...flare } = parsed.data;
+  const result = await postAreaFlare(
+    player.playerId,
+    flare,
+    pointFromCoords(latitude, longitude),
+  );
 
   if (result.ok) return Response.json({ ok: true, flareId: result.flareId });
 

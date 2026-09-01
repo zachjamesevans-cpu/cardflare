@@ -181,3 +181,81 @@ describe("taking one down", () => {
     );
   });
 });
+
+describe("posting with a location instead of a typed ZIP", () => {
+  /*
+   * The bug this block exists for, reported from the live site: "it
+   * doesn't let me click anything and tells me i need to put in a zip,
+   * despite it already knowing my location after i approved it."
+   *
+   * Local accepts EITHER a device coordinate or the profile's ZIP as an
+   * origin. Posting accepted only the ZIP, so granting the browser the
+   * more precise thing left the composer permanently refusing — and
+   * every tap produced the identical sentence, which reads as a screen
+   * that does not respond at all.
+   */
+  it("anchors to the coordinate when the profile has no ZIP", async () => {
+    playerRow = { data: { postal_code: null }, error: null };
+
+    const result = await postAreaFlare(
+      "player-1",
+      { cardId: "card-1" },
+      /* Eugene, Oregon. */
+      { latitude: 44.0521, longitude: -123.0868 },
+    );
+
+    expect(result).toEqual({ ok: true, flareId: "flare-1" });
+    /* Snapped to a centroid: five digits, never the position shared. */
+    expect(inserted()).toMatchObject({ posted_postal_code: "97401" });
+  });
+
+  it("stores five digits, never the coordinate it was given", async () => {
+    playerRow = { data: { postal_code: null }, error: null };
+
+    await postAreaFlare(
+      "player-1",
+      { cardId: "card-1" },
+      { latitude: 44.0521, longitude: -123.0868 },
+    );
+
+    const row = inserted();
+    expect(row).not.toHaveProperty("latitude");
+    expect(row).not.toHaveProperty("longitude");
+    expect(String(row.posted_postal_code)).toMatch(/^[0-9]{5}$/);
+  });
+
+  it("still prefers the ZIP somebody typed", async () => {
+    playerRow = { data: { postal_code: "97477" }, error: null };
+
+    await postAreaFlare(
+      "player-1",
+      { cardId: "card-1" },
+      { latitude: 44.0521, longitude: -123.0868 },
+    );
+
+    expect(inserted()).toMatchObject({ posted_postal_code: "97477" });
+  });
+
+  it("still asks when there is neither", async () => {
+    playerRow = { data: { postal_code: null }, error: null };
+
+    expect(await postAreaFlare("player-1", { cardId: "card-1" }, null)).toEqual({
+      ok: false,
+      reason: "no-postal-code",
+    });
+  });
+
+  it("refuses a coordinate nowhere near a ZIP rather than snapping to nonsense", async () => {
+    playerRow = { data: { postal_code: null }, error: null };
+
+    /* The middle of the Atlantic. The nearest ZCTA is a real row and a
+       ridiculous answer. */
+    expect(
+      await postAreaFlare(
+        "player-1",
+        { cardId: "card-1" },
+        { latitude: 30, longitude: -40 },
+      ),
+    ).toEqual({ ok: false, reason: "no-postal-code" });
+  });
+});
