@@ -1284,6 +1284,19 @@ async function recentItems(
   ownSessionId: string | null,
   held: ReturnType<typeof heldByCard>,
   stores: Map<string, { name: string; city: string | null; joinCode: string }>,
+  /**
+   * The accounts this player follows. The item is filed under a heading
+   * that says "People you follow", and until now it was not filtered by
+   * them at all — it took every open Flare at your stores, which is how
+   * three guests came to sit under that exact heading.
+   *
+   * The founder's split, and the one that makes both screens mean
+   * something: "the feed should only show flares of the people you
+   * follow, while local is an algorithm showing flares in your area."
+   * A guest cannot be followed and so cannot appear here; they are
+   * answerable in the room they posted in, which is where they show.
+   */
+  followedSessions: Set<string>,
 ): Promise<RecentItem[]> {
   const admin = getSupabaseAdmin();
 
@@ -1306,7 +1319,9 @@ async function recentItems(
     (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
       Boolean(flare.event_id) &&
       Boolean(flare.player_session_id) &&
-      flare.player_session_id !== ownSessionId,
+      flare.player_session_id !== ownSessionId &&
+      /* Somebody you follow, or it is not your Feed's business. */
+      followedSessions.has(flare.player_session_id ?? ""),
   );
   if (usable.length === 0) return [];
 
@@ -1621,7 +1636,7 @@ export async function listFeed(
       tradedItems(locals.map((local) => local.storeId)),
       addedItems(followed, playerBySession, wanted),
       suggestionItem(playerId, wanted, new Set(followed.keys())),
-      recentItems(sessionId, held, stores),
+      recentItems(sessionId, held, stores, new Set(playerBySession.keys())),
       packItem(balance),
       shopItem(playerId, balance),
       nearbyStoreItems(playerId, locals, device),
