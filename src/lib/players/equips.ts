@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
+import { tierAllows } from "@/lib/tiers";
 import { artFilesFor, artFileOf, type CosmeticArtFile } from "@/lib/players/art-files";
 import type { CosmeticRow } from "@/lib/supabase/types";
 
@@ -73,18 +74,33 @@ export async function avatarWearFor(
   const ids = [...new Set(playerIds)];
   if (!isSupabaseConfigured() || ids.length === 0) return wear;
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("player_equips")
-    .select("player_id, kind, cosmetic_slug")
-    .in("kind", ["ring", "aura"])
-    .in("player_id", ids);
+  const [{ data, error }, { data: tiers }] = await Promise.all([
+    getSupabaseAdmin()
+      .from("player_equips")
+      .select("player_id, kind, cosmetic_slug")
+      .in("kind", ["ring", "aura"])
+      .in("player_id", ids),
+    getSupabaseAdmin().from("players").select("id, tier").in("id", ids),
+  ]);
 
   if (error) {
     console.error("Could not read worn rings and auras", error);
     return wear;
   }
 
-  const rows = data ?? [];
+  /*
+   * A lapsed Pro's look comes OFF at the read, not just at the equip:
+   * the equips row survives (their look is waiting for them, which is
+   * the honest upsell), but nothing renders for a tier that no longer
+   * wears cosmetics. Same shape as avatarPathFor's animated fallback.
+   */
+  const wears = new Set(
+    (tiers ?? [])
+      .filter((row) => tierAllows(row.tier, "cosmetics"))
+      .map((row) => row.id),
+  );
+
+  const rows = (data ?? []).filter((row) => wears.has(row.player_id));
 
   /* One lookup for every Rive file worn in the room, not one per
      player: a table of twelve wearing the same ring costs one read. */
@@ -136,7 +152,34 @@ export async function getEquips(
   return empty;
 }
 
-export type EquipOutcome = "equipped" | "cleared" | "not-owned" | "failed";
+/**
+ * `getEquips`, for DISPLAY: empty for a tier that no longer wears
+ * cosmetics, so a lapsed Pro's look comes off every profile and card
+ * the moment the tier drops — while the rows survive underneath for the
+ * day they resubscribe. The dressing room (`customizeSections`) keeps
+ * reading the raw rows on purpose: it shows what is waiting.
+ */
+export async function dressedEquipsFor(
+  playerId: string,
+): Promise<Record<EquipKind, string | null>> {
+  const equips = await getEquips(playerId);
+  if (!isSupabaseConfigured()) return equips;
+
+  const { data: wearer } = await getSupabaseAdmin()
+    .from("players")
+    .select("tier")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (tierAllows(wearer?.tier ?? null, "cosmetics")) return equips;
+
+  return Object.fromEntries(Object.keys(equips).map((kind) => [kind, null])) as Record<
+    EquipKind,
+    string | null
+  >;
+}
+
+export type EquipOutcome = "equipped" | "cleared" | "not-owned" | "not-pro" | "failed";
 
 /**
  * Wears one cosmetic, or clears the slot with null.
@@ -144,6 +187,12 @@ export type EquipOutcome = "equipped" | "cleared" | "not-owned" | "failed";
  * Ownership goes through ownsCosmetic, the single decider - which is
  * exactly what keeps a draft wearable by the founder's granted account
  * and by nobody else, price zero or not.
+ *
+ * WEARING is a Pro capability — the founder's pricing pivot: the free
+ * tier customizes nothing but the profile picture. The gate lives here
+ * because both clients (the web action and the app's route) call this
+ * one function. Clearing a slot stays free: taking something off is
+ * not customization, and a lapsed player must always be able to undress.
  */
 export async function setEquip(
   playerId: string,
@@ -166,6 +215,14 @@ export async function setEquip(
     }
     return "cleared";
   }
+
+  const { data: wearer } = await admin
+    .from("players")
+    .select("tier")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (!tierAllows(wearer?.tier ?? null, "cosmetics")) return "not-pro";
 
   const { data: item } = await admin
     .from("cosmetics")
@@ -257,22 +314,30 @@ export interface CustomizeSection {
 export async function customizeSections(playerId: string): Promise<{
   sections: CustomizeSection[];
   equips: Record<EquipKind, string | null>;
+  /** Whether this player's tier may WEAR any of it. The catalogue shows
+      either way — seeing what exists is the store's advertisement. */
+  customizationAllowed: boolean;
 }> {
   const equips = await getEquips(playerId);
-  if (!isSupabaseConfigured()) return { sections: [], equips };
+  if (!isSupabaseConfigured()) {
+    return { sections: [], equips, customizationAllowed: false };
+  }
 
-  const [{ data: rows, error }, owned] = await Promise.all([
+  const [{ data: rows, error }, owned, { data: wearer }] = await Promise.all([
     getSupabaseAdmin()
       .from("cosmetics")
       .select("*")
       .in("kind", [...EQUIP_KINDS])
       .order("sort_order"),
     ownedCosmetics(playerId),
+    getSupabaseAdmin().from("players").select("tier").eq("id", playerId).maybeSingle(),
   ]);
+
+  const customizationAllowed = tierAllows(wearer?.tier ?? null, "cosmetics");
 
   if (error || !rows) {
     console.error("Could not read the customize catalogue", error);
-    return { sections: [], equips };
+    return { sections: [], equips, customizationAllowed };
   }
 
   const sections = EQUIP_KINDS.map((kind) => ({
@@ -291,5 +356,5 @@ export async function customizeSections(playerId: string): Promise<{
       })),
   })).filter((section) => section.items.length > 0);
 
-  return { sections, equips };
+  return { sections, equips, customizationAllowed };
 }

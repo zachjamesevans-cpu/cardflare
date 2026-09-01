@@ -43,6 +43,7 @@ import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { StoreScreen } from "./src/screens/store";
 import { CustomizeScreen } from "./src/screens/customize";
+import { ProScreen } from "./src/screens/pro";
 import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, hasSeenWelcome } from "./src/screens/welcome";
 import { storedAccessToken } from "./src/api";
@@ -105,6 +106,8 @@ export type StackParams = {
   /** Getting dressed, the website's /profile/customize. Two wands, two
       menus: profile cosmetics or showcase cosmetics. */
   Customize: { area?: "profile" | "showcase" } | undefined;
+  /** The cardflare Pro paywall. Every Pro wall in the app opens this. */
+  Pro: undefined;
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
@@ -130,6 +133,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Settings: "Profile",
   Store: "Profile",
   Customize: "Profile",
+  Pro: "Back",
   PlayerProfile: "Back",
   FindPlayer: "Feed",
   PostFlare: "Room",
@@ -527,6 +531,11 @@ export default function App() {
           >
             {({ route }) => <CustomizeScreen area={route.params?.area ?? "profile"} />}
           </Stack.Screen>
+          <Stack.Screen
+            name="Pro"
+            component={ProScreen}
+            options={{ title: "cardflare Pro", headerBackTitle: "Back" }}
+          />
           <Stack.Screen
             name="PlayerProfile"
             component={PlayerProfileScreen}

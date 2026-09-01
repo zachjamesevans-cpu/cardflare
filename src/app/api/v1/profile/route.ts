@@ -18,10 +18,11 @@ import {
 } from "@/lib/players/profile";
 import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
 import { buyCosmetic } from "@/lib/players/cosmetics";
-import { avatarWearFor, getEquips } from "@/lib/players/equips";
+import { avatarWearFor, dressedEquipsFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { displayNameSchema } from "@/lib/players/profile-schema";
 import { siteUrl } from "@/lib/site";
+import { tierAllows } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export async function GET(request: Request): Promise<Response> {
     ),
     resolveEquipped(profile.equipped),
     avatarWearFor([player.playerId]),
-    getEquips(player.playerId),
+    dressedEquipsFor(player.playerId),
   ]);
 
   const wear = wearing.get(player.playerId);
@@ -97,6 +98,12 @@ export async function GET(request: Request): Promise<Response> {
         : profile.coverUrl,
       embersEarned: profile.embersEarned,
       embersBalance: profile.embersBalance,
+      /*
+       * The tier, so the app can draw locks and the Pro screen honestly.
+       * Public on the website's profiles already; not a secret here.
+       */
+      tier: profile.tier,
+      pro: tierAllows(profile.tier, "cosmetics"),
       equipped: worn,
       /*
        * The worn profile border and avatar effect, and the files

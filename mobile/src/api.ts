@@ -790,6 +790,14 @@ export interface Profile {
   avatarUrl: string | null;
   embersEarned: number;
   /**
+   * The membership tier, and the one question the app actually asks of
+   * it. Optional so a build against an older server keeps working —
+   * absent reads as free, which locks nothing that was unlocked before
+   * this shipped and never invents an entitlement.
+   */
+  tier?: string;
+  pro?: boolean;
+  /**
    * Private. The founder's two-number rule: this is what is left to
    * spend, it never appears on anybody else's screen, and the server
    * only ever puts it on the authenticated player's own profile.
@@ -1427,11 +1435,29 @@ export const getCustomize = () =>
   call<{
     sections: CustomizeSection[];
     equips: Record<CustomizeKind, string | null>;
+    /**
+     * Whether this player's tier may WEAR any of it. Optional so a
+     * build against an older server keeps working; absent reads as
+     * allowed, and the server still refuses with "not-pro" either way.
+     */
+    customizationAllowed?: boolean;
   }>("GET", "/api/v1/customize");
 
 /** Wears one cosmetic, or clears the slot with null. */
 export const setCustomizeEquip = (kind: CustomizeKind, slug: string | null) =>
   call<{ ok: true }>("POST", "/api/v1/customize", { kind, slug });
+
+/**
+ * Tells the server an Apple purchase happened, by its original
+ * transaction id. The server treats this as a POKE, not proof: it asks
+ * Apple's App Store Server API what that transaction really is before
+ * writing anything, so a made-up id buys nothing. Returns whether the
+ * player is Pro NOW, from the server's own read.
+ */
+export const syncApplePurchase = (originalTransactionId: string) =>
+  call<{ ok: true; pro: boolean }>("POST", "/api/v1/billing/apple", {
+    originalTransactionId,
+  });
 
 /**
  * A pasted deck list, saved to the want list under one name.

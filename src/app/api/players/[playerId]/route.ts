@@ -3,7 +3,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
-import { getEquips, wornArtFor } from "@/lib/players/equips";
+import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
@@ -63,7 +63,7 @@ export async function GET(
 
   const [worn, dressed] = await Promise.all([
     resolveEquipped(profile.equipped),
-    getEquips(playerId),
+    dressedEquipsFor(playerId),
   ]);
   const dressedArt = await wornArtFor(dressed);
 

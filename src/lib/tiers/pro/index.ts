@@ -9,4 +9,12 @@ export const manifest = {
   /* Animated GIF profile pictures. Declared ahead of the upload
      pipeline supporting them, so the admin can pre-place players. */
   animatedAvatar: true,
+  /*
+   * Wearing cosmetics at all. The founder's pricing pivot: "the only
+   * customization they can do outside of that on the free tier is a
+   * profile picture" — so every equip slot (rings, auras, borders,
+   * titles, the lot) is Pro. Free players keep browsing the catalogue
+   * and keep their Ember balance; wearing is what Pro sells.
+   */
+  cosmetics: true,
 } as const;
