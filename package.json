@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "brand:assets": "node scripts/generate-brand-assets.mjs",
+    "app:welcome-art": "node scripts/generate-welcome-art.mjs",
     "cosmetics:svg": "tsx scripts/build-cosmetic-svgs.ts",
     "cosmetics:art": "node scripts/extract-cosmetic-art.mjs",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
