@@ -21,6 +21,8 @@ const calls: { table: string; op: string; payload: unknown; filters: unknown[][]
   [];
 let playerRow: Response = { data: { postal_code: "97477" }, error: null };
 let insertResult: Response = { data: { id: "flare-1" }, error: null };
+/* The probe that asks whether the migration has been applied. */
+let schemaError: Response | null = null;
 
 function chain(table: string) {
   const c: Record<string, unknown> = {};
@@ -45,7 +47,11 @@ function chain(table: string) {
   c.maybeSingle = () => Promise.resolve(playerRow);
   c.then = (resolve: (v: Response) => unknown, reject: (e: unknown) => unknown) =>
     Promise.resolve(
-      op === "update" ? { error: null } : { data: null, error: null },
+      op === "update"
+        ? { error: null }
+        : table === "flares" && schemaError
+          ? schemaError
+          : { data: null, error: null },
     ).then(resolve, reject);
 
   return c;
@@ -62,6 +68,7 @@ beforeEach(() => {
   calls.length = 0;
   playerRow = { data: { postal_code: "97477" }, error: null };
   insertResult = { data: { id: "flare-1" }, error: null };
+  schemaError = null;
 });
 
 const inserted = () =>
@@ -257,5 +264,50 @@ describe("posting with a location instead of a typed ZIP", () => {
         { latitude: 30, longitude: -40 },
       ),
     ).toEqual({ ok: false, reason: "no-postal-code" });
+  });
+});
+
+describe("when the migration has not been applied", () => {
+  /*
+   * Deploying the app and applying the migrations are two acts in this
+   * project and nothing runs the second one automatically. Before this,
+   * that window produced a not-null violation on `event_id`, an honest
+   * 500, and the words "Could not post that" on somebody's phone — which
+   * sends whoever reads it hunting for a bug in a client that did
+   * everything right.
+   */
+  it("says so instead of shrugging", async () => {
+    schemaError = {
+      data: null,
+      error: { code: "42703", message: "column flares.player_id does not exist" },
+    };
+
+    expect(await postAreaFlare("player-1", { cardId: "card-1" })).toEqual({
+      ok: false,
+      reason: "not-migrated",
+    });
+  });
+
+  it("does not attempt the insert at all", async () => {
+    schemaError = {
+      data: null,
+      error: { code: "42703", message: "column flares.player_id does not exist" },
+    };
+
+    await postAreaFlare("player-1", { cardId: "card-1" });
+
+    expect(calls.find((c) => c.op === "insert")).toBeUndefined();
+  });
+
+  it("names a not-null event_id as the same cause", async () => {
+    insertResult = {
+      data: null,
+      error: { code: "23502", message: 'null value in column "event_id"' },
+    };
+
+    expect(await postAreaFlare("player-1", { cardId: "card-1" })).toEqual({
+      ok: false,
+      reason: "not-migrated",
+    });
   });
 });

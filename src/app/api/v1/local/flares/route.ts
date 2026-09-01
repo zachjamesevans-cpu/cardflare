@@ -67,6 +67,22 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  /*
+   * 503, and named. The app translates this into a sentence about the
+   * server rather than about the card, so nobody goes hunting for a bug
+   * in a client that did everything right.
+   */
+  if (result.reason === "not-migrated") {
+    return Response.json(
+      {
+        ok: false,
+        error: "not-migrated",
+        message: "Posting from Local isn't switched on yet.",
+      },
+      { status: 503 },
+    );
+  }
+
   return Response.json({ ok: false, error: "unavailable" }, { status: 500 });
 }
 

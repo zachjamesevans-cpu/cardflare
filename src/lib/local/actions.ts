@@ -39,7 +39,7 @@ export type LocalActionResult =
        * that decides what to render by searching the copy for the word
        * "ZIP" breaks the first time somebody rewrites the sentence.
        */
-      reason?: "sign-in" | "no-postal-code" | "already-posted";
+      reason?: "sign-in" | "no-postal-code" | "already-posted" | "not-migrated";
     };
 
 /** Null when signed out or the coordinates were nonsense. */
@@ -180,6 +180,14 @@ export async function postAreaFlareAction(
   }
   if (result.reason === "already-posted") {
     return { ok: false, reason: "already-posted", message: "That card is already up." };
+  }
+  if (result.reason === "not-migrated") {
+    return {
+      ok: false,
+      reason: "not-migrated",
+      message:
+        "Posting from Local isn't switched on yet — the database migration has not been applied.",
+    };
   }
 
   return { ok: false, message: GENERIC };

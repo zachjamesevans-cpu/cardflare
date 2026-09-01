@@ -26,7 +26,7 @@ import {
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { RemoteImage } from "../remote-image";
-import { Pill } from "./post-flare";
+import { Highlighted, Pill, Stats, leadArt } from "./post-flare";
 import { colors, radius, spacing } from "../theme";
 import {
   AsyncButton,
@@ -403,43 +403,76 @@ function ComposeArea({
 
       {(hits ?? []).slice(0, 6).map((card) => (
         <View key={card.id}>
+          {/*
+           * The board's own result row, drawn by the board's own code.
+           *
+           * The founder: "when clicking a card or searching in local it
+           * should match exactly what's in the normal flare room search —
+           * such as the drop down for alt arts. same language across the
+           * platform is very important to me." So this is not a row that
+           * resembles Post a Flare's; it is the same art rule, the same
+           * quiet meta line, the same stats, the same "N versions, alt
+           * arts and promos", and the same chevron, from the same
+           * helpers. A copy would have drifted the first time either was
+           * touched.
+           */}
           <Tap onPress={() => choose(card)}>
             <View
               style={{
                 flexDirection: "row",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: spacing(3),
                 paddingVertical: spacing(2),
                 borderTopWidth: 1,
                 borderTopColor: colors.border,
               }}
             >
-              {/* The base printing leads the row, the same rule the
-                  website uses for a card with many versions. */}
-              <Thumb
-                uri={
-                  (
-                    card.printings.find((p) => p.id === card.basePrintingId) ??
-                    card.printings[0]
-                  )?.imageUrl ?? null
-                }
+              <CardImage
+                imageUrl={leadArt(card)}
+                width={40}
+                name={card.name}
+                cardNumber={card.cardNumber}
               />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textPrimary, fontWeight: "700" }}
-                >
-                  {card.name}
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  <Highlighted text={card.name} term={query} />
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textMuted, fontSize: 12, fontFamily: "Menlo" }}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    columnGap: spacing(2),
+                  }}
                 >
-                  {card.cardNumber}
-                </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    <Highlighted text={card.cardNumber} term={query} />
+                  </Text>
+                  {[
+                    card.printings.length === 1
+                      ? (card.printings[0]?.label ?? null)
+                      : null,
+                    card.cardType,
+                    card.colors.length > 0 ? card.colors.join(" / ") : null,
+                  ]
+                    .filter((part): part is string => !!part)
+                    .map((part) => (
+                      <Text
+                        key={part}
+                        style={{ color: colors.textMuted, fontSize: 12 }}
+                      >
+                        {part}
+                      </Text>
+                    ))}
+                </View>
+                <Stats hit={card} />
+                {picked?.id !== card.id && card.printings.length > 1 && (
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {`${card.printings.length} versions, alt arts and promos`}
+                  </Text>
+                )}
               </View>
-              <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
-                {picked?.id === card.id ? "Close" : "Choose"}
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                {picked?.id === card.id ? "▴" : "▾"}
               </Text>
             </View>
           </Tap>
@@ -590,6 +623,9 @@ function ComposeArea({
 function readablePostFailure(caught: unknown): string {
   const raw = caught instanceof Error ? caught.message : "";
 
+  if (raw === "not-migrated") {
+    return "Posting from Local isn't switched on yet. The server needs its latest update.";
+  }
   if (raw === "no-postal-code") {
     return "Tell us roughly where you are and the card goes up.";
   }
