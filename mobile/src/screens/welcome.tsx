@@ -120,7 +120,7 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** The pitch: the mark breathing inside a slow lime glow. */
+/** The pitch: the mark breathing over the card scatter. */
 function Splash({
   onCreate,
   onSignIn,
@@ -169,22 +169,18 @@ function Splash({
         gap: spacing(3),
       }}
     >
-      {/* The glow is a scaled, faded disc behind the mark - all
-          transform and opacity, so it rides the native driver. */}
+      {/*
+       * No disc behind the mark.
+       *
+       * There was a lime circle here, faded and slowly breathing, and the
+       * founder cut it: "please take off that super ugly green glow behind
+       * the cardflare logo on signup screen." On the black canvas it read
+       * as a dull olive smear rather than light, and it sat on top of the
+       * card scatter this screen already has — two backgrounds competing
+       * behind one mark. The breathing stays, on the mark itself, which is
+       * where it was doing the work.
+       */}
       <View style={{ alignItems: "center", justifyContent: "center" }}>
-        <Animated.View
-          style={{
-            position: "absolute",
-            width: 260,
-            height: 260,
-            borderRadius: 130,
-            backgroundColor: colors.accent,
-            opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.05, 0.16] }),
-            transform: [
-              { scale: glow.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.05] }) },
-            ],
-          }}
-        />
         <Animated.View
           style={{
             transform: [
@@ -400,7 +396,7 @@ function AccountStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        Your address and a password, then who you are to other players. The only thing
+        Your email and a password, then who you are to other players. The only thing
         after this is which games you play.
       </Body>
       <Input
@@ -422,14 +418,14 @@ function AccountStep({ onDone }: { onDone: () => void }) {
       <Input
         value={name}
         onChangeText={setName}
-        placeholder="Your name, e.g. Steven B"
+        placeholder="Your name"
         autoCorrect={false}
         maxLength={40}
       />
       <HandleInput
         value={handle}
         onChangeText={(next) => setHandle(handleWhileTyping(next))}
-        placeholder="steven_b"
+        placeholder="your_handle"
         maxLength={HANDLE_MAX}
       />
       <HandleAvailabilityLine status={availability} handle={handle} />

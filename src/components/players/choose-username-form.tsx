@@ -146,7 +146,7 @@ export function ChooseUsernameForm({
           autoFocus
           autoComplete="off"
           maxLength={40}
-          placeholder="Steven B"
+          placeholder="Your name"
           aria-describedby={describedBy("displayName", false, true)}
         />
       </Field>
@@ -188,7 +188,7 @@ export function ChooseUsernameForm({
             autoCapitalize="none"
             spellCheck={false}
             maxLength={HANDLE_MAX}
-            placeholder="steven_b"
+            placeholder="your_handle"
             aria-invalid={error ? true : undefined}
             aria-describedby={describedBy("handle", !!error, true)}
           />
