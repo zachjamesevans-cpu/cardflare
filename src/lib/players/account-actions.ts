@@ -8,7 +8,7 @@ import { getViewer, type Viewer } from "@/lib/auth/session";
 import { sendEmail } from "@/lib/email/client";
 import { playerInviteEmail } from "@/lib/email/store-invite";
 import { findParticipation, joinEvent } from "@/lib/events/participants";
-import { postAreaFlare } from "@/lib/local/area";
+import { postAreaFlare, postAreaFlares } from "@/lib/local/area";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
@@ -29,7 +29,7 @@ import {
   type RepostState,
 } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
-import { listWants, removeWant, saveWant, setWantQuantity } from "./wants";
+import { listWants, removeWant, setWantQuantity } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -470,9 +470,8 @@ export async function importDeckListAction(
    */
   const found = await findCardsByNumbers(lines.map((line) => line.cardNumber));
 
-  let saved = 0;
-  let atCap = false;
   const unknown: string[] = [];
+  const cards = [];
 
   for (const line of lines) {
     const cardId = found.get(compactCardNumber(line.cardNumber));
@@ -482,23 +481,50 @@ export async function importDeckListAction(
       continue;
     }
 
-    const outcome = await saveWant(playerId, {
+    cards.push({
       cardId,
       /* Any printing. A deck list says which card, never which art. */
       printingId: null,
       quantity: line.quantity,
       note: null,
-      deckLabel,
     });
+  }
 
-    if (outcome === "saved") saved += 1;
-    else if (outcome === "at-cap") {
-      atCap = true;
-      break;
-    }
+  /*
+   * A pasted deck goes UP, as one post.
+   *
+   * This used to fill a private want list, which is the last thing in
+   * the product that created one. It posts now, under a single batch id
+   * and the deck's own name, so thirty cards read as one thing on
+   * everybody's Local rather than as thirty rows — the same grouping a
+   * room's board has had since decks could be pasted.
+   */
+  const outcome =
+    cards.length > 0
+      ? await postAreaFlares(playerId, cards, null, deckLabel)
+      : ({ ok: false, reason: "unavailable" } as const);
+
+  if (!outcome.ok) {
+    return {
+      status: "error",
+      message:
+        outcome.reason === "no-postal-code"
+          ? "Tell us roughly where you are and the deck goes up."
+          : outcome.reason === "not-migrated"
+            ? "Posting isn't switched on yet."
+            : "Nothing in that list could be posted. Check the numbers?",
+    };
   }
 
   revalidatePath("/profile");
+  revalidatePath("/flare");
+  revalidatePath("/local");
 
-  return { status: "saved", saved, unknown, unreadable, atCap };
+  return {
+    status: "saved",
+    saved: outcome.posted,
+    unknown,
+    unreadable,
+    atCap: false,
+  };
 }
