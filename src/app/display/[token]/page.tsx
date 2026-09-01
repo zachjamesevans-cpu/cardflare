@@ -3,15 +3,41 @@ import type { Metadata } from "next";
 import { DisplayScreen } from "@/components/event-hub/display-screen";
 import { Logo } from "@/components/brand/logo";
 import { displayPayload } from "@/lib/event-hub/display-payload";
-import { findDisplayByToken } from "@/lib/event-hub/repository";
+import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
+import { findDisplayByToken, listTimers } from "@/lib/event-hub/repository";
 import { joinQrSvg } from "@/lib/events/qr";
 
-export const metadata: Metadata = {
-  title: "Event Hub",
+/**
+ * The tab names its game.
+ *
+ * The founder, running several screens from one browser: "the tab name
+ * should be 'One Piece' if it's OPTCG on that tab — so they can see at
+ * a glance what the tab is." A screen running one game is titled by it;
+ * a mixed wall is titled by the screen's own name. The client keeps the
+ * title current as tournaments come and go — see `DisplayScreen`.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const display = await findDisplayByToken(token);
+
   /* Never indexed. A display token is not a secret worth much, but it is
      certainly not something a search engine should be handing out. */
-  robots: { index: false, follow: false, nocache: true },
-};
+  const robots = { index: false, follow: false, nocache: true };
+
+  if (!display) return { title: "Event Hub", robots };
+
+  const timers = await listTimers(display.id);
+  const games = [...new Set(timers.map((timer) => timer.game))];
+
+  return {
+    title: games.length === 1 ? GAME_PROFILES[games[0]].shortName : display.name,
+    robots,
+  };
+}
 
 export const dynamic = "force-dynamic";
 

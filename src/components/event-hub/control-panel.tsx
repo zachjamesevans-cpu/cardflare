@@ -53,6 +53,7 @@ import {
 } from "@/lib/event-hub/auto-mode";
 import type { DisplayPayload } from "@/lib/event-hub/display-payload";
 import {
+  advanceRound,
   advanceTurn,
   adjust,
   callTime,
@@ -414,6 +415,18 @@ function TimerCard({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
+              {/* The one-press next round, for tournaments running by
+                  hand. Auto Mode's cockpit above owns this door when it
+                  is on — two "start the round" buttons is one too many. */}
+              {!timer.autoMode && (
+                <Control
+                  label={`Start round ${Math.min(99, (timer.round ?? 1) + 1)}`}
+                  icon={Play}
+                  variant="primary"
+                  onClick={() => onRun(timer, "next-round", advanceRound(timer, now))}
+                />
+              )}
+
               {!inOvertime && (
                 <Control
                   label={

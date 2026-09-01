@@ -11,7 +11,14 @@ import {
   STALE_START_MS,
   startNextRound,
 } from "@/lib/event-hub/auto-mode";
-import { adjust, callTime, start, reset, type HubTimer } from "@/lib/event-hub/timer";
+import {
+  adjust,
+  advanceRound,
+  callTime,
+  start,
+  reset,
+  type HubTimer,
+} from "@/lib/event-hub/timer";
 
 /**
  * Auto Mode, which is a promise: "start the tournament and let
@@ -340,6 +347,29 @@ describe("+2 min while held", () => {
     t = apply(t, extendAuto(t, TIME_AT + 8 * MIN));
 
     expect(intermissionFor(t, TIME_AT + 8 * MIN)!.remainingMs).toBe(EXTEND_MS);
+  });
+});
+
+describe("the one-press next round", () => {
+  it("works at time, with or without Auto Mode", () => {
+    for (const auto of [true, false]) {
+      const atTime = autoTimer({ autoMode: auto });
+      const patch = advanceRound(atTime, TIME_AT + MIN)!;
+
+      expect(patch.round).toBe(4);
+      expect(patch.status).toBe("running");
+      expect(patch.timeCalledAt).toBeNull();
+      expect(patch.autoHeldAt).toBeNull();
+      expect(patch.intermissionExtendedMs).toBe(0);
+    }
+  });
+
+  it("refuses mid-round: 'next round' with time left is a mistap", () => {
+    expect(advanceRound(autoTimer(), T0 + 10 * MIN)).toBeNull();
+    expect(advanceRound(autoTimer({ status: "paused" }), T0 + 10 * MIN)).toBeNull();
+    expect(
+      advanceRound(autoTimer({ status: "ready", startedAt: null }), T0),
+    ).toBeNull();
   });
 });
 

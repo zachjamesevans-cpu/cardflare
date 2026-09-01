@@ -41,7 +41,7 @@ export default async function SignupPage() {
 
       <div className="flex flex-col gap-3 text-center">
         <h1 className="text-3xl font-bold text-text-primary">
-          The cards you need are near you.
+          Find your cards. Meet nearby. Trade in person.
         </h1>
         <p className="text-text-secondary">
           Post your wants and cardflare connects you with the people who have them:
@@ -67,6 +67,11 @@ export default async function SignupPage() {
       </ul>
 
       <SignupForm />
+
+      {/* The same promise the app's welcome screen makes. */}
+      <p className="text-center text-sm text-text-muted">
+        Built for collectors, not marketplaces.
+      </p>
     </main>
   );
 }

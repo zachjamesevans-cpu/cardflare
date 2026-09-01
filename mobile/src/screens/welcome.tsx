@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -44,6 +45,11 @@ import { colors, radius, spacing } from "../theme";
  */
 
 const SEEN_KEY = "cf-welcome-seen";
+
+/* The founder's wordmark art, ratio read off the file itself so a
+   future master with different proportions stays correctly shaped. */
+const WORDMARK = require("../../assets/wordmark.png");
+const WORDMARK_SOURCE = Image.resolveAssetSource(WORDMARK);
 
 export async function hasSeenWelcome(): Promise<boolean> {
   try {
@@ -148,7 +154,13 @@ function Splash({
   }, [glow]);
 
   return (
-    <View
+    <ImageBackground
+      /* The founder's mock: a table of cards behind the lockup. Drawn
+         by scripts/generate-welcome-art.mjs from our own vocabulary —
+         no game's art, nobody's IP — with the vignette baked in so the
+         launch path stays plain Image + Animated. */
+      source={require("../../assets/welcome-cards.png")}
+      resizeMode="cover"
       style={{
         flex: 1,
         alignItems: "center",
@@ -187,43 +199,65 @@ function Splash({
         </Animated.View>
       </View>
 
+      {/* The name is the founder's wordmark art, never a font — BRAND.md:
+          "Just put this everywhere." Height set, width follows the file's
+          own ratio, same as the header. */}
+      <Image
+        source={WORDMARK}
+        style={{
+          height: 44,
+          width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
+          resizeMode: "contain",
+        }}
+        accessibilityLabel="cardflare"
+      />
       <Text
         style={{
           color: colors.textPrimary,
-          fontSize: 34,
-          fontWeight: "800",
-          letterSpacing: 0.5,
-        }}
-      >
-        cardflare
-      </Text>
-      <Text
-        style={{
-          color: colors.textSecondary,
-          fontSize: 17,
+          fontSize: 22,
+          fontWeight: "500",
           textAlign: "center",
-          lineHeight: 24,
+          lineHeight: 31,
         }}
       >
-        The cards you need are near you.{"\n"}Post your wants. Trade face to face.
+        Find your cards.{"\n"}Meet nearby.{"\n"}Trade in person.
       </Text>
 
       <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(4) }}>
         <Button label="Create my account" onPress={onCreate} />
-        <Button label="I already have one" variant="secondary" onPress={onSignIn} />
+        <Button
+          label="I already have an account"
+          variant="secondary"
+          onPress={onSignIn}
+        />
+        {/* The guest door, said as an action rather than a shrug — the
+            founder's mock. Guests scanning into a room without an
+            account is still the product's front door (PRODUCT.md). */}
         <Tap onPress={onSkip} hitSlop={8}>
           <Text
             style={{
-              color: colors.textMuted,
+              color: colors.accent,
+              fontWeight: "600",
               textAlign: "center",
               paddingVertical: spacing(2),
             }}
           >
-            Just browsing for now
+            Browse without an account{"  "}›
           </Text>
         </Tap>
       </View>
-    </View>
+
+      <Text
+        style={{
+          color: colors.textMuted,
+          fontSize: 13,
+          textAlign: "center",
+          marginTop: spacing(5),
+        }}
+      >
+        Built for collectors, not marketplaces.
+      </Text>
+    </ImageBackground>
   );
 }
 

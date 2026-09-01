@@ -43,6 +43,7 @@ import {
   startNextRound,
 } from "./auto-mode";
 import {
+  advanceRound,
   advanceTurn,
   adjust,
   callTime,
@@ -478,6 +479,33 @@ export async function timerControlAction(formData: FormData): Promise<void> {
       patch = extendAuto(timer, now);
       guarded = true;
       break;
+
+    /*
+     * The manual next round, from the screens overview or a panel. The
+     * same guarded write as the automatic start, because it races it:
+     * a TO pressing "Next round" at the exact instant a television's
+     * poll starts it must yield ONE round four, not two.
+     */
+    case "next-round": {
+      const roundPatch = advanceRound(timer, now);
+      if (!roundPatch) return;
+
+      const advanced = await patchTimerIfUnchanged(
+        timer.id,
+        timer.updatedAt,
+        roundPatch,
+      );
+      if (advanced) {
+        void logTimerEvent(
+          timer.id,
+          "round-started",
+          `manual · round ${advanced.round}`,
+        );
+      }
+
+      revalidatePath(CONTROL_PANEL);
+      return;
+    }
 
     /*
      * START NOW is the one op that goes through the GUARDED write: it

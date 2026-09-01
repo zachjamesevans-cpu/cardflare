@@ -578,6 +578,42 @@ export function adjust(
   return null;
 }
 
+/**
+ * The next round, in one press.
+ *
+ * The founder, on the screens overview: "it's not intuitive to have to
+ * click into 'manage' just to go to next round." Once a round is at
+ * time — hand-called, derived, in extra time or past it — this is the
+ * whole transition: round up one, regulation reloaded, every
+ * between-rounds remnant cleared. Auto Mode's automatic start is the
+ * same shape; this is the manual door to it, and it works whether or
+ * not Auto Mode is on.
+ *
+ * Refused outside the at-time phases: a running round has a Pause
+ * button, and "next round" mid-round is a mistap, not an intention.
+ */
+export function advanceRound(timer: HubTimer, now: number): TimerPatch | null {
+  const phase = timerPhase(timer, now);
+  if (phase !== "time_called" && phase !== "overtime" && phase !== "overtime_expired") {
+    return null;
+  }
+
+  return {
+    status: "running",
+    round: Math.min(99, (timer.round ?? 1) + 1),
+    startedAt: new Date(now).toISOString(),
+    pausedAt: null,
+    remainingMsWhenPaused: null,
+    overtimeStartedAt: null,
+    overtimeDurationSeconds: null,
+    overtimeTurn: 0,
+    rulesDismissed: false,
+    timeCalledAt: null,
+    autoHeldAt: null,
+    intermissionExtendedMs: 0,
+  };
+}
+
 /** Calls time by hand, before the clock gets there. */
 export function callTime(timer: HubTimer, now: number = Date.now()): TimerPatch | null {
   /* By phase, so a round already showing derived extra time cannot be
