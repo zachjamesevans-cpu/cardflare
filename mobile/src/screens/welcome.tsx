@@ -59,6 +59,23 @@ export async function hasSeenWelcome(): Promise<boolean> {
   }
 }
 
+/**
+ * Forget that the front door was ever shown.
+ *
+ * Signing out returns somebody to it, and a relaunch afterwards should
+ * land there too — otherwise quitting and reopening drops a signed-out
+ * person back into the tabs with no visible way in. "Just browsing"
+ * clears the same way: a guest who signs out can browse again from the
+ * same screen they started at.
+ */
+export async function forgetWelcome(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(SEEN_KEY);
+  } catch {
+    /* Seen-ness is a nicety; the app must not care if it cannot stick. */
+  }
+}
+
 async function markWelcomeSeen(): Promise<void> {
   try {
     await SecureStore.setItemAsync(SEEN_KEY, "1");
@@ -207,13 +224,18 @@ function Splash({
         }}
         accessibilityLabel="cardflare"
       />
+      {/* Smaller, and sitting closer to the mark it belongs to. Three
+          short lines under a wordmark do not need to be nearly the size
+          of the wordmark, and the shared gap held them apart as though
+          they were a separate thought. Centred, like everything here. */}
       <Text
         style={{
           color: colors.textPrimary,
-          fontSize: 22,
+          fontSize: 17,
           fontWeight: "500",
           textAlign: "center",
-          lineHeight: 31,
+          lineHeight: 24,
+          marginTop: -spacing(1.5),
         }}
       >
         Find your cards.{"\n"}Meet nearby.{"\n"}Trade in person.

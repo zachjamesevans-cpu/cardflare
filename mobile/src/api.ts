@@ -41,6 +41,28 @@ async function storeAuth(access: string, refresh: string): Promise<void> {
   await SecureStore.setItemAsync(REFRESH_KEY, refresh);
 }
 
+/*
+ * Who wants to know that somebody signed out.
+ *
+ * The gate in App.tsx, so far: signing out cleared the tokens and left
+ * the person standing in the tabs, looking at a signed-out Feed, with no
+ * way back to the front door short of force-quitting. Signing out should
+ * put you where signing in starts.
+ *
+ * A listener rather than a prop because the button is five screens deep
+ * inside a navigator the gate renders, and threading a callback down
+ * through all of it would touch every screen in between for one event.
+ */
+const signedOut = new Set<() => void>();
+
+/** Subscribe to sign-out. Returns the unsubscribe, for an effect. */
+export function onSignedOut(listener: () => void): () => void {
+  signedOut.add(listener);
+  return () => {
+    signedOut.delete(listener);
+  };
+}
+
 export async function signOut(): Promise<void> {
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
@@ -53,6 +75,8 @@ export async function signOut(): Promise<void> {
    * Signing out has to take both.
    */
   await clearCache();
+
+  for (const listener of signedOut) listener();
 }
 
 /* ------------------------------------------------------------------ */
