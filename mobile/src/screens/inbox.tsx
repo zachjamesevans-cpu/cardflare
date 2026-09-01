@@ -36,10 +36,9 @@ export function InboxScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
-        Notifications
-      </Text>
-
+      {/* No heading here: the navigation bar above already says
+          "Notifications", and printing it twice on one screen reads as a
+          mistake. The website has one because it has no nav bar. */}
       {items === null && <Muted>Loading…</Muted>}
 
       {items?.length === 0 && (

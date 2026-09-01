@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClipboardList, Flame, Wand2 } from "lucide-react";
+import { Flame } from "lucide-react";
 
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { FeedSearch } from "@/components/feed/feed-search";
@@ -43,20 +43,6 @@ export const dynamic = "force-dynamic";
  * announcement from us, which wears the mark rather than a face and
  * carries the expiry that takes it away again.
  */
-
-/**
- * The things a player can always do, whatever the room is doing.
- *
- * The app's home row, on the website, because the two are one product:
- * same three doors, same order, same words. Scanning is deliberately not
- * among them - "move the qr code scanner/code entry to Room. No need to
- * have that in the feed" - and Room is a tab away on both platforms.
- */
-const ACTIONS = [
-  { href: "/profile/settings", icon: ClipboardList, label: "Your wants" },
-  { href: "/profile/store", icon: Flame, label: "Embers store" },
-  { href: "/profile/customize", icon: Wand2, label: "Customize" },
-];
 
 /**
  * Who you are and what you have.
@@ -106,19 +92,6 @@ function Header({
             {balance.toLocaleString()}
           </p>
         )}
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {ACTIONS.map((action) => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-elevated px-2 py-3 text-center transition-colors hover:border-border-strong"
-          >
-            <action.icon className="size-5 text-accent" aria-hidden="true" />
-            <span className="text-xs text-text-secondary">{action.label}</span>
-          </Link>
-        ))}
       </div>
     </div>
   );
