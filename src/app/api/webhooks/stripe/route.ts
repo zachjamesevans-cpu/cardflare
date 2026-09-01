@@ -1,6 +1,7 @@
 import { verifyStripeSignature } from "@/lib/billing/stripe-webhook";
 import {
   markStripeSubscriptionCanceled,
+  syncPlayerTierFromSubscription,
   upsertStripeSubscription,
 } from "@/lib/billing/repository";
 
@@ -71,12 +72,20 @@ export async function POST(request: Request): Promise<Response> {
         currentPeriodEnd: subscription.current_period_end ?? null,
         cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
       });
+      /* The gates read players.tier, so the money table's change is
+         pushed there — same as the Apple paths. */
+      if (subscription.metadata?.player_id) {
+        await syncPlayerTierFromSubscription(subscription.metadata.player_id);
+      }
       break;
     }
 
-    case "customer.subscription.deleted":
+    case "customer.subscription.deleted": {
       await markStripeSubscriptionCanceled(event.data.object.id);
+      const playerId = event.data.object.metadata?.player_id ?? null;
+      if (playerId) await syncPlayerTierFromSubscription(playerId);
       break;
+    }
 
     default:
       // Delivered, not acted on. Stripe stops retrying; we stay quiet.

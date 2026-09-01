@@ -558,6 +558,43 @@ export function ProfileScreen() {
         </View>
 
         {/*
+         * The upgrade, where the look lives. This screen is where
+         * somebody admires their own profile, so it is where the pitch
+         * belongs — one row, gone entirely once they are Pro. `pro`
+         * is optional in the payload; absent reads as free, so a stale
+         * cache shows the row for a beat and the fresh load removes it.
+         */}
+        {!profile.pro && (
+          <Tap
+            onPress={() => navigation.navigate("Pro")}
+            accessibilityLabel="Get cardflare Pro"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(2.5),
+              borderRadius: radius.control,
+              borderWidth: 1,
+              borderColor: colors.accent,
+              backgroundColor: "rgba(198,238,79,0.1)",
+              padding: spacing(3),
+            }}
+          >
+            <Ionicons name="sparkles" size={18} color={colors.accent} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "800" }}>
+                Get cardflare Pro
+              </Text>
+              {/* No price here: the paywall states it in the
+                  storefront's own currency, which this row cannot. */}
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                Wear your cosmetics, animated, on web and app.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+          </Tap>
+        )}
+
+        {/*
          * Picture, cover and name, editable right where they show -
          * the founder's call after the separate edit block read as a
          * duplicate: "it should all go live from the actual edit
@@ -595,13 +632,19 @@ export function ProfileScreen() {
          * Offered to everybody rather than hidden behind the tier. The
          * server refuses a non-Pro upload by name, and a button that
          * says what it is teaches the feature exists; a button that is
-         * simply absent teaches nothing.
+         * simply absent teaches nothing. For a free account it opens
+         * the paywall instead of walking them through picking a GIF
+         * that then bounces — the wall goes at the door, not the till.
          */}
         <Button
           label={busy === "avatar" ? (message ?? "Uploading…") : "Use a GIF (Pro)"}
           variant="secondary"
           disabled={busy === "avatar" || busy === "cover"}
-          onPress={() => void changeAnimatedPicture()}
+          onPress={() =>
+            profile.pro
+              ? void changeAnimatedPicture()
+              : navigation.navigate("Pro")
+          }
         />
 
         {/* The one showcase, editable in place: tap a card to dress

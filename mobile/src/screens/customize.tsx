@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
+import type { StackParams } from "../../App";
 import {
+  ApiError,
   getCustomize,
   setCustomizeEquip,
   type CustomizeKind,
@@ -194,14 +197,21 @@ function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
 interface CachedWardrobe {
   sections: CustomizeSection[];
   equips: Record<string, string | null>;
+  allowed?: boolean;
 }
 
 export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [sections, setSections] = useState<CustomizeSection[] | null>(null);
   /* The worn slug per kind, flipped locally the moment a tile is
      tapped so the tick never waits on the network — same optimistic
      shape as the website's hub. */
   const [worn, setWorn] = useState<Record<string, string | null>>({});
+  /* Whether this tier may WEAR any of it. Browsing is free either way —
+     seeing what exists is the store's advertisement. Defaults to true
+     so a stale cache never flashes a lock at a paying Pro; the server
+     still refuses with "not-pro" if the optimism was wrong. */
+  const [allowed, setAllowed] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
   /* Read inside `load`, whose closure would otherwise hold whatever
@@ -217,6 +227,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       const result = await getCustomize();
       setSections(result.sections);
       setWorn(result.equips);
+      setAllowed(result.customizationAllowed ?? true);
       setMessage(null);
 
       const id = await cachedPlayerId();
@@ -224,6 +235,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         void writeCache("customize", id, {
           sections: result.sections,
           equips: result.equips,
+          allowed: result.customizationAllowed ?? true,
         } satisfies CachedWardrobe);
     } catch {
       /* Only complain when there is nothing to look at. A wardrobe
@@ -253,6 +265,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
 
       setSections(cached.sections);
       setWorn(cached.equips);
+      setAllowed(cached.allowed ?? true);
     })();
 
     return () => {
@@ -267,11 +280,25 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   );
 
   const wear = (kind: CustomizeKind, slug: string | null) => {
+    /* Wearing is Pro; the wall opens the pitch, not an error. Taking
+       something OFF stays free — a lapsed player can always undress —
+       so only the putting-on taps divert. */
+    if (!allowed && slug !== null) {
+      navigation.navigate("Pro");
+      return;
+    }
+
     const before = worn[kind] ?? null;
     setWorn((current) => ({ ...current, [kind]: slug }));
-    setCustomizeEquip(kind, slug).catch(() => {
+    setCustomizeEquip(kind, slug).catch((caught: unknown) => {
       /* Put it back honestly rather than showing a tick that lied. */
       setWorn((current) => ({ ...current, [kind]: before }));
+      if (caught instanceof ApiError && caught.code === "not-pro") {
+        /* The server knows better than our cached flag. */
+        setAllowed(false);
+        navigation.navigate("Pro");
+        return;
+      }
       setMessage("That change did not save. Check your connection and try again.");
     });
   };
@@ -299,6 +326,34 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         </Text>
         <Muted>{AREA_COPY[area].blurb}</Muted>
       </View>
+
+      {/* Honest before anything is tapped: browsing is free, wearing is
+          Pro. The website shows the same banner; here it can actually
+          open the till. */}
+      {!allowed && (
+        <Tap
+          onPress={() => navigation.navigate("Pro")}
+          accessibilityLabel="Get cardflare Pro"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(2),
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.accent,
+            backgroundColor: "rgba(198,238,79,0.1)",
+            padding: spacing(3),
+          }}
+        >
+          <Ionicons name="sparkles" size={16} color={colors.accent} />
+          <Text
+            style={{ color: colors.accent, fontSize: 13, fontWeight: "700", flex: 1 }}
+          >
+            Wearing cosmetics is a cardflare Pro feature. Tap to get Pro.
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+        </Tap>
+      )}
 
       {/* The honest note. No fake previews. */}
       <View

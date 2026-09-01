@@ -20,7 +20,7 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
-import { getEquips, wornArtFor } from "@/lib/players/equips";
+import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 import {
@@ -105,7 +105,7 @@ export default async function ProfilePage() {
       profile.equipped,
     ),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
-    getEquips(playerId),
+    dressedEquipsFor(playerId),
   ]);
 
   /* The dropped-in files behind whatever is worn, in one read. */

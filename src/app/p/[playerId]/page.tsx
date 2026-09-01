@@ -15,7 +15,7 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
-import { getEquips, wornArtFor } from "@/lib/players/equips";
+import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followState } from "@/lib/players/follows";
 import { formatHandle } from "@/lib/players/handle";
 import { publicProfile } from "@/lib/players/profile";
@@ -74,7 +74,7 @@ export default async function PublicProfilePage({
 
   const [worn, dressed] = await Promise.all([
     resolveEquipped(profile.equipped),
-    getEquips(playerId),
+    dressedEquipsFor(playerId),
   ]);
   const dressedArt = await wornArtFor(dressed);
   const shelfBg = backgroundClass(dressed);

@@ -35,6 +35,10 @@ export async function POST(request: Request): Promise<Response> {
   if (outcome === "not-owned") {
     return Response.json({ error: "not-owned" }, { status: 403 });
   }
+  if (outcome === "not-pro") {
+    /* The app reads this and opens the Pro screen instead of an alert. */
+    return Response.json({ error: "not-pro" }, { status: 403 });
+  }
   if (outcome === "failed") {
     return Response.json({ error: "failed" }, { status: 500 });
   }

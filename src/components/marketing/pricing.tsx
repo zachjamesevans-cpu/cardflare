@@ -46,10 +46,16 @@ const TIERS: Tier[] = [
   {
     name: "Pro",
     audience: "Players who want more",
-    price: "$9.99",
+    price: "$7.99",
     cadence: "/month",
-    points: ["Everything in Player stays free", "Pro lands here first when it arrives"],
-    cta: { note: "Arriving soon" },
+    points: [
+      "Wear cosmetics: rings, auras, card borders, titles",
+      "Animated everything, including GIF profile pictures",
+      "Your look follows you on web and app",
+    ],
+    /* Sold through Apple in the iPhone app; no web checkout yet, and a
+       buy button that cannot buy is banned fake functionality. */
+    cta: { note: "Subscribe in the iPhone app" },
   },
   {
     name: "Ultra",

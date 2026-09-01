@@ -56,7 +56,7 @@ export default async function CustomizePage({
   const copy = AREA_COPY[area];
   const kinds = EQUIP_AREAS[area];
 
-  const { sections } = await customizeSections(playerId);
+  const { sections, customizationAllowed } = await customizeSections(playerId);
   const shown = sections.filter((section) =>
     (kinds as readonly string[]).includes(section.kind),
   );
@@ -74,6 +74,14 @@ export default async function CustomizePage({
           </Link>
           <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
           <p className="text-sm text-text-secondary">{copy.blurb}</p>
+          {/* Honest before anything is tapped: browsing is free, wearing
+              is Pro. No buy button here — Pro is sold in the app. */}
+          {!customizationAllowed && (
+            <p className="rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
+              Wearing cosmetics is a cardflare Pro feature. Get Pro in the cardflare
+              app, and everything you equip shows here too.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
