@@ -8,7 +8,7 @@ import {
   describeError,
   lastRoomGame,
   postFlare,
-  saveToList,
+  postAreaFlare,
   searchCards,
   type CardHit,
 } from "../api";
@@ -23,6 +23,8 @@ import {
   Tap,
   Title,
 } from "../ui";
+import { haveLocationPermission, requestCoords, type Coords } from "../location";
+import { NearbyLocationAsk } from "../nearby-location-ask";
 import { colors, radius, spacing } from "../theme";
 
 /**
@@ -195,6 +197,32 @@ export function PostFlareScreen({
   const [grouping, setGrouping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [posted, setPosted] = useState(false);
+  /*
+   * Where the poster is, when they have already granted it.
+   *
+   * A Flare with no room is anchored to an area, and Local accepts
+   * EITHER a device coordinate or the profile ZIP as that anchor. This
+   * screen sent neither once posting moved here, so everyone who had
+   * granted location — the more precise of the two — was told
+   * "no-postal-code 409" and left with nowhere to fix it. Held in memory
+   * for the visit and never written, the same promise the tab makes.
+   */
+  const [at, setAt] = useState<Coords | null>(null);
+  /* The one refusal that is not a fault: it has a fix, and the fix goes
+     on this screen rather than in a sentence pointing elsewhere. */
+  const [needsPostal, setNeedsPostal] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    void (async () => {
+      if (!(await haveLocationPermission())) return;
+      const outcome = await requestCoords();
+      if (current && outcome.status === "granted") setAt(outcome.coords);
+    })();
+    return () => {
+      current = false;
+    };
+  }, []);
   const [error, setError] = useState<string | null>(null);
 
   // So the posted-beat fold-up never fires into an unmounted screen.
@@ -289,9 +317,31 @@ export function PostFlareScreen({
           acceptsCash,
         });
       } else {
-        /* The saved list is a hunt list. A card you are letting go is
-           not a want, so it never lands there. */
-        await saveToList(entry);
+        /*
+         * No room: it goes up for the people near you.
+         *
+         * This branch used to save a private want, which is why the app
+         * had two nouns and three composers. The founder's model, and
+         * the simpler one: "you post a flare. whether its someone local,
+         * at a store, card show, etc. - they can see it."
+         *
+         * WHERE IT LANDS IS DERIVED, NEVER ASKED. Standing in a room is a
+         * fact the app already knows, so a Flare posted there goes on
+         * that board — and Local already shows the boards of stores near
+         * you, so the area sees it too, without a second row or a
+         * visibility picker to answer on every post.
+         */
+        await postAreaFlare({
+          latitude: at?.latitude,
+          longitude: at?.longitude,
+          cardId: entry.cardId,
+          printingId: entry.printingId ?? null,
+          quantity: entry.quantity,
+          note: entry.note ?? null,
+          intent: showcase ? "showcase" : "want",
+          acceptsTrade,
+          acceptsCash,
+        });
       }
 
       // The confirmation happens on the button that was pressed —
@@ -308,14 +358,24 @@ export function PostFlareScreen({
         setPosted(false);
       }, 1400);
     } catch (caught) {
+      const code = caught instanceof ApiError ? caught.code : "";
+
+      /* Not knowing where somebody is is not a fault and not a bug: it
+         is one field, and the field belongs on this screen. */
+      setNeedsPostal(code === "no-postal-code");
+
       setError(
-        caught instanceof ApiError && caught.code === "at-cap"
+        code === "at-cap"
           ? target.kind === "room"
             ? "You have hit the Flare cap for this room."
-            : "Your list is full. Remove something on the Account tab first."
-          : target.kind === "room"
-            ? `Could not post the Flare (${describeError(caught)}). Try again.`
-            : `Could not save it (${describeError(caught)}). Try again.`,
+            : "You have too many Flares up. Take one down first."
+          : code === "no-postal-code"
+            ? "Tell us roughly where you are and the card goes up."
+            : code === "already-posted"
+              ? "That card is already up."
+              : code === "not-migrated"
+                ? "Posting isn't switched on yet. The server needs its latest update."
+                : `Could not post the Flare (${describeError(caught)}). Try again.`,
       );
       setBusy(false);
     }
@@ -402,12 +462,13 @@ export function PostFlareScreen({
       <Card>
         <Title>What are you hunting?</Title>
         {/* Said up front, so nobody thinks a couch Flare reached a room. */}
-        {target.kind === "list" && (
-          <Muted>
-            No room right now, so this saves to your list. Every room you join
-            will offer to post it.
-          </Muted>
-        )}
+        {/* Where it lands, in a sentence, before anybody taps anything —
+            a fact stated rather than a question asked. */}
+        <Muted>
+          {target.kind === "room"
+            ? "Goes on this room's board, and to people near the store."
+            : "Goes up for people near you. Walk into a room and it posts there too."}
+        </Muted>
         <Input
           value={query}
           onChangeText={setQuery}
@@ -624,26 +685,30 @@ export function PostFlareScreen({
                   <Input
                     value={note}
                     onChangeText={setNote}
-                    placeholder="Note for the room (optional)"
+                    placeholder="Note (optional)"
                     maxLength={120}
                   />
 
                   <ErrorLine message={error} />
 
+                  {needsPostal ? (
+                    <NearbyLocationAsk
+                      intro={null}
+                      onDone={() => {
+                        setNeedsPostal(false);
+                        setError(null);
+                        void (async () => {
+                          const outcome = await requestCoords();
+                          if (outcome.status === "granted") setAt(outcome.coords);
+                        })();
+                      }}
+                    />
+                  ) : null}
+
                   <Button
-                    label={
-                      target.kind === "room"
-                        ? posted
-                          ? "Posted ✓"
-                          : busy
-                            ? "Posting…"
-                            : "Post the Flare"
-                        : posted
-                          ? "Saved ✓"
-                          : busy
-                            ? "Saving…"
-                            : "Save to my list"
-                    }
+                    /* One verb either way. It is the same act now: the
+                       room decides where it lands, not the player. */
+                    label={posted ? "Posted ✓" : busy ? "Posting…" : "Post the Flare"}
                     onPress={() => void submit(hit)}
                     busy={busy}
                     disabled={busy || posted}

@@ -618,12 +618,14 @@ export function AddToListForm({
     }
   }
 
+  /* One verb either way: it is the same act, and where it lands is
+     derived from whether somebody is standing in a room. */
   const copy =
     target === "list"
       ? {
-          title: "Save to your list",
-          hint: "No room open right now, so this waits on your account. Every room you join offers to post it.",
-          submit: "Save to my list",
+          title: "What are you hunting?",
+          hint: "Goes up for people near you. Walk into a room and it posts there too.",
+          submit: "Post the Flare",
         }
       : COPY[kind];
 

@@ -6,7 +6,6 @@ import { Check, ChevronLeft, Loader2, MapPin, MessageCircle, Send } from "lucide
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
-import { PostAreaFlare } from "@/components/local/post-area-flare";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
@@ -51,12 +50,10 @@ export function LocalScreen({
   feed: serverFeed,
   threads,
   postalCode,
-  imagesEnabled,
 }: {
   feed: LocalFeed;
   threads: ThreadSummary[];
   postalCode: string | null;
-  imagesEnabled: boolean;
 }) {
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
 
@@ -68,22 +65,8 @@ export function LocalScreen({
    * ask the browser all over again.
    */
   const [deviceFeed, setDeviceFeed] = useState<LocalFeed | null>(null);
-  /*
-   * The coordinate behind that feed, held for as long as the tab is open.
-   *
-   * Posting needs an origin too, and until now it could only use the
-   * profile's ZIP — so somebody who had granted the browser the more
-   * precise thing was told to go and type the less precise one. Still
-   * never persisted: this lives beside the feed it produced and dies with
-   * the page.
-   */
-  const [deviceAt, setDeviceAt] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
-  const router = useRouter();
 
   const feed = deviceFeed ?? serverFeed;
 
@@ -104,10 +87,6 @@ export function LocalScreen({
           setLocating(false);
           if (found) {
             setDeviceFeed(found);
-            setDeviceAt({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
             /* Remember the CHOICE, never the place. The founder: "when
                you do location it should cache it and save it." The
                browser keeps the grant; this one bit is what lets the
@@ -131,21 +110,6 @@ export function LocalScreen({
       { enableHighAccuracy: false, timeout: 10_000 },
     );
   }, []);
-
-  /*
-   * Show a just-posted Flare where it will live.
-   *
-   * Two different reloads, because there are two different origins on
-   * this screen. The ZIP's view is a server render and `router.refresh()`
-   * redraws it; a browser-located view exists only in this component, and
-   * refreshing the page would show the ZIP's list instead — so that one
-   * asks the browser again rather than quietly moving somebody's origin
-   * out from under them.
-   */
-  const reload = useCallback(() => {
-    if (deviceFeed) locate();
-    else router.refresh();
-  }, [deviceFeed, locate, router]);
 
   /*
    * The remembered choice, honoured quietly — the app's exact manner:
@@ -258,12 +222,14 @@ export function LocalScreen({
         </section>
       )}
 
-      {/* Posting comes before reading: somebody opening Local with a card
-          in mind should not have to scroll past other people's to say so. */}
-      {feed.source !== "none" && (
-        <PostAreaFlare imagesEnabled={imagesEnabled} at={deviceAt} onPosted={reload} />
-      )}
-
+      {/*
+       * No composer here.
+       *
+       * Posting lives in one place — the Flare tab — because two
+       * composers asking the same questions is what made "where does
+       * this go" unanswerable. Local is where Flares are READ and
+       * answered; the Flare tab is where they are written.
+       */}
       {feed.source !== "none" && (
         <section className="flex flex-col gap-3" aria-label="Wanted near you">
           <h2 className="text-sm font-semibold tracking-wide text-text-secondary uppercase">
