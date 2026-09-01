@@ -62,7 +62,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({ from: (table: string) => chain(table) }),
 }));
 
-const { postAreaFlare, withdrawAreaFlare } = await import("@/lib/local/area");
+const { postAreaFlare, postAreaFlares, withdrawAreaFlare } =
+  await import("@/lib/local/area");
 
 beforeEach(() => {
   calls.length = 0;
@@ -309,5 +310,71 @@ describe("when the migration has not been applied", () => {
       ok: false,
       reason: "not-migrated",
     });
+  });
+});
+
+describe("posting several cards as one thing", () => {
+  /*
+   * The founder: "should be able to post multiple flares in one group in
+   * local — so it looks like one post." A room's board has done this
+   * since `posted_batch` arrived; Local was one card at a time, so
+   * building a deck there scrolled thirty separate posts past everybody
+   * nearby.
+   */
+  const inserts = () => calls.filter((c) => c.op === "insert");
+
+  it("gives every card the same batch, which is the whole mechanism", async () => {
+    await postAreaFlares("player-1", [
+      { cardId: "card-1" },
+      { cardId: "card-2" },
+      { cardId: "card-3" },
+    ]);
+
+    const batches = inserts().map(
+      (c) => (c.payload as Record<string, unknown>).posted_batch,
+    );
+
+    expect(batches).toHaveLength(3);
+    expect(new Set(batches).size).toBe(1);
+    expect(batches[0]).toEqual(expect.any(String));
+  });
+
+  it("carries the group's name onto each row", async () => {
+    await postAreaFlares(
+      "player-1",
+      [{ cardId: "card-1" }, { cardId: "card-2" }],
+      null,
+      "Red Zoro",
+    );
+
+    for (const call of inserts()) {
+      expect(call.payload).toMatchObject({ deck_label: "Red Zoro" });
+    }
+  });
+
+  it("reports how many went up", async () => {
+    const result = await postAreaFlares("player-1", [
+      { cardId: "card-1" },
+      { cardId: "card-2" },
+    ]);
+
+    expect(result).toMatchObject({ ok: true, posted: 2 });
+  });
+
+  it("stops on a wall every remaining card would hit too", async () => {
+    /* No ZIP is not a per-card problem; grinding through thirty writes
+       to prove it would be thirty pointless failures. */
+    playerRow = { data: { postal_code: null }, error: null };
+
+    expect(
+      await postAreaFlares("player-1", [{ cardId: "card-1" }, { cardId: "card-2" }]),
+    ).toEqual({ ok: false, reason: "no-postal-code" });
+    expect(inserts()).toHaveLength(0);
+  });
+
+  it("leaves a lone card ungrouped, so one card is not a folder", async () => {
+    await postAreaFlare("player-1", { cardId: "card-1" });
+
+    expect(inserted()).toMatchObject({ posted_batch: null, deck_label: null });
   });
 });

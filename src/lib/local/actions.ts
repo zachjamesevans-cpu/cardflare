@@ -3,7 +3,7 @@
 import { pointFromCoords } from "@/lib/geo/zip";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { postAreaFlare, withdrawAreaFlare, type AreaFlareInput } from "./area";
+import { postAreaFlares, withdrawAreaFlare, type AreaFlareInput } from "./area";
 import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
 import {
@@ -156,18 +156,24 @@ export async function localFeedAtAction(
  * looking for a bug instead of a field.
  */
 export async function postAreaFlareAction(
-  input: AreaFlareInput,
+  /* One card or a whole list. A list goes up as ONE post — see
+     postAreaFlares — so building a deck here does not scroll thirty
+     separate items past everybody nearby. */
+  input: AreaFlareInput | AreaFlareInput[],
   /* The browser's coordinate, when Local is being read from one. Rides
      this call, anchors the Flare to a ZIP, and is never written. */
   at?: { latitude: number; longitude: number } | null,
+  /** What to call the group, when several cards go up together. */
+  deckLabel?: string | null,
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
 
-  const result = await postAreaFlare(
+  const result = await postAreaFlares(
     playerId,
-    input,
+    Array.isArray(input) ? input : [input],
     pointFromCoords(at?.latitude, at?.longitude),
+    deckLabel ?? null,
   );
   if (result.ok) return { ok: true };
 
