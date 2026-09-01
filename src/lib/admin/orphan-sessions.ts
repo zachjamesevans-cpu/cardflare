@@ -69,9 +69,14 @@ export async function listOrphanSessions(): Promise<OrphanSession[]> {
       .in("player_session_id", ids),
   ]);
 
-  const count = (rows: { player_session_id: string }[] | null) => {
+  /* Counting what a SESSION left behind, so a Flare with no session — an
+     area Flare, posted by an account from nowhere in particular — is not
+     this tool's business and is skipped rather than counted against
+     somebody. */
+  const count = (rows: { player_session_id: string | null }[] | null) => {
     const out = new Map<string, number>();
     for (const row of rows ?? []) {
+      if (!row.player_session_id) continue;
       out.set(row.player_session_id, (out.get(row.player_session_id) ?? 0) + 1);
     }
     return out;

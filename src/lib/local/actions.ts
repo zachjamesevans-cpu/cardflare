@@ -2,6 +2,7 @@
 
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { postAreaFlare, withdrawAreaFlare, type AreaFlareInput } from "./area";
 import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
 import {
@@ -131,4 +132,46 @@ export async function localFeedAtAction(
   }
 
   return localFeed(playerId, { latitude, longitude });
+}
+
+/**
+ * Posting a Flare to your area rather than to a board.
+ *
+ * The ZIP refusal is deliberately its own message: it is not an error, it
+ * is the one missing thing, and Local already knows how to ask for five
+ * digits. Anything that says "something went wrong" here sends somebody
+ * looking for a bug instead of a field.
+ */
+export async function postAreaFlareAction(
+  input: AreaFlareInput,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+
+  const result = await postAreaFlare(playerId, input);
+  if (result.ok) return { ok: true };
+
+  if (result.reason === "no-postal-code") {
+    return {
+      ok: false,
+      message: "Add your ZIP code first so people know roughly where you are.",
+    };
+  }
+  if (result.reason === "already-posted") {
+    return { ok: false, message: "That card is already up." };
+  }
+
+  return { ok: false, message: GENERIC };
+}
+
+/** Taking your own area Flare down. */
+export async function withdrawAreaFlareAction(
+  flareId: string,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+
+  return (await withdrawAreaFlare(playerId, flareId))
+    ? { ok: true }
+    : { ok: false, message: GENERIC };
 }

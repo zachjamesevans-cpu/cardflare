@@ -1550,7 +1550,8 @@ export interface LocalFlare {
   acceptsTrade: boolean;
   acceptsCash: boolean;
   postedAt: string;
-  storeName: string;
+  /** The shop whose board it is on, or null for a Flare posted to an area. */
+  storeName: string | null;
   storeCity: string | null;
   /** Rounded server-side; no coordinate ever reaches the app. */
   miles: number;
@@ -1577,6 +1578,32 @@ export const getLocal = (coords?: { latitude: number; longitude: number } | null
 
   return call<LocalFeed>("GET", `/api/v1/local${query}`);
 };
+
+/**
+ * Posting a Flare to your area, with no room involved.
+ *
+ * The website's Server Action and this call reach the same lib, so the
+ * rule about who may post one and where it lands cannot drift between
+ * the two platforms.
+ */
+export const postAreaFlare = (input: {
+  cardId: string;
+  printingId?: string | null;
+  quantity?: number;
+  note?: string | null;
+  intent?: "want" | "showcase";
+  acceptsTrade?: boolean;
+  acceptsCash?: boolean;
+}) =>
+  call<{ ok: boolean; flareId?: string; error?: string; message?: string }>(
+    "POST",
+    "/api/v1/local/flares",
+    input,
+  );
+
+/** Taking your own area Flare down. */
+export const withdrawAreaFlare = (flareId: string) =>
+  call<{ ok: boolean }>("DELETE", "/api/v1/local/flares", { flareId });
 
 export const setLocalRadius = (radius: number) =>
   call<{ ok: boolean }>("PUT", "/api/v1/local", { radius });

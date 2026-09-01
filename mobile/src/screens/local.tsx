@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -8,8 +8,11 @@ import {
   getLocal,
   listLocalThreads,
   openLocalThread,
+  postAreaFlare,
+  searchCards,
   setLocalRadius,
   storedAccessToken,
+  type CardHit,
   type LocalFeed,
   type LocalFlare,
   type LocalThread,
@@ -45,6 +48,7 @@ import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Tap, Title } 
 
 type Row =
   | { kind: "radius" }
+  | { kind: "compose" }
   | { kind: "threads-heading" }
   | { kind: "thread"; thread: LocalThread }
   | { kind: "flares-heading" }
@@ -144,7 +148,7 @@ export function LocalScreen() {
   }
 
   const rows: Row[] = [];
-  if (feed) rows.push({ kind: "radius" });
+  if (feed) rows.push({ kind: "radius" }, { kind: "compose" });
   if (threads.length > 0) {
     rows.push({ kind: "threads-heading" });
     for (const thread of threads) rows.push({ kind: "thread", thread });
@@ -173,6 +177,8 @@ export function LocalScreen() {
         switch (item.kind) {
           case "radius":
             return <RadiusRow current={feed!.radius} onSaved={() => void load()} />;
+          case "compose":
+            return <ComposeArea onPosted={() => void load()} />;
           case "threads-heading":
             return <Heading text="Messages" />;
           case "thread":
@@ -191,8 +197,8 @@ export function LocalScreen() {
               <Card>
                 <Title>Nothing on the boards within {feed!.radius} miles</Title>
                 <Body>
-                  Flares land here the moment somebody posts one in a room at a
-                  store near you. Widen the range, or check back after event night.
+                  Post the card you are hunting and anyone nearby can answer.
+                  Flares posted at a store near you land here too.
                 </Body>
               </Card>
             );
@@ -209,6 +215,174 @@ export function LocalScreen() {
       }}
     />
   );
+}
+
+/**
+ * Saying what you are hunting, from wherever you are.
+ *
+ * The founder's brief for Local was "should be intuitive", and every
+ * decision here is a subtraction to earn that: no room to join, no code
+ * to scan, no store to pick, no form. Type a name or a number, tap the
+ * card, it is up. One copy, happy to trade, is the assumption — the
+ * common case should cost two taps, and the uncommon one can be edited
+ * from the row afterwards.
+ *
+ * This posts. It never publishes a saved want: a list kept at home is
+ * private, and choosing to be visible is the whole difference.
+ */
+function ComposeArea({ onPosted }: { onPosted: () => void }) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<CardHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  /* The same debounce the room's search uses: a card list is a network
+     call and a name is typed a letter at a time. */
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setHits(null);
+      return;
+    }
+
+    let current = true;
+    const timer = setTimeout(() => {
+      searchCards(trimmed)
+        .then((result) => {
+          if (current) setHits(result.cards);
+        })
+        .catch(() => {
+          if (current) setHits([]);
+        });
+    }, 300);
+
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  const post = async (card: CardHit) => {
+    setBusy(true);
+    setSaid(null);
+    setFailed(false);
+
+    try {
+      const result = await postAreaFlare({ cardId: card.id });
+
+      if (result.ok) {
+        setQuery("");
+        setHits(null);
+        setSaid(`${card.name} is up. People near you can see it now.`);
+        onPosted();
+        return;
+      }
+
+      setFailed(true);
+      setSaid(result.message ?? "Could not post that.");
+    } catch (caught) {
+      setFailed(true);
+      setSaid(readablePostFailure(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <Title>What are you hunting?</Title>
+      <Muted>
+        Post it here and anyone near you can say they have it. No room needed.
+      </Muted>
+
+      <Input
+        value={query}
+        onChangeText={(next) => {
+          setQuery(next);
+          setSaid(null);
+        }}
+        placeholder="Card name or number"
+        autoCorrect={false}
+      />
+
+      {said ? (
+        <Text
+          style={{ color: failed ? colors.danger : colors.accent, fontSize: 13 }}
+        >
+          {said}
+        </Text>
+      ) : null}
+
+      {hits?.length === 0 && query.trim().length >= 2 ? (
+        <Muted>Nothing by that name yet.</Muted>
+      ) : null}
+
+      {(hits ?? []).slice(0, 6).map((card) => (
+        <Tap key={card.id} disabled={busy} onPress={() => void post(card)}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(3),
+              paddingVertical: spacing(2),
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            {/* The base printing leads the row, the same rule the website
+                uses for a card with many versions. */}
+            <Thumb
+              uri={
+                (card.printings.find((p) => p.id === card.basePrintingId) ??
+                  card.printings[0])?.imageUrl ?? null
+              }
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textPrimary, fontWeight: "700" }}
+              >
+                {card.name}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textMuted, fontSize: 12, fontFamily: "Menlo" }}
+              >
+                {card.cardNumber}
+              </Text>
+            </View>
+            <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
+              Post
+            </Text>
+          </View>
+        </Tap>
+      ))}
+    </Card>
+  );
+}
+
+/**
+ * A posting failure a player can read.
+ *
+ * `http-404` is the one worth translating, and it is not a bug: this app
+ * build is newer than the server it is talking to. TestFlight and Vercel
+ * ship on different clocks, so there is always a window where a screen
+ * exists on the phone and its endpoint does not yet exist in the cloud.
+ * "http-404" reads as broken; the truth is "not yet", and it fixes
+ * itself. The same translation `NearbyLocationAsk` already makes.
+ */
+function readablePostFailure(caught: unknown): string {
+  const raw = caught instanceof Error ? caught.message : "";
+
+  if (raw === "http-404") {
+    return "Posting from Local isn't live yet. Try again after the next update.";
+  }
+  if (raw === "network" || raw === "timeout") {
+    return "No connection. Check your signal and try again.";
+  }
+
+  return "Could not post that.";
 }
 
 function Heading({ text }: { text: string }) {
@@ -397,7 +571,8 @@ function FlareRow({
             style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
           >
             {flare.poster.name}
-            {flare.isYours ? " (you)" : ""} · {flare.storeName} ·{" "}
+            {flare.isYours ? " (you)" : ""}
+            {flare.storeName ? ` · ${flare.storeName}` : ""} ·{" "}
             {milesLabel(flare.miles)}
           </Text>
           {flare.note ? (

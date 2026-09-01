@@ -1061,7 +1061,17 @@ async function wantedItems(
     return [];
   }
 
-  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  /*
+   * Board Flares only. This section is "what happened in rooms near you",
+   * built by walking events to stores; an area Flare has neither, and
+   * Local is where it belongs.
+   */
+  const usable = flares.filter(
+    (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
+      Boolean(flare.event_id) &&
+      Boolean(flare.player_session_id) &&
+      flare.player_session_id !== ownSessionId,
+  );
   if (usable.length === 0) return [];
 
   /* Where each one is, so the item can end in a place like every other. */
@@ -1274,7 +1284,14 @@ async function recentItems(
     return [];
   }
 
-  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  /* Board Flares only: this list is what happened in rooms near you, and
+     it is built by walking events to stores. An area Flare has neither. */
+  const usable = flares.filter(
+    (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
+      Boolean(flare.event_id) &&
+      Boolean(flare.player_session_id) &&
+      flare.player_session_id !== ownSessionId,
+  );
   if (usable.length === 0) return [];
 
   const { data: events } = await admin
