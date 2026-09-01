@@ -1,6 +1,6 @@
 import "server-only";
 
-import { normalisePostalCode } from "@/lib/geo/zip";
+import { nearestPostalCode, normalisePostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -45,6 +45,18 @@ export interface AreaFlareInput {
 export async function postAreaFlare(
   playerId: string,
   input: AreaFlareInput,
+  /*
+   * Where the poster is browsing from, when they granted it.
+   *
+   * Local takes EITHER a device coordinate or the profile's ZIP as an
+   * origin, and the first cut of this function accepted only the ZIP —
+   * so everyone who had granted the browser the more precise thing was
+   * told to go and type the less precise one before they could post.
+   * The coordinate rides this one request and is snapped to a centroid;
+   * what lands on the row is five digits, exactly as if they had been
+   * typed, and the position itself is never written.
+   */
+  at?: Point | null,
 ): Promise<PostAreaFlareResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -62,7 +74,8 @@ export async function postAreaFlare(
    * it does not know where somebody is, so the fix is one field away
    * instead of a dead end.
    */
-  const postalCode = normalisePostalCode(player?.postal_code);
+  const postalCode =
+    normalisePostalCode(player?.postal_code) ?? nearestPostalCode(at ?? null);
   if (!postalCode) return { ok: false, reason: "no-postal-code" };
 
   const { data, error } = await admin

@@ -26,8 +26,20 @@ import {
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { RemoteImage } from "../remote-image";
-import { colors, spacing } from "../theme";
-import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Tap, Title } from "../ui";
+import { Pill } from "./post-flare";
+import { colors, radius, spacing } from "../theme";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  CardImage,
+  ErrorLine,
+  Input,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 
 /**
  * Local — the tab that took Room's place in the bar.
@@ -63,6 +75,14 @@ export function LocalScreen() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /*
+   * The coordinate this feed was read with, kept for as long as the tab
+   * is mounted. Posting needs an origin too, and the profile ZIP is not
+   * the only one Local accepts — reading it from a device and then being
+   * told to go and type five digits before posting was a dead end of
+   * exactly the kind this tab exists to remove. Never persisted.
+   */
+  const [at, setAt] = useState<Coords | null>(null);
 
   const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const token = await storedAccessToken();
@@ -81,6 +101,7 @@ export function LocalScreen() {
       if (outcome.status === "granted") coords = outcome.coords;
     }
     if (!isCurrent()) return;
+    setAt(coords);
 
     try {
       const [nextFeed, nextThreads] = await Promise.all([
@@ -178,7 +199,7 @@ export function LocalScreen() {
           case "radius":
             return <RadiusRow current={feed!.radius} onSaved={() => void load()} />;
           case "compose":
-            return <ComposeArea onPosted={() => void load()} />;
+            return <ComposeArea at={at} onPosted={() => void load()} />;
           case "threads-heading":
             return <Heading text="Messages" />;
           case "thread":
@@ -230,12 +251,31 @@ export function LocalScreen() {
  * This posts. It never publishes a saved want: a list kept at home is
  * private, and choosing to be visible is the whole difference.
  */
-function ComposeArea({ onPosted }: { onPosted: () => void }) {
+function ComposeArea({
+  at,
+  onPosted,
+}: {
+  /** Where the reader is, when they granted it. Anchors the Flare. */
+  at: Coords | null;
+  onPosted: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[] | null>(null);
+  const [picked, setPicked] = useState<CardHit | null>(null);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  /* The one refusal that is not a fault: it has a fix, and the fix goes
+     on this screen rather than in a sentence pointing somewhere else. */
+  const [needsPostal, setNeedsPostal] = useState(false);
+
+  /* The board's questions, in the board's order. */
+  const [showcase, setShowcase] = useState(false);
+  const [acceptsTrade, setAcceptsTrade] = useState(true);
+  const [acceptsCash, setAcceptsCash] = useState(false);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [note, setNote] = useState("");
 
   /* The same debounce the room's search uses: a card list is a network
      call and a name is typed a letter at a time. */
@@ -263,17 +303,45 @@ function ComposeArea({ onPosted }: { onPosted: () => void }) {
     };
   }, [query]);
 
+  /** Opening a card resets its answers, so the last post cannot leak. */
+  const choose = (card: CardHit) => {
+    if (picked?.id === card.id) {
+      setPicked(null);
+      return;
+    }
+    setPicked(card);
+    setShowcase(false);
+    setAcceptsTrade(true);
+    setAcceptsCash(false);
+    setPrintingId(null);
+    setQuantity(1);
+    setNote("");
+    setSaid(null);
+  };
+
   const post = async (card: CardHit) => {
     setBusy(true);
     setSaid(null);
     setFailed(false);
+    setNeedsPostal(false);
 
     try {
-      const result = await postAreaFlare({ cardId: card.id });
+      const result = await postAreaFlare({
+        cardId: card.id,
+        printingId,
+        quantity,
+        note: note.trim() || null,
+        intent: showcase ? "showcase" : "want",
+        acceptsTrade,
+        acceptsCash,
+        latitude: at?.latitude,
+        longitude: at?.longitude,
+      });
 
       if (result.ok) {
         setQuery("");
         setHits(null);
+        setPicked(null);
         setSaid(`${card.name} is up. People near you can see it now.`);
         onPosted();
         return;
@@ -282,7 +350,9 @@ function ComposeArea({ onPosted }: { onPosted: () => void }) {
       setFailed(true);
       setSaid(result.message ?? "Could not post that.");
     } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
       setFailed(true);
+      setNeedsPostal(code === "no-postal-code");
       setSaid(readablePostFailure(caught));
     } finally {
       setBusy(false);
@@ -307,11 +377,24 @@ function ComposeArea({ onPosted }: { onPosted: () => void }) {
       />
 
       {said ? (
-        <Text
-          style={{ color: failed ? colors.danger : colors.accent, fontSize: 13 }}
-        >
+        <Text style={{ color: failed ? colors.danger : colors.accent, fontSize: 13 }}>
           {said}
         </Text>
+      ) : null}
+
+      {needsPostal ? (
+        <NearbyLocationAsk
+          intro={null}
+          onDone={() => {
+            setNeedsPostal(false);
+            setFailed(false);
+            setSaid("Thanks — tap Post again.");
+            /* Reload the tab, which is what re-reads the coordinate this
+               composer posts with. Without it the permission is granted
+               and the next tap still posts with the stale nothing. */
+            onPosted();
+          }}
+        />
       ) : null}
 
       {hits?.length === 0 && query.trim().length >= 2 ? (
@@ -319,44 +402,176 @@ function ComposeArea({ onPosted }: { onPosted: () => void }) {
       ) : null}
 
       {(hits ?? []).slice(0, 6).map((card) => (
-        <Tap key={card.id} disabled={busy} onPress={() => void post(card)}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing(3),
-              paddingVertical: spacing(2),
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-            }}
-          >
-            {/* The base printing leads the row, the same rule the website
-                uses for a card with many versions. */}
-            <Thumb
-              uri={
-                (card.printings.find((p) => p.id === card.basePrintingId) ??
-                  card.printings[0])?.imageUrl ?? null
-              }
-            />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textPrimary, fontWeight: "700" }}
-              >
-                {card.name}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textMuted, fontSize: 12, fontFamily: "Menlo" }}
-              >
-                {card.cardNumber}
+        <View key={card.id}>
+          <Tap onPress={() => choose(card)}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(3),
+                paddingVertical: spacing(2),
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              {/* The base printing leads the row, the same rule the
+                  website uses for a card with many versions. */}
+              <Thumb
+                uri={
+                  (
+                    card.printings.find((p) => p.id === card.basePrintingId) ??
+                    card.printings[0]
+                  )?.imageUrl ?? null
+                }
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textPrimary, fontWeight: "700" }}
+                >
+                  {card.name}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textMuted, fontSize: 12, fontFamily: "Menlo" }}
+                >
+                  {card.cardNumber}
+                </Text>
+              </View>
+              <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
+                {picked?.id === card.id ? "Close" : "Choose"}
               </Text>
             </View>
-            <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
-              Post
-            </Text>
-          </View>
-        </Tap>
+          </Tap>
+
+          {/*
+           * The board's composer, opened inside the row that was tapped.
+           *
+           * Same sections, same order, same words as Post a Flare: a
+           * Local that asked a different set of questions would teach two
+           * products, and a Flare that cannot name an alternate art is
+           * not the Flare somebody meant to post.
+           */}
+          {picked?.id === card.id ? (
+            <View style={{ gap: spacing(2), paddingBottom: spacing(3) }}>
+              <Body>Is this a card you want, or one you have?</Body>
+              <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                <Pill
+                  label="I want this"
+                  active={!showcase}
+                  onPress={() => setShowcase(false)}
+                />
+                <Pill
+                  label="I have this"
+                  active={showcase}
+                  onPress={() => setShowcase(true)}
+                />
+              </View>
+
+              <Body>Trade or cash?</Body>
+              <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                {/* Never both off: a Flare nobody can answer is not a
+                    Flare. The server enforces it too. */}
+                <Pill
+                  label="Trade"
+                  active={acceptsTrade}
+                  disabled={acceptsTrade && !acceptsCash}
+                  onPress={() => setAcceptsTrade(!acceptsTrade)}
+                />
+                <Pill
+                  label="Cash"
+                  active={acceptsCash}
+                  disabled={acceptsCash && !acceptsTrade}
+                  onPress={() => setAcceptsCash(!acceptsCash)}
+                />
+              </View>
+
+              <Body>Which printing?</Body>
+              <View style={{ gap: spacing(2) }}>
+                {[
+                  { id: null as string | null, label: "Any printing", imageUrl: null },
+                  ...card.printings.map((printing) => ({
+                    id: printing.id as string | null,
+                    label: printing.label ?? "Standard printing",
+                    imageUrl: printing.imageUrl,
+                  })),
+                ].map((option) => (
+                  <Tap
+                    key={option.id ?? "any"}
+                    onPress={() => setPrintingId(option.id)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(3),
+                      backgroundColor: colors.elevated,
+                      borderColor:
+                        printingId === option.id ? colors.accent : colors.border,
+                      borderWidth: printingId === option.id ? 2 : 1,
+                      borderRadius: radius.control,
+                      padding: spacing(2),
+                    }}
+                  >
+                    {option.id !== null && (
+                      <CardImage
+                        imageUrl={option.imageUrl}
+                        width={36}
+                        name={card.name}
+                        cardNumber={card.cardNumber}
+                        caption={option.label}
+                      />
+                    )}
+                    <Text
+                      style={{ color: colors.textSecondary, flex: 1, fontSize: 13 }}
+                    >
+                      {option.label}
+                    </Text>
+                  </Tap>
+                ))}
+              </View>
+
+              <Body>How many?</Body>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+              >
+                <Button
+                  label="−"
+                  variant="secondary"
+                  onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+                />
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: "700",
+                    minWidth: 24,
+                    textAlign: "center",
+                  }}
+                >
+                  {quantity}
+                </Text>
+                <Button
+                  label="+"
+                  variant="secondary"
+                  onPress={() => setQuantity((q) => Math.min(20, q + 1))}
+                />
+              </View>
+
+              <Input
+                value={note}
+                onChangeText={setNote}
+                placeholder="Note (optional)"
+                maxLength={280}
+              />
+
+              <AsyncButton
+                label="Post the Flare"
+                pendingLabel="Posting…"
+                disabled={busy}
+                onPress={() => post(card)}
+              />
+            </View>
+          ) : null}
+        </View>
       ))}
     </Card>
   );
@@ -375,6 +590,12 @@ function ComposeArea({ onPosted }: { onPosted: () => void }) {
 function readablePostFailure(caught: unknown): string {
   const raw = caught instanceof Error ? caught.message : "";
 
+  if (raw === "no-postal-code") {
+    return "Tell us roughly where you are and the card goes up.";
+  }
+  if (raw === "already-posted") {
+    return "That card is already up.";
+  }
   if (raw === "http-404") {
     return "Posting from Local isn't live yet. Try again after the next update.";
   }
