@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { localFeed } from "@/lib/local/feed";
-import { cardImagesEnabled } from "@/lib/cards/images";
 import { listThreads } from "@/lib/local/threads";
 import { playerForUser } from "@/lib/players/accounts";
 import { postalCodeForPlayer } from "@/lib/players/location";
@@ -80,12 +79,7 @@ export default async function LocalPage() {
         </Link>
       </div>
 
-      <LocalScreen
-        feed={feed}
-        threads={threads}
-        postalCode={postalCode}
-        imagesEnabled={cardImagesEnabled()}
-      />
+      <LocalScreen feed={feed} threads={threads} postalCode={postalCode} />
     </Shell>
   );
 }

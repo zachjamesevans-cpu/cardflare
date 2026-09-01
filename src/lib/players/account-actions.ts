@@ -8,6 +8,7 @@ import { getViewer, type Viewer } from "@/lib/auth/session";
 import { sendEmail } from "@/lib/email/client";
 import { playerInviteEmail } from "@/lib/email/store-invite";
 import { findParticipation, joinEvent } from "@/lib/events/participants";
+import { postAreaFlare } from "@/lib/local/area";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
@@ -359,20 +360,44 @@ export async function saveWantAction(
     };
   }
 
-  const outcome = await saveWant(playerId, parsed.data);
+  /*
+   * No room: it goes up for the people near you.
+   *
+   * This used to save a private want, which is the reason the product
+   * had two nouns and three composers. The founder's model, and the
+   * simpler one: "you post a flare. whether its someone local, at a
+   * store, card show, etc. - they can see it."
+   *
+   * WHERE IT LANDS IS DERIVED, NEVER ASKED. Being in a room is a fact
+   * the app already knows, so a Flare posted there goes on that board —
+   * and Local already shows the boards of stores near you, so the area
+   * sees it too, with no second row and no visibility question to answer
+   * on every post.
+   */
+  const outcome = await postAreaFlare(playerId, {
+    cardId: parsed.data.cardId,
+    printingId: parsed.data.printingId ?? null,
+    quantity: parsed.data.quantity,
+    note: parsed.data.note ?? null,
+  });
 
-  if (outcome !== "saved") {
+  if (!outcome.ok) {
     return {
       status: "error",
       message:
-        outcome === "at-cap"
-          ? "Your list is full. Remove something on your account page first."
-          : "Something went wrong. Please try again in a moment.",
+        outcome.reason === "no-postal-code"
+          ? "Tell us roughly where you are and the card goes up."
+          : outcome.reason === "already-posted"
+            ? "That card is already up."
+            : outcome.reason === "not-migrated"
+              ? "Posting isn't switched on yet."
+              : "Something went wrong. Please try again in a moment.",
     };
   }
 
   revalidatePath("/profile/settings");
   revalidatePath("/flare");
+  revalidatePath("/local");
 
   return {
     status: "added",
