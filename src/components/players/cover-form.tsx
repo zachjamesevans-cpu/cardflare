@@ -21,7 +21,7 @@ import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
  * founder could not upload a header photo from a Mac — a Retina
  * screenshot is several megabytes and the bucket takes two — and he
  * asked to be able to crop one. Both are answered by drawing the chosen
- * rectangle into a canvas at 1200x450 before anything is sent: what
+ * rectangle into a canvas at 1200x900 before anything is sent: what
  * leaves the browser is already the banner, already small.
  *
  * So the file no longer uploads the instant it is picked. There IS
