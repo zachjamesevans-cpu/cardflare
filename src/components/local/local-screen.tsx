@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { Check, ChevronLeft, Loader2, MapPin, MessageCircle, Send } from "lucide-react";
 
 import { PostalAsk } from "@/components/feed/postal-ask";
+import { PostAreaFlare } from "@/components/local/post-area-flare";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
@@ -49,10 +50,12 @@ export function LocalScreen({
   feed: serverFeed,
   threads,
   postalCode,
+  imagesEnabled,
 }: {
   feed: LocalFeed;
   threads: ThreadSummary[];
   postalCode: string | null;
+  imagesEnabled: boolean;
 }) {
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
 
@@ -66,6 +69,7 @@ export function LocalScreen({
   const [deviceFeed, setDeviceFeed] = useState<LocalFeed | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
+  const router = useRouter();
 
   const feed = deviceFeed ?? serverFeed;
 
@@ -109,6 +113,21 @@ export function LocalScreen({
       { enableHighAccuracy: false, timeout: 10_000 },
     );
   }, []);
+
+  /*
+   * Show a just-posted Flare where it will live.
+   *
+   * Two different reloads, because there are two different origins on
+   * this screen. The ZIP's view is a server render and `router.refresh()`
+   * redraws it; a browser-located view exists only in this component, and
+   * refreshing the page would show the ZIP's list instead — so that one
+   * asks the browser again rather than quietly moving somebody's origin
+   * out from under them.
+   */
+  const reload = useCallback(() => {
+    if (deviceFeed) locate();
+    else router.refresh();
+  }, [deviceFeed, locate, router]);
 
   /*
    * The remembered choice, honoured quietly — the app's exact manner:
@@ -219,6 +238,12 @@ export function LocalScreen({
             ))}
           </Card>
         </section>
+      )}
+
+      {/* Posting comes before reading: somebody opening Local with a card
+          in mind should not have to scroll past other people's to say so. */}
+      {feed.source !== "none" && (
+        <PostAreaFlare imagesEnabled={imagesEnabled} onPosted={reload} />
       )}
 
       {feed.source !== "none" && (

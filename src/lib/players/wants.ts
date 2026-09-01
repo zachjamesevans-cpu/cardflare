@@ -269,7 +269,7 @@ export async function clearWantForFlare(flareId: string): Promise<void> {
   // relationship metadata, so joins are untyped and silently `never`.
   const { data: flare, error } = await admin
     .from("flares")
-    .select("card_id, printing_id, player_session_id")
+    .select("card_id, printing_id, player_session_id, player_id")
     .eq("id", flareId)
     .maybeSingle();
 
@@ -278,15 +278,25 @@ export async function clearWantForFlare(flareId: string): Promise<void> {
     return;
   }
 
-  const { data: session } = await admin
+  /* An area Flare names its account outright; one posted to a board
+     names the session, and the account is behind it. */
+  const playerId = flare.player_id ?? (await accountBehind(flare.player_session_id));
+  if (!playerId) return;
+
+  await clearWant(playerId, flare.card_id, flare.printing_id);
+}
+
+/** The account behind a room session, when there is one. */
+async function accountBehind(sessionId: string | null): Promise<string | null> {
+  if (!sessionId) return null;
+
+  const { data } = await getSupabaseAdmin()
     .from("player_sessions")
     .select("player_id")
-    .eq("id", flare.player_session_id)
+    .eq("id", sessionId)
     .maybeSingle();
 
-  if (!session?.player_id) return;
-
-  await clearWant(session.player_id, flare.card_id, flare.printing_id);
+  return data?.player_id ?? null;
 }
 
 /**
@@ -316,36 +326,76 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
     .eq("player_id", playerId);
 
   const sessionIds = (sessions ?? []).map((row) => row.id);
-  if (sessionIds.length === 0) return out;
 
-  const { data: flares } = await admin
-    .from("flares")
-    .select("card_id, event_id")
-    .in("player_session_id", sessionIds)
-    .eq("status", "open")
-    .eq("intent", "want");
+  /*
+   * Both shapes of Flare, because both are "live" and the list's whole
+   * job is to say which cards already are. An area Flare has no session
+   * and no store, so it is matched on the account and named for where it
+   * actually is: near you, rather than at a shop it was never posted to.
+   */
+  const [board, area] = await Promise.all([
+    sessionIds.length > 0
+      ? admin
+          .from("flares")
+          .select("card_id, event_id")
+          .in("player_session_id", sessionIds)
+          .eq("status", "open")
+          .eq("intent", "want")
+      : Promise.resolve({ data: [] as { card_id: string; event_id: string | null }[] }),
+    admin
+      .from("flares")
+      .select("card_id")
+      .eq("player_id", playerId)
+      .is("event_id", null)
+      .eq("status", "open")
+      .eq("intent", "want"),
+  ]);
 
-  if (!flares || flares.length === 0) return out;
+  const boardFlares = board.data ?? [];
+  const eventIds = [
+    ...new Set(
+      boardFlares
+        .map((flare) => flare.event_id)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
 
-  const { data: events } = await admin
-    .from("events")
-    .select("id, store_id")
-    .in("id", [...new Set(flares.map((flare) => flare.event_id))]);
+  if (eventIds.length > 0) {
+    const { data: events } = await admin
+      .from("events")
+      .select("id, store_id")
+      .in("id", eventIds);
 
-  const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
+    const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
 
-  const { data: stores } = await admin
-    .from("stores")
-    .select("id, name")
-    .in("id", [...new Set([...storeOf.values()])]);
+    const { data: stores } = await admin
+      .from("stores")
+      .select("id, name")
+      .in("id", [...new Set([...storeOf.values()])]);
 
-  const nameOf = new Map((stores ?? []).map((store) => [store.id, store.name]));
+    const nameOf = new Map((stores ?? []).map((store) => [store.id, store.name]));
 
-  for (const flare of flares) {
-    const storeId = storeOf.get(flare.event_id);
-    const name = storeId ? nameOf.get(storeId) : undefined;
-    if (name && !out.has(flare.card_id)) out.set(flare.card_id, name);
+    for (const flare of boardFlares) {
+      const storeId = flare.event_id ? storeOf.get(flare.event_id) : undefined;
+      const name = storeId ? nameOf.get(storeId) : undefined;
+      if (name && !out.has(flare.card_id)) out.set(flare.card_id, name);
+    }
+  }
+
+  /* A board wins the label when a card is on both: "live at Mox Valley
+     Games tonight" is the more useful of the two sentences. */
+  for (const flare of area.data ?? []) {
+    if (!out.has(flare.card_id)) out.set(flare.card_id, AREA_LABEL);
   }
 
   return out;
 }
+
+/**
+ * What an area Flare is called where a store's name would go.
+ *
+ * Both platforms read this map and print `Live at {value}`, so the value
+ * has to finish that sentence. "Live near you" does; a store name it was
+ * never posted to would be a lie.
+ */
+export const AREA_LABEL = "near you";
