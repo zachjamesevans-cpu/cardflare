@@ -73,14 +73,28 @@ describe("the Feed's items", () => {
 });
 
 describe("the home screen's furniture", () => {
-  it("offers the same three actions, in the same order, on both", () => {
-    const labels = ["Your wants", "Embers store", "Customize"];
-
-    for (const source of [web, app]) {
-      const found = labels.map((label) => source.indexOf(label));
-      expect(found.every((at) => at > -1)).toBe(true);
-      expect([...found].sort((a, b) => a - b)).toEqual(found);
-    }
+  it("keeps the shortcut row off the Feed on both", () => {
+    /*
+     * There were three tiles here — Your wants, Embers store, Customize —
+     * and the founder cut them: "the top three things at top can be
+     * removed since they're already elsewhere in the app... which will
+     * open up more room for people's posts." Every one of them was a
+     * second door to a screen that already has one, sitting above the
+     * thing the Feed is actually for.
+     *
+     * Asserted on both platforms rather than deleted, because the row's
+     * whole history is one platform growing furniture the other did not.
+     */
+    /*
+     * The row itself, not the words. "Embers store" still appears on the
+     * pack item and "Customize" is still a route the cosmetics item
+     * navigates to — both are Feed posts rather than shortcuts, and
+     * asserting on the strings alone would fail on those.
+     */
+    expect(app).not.toContain("Your wants");
+    expect(web).not.toContain("Your wants");
+    expect(app).not.toMatch(/const ACTIONS = \[/);
+    expect(web).not.toMatch(/const ACTIONS = \[/);
   });
 
   it("keeps scanning out of the Feed on both", () => {
