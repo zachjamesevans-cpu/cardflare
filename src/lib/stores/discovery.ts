@@ -5,6 +5,7 @@ import { SnapshotPlacesProvider, snapshots } from "@/lib/places/snapshot";
 import { scoreRelevance, type Relevance } from "@/lib/places/relevance";
 import type { PlaceCandidate, PlacesProvider } from "@/lib/places/provider";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import type { StoreUpdate } from "@/lib/supabase/types";
 
 /**
  * Finding shops, judging them, and never publishing one by accident.
@@ -188,6 +189,12 @@ export async function discover(
 
 export interface ImportResult {
   created: number;
+  /**
+   * Matched an existing store by name and place, so the provider's
+   * address and coordinate filled that store's gaps instead of a second
+   * row being created for the same shop. See importCandidates.
+   */
+  enriched: number;
   /** Already in cardflare, matched by provider id. Not a problem. */
   skipped: number;
   /** Tried and failed. A problem, and never to be reported as a skip. */
@@ -235,12 +242,19 @@ export async function importCandidates(
   importedBy: string | null,
 ): Promise<ImportResult> {
   if (!isSupabaseConfigured() || candidates.length === 0) {
-    return { created: 0, skipped: candidates.length, failed: 0, error: null };
+    return {
+      created: 0,
+      enriched: 0,
+      skipped: candidates.length,
+      failed: 0,
+      error: null,
+    };
   }
 
   if (!(await directorySchemaReady())) {
     return {
       created: 0,
+      enriched: 0,
       skipped: 0,
       failed: candidates.length,
       error: "The store directory migration has not been applied to this database.",
@@ -250,9 +264,33 @@ export async function importCandidates(
   const admin = getSupabaseAdmin();
   const provider = placesProvider().name;
   let created = 0;
+  let enriched = 0;
   let skipped = 0;
   let failed = 0;
   let firstError: string | null = null;
+
+  /*
+   * Every store already known, read once, so a candidate can be matched
+   * against the shops cardflare has rather than only against the ids this
+   * provider has used before. `discover` has always computed this match
+   * and shown it as "possible duplicate"; the import ignored it, so an
+   * admin importing a metro that contained one of their own customers
+   * created a SECOND row for that shop.
+   *
+   * That split is not cosmetic. Rooms, events and Flares hang off the
+   * customer's row; the coordinate arrives on the imported one. Local
+   * finds stores by coordinate and then asks for their boards, so the row
+   * it can find has no boards and the row with the boards it cannot find
+   * - and a player standing inside the shop is told there is nothing
+   * within a hundred miles. One business, one row: the store-directory
+   * migration says so in its first paragraph, and this is the code that
+   * was quietly disagreeing.
+   */
+  const { data: known } = await admin
+    .from("stores")
+    .select(
+      "id, name, city, address_line, postal_code, country, phone, website, latitude, longitude",
+    );
 
   for (const candidate of candidates) {
     const { data: existing } = await admin
@@ -264,6 +302,82 @@ export async function importCandidates(
 
     if (existing) {
       skipped += 1;
+      continue;
+    }
+
+    /* The same rule `discover` flags as "possible duplicate": the same
+       name in the same town, or the same name within a quarter mile. */
+    const wanted = normaliseName(candidate.name);
+    const twin = (known ?? []).find((store) => {
+      if (normaliseName(store.name) !== wanted) return false;
+      if (store.city && candidate.city && store.city === candidate.city) return true;
+
+      return (
+        store.latitude !== null &&
+        store.longitude !== null &&
+        candidate.latitude !== null &&
+        candidate.longitude !== null &&
+        milesBetween(
+          { latitude: store.latitude, longitude: store.longitude },
+          { latitude: candidate.latitude, longitude: candidate.longitude },
+        ) < 0.25
+      );
+    });
+
+    if (twin) {
+      /*
+       * Fill the gaps and nothing else. A shop that claimed its listing
+       * and corrected its own address must not have that overwritten by
+       * a places provider on the next import, so every field is written
+       * only where cardflare currently knows nothing.
+       */
+      const gaps: StoreUpdate = {};
+      if (twin.address_line === null && candidate.addressLine !== null)
+        gaps.address_line = candidate.addressLine;
+      if (twin.postal_code === null && candidate.postalCode !== null)
+        gaps.postal_code = candidate.postalCode;
+      if (twin.country === null && candidate.country !== null)
+        gaps.country = candidate.country;
+      if (twin.phone === null && candidate.phone !== null) gaps.phone = candidate.phone;
+      if (twin.website === null && candidate.website !== null)
+        gaps.website = candidate.website;
+      if (
+        (twin.latitude === null || twin.longitude === null) &&
+        candidate.latitude !== null &&
+        candidate.longitude !== null
+      ) {
+        gaps.latitude = candidate.latitude;
+        gaps.longitude = candidate.longitude;
+      }
+
+      if (Object.keys(gaps).length > 0) {
+        const { error: gapError } = await admin
+          .from("stores")
+          .update(gaps)
+          .eq("id", twin.id);
+
+        if (gapError) {
+          console.error("Could not fill the store's gaps from the provider", gapError);
+          failed += 1;
+          firstError ??= gapError.message;
+          continue;
+        }
+      }
+
+      /* Provenance still gets recorded: this provider record is now
+         attached to the store it actually describes. */
+      await admin.from("store_sources").insert({
+        store_id: twin.id,
+        provider,
+        provider_place_id: candidate.providerPlaceId,
+        license: candidate.license,
+        attribution: candidate.attribution,
+        imported_by: importedBy,
+        last_verified_at: null,
+        last_synced_at: null,
+      });
+
+      enriched += 1;
       continue;
     }
 
@@ -339,7 +453,7 @@ export async function importCandidates(
     created += 1;
   }
 
-  return { created, skipped, failed, error: firstError };
+  return { created, enriched, skipped, failed, error: firstError };
 }
 
 /** Remembers a "no", so the same junk stops coming back every search. */
