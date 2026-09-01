@@ -28,7 +28,34 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export type PostAreaFlareResult =
   | { ok: true; flareId: string }
-  | { ok: false; reason: "no-postal-code" | "already-posted" | "unavailable" };
+  | {
+      ok: false;
+      reason: "no-postal-code" | "already-posted" | "not-migrated" | "unavailable";
+    };
+
+/**
+ * Whether the area-Flare columns are actually there.
+ *
+ * Deploying the app and applying the migrations are two acts in this
+ * project and nothing runs the second one automatically, so there is
+ * always a window where this code is live and `flares.player_id` does
+ * not exist yet. Every insert then dies on a not-null `event_id` or an
+ * unknown column, and the honest 500 that follows reaches a player as
+ * "Could not post that" — which sends whoever reads it looking for a bug
+ * in the app. One cheap probe turns that into a sentence that names the
+ * real cause. The store directory answers the same question the same
+ * way; see `directorySchemaReady`.
+ */
+export async function areaFlareSchemaReady(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("flares")
+    .select("player_id, posted_postal_code")
+    .limit(1);
+
+  return !error;
+}
 
 export interface AreaFlareInput {
   cardId: string;
@@ -59,6 +86,8 @@ export async function postAreaFlare(
   at?: Point | null,
 ): Promise<PostAreaFlareResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  if (!(await areaFlareSchemaReady())) return { ok: false, reason: "not-migrated" };
 
   const admin = getSupabaseAdmin();
 
@@ -105,6 +134,14 @@ export async function postAreaFlare(
        Posting the same card twice is not an error worth a red line — it
        is already up. */
     if (error.code === "23505") return { ok: false, reason: "already-posted" };
+
+    /* The shapes a missing migration takes: the column is not there, or
+       `event_id` is still not-null, or the two-shapes check does not
+       exist to permit this row. All one cause, and not the player's. */
+    if (["42703", "23502", "23514"].includes(error.code ?? "")) {
+      console.error("The area-Flare migration has not been applied", error);
+      return { ok: false, reason: "not-migrated" };
+    }
 
     console.error("Could not post the area Flare", error);
     return { ok: false, reason: "unavailable" };

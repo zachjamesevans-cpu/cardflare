@@ -39,7 +39,9 @@ import { colors, radius, spacing } from "../theme";
  */
 
 /** The art a card leads with: the base printing, the website's rule. */
-function leadArt(hit: CardHit): string | null {
+/* Exported so Local's search draws the same row rather than a
+   lookalike: same art rule, same words, same order. */
+export function leadArt(hit: CardHit): string | null {
   return (
     hit.printings.find((printing) => printing.id === hit.basePrintingId)
       ?.imageUrl ??
@@ -102,7 +104,7 @@ export function Pill({
 }
 
 /** The website's search highlight: the matched part of a name lights up. */
-function Highlighted({ text, term }: { text: string; term: string }) {
+export function Highlighted({ text, term }: { text: string; term: string }) {
   const needle = term.trim().toLowerCase();
   const at = needle ? text.toLowerCase().indexOf(needle) : -1;
   if (at < 0) return <>{text}</>;
@@ -119,7 +121,7 @@ function Highlighted({ text, term }: { text: string; term: string }) {
 }
 
 /** The stats that apply differ by card type, so only present ones render. */
-function Stats({ hit }: { hit: CardHit }) {
+export function Stats({ hit }: { hit: CardHit }) {
   const stats = [
     hit.cost !== null && { label: "Cost", value: hit.cost },
     hit.life !== null && { label: "Life", value: hit.life },
