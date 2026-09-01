@@ -157,7 +157,7 @@ export function SignupForm() {
           name="displayName"
           autoComplete="nickname"
           maxLength={40}
-          placeholder="Steven B"
+          placeholder="Your name"
           aria-describedby={describedBy("displayName", false, true)}
           required
         />
@@ -185,7 +185,7 @@ export function SignupForm() {
             autoCapitalize="none"
             spellCheck={false}
             maxLength={HANDLE_MAX}
-            placeholder="steven_b"
+            placeholder="your_handle"
             value={handle}
             onChange={(event) => setHandle(handleWhileTyping(event.target.value))}
             aria-describedby={describedBy("handle", false, true)}

@@ -1073,7 +1073,7 @@ export function HandleField({
            the stored-handle one strips it the moment it lands. */
         onChangeText={(next) => setValue(handleWhileTyping(next))}
         maxLength={HANDLE_MAX}
-        placeholder="steven_b"
+        placeholder="your_handle"
       />
       <Button
         label="Save"
