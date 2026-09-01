@@ -8,7 +8,7 @@
  * so the picker refused files that were perfectly good pictures.
  *
  * Raising the limit would be the wrong fix. The server crops every
- * upload to 512x512 or 1200x450 anyway, so a 12MB original is 12MB
+ * upload to 512x512 or 1200x900 anyway, so a 12MB original is 12MB
  * carried across a shop's wifi to be thrown away. Shrinking first is
  * faster for the person AND cheaper for us.
  *

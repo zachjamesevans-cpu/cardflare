@@ -952,7 +952,7 @@ async function putAvatarObject(
  *
  * Same decode discipline (failOn error), same JPEG-only rule, same
  * Blob-not-Buffer upload, same store-the-path decision. The crop to
- * 1200x450 is what makes "rounded edges, cropped automatically" true:
+ * 1200x900 is what makes "rounded edges, cropped automatically" true:
  * whatever shape arrives, the stored object is exactly the banner box.
  */
 export async function setCover(
@@ -972,7 +972,23 @@ export async function setCover(
   try {
     encoded = await sharp(Buffer.from(await file.arrayBuffer()), { failOn: "error" })
       .rotate()
-      .resize(COVER_WIDTH, COVER_HEIGHT, { fit: "cover", position: "centre" })
+      /*
+       * TOP, not centre, and it matters most to the app.
+       *
+       * iOS ignores the aspect an image picker asks for — "on iOS the
+       * crop rectangle is always a square" — so a cover arriving from a
+       * phone is a square somebody composed, and this is the step that
+       * decides which quarter of it to throw away. Taking the middle
+       * pushed the top of their composition off the banner. Both display
+       * layers already anchor to the top for exactly this reason
+       * (`object-top`, `contentPosition="top"`), so the stored file now
+       * agrees with them: a face or a logo in the upper half survives.
+       *
+       * A cover from the website arrives already at this ratio, cropped
+       * by hand, so the resize is a no-op there and the position is
+       * moot — which is what makes changing it safe.
+       */
+      .resize(COVER_WIDTH, COVER_HEIGHT, { fit: "cover", position: "top" })
       .jpeg({ quality: 80 })
       .toBuffer();
   } catch (error) {
