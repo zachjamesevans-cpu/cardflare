@@ -121,6 +121,60 @@ async function markInSquare(size, margin, background) {
     .toBuffer();
 }
 
+/**
+ * The splash lockup: aura, mark, wordmark, in the app's own proportions.
+ *
+ * Composed from the two masters like every other derivative — the aura
+ * is the only drawn element, and it is a plain radial fade of the brand
+ * accent, no new artwork. expo-splash-screen scales the whole file by
+ * `imageWidth`, so only the internal proportions matter here.
+ */
+async function splashLockup() {
+  const W = 1400;
+  const H = 1240;
+
+  /* The accent (#c6ee4f), fading from a whisper to nothing. Subtle on
+     purpose: a launch frame, not a light show. */
+  const aura = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+       <defs>
+         <radialGradient id="g" cx="50%" cy="50%" r="50%">
+           <stop offset="0%" stop-color="#c6ee4f" stop-opacity="0.20"/>
+           <stop offset="55%" stop-color="#c6ee4f" stop-opacity="0.07"/>
+           <stop offset="100%" stop-color="#c6ee4f" stop-opacity="0"/>
+         </radialGradient>
+       </defs>
+       <circle cx="700" cy="430" r="620" fill="url(#g)"/>
+     </svg>`,
+  );
+
+  const mark = await trimmedMark().resize({ height: 600 }).png().toBuffer();
+  const markWidth = (await sharp(mark).metadata()).width ?? 0;
+
+  const wordmark = await (
+    await cutOutWordmark()
+  )
+    .resize({ width: 960 })
+    .png()
+    .toBuffer();
+
+  return sharp({
+    create: {
+      width: W,
+      height: H,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      { input: aura, left: 0, top: 0 },
+      { input: mark, left: Math.round((W - markWidth) / 2), top: 130 },
+      { input: wordmark, left: Math.round((W - 960) / 2), top: 730 + 90 },
+    ])
+    .png(png)
+    .toBuffer();
+}
+
 async function main() {
   console.log("Generating CardFlare brand assets…");
 
@@ -178,13 +232,13 @@ async function main() {
       .toBuffer(),
   );
 
-  // Splash mark: the trimmed artwork on transparency, sized by height as
-  // the brand rules ask. app.json's imageWidth then scales it down; the
-  // dark backdrop behind it comes from the splash config, not the file.
-  await write(
-    resolve(ROOT, "mobile/assets/splash-icon.png"),
-    await trimmedMark().resize({ height: 512 }).png(png).toBuffer(),
-  );
+  // Splash: the full lockup — a soft lime aura, the mark, and the
+  // founder's wordmark art beneath it — on transparency, so the launch
+  // frame is the brand and not a lone small mark on a void. The founder,
+  // seeing the old one on TestFlight: "the splash screen is hideous."
+  // The dark backdrop comes from the splash config (true black, matching
+  // the app's canvas so launch does not flash a different dark).
+  await write(resolve(ROOT, "mobile/assets/splash-icon.png"), await splashLockup());
 
   // Android adaptive icon. The launcher masks to the middle ~66% circle,
   // so the foreground keeps the mark well inside that safe zone.

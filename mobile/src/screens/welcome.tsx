@@ -45,6 +45,11 @@ import { colors, radius, spacing } from "../theme";
 
 const SEEN_KEY = "cf-welcome-seen";
 
+/* The founder's wordmark art, ratio read off the file itself so a
+   future master with different proportions stays correctly shaped. */
+const WORDMARK = require("../../assets/wordmark.png");
+const WORDMARK_SOURCE = Image.resolveAssetSource(WORDMARK);
+
 export async function hasSeenWelcome(): Promise<boolean> {
   try {
     return (await SecureStore.getItemAsync(SEEN_KEY)) === "1";
@@ -187,16 +192,18 @@ function Splash({
         </Animated.View>
       </View>
 
-      <Text
+      {/* The name is the founder's wordmark art, never a font — BRAND.md:
+          "Just put this everywhere." Height set, width follows the file's
+          own ratio, same as the header. */}
+      <Image
+        source={WORDMARK}
         style={{
-          color: colors.textPrimary,
-          fontSize: 34,
-          fontWeight: "800",
-          letterSpacing: 0.5,
+          height: 44,
+          width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
+          resizeMode: "contain",
         }}
-      >
-        cardflare
-      </Text>
+        accessibilityLabel="cardflare"
+      />
       <Text
         style={{
           color: colors.textSecondary,
