@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { nearestPostalCode, normalisePostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -57,6 +59,13 @@ export async function areaFlareSchemaReady(): Promise<boolean> {
   return !error;
 }
 
+export type PostAreaFlaresResult =
+  | { ok: true; batchId: string; posted: number }
+  | {
+      ok: false;
+      reason: "no-postal-code" | "already-posted" | "not-migrated" | "unavailable";
+    };
+
 export interface AreaFlareInput {
   cardId: string;
   /** Null means any printing will do — the same default a board uses. */
@@ -84,6 +93,8 @@ export async function postAreaFlare(
    * typed, and the position itself is never written.
    */
   at?: Point | null,
+  /** Set when this card is one of several posted in one action. */
+  group?: { batchId: string; deckLabel: string | null },
 ): Promise<PostAreaFlareResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -114,10 +125,10 @@ export async function postAreaFlare(
       player_session_id: null,
       player_id: playerId,
       posted_postal_code: postalCode,
-      /* Batches group a deck posted to one board in one go. An area Flare
-         is posted alone, from nowhere in particular. */
-      posted_batch: null,
-      deck_label: null,
+      /* The batch is what makes several cards read as one post, exactly
+         as it does on a room's board. Null when a card goes up alone. */
+      posted_batch: group?.batchId ?? null,
+      deck_label: group?.deckLabel ?? null,
       card_id: input.cardId,
       printing_id: input.printingId ?? null,
       quantity: input.quantity ?? 1,
@@ -148,6 +159,59 @@ export async function postAreaFlare(
   }
 
   return { ok: true, flareId: data.id };
+}
+
+/**
+ * Several cards, posted as one thing.
+ *
+ * The founder: "should be able to post multiple flares in one group in
+ * local — so it looks like one post." A board already works this way and
+ * has since `posted_batch` arrived: a deck put up in one action is told
+ * to the room once and shows as one item rather than thirty. Local was
+ * one card at a time, so building a deck there meant thirty separate
+ * posts scrolling past everybody nearby.
+ *
+ * One batch id across the lot, which is the whole mechanism — the feed
+ * groups on it exactly as the room's board does, and nothing new is
+ * needed in the schema to carry it.
+ *
+ * A card already up is NOT a failure. Re-posting a list after adding two
+ * cards to it should cost two rows and say so, rather than refusing the
+ * whole batch over the twenty-eight that were already there.
+ */
+export async function postAreaFlares(
+  playerId: string,
+  inputs: AreaFlareInput[],
+  at?: Point | null,
+  deckLabel?: string | null,
+): Promise<PostAreaFlaresResult> {
+  if (inputs.length === 0) return { ok: false, reason: "unavailable" };
+
+  const batchId = randomUUID();
+  let posted = 0;
+  let lastRefusal: PostAreaFlareResult | null = null;
+
+  for (const input of inputs) {
+    const result = await postAreaFlare(playerId, input, at, {
+      batchId,
+      deckLabel: deckLabel ?? null,
+    });
+
+    if (result.ok) {
+      posted += 1;
+      continue;
+    }
+
+    /* A duplicate is somebody re-posting a list they have grown; skip it
+       and keep going. Anything else is the same wall for every remaining
+       card — no ZIP, no migration — so stop rather than write it out
+       thirty times. */
+    lastRefusal = result;
+    if (result.reason !== "already-posted") break;
+  }
+
+  if (posted > 0) return { ok: true, batchId, posted };
+  return lastRefusal ?? { ok: false, reason: "unavailable" };
 }
 
 /**

@@ -39,6 +39,7 @@ import {
   Muted,
   Tap,
   Title,
+  type ZoomCard,
 } from "../ui";
 
 /**
@@ -65,6 +66,7 @@ type Row =
   | { kind: "thread"; thread: LocalThread }
   | { kind: "flares-heading" }
   | { kind: "flare"; flare: LocalFlare }
+  | { kind: "group"; flares: LocalFlare[] }
   | { kind: "empty" };
 
 export function LocalScreen() {
@@ -177,7 +179,29 @@ export function LocalScreen() {
   if (feed) {
     rows.push({ kind: "flares-heading" });
     if (feed.flares.length === 0) rows.push({ kind: "empty" });
-    for (const flare of feed.flares) rows.push({ kind: "flare", flare });
+
+    /*
+     * Cards posted together stay together.
+     *
+     * The board has grouped a pasted deck under one folder since
+     * `posted_batch` arrived — "decks posted in one paste group together,
+     * not thirty loose rows" — and Local now carries the same batch id,
+     * so it can do the same thing rather than scrolling somebody's whole
+     * deck past everybody nearby one card at a time.
+     */
+    const seen = new Set<string>();
+    for (const flare of feed.flares) {
+      if (!flare.batchId) {
+        rows.push({ kind: "flare", flare });
+        continue;
+      }
+      if (seen.has(flare.batchId)) continue;
+      seen.add(flare.batchId);
+
+      const group = feed.flares.filter((other) => other.batchId === flare.batchId);
+      if (group.length === 1) rows.push({ kind: "flare", flare });
+      else rows.push({ kind: "group", flares: group });
+    }
   }
 
   return (
@@ -223,6 +247,15 @@ export function LocalScreen() {
                 </Body>
               </Card>
             );
+          case "group":
+            return (
+              <FlareGroup
+                flares={item.flares}
+                onThreadOpened={(threadId) =>
+                  navigation.navigate("LocalThread", { threadId })
+                }
+              />
+            );
           case "flare":
             return (
               <FlareRow
@@ -262,6 +295,18 @@ function ComposeArea({
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[] | null>(null);
   const [picked, setPicked] = useState<CardHit | null>(null);
+  /*
+   * Cards chosen but not yet posted.
+   *
+   * The founder: "should be able to post multiple flares in one group in
+   * local — so it looks like one post." A board has worked this way since
+   * decks could be pasted; this is the same idea reaching Local. They go
+   * up sharing one batch id, and the list below groups on it.
+   */
+  const [basket, setBasket] = useState<
+    { card: CardHit; printingId: string | null; intent: "want" | "showcase"; quantity: number }[]
+  >([]);
+  const [groupName, setGroupName] = useState("");
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -325,15 +370,32 @@ function ComposeArea({
     setFailed(false);
     setNeedsPostal(false);
 
-    try {
-      const result = await postAreaFlare({
+    /* Whatever is in the basket, plus the card open right now. One
+       request, one batch, one post on everybody's Local. */
+    const cards = [
+      ...basket.map((entry) => ({
+        cardId: entry.card.id,
+        printingId: entry.printingId,
+        quantity: entry.quantity,
+        intent: entry.intent,
+        acceptsTrade,
+        acceptsCash,
+      })),
+      {
         cardId: card.id,
         printingId,
         quantity,
         note: note.trim() || null,
-        intent: showcase ? "showcase" : "want",
+        intent: (showcase ? "showcase" : "want") as "want" | "showcase",
         acceptsTrade,
         acceptsCash,
+      },
+    ];
+
+    try {
+      const result = await postAreaFlare({
+        cards,
+        deckLabel: groupName.trim() || null,
         latitude: at?.latitude,
         longitude: at?.longitude,
       });
@@ -342,7 +404,13 @@ function ComposeArea({
         setQuery("");
         setHits(null);
         setPicked(null);
-        setSaid(`${card.name} is up. People near you can see it now.`);
+        setBasket([]);
+        setGroupName("");
+        setSaid(
+          cards.length === 1
+            ? `${card.name} is up. People near you can see it now.`
+            : `${cards.length} cards are up as one post.`,
+        );
         onPosted();
         return;
       }
@@ -375,6 +443,49 @@ function ComposeArea({
         placeholder="Card name or number"
         autoCorrect={false}
       />
+
+      {basket.length > 0 ? (
+        <View style={{ gap: spacing(2) }}>
+          <Muted>
+            {`Going up together: ${basket.length} card${basket.length === 1 ? "" : "s"}`}
+          </Muted>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+            {basket.map((entry, index) => (
+              <Tap
+                key={`${entry.card.id}-${index}`}
+                onPress={() =>
+                  setBasket((current) => current.filter((_, at) => at !== index))
+                }
+                accessibilityLabel={`Remove ${entry.card.name}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(1),
+                  paddingHorizontal: spacing(2),
+                  paddingVertical: spacing(1),
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: colors.borderStrong,
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textSecondary, fontSize: 12, maxWidth: 140 }}
+                >
+                  {entry.card.name}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>×</Text>
+              </Tap>
+            ))}
+          </View>
+          <Input
+            value={groupName}
+            onChangeText={setGroupName}
+            placeholder="Call the group something (optional)"
+            maxLength={40}
+          />
+        </View>
+      ) : null}
 
       {said ? (
         <Text style={{ color: failed ? colors.danger : colors.accent, fontSize: 13 }}>
@@ -596,12 +707,42 @@ function ComposeArea({
                 maxLength={280}
               />
 
-              <AsyncButton
-                label="Post the Flare"
-                pendingLabel="Posting…"
-                disabled={busy}
-                onPress={() => post(card)}
-              />
+              <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Add another"
+                    variant="secondary"
+                    disabled={busy}
+                    onPress={() => {
+                      setBasket((current) => [
+                        ...current,
+                        {
+                          card,
+                          printingId,
+                          intent: showcase ? "showcase" : "want",
+                          quantity,
+                        },
+                      ]);
+                      setPicked(null);
+                      setQuery("");
+                      setHits(null);
+                      setSaid(null);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AsyncButton
+                    label={
+                      basket.length > 0
+                        ? `Post ${basket.length + 1} cards`
+                        : "Post the Flare"
+                    }
+                    pendingLabel="Posting…"
+                    disabled={busy}
+                    onPress={() => post(card)}
+                  />
+                </View>
+              </View>
             </View>
           ) : null}
         </View>
@@ -785,6 +926,99 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
   );
 }
 
+/**
+ * Several cards posted in one act, shown as one post.
+ *
+ * The founder asked for it and the board already had it: a deck put up
+ * together reads as one thing with its cards inside, not as thirty
+ * separate rows between other people's. The header carries what the
+ * whole group has in common — who, where, how far, when — so each card
+ * underneath is just the card.
+ *
+ * Every image opens the same zoom the rest of the app uses, with the
+ * group as its shelf, so a swipe walks the deck.
+ */
+function FlareGroup({
+  flares,
+  onThreadOpened,
+}: {
+  flares: LocalFlare[];
+  onThreadOpened: (threadId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const lead = flares[0];
+  if (!lead) return null;
+
+  const shelf: ZoomCard[] = flares.map((flare) => ({
+    imageUrl: flare.imageUrl,
+    name: flare.cardName,
+    cardNumber: flare.cardNumber,
+    caption: flare.printingLabel,
+    note: flare.note,
+    lookingFor: flare.quantity,
+    direction: flare.intent === "showcase" ? "showcase" : "want",
+  }));
+
+  return (
+    <Card>
+      <Tap onPress={() => setOpen((was) => !was)}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textPrimary, fontWeight: "700" }}
+            >
+              {lead.deckLabel?.trim() || `${flares.length} cards`}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
+            >
+              {lead.poster.name}
+              {lead.isYours ? " (you)" : ""}
+              {lead.storeName ? ` · ${lead.storeName}` : ""} · {milesLabel(lead.miles)} ·{" "}
+              {agoLabel(lead.postedAt)}
+            </Text>
+          </View>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {open ? "▴" : `${flares.length} ▾`}
+          </Text>
+        </View>
+      </Tap>
+
+      {/* The faces, always — a group nobody can see into is a headline
+          with no story. Tapping one opens the zoom on the whole deck. */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+        {flares.map((flare, index) => (
+          <CardImage
+            key={flare.flareId}
+            imageUrl={flare.imageUrl}
+            width={48}
+            name={flare.cardName}
+            cardNumber={flare.cardNumber}
+            caption={flare.printingLabel}
+            note={flare.note}
+            lookingFor={flare.quantity}
+            direction={flare.intent === "showcase" ? "showcase" : "want"}
+            siblings={shelf}
+            position={index}
+          />
+        ))}
+      </View>
+
+      {open
+        ? flares.map((flare) => (
+            <FlareRow
+              key={flare.flareId}
+              flare={flare}
+              onThreadOpened={onThreadOpened}
+            />
+          ))
+        : null}
+    </Card>
+  );
+}
+
 function FlareRow({
   flare,
   onThreadOpened,
@@ -804,7 +1038,21 @@ function FlareRow({
   return (
     <Card>
       <View style={{ flexDirection: "row", gap: spacing(3) }}>
-        <Thumb uri={flare.imageUrl} />
+        {/* The same zoom the rest of the app uses — the founder: "should
+            be able to click the images in local to do the same zoom view
+            that we have throughout the rest of the app." A flat thumbnail
+            here was the one card face in the product that did nothing
+            when tapped. */}
+        <CardImage
+          imageUrl={flare.imageUrl}
+          width={48}
+          name={flare.cardName}
+          cardNumber={flare.cardNumber}
+          caption={flare.printingLabel}
+          note={flare.note}
+          lookingFor={flare.quantity}
+          direction={flare.intent === "showcase" ? "showcase" : "want"}
+        />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text

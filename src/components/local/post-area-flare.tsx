@@ -19,6 +19,15 @@ import { Card } from "@/components/ui/card";
 import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/schema";
 import { postAreaFlareAction } from "@/lib/local/actions";
 
+/** What the composer settles about one card before it goes up. */
+interface ComposedFields {
+  showcase: boolean;
+  quantity: number;
+  acceptsTrade: boolean;
+  acceptsCash: boolean;
+  note: string;
+}
+
 /** A deck is fifty-one plus a leader; nobody hunts more of one card. */
 const MAX_QUANTITY = 20;
 
@@ -66,6 +75,18 @@ export function PostAreaFlare({
   /* The one refusal that is not a fault: it has a fix, and the fix goes
      here rather than in a sentence pointing somewhere else. */
   const [needsPostal, setNeedsPostal] = useState(false);
+  /*
+   * Cards chosen but not yet posted.
+   *
+   * The founder: "should be able to post multiple flares in one group in
+   * local — so it looks like one post." They go up sharing one batch id,
+   * and the list groups on it, exactly as a room's board has grouped a
+   * pasted deck since `posted_batch` arrived.
+   */
+  const [basket, setBasket] = useState<
+    { card: CardResult; printingId: string; fields: ComposedFields }[]
+  >([]);
+  const [groupName, setGroupName] = useState("");
   const [pending, startTransition] = useTransition();
 
   const post = (
@@ -83,24 +104,35 @@ export function PostAreaFlare({
     setFailed(false);
     setNeedsPostal(false);
 
+    /* Whatever is waiting, plus the card open right now. One call, one
+       batch, one post on everybody's Local. */
+    const cards = [...basket, { card, printingId, fields }].map((entry) => ({
+      cardId: entry.card.id,
+      printingId: entry.printingId || null,
+      quantity: entry.fields.quantity,
+      note: entry.fields.note.trim() || null,
+      intent: (entry.fields.showcase ? "showcase" : "want") as "showcase" | "want",
+      acceptsTrade: entry.fields.acceptsTrade,
+      acceptsCash: entry.fields.acceptsCash,
+    }));
+
     startTransition(async () => {
       const result = await postAreaFlareAction(
-        {
-          cardId: card.id,
-          printingId: printingId || null,
-          quantity: fields.quantity,
-          note: fields.note.trim() || null,
-          intent: fields.showcase ? "showcase" : "want",
-          acceptsTrade: fields.acceptsTrade,
-          acceptsCash: fields.acceptsCash,
-        },
+        cards,
         at ?? null,
+        groupName.trim() || null,
       );
 
       if (result.ok) {
         setPicked(null);
         setOpen(false);
-        setMessage(`${card.exactName} is up. People near you can see it now.`);
+        setBasket([]);
+        setGroupName("");
+        setMessage(
+          cards.length === 1
+            ? `${card.exactName} is up. People near you can see it now.`
+            : `${cards.length} cards are up as one post.`,
+        );
         onPosted();
         return;
       }
@@ -119,6 +151,39 @@ export function PostAreaFlare({
           Post it here and anyone near you can say they have it. No room needed.
         </p>
       </div>
+
+      {basket.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-text-muted">
+            Going up together: {basket.length} card{basket.length === 1 ? "" : "s"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {basket.map((entry, index) => (
+              <button
+                key={`${entry.card.id}-${index}`}
+                type="button"
+                onClick={() =>
+                  setBasket((current) => current.filter((_, at) => at !== index))
+                }
+                aria-label={`Remove ${entry.card.exactName}`}
+                className="flex max-w-52 items-center gap-1.5 rounded-full border border-border-strong px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
+              >
+                <span className="truncate">{entry.card.exactName}</span>
+                <span aria-hidden="true" className="text-text-muted">
+                  ×
+                </span>
+              </button>
+            ))}
+          </div>
+          <input
+            value={groupName}
+            onChange={(event) => setGroupName(event.target.value)}
+            maxLength={40}
+            placeholder="Call the group something (optional)"
+            className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          />
+        </div>
+      )}
 
       {open ? (
         <div className="flex flex-col gap-3">
@@ -142,6 +207,15 @@ export function PostAreaFlare({
                   key={composerKeyFor(picked)}
                   picked={picked}
                   pending={pending}
+                  waiting={basket.length}
+                  onAdd={(fields) => {
+                    setBasket((current) => [
+                      ...current,
+                      { card: picked.card, printingId: picked.printingId, fields },
+                    ]);
+                    setPicked(null);
+                    setMessage(null);
+                  }}
                   onPost={(fields) => post(picked.card, picked.printingId, fields)}
                 />
               ) : null
@@ -201,17 +275,16 @@ export function PostAreaFlare({
 function AreaComposer({
   picked,
   pending,
+  waiting,
+  onAdd,
   onPost,
 }: {
   picked: { card: CardResult; printingId: string };
   pending: boolean;
-  onPost: (fields: {
-    showcase: boolean;
-    quantity: number;
-    acceptsTrade: boolean;
-    acceptsCash: boolean;
-    note: string;
-  }) => void;
+  /** How many are already waiting to go up with this one. */
+  waiting: number;
+  onAdd: (fields: ComposedFields) => void;
+  onPost: (fields: ComposedFields) => void;
 }) {
   const { card, printingId } = picked;
   const [showcase, setShowcase] = useState(false);
@@ -313,14 +386,25 @@ function AreaComposer({
 
         <Button
           type="button"
+          variant="secondary"
           className="ml-auto"
+          disabled={pending}
+          onClick={() => onAdd({ showcase, quantity, acceptsTrade, acceptsCash, note })}
+        >
+          Add another
+        </Button>
+
+        {/* Add another keeps the composer open for the next card and posts
+            nothing yet; Post sends the lot as one thing. */}
+        <Button
+          type="button"
           disabled={pending}
           onClick={() =>
             onPost({ showcase, quantity, acceptsTrade, acceptsCash, note })
           }
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-          {pending ? "Posting…" : "Post"}
+          {pending ? "Posting…" : waiting > 0 ? `Post ${waiting + 1} cards` : "Post"}
         </Button>
       </div>
 

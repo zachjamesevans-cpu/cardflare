@@ -1600,6 +1600,10 @@ export interface LocalFlare {
   acceptsTrade: boolean;
   acceptsCash: boolean;
   postedAt: string;
+  /** The posting act this belonged to, when several went up at once. */
+  batchId: string | null;
+  /** What the poster called the group, when they named it. */
+  deckLabel: string | null;
   /** The shop whose board it is on, or null for a Flare posted to an area. */
   storeName: string | null;
   storeCity: string | null;
@@ -1637,7 +1641,18 @@ export const getLocal = (coords?: { latitude: number; longitude: number } | null
  * the two platforms.
  */
 export const postAreaFlare = (input: {
-  cardId: string;
+  /** One card, or `cards` for a list that goes up as a single post. */
+  cardId?: string;
+  cards?: {
+    cardId: string;
+    printingId?: string | null;
+    quantity?: number;
+    note?: string | null;
+    intent?: "want" | "showcase";
+    acceptsTrade?: boolean;
+    acceptsCash?: boolean;
+  }[];
+  deckLabel?: string | null;
   printingId?: string | null;
   quantity?: number;
   note?: string | null;
@@ -1649,9 +1664,13 @@ export const postAreaFlare = (input: {
   latitude?: number;
   longitude?: number;
 }) =>
-  call<{ ok: boolean; flareId?: string; error?: string; message?: string }>(
-    "POST",
-    "/api/v1/local/flares",
+  call<{
+    ok: boolean;
+    batchId?: string;
+    posted?: number;
+    error?: string;
+    message?: string;
+  }>("POST", "/api/v1/local/flares",
     input,
   );
 

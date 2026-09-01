@@ -45,6 +45,14 @@ export interface LocalFlare {
   acceptsTrade: boolean;
   acceptsCash: boolean;
   postedAt: string;
+  /**
+   * The posting act this card belonged to, when several went up at once.
+   * Both platforms group on it so a list reads as one post rather than
+   * thirty — the same thing `posted_batch` does on a room's board.
+   */
+  batchId: string | null;
+  /** What the poster called the group, when they named it. */
+  deckLabel: string | null;
   /** The shop whose board it is on, or null for a Flare posted to an area. */
   storeName: string | null;
   storeCity: string | null;
@@ -111,7 +119,7 @@ export async function localFeed(
   if (!point) return { source, radius, flares: [] };
 
   const COLUMNS =
-    "id, event_id, card_id, printing_id, quantity, note, intent, accepts_trade, accepts_cash, created_at, player_session_id, player_id, posted_postal_code";
+    "id, event_id, card_id, printing_id, quantity, note, intent, accepts_trade, accepts_cash, created_at, player_session_id, player_id, posted_postal_code, posted_batch, deck_label";
 
   /*
    * Both shapes of Flare, gathered independently and merged.
@@ -264,6 +272,8 @@ export async function localFeed(
       acceptsTrade: row.accepts_trade,
       acceptsCash: row.accepts_cash,
       postedAt: row.created_at,
+      batchId: row.posted_batch,
+      deckLabel: row.deck_label,
       storeName: spot.name,
       storeCity: spot.city,
       miles: Math.round(spot.miles * 10) / 10,
@@ -297,6 +307,8 @@ type FlareRowLite = {
   player_session_id: string | null;
   player_id: string | null;
   posted_postal_code: string | null;
+  posted_batch: string | null;
+  deck_label: string | null;
 };
 
 /**
