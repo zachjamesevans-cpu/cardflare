@@ -1,5 +1,5 @@
 /**
- * Tournament timer profiles: the five games, as data.
+ * Tournament timer profiles: the six games, as data.
  *
  * DEVELOPER NOTE — Tournament rule summaries must be manually reviewed
  * against official publisher documentation periodically. Rules change,
@@ -14,29 +14,37 @@
  * a React component. Updating One Piece's extra-turn rule must be an
  * edit to a string array, never a rebuild of a timer.
  *
- * Five games in version one. A sixth is an entry in `GAME_PROFILES` plus
- * an accent token — deliberately a code change rather than a form field,
- * because a game here fans out into rules a store reads off a wall.
+ * Five games in version one; Magic arrived with the card catalogue. A
+ * seventh is an entry in `GAME_PROFILES` plus an accent token —
+ * deliberately a code change rather than a form field, because a game
+ * here fans out into rules a store reads off a wall.
  */
 
 /**
  * The slugs.
  *
- * Styled to match `player_games.game`, which already uses `one-piece`,
- * `pokemon`, `lorcana` and `riftbound`. That table has no Flesh and
- * Blood and does have Magic, so the two lists are not the same list —
- * but four of five line up exactly, which is what a future reconciliation
- * will be glad of.
+ * The same slugs `player_games.game` and `cards.game` store: one
+ * vocabulary for "which game", reconciled in 20261001140000 after the
+ * room's QR (hyphenated) and the cards table (underscored) disagreed
+ * and every scoped search came back empty.
  */
 export type GameId =
-  "one-piece" | "pokemon" | "lorcana" | "riftbound" | "flesh-and-blood";
+  "one-piece" | "pokemon" | "lorcana" | "riftbound" | "flesh-and-blood" | "mtg";
 
+/*
+ * The same six slugs as `TCG_GAMES` in players/games-catalog.ts, and
+ * tests/unit/app-games-parity.test.ts holds them equal: a tournament's
+ * QR carries one of these, the room's card search compares it to
+ * `cards.game`, and the sign-up question stores it, so the three
+ * cannot be allowed to drift again.
+ */
 export const GAME_IDS: readonly GameId[] = [
   "one-piece",
   "pokemon",
   "lorcana",
   "riftbound",
   "flesh-and-blood",
+  "mtg",
 ];
 
 /** Which set of end-of-round rules applies. */
@@ -494,6 +502,84 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
     officialRulesUrl: "https://rules.fabtcg.com/en/trp/03-tournament-logistics/",
     rulesLastVerified: "2026-08-17",
     procedureVersion: "2026.08-trp-logistics",
+  },
+
+  mtg: {
+    id: "mtg",
+    displayName: "Magic: The Gathering",
+    shortName: "Magic",
+    accentToken: "--color-game-mtg",
+    presets: [
+      {
+        id: "constructed",
+        label: "Constructed",
+        durationSeconds: 50 * MIN,
+        overtimeSeconds: null,
+        note: "50:00 regulation",
+      },
+      {
+        id: "limited",
+        label: "Limited (Draft / Sealed)",
+        durationSeconds: 50 * MIN,
+        overtimeSeconds: null,
+        note: "50:00 regulation",
+      },
+      {
+        id: "commander",
+        label: "Commander pod",
+        durationSeconds: 80 * MIN,
+        overtimeSeconds: null,
+        note: "80:00 suggested. Follow your event's own end-of-round rules.",
+      },
+      {
+        id: "top-8",
+        label: "Top 8 (untimed)",
+        durationSeconds: null,
+        overtimeSeconds: null,
+        note: "Untimed. Playoff rounds run to a result.",
+      },
+    ],
+    defaultPresetId: "constructed",
+    swiss: {
+      headline: "+5 TURNS",
+      steps: [
+        "The active player finishes the current turn. That turn is Turn 0.",
+        "Then play 5 additional turns, alternating as normal.",
+        "A normal win during those turns ends the game normally.",
+        "Nobody has won by the end of Turn 5? The game is a draw.",
+        "More game wins takes the match. Equal game wins is a drawn match.",
+      ],
+      extraTimeLine:
+        "Finish the current turn, then play 5 more. Nobody has won? It is a draw.",
+      additionalTurns: 5,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    elimination: {
+      headline: "+5 TURNS · SUDDEN DEATH",
+      steps: [
+        "The active player finishes the current turn. That turn is Turn 0.",
+        "Then play 5 additional turns.",
+        "Still no winner? Call a Judge: playoff rounds continue under sudden death.",
+        "In sudden death, the first player whose life total is lower than the opponent's at any moment loses the game.",
+        "Follow the current Magic Tournament Rules for anything the Judge rules on.",
+      ],
+      extraTimeLine:
+        "Finish the current turn, then play 5 more. Still tied? Sudden death, with a Judge.",
+      additionalTurns: 5,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    beginnerTldr: [
+      "Bring a 60-card deck for Constructed, or nothing at all for a draft: you build from packs at the table.",
+      "Matches are best-of-three at 50 minutes. Sideboarding between games is normal and nobody minds if you skip it.",
+      "When time is called you finish the current turn plus five more, and an unfinished game is a draw.",
+      "Friday Night Magic is the beginner event. Say it is your first one and your opponent will walk you through it.",
+    ],
+    officialRulesUrl:
+      "https://media.wizards.com/ContentResources/WotC/Magic_The_Gathering/tournament_rules.html",
+    rulesLastVerified: "2026-09-02",
+    procedureVersion: "2026.09-mtr-end-of-match",
   },
 };
 

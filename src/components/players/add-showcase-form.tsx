@@ -34,6 +34,7 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  */
 export function AddShowcaseForm({
   imagesEnabled,
+  playerGames = [],
   frames,
   holos,
   defaultFrame,
@@ -41,6 +42,8 @@ export function AddShowcaseForm({
   effect,
 }: {
   imagesEnabled: boolean;
+  /** The reader's sign-up games, for the search's default chip. */
+  playerGames?: readonly string[];
   /** Owned dressing options, the free items included. */
   frames: DressingOption[];
   holos: DressingOption[];
@@ -126,6 +129,7 @@ export function AddShowcaseForm({
       {!chosen ? (
         <CardSearch
           imagesEnabled={imagesEnabled}
+          playerGames={playerGames}
           onSelect={(card, printing) => setChosen({ card, printing: printing ?? null })}
           autoFocus
         />

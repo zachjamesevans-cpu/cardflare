@@ -7,6 +7,9 @@ import {
   ApiError,
   describeError,
   lastRoomGame,
+  lastSearchGame,
+  rememberSearchGame,
+  getGames,
   postFlare,
   saveToList,
   searchCards,
@@ -24,6 +27,9 @@ import {
   Title,
 } from "../ui";
 import { colors, radius, spacing } from "../theme";
+import { GameChips } from "../game-chips";
+import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
+import { gameShortName, type GameSlug } from "../games";
 
 /**
  * Posting a Flare, all on one screen. Tapping a result unfolds it in
@@ -41,8 +47,7 @@ import { colors, radius, spacing } from "../theme";
 /** The art a card leads with: the base printing, the website's rule. */
 function leadArt(hit: CardHit): string | null {
   return (
-    hit.printings.find((printing) => printing.id === hit.basePrintingId)
-      ?.imageUrl ??
+    hit.printings.find((printing) => printing.id === hit.basePrintingId)?.imageUrl ??
     hit.printings.find((printing) => printing.imageUrl)?.imageUrl ??
     null
   );
@@ -228,6 +233,43 @@ export function PostFlareScreen({
     };
   }, [target.kind]);
 
+  /*
+   * The scope, resolved the way the website resolves it: the room's
+   * game locks it; otherwise the chip last tapped here, else the first
+   * game from sign-up. A guest has no games and gets every game.
+   */
+  const [playerGames, setPlayerGames] = useState<string[]>([]);
+  const [remembered, setRemembered] = useState<string | null>(null);
+  useEffect(() => {
+    let current = true;
+    void lastSearchGame().then((value) => {
+      if (current) setRemembered(value);
+    });
+    void getGames()
+      .then((result) => {
+        if (current) setPlayerGames(result.mine);
+      })
+      .catch(() => {
+        /* Not signed in, or offline: no default, every game. */
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  const scope = resolveGameScope({
+    roomGame: target.kind === "room" ? roomGame : null,
+    playerGames,
+    remembered,
+  });
+  const scopedGame = scope.selected;
+
+  const pickGame = (game: GameSlug | null) => {
+    const value = game ?? ALL_GAMES;
+    setRemembered(value);
+    void rememberSearchGame(value);
+  };
+
   // Debounced search: a keystroke pause is the request, not every letter.
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -236,13 +278,13 @@ export function PostFlareScreen({
     }
 
     const timer = setTimeout(() => {
-      void searchCards(query.trim(), target.kind === "room" ? roomGame : null)
+      void searchCards(query.trim(), scopedGame)
         .then((result) => setHits(result.cards))
         .catch(() => setHits([]));
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, roomGame, target.kind]);
+  }, [query, scopedGame]);
 
   /** Unfold a card with a fresh form, or fold it back up. */
   const toggle = (hit: CardHit) => {
@@ -343,9 +385,7 @@ export function PostFlareScreen({
                 gap: spacing(2),
               }}
             >
-              <Text
-                style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}
-              >
+              <Text style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}>
                 {deck.trim().length > 0 ? "Posting into" : "Name the group"}
               </Text>
               <Tap
@@ -366,8 +406,8 @@ export function PostFlareScreen({
               autoCapitalize="words"
             />
             <Muted>
-              Every card you post from here joins this group, until you clear
-              it. The room shows them as one folder, and so does the Feed.
+              Every card you post from here joins this group, until you clear it. The
+              room shows them as one folder, and so does the Feed.
             </Muted>
           </>
         ) : (
@@ -398,19 +438,24 @@ export function PostFlareScreen({
         {/* Said up front, so nobody thinks a couch Flare reached a room. */}
         {target.kind === "list" && (
           <Muted>
-            No room right now, so this saves to your list. Every room you join
-            will offer to post it.
+            No room right now, so this saves to your list. Every room you join will
+            offer to post it.
           </Muted>
         )}
+        <GameChips scope={scope} onPick={pickGame} />
         <Input
           value={query}
           onChangeText={setQuery}
-          placeholder="Card name or number"
+          placeholder={searchPlaceholder(scopedGame)}
           autoFocus
           autoCorrect={false}
         />
         {query.trim().length >= 2 && hits.length === 0 && (
-          <Muted>Nothing yet. Keep typing, or check the number.</Muted>
+          <Muted>
+            {scopedGame && !scope.locked
+              ? `No ${gameShortName(scopedGame)} cards yet. Keep typing, check the number, or try All games.`
+              : "Nothing yet. Keep typing, or check the number."}
+          </Muted>
         )}
         {hits.map((hit) => {
           const open = expanded === hit.id;
@@ -556,9 +601,7 @@ export function PostFlareScreen({
                           gap: spacing(3),
                           backgroundColor: colors.elevated,
                           borderColor:
-                            printingId === option.id
-                              ? colors.accent
-                              : colors.border,
+                            printingId === option.id ? colors.accent : colors.border,
                           borderWidth: printingId === option.id ? 2 : 1,
                           borderRadius: radius.control,
                           padding: spacing(2),

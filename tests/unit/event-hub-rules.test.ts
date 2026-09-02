@@ -28,28 +28,30 @@ import { overtimeSecondsFor } from "@/lib/event-hub/schema";
  * periodically. That is what `rulesLastVerified` is for.
  */
 
-const FIVE: GameId[] = [
+const SIX: GameId[] = [
   "one-piece",
   "pokemon",
   "lorcana",
   "riftbound",
   "flesh-and-blood",
+  "mtg",
 ];
 
-describe("the five games", () => {
-  it("is exactly the five, and no more", () => {
-    /* Version one supports five. Magic, Yu-Gi-Oh and the rest arrive by
-       adding a profile, which is deliberately a code change. */
-    expect([...GAME_IDS]).toEqual(FIVE);
-    expect(allProfiles()).toHaveLength(5);
+describe("the six games", () => {
+  it("is exactly the six, and no more", () => {
+    /* Version one supported five; Magic arrived with the card catalogue
+       round. Yu-Gi-Oh and the rest arrive by adding a profile, which is
+       deliberately a code change. */
+    expect([...GAME_IDS]).toEqual(SIX);
+    expect(allProfiles()).toHaveLength(6);
   });
 
   it("refuses a game it does not carry", () => {
-    expect(gameProfile("mtg")).toBeNull();
+    expect(gameProfile("yugioh")).toBeNull();
     expect(gameProfile("")).toBeNull();
   });
 
-  it.each(FIVE)("%s carries everything a rules update needs", (id) => {
+  it.each(SIX)("%s carries everything a rules update needs", (id) => {
     const profile = GAME_PROFILES[id];
 
     expect(profile.officialRulesUrl).toMatch(/^https:\/\//);
@@ -61,7 +63,7 @@ describe("the five games", () => {
     expect(timerPreset(id, profile.defaultPresetId)).not.toBeNull();
   });
 
-  it.each(FIVE)("%s keeps both procedures readable across a room", (id) => {
+  it.each(SIX)("%s keeps both procedures readable across a room", (id) => {
     for (const bracket of ["swiss", "elimination"] as const) {
       const procedure = procedureFor(GAME_PROFILES[id], bracket);
 
@@ -77,7 +79,7 @@ describe("the five games", () => {
     }
   });
 
-  it.each(FIVE)("%s only claims a countdown when it has one", (id) => {
+  it.each(SIX)("%s only claims a countdown when it has one", (id) => {
     for (const bracket of ["swiss", "elimination"] as const) {
       const procedure = procedureFor(GAME_PROFILES[id], bracket);
 
@@ -90,8 +92,8 @@ describe("the five games", () => {
   });
 
   it("gives every game a distinct accent token", () => {
-    const tokens = FIVE.map((id) => GAME_PROFILES[id].accentToken);
-    expect(new Set(tokens).size).toBe(5);
+    const tokens = SIX.map((id) => GAME_PROFILES[id].accentToken);
+    expect(new Set(tokens).size).toBe(6);
     /* A token name, never a literal — brand colour lives in globals.css. */
     for (const token of tokens) expect(token).toMatch(/^--color-game-/);
   });
@@ -255,7 +257,7 @@ describe("Flesh and Blood", () => {
 });
 
 describe("switching between Swiss and elimination", () => {
-  it.each(FIVE)("%s gives a different procedure for each", (id) => {
+  it.each(SIX)("%s gives a different procedure for each", (id) => {
     const profile = GAME_PROFILES[id];
 
     expect(procedureFor(profile, "swiss")).toBe(profile.swiss);

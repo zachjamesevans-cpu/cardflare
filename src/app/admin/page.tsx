@@ -19,6 +19,7 @@ import { listImportedSets } from "@/lib/cards/imported-sets";
 import { catalogForConsole } from "@/lib/admin/catalog";
 import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
+import { CatalogueImportForm } from "@/components/admin/catalogue-import-form";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
@@ -319,6 +320,20 @@ export default async function AdminPage() {
 
         <Card>
           <SyncCatalogForm providerName={providerName} />
+        </Card>
+
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-lg font-bold text-text-primary">Other games</h3>
+          <p className="text-sm text-text-secondary">
+            Magic, Pokémon, Flesh and Blood and Riftbound come in one set at a time from
+            their public catalogues. Every card lands under its own game, so a room
+            scanned in from a Riftbound screen searches Riftbound cards and nothing
+            else.
+          </p>
+        </div>
+
+        <Card>
+          <CatalogueImportForm />
         </Card>
 
         <CatalogHealth

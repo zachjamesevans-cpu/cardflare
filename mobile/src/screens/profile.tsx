@@ -22,7 +22,10 @@ import {
   dressAllShowcase,
   dressShowcase,
   getFollowing,
+  getGames,
   getProfile,
+  lastSearchGame,
+  rememberSearchGame,
   removeFromShowcase,
   renameProfile,
   searchCards,
@@ -54,6 +57,9 @@ import {
   Title,
 } from "../ui";
 import { colors, radius, spacing } from "../theme";
+import { GameChips } from "../game-chips";
+import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
+import type { GameSlug } from "../games";
 
 /** How far the cover reaches: past the name and the Embers badge. */
 const COVER_HEIGHT = 280;
@@ -396,8 +402,8 @@ export function ProfileScreen() {
         <Card>
           <Title>Pick your name</Title>
           <Body>
-            This is the name people see next to everything you post. Spaces and
-            capitals are fine, and it does not have to be unique.
+            This is the name people see next to everything you post. Spaces and capitals
+            are fine, and it does not have to be unique.
           </Body>
           <NameField
             current={profile.displayName}
@@ -641,9 +647,7 @@ export function ProfileScreen() {
           variant="secondary"
           disabled={busy === "avatar" || busy === "cover"}
           onPress={() =>
-            profile.pro
-              ? void changeAnimatedPicture()
-              : navigation.navigate("Pro")
+            profile.pro ? void changeAnimatedPicture() : navigation.navigate("Pro")
           }
         />
 
@@ -1135,6 +1139,35 @@ function AddToShowcase({
   } | null>(null);
   const [picked, setPicked] = useState({ frame: defaultFrame, holo: defaultHolo });
 
+  /* Which game: the chip last tapped on this device, else the first
+     game from sign-up - resolved the way the post screen and the
+     website resolve it, so one person gets one default everywhere. */
+  const [playerGames, setPlayerGames] = useState<string[]>([]);
+  const [remembered, setRemembered] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    void lastSearchGame().then((value) => {
+      if (current) setRemembered(value);
+    });
+    void getGames()
+      .then((result) => {
+        if (current) setPlayerGames(result.mine);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [open]);
+
+  const scope = resolveGameScope({ playerGames, remembered });
+  const scopedGame = scope.selected;
+  const pickGame = (game: GameSlug | null) => {
+    const value = game ?? ALL_GAMES;
+    setRemembered(value);
+    void rememberSearchGame(value);
+  };
+
   useEffect(() => {
     if (query.trim().length < 2) {
       setHits([]);
@@ -1144,13 +1177,13 @@ function AddToShowcase({
     /* The same 300ms the post screen uses: long enough that a phone
        keyboard does not fire a query per character. */
     const timer = setTimeout(() => {
-      void searchCards(query.trim())
+      void searchCards(query.trim(), scopedGame)
         .then((result) => setHits(result.cards))
         .catch(() => setHits([]));
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, scopedGame]);
 
   if (!open) {
     return (
@@ -1209,12 +1242,13 @@ function AddToShowcase({
 
   return (
     <View style={{ gap: spacing(2) }}>
+      <GameChips scope={scope} onPick={pickGame} />
       <Input
         value={query}
         onChangeText={setQuery}
         autoFocus
         autoCorrect={false}
-        placeholder="Search for a card"
+        placeholder={searchPlaceholder(scopedGame)}
       />
 
       {hits.slice(0, 8).map((hit) => (

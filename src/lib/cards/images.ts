@@ -28,7 +28,19 @@ export function cardImagesEnabled(): boolean {
  * reached the database from elsewhere cannot be rendered. Kept as narrow as
  * practical: an allow-list, never a wildcard.
  */
-export const ALLOWED_IMAGE_HOSTS = ["optcgapi.com", "www.optcgapi.com"] as const;
+export const ALLOWED_IMAGE_HOSTS = [
+  "optcgapi.com",
+  "www.optcgapi.com",
+  /* The four public catalogues' picture hosts. Listed by hand rather
+     than imported from the provider registry, because this file ships
+     to the browser and the registry drags the adapters with it;
+     tests/unit/catalogue-providers.test.ts holds the two lists equal. */
+  "cards.scryfall.io",
+  "assets.tcgdex.net",
+  "legendstory-production-s3-public.s3.amazonaws.com",
+  "storage.googleapis.com",
+  "cmsassets.rgpub.io",
+] as const;
 
 /**
  * Whether a stored URL is safe to render.

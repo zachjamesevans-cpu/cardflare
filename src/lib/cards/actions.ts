@@ -5,6 +5,7 @@ import { clientKey } from "@/lib/request-context";
 import { parseCardQuery } from "./query";
 import { cardQuerySchema, floatAskedVariants, type CardResult } from "./schema";
 import { countCards, searchCards, type CardSearchFilters } from "./search";
+import { isGameSlug } from "@/lib/players/games-catalog";
 
 /**
  * Search is unauthenticated and hits the database on every call, and the UI
@@ -74,9 +75,7 @@ export async function searchCardsAction(
     /* The room's game rides every branch below: it is a scan's decision,
        not a guess read out of prose, so the no-results fallback must not
        drop it. Shaped, because it arrives from a URL. */
-    const game = /^[a-z][a-z0-9-]{1,30}$/.test(filters.game ?? "")
-      ? filters.game
-      : null;
+    const game = isGameSlug(filters.game ?? "") ? filters.game : null;
 
     let query = typed.text;
     let results = await searchCards(query, {

@@ -48,6 +48,7 @@ import {
 } from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
 import { gameProfile } from "@/lib/event-hub/game-profiles";
+import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import { listMyTrades } from "@/lib/trades/repository";
 import { cn } from "@/lib/cn";
@@ -149,6 +150,7 @@ export default async function JoinByCodePage({
    * a crafted URL degrades to no filter rather than an empty search.
    */
   const scannedGame = gameProfile(params_.g ?? "")?.id ?? null;
+  const games = await viewerGames();
 
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
@@ -623,6 +625,7 @@ export default async function JoinByCodePage({
               kind="flare"
               imagesEnabled={images}
               game={scannedGame}
+              playerGames={games}
               footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
             />
 

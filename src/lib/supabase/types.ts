@@ -407,7 +407,16 @@ export type StoreSinglesSyncInsert = Omit<StoreSinglesSyncRow, "synced_at"> & {
 };
 
 export type EventStatus = "draft" | "open" | "closed";
-export type Game = "one_piece";
+/**
+ * The games a card or an event belongs to: `cards.game` and
+ * `events.game`, text with a check since 20261001140000 (an enum
+ * before that, and the one value it had was spelt `one_piece`). The
+ * same slugs as `player_games` and the Event Hub, on purpose — the
+ * room's QR carries one of these and the card search compares it to
+ * this column, so the two had to be one vocabulary.
+ */
+export type Game =
+  "one-piece" | "riftbound" | "lorcana" | "mtg" | "pokemon" | "flesh-and-blood";
 
 /**
  * `walk_in` rooms are opened by the application when somebody scans a store's
@@ -873,7 +882,7 @@ export type PlayerEquipInsert = Omit<PlayerEquipRow, "updated_at"> & {
 
 export type PlayerGameRow = {
   player_id: string;
-  game: "one-piece" | "riftbound" | "lorcana" | "mtg" | "pokemon";
+  game: Game;
   created_at: string;
 };
 
