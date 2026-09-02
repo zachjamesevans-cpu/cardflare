@@ -9,6 +9,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { signOutToSignup } from "@/lib/auth/actions";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -58,7 +59,9 @@ export default async function SignupPage() {
         </li>
         <li className="flex items-center gap-2.5">
           <MapPin className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          Local shows every hunt around you. Have the card? Message them.
+          {LOCAL_ENABLED
+            ? "Local shows every hunt around you. Have the card? Message them."
+            : "Scan the code at the counter and see every hunt in the room."}
         </li>
         <li className="flex items-center gap-2.5">
           <Flame className="size-4 shrink-0 text-accent" aria-hidden="true" />

@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Section, SectionHeading } from "@/components/ui/section";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { STORE_PILOT_ANCHOR, VENDOR_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
 
 /**
@@ -36,7 +37,9 @@ const TIERS: Tier[] = [
     cadence: null,
     points: [
       "Post Flares and see who has your cards",
-      "Local: every Flare near you, and messaging",
+      ...(LOCAL_ENABLED
+        ? ["Local: every Flare near you, and messaging"]
+        : ["The room: everyone at tonight's event, on one board"]),
       "Your binder, wants and decks on web and app",
       "Earn Embers on confirmed trades",
     ],

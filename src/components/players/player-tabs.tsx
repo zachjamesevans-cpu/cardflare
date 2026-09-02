@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Home, MapPin, UserCircle2 } from "lucide-react";
+import { Bell, Home, MapPin, UserCircle2, Users } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * The app's bottom bar, on the website.
@@ -28,7 +29,11 @@ const TABS = [
      somebody stands in a shop; scanning is a button on the Feed now, which
      is fewer taps than the tab it replaced. See PRODUCT.md. */
   { href: "/feed", label: "Feed", icon: Home },
-  { href: "/local", label: "Local", icon: MapPin },
+  /* Room's slot. Local took it for a while; with Local switched off
+     (src/lib/local/enabled.ts) the live room has its tab back. */
+  ...(LOCAL_ENABLED
+    ? [{ href: "/local", label: "Local", icon: MapPin } as const]
+    : [{ href: "/room", label: "Room", icon: Users } as const]),
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },
   { href: "/profile", label: "Profile", icon: UserCircle2 },
@@ -49,9 +54,10 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
            * tab has to own that path too or the bar goes blank exactly
            * when a player is deepest in the product.
            */
+          const roomOwner = LOCAL_ENABLED ? "/feed" : "/room";
           const active =
             pathname === tab.href ||
-            (tab.href === "/feed" && pathname.startsWith("/e/"));
+            (tab.href === roomOwner && pathname.startsWith("/e/"));
 
           const Icon = tab.icon;
 

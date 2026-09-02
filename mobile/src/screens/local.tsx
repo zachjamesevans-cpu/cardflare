@@ -62,9 +62,16 @@ type Row =
   | { kind: "flares-heading" }
   | { kind: "flare"; flare: LocalFlare }
   | { kind: "group"; flares: LocalFlare[] }
-  | { kind: "empty" };
+  | { kind: "empty" }
+  | { kind: "no-threads" };
 
-export function LocalScreen() {
+export function LocalScreen({
+  threadsOnly = false,
+}: {
+  /** Local switched off: the conversations people already had, and
+      nothing near-you at all. See src/local-enabled.ts. */
+  threadsOnly?: boolean;
+}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
   const [feed, setFeed] = useState<LocalFeed | null>(null);
@@ -93,7 +100,7 @@ export function LocalScreen() {
     /* A permission we already hold is used quietly; the screen never
        pops the system dialog on its own — the ask card does that. */
     let coords: Coords | null = null;
-    if (await haveLocationPermission()) {
+    if (!threadsOnly && (await haveLocationPermission())) {
       const outcome = await requestCoords();
       if (outcome.status === "granted") coords = outcome.coords;
     }
@@ -102,7 +109,7 @@ export function LocalScreen() {
 
     try {
       const [nextFeed, nextThreads] = await Promise.all([
-        getLocal(coords),
+        threadsOnly ? null : getLocal(coords),
         listLocalThreads(),
       ]);
       if (!isCurrent()) return;
@@ -111,9 +118,13 @@ export function LocalScreen() {
       setFailure(null);
     } catch {
       if (!isCurrent()) return;
-      setFailure("Local could not load. Pull to try again.");
+      setFailure(
+        threadsOnly
+          ? "Messages could not load. Pull to try again."
+          : "Local could not load. Pull to try again.",
+      );
     }
-  }, []);
+  }, [threadsOnly]);
 
   useFocusEffect(
     useCallback(() => {
@@ -138,10 +149,11 @@ export function LocalScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
         <Card>
-          <Title>Flares near you</Title>
+          <Title>{threadsOnly ? "Messages" : "Flares near you"}</Title>
           <Body>
-            Local shows every Flare posted near you, and lets you message the poster
-            when you have the card. Sign in and it lights up.
+            {threadsOnly
+              ? "Your conversations about cards live here. Sign in to read them."
+              : "Local shows every Flare posted near you, and lets you message the poster when you have the card. Sign in and it lights up."}
           </Body>
           <Button label="Sign in" onPress={() => navigation.navigate("SignIn")} />
         </Card>
@@ -168,8 +180,10 @@ export function LocalScreen() {
   const rows: Row[] = [];
   if (feed) rows.push({ kind: "radius" });
   if (threads.length > 0) {
-    rows.push({ kind: "threads-heading" });
+    if (!threadsOnly) rows.push({ kind: "threads-heading" });
     for (const thread of threads) rows.push({ kind: "thread", thread });
+  } else if (threadsOnly && signedIn) {
+    rows.push({ kind: "no-threads" });
   }
   if (feed) {
     rows.push({ kind: "flares-heading" });
@@ -219,6 +233,16 @@ export function LocalScreen() {
             return <RadiusRow current={feed!.radius} onSaved={() => void load()} />;
           case "threads-heading":
             return <Heading text="Messages" />;
+          case "no-threads":
+            return (
+              <Card>
+                <Title>No conversations yet</Title>
+                <Body>
+                  When somebody answers one of your Flares, the conversation lands
+                  here.
+                </Body>
+              </Card>
+            );
           case "thread":
             return (
               <ThreadRow

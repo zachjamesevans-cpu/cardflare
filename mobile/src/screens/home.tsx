@@ -17,6 +17,8 @@ import {
 } from "react-native";
 
 import type { StackParams } from "../../App";
+import { LOCAL_ENABLED } from "../local-enabled";
+import { openRoom } from "../open-room";
 import {
   getFeed,
   SECTION_TITLES,
@@ -326,7 +328,7 @@ export function HomeScreen() {
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
-    navigation.navigate("Room");
+    openRoom(navigation);
   };
 
   /*
@@ -344,11 +346,12 @@ export function HomeScreen() {
       return;
     }
     if (href === "/room") {
-      navigation.navigate("Room");
+      openRoom(navigation);
       return;
     }
     if (href === "/local") {
-      navigation.navigate("Tabs", { screen: "Local" });
+      if (LOCAL_ENABLED) navigation.navigate("Tabs", { screen: "Local" });
+      else navigation.navigate("Messages");
       return;
     }
     if (href === "/profile/settings") {
@@ -386,7 +389,7 @@ export function HomeScreen() {
         }).catch(() => {});
       }
       await rememberRoom(local.nextEventCode);
-      navigation.navigate("Room");
+      openRoom(navigation);
     } catch {
       // The Room tab shows the truthful state; nothing to add here.
     } finally {
@@ -751,7 +754,7 @@ export function HomeScreen() {
               label={STARTERS[item.topic].label}
               onPress={() =>
                 item.topic === "store"
-                  ? navigation.navigate("Room")
+                  ? openRoom(navigation)
                   : navigation.navigate("Settings")
               }
             />
