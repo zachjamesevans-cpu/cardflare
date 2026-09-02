@@ -12,7 +12,14 @@ import {
   type ProviderSet,
 } from "@/lib/cards/domain";
 import { ProviderHttp, ProviderHttpError, type HttpOptions } from "../http";
-import { asInt, asRecord, asString, asStringList, cleanSetCode } from "../shared";
+import {
+  asInt,
+  asRecord,
+  asString,
+  asStringList,
+  cleanSetCode,
+  versionBases,
+} from "../shared";
 
 export const RIFTCODEX_KEY = "riftcodex";
 export const RIFTCODEX_BASE_URL = "https://api.riftcodex.com";
@@ -69,10 +76,15 @@ export class RiftcodexProvider implements CardDataProvider {
     const collector = asInt(record.collectorNumber);
     const name = asString(record.name) ?? "";
     const supertype = asString(record.supertype);
+    /* Set by fetchCards from `versionBases`: the collector number of
+       the card this alternate art is a version of. */
+    const baseCollector = asInt(record.__base_number) ?? collector;
+    const { __base_number: _base, ...stored } = record;
+    void _base;
 
     const candidate = {
       canonicalCardNumber:
-        setId && collector !== null ? riftboundNumber(setId, collector) : "",
+        setId && baseCollector !== null ? riftboundNumber(setId, baseCollector) : "",
       exactName: name,
       cardType: asString(record.type)?.toLowerCase() ?? null,
       colors: asStringList(record.domains).map((domain) => domain.toLowerCase()),
@@ -86,7 +98,7 @@ export class RiftcodexProvider implements CardDataProvider {
       effectText: asString(record.text),
       triggerText: null,
       providerExternalId: id,
-      rawMetadata: record,
+      rawMetadata: stored,
       providerUpdatedAt: null,
       printings: [
         {
@@ -95,7 +107,12 @@ export class RiftcodexProvider implements CardDataProvider {
           source: "set" as const,
           setCode: setId?.toUpperCase() ?? null,
           setName: asString(record.setLabel),
-          printingLabel: setId?.toUpperCase() ?? null,
+          /* "OGN #300": the number rides the label so an alternate art
+             reads apart from the card it sits under. */
+          printingLabel:
+            setId && collector !== null
+              ? `${setId.toUpperCase()} #${String(collector).padStart(3, "0")}`
+              : (setId?.toUpperCase() ?? null),
           /* The data's own word: "Signature" for a champion's signature
              printing; nothing otherwise. */
           variantType: supertype,
@@ -108,7 +125,7 @@ export class RiftcodexProvider implements CardDataProvider {
           isReprint: null,
           language: "en",
           imageUrl: asString(record.imageUrl),
-          rawMetadata: record,
+          rawMetadata: stored,
           providerUpdatedAt: null,
         },
       ],
@@ -194,8 +211,21 @@ export class RiftcodexProvider implements CardDataProvider {
 
     const records = options.sample ? wanted.slice(0, SAMPLE_CAP) : wanted;
 
+    /* An alternate art is a version of the same-named card in its set:
+       Riftcodex flags the alternate, the name links the two. */
+    const bases = versionBases(wanted, {
+      id: (record) => asString(record.id),
+      set: (record) => asString(record.setId)?.toUpperCase() ?? null,
+      name: (record) => asString(record.name),
+      isVersion: (record) => record.alternateArt === true,
+    });
+
     for (const record of records) {
-      const result = this.normalizeCard(record);
+      const base = bases.get(asString(record.id) ?? "");
+      const baseNumber = base ? asInt(base.collectorNumber) : null;
+      const result = this.normalizeCard(
+        baseNumber !== null ? { ...record, __base_number: baseNumber } : record,
+      );
       if (result.ok) cards.push(result.card);
       else failures.push(result.failure);
     }
