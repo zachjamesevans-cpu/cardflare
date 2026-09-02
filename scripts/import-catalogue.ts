@@ -107,7 +107,17 @@ async function main() {
     codes.push({ code, name: null });
   } else {
     console.log(`Listing ${source.sourceName}'s sets…`);
-    const sets = await provider.fetchSets();
+    let sets: Awaited<ReturnType<typeof provider.fetchSets>>;
+    try {
+      sets = await provider.fetchSets();
+    } catch (error) {
+      console.error(
+        `\n${error instanceof Error ? error.message : String(error)}\n\n` +
+          `Nothing was written. This is the network between this computer and ${source.sourceName}: ` +
+          "check the connection (a phone hotspot rules the Wi-Fi out), then run the same command again.",
+      );
+      process.exit(1);
+    }
     if (sets.length === 0) {
       console.error("The source listed no sets. Nothing to import.");
       process.exit(1);

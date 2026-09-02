@@ -40,6 +40,42 @@ export class ProviderHttpError extends Error {
   }
 }
 
+/**
+ * "fetch failed" with the reason attached.
+ *
+ * Node's fetch reports every network failure as the two words "fetch
+ * failed" and keeps the actual reason — DNS, refused, reset, a TLS
+ * complaint — on `cause`. That reason is the only thing a person at a
+ * terminal can act on, so it is put back into the message.
+ */
+export function describeNetworkError(error: unknown, url: string): string {
+  const host = (() => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  })();
+
+  if (!(error instanceof Error)) return `Could not reach ${host}`;
+
+  const cause = (error as { cause?: unknown }).cause;
+  const detail =
+    cause && typeof cause === "object"
+      ? [(cause as { code?: unknown }).code, (cause as { message?: unknown }).message]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(": ")
+      : "";
+
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return `Timed out reaching ${host}`;
+  }
+
+  return detail
+    ? `Could not reach ${host} (${detail})`
+    : `Could not reach ${host} (${error.message})`;
+}
+
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -143,7 +179,7 @@ export class ProviderHttp {
         } else {
           // Network failure or timeout. Worth another go.
           lastError = new ProviderHttpError(
-            error instanceof Error ? error.message : "Request failed",
+            describeNetworkError(error, url),
             null,
             true,
           );
