@@ -17,13 +17,19 @@ import {
   riftboundNumber,
 } from "@/lib/cards/providers/riftcodex/adapter";
 import {
+  baseNumbersByRecord,
   primaryType as mtgType,
   ScryfallProvider,
   subtypes,
+  treatmentOf,
 } from "@/lib/cards/providers/scryfall/adapter";
 import { describeNetworkError } from "@/lib/cards/providers/http";
 import { cleanSetCode } from "@/lib/cards/providers/shared";
-import { printedNumber, TcgdexProvider } from "@/lib/cards/providers/tcgdex/adapter";
+import {
+  printedNumber,
+  secretRareBases,
+  TcgdexProvider,
+} from "@/lib/cards/providers/tcgdex/adapter";
 import { GAME_SLUGS } from "@/lib/players/games-catalog";
 
 /**
@@ -478,5 +484,145 @@ describe("describeNetworkError", () => {
     expect(describeNetworkError("nope", "https://api.lorcast.com/v0/sets")).toBe(
       "Could not reach api.lorcast.com",
     );
+  });
+});
+
+describe("versions nest under one card", () => {
+  it("keys a Magic showcase printing on its base card's number", async () => {
+    const page = {
+      data: [
+        {
+          id: "aaaaaaaa-0000-4000-8000-000000000001",
+          oracle_id: "bolt-oracle",
+          name: "Lightning Bolt",
+          set: "mh3",
+          set_name: "Modern Horizons 3",
+          collector_number: "231",
+          rarity: "uncommon",
+          type_line: "Instant",
+          image_uris: { normal: "https://cards.scryfall.io/normal/front/a/a/1.jpg" },
+        },
+        {
+          id: "aaaaaaaa-0000-4000-8000-000000000002",
+          oracle_id: "bolt-oracle",
+          name: "Lightning Bolt",
+          set: "mh3",
+          set_name: "Modern Horizons 3",
+          collector_number: "412",
+          rarity: "uncommon",
+          type_line: "Instant",
+          frame_effects: ["showcase"],
+          image_uris: { normal: "https://cards.scryfall.io/normal/front/a/a/2.jpg" },
+        },
+        {
+          id: "aaaaaaaa-0000-4000-8000-000000000003",
+          oracle_id: "other-oracle",
+          name: "Ajani",
+          set: "mh3",
+          set_name: "Modern Horizons 3",
+          collector_number: "1",
+          rarity: "mythic",
+          type_line: "Legendary Planeswalker — Ajani",
+          image_uris: { normal: "https://cards.scryfall.io/normal/front/a/a/3.jpg" },
+        },
+      ],
+      has_more: false,
+    };
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify(page), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+    const provider = new ScryfallProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards, failures } = await provider.fetchCards({ setCode: "MH3" });
+    expect(failures).toHaveLength(0);
+    const numbers = cards.map((card) => card.canonicalCardNumber);
+    /* The showcase printing is keyed on 231, so the sync merges it
+       under the base card as a second printing. */
+    expect(numbers).toEqual(["MH3-231", "MH3-231", "MH3-1"]);
+    const showcase = cards[1].printings[0];
+    expect(showcase.printingLabel).toBe("MH3 #412");
+    expect(showcase.variantType).toBe("showcase");
+    expect(showcase.isAlternateArt).toBe(true);
+    expect(cards[0].printings[0].printingLabel).toBe("MH3 #231");
+    expect(cards[0].printings[0].isAlternateArt).toBeNull();
+  });
+
+  it("prefers the plain printing as the base even when it is numbered later", () => {
+    const bases = baseNumbersByRecord([
+      {
+        id: "x",
+        oracle_id: "o",
+        set: "blb",
+        collector_number: "300",
+        border_color: "borderless",
+      },
+      {
+        id: "y",
+        oracle_id: "o",
+        set: "blb",
+        collector_number: "301",
+        border_color: "black",
+      },
+    ]);
+    expect(bases.get("x")).toBe("301");
+    expect(bases.get("y")).toBe("301");
+    expect(treatmentOf({ border_color: "borderless" })).toBe("borderless");
+    expect(treatmentOf({ promo_types: ["prerelease"] })).toBe("prerelease");
+    expect(treatmentOf({ border_color: "black" })).toBeNull();
+  });
+
+  it("keys a Pokémon secret rare on the same-named card inside the official count", async () => {
+    const set = {
+      id: "sv3",
+      name: "Obsidian Flames",
+      cardCount: { official: 197, total: 230 },
+      cards: [
+        {
+          id: "sv3-125",
+          localId: "125",
+          name: "Charizard ex",
+          image: "https://assets.tcgdex.net/en/sv/sv3/125",
+        },
+        {
+          id: "sv3-223",
+          localId: "223",
+          name: "Charizard ex",
+          image: "https://assets.tcgdex.net/en/sv/sv3/223",
+        },
+        { id: "sv3-25", localId: "25", name: "Pikachu" },
+        { id: "sv3-26", localId: "26", name: "Pikachu" },
+        { id: "sv3-210", localId: "210", name: "Pikachu" },
+      ],
+    };
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify(set), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+    const provider = new TcgdexProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards } = await provider.fetchCards({ setCode: "sv3" });
+    const byId = new Map(cards.map((card) => [card.providerExternalId, card]));
+
+    expect(byId.get("sv3-223")?.canonicalCardNumber).toBe("SV3-125");
+    expect(byId.get("sv3-223")?.printings[0].isAlternateArt).toBe(true);
+    expect(byId.get("sv3-223")?.printings[0].printingLabel).toBe("SV3 #223");
+    expect(byId.get("sv3-125")?.printings[0].isAlternateArt).toBeNull();
+    /* Three Pikachus: the secret one cannot say which it is, so it stays its own card. */
+    expect(byId.get("sv3-210")?.canonicalCardNumber).toBe("SV3-210");
+  });
+
+  it("nests nothing when the set does not say its official count", () => {
+    expect(
+      secretRareBases(
+        [
+          { id: "a", localId: "1", name: "X" },
+          { id: "b", localId: "9", name: "X" },
+        ],
+        undefined,
+      ).size,
+    ).toBe(0);
   });
 });

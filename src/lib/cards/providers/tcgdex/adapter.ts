@@ -42,8 +42,61 @@ const SAMPLE_CAP = 40;
 const setSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
+  /* How many cards the set officially has. Everything numbered past
+     it is a secret rare: an illustration rare, a special illustration
+     rare, a gold card — another version of a card inside the count. */
+  cardCount: z
+    .object({ official: z.number().optional(), total: z.number().optional() })
+    .optional(),
   cards: z.array(z.record(z.string(), z.unknown())),
 });
+
+/**
+ * Which base card each secret-rare version belongs under.
+ *
+ * Pokémon prints its alternate arts past the set's official count with
+ * their own numbers: Charizard ex is 125/197 and again 223/197 as a
+ * special illustration rare. Keyed on number alone the second landed
+ * as a separate card. The set says how many cards it officially has,
+ * and a card numbered past that with the same name as exactly one card
+ * inside the count is that card's version. Two same-named cards inside
+ * the count (three different Pikachus) make the match ambiguous, and
+ * the secret rare stays its own card rather than guessing.
+ *
+ * Returns, per card id, the base card's local id.
+ */
+export function secretRareBases(
+  cards: readonly Record<string, unknown>[],
+  official: number | undefined,
+): Map<string, string> {
+  const bases = new Map<string, string>();
+  if (!official || official <= 0) return bases;
+
+  const numberOf = (card: Record<string, unknown>): number | null => {
+    const local = asString(card.localId);
+    return local && /^\d+$/.test(local) ? Number.parseInt(local, 10) : null;
+  };
+
+  const inCount = new Map<string, string[]>();
+  for (const card of cards) {
+    const number = numberOf(card);
+    const name = asString(card.name);
+    const local = asString(card.localId);
+    if (number === null || number > official || !name || !local) continue;
+    inCount.set(name, [...(inCount.get(name) ?? []), local]);
+  }
+
+  for (const card of cards) {
+    const number = numberOf(card);
+    const name = asString(card.name);
+    const id = asString(card.id);
+    if (number === null || number <= official || !name || !id) continue;
+    const candidates = inCount.get(name) ?? [];
+    if (candidates.length === 1) bases.set(id, candidates[0]);
+  }
+
+  return bases;
+}
 
 const setListSchema = z.array(z.record(z.string(), z.unknown()));
 
@@ -94,10 +147,16 @@ export class TcgdexProvider implements CardDataProvider {
     const setName = asString(set?.name);
     const name = asString(record.name) ?? "";
     const imageBase = asString(record.image);
+    /* Set by fetchCards from `secretRareBases`: the local id of the
+       card this printing is a version of. Absent, it is its own card. */
+    const baseLocal = asString(record.__base_local) ?? localId;
+    const isVersion = Boolean(asString(record.__base_local));
+    const { __base_local: _base, ...stored } = record;
+    void _base;
 
     const candidate = {
       canonicalCardNumber:
-        setCode && localId ? `${setCode}-${printedNumber(localId)}` : "",
+        setCode && baseLocal ? `${setCode}-${printedNumber(baseLocal)}` : "",
       exactName: name,
       cardType: asString(record.category)?.toLowerCase() ?? null,
       /* Energy types, when the detailed record carries them. HP stays
@@ -113,7 +172,7 @@ export class TcgdexProvider implements CardDataProvider {
       effectText: null,
       triggerText: null,
       providerExternalId: id,
-      rawMetadata: record,
+      rawMetadata: stored,
       providerUpdatedAt: null,
       printings: [
         {
@@ -122,17 +181,25 @@ export class TcgdexProvider implements CardDataProvider {
           source: "set" as const,
           setCode,
           setName,
-          printingLabel: setCode,
-          variantType: null,
+          /* "SV3 #223": the number rides the label so two versions of
+             one card read apart in the dropdown. */
+          printingLabel:
+            setCode && localId ? `${setCode} #${printedNumber(localId)}` : setCode,
+          /* The rarity is the treatment's name in Pokémon ("Illustration
+             rare"); known only when the details were fetched. */
+          variantType: isVersion ? asString(record.rarity) : null,
           rarity: asString(record.rarity),
           name,
-          isAlternateArt: null,
+          /* A card numbered past the set's official count, carrying the
+             name of one card inside it: the set's own numbering says
+             this is that card's other version. */
+          isAlternateArt: isVersion ? true : null,
           isPromo: null,
           isParallel: null,
           isReprint: null,
           language: "en",
           imageUrl: imageBase ? `${imageBase}/high.png` : null,
-          rawMetadata: record,
+          rawMetadata: stored,
           providerUpdatedAt: null,
         },
       ],
@@ -207,6 +274,10 @@ export class TcgdexProvider implements CardDataProvider {
       ? parsed.data.cards.slice(0, SAMPLE_CAP)
       : parsed.data.cards;
 
+    /* Worked out over the WHOLE set, sample or not: a version's base is
+       only findable when the base is in the list. */
+    const bases = secretRareBases(parsed.data.cards, parsed.data.cardCount?.official);
+
     let index = 0;
     for (const brief of listing) {
       index += 1;
@@ -236,8 +307,10 @@ export class TcgdexProvider implements CardDataProvider {
         }
       }
 
+      const baseLocal = bases.get(asString(brief.id) ?? "");
       const result = this.normalizeCard({
         ...record,
+        ...(baseLocal ? { __base_local: baseLocal } : {}),
         set: { id: parsed.data.id, name: parsed.data.name ?? null },
       });
       if (result.ok) cards.push(result.card);

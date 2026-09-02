@@ -117,6 +117,84 @@ export function subtypes(typeLine: string | null): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Which printing is THE card, when a set prints it several ways.
+ *
+ * A showcase, borderless or extended-art version of a card carries its
+ * own collector number, so keyed on number alone it landed as a second
+ * card beside the first instead of a version under it — the founder:
+ * "make sure if they have the same id that they get nested". Scryfall
+ * names the shared identity: `oracle_id` is the same for every printing
+ * of one card. Within one set, the printing with no treatment and the
+ * lowest number is the base; the rest become its versions and keep
+ * their own numbers on the printing.
+ *
+ * Returns, per record id, the collector number the card should be keyed
+ * on. Records without an oracle id (tokens, art cards) are left alone.
+ */
+export function baseNumbersByRecord(
+  records: readonly Record<string, unknown>[],
+): Map<string, string> {
+  const groups = new Map<string, Record<string, unknown>[]>();
+  for (const record of records) {
+    const set = asString(record.set);
+    const oracle = asString(record.oracle_id);
+    if (!set || !oracle) continue;
+    const key = `${set}:${oracle}`;
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  }
+
+  const chosen = new Map<string, string>();
+  for (const group of groups.values()) {
+    const base = [...group].sort((a, b) => {
+      const plainA = isTreated(a) ? 1 : 0;
+      const plainB = isTreated(b) ? 1 : 0;
+      if (plainA !== plainB) return plainA - plainB;
+      return compareCollector(
+        asString(a.collector_number) ?? "",
+        asString(b.collector_number) ?? "",
+      );
+    })[0];
+    const number = asString(base.collector_number);
+    if (!number) continue;
+    for (const record of group) {
+      const id = asString(record.id);
+      if (id) chosen.set(id, number);
+    }
+  }
+  return chosen;
+}
+
+/** Whether Scryfall marks the printing as a treatment of the card. */
+function isTreated(record: Record<string, unknown>): boolean {
+  return (
+    asStringList(record.frame_effects).length > 0 ||
+    asString(record.border_color) === "borderless" ||
+    record.full_art === true ||
+    asStringList(record.promo_types).length > 0
+  );
+}
+
+/** "231" before "412", and "231" before "231s" or "231★". */
+function compareCollector(a: string, b: string): number {
+  const numA = Number.parseInt(a, 10);
+  const numB = Number.parseInt(b, 10);
+  if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB)
+    return numA - numB;
+  return a.length - b.length || a.localeCompare(b);
+}
+
+/** Scryfall's own word for the treatment, or null for the plain card. */
+export function treatmentOf(record: Record<string, unknown>): string | null {
+  return (
+    asStringList(record.frame_effects)[0] ??
+    (asString(record.border_color) === "borderless" ? "borderless" : null) ??
+    (record.full_art === true ? "full art" : null) ??
+    asStringList(record.promo_types)[0] ??
+    null
+  );
+}
+
 export class ScryfallProvider implements CardDataProvider {
   readonly providerKey = SCRYFALL_KEY;
   readonly displayName = "Scryfall (scryfall.com)";
@@ -170,10 +248,14 @@ export class ScryfallProvider implements CardDataProvider {
     const imageUrl = asString(imageUris?.normal) ?? asString(imageUris?.large);
 
     const lang = asString(record.lang) ?? "en";
-    const stored = without(record, DROPPED_FIELDS);
+    /* Set by fetchCards from `baseNumbersByRecord`: the number this
+       printing's CARD is keyed on. Absent, the printing is its own card. */
+    const baseNumber = asString(record.__base_number) ?? collector;
+    const treatment = treatmentOf(record);
+    const stored = without(record, [...DROPPED_FIELDS, "__base_number"]);
 
     const candidate = {
-      canonicalCardNumber: set && collector ? `${set}-${collector}` : "",
+      canonicalCardNumber: set && baseNumber ? `${set}-${baseNumber}` : "",
       exactName: name,
       cardType: primaryType(typeLine),
       colors: colors.map((letter) => COLOR_WORDS[letter] ?? letter.toLowerCase()),
@@ -198,13 +280,19 @@ export class ScryfallProvider implements CardDataProvider {
           source: "set" as const,
           setCode: set,
           setName: asString(record.set_name),
-          printingLabel: set,
+          /* The number rides the label, so two versions of one card in
+             one set read as "MH3 #231" and "MH3 #412" rather than twice
+             the set code. */
+          printingLabel: set && collector ? `${set} #${collector}` : set,
           /* Scryfall's own words for a treatment, e.g. "showcase",
              "borderless", "extendedart". */
-          variantType: asStringList(record.frame_effects)[0] ?? null,
+          variantType: treatment,
           rarity: asString(record.rarity),
           name,
-          isAlternateArt: null,
+          /* Stated by Scryfall's frame, border, art and promo fields,
+             not read off a name: a treated printing is the alternate
+             art, the plain printing is unclassified. */
+          isAlternateArt: treatment ? true : null,
           isPromo: record.promo === true ? true : null,
           isParallel: null,
           isReprint:
@@ -262,6 +350,9 @@ export class ScryfallProvider implements CardDataProvider {
     let path: string | null =
       `/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=set`;
     let page = 0;
+    /* The whole set before any of it is normalised: which printing is
+       the base of a card is only knowable once every printing is in. */
+    const gathered: Record<string, unknown>[] = [];
 
     while (path) {
       page += 1;
@@ -297,21 +388,30 @@ export class ScryfallProvider implements CardDataProvider {
         ? parsed.data.data.slice(0, SAMPLE_CAP)
         : parsed.data.data;
 
-      for (const record of records) {
-        const result = this.normalizeCard(record);
-        if (result.ok) cards.push(result.card);
-        else failures.push(result.failure);
-      }
+      gathered.push(...records);
 
-      options.onProgress?.(
-        `  ${records.length} record(s) on page ${page}, ${failures.length} failure(s) so far`,
-      );
+      options.onProgress?.(`  ${records.length} record(s) on page ${page}`);
 
       path =
         !options.sample && parsed.data.has_more && parsed.data.next_page
           ? parsed.data.next_page
           : null;
     }
+
+    const bases = baseNumbersByRecord(gathered);
+    for (const record of gathered) {
+      const id = asString(record.id);
+      const base = id ? bases.get(id) : undefined;
+      const result = this.normalizeCard(
+        base ? { ...record, __base_number: base } : record,
+      );
+      if (result.ok) cards.push(result.card);
+      else failures.push(result.failure);
+    }
+
+    options.onProgress?.(
+      `  ${gathered.length} printing(s), ${failures.length} failure(s)`,
+    );
 
     if (cards.length > PAGE_SIZE_HINT * 12) {
       options.onProgress?.(`  ${set} is unusually large (${cards.length} printings)`);
