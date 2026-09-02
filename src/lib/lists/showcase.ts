@@ -47,16 +47,22 @@ export async function huntersFor(entry: {
     return [];
   }
 
-  return (data ?? [])
-    .filter((row) => row.player_session_id !== entry.excludeSessionId)
-    .filter(
-      (row) =>
-        // Any printing wanted, or the exact one, or the showcase is open.
-        row.printing_id === null ||
-        entry.printingId === null ||
-        row.printing_id === entry.printingId,
-    )
-    .map((row) => ({ flareId: row.id, playerSessionId: row.player_session_id }));
+  return (
+    (data ?? [])
+      /* Scoped to one event above, so every row is a board Flare. */
+      .filter((row): row is typeof row & { player_session_id: string } =>
+        Boolean(row.player_session_id),
+      )
+      .filter((row) => row.player_session_id !== entry.excludeSessionId)
+      .filter(
+        (row) =>
+          // Any printing wanted, or the exact one, or the showcase is open.
+          row.printing_id === null ||
+          entry.printingId === null ||
+          row.printing_id === entry.printingId,
+      )
+      .map((row) => ({ flareId: row.id, playerSessionId: row.player_session_id }))
+  );
 }
 
 /**

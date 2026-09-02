@@ -1,6 +1,7 @@
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { addEntrySchema } from "@/lib/lists/schema";
+import { postAreaFlares } from "@/lib/local/area";
 import { saveWant } from "@/lib/players/wants";
 import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList } from "@/lib/players/deck-list";
@@ -71,9 +72,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const found = await findCardsByNumbers(lines.map((line) => line.cardNumber));
 
-    let saved = 0;
-    let atCap = false;
     const unknown: string[] = [];
+    const cards = [];
 
     for (const line of lines) {
       const cardId = found.get(compactCardNumber(line.cardNumber));
@@ -82,21 +82,33 @@ export async function POST(request: Request): Promise<Response> {
         continue;
       }
 
-      const outcome = await saveWant(player.playerId, {
+      cards.push({
         cardId,
         /* Any printing. A deck list says which card, never which art. */
         printingId: null,
         quantity: line.quantity,
         note: null,
-        deckLabel: asDeck.data.deckLabel ?? null,
       });
-
-      if (outcome === "saved") saved += 1;
-      else if (outcome === "at-cap") {
-        atCap = true;
-        break;
-      }
     }
+
+    /*
+     * A pasted deck goes UP, as one post — the website's paste does the
+     * same, and the two platforms cannot differ on what a button does.
+     * One batch id and the deck's own name, so thirty cards read as one
+     * thing on everybody's Local rather than as thirty rows.
+     */
+    const outcome =
+      cards.length > 0
+        ? await postAreaFlares(
+            player.playerId,
+            cards,
+            null,
+            asDeck.data.deckLabel ?? null,
+          )
+        : ({ ok: false, reason: "unavailable" } as const);
+
+    const saved = outcome.ok ? outcome.posted : 0;
+    const atCap = false;
 
     return Response.json({ ok: true, saved, unknown, unreadable, atCap });
   }

@@ -232,8 +232,18 @@ export function ProfileScreen() {
     const chosen = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      /* The crop the server will make anyway, offered up front. */
-      aspect: kind === "cover" ? [8, 3] : [1, 1],
+      /*
+       * The crop the server will make anyway, offered up front — and it
+       * has to be the shape the cover is actually DRAWN in, or the
+       * cropper is lying. It asked for 8:3 while the profile drew the
+       * result into roughly 1.3:1, which magnified it past twice and cut
+       * half the width away: the founder's "appears quite zoomed in".
+       * Four by three is the tallest box a cover is ever shown in; every
+       * wider one crops the bottom, which is the half already fading out
+       * behind the name. Kept in step with COVER_WIDTH/COVER_HEIGHT on
+       * the server by tests/unit/app-cover-aspect.test.ts.
+       */
+      aspect: kind === "cover" ? [4, 3] : [1, 1],
       quality: 1,
     });
     if (chosen.canceled || chosen.assets.length === 0) return;
@@ -1077,7 +1087,7 @@ export function HandleField({
            the stored-handle one strips it the moment it lands. */
         onChangeText={(next) => setValue(handleWhileTyping(next))}
         maxLength={HANDLE_MAX}
-        placeholder="steven_b"
+        placeholder="your_handle"
       />
       <Button
         label="Save"

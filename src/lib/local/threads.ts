@@ -63,6 +63,19 @@ function trimmedBody(raw: string): string | null {
   return body;
 }
 
+/** The account behind a room session, when the session belongs to one. */
+async function accountBehindSession(sessionId: string | null): Promise<string | null> {
+  if (!sessionId) return null;
+
+  const { data } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .select("player_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  return data?.player_id ?? null;
+}
+
 /**
  * Opens (or reuses) the thread for a Flare and sends the first message.
  *
@@ -84,19 +97,23 @@ export async function openFlareThread(
 
   const { data: flare } = await admin
     .from("flares")
-    .select("id, player_session_id, card_id")
+    .select("id, player_session_id, player_id, card_id")
     .eq("id", flareId)
     .maybeSingle();
 
   if (!flare) return { ok: false, reason: "not-found" };
 
-  const { data: session } = await admin
-    .from("player_sessions")
-    .select("player_id")
-    .eq("id", flare.player_session_id)
-    .maybeSingle();
-
-  const authorPlayerId = session?.player_id ?? null;
+  /*
+   * Who to write to, from either shape of Flare.
+   *
+   * An area Flare names its account outright — it could not have been
+   * posted without one. A board Flare names the session it was posted
+   * under, and the account behind that session may not exist at all: a
+   * guest's Flare is honestly posted and honestly unanswerable, which is
+   * what "no-account" tells the caller.
+   */
+  const authorPlayerId =
+    flare.player_id ?? (await accountBehindSession(flare.player_session_id));
   if (!authorPlayerId) return { ok: false, reason: "no-account" };
   if (authorPlayerId === responderPlayerId) return { ok: false, reason: "yourself" };
 

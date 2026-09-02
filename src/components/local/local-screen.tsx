@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Check, ChevronLeft, Loader2, MapPin, MessageCircle, Send } from "lucide-react";
 
+import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -221,6 +222,14 @@ export function LocalScreen({
         </section>
       )}
 
+      {/*
+       * No composer here.
+       *
+       * Posting lives in one place — the Flare tab — because two
+       * composers asking the same questions is what made "where does
+       * this go" unanswerable. Local is where Flares are READ and
+       * answered; the Flare tab is where they are written.
+       */}
       {feed.source !== "none" && (
         <section className="flex flex-col gap-3" aria-label="Wanted near you">
           <h2 className="text-sm font-semibold tracking-wide text-text-secondary uppercase">
@@ -239,13 +248,21 @@ export function LocalScreen({
             </Card>
           ) : (
             <Card className="flex flex-col p-0">
-              {feed.flares.map((flare) => (
-                <FlareRow
-                  key={flare.flareId}
-                  flare={flare}
-                  onThreadOpened={setOpenThreadId}
-                />
-              ))}
+              {groupFlares(feed.flares).map((entry) =>
+                entry.kind === "one" ? (
+                  <FlareRow
+                    key={entry.flare.flareId}
+                    flare={entry.flare}
+                    onThreadOpened={setOpenThreadId}
+                  />
+                ) : (
+                  <FlareGroup
+                    key={entry.batchId}
+                    flares={entry.flares}
+                    onThreadOpened={setOpenThreadId}
+                  />
+                ),
+              )}
             </Card>
           )}
         </section>
@@ -356,7 +373,20 @@ function FlareRow({
   return (
     <div className="flex flex-col gap-3 border-t border-border p-3 first:border-t-0">
       <div className="flex items-start gap-3">
-        <Thumb imageUrl={flare.imageUrl} />
+        {/* The same zoom the rest of the product uses. A flat thumbnail
+            here was the one card face that did nothing when clicked. */}
+        <span className="block w-12 shrink-0">
+          <CardImageZoom
+            imageUrl={flare.imageUrl}
+            exactName={flare.cardName}
+            cardNumber={flare.cardNumber}
+            enabled
+            caption={flare.printingLabel}
+            note={flare.note}
+            lookingFor={flare.quantity}
+            direction={flare.intent === "showcase" ? "showcase" : "want"}
+          />
+        </span>
 
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-text-primary">
@@ -597,6 +627,130 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Cards posted together, kept together.
+ *
+ * The founder: "should be able to post multiple flares in one group in
+ * local — so it looks like one post." A room's board has grouped a pasted
+ * deck under one folder since `posted_batch` arrived; Local carries the
+ * same batch id now, so it can stop scrolling somebody's whole deck past
+ * everybody nearby one card at a time.
+ *
+ * A batch of one is not a group: it is a card, and dressing it up as a
+ * folder with a single thing inside would be worse than the row it
+ * replaced.
+ */
+function groupFlares(
+  flares: LocalFlare[],
+): (
+  | { kind: "one"; flare: LocalFlare }
+  | { kind: "many"; batchId: string; flares: LocalFlare[] }
+)[] {
+  const out: (
+    | { kind: "one"; flare: LocalFlare }
+    | { kind: "many"; batchId: string; flares: LocalFlare[] }
+  )[] = [];
+  const seen = new Set<string>();
+
+  for (const flare of flares) {
+    if (!flare.batchId) {
+      out.push({ kind: "one", flare });
+      continue;
+    }
+    if (seen.has(flare.batchId)) continue;
+    seen.add(flare.batchId);
+
+    const group = flares.filter((other) => other.batchId === flare.batchId);
+    if (group.length === 1) out.push({ kind: "one", flare });
+    else out.push({ kind: "many", batchId: flare.batchId, flares: group });
+  }
+
+  return out;
+}
+
+/**
+ * One posting act, shown as one post.
+ *
+ * The header carries what the whole group has in common — who, where, how
+ * far, when — so each card underneath is just the card. Every face opens
+ * the same zoom as everywhere else, with the group as its shelf, so one
+ * swipe walks the deck.
+ */
+function FlareGroup({
+  flares,
+  onThreadOpened,
+}: {
+  flares: LocalFlare[];
+  onThreadOpened: (threadId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const lead = flares[0];
+  if (!lead) return null;
+
+  const shelf = flares.map((flare) => ({
+    imageUrl: flare.imageUrl,
+    exactName: flare.cardName,
+    cardNumber: flare.cardNumber,
+    caption: flare.printingLabel,
+    note: flare.note,
+    lookingFor: flare.quantity,
+    direction: (flare.intent === "showcase" ? "showcase" : "want") as
+      "showcase" | "want",
+  }));
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border p-3 first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setOpen((was) => !was)}
+        aria-expanded={open}
+        className="flex items-center gap-2 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-text-primary">
+            {lead.deckLabel?.trim() || `${flares.length} cards`}
+          </span>
+          <span className="block truncate text-sm text-text-secondary">
+            {lead.poster.name}
+            {lead.isYours ? " (you)" : ""}
+            {lead.storeName ? ` · ${lead.storeName}` : ""} · {milesLabel(lead.miles)} ·{" "}
+            {agoLabel(lead.postedAt)}
+          </span>
+        </span>
+        <span className="shrink-0 text-xs text-text-muted">
+          {open ? "Hide" : `${flares.length} cards`}
+        </span>
+      </button>
+
+      {/* The faces, always: a group nobody can see into is a headline
+          with no story. */}
+      <div className="flex flex-wrap gap-2">
+        {flares.map((flare, index) => (
+          <span key={flare.flareId} className="block w-12">
+            <CardImageZoom
+              imageUrl={flare.imageUrl}
+              exactName={flare.cardName}
+              cardNumber={flare.cardNumber}
+              enabled
+              caption={flare.printingLabel}
+              note={flare.note}
+              lookingFor={flare.quantity}
+              direction={flare.intent === "showcase" ? "showcase" : "want"}
+              siblings={shelf}
+              position={index}
+            />
+          </span>
+        ))}
+      </div>
+
+      {open &&
+        flares.map((flare) => (
+          <FlareRow key={flare.flareId} flare={flare} onThreadOpened={onThreadOpened} />
+        ))}
     </div>
   );
 }

@@ -45,8 +45,8 @@ import { StoreScreen } from "./src/screens/store";
 import { CustomizeScreen } from "./src/screens/customize";
 import { ProScreen } from "./src/screens/pro";
 import { SignInScreen } from "./src/screens/sign-in";
-import { WelcomeScreen, hasSeenWelcome } from "./src/screens/welcome";
-import { storedAccessToken } from "./src/api";
+import { WelcomeScreen, forgetWelcome, hasSeenWelcome } from "./src/screens/welcome";
+import { onSignedOut, storedAccessToken } from "./src/api";
 import { firstBootError } from "./src/boot-errors";
 import { colors, spacing } from "./src/theme";
 import { Tap } from "./src/ui";
@@ -450,6 +450,24 @@ export default function App() {
       live = false;
     };
   }, []);
+
+  /*
+   * Signing out goes back to the front door.
+   *
+   * The founder: "make sure that when I sign out it goes out to the main
+   * cardflare menu." It did not — the gate only ever moved toward `open`,
+   * so signing out left somebody in the tabs looking at a signed-out
+   * Feed. The seen-flag is cleared with it so a relaunch lands there too,
+   * rather than dropping them back inside with no visible way in.
+   */
+  useEffect(
+    () =>
+      onSignedOut(() => {
+        void forgetWelcome();
+        setGate("welcome");
+      }),
+    [],
+  );
 
   if (gate === "checking") {
     return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;

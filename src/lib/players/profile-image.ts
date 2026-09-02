@@ -21,12 +21,27 @@ export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const AVATAR_SIZE = 512;
 
 /**
- * The cover banner behind the picture: wide, short, and re-encoded to
- * exactly this box so every profile block lines up. Same 2MB send
- * ceiling as the avatar; the stored file lands around 100KB.
+ * The cover banner behind the picture, re-encoded to exactly this box so
+ * every profile block lines up. Same 2MB send ceiling as the avatar.
+ *
+ * FOUR BY THREE, AND IT USED TO BE EIGHT BY THREE. That was the bug the
+ * founder reported as a banner that "appears quite zoomed in": the
+ * cropper asked people to choose a wide 2.67:1 strip, and the profile
+ * then drew it into a box about 1.3:1 — roughly the card's width by the
+ * 280pt the cover carries down behind the name. Covering a 1.3 box with
+ * a 2.67 image magnifies it a little over twice and throws away half the
+ * width, so what somebody composed in the cropper was never what they
+ * saw afterwards. A cropper that lies is worse than no cropper.
+ *
+ * So the kept rectangle is now the shape of the TALLEST box a cover is
+ * ever drawn in. Everywhere else it appears is wider and shorter — the
+ * peek's 86pt strip, a desktop column — and those crop the bottom, which
+ * is the half already dissolving into the card behind the name. That is
+ * what `object-top` and `contentPosition="top"` were always for: "a face
+ * or a logo in the upper half of somebody's banner survives the crop."
  */
 export const COVER_WIDTH = 1200;
-export const COVER_HEIGHT = 450;
+export const COVER_HEIGHT = 900;
 
 /** The object path a cover is stored at, beside the avatars. */
 export function coverObjectPath(playerId: string, at = Date.now()): string {

@@ -589,13 +589,15 @@ async function embersBalance(playerId: string): Promise<number> {
  * scan, and it means a quiet week reads as "nothing on tonight" rather
  * than as an empty app.
  */
-export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
+export type FeedSection =
+  "wanted" | "tonight" | "people" | "walkin" | "nearby" | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
 };
@@ -606,9 +608,23 @@ function sectionFor(item: FeedItem): FeedSection {
       return "wanted";
     case "announcement":
     case "board":
-    case "upcoming":
     case "start":
       return "tonight";
+    /*
+     * A night on the calendar is news; a shop that merely accepts
+     * walk-ins is a place.
+     *
+     * Both arrived here as "upcoming" and both were filed under Tonight,
+     * so a Feed with nothing actually on opened with two identical "Walk
+     * in any time" cards beneath a heading promising an event. The
+     * founder, looking at exactly that: "seeing two rooms that you can
+     * open on the main feed maybe isn't the first thing that should be
+     * showing." It is not. A store with a real date keeps its place at
+     * the top; one without drops to its own quieter heading further
+     * down, beside the other places.
+     */
+    case "upcoming":
+      return item.nextEventAt ? "tonight" : "walkin";
     case "hunt":
     case "recent":
     case "added":
@@ -1061,7 +1077,17 @@ async function wantedItems(
     return [];
   }
 
-  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  /*
+   * Board Flares only. This section is "what happened in rooms near you",
+   * built by walking events to stores; an area Flare has neither, and
+   * Local is where it belongs.
+   */
+  const usable = flares.filter(
+    (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
+      Boolean(flare.event_id) &&
+      Boolean(flare.player_session_id) &&
+      flare.player_session_id !== ownSessionId,
+  );
   if (usable.length === 0) return [];
 
   /* Where each one is, so the item can end in a place like every other. */
@@ -1258,6 +1284,19 @@ async function recentItems(
   ownSessionId: string | null,
   held: ReturnType<typeof heldByCard>,
   stores: Map<string, { name: string; city: string | null; joinCode: string }>,
+  /**
+   * The accounts this player follows. The item is filed under a heading
+   * that says "People you follow", and until now it was not filtered by
+   * them at all — it took every open Flare at your stores, which is how
+   * three guests came to sit under that exact heading.
+   *
+   * The founder's split, and the one that makes both screens mean
+   * something: "the feed should only show flares of the people you
+   * follow, while local is an algorithm showing flares in your area."
+   * A guest cannot be followed and so cannot appear here; they are
+   * answerable in the room they posted in, which is where they show.
+   */
+  followedSessions: Set<string>,
 ): Promise<RecentItem[]> {
   const admin = getSupabaseAdmin();
 
@@ -1274,7 +1313,16 @@ async function recentItems(
     return [];
   }
 
-  const usable = flares.filter((flare) => flare.player_session_id !== ownSessionId);
+  /* Board Flares only: this list is what happened in rooms near you, and
+     it is built by walking events to stores. An area Flare has neither. */
+  const usable = flares.filter(
+    (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
+      Boolean(flare.event_id) &&
+      Boolean(flare.player_session_id) &&
+      flare.player_session_id !== ownSessionId &&
+      /* Somebody you follow, or it is not your Feed's business. */
+      followedSessions.has(flare.player_session_id ?? ""),
+  );
   if (usable.length === 0) return [];
 
   const { data: events } = await admin
@@ -1588,7 +1636,7 @@ export async function listFeed(
       tradedItems(locals.map((local) => local.storeId)),
       addedItems(followed, playerBySession, wanted),
       suggestionItem(playerId, wanted, new Set(followed.keys())),
-      recentItems(sessionId, held, stores),
+      recentItems(sessionId, held, stores, new Set(playerBySession.keys())),
       packItem(balance),
       shopItem(playerId, balance),
       nearbyStoreItems(playerId, locals, device),
@@ -1626,13 +1674,16 @@ export async function listFeed(
     })),
     ...boards.filter((item) => item.kind === "hunt"),
     ...boards.filter((item) => item.kind === "board" && item.yours),
-    ...upcoming,
+    ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
     ...boards.filter((item) => item.kind === "board" && !item.yours),
     ...recent,
     ...added,
     ...traded,
     ...suggested,
+    /* The walk-in-only stores, down here with the other places rather
+       than at the top pretending to be tonight. */
+    ...upcoming.filter((item) => item.nextEventAt === null),
     ...nearbyStores,
     ...pack,
     ...shop,

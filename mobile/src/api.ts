@@ -41,6 +41,28 @@ async function storeAuth(access: string, refresh: string): Promise<void> {
   await SecureStore.setItemAsync(REFRESH_KEY, refresh);
 }
 
+/*
+ * Who wants to know that somebody signed out.
+ *
+ * The gate in App.tsx, so far: signing out cleared the tokens and left
+ * the person standing in the tabs, looking at a signed-out Feed, with no
+ * way back to the front door short of force-quitting. Signing out should
+ * put you where signing in starts.
+ *
+ * A listener rather than a prop because the button is five screens deep
+ * inside a navigator the gate renders, and threading a callback down
+ * through all of it would touch every screen in between for one event.
+ */
+const signedOut = new Set<() => void>();
+
+/** Subscribe to sign-out. Returns the unsubscribe, for an effect. */
+export function onSignedOut(listener: () => void): () => void {
+  signedOut.add(listener);
+  return () => {
+    signedOut.delete(listener);
+  };
+}
+
 export async function signOut(): Promise<void> {
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
@@ -53,6 +75,8 @@ export async function signOut(): Promise<void> {
    * Signing out has to take both.
    */
   await clearCache();
+
+  for (const listener of signedOut) listener();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1118,13 +1142,20 @@ export interface FeedCard {
 }
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
-export type FeedSection = "wanted" | "tonight" | "people" | "nearby" | "store";
+export type FeedSection =
+  | "wanted"
+  | "tonight"
+  | "people"
+  | "walkin"
+  | "nearby"
+  | "store";
 
 /** The heading each section is drawn under. Same words as the website. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
   people: "People you follow",
+  walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
 };
@@ -1598,7 +1629,12 @@ export interface LocalFlare {
   acceptsTrade: boolean;
   acceptsCash: boolean;
   postedAt: string;
-  storeName: string;
+  /** The posting act this belonged to, when several went up at once. */
+  batchId: string | null;
+  /** What the poster called the group, when they named it. */
+  deckLabel: string | null;
+  /** The shop whose board it is on, or null for a Flare posted to an area. */
+  storeName: string | null;
   storeCity: string | null;
   /** Rounded server-side; no coordinate ever reaches the app. */
   miles: number;
@@ -1625,6 +1661,51 @@ export const getLocal = (coords?: { latitude: number; longitude: number } | null
 
   return call<LocalFeed>("GET", `/api/v1/local${query}`);
 };
+
+/**
+ * Posting a Flare to your area, with no room involved.
+ *
+ * The website's Server Action and this call reach the same lib, so the
+ * rule about who may post one and where it lands cannot drift between
+ * the two platforms.
+ */
+export const postAreaFlare = (input: {
+  /** One card, or `cards` for a list that goes up as a single post. */
+  cardId?: string;
+  cards?: {
+    cardId: string;
+    printingId?: string | null;
+    quantity?: number;
+    note?: string | null;
+    intent?: "want" | "showcase";
+    acceptsTrade?: boolean;
+    acceptsCash?: boolean;
+  }[];
+  deckLabel?: string | null;
+  printingId?: string | null;
+  quantity?: number;
+  note?: string | null;
+  intent?: "want" | "showcase";
+  acceptsTrade?: boolean;
+  acceptsCash?: boolean;
+  /* Where the phone is, when it has permission. Rides this one request
+     and anchors the Flare to a ZIP; the position is never stored. */
+  latitude?: number;
+  longitude?: number;
+}) =>
+  call<{
+    ok: boolean;
+    batchId?: string;
+    posted?: number;
+    error?: string;
+    message?: string;
+  }>("POST", "/api/v1/local/flares",
+    input,
+  );
+
+/** Taking your own area Flare down. */
+export const withdrawAreaFlare = (flareId: string) =>
+  call<{ ok: boolean }>("DELETE", "/api/v1/local/flares", { flareId });
 
 export const setLocalRadius = (radius: number) =>
   call<{ ok: boolean }>("PUT", "/api/v1/local", { radius });

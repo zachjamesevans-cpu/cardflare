@@ -72,3 +72,100 @@ export function pointFromCoords(
 
   return { latitude: lat, longitude: lon };
 }
+
+/**
+ * Every ZIP whose centroid is within `miles` of a point.
+ *
+ * For finding area Flares, which are anchored to their poster's ZIP and
+ * so cannot be filtered by a coordinate index. Turning the radius into a
+ * list of postal codes moves the work to a column Postgres CAN index, and
+ * keeps the alternative — reading every open area Flare in the country and
+ * measuring it here — off the table.
+ *
+ * A bounding box first, because haversine on thirty-three thousand
+ * centroids for every read of the tab is silly when a degree comparison
+ * discards almost all of them.
+ */
+export function zipsWithin(origin: Point, miles: number): string[] {
+  const latSpan = miles / 69;
+  const shrink = Math.max(Math.cos((origin.latitude * Math.PI) / 180), 0.01);
+  const lonSpan = miles / (69 * shrink);
+
+  const out: string[] = [];
+
+  for (const [zip, pair] of Object.entries(CENTROIDS)) {
+    if (pair?.length !== 2) continue;
+
+    const [latitude, longitude] = pair as [number, number];
+    if (Math.abs(latitude - origin.latitude) > latSpan) continue;
+    if (Math.abs(longitude - origin.longitude) > lonSpan) continue;
+    if (milesApart(origin, { latitude, longitude }) > miles) continue;
+
+    out.push(zip);
+  }
+
+  return out;
+}
+
+const EARTH_MILES = 3958.8;
+
+/** Haversine, kept here so this module owes nothing to the store code. */
+function milesApart(a: Point, b: Point): number {
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat1 = (a.latitude * Math.PI) / 180;
+  const lat2 = (b.latitude * Math.PI) / 180;
+
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+
+  return 2 * EARTH_MILES * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * The ZIP a coordinate sits in, near enough.
+ *
+ * For anchoring something posted by somebody who gave the browser their
+ * location instead of typing five digits. Local accepts either as an
+ * origin, so anything that demands the typed one has invented a
+ * requirement the rest of the product does not have — which is exactly
+ * how posting a Flare came to refuse the people who had granted the more
+ * precise thing.
+ *
+ * Snapping to a centroid is deliberately lossy, and the loss is the
+ * point: what gets stored is the same five digits somebody could have
+ * typed, never the position they actually shared.
+ *
+ * Null past the cap, because the nearest ZCTA to a coordinate in the
+ * Atlantic is a real row and a nonsense answer. Only US ZIPs exist in
+ * this table; outside them, saying "I do not know" is the honest result.
+ */
+export function nearestPostalCode(
+  origin: Point | null | undefined,
+  withinMiles = 30,
+): string | null {
+  if (!origin) return null;
+
+  let best: string | null = null;
+  let bestMiles = Infinity;
+
+  const latSpan = withinMiles / 69;
+  const shrink = Math.max(Math.cos((origin.latitude * Math.PI) / 180), 0.01);
+  const lonSpan = withinMiles / (69 * shrink);
+
+  for (const [zip, pair] of Object.entries(CENTROIDS)) {
+    if (pair?.length !== 2) continue;
+
+    const [latitude, longitude] = pair as [number, number];
+    if (Math.abs(latitude - origin.latitude) > latSpan) continue;
+    if (Math.abs(longitude - origin.longitude) > lonSpan) continue;
+
+    const miles = milesApart(origin, { latitude, longitude });
+    if (miles < bestMiles) {
+      bestMiles = miles;
+      best = zip;
+    }
+  }
+
+  return bestMiles <= withinMiles ? best : null;
+}

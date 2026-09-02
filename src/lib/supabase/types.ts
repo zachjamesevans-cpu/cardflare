@@ -482,8 +482,20 @@ export type FlareRow = {
   id: string;
   created_at: string;
   updated_at: string;
-  event_id: string;
-  player_session_id: string;
+  /**
+   * The board it was posted to, or null for an area Flare.
+   *
+   * A Flare has exactly two shapes and the database check enforces the
+   * pair: `event_id` + `player_session_id` for one posted at a store, or
+   * `player_id` + `posted_postal_code` for one posted to whoever is
+   * nearby. Never a mixture, never neither.
+   */
+  event_id: string | null;
+  player_session_id: string | null;
+  /** The account behind an area Flare. Null for one posted to a board. */
+  player_id: string | null;
+  /** The poster's own five digits, for an area Flare. Coarse on purpose. */
+  posted_postal_code: string | null;
   status: FlareStatus;
   card_id: string;
   /** Null means any printing will do. */
@@ -511,6 +523,8 @@ export type FlareInsert = Omit<
   | "id"
   | "created_at"
   | "updated_at"
+  | "player_id"
+  | "posted_postal_code"
   | "status"
   | "quantity"
   | "deck_label"
@@ -521,6 +535,8 @@ export type FlareInsert = Omit<
   id?: string;
   created_at?: string;
   updated_at?: string;
+  player_id?: string | null;
+  posted_postal_code?: string | null;
   status?: FlareStatus;
   quantity?: number;
   deck_label?: string | null;
