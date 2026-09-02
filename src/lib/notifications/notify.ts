@@ -63,6 +63,16 @@ async function flareContext(flareId: string): Promise<{
 
   if (!flare) return null;
 
+  /*
+   * A board Flare, or nothing to notify about.
+   *
+   * This whole path is the room's: somebody raised a hand on a board and
+   * the poster's phone should say so. An area Flare has no board and no
+   * hands to raise — it is answered by opening a thread, which sends its
+   * own notice — so there is deliberately nothing here for one.
+   */
+  if (!flare.event_id || !flare.player_session_id) return null;
+
   const [{ data: card }, { data: event }] = await Promise.all([
     admin.from("cards").select("exact_name").eq("id", flare.card_id).maybeSingle(),
     admin.from("events").select("join_code").eq("id", flare.event_id).maybeSingle(),

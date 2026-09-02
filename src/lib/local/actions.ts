@@ -1,7 +1,9 @@
 "use server";
 
+import { pointFromCoords } from "@/lib/geo/zip";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { postAreaFlares, withdrawAreaFlare, type AreaFlareInput } from "./area";
 import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
 import {
@@ -26,7 +28,19 @@ async function viewerPlayerId(): Promise<string | null> {
   return (await playerForUser(viewer.user.id))?.id ?? null;
 }
 
-export type LocalActionResult = { ok: true } | { ok: false; message: string };
+export type LocalActionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      message: string;
+      /**
+       * What kind of refusal, when the caller can do something specific
+       * about it. Named rather than sniffed out of the message: a screen
+       * that decides what to render by searching the copy for the word
+       * "ZIP" breaks the first time somebody rewrites the sentence.
+       */
+      reason?: "sign-in" | "no-postal-code" | "already-posted" | "not-migrated";
+    };
 
 /** Null when signed out or the coordinates were nonsense. */
 export type LocalFeedResult = LocalFeed | null;
@@ -131,4 +145,68 @@ export async function localFeedAtAction(
   }
 
   return localFeed(playerId, { latitude, longitude });
+}
+
+/**
+ * Posting a Flare to your area rather than to a board.
+ *
+ * The ZIP refusal is deliberately its own message: it is not an error, it
+ * is the one missing thing, and Local already knows how to ask for five
+ * digits. Anything that says "something went wrong" here sends somebody
+ * looking for a bug instead of a field.
+ */
+export async function postAreaFlareAction(
+  /* One card or a whole list. A list goes up as ONE post — see
+     postAreaFlares — so building a deck here does not scroll thirty
+     separate items past everybody nearby. */
+  input: AreaFlareInput | AreaFlareInput[],
+  /* The browser's coordinate, when Local is being read from one. Rides
+     this call, anchors the Flare to a ZIP, and is never written. */
+  at?: { latitude: number; longitude: number } | null,
+  /** What to call the group, when several cards go up together. */
+  deckLabel?: string | null,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+
+  const result = await postAreaFlares(
+    playerId,
+    Array.isArray(input) ? input : [input],
+    pointFromCoords(at?.latitude, at?.longitude),
+    deckLabel ?? null,
+  );
+  if (result.ok) return { ok: true };
+
+  if (result.reason === "no-postal-code") {
+    return {
+      ok: false,
+      reason: "no-postal-code",
+      message: "Tell us roughly where you are and the card goes up.",
+    };
+  }
+  if (result.reason === "already-posted") {
+    return { ok: false, reason: "already-posted", message: "That card is already up." };
+  }
+  if (result.reason === "not-migrated") {
+    return {
+      ok: false,
+      reason: "not-migrated",
+      message:
+        "Posting from Local isn't switched on yet — the database migration has not been applied.",
+    };
+  }
+
+  return { ok: false, message: GENERIC };
+}
+
+/** Taking your own area Flare down. */
+export async function withdrawAreaFlareAction(
+  flareId: string,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+
+  return (await withdrawAreaFlare(playerId, flareId))
+    ? { ok: true }
+    : { ok: false, message: GENERIC };
 }

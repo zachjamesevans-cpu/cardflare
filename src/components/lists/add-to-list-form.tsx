@@ -110,7 +110,7 @@ function Outcome({ state, saved = false }: { state: ListState; saved?: boolean }
  * state; a radio group gets both from the platform, and posts its value
  * without any of this component's state being involved.
  */
-function Segment({
+export function Segment({
   name,
   value,
   checked,
@@ -194,7 +194,7 @@ function Chip({
  * buttons beside them so the row reads as one family of controls; the
  * name still posts and a screen reader still gets the words.
  */
-function IconChip({
+export function IconChip({
   name,
   checked,
   onToggle,
@@ -230,7 +230,10 @@ function IconChip({
 }
 
 /** Where a selection's composer belongs, in the key CardSearch matches on. */
-function composerKeyFor(picked: { card: CardResult; printingId: string }): string {
+export function composerKeyFor(picked: {
+  card: CardResult;
+  printingId: string;
+}): string {
   return picked.printingId ? `${picked.card.id}:${picked.printingId}` : picked.card.id;
 }
 
@@ -618,12 +621,14 @@ export function AddToListForm({
     }
   }
 
+  /* One verb either way: it is the same act, and where it lands is
+     derived from whether somebody is standing in a room. */
   const copy =
     target === "list"
       ? {
-          title: "Save to your list",
-          hint: "No room open right now, so this waits on your account. Every room you join offers to post it.",
-          submit: "Save to my list",
+          title: "What are you hunting?",
+          hint: "Goes up for people near you. Walk into a room and it posts there too.",
+          submit: "Post the Flare",
         }
       : COPY[kind];
 

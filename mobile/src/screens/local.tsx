@@ -23,8 +23,20 @@ import {
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { RemoteImage } from "../remote-image";
-import { colors, spacing } from "../theme";
-import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Tap, Title } from "../ui";
+import { colors, radius, spacing } from "../theme";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  CardImage,
+  ErrorLine,
+  Input,
+  Muted,
+  Tap,
+  Title,
+  type ZoomCard,
+} from "../ui";
 
 /**
  * Local — the tab that took Room's place in the bar.
@@ -49,6 +61,7 @@ type Row =
   | { kind: "thread"; thread: LocalThread }
   | { kind: "flares-heading" }
   | { kind: "flare"; flare: LocalFlare }
+  | { kind: "group"; flares: LocalFlare[] }
   | { kind: "empty" };
 
 export function LocalScreen() {
@@ -59,6 +72,14 @@ export function LocalScreen() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /*
+   * The coordinate this feed was read with, kept for as long as the tab
+   * is mounted. Posting needs an origin too, and the profile ZIP is not
+   * the only one Local accepts — reading it from a device and then being
+   * told to go and type five digits before posting was a dead end of
+   * exactly the kind this tab exists to remove. Never persisted.
+   */
+  const [at, setAt] = useState<Coords | null>(null);
 
   const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     const token = await storedAccessToken();
@@ -77,6 +98,7 @@ export function LocalScreen() {
       if (outcome.status === "granted") coords = outcome.coords;
     }
     if (!isCurrent()) return;
+    setAt(coords);
 
     try {
       const [nextFeed, nextThreads] = await Promise.all([
@@ -152,7 +174,29 @@ export function LocalScreen() {
   if (feed) {
     rows.push({ kind: "flares-heading" });
     if (feed.flares.length === 0) rows.push({ kind: "empty" });
-    for (const flare of feed.flares) rows.push({ kind: "flare", flare });
+
+    /*
+     * Cards posted together stay together.
+     *
+     * The board has grouped a pasted deck under one folder since
+     * `posted_batch` arrived — "decks posted in one paste group together,
+     * not thirty loose rows" — and Local now carries the same batch id,
+     * so it can do the same thing rather than scrolling somebody's whole
+     * deck past everybody nearby one card at a time.
+     */
+    const seen = new Set<string>();
+    for (const flare of feed.flares) {
+      if (!flare.batchId) {
+        rows.push({ kind: "flare", flare });
+        continue;
+      }
+      if (seen.has(flare.batchId)) continue;
+      seen.add(flare.batchId);
+
+      const group = feed.flares.filter((other) => other.batchId === flare.batchId);
+      if (group.length === 1) rows.push({ kind: "flare", flare });
+      else rows.push({ kind: "group", flares: group });
+    }
   }
 
   return (
@@ -191,10 +235,19 @@ export function LocalScreen() {
               <Card>
                 <Title>Nothing on the boards within {feed!.radius} miles</Title>
                 <Body>
-                  Flares land here the moment somebody posts one in a room at a
-                  store near you. Widen the range, or check back after event night.
+                  Post the card you are hunting and anyone nearby can answer.
+                  Flares posted at a store near you land here too.
                 </Body>
               </Card>
+            );
+          case "group":
+            return (
+              <FlareGroup
+                flares={item.flares}
+                onThreadOpened={(threadId) =>
+                  navigation.navigate("LocalThread", { threadId })
+                }
+              />
             );
           case "flare":
             return (
@@ -211,6 +264,19 @@ export function LocalScreen() {
   );
 }
 
+/**
+ * Saying what you are hunting, from wherever you are.
+ *
+ * The founder's brief for Local was "should be intuitive", and every
+ * decision here is a subtraction to earn that: no room to join, no code
+ * to scan, no store to pick, no form. Type a name or a number, tap the
+ * card, it is up. One copy, happy to trade, is the assumption — the
+ * common case should cost two taps, and the uncommon one can be edited
+ * from the row afterwards.
+ *
+ * This posts. It never publishes a saved want: a list kept at home is
+ * private, and choosing to be visible is the whole difference.
+ */
 function Heading({ text }: { text: string }) {
   return (
     <Text
@@ -354,6 +420,99 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
   );
 }
 
+/**
+ * Several cards posted in one act, shown as one post.
+ *
+ * The founder asked for it and the board already had it: a deck put up
+ * together reads as one thing with its cards inside, not as thirty
+ * separate rows between other people's. The header carries what the
+ * whole group has in common — who, where, how far, when — so each card
+ * underneath is just the card.
+ *
+ * Every image opens the same zoom the rest of the app uses, with the
+ * group as its shelf, so a swipe walks the deck.
+ */
+function FlareGroup({
+  flares,
+  onThreadOpened,
+}: {
+  flares: LocalFlare[];
+  onThreadOpened: (threadId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const lead = flares[0];
+  if (!lead) return null;
+
+  const shelf: ZoomCard[] = flares.map((flare) => ({
+    imageUrl: flare.imageUrl,
+    name: flare.cardName,
+    cardNumber: flare.cardNumber,
+    caption: flare.printingLabel,
+    note: flare.note,
+    lookingFor: flare.quantity,
+    direction: flare.intent === "showcase" ? "showcase" : "want",
+  }));
+
+  return (
+    <Card>
+      <Tap onPress={() => setOpen((was) => !was)}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textPrimary, fontWeight: "700" }}
+            >
+              {lead.deckLabel?.trim() || `${flares.length} cards`}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
+            >
+              {lead.poster.name}
+              {lead.isYours ? " (you)" : ""}
+              {lead.storeName ? ` · ${lead.storeName}` : ""} · {milesLabel(lead.miles)} ·{" "}
+              {agoLabel(lead.postedAt)}
+            </Text>
+          </View>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {open ? "▴" : `${flares.length} ▾`}
+          </Text>
+        </View>
+      </Tap>
+
+      {/* The faces, always — a group nobody can see into is a headline
+          with no story. Tapping one opens the zoom on the whole deck. */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+        {flares.map((flare, index) => (
+          <CardImage
+            key={flare.flareId}
+            imageUrl={flare.imageUrl}
+            width={48}
+            name={flare.cardName}
+            cardNumber={flare.cardNumber}
+            caption={flare.printingLabel}
+            note={flare.note}
+            lookingFor={flare.quantity}
+            direction={flare.intent === "showcase" ? "showcase" : "want"}
+            siblings={shelf}
+            position={index}
+          />
+        ))}
+      </View>
+
+      {open
+        ? flares.map((flare) => (
+            <FlareRow
+              key={flare.flareId}
+              flare={flare}
+              onThreadOpened={onThreadOpened}
+            />
+          ))
+        : null}
+    </Card>
+  );
+}
+
 function FlareRow({
   flare,
   onThreadOpened,
@@ -373,7 +532,21 @@ function FlareRow({
   return (
     <Card>
       <View style={{ flexDirection: "row", gap: spacing(3) }}>
-        <Thumb uri={flare.imageUrl} />
+        {/* The same zoom the rest of the app uses — the founder: "should
+            be able to click the images in local to do the same zoom view
+            that we have throughout the rest of the app." A flat thumbnail
+            here was the one card face in the product that did nothing
+            when tapped. */}
+        <CardImage
+          imageUrl={flare.imageUrl}
+          width={48}
+          name={flare.cardName}
+          cardNumber={flare.cardNumber}
+          caption={flare.printingLabel}
+          note={flare.note}
+          lookingFor={flare.quantity}
+          direction={flare.intent === "showcase" ? "showcase" : "want"}
+        />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
@@ -397,7 +570,8 @@ function FlareRow({
             style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
           >
             {flare.poster.name}
-            {flare.isYours ? " (you)" : ""} · {flare.storeName} ·{" "}
+            {flare.isYours ? " (you)" : ""}
+            {flare.storeName ? ` · ${flare.storeName}` : ""} ·{" "}
             {milesLabel(flare.miles)}
           </Text>
           {flare.note ? (

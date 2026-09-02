@@ -629,6 +629,9 @@ export async function countOpenFlares(
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
+    /* The query is scoped to a set of events, so this cannot be an area
+       Flare — the narrowing is for the compiler, not for the data. */
+    if (!row.event_id) continue;
     counts.set(row.event_id, (counts.get(row.event_id) ?? 0) + 1);
   }
   return counts;

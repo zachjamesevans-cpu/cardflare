@@ -1,5 +1,6 @@
 import "server-only";
 
+import { pointForPostalCode } from "@/lib/geo/zip";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { StoreClaimStatus, StoreTier } from "@/lib/supabase/types";
 
@@ -39,6 +40,17 @@ const EARTH_MILES = 3958.8;
 
 /** Rough miles per degree of latitude; longitude shrinks toward the pole. */
 const MILES_PER_DEGREE_LAT = 69;
+
+/**
+ * How many postal-code-located stores one search will consider.
+ *
+ * These cannot be prefiltered by the coordinate index - a ZIP becomes a
+ * point in this process, not in Postgres - so the query is capped rather
+ * than left to grow with the directory. Imported listings always carry a
+ * real coordinate and never land here, so the set is the hand-created
+ * stores, which is the customer list.
+ */
+const POSTAL_LOCATED_LIMIT = 500;
 
 export function milesBetween(
   a: { latitude: number; longitude: number },
@@ -86,33 +98,70 @@ export async function storesNear(
   if (!isSupabaseConfigured()) return [];
 
   const box = boundingBox(origin, radiusMiles);
+  const admin = getSupabaseAdmin();
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("stores")
-    .select(
-      "id, name, city, region, address_line, latitude, longitude, claim_status, tier, verified_at",
-    )
-    /* Published only. A draft is an imported candidate nobody has
-       approved, and it must never reach a player. */
-    .eq("listing_state", "published")
-    .gte("latitude", box.minLat)
-    .lte("latitude", box.maxLat)
-    .gte("longitude", box.minLon)
-    .lte("longitude", box.maxLon);
+  const columns =
+    "id, name, city, region, address_line, postal_code, latitude, longitude, claim_status, tier, verified_at";
 
-  if (error) {
-    console.error("Could not read nearby stores", error);
+  /* Published only. A draft is an imported candidate nobody has
+     approved, and it must never reach a player. */
+  const [placed, postal] = await Promise.all([
+    admin
+      .from("stores")
+      .select(columns)
+      .eq("listing_state", "published")
+      .gte("latitude", box.minLat)
+      .lte("latitude", box.maxLat)
+      .gte("longitude", box.minLon)
+      .lte("longitude", box.maxLon),
+    /*
+     * The shops that run rooms, which the box above cannot see.
+     *
+     * `stores.latitude` arrived with the directory migration and is
+     * filled by ONE thing: the Overture import. A store that signed up
+     * as a customer - which is every store that actually hosts a board -
+     * has never been asked for a coordinate, so its columns are null and
+     * a bounding box excludes it however close a player is standing.
+     * That is not a cosmetic gap: Local is every open Flare at a store
+     * near you, and a Flare can only be posted in a room, and a room only
+     * exists at a customer store. The one query that finds stores was
+     * therefore guaranteed to miss every store that could have an answer.
+     *
+     * A ZIP centroid is the fallback, and it is the same resolution the
+     * product already accepts for a PLAYER's position - miles across, and
+     * deliberately so. A distance computed from it is approximate, and
+     * `milesLabel` already rounds away more precision than the error.
+     * A store with neither a coordinate nor a postal code stays invisible,
+     * which is honest: nothing here knows where it is.
+     *
+     * Bounded because this cannot use the coordinate index. The set is
+     * small by construction - imported listings always carry a coordinate,
+     * so only hand-created stores land here.
+     */
+    admin
+      .from("stores")
+      .select(columns)
+      .eq("listing_state", "published")
+      .not("postal_code", "is", null)
+      .or("latitude.is.null,longitude.is.null")
+      .limit(POSTAL_LOCATED_LIMIT),
+  ]);
+
+  if (placed.error || postal.error) {
+    console.error("Could not read nearby stores", placed.error ?? postal.error);
     return [];
   }
 
-  return (data ?? [])
+  return [...(placed.data ?? []), ...(postal.data ?? [])]
     .flatMap((row) => {
-      if (row.latitude === null || row.longitude === null) return [];
+      /* Its own coordinate first, its ZIP's centroid second. */
+      const point =
+        row.latitude !== null && row.longitude !== null
+          ? { latitude: row.latitude, longitude: row.longitude }
+          : pointForPostalCode(row.postal_code);
+      if (!point) return [];
 
-      const miles = milesBetween(origin, {
-        latitude: row.latitude,
-        longitude: row.longitude,
-      });
+      const miles = milesBetween(origin, point);
       if (miles > radiusMiles) return [];
 
       /* The coordinate is dropped HERE, at the edge of the server, and

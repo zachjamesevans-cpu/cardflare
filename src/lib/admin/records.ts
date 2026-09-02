@@ -1,5 +1,6 @@
 import "server-only";
 
+import { pointForPostalCode } from "@/lib/geo/zip";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -90,8 +91,7 @@ export async function updateStoreRecord(
       country: fields.country ?? null,
       phone: fields.phone ?? null,
       website: fields.website ?? null,
-      latitude: fields.latitude ?? null,
-      longitude: fields.longitude ?? null,
+      ...placed(fields),
     })
     .eq("id", storeId)
     .select("id")
@@ -103,6 +103,37 @@ export async function updateStoreRecord(
   }
 
   return data ? { ok: true } : { ok: false, reason: "not-found" };
+}
+
+/**
+ * Where the store is, from whatever the form gave us.
+ *
+ * A typed coordinate wins, because somebody who entered one meant it.
+ * Otherwise the postal code's centroid stands in, so filling in an
+ * address is enough to put a shop on the map - nobody should have to
+ * find their own latitude to be findable, and until now nothing but the
+ * Overture import ever wrote these columns at all. That left every store
+ * that signed up as a customer with no location, and a store with no
+ * location is absent from `storesNear`, which is the only way Local
+ * finds a board.
+ *
+ * Coarse, and that is the same bargain the rest of the location work
+ * makes: a ZCTA centroid is miles across, distances are rounded before
+ * they reach anyone, and no exact position is claimed or shown.
+ */
+function placed(fields: {
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}): { latitude: number | null; longitude: number | null } {
+  if (fields.latitude != null && fields.longitude != null) {
+    return { latitude: fields.latitude, longitude: fields.longitude };
+  }
+
+  const centroid = pointForPostalCode(fields.postalCode);
+  return centroid
+    ? { latitude: centroid.latitude, longitude: centroid.longitude }
+    : { latitude: fields.latitude ?? null, longitude: fields.longitude ?? null };
 }
 
 /** A player's public name — the one the room sees over their Flares. */
