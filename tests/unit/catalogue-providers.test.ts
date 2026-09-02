@@ -11,6 +11,7 @@ import {
   catalogueSource,
   providerForGame,
 } from "@/lib/cards/providers/registry";
+import { lorcanaNumber, LorcastProvider } from "@/lib/cards/providers/lorcast/adapter";
 import {
   RiftcodexProvider,
   riftboundNumber,
@@ -35,12 +36,13 @@ import { GAME_SLUGS } from "@/lib/players/games-catalog";
  */
 
 describe("the registry", () => {
-  it("names a provider for exactly the four games the founder asked for", () => {
+  it("names a provider for every game but One Piece", () => {
     expect(CATALOGUE_SOURCES.map((source) => source.game)).toEqual([
       "mtg",
       "pokemon",
       "flesh-and-blood",
       "riftbound",
+      "lorcana",
     ]);
     for (const source of CATALOGUE_SOURCES) {
       const provider = providerForGame(source.game);
@@ -48,9 +50,8 @@ describe("the registry", () => {
       expect(provider?.providerKey).toBe(source.providerKey);
       expect(GAME_SLUGS).toContain(source.game);
     }
-    /* One Piece has its own sync; Lorcana has no catalogue yet. */
+    /* One Piece has its own sync and its own by-hand importer. */
     expect(providerForGame("one-piece")).toBeNull();
-    expect(providerForGame("lorcana")).toBeNull();
     expect(catalogueSource("yugioh")).toBeNull();
   });
 
@@ -360,5 +361,88 @@ describe("Riftcodex", () => {
   it("pads the number the way the card prints it", () => {
     expect(riftboundNumber("ogn", 56)).toBe("OGN-056");
     expect(riftboundNumber("UNL", 131)).toBe("UNL-131");
+  });
+});
+
+describe("Lorcast", () => {
+  const provider = new LorcastProvider();
+
+  const elsa = {
+    id: "crd_9d3f2b8f0b1c4e2a9c7d5e6f7a8b9c0d",
+    name: "Elsa",
+    version: "Snow Queen",
+    layout: "normal",
+    released_at: "2023-08-18",
+    image_uris: {
+      digital: {
+        small: "https://cards.lorcast.io/card/digital/small/crd_9d3f.avif?1700000000",
+        normal: "https://cards.lorcast.io/card/digital/normal/crd_9d3f.avif?1700000000",
+        large: "https://cards.lorcast.io/card/digital/large/crd_9d3f.avif?1700000000",
+      },
+    },
+    cost: 8,
+    inkwell: false,
+    ink: "Amethyst",
+    type: ["Character"],
+    classifications: ["Storyborn", "Hero", "Queen", "Sorcerer"],
+    text: "Deep Freeze: Exert up to 2 chosen characters.",
+    strength: 4,
+    willpower: 6,
+    lore: 3,
+    rarity: "Legendary",
+    collector_number: "42",
+    lang: "en",
+    set: {
+      id: "set_7ecb0e0c71af496a9e0110e78824e893",
+      code: "1",
+      name: "The First Chapter",
+    },
+    prices: { usd: "12.00" },
+    legalities: { core: "legal" },
+  };
+
+  it("keys the card on set and number and names it with its version", () => {
+    const result = provider.normalizeCard(elsa);
+    if (!result.ok) throw new Error(result.failure.reason);
+    expect(provider.game).toBe("lorcana");
+    expect(result.card.canonicalCardNumber).toBe("1-042");
+    expect(result.card.exactName).toBe("Elsa - Snow Queen");
+    expect(result.card.cardType).toBe("character");
+    expect(result.card.colors).toEqual(["amethyst"]);
+    expect(result.card.cost).toBe(8);
+    expect(result.card.power).toBe(4);
+    expect(result.card.life).toBe(6);
+    expect(result.card.traits).toEqual(["Storyborn", "Hero", "Queen", "Sorcerer"]);
+    expect(result.card.printings[0].imageUrl).toContain("cards.lorcast.io");
+    expect(result.card.printings[0].setName).toBe("The First Chapter");
+    expect(result.card.printings[0].isAlternateArt).toBeNull();
+  });
+
+  it("marks an Enchanted printing as the alternate art, by Lorcast's own word", () => {
+    const result = provider.normalizeCard({
+      ...elsa,
+      rarity: "Enchanted",
+      collector_number: "207",
+    });
+    if (!result.ok) throw new Error(result.failure.reason);
+    expect(result.card.canonicalCardNumber).toBe("1-207");
+    expect(result.card.printings[0].isAlternateArt).toBe(true);
+    expect(result.card.printings[0].variantType).toBe("Enchanted");
+  });
+
+  it("accepts a flat image_uris shape too, and drops prices", () => {
+    const result = provider.normalizeCard({
+      ...elsa,
+      image_uris: { normal: "https://cards.lorcast.io/card/digital/normal/x.avif" },
+    });
+    if (!result.ok) throw new Error(result.failure.reason);
+    expect(result.card.printings[0].imageUrl).toContain("/x.avif");
+    expect((result.card.rawMetadata as Record<string, unknown>).prices).toBeUndefined();
+  });
+
+  it("refuses a card with no set or number", () => {
+    expect(provider.normalizeCard({ ...elsa, set: undefined }).ok).toBe(false);
+    expect(lorcanaNumber("1", "7")).toBe("1-007");
+    expect(lorcanaNumber("Q1", "12a")).toBe("Q1-12A");
   });
 });

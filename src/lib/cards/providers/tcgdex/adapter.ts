@@ -12,7 +12,7 @@ import {
   type ProviderSet,
 } from "@/lib/cards/domain";
 import { ProviderHttp, ProviderHttpError, type HttpOptions } from "../http";
-import { asRecord, asString, cleanSetCode } from "../shared";
+import { asRecord, asString, asStringList, cleanSetCode } from "../shared";
 
 export const TCGDEX_KEY = "tcgdex";
 export const TCGDEX_BASE_URL = "https://api.tcgdex.net";
@@ -100,8 +100,10 @@ export class TcgdexProvider implements CardDataProvider {
         setCode && localId ? `${setCode}-${printedNumber(localId)}` : "",
       exactName: name,
       cardType: asString(record.category)?.toLowerCase() ?? null,
-      colors: [],
-      traits: [],
+      /* Energy types, when the detailed record carries them. HP stays
+         in the record: it runs past the column's ceiling of 99. */
+      colors: asStringList(record.types).map((type) => type.toLowerCase()),
+      traits: asString(record.stage) ? [asString(record.stage) as string] : [],
       cost: null,
       power: null,
       counter: null,
@@ -205,9 +207,37 @@ export class TcgdexProvider implements CardDataProvider {
       ? parsed.data.cards.slice(0, SAMPLE_CAP)
       : parsed.data.cards;
 
+    let index = 0;
     for (const brief of listing) {
+      index += 1;
+      let record: Record<string, unknown> = brief;
+
+      /*
+       * The details behind the listing: rarity, category, energy types,
+       * HP, the illustrator. One request each, so a 200-card set is
+       * about a minute at the polite pace — the laptop command's job,
+       * and progress says where it is so a long run is not a silent one.
+       */
+      if (options.detailed) {
+        const id = asString(brief.id);
+        if (id && /^[a-z0-9.-]{1,40}$/i.test(id)) {
+          try {
+            const detail = asRecord(
+              await this.http.getJson(`/v2/en/cards/${encodeURIComponent(id)}`),
+            );
+            if (detail) record = { ...brief, ...detail };
+          } catch (error) {
+            if (!(error instanceof ProviderHttpError)) throw error;
+            /* The listing's facts still stand; only the extras are missing. */
+          }
+          if (index % 25 === 0) {
+            options.onProgress?.(`  ${index}/${listing.length} detailed`);
+          }
+        }
+      }
+
       const result = this.normalizeCard({
-        ...brief,
+        ...record,
         set: { id: parsed.data.id, name: parsed.data.name ?? null },
       });
       if (result.ok) cards.push(result.card);

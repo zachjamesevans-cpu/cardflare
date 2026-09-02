@@ -10,7 +10,7 @@ import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Card search",
-  description: `Search One Piece, Magic, Pokémon, Flesh and Blood and Riftbound cards on ${SITE.name}.`,
+  description: `Search One Piece, Magic, Pokémon, Flesh and Blood, Riftbound and Lorcana cards on ${SITE.name}.`,
   // Not indexed while the catalog is being loaded and search is in beta.
   robots: { index: false, follow: false },
 };
