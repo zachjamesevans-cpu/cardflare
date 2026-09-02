@@ -51,7 +51,8 @@ export function LocalScreen({
   threads,
   postalCode,
 }: {
-  feed: LocalFeed;
+  /** Null with Local switched off: then this is the Messages list only. */
+  feed: LocalFeed | null;
   threads: ThreadSummary[];
   postalCode: string | null;
 }) {
@@ -152,6 +153,38 @@ export function LocalScreen({
 
   if (openThreadId) {
     return <ThreadView threadId={openThreadId} onBack={() => setOpenThreadId(null)} />;
+  }
+
+  /*
+   * Local switched off (src/lib/local/enabled.ts): the conversations
+   * people already had, readable, and nothing else. No radius, no
+   * near-you list, no new "I have this" door.
+   */
+  if (!feed) {
+    return (
+      <div className="flex flex-col gap-6">
+        {threads.length > 0 ? (
+          <section className="flex flex-col gap-3" aria-label="Messages">
+            <Card className="flex flex-col p-0">
+              {threads.map((thread) => (
+                <ThreadRow
+                  key={thread.threadId}
+                  thread={thread}
+                  onOpen={() => setOpenThreadId(thread.threadId)}
+                />
+              ))}
+            </Card>
+          </section>
+        ) : (
+          <Card className="flex flex-col gap-1">
+            <h2 className="font-semibold text-text-primary">No conversations yet</h2>
+            <p className="text-sm text-text-secondary">
+              When somebody answers one of your Flares, the conversation lands here.
+            </p>
+          </Card>
+        )}
+      </div>
+    );
   }
 
   return (

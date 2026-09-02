@@ -3,10 +3,17 @@ import { Check } from "lucide-react";
 
 import { FlareComposerPreview } from "@/components/app-preview/flare-composer-preview";
 import { Section, SectionHeading } from "@/components/ui/section";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 const BENEFITS = [
   "Post a Flare and reach everyone near you, not just whoever you bump into.",
-  "See every hunt in your area on Local, and message people directly when you have the card.",
+  ...(LOCAL_ENABLED
+    ? [
+        "See every hunt in your area on Local, and message people directly when you have the card.",
+      ]
+    : [
+        "See who in the room has your card, and who wants yours, the moment you scan in.",
+      ]),
   "Find missing cards before the next round starts at event night.",
   "Request an exact printing, or any printing that works.",
   "At card shows, search every vendor's booth from your phone, singles and slabs alike.",

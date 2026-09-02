@@ -210,19 +210,21 @@ describe("the home screen's furniture", () => {
     }
   });
 
-  it("names the tabs the same on both: Feed is Feed, Local is its own", () => {
-    /* The founder's second pass on the bar: the Feed tab keeps its name,
-       Room's slot becomes Local — area Flares and their conversations —
-       and the live room rides the Feed as a banner. Both platforms, one
-       arrangement. */
+  it("names the tabs the same on both: Feed is Feed, and the second slot follows the flag", () => {
+    /* The founder's third pass on the bar: Local is built and switched
+       off (src/lib/local/enabled.ts), so the live room has its tab back.
+       Both platforms carry BOTH arrangements behind the one constant, and
+       the constant decides — so flipping it is one edit per platform. */
     expect(appRoot).toContain('tabBarLabel: "Feed"');
-    expect(appRoot).toContain('name="Local"');
-    expect(appRoot).not.toContain('<Tab.Screen name="Room"');
+    expect(appRoot).toContain('<Tab.Screen name="Local"');
+    expect(appRoot).toContain('<Tab.Screen name="Room"');
+    expect(appRoot).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
 
     const webTabs = read("src/components/players/player-tabs.tsx");
     expect(webTabs).toContain('label: "Feed"');
     expect(webTabs).toContain('label: "Local"');
-    expect(webTabs).not.toContain('label: "Room"');
+    expect(webTabs).toContain('label: "Room"');
+    expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
   it("lets the feed be asked for again", () => {

@@ -24,7 +24,7 @@ import {
   treatmentOf,
 } from "@/lib/cards/providers/scryfall/adapter";
 import { describeNetworkError } from "@/lib/cards/providers/http";
-import { cleanSetCode } from "@/lib/cards/providers/shared";
+import { cleanSetCode, versionBases } from "@/lib/cards/providers/shared";
 import {
   printedNumber,
   secretRareBases,
@@ -72,7 +72,8 @@ describe("the registry", () => {
     expect(cleanSetCode(" mh3 ")).toBe("MH3");
     expect(cleanSetCode("swsh12")).toBe("SWSH12");
     expect(cleanSetCode("../etc")).toBeNull();
-    expect(cleanSetCode("a")).toBeNull();
+    expect(cleanSetCode("1")).toBe("1");
+    expect(cleanSetCode("")).toBeNull();
     expect(cleanSetCode(undefined)).toBeNull();
   });
 });
@@ -624,5 +625,122 @@ describe("versions nest under one card", () => {
         undefined,
       ).size,
     ).toBe(0);
+  });
+});
+
+describe("Lorcana and Riftbound versions", () => {
+  it("keys an Enchanted Lorcana card on the card it is a version of", async () => {
+    const set = [
+      {
+        id: "crd_a",
+        name: "Elsa",
+        version: "Snow Queen",
+        rarity: "Legendary",
+        collector_number: "42",
+        set: { code: "1", name: "The First Chapter" },
+        image_uris: { digital: { normal: "https://cards.lorcast.io/a.avif" } },
+      },
+      {
+        id: "crd_b",
+        name: "Elsa",
+        version: "Snow Queen",
+        rarity: "Enchanted",
+        collector_number: "207",
+        set: { code: "1", name: "The First Chapter" },
+        image_uris: { digital: { normal: "https://cards.lorcast.io/b.avif" } },
+      },
+      {
+        id: "crd_c",
+        name: "Elsa",
+        version: "Spirit of Winter",
+        rarity: "Legendary",
+        collector_number: "43",
+        set: { code: "1", name: "The First Chapter" },
+      },
+    ];
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify(set), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+    const provider = new LorcastProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards, failures } = await provider.fetchCards({ setCode: "1" });
+    expect(failures).toHaveLength(0);
+    expect(cards.map((card) => card.canonicalCardNumber)).toEqual([
+      "1-042",
+      "1-042",
+      "1-043",
+    ]);
+    expect(cards[1].printings[0].printingLabel).toBe("1 #207");
+    expect(cards[1].printings[0].isAlternateArt).toBe(true);
+    expect(cards[0].printings[0].printingLabel).toBe("1 #42");
+  });
+
+  it("keys a Riftbound alternate art on the card it is a version of", async () => {
+    const all = [
+      {
+        id: "r1",
+        name: "Jinx, Loose Cannon",
+        setId: "OGN",
+        setLabel: "Origins",
+        collectorNumber: 142,
+        type: "Legend",
+        domains: ["Chaos"],
+        alternateArt: false,
+        imageUrl: "https://cmsassets.rgpub.io/1.png",
+      },
+      {
+        id: "r2",
+        name: "Jinx, Loose Cannon",
+        setId: "OGN",
+        setLabel: "Origins",
+        collectorNumber: 300,
+        type: "Legend",
+        domains: ["Chaos"],
+        alternateArt: true,
+        imageUrl: "https://cmsassets.rgpub.io/2.png",
+      },
+      {
+        id: "r3",
+        name: "Jinx, Loose Cannon",
+        setId: "UNL",
+        setLabel: "Unleashed",
+        collectorNumber: 9,
+        type: "Legend",
+        domains: ["Chaos"],
+        alternateArt: true,
+      },
+    ];
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify(all), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+    const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards } = await provider.fetchCards({});
+    const byId = new Map(cards.map((card) => [card.providerExternalId, card]));
+    expect(byId.get("r2")?.canonicalCardNumber).toBe("OGN-142");
+    expect(byId.get("r2")?.printings[0].printingLabel).toBe("OGN #300");
+    /* Another set's alternate has no base in its own set: its own card. */
+    expect(byId.get("r3")?.canonicalCardNumber).toBe("UNL-009");
+  });
+
+  it("refuses to guess between two same-named base cards", () => {
+    const bases = versionBases(
+      [
+        { id: "a", set: "s", name: "Pikachu", v: false },
+        { id: "b", set: "s", name: "Pikachu", v: false },
+        { id: "c", set: "s", name: "Pikachu", v: true },
+      ],
+      {
+        id: (r) => r.id,
+        set: (r) => r.set,
+        name: (r) => r.name,
+        isVersion: (r) => r.v,
+      },
+    );
+    expect(bases.size).toBe(0);
   });
 });

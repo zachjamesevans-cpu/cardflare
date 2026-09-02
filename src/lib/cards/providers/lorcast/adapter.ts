@@ -18,6 +18,7 @@ import {
   asString,
   asStringList,
   cleanSetCode,
+  versionBases,
   without,
 } from "../shared";
 
@@ -100,11 +101,15 @@ export class LorcastProvider implements CardDataProvider {
       asString(images?.large);
 
     const rarity = asString(record.rarity);
-    const stored = without(record, DROPPED_FIELDS);
+    const enchanted = rarity?.toLowerCase() === "enchanted";
+    /* Set by fetchSet from `versionBases`: the collector number of the
+       card this Enchanted printing is a version of. */
+    const baseCollector = asString(record.__base_number) ?? collector;
+    const stored = without(record, [...DROPPED_FIELDS, "__base_number"]);
 
     const candidate = {
       canonicalCardNumber:
-        setCode && collector ? lorcanaNumber(setCode, collector) : "",
+        setCode && baseCollector ? lorcanaNumber(setCode, baseCollector) : "",
       exactName: name,
       cardType: asStringList(record.type)[0]?.toLowerCase() ?? null,
       colors: (() => {
@@ -131,13 +136,18 @@ export class LorcastProvider implements CardDataProvider {
           source: "set" as const,
           setCode: setCode?.toUpperCase() ?? null,
           setName: asString(set?.name),
-          printingLabel: setCode?.toUpperCase() ?? null,
+          /* "1 #207": the number rides the label so the Enchanted
+             version reads apart from the card it sits under. */
+          printingLabel:
+            setCode && collector
+              ? `${setCode.toUpperCase()} #${collector.toUpperCase()}`
+              : (setCode?.toUpperCase() ?? null),
           /* Lorcast's own word for a treatment ("Enchanted" is a rarity
              there, and an Enchanted card is the alternate art). */
-          variantType: rarity?.toLowerCase() === "enchanted" ? "Enchanted" : null,
+          variantType: enchanted ? "Enchanted" : null,
           rarity,
           name,
-          isAlternateArt: rarity?.toLowerCase() === "enchanted" ? true : null,
+          isAlternateArt: enchanted ? true : null,
           isPromo: null,
           isParallel: null,
           isReprint: null,
@@ -205,8 +215,25 @@ export class LorcastProvider implements CardDataProvider {
     }
 
     const records = options.sample ? list.data.slice(0, SAMPLE_CAP) : list.data;
+
+    /* An Enchanted card is a version of the same-named card in its
+       set: Lorcast flags the Enchanted, the name links the two. */
+    const bases = versionBases(list.data, {
+      id: (record) => asString(record.id),
+      set: (record) =>
+        asString(asRecord(record.set)?.code) ?? asString(record.set_code),
+      name: (record) =>
+        [asString(record.name), asString(record.version)].filter(Boolean).join(" - ") ||
+        null,
+      isVersion: (record) => asString(record.rarity)?.toLowerCase() === "enchanted",
+    });
+
     for (const record of records) {
-      const result = this.normalizeCard(record);
+      const base = bases.get(asString(record.id) ?? "");
+      const baseNumber = base ? asString(base.collector_number) : null;
+      const result = this.normalizeCard(
+        baseNumber ? { ...record, __base_number: baseNumber } : record,
+      );
       if (result.ok) cards.push(result.card);
       else failures.push(result.failure);
     }

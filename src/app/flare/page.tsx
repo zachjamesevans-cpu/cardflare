@@ -15,6 +15,7 @@ import { currentRoomForSession } from "@/lib/players/current-room";
 import { getPlayerSession } from "@/lib/players/session";
 import { listWants, postedCardStores } from "@/lib/players/wants";
 import { SITE } from "@/lib/site";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 export const metadata: Metadata = {
   title: "Your Flares",
@@ -94,7 +95,8 @@ export default async function FlarePage() {
               <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
               <p className="text-text-secondary">
                 A Flare says what card you are hunting, and the people who can help see
-                it: the room at a store event, players near that store on Local, and
+                it: the room at a store event
+                {LOCAL_ENABLED ? ", players near that store on Local," : ""} and
                 everyone who follows you. Create a free account to start posting, or
                 scan the code at a store&rsquo;s counter to post into tonight&rsquo;s
                 event.

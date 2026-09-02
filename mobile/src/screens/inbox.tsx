@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
+import { LOCAL_ENABLED } from "../local-enabled";
 import { getNotifications, markRead, type InboxItem } from "../api";
 import { Button, Card, Muted, Tap } from "../ui";
 import { colors, spacing } from "../theme";
@@ -77,7 +78,11 @@ export function InboxScreen() {
               <Tap
                 key={item.id}
                 disabled={item.url !== "/local"}
-                onPress={() => navigation.navigate("Tabs", { screen: "Local" })}
+                onPress={() =>
+                  LOCAL_ENABLED
+                    ? navigation.navigate("Tabs", { screen: "Local" })
+                    : navigation.navigate("Messages")
+                }
                 style={{
                   gap: spacing(1),
                   paddingVertical: spacing(3),

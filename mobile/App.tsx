@@ -50,16 +50,18 @@ import { onSignedOut, storedAccessToken } from "./src/api";
 import { firstBootError } from "./src/boot-errors";
 import { colors, spacing } from "./src/theme";
 import { Tap } from "./src/ui";
+import { LOCAL_ENABLED } from "./src/local-enabled";
+import { openRoom } from "./src/open-room";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
  * rooms as cardflare.gg — plus the one thing a website cannot do: tell
  * you about an offer while your phone is locked.
  *
- * Five tabs: Join (the front door — scan or type a code), Room (where
- * you are right now; remembers the last room), Flare, Inbox, Profile.
- * Scanning, posting, signing in and settings ride on top as stack
- * screens.
+ * Five tabs: Feed, Room (where you are right now; remembers the last
+ * room), Flare, Inbox, Profile. Scanning, posting, signing in and
+ * settings ride on top as stack screens. Local can take Room's slot
+ * (src/local-enabled.ts) and is switched off.
  *
  * Profile replaced Account, which is the founder's call: an account page
  * is housekeeping and nobody visits housekeeping twice. Everything that
@@ -85,7 +87,9 @@ try {
 
 export type TabParams = {
   Feed: undefined;
+  /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
+  Room: undefined;
   Flare: undefined;
   Inbox: undefined;
   Profile: undefined;
@@ -93,11 +97,13 @@ export type TabParams = {
 
 export type StackParams = {
   Tabs: { screen?: keyof TabParams } | undefined;
-  /** The live room. A stack screen now: its tab slot went to Local, and
-      the Feed's banner is the door on event nights. */
+  /** The live room as a stack screen, only while Local holds its tab
+      slot. Open it through src/open-room.ts, never by name. */
   Room: undefined;
-  /** One conversation about one Flare, from Local or the Inbox. */
+  /** One conversation about one Flare, from Local, Messages or the Inbox. */
   LocalThread: { threadId: string };
+  /** The conversations people already had, while Local is off. */
+  Messages: undefined;
   SignIn: undefined;
   Scan: undefined;
   Settings: undefined;
@@ -138,7 +144,8 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   FindPlayer: "Feed",
   PostFlare: "Room",
   Room: "Back",
-  LocalThread: "Local",
+  LocalThread: LOCAL_ENABLED ? "Local" : "Messages",
+  Messages: "Inbox",
 };
 
 /**
@@ -184,6 +191,7 @@ const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>
      habit, and scanning moved to a button on it. */
   Feed: "home-outline",
   Local: "location-outline",
+  Room: "people-outline",
   Inbox: "notifications-outline",
   Profile: "person-circle-outline",
 };
@@ -335,15 +343,13 @@ function Tabs() {
           tabBarLabel: "Feed",
         }}
       />
-      {/* Room's old slot. The live room moved to the Feed's banner and a
-          stack screen; the bar's four-nights-a-month tab became the
-          every-day one: Flares near you, and the conversations they
-          start. */}
-      <Tab.Screen
-        name="Local"
-        component={LocalScreen}
-        options={{ title: "Local" }}
-      />
+      {/* The second slot: Local while it is on, the live room otherwise.
+          See src/local-enabled.ts for the founder's call. */}
+      {LOCAL_ENABLED ? (
+        <Tab.Screen name="Local" component={LocalScreen} options={{ title: "Local" }} />
+      ) : (
+        <Tab.Screen name="Room" component={RoomTab} options={{ title: "Room" }} />
+      )}
       {/* The tab keeps the product's name; the header says what the
           hub holds now: your standing list, not just the post form. */}
       <Tab.Screen
@@ -507,15 +513,29 @@ export default function App() {
           })}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="Room"
-            component={RoomTab}
-            options={{ title: "Room", headerBackTitle: "Back" }}
-          />
+          {LOCAL_ENABLED ? (
+            <Stack.Screen
+              name="Room"
+              component={RoomTab}
+              options={{ title: "Room", headerBackTitle: "Back" }}
+            />
+          ) : (
+            /* Local off: the conversations people already had, one
+               screen, reached from the Inbox. */
+            <Stack.Screen
+              name="Messages"
+              options={{ title: "Messages", headerBackTitle: "Inbox" }}
+            >
+              {() => <LocalScreen threadsOnly />}
+            </Stack.Screen>
+          )}
           <Stack.Screen
             name="LocalThread"
             component={ThreadScreen}
-            options={{ title: "Conversation", headerBackTitle: "Local" }}
+            options={{
+              title: "Conversation",
+              headerBackTitle: LOCAL_ENABLED ? "Local" : "Messages",
+            }}
           />
           <Stack.Screen
             name="SignIn"
@@ -530,7 +550,7 @@ export default function App() {
             options={{ title: "Scan", headerBackTitle: "Back" }}
           >
             {({ navigation }) => (
-              <ScanScreen onCode={() => navigation.navigate("Room")} />
+              <ScanScreen onCode={() => openRoom(navigation)} />
             )}
           </Stack.Screen>
           <Stack.Screen
@@ -568,7 +588,7 @@ export default function App() {
           <Stack.Screen
             name="FindPlayer"
             component={FindPlayerScreen}
-            options={{ title: "Find a player", headerBackTitle: "Local" }}
+            options={{ title: "Find a player", headerBackTitle: "Feed" }}
           />
           <Stack.Screen
             name="PostFlare"

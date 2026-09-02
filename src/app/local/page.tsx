@@ -6,13 +6,14 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { localFeed } from "@/lib/local/feed";
 import { listThreads } from "@/lib/local/threads";
 import { playerForUser } from "@/lib/players/accounts";
 import { postalCodeForPlayer } from "@/lib/players/location";
 
 export const metadata: Metadata = {
-  title: "Local",
+  title: LOCAL_ENABLED ? "Local" : "Messages",
   robots: { index: false, follow: false },
 };
 
@@ -44,11 +45,13 @@ export default async function LocalPage() {
     return (
       <Shell>
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-text-primary">Flares near you</h2>
+          <h2 className="font-semibold text-text-primary">
+            {LOCAL_ENABLED ? "Flares near you" : "Messages"}
+          </h2>
           <p className="text-sm text-text-secondary">
-            Local shows every Flare posted near you, and lets you message the poster
-            when you have the card. It needs an account, so the conversation is with a
-            real name.
+            {LOCAL_ENABLED
+              ? "Local shows every Flare posted near you, and lets you message the poster when you have the card. It needs an account, so the conversation is with a real name."
+              : "Your conversations about cards live here. They need an account, so every conversation is with a real name."}
           </p>
           <Link href="/signup" className={buttonStyles("primary", "sm")}>
             Create an account
@@ -58,8 +61,10 @@ export default async function LocalPage() {
     );
   }
 
+  /* With Local off this page is the Messages page: the conversations
+     people already had, and nothing near-you at all. */
   const [feed, threads, postalCode] = await Promise.all([
-    localFeed(playerId, null),
+    LOCAL_ENABLED ? localFeed(playerId, null) : null,
     listThreads(playerId),
     postalCodeForPlayer(playerId),
   ]);
@@ -68,15 +73,18 @@ export default async function LocalPage() {
     <Shell>
       <div className="flex items-baseline justify-between gap-3">
         <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
-          Local
+          {LOCAL_ENABLED ? "Local" : "Messages"}
         </h1>
-        {/* The room's door, for somebody standing in a shop right now. */}
-        <Link
-          href="/room"
-          className="text-sm font-semibold text-accent hover:text-accent-hover"
-        >
-          In a shop? Open the Room
-        </Link>
+        {/* The room's door, for somebody standing in a shop right now.
+            Only while Room has no tab of its own. */}
+        {LOCAL_ENABLED && (
+          <Link
+            href="/room"
+            className="text-sm font-semibold text-accent hover:text-accent-hover"
+          >
+            In a shop? Open the Room
+          </Link>
+        )}
       </div>
 
       <LocalScreen feed={feed} threads={threads} postalCode={postalCode} />
