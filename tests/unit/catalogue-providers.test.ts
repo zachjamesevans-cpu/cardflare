@@ -21,6 +21,7 @@ import {
   ScryfallProvider,
   subtypes,
 } from "@/lib/cards/providers/scryfall/adapter";
+import { describeNetworkError } from "@/lib/cards/providers/http";
 import { cleanSetCode } from "@/lib/cards/providers/shared";
 import { printedNumber, TcgdexProvider } from "@/lib/cards/providers/tcgdex/adapter";
 import { GAME_SLUGS } from "@/lib/players/games-catalog";
@@ -444,5 +445,38 @@ describe("Lorcast", () => {
     expect(provider.normalizeCard({ ...elsa, set: undefined }).ok).toBe(false);
     expect(lorcanaNumber("1", "7")).toBe("1-007");
     expect(lorcanaNumber("Q1", "12a")).toBe("Q1-12A");
+  });
+});
+
+describe("describeNetworkError", () => {
+  it("puts the reason Node hides on `cause` back into the message", () => {
+    const failed = new Error("fetch failed");
+    (failed as { cause?: unknown }).cause = {
+      code: "ENOTFOUND",
+      message: "getaddrinfo ENOTFOUND api.tcgdex.net",
+    };
+    expect(describeNetworkError(failed, "https://api.tcgdex.net/v2/en/sets")).toBe(
+      "Could not reach api.tcgdex.net (ENOTFOUND: getaddrinfo ENOTFOUND api.tcgdex.net)",
+    );
+  });
+
+  it("names a timeout as a timeout", () => {
+    const timeout = new Error("The operation was aborted due to timeout");
+    timeout.name = "TimeoutError";
+    expect(describeNetworkError(timeout, "https://api.scryfall.com/sets")).toBe(
+      "Timed out reaching api.scryfall.com",
+    );
+  });
+
+  it("still names the host when there is no cause at all", () => {
+    expect(
+      describeNetworkError(
+        new Error("fetch failed"),
+        "https://api.lorcast.com/v0/sets",
+      ),
+    ).toBe("Could not reach api.lorcast.com (fetch failed)");
+    expect(describeNetworkError("nope", "https://api.lorcast.com/v0/sets")).toBe(
+      "Could not reach api.lorcast.com",
+    );
   });
 });
