@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { WantEntries } from "@/components/players/want-entries";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { viewerGames } from "@/lib/players/viewer-games";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { getPlayerSession } from "@/lib/players/session";
@@ -48,6 +49,7 @@ export default async function FlarePage() {
 
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
+  const games = await viewerGames();
   const [wants, posted] = playerId
     ? await Promise.all([listWants(playerId), postedCardStores(playerId)])
     : [null, new Map<string, string>()];
@@ -72,10 +74,21 @@ export default async function FlarePage() {
                 </p>
               </Card>
 
-              <AddToListForm code={room.code} kind="flare" imagesEnabled={images} />
+              <AddToListForm
+                code={room.code}
+                kind="flare"
+                imagesEnabled={images}
+                playerGames={games}
+              />
             </>
           ) : playerId ? (
-            <AddToListForm code="" kind="flare" imagesEnabled={images} target="list" />
+            <AddToListForm
+              code=""
+              kind="flare"
+              imagesEnabled={images}
+              playerGames={games}
+              target="list"
+            />
           ) : (
             <Card className="flex flex-col gap-3">
               <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>

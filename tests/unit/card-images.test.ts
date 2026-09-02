@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -78,8 +80,11 @@ describe("isRenderableImageUrl", () => {
 
   it("matches the hosts declared to Next's image optimiser", () => {
     // Drifting from next.config.ts would mean a URL that passes here and then
-    // fails to render, or vice versa.
-    expect([...ALLOWED_IMAGE_HOSTS]).toEqual(["optcgapi.com", "www.optcgapi.com"]);
+    // fails to render, or vice versa. Read from the config itself, so a host
+    // added for a new catalogue has to be added in both places.
+    const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    const declared = [...config.matchAll(/hostname:\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect([...ALLOWED_IMAGE_HOSTS]).toEqual(declared);
   });
 });
 

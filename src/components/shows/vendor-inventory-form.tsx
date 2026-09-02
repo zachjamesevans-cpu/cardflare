@@ -41,9 +41,12 @@ function SubmitButton() {
 export function VendorInventoryForm({
   storeId,
   imagesEnabled,
+  playerGames = [],
 }: {
   storeId: string;
   imagesEnabled: boolean;
+  /** The reader's sign-up games, for the search's default chip. */
+  playerGames?: readonly string[];
 }) {
   const [state, formAction] = useActionState(addInventoryAction, INVENTORY_IDLE);
   const [picked, setPicked] = useState<{
@@ -83,6 +86,7 @@ export function VendorInventoryForm({
       {!picked ? (
         <CardSearch
           imagesEnabled={imagesEnabled}
+          playerGames={playerGames}
           onSelect={(card: CardResult, printing?: CardPrinting) =>
             setPicked({ card, printingId: printing?.id ?? "" })
           }

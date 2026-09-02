@@ -74,4 +74,14 @@ export const GAME_TLDRS: readonly GameTldr[] = [
       "Armory nights exist specifically for learning. Say you are new and the whole table adjusts.",
     ],
   },
+  {
+    id: "mtg",
+    name: "Magic: The Gathering",
+    lines: [
+      "Bring a 60-card deck for Constructed, or nothing at all for a draft: you build from packs at the table.",
+      "Matches are best-of-three at 50 minutes. Sideboarding between games is normal and nobody minds if you skip it.",
+      "When time is called you finish the current turn plus five more, and an unfinished game is a draw.",
+      "Friday Night Magic is the beginner event. Say it is your first one and your opponent will walk you through it.",
+    ],
+  },
 ];

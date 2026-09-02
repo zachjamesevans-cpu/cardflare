@@ -18,6 +18,7 @@ import { Rail } from "@/components/lists/rail";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { listPlayerGames } from "@/lib/players/games";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
@@ -123,6 +124,7 @@ export default async function ProfilePage() {
     .map(({ slug, name }) => ({ slug, name }));
 
   const imagesEnabled = cardImagesEnabled();
+  const games = await listPlayerGames(playerId);
 
   const currentArea = areas.some((area) => area.href === "/profile")
     ? "/profile"
@@ -316,6 +318,7 @@ export default async function ProfilePage() {
               {profile.showcase.length < SHOWCASE_LIMIT ? (
                 <AddShowcaseForm
                   imagesEnabled={imagesEnabled}
+                  playerGames={games}
                   frames={ownedFrames}
                   holos={ownedHolos}
                   defaultFrame={worn.frame}

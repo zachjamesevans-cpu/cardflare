@@ -21,6 +21,7 @@ import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { viewerGames } from "@/lib/players/viewer-games";
 import {
   boothsForStore,
   listClaimableShows,
@@ -141,7 +142,11 @@ export default async function StorePage({
             </span>
           </div>
 
-          <VendorInventoryForm storeId={store.id} imagesEnabled={cardImagesEnabled()} />
+          <VendorInventoryForm
+            storeId={store.id}
+            imagesEnabled={cardImagesEnabled()}
+            playerGames={await viewerGames()}
+          />
           <VendorInventoryList storeId={store.id} lines={lines} />
         </section>
       </AppShell>

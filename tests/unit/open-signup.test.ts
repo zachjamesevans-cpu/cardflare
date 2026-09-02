@@ -74,22 +74,26 @@ describe("the starter name", () => {
 });
 
 describe("the games catalogue", () => {
-  it("carries the founder's five, in the founder's order", () => {
+  it("carries the founder's five plus Flesh and Blood, in the founder's order", () => {
     expect(TCG_GAMES.map((game) => game.label)).toEqual([
       "One Piece TCG",
       "Riftbound",
       "Lorcana",
       "Magic: The Gathering",
       "Pokémon",
+      "Flesh and Blood",
     ]);
   });
 
   it("every slug is one the database will accept", () => {
-    const match = sql.match(
-      /create table if not exists public\.player_games[\s\S]*?check \(game in \(([^)]+)\)\)/,
-    );
-    expect(match, "player_games migration not found").toBeTruthy();
-    const allowed = [...(match?.[1] ?? "").matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+    /* The LATEST check wins: the table was created with five and a
+       later migration replaced the constraint with six. */
+    const matches = [
+      ...sql.matchAll(/player_games[\s\S]*?check \(game in \(([^)]+)\)\)/g),
+    ];
+    const last = matches.at(-1);
+    expect(last, "player_games migration not found").toBeTruthy();
+    const allowed = [...(last?.[1] ?? "").matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
     expect(allowed.sort()).toEqual([...GAME_SLUGS].sort());
   });
 

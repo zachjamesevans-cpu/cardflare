@@ -6,6 +6,8 @@ import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { MappingUnverifiedError, OptcgApiProvider } from "./providers/optcgapi/adapter";
+import { catalogueSource, providerForGame } from "./providers/registry";
+import { cleanSetCode } from "./providers/shared";
 import { activeSyncRun, syncCards } from "./sync";
 import { fullSyncPermitted, parseSyncMode, type SyncActionState } from "./sync-state";
 
@@ -123,6 +125,109 @@ export async function syncCatalogAction(
       message:
         "The sync failed part-way. Nothing was deleted, and re-running is safe. " +
         "check the runtime logs and card_sync_failures for the reason.",
+    };
+  }
+}
+
+/**
+ * Imports one set of one game from its public catalogue.
+ *
+ * The same `syncCards` behind the same admin gate as the One Piece
+ * sync above, with the provider chosen by GAME from a fixed table and
+ * never by anything the request names. The set code is the only free
+ * text, and it is shaped before it can reach a request path.
+ *
+ * Full mode, always: a set is already the unit of "a sample", and the
+ * two catalogues that can take the whole game (Flesh and Blood,
+ * Riftbound) are a few thousand cards, which fits.
+ */
+export async function importCatalogueSetAction(
+  _previous: SyncActionState,
+  formData: FormData,
+): Promise<SyncActionState> {
+  const viewer = await getViewer();
+
+  if (viewer.kind !== "admin") {
+    return { status: "error", message: GENERIC_ERROR };
+  }
+
+  const game = text(formData, "game") ?? "";
+  const source = catalogueSource(game);
+  const provider = providerForGame(game);
+
+  if (!source || !provider) {
+    return { status: "error", message: "Choose a game with a catalogue." };
+  }
+
+  const typed = (text(formData, "setCode") ?? "").trim();
+  const setCode = typed ? cleanSetCode(typed) : null;
+
+  if (typed && !setCode) {
+    return {
+      status: "error",
+      message: "A set code is letters, digits and dashes only.",
+    };
+  }
+
+  if (!setCode && !source.wholeGame) {
+    return {
+      status: "error",
+      message: `${source.sourceName} imports one set at a time. ${source.setCodeHint}`,
+    };
+  }
+
+  const rate = checkRateLimit(`card-sync:${viewer.user.id}`, SYNC_MAX, SYNC_WINDOW_MS);
+
+  if (!rate.allowed) {
+    return {
+      status: "error",
+      message: `Too many imports in a short window. Try again in ${Math.ceil(rate.retryAfterSeconds / 60)} minute(s).`,
+    };
+  }
+
+  try {
+    const running = await activeSyncRun();
+
+    if (running) {
+      return {
+        status: "error",
+        message: `A ${running.mode} sync started at ${running.startedAt.replace("T", " ").slice(0, 16)} UTC is still running. Wait for it to finish.`,
+      };
+    }
+  } catch (error) {
+    console.error("Could not check for a running sync", error);
+    return { status: "error", message: GENERIC_ERROR };
+  }
+
+  try {
+    const summary = await syncCards(provider, {
+      mode: "full",
+      setCode: setCode ?? undefined,
+    });
+
+    revalidatePath("/admin");
+
+    return {
+      status: "success",
+      mode: "full",
+      runId: summary.runId,
+      counts: {
+        recordsSeen: summary.recordsSeen,
+        uniqueCards: summary.uniqueCards,
+        cardsUpserted: summary.cardsUpserted,
+        printingsUpserted: summary.printingsUpserted,
+        recordsFailed: summary.recordsFailed,
+      },
+    };
+  } catch (error) {
+    revalidatePath("/admin");
+    console.error("Catalogue import failed", error);
+
+    return {
+      status: "failed",
+      message:
+        "The import failed part-way. Nothing was deleted, and re-running is safe. " +
+        "Check the runtime logs and card_sync_failures for the reason.",
     };
   }
 }

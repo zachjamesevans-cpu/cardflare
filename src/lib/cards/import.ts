@@ -170,6 +170,10 @@ export async function writeImportedSet(
   }
 
   const cardRows = [...byNumber.values()].map((card) => ({
+    /* The manifest importers (Bandai, Kaizoku, manual) are One Piece
+       collectors; written explicitly now that the column has six
+       values, so a default changing under it cannot move a set. */
+    game: "one-piece" as const,
     canonical_card_number: card.cardNumber,
     compact_card_number: compactNumber(card.cardNumber),
     exact_name: card.name,
@@ -212,6 +216,9 @@ export async function writeImportedSet(
   const { data: written, error: readError } = await admin
     .from("cards")
     .select("id, canonical_card_number")
+    /* Scoped to the game: a number is only unique WITHIN one, and a
+       Pokémon SV1-001 must not lend its id to a One Piece printing. */
+    .eq("game", "one-piece")
     .in("canonical_card_number", [...byNumber.keys()]);
 
   if (readError) {

@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown, ChevronRight, Loader2, Lock, Search } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { searchCardsAction } from "@/lib/cards/actions";
+import {
+  ALL_GAMES,
+  resolveGameScope,
+  searchPlaceholder,
+  type GameScope,
+} from "@/lib/cards/game-scope";
+import { gameShortName, type GameSlug } from "@/lib/players/games-catalog";
 import { parseCardQuery } from "@/lib/cards/query";
 import {
   highlightParts,
@@ -26,6 +33,110 @@ import { cn } from "@/lib/cn";
 const DEBOUNCE_MS = 250;
 
 type Status = "idle" | "loading" | "ready" | "empty" | "pool-empty" | "error";
+
+/** Where this device keeps the chip the reader last tapped. */
+const REMEMBERED_GAME_KEY = "cf-search-game";
+
+function rememberedGame(): string | null {
+  try {
+    return window.localStorage.getItem(REMEMBERED_GAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * The remembered chip as an external store, so the component reads it
+ * with `useSyncExternalStore` — the server snapshot is null, the first
+ * client paint matches it, and no effect has to set state to catch up.
+ */
+const rememberedListeners = new Set<() => void>();
+
+function subscribeRemembered(listener: () => void): () => void {
+  rememberedListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    rememberedListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+function rememberGame(value: string): void {
+  try {
+    window.localStorage.setItem(REMEMBERED_GAME_KEY, value);
+  } catch {
+    /* Private mode, or storage refused: the choice lasts the page. */
+  }
+  for (const listener of rememberedListeners) listener();
+}
+
+/**
+ * The game chips above the search.
+ *
+ * The same chip as the composer's trade/cash toggles — rounded, accent
+ * border and tint when on, muted when off — so the search stops being
+ * the one control with its own look. One row that wraps, "All games"
+ * first, the reader's own games next, the rest after.
+ *
+ * Locked (inside a room scanned from a tournament's screen) the row is
+ * one chip with a lock on it and nothing to tap: the code decided.
+ */
+function GameChips({
+  scope,
+  onPick,
+}: {
+  scope: GameScope;
+  onPick: (game: GameSlug | null) => void;
+}) {
+  const base =
+    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors";
+  const on = "border-accent bg-accent/15 text-text-primary";
+  const off = "border-border text-text-muted hover:text-text-secondary";
+
+  if (scope.locked && scope.selected) {
+    return (
+      <p className="flex flex-wrap gap-2" aria-label="Search scope">
+        <span className={cn(base, on)}>
+          <Lock className="size-3.5 text-accent" aria-hidden="true" />
+          {gameShortName(scope.selected)} cards only
+        </span>
+      </p>
+    );
+  }
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Which game to search"
+      className="flex flex-wrap gap-2"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={scope.selected === null}
+        onClick={() => onPick(null)}
+        className={cn(base, scope.selected === null ? on : off)}
+      >
+        All games
+      </button>
+      {scope.chips.map((game) => {
+        const active = scope.selected === game;
+        return (
+          <button
+            key={game}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onPick(game)}
+            className={cn(base, active ? on : off)}
+          >
+            {gameShortName(game)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function Highlighted({ text, term }: { text: string; term: string }) {
   return (
@@ -334,9 +445,16 @@ export interface CardSearchProps {
   /**
    * The room's TCG, when the scan said which one. A player who scanned
    * the One Piece tournament's screen searches One Piece cards and
-   * nothing else — the whole point of a per-tournament code.
+   * nothing else — the whole point of a per-tournament code. Locks the
+   * scope: no chips, no widening.
    */
   game?: string | null;
+  /**
+   * The games the reader said they play at sign-up, in the founder's
+   * order. The first is pre-selected and they lead the chip row, so a
+   * One Piece player never has to say "One Piece" before searching.
+   */
+  playerGames?: readonly string[];
   /**
    * Supplied when the search is being used to pick a card. The printing is
    * present only when a specific version was tapped from the expanded list —
@@ -380,6 +498,7 @@ export interface CardSearchProps {
 export function CardSearch({
   imagesEnabled,
   game = null,
+  playerGames = [],
   onSelect,
   autoFocus = false,
   composer = null,
@@ -388,6 +507,26 @@ export function CardSearch({
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+
+  /*
+   * The scope: the room's game when there is one, else the chip tapped
+   * last on this device, else the reader's first sign-up game. The
+   * remembered chip is read in an effect rather than during render,
+   * because localStorage does not exist on the server and the first
+   * paint must match it.
+   */
+  const remembered = useSyncExternalStore(
+    subscribeRemembered,
+    rememberedGame,
+    () => null,
+  );
+
+  const scope = resolveGameScope({ roomGame: game, playerGames, remembered });
+  const scopedGame = scope.selected;
+
+  const pickGame = (picked: GameSlug | null) => {
+    rememberGame(picked ?? ALL_GAMES);
+  };
 
   /*
    * Which query the reader explicitly widened. Keyed to the query
@@ -464,7 +603,7 @@ export function CardSearch({
     const id = ++requestId.current;
 
     const timer = setTimeout(async () => {
-      const response = await searchCardsAction(trimmed, { game });
+      const response = await searchCardsAction(trimmed, { game: scopedGame });
 
       // A response from a superseded keystroke is discarded.
       if (id !== requestId.current) return;
@@ -494,7 +633,7 @@ export function CardSearch({
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmed, tooShort, game]);
+  }, [trimmed, tooShort, scopedGame]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
@@ -523,6 +662,8 @@ export function CardSearch({
           Card name or number
         </label>
 
+        <GameChips scope={scope} onPick={pickGame} />
+
         <div className="relative">
           <Search
             aria-hidden="true"
@@ -538,7 +679,7 @@ export function CardSearch({
             spellCheck={false}
             enterKeyHint="search"
             maxLength={MAX_QUERY_LENGTH}
-            placeholder="OP01-024, or Luffy"
+            placeholder={searchPlaceholder(scopedGame)}
             className="pr-10 pl-10"
             role="combobox"
             aria-expanded={status === "ready"}
@@ -590,7 +731,9 @@ export function CardSearch({
 
       {status === "empty" && (
         <Card className="py-8 text-center text-text-secondary">
-          No matching cards found. Check the name or card number and try again.
+          {scopedGame
+            ? `No matching ${gameShortName(scopedGame)} cards found. Check the name or card number${scope.locked ? "" : ", or try All games"}.`
+            : "No matching cards found. Check the name or card number and try again."}
         </Card>
       )}
 

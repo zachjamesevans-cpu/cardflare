@@ -192,6 +192,7 @@ function asColors(value: unknown): string[] {
 export class OptcgApiProvider implements CardDataProvider {
   readonly providerKey = OPTCGAPI_KEY;
   readonly displayName = "OPTCG API (optcgapi.com)";
+  readonly game = "one-piece" as const;
   readonly suppliesImages = true;
 
   private readonly http: ProviderHttp;

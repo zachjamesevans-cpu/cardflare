@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { GameSlug } from "@/lib/players/games-catalog";
+
 /**
  * cardflare's own card model. No provider's vocabulary appears here.
  *
@@ -211,6 +213,12 @@ export type ProviderSource = "set" | "starter-deck" | "promo" | "don";
 export interface CardFetchOptions {
   /** Sample mode: cap how much is pulled, for interface and schema testing. */
   sample?: boolean;
+  /**
+   * One set, for the providers whose whole catalogue is too large to
+   * pull in one go (Magic is a hundred thousand printings). A provider
+   * that cannot narrow ignores it; one that can pulls only that set.
+   */
+  setCode?: string;
   /** Called with human-readable progress. Never receives secrets. */
   onProgress?: (message: string) => void;
 }
@@ -236,6 +244,12 @@ export interface CardDataProvider {
   readonly providerKey: string;
   /** Human-readable, for logs and the admin panel. */
   readonly displayName: string;
+  /**
+   * Which TCG every card from this provider belongs to — written on the
+   * row, because `(game, canonical_card_number)` is a card's identity
+   * and two games can print the same number.
+   */
+  readonly game: GameSlug;
   /**
    * Whether this provider is permitted to supply artwork URLs.
    *

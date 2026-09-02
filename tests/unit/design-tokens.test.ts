@@ -141,6 +141,7 @@ describe("game accents", () => {
     "game-lorcana",
     "game-riftbound",
     "game-flesh-and-blood",
+    "game-mtg",
   ];
 
   it.each(GAMES)("%s clears AA on canvas, surface and elevated", (name) => {

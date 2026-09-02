@@ -5,6 +5,7 @@ import {
   printingLabel,
 } from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
+import { isGameSlug } from "@/lib/players/games-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export async function GET(request: Request): Promise<Response> {
    * because "no One Piece card matches" must not answer with Lorcana.
    */
   const gameParam = params.get("game") ?? "";
-  const game = /^[a-z][a-z0-9-]{1,30}$/.test(gameParam) ? gameParam : null;
+  const game = isGameSlug(gameParam) ? gameParam : null;
 
   /*
    * Same keyword narrowing the website's picker does, including the

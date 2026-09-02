@@ -694,6 +694,28 @@ export async function lastRoomGame(): Promise<string | null> {
   return SecureStore.getItemAsync(LAST_ROOM_GAME_KEY);
 }
 
+/**
+ * The game chip last tapped above a card search on this device - the
+ * website keeps the same thing in localStorage under the same name.
+ * "all" is a real answer (every game), stored so it beats the sign-up
+ * default; anything else is a game slug.
+ */
+const SEARCH_GAME_KEY = "cf-search-game";
+
+export async function rememberSearchGame(value: string): Promise<void> {
+  if (/^[a-z][a-z0-9-]{1,30}$/.test(value)) {
+    await SecureStore.setItemAsync(SEARCH_GAME_KEY, value);
+  }
+}
+
+export async function lastSearchGame(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(SEARCH_GAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export interface CardHit {
   id: string;
   name: string;

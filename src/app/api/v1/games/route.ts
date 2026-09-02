@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
-import { TCG_GAMES } from "@/lib/players/games-catalog";
+import { isGameSlug, TCG_GAMES } from "@/lib/players/games-catalog";
 import { listPlayerGames, setPlayerGames } from "@/lib/players/games";
 
 export const dynamic = "force-dynamic";
@@ -25,9 +25,9 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 const schema = z.object({
-  games: z
-    .array(z.enum(["one-piece", "riftbound", "lorcana", "mtg", "pokemon"]))
-    .max(TCG_GAMES.length),
+  /* Refined against the one list rather than a second copy of it, so a
+     game added to the catalogue is accepted here the same day. */
+  games: z.array(z.string().refine(isGameSlug)).max(TCG_GAMES.length),
 });
 
 export async function POST(request: Request): Promise<Response> {

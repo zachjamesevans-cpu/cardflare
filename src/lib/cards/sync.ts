@@ -11,6 +11,8 @@ import {
 
 export interface SyncOptions {
   mode: "sample" | "full";
+  /** One set only, for providers that can narrow. See CardFetchOptions. */
+  setCode?: string;
   onProgress?: (message: string) => void;
 }
 
@@ -146,6 +148,7 @@ export async function syncCards(
   try {
     const { cards, failures } = await provider.fetchCards({
       sample: options.mode === "sample",
+      setCode: options.setCode,
       onProgress: progress,
     });
 
@@ -199,6 +202,10 @@ export async function syncCards(
 
 function toCardRow(card: NormalizedCard, provider: CardDataProvider) {
   return {
+    /* Half of the card's identity, and the column the room's search
+       filters on. Written explicitly: the default is One Piece, and a
+       Magic card left to the default would land in the wrong game. */
+    game: provider.game,
     canonical_card_number: card.canonicalCardNumber,
     compact_card_number: compactCardNumber(card.canonicalCardNumber),
     exact_name: card.exactName,

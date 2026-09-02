@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "optcgapi.com" },
       { protocol: "https", hostname: "www.optcgapi.com" },
+      { protocol: "https", hostname: "cards.scryfall.io" },
+      { protocol: "https", hostname: "assets.tcgdex.net" },
+      {
+        protocol: "https",
+        hostname: "legendstory-production-s3-public.s3.amazonaws.com",
+      },
+      { protocol: "https", hostname: "storage.googleapis.com" },
+      { protocol: "https", hostname: "cmsassets.rgpub.io" },
     ],
   },
 };
