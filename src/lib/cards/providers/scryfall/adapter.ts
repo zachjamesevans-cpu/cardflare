@@ -45,6 +45,15 @@ export const SCRYFALL_BASE_URL = "https://api.scryfall.com";
  */
 
 const PAGE_SIZE_HINT = 175;
+
+/** Scryfall set types an all-sets import leaves out. */
+export const SKIPPED_SET_TYPES = new Set([
+  "token",
+  "memorabilia",
+  "minigame",
+  "alchemy",
+  "vanguard",
+]);
 const SAMPLE_CAP = 40;
 
 /** Scryfall's colour letters, spelt out the way a filter word is typed. */
@@ -326,6 +335,12 @@ export class ScryfallProvider implements CardDataProvider {
     return parsed.data.data.flatMap((record) => {
       const code = asString(record.code);
       if (!code || record.digital === true) return [];
+      /* Not cards anybody trades: token and memorabilia sets, the
+         minigame inserts, Arena-only Alchemy, and the Vanguard oversize
+         cards. Everything else, promos included, is somebody's hunt. */
+      const type = asString(record.set_type) ?? "";
+      if (SKIPPED_SET_TYPES.has(type)) return [];
+      if ((asInt(record.card_count) ?? 0) === 0) return [];
       return [
         {
           code: code.toUpperCase(),

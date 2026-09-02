@@ -13,6 +13,8 @@ export interface SyncOptions {
   mode: "sample" | "full";
   /** One set only, for providers that can narrow. See CardFetchOptions. */
   setCode?: string;
+  /** Per-card details, one request each. See CardFetchOptions. */
+  detailed?: boolean;
   onProgress?: (message: string) => void;
 }
 
@@ -149,6 +151,7 @@ export async function syncCards(
     const { cards, failures } = await provider.fetchCards({
       sample: options.mode === "sample",
       setCode: options.setCode,
+      detailed: options.detailed,
       onProgress: progress,
     });
 

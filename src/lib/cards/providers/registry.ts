@@ -1,6 +1,7 @@
 import type { CardDataProvider } from "@/lib/cards/domain";
 import type { GameSlug } from "@/lib/players/games-catalog";
 import { FabCubeProvider, FABCUBE_KEY } from "./fabcube/adapter";
+import { LorcastProvider, LORCAST_KEY } from "./lorcast/adapter";
 import { RiftcodexProvider, RIFTCODEX_KEY } from "./riftcodex/adapter";
 import { ScryfallProvider, SCRYFALL_KEY } from "./scryfall/adapter";
 import { TcgdexProvider, TCGDEX_KEY } from "./tcgdex/adapter";
@@ -11,9 +12,7 @@ import { TcgdexProvider, TCGDEX_KEY } from "./tcgdex/adapter";
  *
  * One Piece is deliberately absent: it has its own sync (optcgapi) and
  * its own by-hand importer, both older than this table, and moving it
- * here would be churn for nothing. Lorcana has no catalogue yet — the
- * founder did not ask for one — and the console says so rather than
- * offering a game that imports nothing.
+ * here would be churn for nothing.
  *
  * Free of server-only imports so the admin form can render the list
  * and the tests can read it.
@@ -75,6 +74,15 @@ export const CATALOGUE_SOURCES: readonly CatalogueSource[] = [
     wholeGame: true,
     imageHosts: ["cmsassets.rgpub.io"],
   },
+  {
+    game: "lorcana",
+    providerKey: LORCAST_KEY,
+    sourceName: "Lorcast",
+    sourceUrl: "https://lorcast.com/docs/api",
+    setCodeHint: "Lorcast's set code: 1, 2, 3 … or Q1. Leave blank for the whole game.",
+    wholeGame: true,
+    imageHosts: ["cards.lorcast.io"],
+  },
 ];
 
 export function catalogueSource(game: string): CatalogueSource | null {
@@ -92,6 +100,8 @@ export function providerForGame(game: string): CardDataProvider | null {
       return new FabCubeProvider();
     case "riftbound":
       return new RiftcodexProvider();
+    case "lorcana":
+      return new LorcastProvider();
     default:
       return null;
   }

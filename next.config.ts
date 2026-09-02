@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
       },
       { protocol: "https", hostname: "storage.googleapis.com" },
       { protocol: "https", hostname: "cmsassets.rgpub.io" },
+      { protocol: "https", hostname: "cards.lorcast.io" },
     ],
   },
 };

@@ -219,6 +219,13 @@ export interface CardFetchOptions {
    * that cannot narrow ignores it; one that can pulls only that set.
    */
   setCode?: string;
+  /**
+   * Fetch what a listing leaves out, one request per card. Slow by
+   * design (a whole set is minutes of polite requests), so it is for
+   * the laptop command, never the admin button. A provider whose
+   * listing is already complete ignores it.
+   */
+  detailed?: boolean;
   /** Called with human-readable progress. Never receives secrets. */
   onProgress?: (message: string) => void;
 }

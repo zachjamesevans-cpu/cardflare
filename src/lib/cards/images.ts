@@ -40,6 +40,7 @@ export const ALLOWED_IMAGE_HOSTS = [
   "legendstory-production-s3-public.s3.amazonaws.com",
   "storage.googleapis.com",
   "cmsassets.rgpub.io",
+  "cards.lorcast.io",
 ] as const;
 
 /**
