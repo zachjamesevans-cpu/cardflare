@@ -164,10 +164,31 @@ export async function countPrintingImages(): Promise<{
 }
 
 /**
- * How many cards are loaded.
+ * Whether the catalogue has anything in it at all.
  *
- * Exists so an empty pool can be told from a query that matched nothing.
- * Those are the same screen to a player and completely different problems.
+ * Asked only when a search found nothing, to tell "no card matches"
+ * from "no cards are loaded". That question needs one row, not a
+ * count: counting a catalogue of six games walks every row of it,
+ * and a miss must not cost more than a hit.
+ */
+export async function catalogueIsEmpty(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+
+  const { data, error } = await getSupabaseAdmin().from("cards").select("id").limit(1);
+
+  if (error) {
+    console.error("Could not check whether the catalogue is empty", error);
+    return false;
+  }
+
+  return (data ?? []).length === 0;
+}
+
+/**
+ * How many cards are loaded, for the admin console's health card.
+ *
+ * A full count, so it is not what a search asks; `catalogueIsEmpty`
+ * answers that without walking the table.
  */
 export async function countCards(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;

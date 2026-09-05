@@ -1,0 +1,67 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * The card search runs in the database, so what can be checked here is
+ * the text of the function the migrations leave behind. Two things
+ * about it must stay true, and neither would fail loudly if broken:
+ *
+ * 1. The index and the ranking must agree on where noise starts. The
+ *    candidate step asks the trigram index for "similar" using the
+ *    `%` operator, which reads pg_trgm.similarity_threshold; the
+ *    ranking keeps rows with a score at or above its own floor. If
+ *    the floor dropped below the threshold, cards the ranking would
+ *    have shown could never reach it, and nobody would notice until a
+ *    misspelling that used to work stopped working. The threshold is
+ *    pg_trgm's default, because Supabase's `postgres` role may not set
+ *    it from a function ("permission denied to set parameter").
+ *
+ * 2. The search must keep finding its candidates by index. The
+ *    version that scored every card in the table was fine for one
+ *    game and half a second per keystroke for six.
+ */
+const MIGRATIONS = join(process.cwd(), "supabase", "migrations");
+
+function latestSearchFunction(): string {
+  const files = readdirSync(MIGRATIONS)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  let latest = "";
+  for (const name of files) {
+    const sql = readFileSync(join(MIGRATIONS, name), "utf8");
+    const match = sql.match(
+      /create (?:or replace )?function public\.search_cards\([\s\S]*?\$function\$;/,
+    );
+    if (match) latest = match[0];
+  }
+  return latest;
+}
+
+describe("the search_cards function", () => {
+  const sql = latestSearchFunction();
+
+  it("exists in the migrations", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("keeps the ranking floor at pg_trgm's default similarity threshold", () => {
+    const PG_TRGM_DEFAULT_THRESHOLD = 0.3;
+    const floor = sql.match(/where s\.score >= ([\d.]+)/);
+    expect(Number(floor?.[1])).toBe(PG_TRGM_DEFAULT_THRESHOLD);
+  });
+
+  it("does not try to change the threshold, which Supabase forbids", () => {
+    expect(sql).not.toMatch(/^\s*set\s+pg_trgm\.similarity_threshold/im);
+  });
+
+  it("gathers candidates through the trigram indexes before scoring", () => {
+    expect(sql).toMatch(/candidates as \(/);
+    expect(sql).toMatch(/c\.normalized_name % p\.term/);
+    expect(sql).toMatch(/lower\(c\.canonical_card_number\) % p\.term/);
+    /* The candidate ids are fetched by primary key, never by re-reading
+       the table. */
+    expect(sql).toMatch(/c\.id = any \(array\(select k\.id from candidates k\)\)/);
+  });
+});

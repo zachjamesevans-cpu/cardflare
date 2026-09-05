@@ -4,7 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { parseCardQuery } from "./query";
 import { cardQuerySchema, floatAskedVariants, type CardResult } from "./schema";
-import { countCards, searchCards, type CardSearchFilters } from "./search";
+import { catalogueIsEmpty, searchCards, type CardSearchFilters } from "./search";
 import { isGameSlug } from "@/lib/players/games-catalog";
 
 /**
@@ -103,7 +103,7 @@ export async function searchCardsAction(
     }
 
     // Only asked when nothing matched, so the common path is still one query.
-    const poolEmpty = results.length === 0 ? (await countCards()) === 0 : false;
+    const poolEmpty = results.length === 0 ? await catalogueIsEmpty() : false;
 
     /* "Zoro sp": the cards that have an SP lead the page. The rows
        themselves read the same word out of the query to front that

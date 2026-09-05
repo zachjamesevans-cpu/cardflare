@@ -4,7 +4,7 @@ import { resetRateLimits } from "@/lib/rate-limit";
 import { highlightParts, printingLabel } from "@/lib/cards/schema";
 
 const searchCards = vi.fn();
-const countCards = vi.fn();
+const catalogueIsEmpty = vi.fn();
 let requestHeaders: Record<string, string> = {};
 
 vi.mock("next/headers", () => ({
@@ -16,7 +16,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/cards/search", () => ({
   SEARCH_LIMIT: 20,
   searchCards: (...args: unknown[]) => searchCards(...args),
-  countCards: () => countCards(),
+  catalogueIsEmpty: () => catalogueIsEmpty(),
 }));
 
 const { searchCardsAction } = await import("@/lib/cards/actions");
@@ -30,7 +30,7 @@ const hit = {
 beforeEach(() => {
   resetRateLimits();
   searchCards.mockReset().mockResolvedValue([]);
-  countCards.mockReset().mockResolvedValue(2451);
+  catalogueIsEmpty.mockReset().mockResolvedValue(false);
   requestHeaders = { "x-forwarded-for": `10.0.0.${Math.floor(Math.random() * 250)}` };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -104,7 +104,7 @@ describe("searchCardsAction", () => {
    * and completely different problems. Only the second is a setup task.
    */
   it("distinguishes an empty catalog from a query that matched nothing", async () => {
-    countCards.mockResolvedValue(0);
+    catalogueIsEmpty.mockResolvedValue(true);
 
     expect(await searchCardsAction("luffy")).toMatchObject({ poolEmpty: true });
   });
@@ -114,7 +114,7 @@ describe("searchCardsAction", () => {
 
     await searchCardsAction("luffy");
 
-    expect(countCards).not.toHaveBeenCalled();
+    expect(catalogueIsEmpty).not.toHaveBeenCalled();
   });
 
   it("refuses a query below the minimum without querying", async () => {
