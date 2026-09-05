@@ -12,12 +12,12 @@ import {
 } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
-import { PostalAsk } from "@/components/feed/postal-ask";
 import { IconChip, Segment, composerKeyFor } from "@/components/lists/add-to-list-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { printingLabel, type CardPrinting, type CardResult } from "@/lib/cards/schema";
 import { postAreaFlareAction } from "@/lib/local/actions";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /** What the composer settles about one card before it goes up. */
 interface ComposedFields {
@@ -72,9 +72,6 @@ export function PostAreaFlare({
   } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  /* The one refusal that is not a fault: it has a fix, and the fix goes
-     here rather than in a sentence pointing somewhere else. */
-  const [needsPostal, setNeedsPostal] = useState(false);
   /*
    * Cards chosen but not yet posted.
    *
@@ -102,7 +99,6 @@ export function PostAreaFlare({
   ) => {
     setMessage(null);
     setFailed(false);
-    setNeedsPostal(false);
 
     /* Whatever is waiting, plus the card open right now. One call, one
        batch, one post on everybody's Local. */
@@ -130,7 +126,11 @@ export function PostAreaFlare({
         setGroupName("");
         setMessage(
           cards.length === 1
-            ? `${card.exactName} is up. People near you can see it now.`
+            ? `${card.exactName} is up. ${
+                LOCAL_ENABLED
+                  ? "People near you can see it now."
+                  : "Your friends can see it in the Feed."
+              }`
             : `${cards.length} cards are up as one post.`,
         );
         onPosted();
@@ -138,7 +138,6 @@ export function PostAreaFlare({
       }
 
       setFailed(true);
-      setNeedsPostal(result.reason === "no-postal-code");
       setMessage(result.message);
     });
   };
@@ -148,7 +147,9 @@ export function PostAreaFlare({
       <div className="flex flex-col gap-0.5">
         <p className="font-semibold text-text-primary">What are you hunting?</p>
         <p className="text-xs text-text-muted">
-          Post it here and anyone near you can say they have it. No room needed.
+          {LOCAL_ENABLED
+            ? "Post it here and anyone near you can say they have it. No room needed."
+            : "No room needed. Your friends see it in the Feed."}
         </p>
       </div>
 
@@ -253,14 +254,6 @@ export function PostAreaFlare({
           {message}
         </p>
       )}
-
-      {/*
-       * Telling somebody to say where they are and leaving them on a
-       * screen with no field to say it in is how a two-tap feature
-       * becomes a dead end — and on the live site it was one. The ask
-       * belongs here, beside the card they were trying to post.
-       */}
-      {needsPostal && <PostalAsk />}
     </Card>
   );
 }

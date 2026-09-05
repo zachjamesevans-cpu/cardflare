@@ -67,22 +67,6 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: true, batchId: result.batchId, posted: result.posted });
   }
 
-  /*
-   * A missing ZIP answers 409 rather than 400: the request was fine and
-   * the account is not ready, which is a different thing to the client
-   * and gets a different sentence on the screen.
-   */
-  if (result.reason === "no-postal-code") {
-    return Response.json(
-      {
-        ok: false,
-        error: "no-postal-code",
-        message: "Add your ZIP code first so people know roughly where you are.",
-      },
-      { status: 409 },
-    );
-  }
-
   if (result.reason === "already-posted") {
     return Response.json(
       { ok: false, error: "already-posted", message: "That card is already up." },

@@ -39,7 +39,7 @@ export type LocalActionResult =
        * that decides what to render by searching the copy for the word
        * "ZIP" breaks the first time somebody rewrites the sentence.
        */
-      reason?: "sign-in" | "no-postal-code" | "already-posted" | "not-migrated";
+      reason?: "sign-in" | "already-posted" | "not-migrated";
     };
 
 /** Null when signed out or the coordinates were nonsense. */
@@ -148,12 +148,9 @@ export async function localFeedAtAction(
 }
 
 /**
- * Posting a Flare to your area rather than to a board.
- *
- * The ZIP refusal is deliberately its own message: it is not an error, it
- * is the one missing thing, and Local already knows how to ask for five
- * digits. Anything that says "something went wrong" here sends somebody
- * looking for a bug instead of a field.
+ * Posting a Flare with no board: to your friends in the Feed, and to
+ * your area when Local is on. Nothing is asked first; a ZIP rides along
+ * when the profile has one.
  */
 export async function postAreaFlareAction(
   /* One card or a whole list. A list goes up as ONE post — see
@@ -177,13 +174,6 @@ export async function postAreaFlareAction(
   );
   if (result.ok) return { ok: true };
 
-  if (result.reason === "no-postal-code") {
-    return {
-      ok: false,
-      reason: "no-postal-code",
-      message: "Tell us roughly where you are and the card goes up.",
-    };
-  }
   if (result.reason === "already-posted") {
     return { ok: false, reason: "already-posted", message: "That card is already up." };
   }

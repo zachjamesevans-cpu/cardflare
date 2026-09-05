@@ -385,13 +385,11 @@ export async function saveWantAction(
     return {
       status: "error",
       message:
-        outcome.reason === "no-postal-code"
-          ? "Tell us roughly where you are and the card goes up."
-          : outcome.reason === "already-posted"
-            ? "That card is already up."
-            : outcome.reason === "not-migrated"
-              ? "Posting isn't switched on yet."
-              : "Something went wrong. Please try again in a moment.",
+        outcome.reason === "already-posted"
+          ? "That card is already up."
+          : outcome.reason === "not-migrated"
+            ? "Posting isn't switched on yet."
+            : "Something went wrong. Please try again in a moment.",
     };
   }
 
@@ -508,11 +506,9 @@ export async function importDeckListAction(
     return {
       status: "error",
       message:
-        outcome.reason === "no-postal-code"
-          ? "Tell us roughly where you are and the deck goes up."
-          : outcome.reason === "not-migrated"
-            ? "Posting isn't switched on yet."
-            : "Nothing in that list could be posted. Check the numbers?",
+        outcome.reason === "not-migrated"
+          ? "Posting isn't switched on yet."
+          : "Nothing in that list could be posted. Check the numbers?",
     };
   }
 

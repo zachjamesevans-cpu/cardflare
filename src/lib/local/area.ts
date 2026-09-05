@@ -21,18 +21,27 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * product is that binders and lists stay private. This is the second
  * place a player can choose to be seen, and the choosing is the point.
  *
- * WHERE IT SITS is the poster's own five-digit ZIP, copied onto the row.
- * Not a device coordinate: a precise position rides one request and is
- * never stored, and this row outlives its request by design. A ZIP is
- * miles across, it is what the profile already holds, and it is the
- * coarsest anchor that can still answer "near me".
+ * WHERE IT SITS, when it sits anywhere, is the poster's own five-digit
+ * ZIP, copied onto the row. Not a device coordinate: a precise position
+ * rides one request and is never stored, and this row outlives its
+ * request by design. A ZIP is miles across, it is what the profile
+ * already holds, and it is the coarsest anchor that can still answer
+ * "near me".
+ *
+ * And it is optional. With Local switched off (src/lib/local/enabled.ts)
+ * a Flare with no room goes to the poster's friends in the Feed, who
+ * are found by friendship and not by distance, so demanding a ZIP
+ * first was a wall in front of nothing. The founder: "No need to have
+ * that requirement now because it just shows your flares to your
+ * friends in the feed." A ZIP is still written when there is one, so
+ * Local finds the Flare again the day it is switched back on.
  */
 
 export type PostAreaFlareResult =
   | { ok: true; flareId: string }
   | {
       ok: false;
-      reason: "no-postal-code" | "already-posted" | "not-migrated" | "unavailable";
+      reason: "already-posted" | "not-migrated" | "unavailable";
     };
 
 /**
@@ -63,7 +72,7 @@ export type PostAreaFlaresResult =
   | { ok: true; batchId: string; posted: number }
   | {
       ok: false;
-      reason: "no-postal-code" | "already-posted" | "not-migrated" | "unavailable";
+      reason: "already-posted" | "not-migrated" | "unavailable";
     };
 
 export interface AreaFlareInput {
@@ -109,14 +118,13 @@ export async function postAreaFlare(
     .maybeSingle();
 
   /*
-   * No ZIP, no anchor. This is a real answer rather than a failure: the
-   * caller turns it into the same five-digit ask Local already shows when
-   * it does not know where somebody is, so the fix is one field away
-   * instead of a dead end.
+   * The ZIP when there is one, from the profile first and a granted
+   * position second, snapped to a centroid. None is not a refusal any
+   * more: the Flare goes to friends either way, and only Local's radius
+   * would have wanted the anchor.
    */
   const postalCode =
     normalisePostalCode(player?.postal_code) ?? nearestPostalCode(at ?? null);
-  if (!postalCode) return { ok: false, reason: "no-postal-code" };
 
   const { data, error } = await admin
     .from("flares")
@@ -124,7 +132,7 @@ export async function postAreaFlare(
       event_id: null,
       player_session_id: null,
       player_id: playerId,
-      posted_postal_code: postalCode,
+      posted_postal_code: postalCode ?? null,
       /* The batch is what makes several cards read as one post, exactly
          as it does on a room's board. Null when a card goes up alone. */
       posted_batch: group?.batchId ?? null,
@@ -147,8 +155,9 @@ export async function postAreaFlare(
     if (error.code === "23505") return { ok: false, reason: "already-posted" };
 
     /* The shapes a missing migration takes: the column is not there, or
-       `event_id` is still not-null, or the two-shapes check does not
-       exist to permit this row. All one cause, and not the player's. */
+       `event_id` is still not-null, or the two-shapes check still
+       demands a ZIP this row does not carry. All one cause, and not the
+       player's. */
     if (["42703", "23502", "23514"].includes(error.code ?? "")) {
       console.error("The area-Flare migration has not been applied", error);
       return { ok: false, reason: "not-migrated" };
@@ -204,7 +213,7 @@ export async function postAreaFlares(
 
     /* A duplicate is somebody re-posting a list they have grown; skip it
        and keep going. Anything else is the same wall for every remaining
-       card — no ZIP, no migration — so stop rather than write it out
+       card — a missing migration — so stop rather than write it out
        thirty times. */
     lastRefusal = result;
     if (result.reason !== "already-posted") break;
