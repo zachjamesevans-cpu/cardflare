@@ -68,6 +68,20 @@ export function resolveGameScope(input: GameScopeInput): GameScope {
 }
 
 /**
+ * The picker's list, in two halves: the games the reader said they
+ * play, then everyone else. "All games" is drawn by the picker itself,
+ * last, because it is the exception and not a game.
+ */
+export function splitGames(
+  scope: GameScope,
+  playerGames: readonly string[] = [],
+): { mine: GameSlug[]; others: GameSlug[] } {
+  const mine = scope.chips.filter((game) => playerGames.includes(game));
+  const others = scope.chips.filter((game) => !playerGames.includes(game));
+  return { mine, others };
+}
+
+/**
  * What the search box suggests typing, for the scope it is in. A
  * placeholder that says "OP01-024" above a Magic search teaches the
  * wrong thing; each game gets a real card of its own.

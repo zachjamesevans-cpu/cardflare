@@ -29,7 +29,7 @@ import {
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { colors, radius, spacing } from "../theme";
-import { GameChips } from "../game-chips";
+import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import { gameShortName, type GameSlug } from "../games";
 
@@ -312,13 +312,19 @@ export function PostFlareScreen({
     }
 
     const timer = setTimeout(() => {
+      /* The game a search actually ran in is the one to come back to;
+         "all" is never written this way. Same rule as the website. */
+      if (scopedGame && !scope.locked && remembered !== scopedGame) {
+        setRemembered(scopedGame);
+        void rememberSearchGame(scopedGame);
+      }
       void searchCards(query.trim(), scopedGame)
         .then((result) => setHits(result.cards))
         .catch(() => setHits([]));
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, scopedGame]);
+  }, [query, scopedGame, scope.locked, remembered]);
 
   /** Unfold a card with a fresh form, or fold it back up. */
   const toggle = (hit: CardHit) => {
@@ -508,13 +514,14 @@ export function PostFlareScreen({
             offer to post it.
           </Muted>
         )}
-        <GameChips scope={scope} onPick={pickGame} />
-        <Input
+        <GameSearchField
+          scope={scope}
+          playerGames={playerGames}
+          onPick={pickGame}
           value={query}
           onChangeText={setQuery}
           placeholder={searchPlaceholder(scopedGame)}
           autoFocus
-          autoCorrect={false}
         />
         {query.trim().length >= 2 && hits.length === 0 && (
           <Muted>

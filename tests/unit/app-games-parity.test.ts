@@ -5,12 +5,14 @@ import {
   ALL_GAMES as WEB_ALL,
   resolveGameScope as webScope,
   searchPlaceholder as webPlaceholder,
+  splitGames as webSplit,
 } from "@/lib/cards/game-scope";
 import { GAME_SLUGS, TCG_GAMES as WEB_GAMES } from "@/lib/players/games-catalog";
 import {
   ALL_GAMES as APP_ALL,
   resolveGameScope as appScope,
   searchPlaceholder as appPlaceholder,
+  splitGames as appSplit,
 } from "../../mobile/src/game-scope";
 import { TCG_GAMES as APP_GAMES } from "../../mobile/src/games";
 
@@ -47,6 +49,19 @@ describe("the search scope", () => {
     for (const input of inputs) {
       expect(appScope(input)).toEqual(webScope(input));
     }
+  });
+
+  it("splits the picker's list the same way: yours first, then the rest", () => {
+    const scope = webScope({ playerGames: ["pokemon", "mtg"] });
+    const web = webSplit(scope, ["pokemon", "mtg"]);
+    expect(web.mine).toEqual(["pokemon", "mtg"]);
+    expect(web.others).toEqual(
+      GAME_SLUGS.filter((g) => g !== "pokemon" && g !== "mtg"),
+    );
+    expect(
+      appSplit(appScope({ playerGames: ["pokemon", "mtg"] }), ["pokemon", "mtg"]),
+    ).toEqual(web);
+    expect(webSplit(webScope({}), []).mine).toEqual([]);
   });
 
   it("suggests the same card on both platforms", () => {

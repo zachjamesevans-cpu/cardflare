@@ -1,85 +1,204 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { gameShortName, type GameSlug } from "./games";
-import type { GameScope } from "./game-scope";
+import { splitGames, type GameScope } from "./game-scope";
 import { Tap } from "./ui";
-import { colors, spacing } from "./theme";
+import { colors, radius, spacing } from "./theme";
 
 /**
- * The game chips above a card search - the website's chip row, in the
- * app's own pill: accent border and a tinted fill when on, the border
- * colour and muted text when off, exactly the pill the post screen
- * already uses for "want" and "have". One row, scrolling sideways, so
- * six games never wrap into a wall above the keyboard.
+ * The search field with the game inside it - the website's
+ * `GamePill` + field, natively.
  *
- * Locked (inside a room scanned off a tournament's screen) the row is
- * one chip with a lock on it and nothing to tap: the code decided.
+ * The founder: "most people stick to one maybe two card games, so once
+ * they're locked in, it would be nice to not have to see all other
+ * TCGs at once." One pill on the left of the box, like a country code
+ * in a phone field; tap it and a short list opens under the field,
+ * the player's own games first and marked "yours", the others under a
+ * hairline, "All games" last. The keyboard stays up throughout.
+ *
+ * The box wears the Input's own border, radius and height, so it is
+ * one control rather than a pill parked beside a field. Inside a room
+ * scanned from a tournament's screen the pill wears a lock and does
+ * not open.
  */
-export function GameChips({
+export function GameSearchField({
   scope,
+  playerGames = [],
   onPick,
+  ...input
 }: {
   scope: GameScope;
+  playerGames?: readonly string[];
   /** Null means "all games". */
   onPick: (game: GameSlug | null) => void;
-}) {
-  if (scope.locked && scope.selected) {
-    return (
-      <View style={{ flexDirection: "row" }}>
-        <View style={chip(true)}>
-          <Ionicons name="lock-closed" size={11} color={colors.accent} />
-          <Text style={label(true)}>{gameShortName(scope.selected)} cards only</Text>
-        </View>
-      </View>
-    );
-  }
+} & Pick<TextInputProps, "value" | "onChangeText" | "placeholder" | "autoFocus">) {
+  const [open, setOpen] = useState(false);
+  const label = scope.selected ? gameShortName(scope.selected) : "All games";
+  const locked = scope.locked && scope.selected !== null;
+  const { mine, others } = splitGames(scope, playerGames);
+
+  const pick = (game: GameSlug | null) => {
+    setOpen(false);
+    onPick(game);
+  };
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: spacing(1.5) }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Tap
-        onPress={() => onPick(null)}
-        accessibilityLabel="Search every game"
-        style={chip(scope.selected === null)}
+    <View style={{ gap: spacing(1.5) }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing(2),
+          backgroundColor: colors.canvas,
+          borderColor: open ? colors.accent : colors.border,
+          borderWidth: 1,
+          borderRadius: radius.control,
+          paddingHorizontal: spacing(1.5),
+          minHeight: 48,
+        }}
       >
-        <Text style={label(scope.selected === null)}>All games</Text>
-      </Tap>
-      {scope.chips.map((game) => {
-        const on = scope.selected === game;
-        return (
+        {locked ? (
+          <View style={pill}>
+            <Ionicons name="lock-closed" size={12} color={colors.accent} />
+            <Text style={pillLabel}>{label}</Text>
+          </View>
+        ) : (
           <Tap
-            key={game}
-            onPress={() => onPick(game)}
-            accessibilityLabel={`Search ${gameShortName(game)} cards`}
-            style={chip(on)}
+            onPress={() => setOpen((value) => !value)}
+            accessibilityLabel={`Searching ${label}. Change game`}
+            style={pill}
           >
-            <Text style={label(on)}>{gameShortName(game)}</Text>
+            <Text style={pillLabel}>{label}</Text>
+            <Ionicons
+              name={open ? "chevron-up" : "chevron-down"}
+              size={13}
+              color={colors.accent}
+            />
           </Tap>
-        );
-      })}
-    </ScrollView>
+        )}
+        <View style={{ width: 1, height: 24, backgroundColor: colors.border }} />
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          {...input}
+          placeholderTextColor={colors.textMuted}
+          autoCorrect={false}
+          accessibilityLabel="Card name or number"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            color: colors.textPrimary,
+            fontSize: 16,
+            paddingVertical: spacing(3),
+          }}
+        />
+      </View>
+
+      {open && !locked && (
+        <View
+          style={{
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.borderStrong,
+            backgroundColor: colors.surface,
+            padding: spacing(1.5),
+          }}
+        >
+          {mine.map((game) => (
+            <Row
+              key={game}
+              label={gameShortName(game)}
+              on={scope.selected === game}
+              yours
+              onPress={() => pick(game)}
+            />
+          ))}
+          {mine.length > 0 && others.length > 0 && <Rule />}
+          {others.map((game) => (
+            <Row
+              key={game}
+              label={gameShortName(game)}
+              on={scope.selected === game}
+              onPress={() => pick(game)}
+            />
+          ))}
+          <Rule />
+          <Row label="All games" on={scope.selected === null} onPress={() => pick(null)} />
+        </View>
+      )}
+    </View>
   );
 }
 
-const chip = (on: boolean) => ({
+function Row({
+  label,
+  on,
+  yours = false,
+  onPress,
+}: {
+  label: string;
+  on: boolean;
+  yours?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityLabel={`Search ${label}`}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(2),
+        borderRadius: 8,
+        paddingHorizontal: spacing(3),
+        paddingVertical: spacing(2.5),
+        backgroundColor: on ? "rgba(198,238,79,0.15)" : "transparent",
+      }}
+    >
+      <Text
+        style={{
+          flex: 1,
+          color: on ? colors.textPrimary : colors.textSecondary,
+          fontSize: 14,
+          fontWeight: on ? "600" : "500",
+        }}
+      >
+        {label}
+      </Text>
+      {on && <Ionicons name="checkmark" size={15} color={colors.accent} />}
+      {yours && <Text style={{ color: colors.textMuted, fontSize: 11 }}>yours</Text>}
+    </Tap>
+  );
+}
+
+function Rule() {
+  return (
+    <View
+      style={{
+        height: 1,
+        backgroundColor: colors.border,
+        marginVertical: spacing(1.5),
+        marginHorizontal: spacing(1.5),
+      }}
+    />
+  );
+}
+
+const pill = {
   flexDirection: "row" as const,
   alignItems: "center" as const,
-  gap: spacing(1),
-  borderRadius: 999,
+  gap: spacing(1.5),
+  borderRadius: 8,
   borderWidth: 1,
-  borderColor: on ? colors.accent : colors.border,
-  backgroundColor: on ? "rgba(198,238,79,0.15)" : "transparent",
-  paddingHorizontal: spacing(3),
+  borderColor: colors.accent,
+  backgroundColor: "rgba(198,238,79,0.15)",
+  paddingHorizontal: spacing(2.5),
   paddingVertical: spacing(1.5),
-});
+};
 
-const label = (on: boolean) => ({
-  color: on ? colors.textPrimary : colors.textMuted,
+const pillLabel = {
+  color: colors.textPrimary,
   fontSize: 13,
-  fontWeight: on ? ("600" as const) : ("500" as const),
-});
+  fontWeight: "600" as const,
+};

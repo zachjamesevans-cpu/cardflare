@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronRight, Loader2, Lock, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, Lock, Search } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
-import { TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { searchCardsAction } from "@/lib/cards/actions";
 import {
   ALL_GAMES,
   resolveGameScope,
   searchPlaceholder,
+  splitGames,
   type GameScope,
 } from "@/lib/cards/game-scope";
 import { gameShortName, type GameSlug } from "@/lib/players/games-catalog";
@@ -71,69 +71,130 @@ function rememberGame(value: string): void {
 }
 
 /**
- * The game chips above the search.
+ * The game, as one small pill INSIDE the search field.
  *
- * The same chip as the composer's trade/cash toggles — rounded, accent
- * border and tint when on, muted when off — so the search stops being
- * the one control with its own look. One row that wraps, "All games"
- * first, the reader's own games next, the rest after.
+ * The founder: "most people stick to one maybe two card games, so once
+ * they're locked in, it would be nice to not have to see all other
+ * TCGs at once." So the field carries the game the way a phone field
+ * carries a country code: one pill on the left, the rest of the box
+ * for typing. Tap the pill and a short list drops down — the reader's
+ * own games first, marked "yours", the others under a hairline, and
+ * "All games" last because it is the exception. Tap one and the list
+ * closes, the pill changes, and the search runs again.
  *
- * Locked (inside a room scanned from a tournament's screen) the row is
- * one chip with a lock on it and nothing to tap: the code decided.
+ * Inside a room scanned from a tournament's screen the pill wears a
+ * lock and does not open: the code decided.
  */
-function GameChips({
+function GamePill({
   scope,
+  playerGames,
   onPick,
 }: {
   scope: GameScope;
+  playerGames: readonly string[];
   onPick: (game: GameSlug | null) => void;
 }) {
-  const base =
-    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors";
-  const on = "border-accent bg-accent/15 text-text-primary";
-  const off = "border-border text-text-muted hover:text-text-secondary";
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  /* Outside click or Escape closes it, the way every menu should. */
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const pill =
+    "flex shrink-0 items-center gap-1.5 rounded-lg border border-accent bg-accent/15 px-3 py-1.5 text-[13px] font-semibold text-text-primary";
+  const label = scope.selected ? gameShortName(scope.selected) : "All games";
 
   if (scope.locked && scope.selected) {
     return (
-      <p className="flex flex-wrap gap-2" aria-label="Search scope">
-        <span className={cn(base, on)}>
-          <Lock className="size-3.5 text-accent" aria-hidden="true" />
-          {gameShortName(scope.selected)} cards only
-        </span>
-      </p>
+      <span className={pill} aria-label={`${label} cards only`}>
+        <Lock className="size-3.5 text-accent" aria-hidden="true" />
+        {label}
+      </span>
     );
   }
 
+  const { mine, others } = splitGames(scope, playerGames);
+  const row =
+    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors";
+  const item = (game: GameSlug | null, yours: boolean) => {
+    const on = scope.selected === game;
+    return (
+      <li key={game ?? "all"} role="none">
+        <button
+          type="button"
+          role="menuitemradio"
+          aria-checked={on}
+          onClick={() => {
+            onPick(game);
+            setOpen(false);
+          }}
+          className={cn(
+            row,
+            on
+              ? "bg-accent/15 font-semibold text-text-primary"
+              : "text-text-secondary hover:bg-elevated hover:text-text-primary",
+          )}
+        >
+          <span className="flex-1">{game ? gameShortName(game) : "All games"}</span>
+          {on && <Check className="size-3.5 text-accent" aria-hidden="true" />}
+          {yours && <span className="text-[11px] text-text-muted">yours</span>}
+        </button>
+      </li>
+    );
+  };
+
   return (
-    <div
-      role="radiogroup"
-      aria-label="Which game to search"
-      className="flex flex-wrap gap-2"
-    >
+    <div ref={wrap} className="relative shrink-0">
       <button
         type="button"
-        role="radio"
-        aria-checked={scope.selected === null}
-        onClick={() => onPick(null)}
-        className={cn(base, scope.selected === null ? on : off)}
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={`Searching ${label}. Change game`}
+        className={cn(pill, "transition-colors hover:bg-accent/25")}
       >
-        All games
+        {label}
+        <ChevronDown
+          className={cn(
+            "size-3.5 text-accent transition-transform duration-[var(--duration-base)]",
+            open && "rotate-180",
+          )}
+          aria-hidden="true"
+        />
       </button>
-      {scope.chips.map((game) => {
-        const active = scope.selected === game;
-        return (
-          <button
-            key={game}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onPick(game)}
-            className={cn(base, active ? on : off)}
-          >
-            {gameShortName(game)}
-          </button>
-        );
-      })}
+
+      {open && (
+        <ul
+          id={menuId}
+          role="menu"
+          aria-label="Which game to search"
+          className="absolute top-full left-0 z-20 mt-2 w-64 rounded-[var(--radius-card)] border border-border-strong bg-surface p-1.5 shadow-lg"
+        >
+          {mine.map((game) => item(game, true))}
+          {mine.length > 0 && others.length > 0 && (
+            <li role="separator" className="my-1.5 border-t border-border" />
+          )}
+          {others.map((game) => item(game, false))}
+          <li role="separator" className="my-1.5 border-t border-border" />
+          {item(null, false)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -603,6 +664,13 @@ export function CardSearch({
     const id = ++requestId.current;
 
     const timer = setTimeout(async () => {
+      /* The game a search actually ran in is the one to come back to:
+         a sign-up default becomes "yours" after the first search, with
+         no tap. "All" is never written this way, so a guest who later
+         signs up still gets their own game. */
+      if (scopedGame && !scope.locked && remembered !== scopedGame) {
+        rememberGame(scopedGame);
+      }
       const response = await searchCardsAction(trimmed, { game: scopedGame });
 
       // A response from a superseded keystroke is discarded.
@@ -633,7 +701,7 @@ export function CardSearch({
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [trimmed, tooShort, scopedGame]);
+  }, [trimmed, tooShort, scopedGame, scope.locked, remembered]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
@@ -658,18 +726,17 @@ export function CardSearch({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <label htmlFor={inputId} className="text-sm font-medium text-text-secondary">
-          Card name or number
-        </label>
-
-        <GameChips scope={scope} onPick={pickGame} />
-
-        <div className="relative">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-text-muted"
-          />
-          <TextInput
+        {/*
+         * One box: the game pill, a hairline, the magnifier, the text.
+         * The box wears the input's own border and radius and lights
+         * its edge on focus, so it reads as one control rather than a
+         * pill parked beside a field.
+         */}
+        <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-canvas px-2 transition-colors focus-within:border-accent">
+          <GamePill scope={scope} playerGames={playerGames} onPick={pickGame} />
+          <span className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+          <Search aria-hidden="true" className="size-4 shrink-0 text-text-muted" />
+          <input
             id={inputId}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -680,7 +747,8 @@ export function CardSearch({
             enterKeyHint="search"
             maxLength={MAX_QUERY_LENGTH}
             placeholder={searchPlaceholder(scopedGame)}
-            className="pr-10 pl-10"
+            aria-label="Card name or number"
+            className="min-w-0 flex-1 bg-transparent py-3 text-base text-text-primary placeholder:text-text-muted focus:outline-none"
             role="combobox"
             aria-expanded={status === "ready"}
             aria-controls={listId}
@@ -693,12 +761,15 @@ export function CardSearch({
           {status === "loading" && (
             <Loader2
               aria-hidden="true"
-              className="absolute top-1/2 right-3.5 size-4 -translate-y-1/2 animate-spin text-text-muted"
+              className="size-4 shrink-0 animate-spin text-text-muted"
             />
           )}
         </div>
 
         <p id={`${inputId}-hint`} className="text-xs text-text-muted">
+          {scope.locked && scopedGame
+            ? `This room searches ${gameShortName(scopedGame)} cards only. `
+            : ""}
           Misspellings are fine, and card numbers work with or without the dash. Add a
           colour, a type or a set to narrow it: &ldquo;luffy leader&rdquo;.
         </p>
