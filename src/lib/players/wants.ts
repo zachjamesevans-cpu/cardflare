@@ -2,6 +2,7 @@ import "server-only";
 
 import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * Saved wants: the durable version of a Flare.
@@ -398,4 +399,4 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
  * has to finish that sentence. "Live near you" does; a store name it was
  * never posted to would be a lie.
  */
-export const AREA_LABEL = "near you";
+export const AREA_LABEL = LOCAL_ENABLED ? "near you" : "in the Feed";

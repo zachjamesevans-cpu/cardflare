@@ -72,7 +72,7 @@ export function NearbyLocationAsk({
 
     if (outcome.status === "denied") {
       setSettings("denied");
-      setNote("No problem — a ZIP code works too.");
+      setNote("No problem. A ZIP code works too.");
     } else if (outcome.status === "unavailable") {
       setSettings("services");
       setNote("Location Services are off for this device. A ZIP code works too.");

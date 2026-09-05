@@ -8,6 +8,7 @@ import { compactCardNumber, parseDeckList } from "@/lib/players/deck-list";
 import { previewDeckList } from "@/lib/players/deck-list-preview";
 import { absoluteImageUrls } from "@/lib/api/absolute";
 import { z } from "zod";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 /** The pasted-list shape, told apart from a single card by `list`. */
 const deckListSchema = z.object({
@@ -43,6 +44,13 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  const limited = tooMany(
+    `deck-list:${player.playerId}`,
+    LIMITS.deckList.limit,
+    LIMITS.deckList.windowMs,
+  );
+  if (limited) return limited;
 
   const body = await readJsonPayload(request);
 

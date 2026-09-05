@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { getViewer, type Viewer } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { deleteAccount } from "@/lib/players/delete-account";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
@@ -281,7 +284,7 @@ export async function setCoverAction(
       message:
         outcome.reason === "unreadable"
           ? "That file could not be read as a picture. Try another one."
-          : GENERIC_ERROR,
+          : "The cover could not be saved. Try again in a moment.",
     };
   }
 
@@ -449,4 +452,27 @@ export async function changeHandleAction(
   revalidateProfile();
 
   return { status: "saved", message: `You are now @${parsed.data.handle}.` };
+}
+
+/**
+ * Deleting your own account, from the website.
+ *
+ * The twin of the app's endpoint, behind the same lock: the handle
+ * typed back exactly. On success the session is signed out and the
+ * browser lands on the front page, because there is no longer a
+ * profile to return to.
+ */
+export async function deleteAccountAction(
+  _previous: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const outcome = await deleteAccount(playerId, text(formData, "confirmHandle"));
+  if (!outcome.ok) return { status: "error", message: outcome.message };
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  redirect("/");
 }

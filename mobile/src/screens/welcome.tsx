@@ -15,7 +15,6 @@ import {
 
 import {
   checkHandle,
-  chooseUsername,
   describeError,
   setGames,
   signUp,
@@ -505,8 +504,8 @@ function GamesStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        When locals near you go up on cardflare, this is how we know which ones are
-        yours. Pick any number.
+        Last step. When your stores run event nights on cardflare, this is how we
+        know which ones are yours. Pick any number.
       </Body>
 
       <View style={{ gap: spacing(2) }}>

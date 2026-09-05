@@ -3,6 +3,7 @@ import {
   DarkTheme,
   NavigationContainer,
   type Theme,
+  createNavigationContainerRef,
 } from "@react-navigation/native";
 import {
   createBottomTabNavigator,
@@ -52,6 +53,7 @@ import { colors, spacing } from "./src/theme";
 import { Tap } from "./src/ui";
 import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
+import { followHref } from "./src/follow-href";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -435,6 +437,25 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
   }
 }
 
+/**
+ * A tap on a push notification lands where the notice pointed.
+ *
+ * The server sends `data.url` with every push (a website path, the
+ * same one the Feed's notice buttons carry); until now nothing read it,
+ * so "Somebody offered on your Flare" opened whichever tab was last
+ * open. Two entry points: a tap that wakes a cold app is read once the
+ * navigator is ready, a tap while running arrives through the listener.
+ */
+const navigationRef = createNavigationContainerRef<StackParams>();
+
+function openNotificationLink(response: Notifications.NotificationResponse | null) {
+  const url = response?.notification.request.content.data?.url;
+  if (typeof url !== "string" || !url.startsWith("/") || !navigationRef.isReady()) {
+    return;
+  }
+  void followHref(navigationRef, url).catch(() => {});
+}
+
 export default function App() {
   /*
    * The front door. A fresh install (no session, welcome never seen)
@@ -475,6 +496,14 @@ export default function App() {
     [],
   );
 
+  useEffect(() => {
+    if (gate !== "open") return;
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      openNotificationLink,
+    );
+    return () => subscription.remove();
+  }, [gate]);
+
   if (gate === "checking") {
     return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
   }
@@ -490,7 +519,15 @@ export default function App() {
 
   return (
     <StartupGuard>
-      <NavigationContainer theme={theme}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={theme}
+        onReady={() => {
+          void Notifications.getLastNotificationResponseAsync()
+            .then(openNotificationLink)
+            .catch(() => {});
+        }}
+      >
         <StatusBar style="light" />
         <Stack.Navigator
           screenOptions={({ navigation, route }) => ({

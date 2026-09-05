@@ -84,8 +84,7 @@ export function SignInForm({ next }: { next?: string }) {
       <SubmitButton />
 
       <p className="text-sm leading-relaxed text-text-muted">
-        The link signs you in without a password. Accounts are created by invitation
-        during the beta.
+        The link signs you in without a password.
       </p>
     </form>
   );

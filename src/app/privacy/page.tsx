@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "1 August 2026";
+const LAST_UPDATED = "5 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -29,12 +29,22 @@ export default function PrivacyPage() {
           <li>Your email address, display name and handle.</li>
           <li>
             What you add to your profile: a picture, the games you play, your wants and
-            decks, and optionally a five-digit ZIP for the Local tab. A device location,
-            when you grant one, rides a single request and is never stored.
+            decks, and optionally a five-digit ZIP. A device location, when you grant
+            one, rides a single request and is never stored.
           </li>
           <li>
             Messages you send other players about a card, so both sides of the
             conversation can read it.
+          </li>
+          <li>
+            In the app, if you allow notifications, the push token your phone gives us,
+            so an offer on your Flare can reach you. Turning notifications off removes
+            it.
+          </li>
+          <li>
+            If you subscribe to {SITE.name} Pro, whether the subscription is active.
+            Apple bills it and holds your payment details; we receive the transaction
+            reference and its status, never your card.
           </li>
         </ul>
         <p>When a store or vendor requests an invite we store:</p>
@@ -46,14 +56,14 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          We do not ask for a mailing address or phone number, and we hold no payment
-          details today.
+          We do not ask for a mailing address or phone number, and we never see your
+          payment details.
         </p>
       </LegalSection>
 
       <LegalSection heading="How we use it">
         <ul>
-          <li>To run the product: accounts, rooms, Flares, Local and messages.</li>
+          <li>To run the product: accounts, rooms, Flares, the Feed and messages.</li>
           <li>To answer invite requests from stores and vendors.</li>
           <li>To email you about your account and, if you opted in, product news.</li>
         </ul>
@@ -62,7 +72,7 @@ export default function PrivacyPage() {
 
       <LegalSection heading="Email">
         <p>
-          We email what your account needs — sign-in links, password resets, and
+          We email what your account needs: sign-in links, password resets, and
           notifications you can expect, like an offer landing on your Flare. An invite
           request gets a reply about setting you up.
         </p>
@@ -123,10 +133,17 @@ export default function PrivacyPage() {
 
       <LegalSection heading="Deleting your data">
         <p>
-          Email <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a> from the
+          You can delete your account yourself: in the app, open your profile, then
+          settings, then Delete your account; on the website, the same card sits at the
+          bottom of your profile settings. It removes your profile, Flares, lists,
+          showcase, messages and unlocks at once, and it cannot be undone. A Pro
+          subscription is cancelled separately, in your Apple subscription settings.
+        </p>
+        <p>
+          You can also email{" "}
+          <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a> from the
           address you signed up with and ask us to delete your account or your invite
-          request. We will remove it and confirm when it is done. You can also ask us
-          for a copy of what we hold about you.
+          request, or for a copy of what we hold about you.
         </p>
       </LegalSection>
 

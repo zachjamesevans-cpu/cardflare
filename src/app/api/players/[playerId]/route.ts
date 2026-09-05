@@ -9,6 +9,7 @@ import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 /** Repo-shipped art, made fetchable by a client with no origin. */
 function absoluteArt<T extends { url: string } | null>(art: T): T {
@@ -140,6 +141,8 @@ export async function POST(
   if (me === playerId) {
     return Response.json({ error: "That is you." }, { status: 400 });
   }
+  const limited = tooMany(`follow:${me}`, LIMITS.follow.limit, LIMITS.follow.windowMs);
+  if (limited) return limited;
 
   const body = (await readJsonPayload(request)) as { action?: string } | null;
   const action = body?.action;

@@ -11,6 +11,7 @@ import { addFlare, cancelFlare } from "@/lib/lists/repository";
 import { announceShowcase } from "@/lib/lists/showcase";
 import { acceptsSchema, addEntrySchema } from "@/lib/lists/schema";
 import { saveWant } from "@/lib/players/wants";
+import { afterResponse } from "@/lib/after-response";
 
 export const dynamic = "force-dynamic";
 
@@ -83,12 +84,14 @@ export async function POST(
 
   // Everyone in the room hears about it, exactly as the website's
   // Server Action does - one helper, so the surfaces cannot drift.
-  void notifyRoomFlare(
-    resolved.room.id,
-    session.id,
-    session.display_name ?? "A player",
-    [parsed.data.cardId],
-    intent,
+  afterResponse(() =>
+    notifyRoomFlare(
+      resolved.room.id,
+      session.id,
+      session.display_name ?? "A player",
+      [parsed.data.cardId],
+      intent,
+    ),
   );
 
   // The payoff for offering a card up: everyone already hunting it is

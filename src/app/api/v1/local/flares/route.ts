@@ -4,6 +4,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { pointFromCoords } from "@/lib/geo/zip";
 import { readJsonPayload } from "@/lib/api/payload";
 import { postAreaFlares, withdrawAreaFlare } from "@/lib/local/area";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,13 @@ const postSchema = cardSchema
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  const limited = tooMany(
+    `area-flare:${player.playerId}`,
+    LIMITS.areaFlare.limit,
+    LIMITS.areaFlare.windowMs,
+  );
+  if (limited) return limited;
 
   const parsed = postSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("Unrecognised Flare");

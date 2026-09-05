@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "25 August 2026";
+const LAST_UPDATED = "5 September 2026";
 
 export default function TermsPage() {
   return (
@@ -87,6 +87,31 @@ export default function TermsPage() {
         <p>
           The {SITE.name} name, logo and site content belong to {SITE.name}. Please do
           not reuse them without permission.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading={`${SITE.name} Pro`}>
+        <p>
+          {SITE.name} Pro is an optional monthly subscription that unlocks cosmetic
+          features. In the app it is sold through Apple and billed to your Apple ID. It
+          renews automatically each month at the price shown when you subscribe, until
+          you cancel. You can cancel at any time in your Apple ID subscription settings,
+          and it stays on until the end of the period you already paid for. Refunds are
+          handled by Apple under its own terms.
+        </p>
+        <p>
+          Everything you unlock with Pro is a look inside {SITE.name}, not property: it
+          is not transferable, has no cash value, and ends if the subscription lapses or
+          the account is closed.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="Closing your account">
+        <p>
+          You can delete your account at any time from your profile settings in the app
+          or on the website. Deletion is immediate and cannot be undone. Cancelling a
+          Pro subscription is a separate step in your Apple settings. We may close an
+          account that breaks these terms.
         </p>
       </LegalSection>
 

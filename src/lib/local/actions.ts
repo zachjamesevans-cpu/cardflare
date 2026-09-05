@@ -13,6 +13,9 @@ import {
   sendThreadMessage,
   type ThreadMessage,
 } from "./threads";
+import { LIMITS } from "@/lib/api/throttle";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * The website's writes for Local. Thin: each re-establishes the player
@@ -45,7 +48,8 @@ export type LocalActionResult =
 /** Null when signed out or the coordinates were nonsense. */
 export type LocalFeedResult = LocalFeed | null;
 
-const SIGN_IN = "Sign in to use Local.";
+const SIGN_IN = LOCAL_ENABLED ? "Sign in to use Local." : "Sign in first.";
+const TOO_MANY = "That is a lot at once. Try again in a moment.";
 const GENERIC = "Something went wrong. Please try again in a moment.";
 
 export async function setLocalRadiusAction(radius: number): Promise<LocalActionResult> {
@@ -63,6 +67,15 @@ export async function openThreadAction(
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `thread-open:${playerId}`,
+      LIMITS.threadOpen.limit,
+      LIMITS.threadOpen.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const outcome = await openFlareThread(flareId, playerId, body);
   if (outcome.ok) return outcome;
@@ -84,6 +97,15 @@ export async function sendMessageAction(
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `message:${playerId}`,
+      LIMITS.message.limit,
+      LIMITS.message.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const outcome = await sendThreadMessage(threadId, playerId, body);
   if (outcome.ok) return { ok: true };
@@ -165,6 +187,15 @@ export async function postAreaFlareAction(
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `area-flare:${playerId}`,
+      LIMITS.areaFlare.limit,
+      LIMITS.areaFlare.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const result = await postAreaFlares(
     playerId,

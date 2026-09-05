@@ -3,6 +3,9 @@ import { notifyBoardOpen } from "@/lib/notifications/notify";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+/* A run walks every store's early-window events and notifies each
+   local in turn; give it the longest window the plan allows. */
+export const maxDuration = 60;
 
 /**
  * The clock the doorbell hangs on.

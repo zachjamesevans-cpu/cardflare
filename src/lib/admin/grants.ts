@@ -67,12 +67,15 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
     .limit(SEARCH_LIMIT);
 
   if (term) {
-    /* Escaped so a name containing % or _ matches itself, not everything. */
+    /* Escaped so a name containing % or _ matches itself, not everything,
+       then quoted so a comma or bracket cannot become filter grammar. */
     const pattern = term.replace(/([%_\\])/g, "\\$1");
+    const quoted = (value: string) =>
+      `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
     /* Either half finds them: an admin looking somebody up from a
        support email has whichever one the player quoted. */
     request = request.or(
-      `display_name.ilike.%${pattern}%,handle.ilike.%${pattern.toLowerCase()}%`,
+      `display_name.ilike.${quoted(`%${pattern}%`)},handle.ilike.${quoted(`%${pattern.toLowerCase()}%`)}`,
     );
   }
 

@@ -1,6 +1,8 @@
 import { readJsonPayload } from "@/lib/api/payload";
 import { readClaim, validateClaim } from "@/lib/stores/claim-schema";
 import { submitClaim } from "@/lib/stores/claims";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
+import { clientKey } from "@/lib/request-context";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,13 @@ export async function POST(
   { params }: { params: Promise<{ storeId: string }> },
 ): Promise<Response> {
   const { storeId } = await params;
+
+  const limited = tooMany(
+    `claim:${await clientKey()}`,
+    LIMITS.claim.limit,
+    LIMITS.claim.windowMs,
+  );
+  if (limited) return limited;
 
   /* Header first: the app sends no body at all. See lib/api/payload.ts. */
   const body = (await readJsonPayload(request)) as Record<string, unknown> | null;

@@ -28,8 +28,25 @@ const SESSION_KEY = "cf_room_session";
 /* Token storage                                                       */
 /* ------------------------------------------------------------------ */
 
+const PUSH_KEY = "cf_push_token";
+
+/**
+ * Never throws. The keychain is unavailable for a moment after a
+ * restart before the first unlock, and a throw here left the front
+ * door at "checking" forever: a black screen with nothing to tap.
+ * No token is the honest answer until the keychain is back.
+ */
 export async function storedAccessToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(ACCESS_KEY);
+  try {
+    return await SecureStore.getItemAsync(ACCESS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The Expo push token this phone registered, so sign-out can unregister it. */
+export async function rememberPushToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(PUSH_KEY, token).catch(() => {});
 }
 
 export async function storedSessionToken(): Promise<string | null> {
@@ -64,8 +81,11 @@ export function onSignedOut(listener: () => void): () => void {
 }
 
 export async function signOut(): Promise<void> {
-  await SecureStore.deleteItemAsync(ACCESS_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await forgetDevice();
+  await forgetAuth();
+  /* The guest room identity goes too: it was joined under this
+     account's name and would follow the next sign-in into the room. */
+  await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
 
   /*
    * And the cached feed, which is the part that is easy to forget.
@@ -77,6 +97,28 @@ export async function signOut(): Promise<void> {
   await clearCache();
 
   for (const listener of signedOut) listener();
+}
+
+/**
+ * The phone stops being this account's phone. Without this the next
+ * person to sign in on it would still get the last account's pushes:
+ * the token row on the server is the phone, not the person. Best
+ * effort, so a dead network cannot block signing out.
+ */
+async function forgetDevice(): Promise<void> {
+  try {
+    const pushToken = await SecureStore.getItemAsync(PUSH_KEY);
+    if (pushToken) await unregisterDevice(pushToken).catch(() => {});
+    await SecureStore.deleteItemAsync(PUSH_KEY);
+  } catch {
+    /* Nothing to unregister, or nowhere to say so. */
+  }
+}
+
+/** Drops the account tokens. The keychain is the only place they live. */
+async function forgetAuth(): Promise<void> {
+  await SecureStore.deleteItemAsync(ACCESS_KEY).catch(() => {});
+  await SecureStore.deleteItemAsync(REFRESH_KEY).catch(() => {});
 }
 
 /* ------------------------------------------------------------------ */
@@ -236,15 +278,48 @@ export async function signIn(email: string, password: string): Promise<AuthResul
   return { ok: false, message: "Could not reach cardflare. Try again." };
 }
 
+/**
+ * One refresh at a time. Several screens loading at once each hit a
+ * 401 together; the first refresh rotates the token and the second,
+ * presenting the now-spent refresh token, would be told no. They all
+ * wait on the same promise instead.
+ */
+let refreshing: Promise<boolean> | null = null;
+
 async function refreshAccessToken(): Promise<boolean> {
+  if (!refreshing) {
+    refreshing = refreshOnce().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
+async function refreshOnce(): Promise<boolean> {
   const refresh = await SecureStore.getItemAsync(REFRESH_KEY);
   if (!refresh) return false;
 
   const result = await authRequest({ action: "refresh", refreshToken: refresh });
-  if (!result.accessToken) return false;
 
-  await storeAuth(result.accessToken, result.refreshToken || refresh);
-  return true;
+  if (result.accessToken) {
+    await storeAuth(result.accessToken, result.refreshToken || refresh);
+    return true;
+  }
+
+  /*
+   * The server answered and said no: the refresh token is dead
+   * (password changed on the website, session revoked, long expiry).
+   * The tokens stay in the keychain otherwise, every call 401s, and the
+   * profile shows "could not load" with no Sign out in reach. So a
+   * refusal signs the phone out properly, back to the front door. A
+   * network failure (status 0) is not a refusal and changes nothing.
+   */
+  if (result.status !== 0) {
+    await forgetAuth();
+    await clearCache();
+    for (const listener of signedOut) listener();
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ */
@@ -348,7 +423,14 @@ async function call<T>(
     throw new ApiError(response.status, detail.error ?? `http-${response.status}`);
   }
 
-  return (await response.json()) as T;
+  /* A 200 that is not JSON is a captive portal or a CDN error page,
+     not our server. Named, so the screen says "bad-json" rather than
+     "JSON Parse error: Unexpected character: <". */
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiError(response.status, "bad-json");
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -760,6 +842,9 @@ export const getTrades = (code: string) =>
 export const registerDevice = (platform: "ios" | "android", pushToken: string) =>
   call<{ ok: true }>("POST", "/api/v1/devices", { platform, pushToken });
 
+export const unregisterDevice = (pushToken: string) =>
+  call<{ ok: true }>("DELETE", "/api/v1/devices", { pushToken });
+
 export interface InboxItem {
   id: string;
   kind: string;
@@ -912,6 +997,13 @@ export const chooseUsername = (displayName: string, handle?: string) =>
 
 export const renameProfile = (displayName: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
+
+/**
+ * Deleting the account. The handle typed back is the lock; the server
+ * checks it again and refuses with "handle-mismatch" if it differs.
+ */
+export const deleteAccount = (confirmHandle: string) =>
+  call<{ ok: true }>("POST", "/api/v1/me/delete", { confirmHandle });
 
 /** Changing the handle. The one field that can still come back taken. */
 export const setHandle = (handle: string) =>

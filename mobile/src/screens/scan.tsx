@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
 
 import { rememberRoom, rememberRoomGame } from "../api";
 
@@ -25,11 +25,22 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
           <Body>
             The camera is only used to read the code on the store&rsquo;s counter.
           </Body>
-          <AsyncButton
-          label="Allow camera"
-          pendingLabel="Asking…"
-          onPress={() => requestPermission()}
-        />
+          {permission && !permission.canAskAgain ? (
+            /* iOS asks once. After a refusal the only way back is the
+               Settings app, so the button has to go there rather than
+               call a prompt that will never show again. */
+            <AsyncButton
+              label="Open Settings"
+              pendingLabel="Opening…"
+              onPress={() => Linking.openSettings().catch(() => {})}
+            />
+          ) : (
+            <AsyncButton
+              label="Allow camera"
+              pendingLabel="Asking…"
+              onPress={() => requestPermission()}
+            />
+          )}
         </Card>
       </View>
     );
@@ -55,7 +66,12 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
           fired.current = true;
           // Remembered before navigating so the Room tab finds it.
           void Promise.all([rememberRoom(code.toUpperCase()), rememberRoomGame(game)])
-            .then(() => onCode(code.toUpperCase()));
+            .then(() => onCode(code.toUpperCase()))
+            .catch(() => {
+              /* The keychain refused; let the next scan try again
+                 rather than leaving the camera deaf. */
+              fired.current = false;
+            });
         }}
       />
       <View style={styles.hint}>

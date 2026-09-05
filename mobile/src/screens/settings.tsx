@@ -7,6 +7,8 @@ import type { StackParams } from "../../App";
 
 import { API_BASE } from "../config";
 import {
+  ApiError,
+  deleteAccount,
   describeError,
   getMe,
   getProfile,
@@ -14,6 +16,7 @@ import {
   renameProfile,
   saveDeckList,
   setHandle,
+  signOut,
   type DeckPreviewEntry,
   type Me,
   type Profile,
@@ -276,7 +279,82 @@ export function SettingsScreen() {
       </Card>
 
       <ConnectionTest />
+
+      {profile && <DeleteAccount handle={profile.handle} />}
     </ScrollView>
+  );
+}
+
+/**
+ * Deleting the account, from inside the app.
+ *
+ * App Store Review Guideline 5.1.1(v): an app that creates accounts
+ * has to let people delete them here, not by email. Closed by default
+ * so the most destructive control on the screen cannot be hit in
+ * passing; open, it wants the handle typed back and the server checks
+ * the same thing. The website's settings page carries the same card in
+ * the same words.
+ */
+function DeleteAccount({ handle }: { handle: string }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [said, setSaid] = useState<string | null>(null);
+  const matches = typed.trim().replace(/^@/, "").toLowerCase() === handle.toLowerCase();
+
+  return (
+    <Card>
+      <Title>Delete your account</Title>
+      <Body>
+        Everything goes: profile, Flares, lists, showcase and unlocks. There is no
+        undo.
+      </Body>
+      {open ? (
+        <>
+          <Body>Type your handle, @{handle}, to confirm.</Body>
+          <Input
+            value={typed}
+            onChangeText={setTyped}
+            placeholder={`@${handle}`}
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Type your handle to confirm"
+          />
+          <AsyncButton
+            label="Delete my account"
+            pendingLabel="Deleting…"
+            disabled={!matches}
+            onPress={async () => {
+              setSaid(null);
+              try {
+                await deleteAccount(typed);
+                await signOut();
+              } catch (caught) {
+                setSaid(
+                  caught instanceof ApiError && caught.code === "handle-mismatch"
+                    ? "That is not your handle."
+                    : `The account could not be deleted (${describeError(caught)}). Try again.`,
+                );
+              }
+            }}
+          />
+          <Tap
+            accessibilityLabel="Keep the account"
+            onPress={() => {
+              setOpen(false);
+              setTyped("");
+              setSaid(null);
+            }}
+          >
+            <Muted>Keep it</Muted>
+          </Tap>
+          {said && <Muted>{said}</Muted>}
+        </>
+      ) : (
+        <Tap accessibilityLabel="Delete your account" onPress={() => setOpen(true)}>
+          <Text style={{ color: colors.danger, fontSize: 14 }}>Delete your account</Text>
+        </Tap>
+      )}
+    </Card>
   );
 }
 

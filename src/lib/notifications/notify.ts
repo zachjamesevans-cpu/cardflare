@@ -766,17 +766,25 @@ export async function notifyRoomFlare(
      */
     const key = unique.slice().sort().join(",");
 
-    for (const playerId of recipients) {
-      const id = await record({
-        playerId,
-        kind: "room-flare",
-        title,
-        body,
-        url: path,
-        dedupeKey: `room-flare:${eventId}:${posterSessionId}:${key}:${playerId}`,
-      });
+    /* Ten at a time rather than one after another: a full room is a
+       hundred people, and a hundred sequential inserts and pushes is
+       the difference between "instant" and "a minute later". */
+    const everyone = [...recipients];
+    for (let at = 0; at < everyone.length; at += 10) {
+      await Promise.all(
+        everyone.slice(at, at + 10).map(async (playerId) => {
+          const id = await record({
+            playerId,
+            kind: "room-flare",
+            title,
+            body,
+            url: path,
+            dedupeKey: `room-flare:${eventId}:${posterSessionId}:${key}:${playerId}`,
+          });
 
-      if (id) await deliverByPush(playerId, title, body, path);
+          if (id) await deliverByPush(playerId, title, body, path);
+        }),
+      );
     }
   } catch (error) {
     console.error("Could not tell the room about the Flare", error);

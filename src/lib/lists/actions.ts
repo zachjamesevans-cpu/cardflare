@@ -29,6 +29,7 @@ import {
   kindSchema,
   type ListState,
 } from "./schema";
+import { afterResponse } from "@/lib/after-response";
 
 /**
  * Posting a Flare, and keeping the binder.
@@ -220,12 +221,17 @@ export async function addToListAction(
    * board already shows it; nobody at a counter is watching a board.
    */
   if (result.ok && kind.data === "flare") {
-    void notifyRoomFlare(
-      room.eventId,
-      room.playerSessionId,
-      (await getPlayerSession())?.display_name ?? "A player",
-      [parsed.data.cardId],
-      showcase ? "showcase" : "want",
+    /* After the response, not beside it, so the fan-out is not frozen
+       with the function the moment it answers. See afterResponse. */
+    const posterName = (await getPlayerSession())?.display_name ?? "A player";
+    afterResponse(() =>
+      notifyRoomFlare(
+        room.eventId,
+        room.playerSessionId,
+        posterName,
+        [parsed.data.cardId],
+        showcase ? "showcase" : "want",
+      ),
     );
   }
 

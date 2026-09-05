@@ -6,6 +6,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
+import { openRoom } from "../open-room";
 import { getNotifications, markRead, type InboxItem } from "../api";
 import { Button, Card, Muted, Tap } from "../ui";
 import { colors, spacing } from "../theme";
@@ -60,7 +61,7 @@ export function InboxScreen() {
             <Button
               label="Find a room"
               variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
+              onPress={() => openRoom(navigation)}
             />
           </View>
         </Card>

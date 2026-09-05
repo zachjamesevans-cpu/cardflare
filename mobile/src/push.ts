@@ -3,7 +3,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { registerDevice } from "./api";
+import { registerDevice, rememberPushToken } from "./api";
 
 /**
  * Push registration: ask once, register the Expo token with the API.
@@ -46,6 +46,7 @@ export async function registerForPush(): Promise<void> {
       Platform.OS === "ios" ? "ios" : "android",
       token.data,
     );
+    await rememberPushToken(token.data);
   } catch (error) {
     console.warn("Push registration skipped", error);
   }

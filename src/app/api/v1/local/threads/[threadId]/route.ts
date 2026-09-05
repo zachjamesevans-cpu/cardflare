@@ -4,6 +4,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { MESSAGE_MAX_LENGTH } from "@/lib/local/shared";
 import { closeThread, readThread, sendThreadMessage } from "@/lib/local/threads";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,13 @@ export async function POST(
 ): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  const limited = tooMany(
+    `message:${player.playerId}`,
+    LIMITS.message.limit,
+    LIMITS.message.windowMs,
+  );
+  if (limited) return limited;
 
   const parsed = sendSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("a message is needed");
