@@ -4,7 +4,6 @@ import {
   Animated,
   Easing,
   Image,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -136,7 +135,7 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** The pitch: the mark breathing over the card scatter. */
+/** The pitch: the mark breathing on pure black. */
 function Splash({
   onCreate,
   onSignIn,
@@ -170,15 +169,20 @@ function Splash({
   }, [glow]);
 
   return (
-    <ImageBackground
-      /* The founder's mock: a table of cards behind the lockup. Drawn
-         by scripts/generate-welcome-art.mjs from our own vocabulary —
-         no game's art, nobody's IP — with the vignette baked in so the
-         launch path stays plain Image + Animated. */
-      source={require("../../assets/welcome-cards.png")}
-      resizeMode="cover"
+    <View
+      /*
+       * Pure black behind the lockup, and nothing else.
+       *
+       * There was a scatter of cards here — generated art, drawn by
+       * scripts/generate-welcome-art.mjs, with a vignette baked in. The
+       * founder cut it: "make the splash sign up screen for app just
+       * have a pure black background." colors.canvas IS #000000, so the
+       * first screen of a fresh install is the mark, the wordmark, the
+       * three lines and the buttons, on nothing.
+       */
       style={{
         flex: 1,
+        backgroundColor: colors.canvas,
         alignItems: "center",
         justifyContent: "center",
         padding: spacing(6),
@@ -191,10 +195,8 @@ function Splash({
        * There was a lime circle here, faded and slowly breathing, and the
        * founder cut it: "please take off that super ugly green glow behind
        * the cardflare logo on signup screen." On the black canvas it read
-       * as a dull olive smear rather than light, and it sat on top of the
-       * card scatter this screen already has — two backgrounds competing
-       * behind one mark. The breathing stays, on the mark itself, which is
-       * where it was doing the work.
+       * as a dull olive smear rather than light. The breathing stays, on
+       * the mark itself, which is where it was doing the work.
        */}
       <View style={{ alignItems: "center", justifyContent: "center" }}>
         <Animated.View
@@ -274,7 +276,7 @@ function Splash({
       >
         Built for collectors, not marketplaces.
       </Text>
-    </ImageBackground>
+    </View>
   );
 }
 
