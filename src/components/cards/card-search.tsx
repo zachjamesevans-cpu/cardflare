@@ -586,7 +586,15 @@ export function CardSearch({
   const scopedGame = scope.selected;
 
   const pickGame = (picked: GameSlug | null) => {
+    if (picked === scopedGame) return;
     rememberGame(picked ?? ALL_GAMES);
+    /* A new game, a clean field. The founder, after typing "Mickey"
+       in Lorcana and switching to One Piece: card names do not carry
+       across games, so what was typed for one is noise in the next. */
+    setQuery("");
+    setSettled(null);
+    setActive(0);
+    setShowAllFor(null);
   };
 
   /*

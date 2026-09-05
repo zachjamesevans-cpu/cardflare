@@ -299,9 +299,13 @@ export function PostFlareScreen({
   const scopedGame = scope.selected;
 
   const pickGame = (game: GameSlug | null) => {
+    if (game === scopedGame) return;
     const value = game ?? ALL_GAMES;
     setRemembered(value);
     void rememberSearchGame(value);
+    /* A new game, a clean field: card names do not carry across games. */
+    setQuery("");
+    setHits([]);
   };
 
   // Debounced search: a keystroke pause is the request, not every letter.
