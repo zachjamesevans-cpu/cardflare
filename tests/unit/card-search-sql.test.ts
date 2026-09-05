@@ -12,9 +12,11 @@ import { describe, expect, it } from "vitest";
  *    candidate step asks the trigram index for "similar" using the
  *    `%` operator, which reads pg_trgm.similarity_threshold; the
  *    ranking keeps rows with a score at or above its own floor. If
- *    the threshold drifted above the floor, cards the ranking would
+ *    the floor dropped below the threshold, cards the ranking would
  *    have shown could never reach it, and nobody would notice until a
- *    misspelling that used to work stopped working.
+ *    misspelling that used to work stopped working. The threshold is
+ *    pg_trgm's default, because Supabase's `postgres` role may not set
+ *    it from a function ("permission denied to set parameter").
  *
  * 2. The search must keep finding its candidates by index. The
  *    version that scored every card in the table was fine for one
@@ -44,12 +46,14 @@ describe("the search_cards function", () => {
     expect(sql).not.toBe("");
   });
 
-  it("sets the trigram threshold to the same floor the ranking keeps", () => {
-    const threshold = sql.match(/set pg_trgm\.similarity_threshold = ([\d.]+)/);
+  it("keeps the ranking floor at pg_trgm's default similarity threshold", () => {
+    const PG_TRGM_DEFAULT_THRESHOLD = 0.3;
     const floor = sql.match(/where s\.score >= ([\d.]+)/);
-    expect(threshold?.[1]).toBeDefined();
-    expect(floor?.[1]).toBeDefined();
-    expect(Number(threshold?.[1])).toBe(Number(floor?.[1]));
+    expect(Number(floor?.[1])).toBe(PG_TRGM_DEFAULT_THRESHOLD);
+  });
+
+  it("does not try to change the threshold, which Supabase forbids", () => {
+    expect(sql).not.toMatch(/^\s*set\s+pg_trgm\.similarity_threshold/im);
   });
 
   it("gathers candidates through the trigram indexes before scoring", () => {

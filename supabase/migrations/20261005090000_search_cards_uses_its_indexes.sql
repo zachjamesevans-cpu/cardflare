@@ -17,17 +17,23 @@
 -- without reading the table. So the search now runs in two steps.
 -- First, a handful of index probes gather every card that could
 -- possibly score: a number starting with what was typed, a number or
--- name within similarity 0.25 of it, a name or alias containing it.
+-- name the index calls similar to it, a name or alias containing it.
 -- Second, exactly the old scoring runs over those candidates only.
--- The ranking, the tie-break, the 0.25 floor and every filter are
--- unchanged, so the same query returns the same cards in the same
--- order; it just stops looking at the hundred thousand that could
--- never have made the page.
+-- The ranking, the tie-break and every filter are unchanged; it just
+-- stops looking at the hundred thousand that could never have made
+-- the page.
 --
--- pg_trgm.similarity_threshold is set on the function itself to the
--- same 0.25 the ranking keeps, so the index and the floor agree. It
--- is a session setting that the function scopes to its own call; it
--- never leaks into the caller's session.
+-- The index answers `%` at pg_trgm.similarity_threshold, which is
+-- 0.3 and cannot be changed from a function on Supabase: its
+-- `postgres` role is not a superuser, and "permission denied to set
+-- parameter" is what the SQL editor says to a function that tries.
+-- So the ranking's floor moves from 0.25 to 0.3 to agree with the
+-- index. The only rows that could change are the ones a search used
+-- to fill its last places with when nothing better matched: names
+-- sharing barely a quarter of their trigrams with what was typed.
+-- Everything found by number, by exact or contained name, by alias,
+-- or by a plausible misspelling scores well above 0.3 and comes back
+-- exactly as before, in the same order.
 --
 -- The one new index: `compact_card_number` had a plain b-tree, which
 -- cannot answer "starts with OP01" under a locale-aware collation.
@@ -65,7 +71,6 @@ returns table (
 language sql
 stable
 set search_path = public, pg_temp
-set pg_trgm.similarity_threshold = 0.25
 as $function$
   with params as (
     select
@@ -78,12 +83,14 @@ as $function$
         as set_wanted,
       least(greatest(coalesce(result_limit, 20), 1), 50) as lim
   ),
-  -- Every card that could score 0.25 or better, found by index. Each
+  -- Every card that could score 0.3 or better, found by index. Each
   -- branch mirrors one arm of the scoring below: the number branches
   -- cover the exact, prefix and similar-number cases, the name
   -- branches cover exact, contains and similar, and the alias branch
-  -- covers the alias sub-select. A card the scoring would give 0.25
-  -- to is in at least one of them.
+  -- covers the alias sub-select. A card the scoring would give 0.3
+  -- to is in at least one of them: `%` is "similarity at or above
+  -- pg_trgm.similarity_threshold", the default 0.3, which is why the
+  -- floor below is 0.3 and must stay so.
   candidates as (
     select c.id
     from public.cards c
@@ -187,8 +194,10 @@ as $function$
     s.cost, s.power, s.counter, s.life, s.rarity, s.effect_text, s.trigger_text,
     s.score
   from scored s
-  -- Below this, results are noise rather than near misses.
-  where s.score >= 0.25
+  -- Below this, results are noise rather than near misses. The same
+  -- number as pg_trgm's default similarity threshold, on purpose: the
+  -- candidate step can only find what the index calls similar.
+  where s.score >= 0.3
   order by s.score desc, s.canonical_card_number asc
   limit (select lim from params);
 $function$;
