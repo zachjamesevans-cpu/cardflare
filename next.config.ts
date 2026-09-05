@@ -1,6 +1,35 @@
 import type { NextConfig } from "next";
 
+/**
+ * Headers every response carries.
+ *
+ * The site sent none before launch. These are the ones with no
+ * trade-off: they stop a browser sniffing a response into a script,
+ * stop the site being framed by someone else's page, keep the full
+ * URL out of the Referer sent to card-art hosts, and tell browsers
+ * this origin never uses the camera or microphone from a web page.
+ * Geolocation stays available to the site itself for Local, off today.
+ *
+ * No Content-Security-Policy yet: Next's inline scripts, Rive's WASM
+ * and the card-art hosts each need an allowance, and a wrong one
+ * breaks pages silently. That is a deliberate round of its own, after
+ * launch, with a report-only pass first. Strict-Transport-Security is
+ * set by the host in front of us for the custom domain.
+ */
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(self), payment=()",
+  },
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
+  },
   images: {
     /**
      * Hosts whose card artwork may be optimised and served.

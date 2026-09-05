@@ -5,6 +5,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { MESSAGE_MAX_LENGTH } from "@/lib/local/shared";
 import { listThreads, openFlareThread } from "@/lib/local/threads";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,13 @@ const openSchema = z.object({
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  const limited = tooMany(
+    `thread-open:${player.playerId}`,
+    LIMITS.threadOpen.limit,
+    LIMITS.threadOpen.windowMs,
+  );
+  if (limited) return limited;
 
   const parsed = openSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId and a message are needed");

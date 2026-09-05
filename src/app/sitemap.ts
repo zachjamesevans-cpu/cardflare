@@ -9,6 +9,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: origin, lastModified, changeFrequency: "weekly", priority: 1 },
     {
+      url: `${origin}/signup`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${origin}/tournaments`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    },
+    {
       url: `${origin}/contact`,
       lastModified,
       changeFrequency: "yearly",

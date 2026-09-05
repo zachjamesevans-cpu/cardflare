@@ -1,3 +1,4 @@
+import { cache } from "react";
 import "server-only";
 
 import { redirect } from "next/navigation";
@@ -28,7 +29,7 @@ export type Viewer =
  * with the auth server. The difference matters because this result gates the
  * admin console.
  */
-export async function getViewer(): Promise<Viewer> {
+export const getViewer = cache(async function getViewer(): Promise<Viewer> {
   // An unconfigured deployment should present as signed out rather than crash.
   // Treating it as anonymous also keeps every guard below fail-closed.
   if (!isSupabaseConfigured()) return { kind: "anonymous" };
@@ -70,7 +71,7 @@ export async function getViewer(): Promise<Viewer> {
   }
 
   return { kind: "unaffiliated", user };
-}
+});
 
 /**
  * Gate for the admin console. Redirects rather than rendering anything.

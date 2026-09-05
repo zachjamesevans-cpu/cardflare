@@ -141,7 +141,7 @@ export default async function FlareCastPage({
         <div className="max-w-2xl space-y-2 text-sm text-text-secondary">
           <p>
             Each screen has its own private link. Open it in the browser on whatever
-            drives that television, press Enter Fullscreen once, and leave it — it needs
+            drives that television, press Enter Fullscreen once, and leave it. It needs
             nobody to sign in and keeps counting through wifi hiccups. The link lives on
             each screen&rsquo;s manage page.
           </p>

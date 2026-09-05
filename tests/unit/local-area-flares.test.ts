@@ -94,14 +94,21 @@ describe("posting a Flare to your area", () => {
     expect(inserted()).toMatchObject({ event_id: null, player_session_id: null });
   });
 
-  it("asks for a ZIP rather than failing when there is none", async () => {
+  /* Local is off and a Flare with no room goes to friends, so a
+     missing ZIP is not a wall: the founder, "No need to have that
+     requirement now because it just shows your flares to your friends
+     in the feed." */
+  it("posts without a ZIP when there is none", async () => {
     playerRow = { data: { postal_code: null }, error: null };
 
     expect(await postAreaFlare("player-1", { cardId: "card-1" })).toEqual({
-      ok: false,
-      reason: "no-postal-code",
+      ok: true,
+      flareId: "flare-1",
     });
-    expect(calls.find((c) => c.op === "insert")).toBeUndefined();
+    expect(inserted()).toMatchObject({
+      posted_postal_code: null,
+      player_id: "player-1",
+    });
   });
 
   it("treats a ZIP+4 and stray spacing as the five digits they are", async () => {
@@ -112,13 +119,14 @@ describe("posting a Flare to your area", () => {
     expect(inserted()).toMatchObject({ posted_postal_code: "97477" });
   });
 
-  it("refuses a postal code that is not five digits", async () => {
+  it("writes no ZIP rather than a malformed one", async () => {
     playerRow = { data: { postal_code: "SW1A 1AA" }, error: null };
 
     expect(await postAreaFlare("player-1", { cardId: "card-1" })).toEqual({
-      ok: false,
-      reason: "no-postal-code",
+      ok: true,
+      flareId: "flare-1",
     });
+    expect(inserted()).toMatchObject({ posted_postal_code: null });
   });
 
   it("says the card is already up rather than reporting a database error", async () => {
@@ -244,16 +252,17 @@ describe("posting with a location instead of a typed ZIP", () => {
     expect(inserted()).toMatchObject({ posted_postal_code: "97477" });
   });
 
-  it("still asks when there is neither", async () => {
+  it("still posts, unanchored, when there is neither", async () => {
     playerRow = { data: { postal_code: null }, error: null };
 
     expect(await postAreaFlare("player-1", { cardId: "card-1" }, null)).toEqual({
-      ok: false,
-      reason: "no-postal-code",
+      ok: true,
+      flareId: "flare-1",
     });
+    expect(inserted()).toMatchObject({ posted_postal_code: null });
   });
 
-  it("refuses a coordinate nowhere near a ZIP rather than snapping to nonsense", async () => {
+  it("leaves a coordinate nowhere near a ZIP unanchored rather than snapping to nonsense", async () => {
     playerRow = { data: { postal_code: null }, error: null };
 
     /* The middle of the Atlantic. The nearest ZCTA is a real row and a
@@ -264,7 +273,8 @@ describe("posting with a location instead of a typed ZIP", () => {
         { cardId: "card-1" },
         { latitude: 30, longitude: -40 },
       ),
-    ).toEqual({ ok: false, reason: "no-postal-code" });
+    ).toEqual({ ok: true, flareId: "flare-1" });
+    expect(inserted()).toMatchObject({ posted_postal_code: null });
   });
 });
 
@@ -362,14 +372,14 @@ describe("posting several cards as one thing", () => {
   });
 
   it("stops on a wall every remaining card would hit too", async () => {
-    /* No ZIP is not a per-card problem; grinding through thirty writes
-       to prove it would be thirty pointless failures. */
-    playerRow = { data: { postal_code: null }, error: null };
+    /* A missing migration is not a per-card problem; grinding through
+       thirty writes to prove it would be thirty pointless failures. */
+    insertResult = { data: null, error: { code: "23514", message: "check violated" } };
 
     expect(
       await postAreaFlares("player-1", [{ cardId: "card-1" }, { cardId: "card-2" }]),
-    ).toEqual({ ok: false, reason: "no-postal-code" });
-    expect(inserts()).toHaveLength(0);
+    ).toEqual({ ok: false, reason: "not-migrated" });
+    expect(inserts()).toHaveLength(1);
   });
 
   it("leaves a lone card ungrouped, so one card is not a folder", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -30,10 +30,18 @@ import { useRouter } from "next/navigation";
  */
 export function RoomTicker({ intervalMs = 12_000 }: { intervalMs?: number }) {
   const router = useRouter();
+  /* A refresh still in flight on slow wifi is not joined by another:
+     the transition's pending flag is the in-flight marker. */
+  const [pending, startTransition] = useTransition();
+  const inFlight = useRef(false);
+  useEffect(() => {
+    inFlight.current = pending;
+  }, [pending]);
 
   useEffect(() => {
     const tick = () => {
-      if (document.visibilityState === "visible") router.refresh();
+      if (document.visibilityState !== "visible" || inFlight.current) return;
+      startTransition(() => router.refresh());
     };
 
     const timer = setInterval(tick, intervalMs);
@@ -41,7 +49,9 @@ export function RoomTicker({ intervalMs = 12_000 }: { intervalMs?: number }) {
     // Coming back to the tab refreshes immediately rather than waiting out
     // the rest of an interval that started while the phone was pocketed.
     const onVisible = () => {
-      if (document.visibilityState === "visible") router.refresh();
+      if (document.visibilityState === "visible" && !inFlight.current) {
+        startTransition(() => router.refresh());
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
 

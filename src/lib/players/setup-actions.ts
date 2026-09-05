@@ -192,7 +192,7 @@ export async function finishSetupAction(
   );
 
   if (outcome === "taken") {
-    return fail("That handle is taken. Try another one — your password is saved.");
+    return fail("That handle is taken. Try another one. Your password is saved.");
   }
   if (outcome === "failed") return fail(GENERIC_ERROR);
 

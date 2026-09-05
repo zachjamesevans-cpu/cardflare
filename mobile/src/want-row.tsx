@@ -98,7 +98,7 @@ export function WantRow({
             </Text>
           ) : (
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-              Saved — not on a board yet
+              Saved
             </Text>
           )}
 

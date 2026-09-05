@@ -4,6 +4,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { pointFromCoords } from "@/lib/geo/zip";
 import { readJsonPayload } from "@/lib/api/payload";
 import { postAreaFlares, withdrawAreaFlare } from "@/lib/local/area";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,13 @@ export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
+  const limited = tooMany(
+    `area-flare:${player.playerId}`,
+    LIMITS.areaFlare.limit,
+    LIMITS.areaFlare.windowMs,
+  );
+  if (limited) return limited;
+
   const parsed = postSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("Unrecognised Flare");
 
@@ -65,22 +73,6 @@ export async function POST(request: Request): Promise<Response> {
 
   if (result.ok) {
     return Response.json({ ok: true, batchId: result.batchId, posted: result.posted });
-  }
-
-  /*
-   * A missing ZIP answers 409 rather than 400: the request was fine and
-   * the account is not ready, which is a different thing to the client
-   * and gets a different sentence on the screen.
-   */
-  if (result.reason === "no-postal-code") {
-    return Response.json(
-      {
-        ok: false,
-        error: "no-postal-code",
-        message: "Add your ZIP code first so people know roughly where you are.",
-      },
-      { status: 409 },
-    );
   }
 
   if (result.reason === "already-posted") {

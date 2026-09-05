@@ -55,7 +55,7 @@ export default async function SignupPage() {
       <ul className="flex flex-col gap-2 text-sm text-text-secondary">
         <li className="flex items-center gap-2.5">
           <Radio className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          Post a Flare for any card and the people near you see what you are hunting.
+          Post a Flare for any card and your friends see what you are hunting.
         </li>
         <li className="flex items-center gap-2.5">
           <MapPin className="size-4 shrink-0 text-accent" aria-hidden="true" />

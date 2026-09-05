@@ -3,6 +3,8 @@ import { getViewer } from "@/lib/auth/session";
 import { searchPlayersByName } from "@/lib/players/search";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
+import { clientKey } from "@/lib/request-context";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,13 @@ export async function GET(request: Request): Promise<Response> {
   ) {
     return Response.json({ error: "Sign in first." }, { status: 401 });
   }
+
+  const limited = tooMany(
+    `player-search:${await clientKey()}`,
+    LIMITS.search.limit,
+    LIMITS.search.windowMs,
+  );
+  if (limited) return limited;
 
   const query = new URL(request.url).searchParams.get("q") ?? "";
   const players = await searchPlayersByName(query);

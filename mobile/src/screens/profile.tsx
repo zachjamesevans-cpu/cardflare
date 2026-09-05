@@ -401,6 +401,19 @@ export function ProfileScreen() {
             pendingLabel="Retrying…"
             onPress={() => load()}
           />
+          {/* The way out has to be reachable from the failed state too,
+              or a dead session is a screen nobody can leave. */}
+          <AsyncButton
+            label="Sign out"
+            pendingLabel="Signing out…"
+            variant="secondary"
+            onPress={() =>
+              signOut().then(() => {
+                setProfile(null);
+                setWardrobe(null);
+              })
+            }
+          />
         </Card>
       </ScrollView>
     );
@@ -451,7 +464,7 @@ export function ProfileScreen() {
         <Card>
           <Body>
             No account? Nothing changes. Scan any counter code and trade as a guest,
-            same as always. Accounts are invite-only while cardflare is in its pilot.
+            same as always.
           </Body>
         </Card>
       </ScrollView>

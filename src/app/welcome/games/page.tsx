@@ -53,8 +53,8 @@ export default async function WelcomeGamesPage() {
             Which games do you play?
           </h1>
           <p className="text-text-secondary">
-            Last step. When locals near you go up on cardflare, this is how we know
-            which ones are yours.
+            Last step. When your stores run event nights on cardflare, this is how we
+            know which ones are yours.
           </p>
         </div>
 

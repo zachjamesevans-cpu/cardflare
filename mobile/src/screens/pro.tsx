@@ -7,7 +7,7 @@ import { Linking, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { getProfile } from "../api";
 import { API_BASE } from "../config";
-import { buyPro, proPrice, restorePro, PRO_PRICE_FALLBACK } from "../pro";
+import { PRO_PRICE_FALLBACK, buyPro, proPrice, restorePro, syncOwnedPro } from "../pro";
 import { AsyncButton, Card, Muted, Tap } from "../ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -69,6 +69,11 @@ export function ProScreen() {
           if (!alive.current) return;
           setPlayerId(result.profile.playerId);
           setPro(result.profile.pro ?? false);
+          /* Not Pro on the server, but maybe Pro on the phone: a paid
+             transaction the confirm step dropped. Finish it here. */
+          if (!result.profile.pro && (await syncOwnedPro()) && alive.current) {
+            setPro(true);
+          }
         } catch {
           /* The screen still pitches; the button will say sign in. */
         }
@@ -97,6 +102,12 @@ export function ProScreen() {
       return;
     }
     if (outcome.kind === "cancelled") return;
+    if (outcome.kind === "pending") {
+      setMessage(
+        "Waiting for approval. Once it is approved, open this screen again and Pro will be on.",
+      );
+      return;
+    }
     if (outcome.kind === "unconfirmed") {
       setMessage(
         "Your purchase went through but we could not confirm it yet. Tap Restore purchases in a moment; nothing is lost.",

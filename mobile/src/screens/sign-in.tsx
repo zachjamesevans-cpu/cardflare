@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Linking, Text, View } from "react-native";
 
-import { signIn } from "../api";
+import { describeError, signIn } from "../api";
 import { API_BASE, authConfigured } from "../config";
 import { registerForPush } from "../push";
 import { Body, Button, Card, ErrorLine, Input, Title } from "../ui";
@@ -22,18 +22,25 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
     setBusy(true);
     setError(null);
 
-    const result = await signIn(email, password);
-    setBusy(false);
+    try {
+      const result = await signIn(email, password);
 
-    if (!result.ok) {
-      setError(result.message);
-      return;
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      // The moment push becomes worth asking for: a signed-in account
+      // can actually receive something.
+      await registerForPush();
+      onSignedIn();
+    } catch (caught) {
+      /* The keychain, usually: a throw here used to leave the button
+         stuck on "Signing in…" with nothing said. */
+      setError(`Could not sign in (${describeError(caught)}). Try again.`);
+    } finally {
+      setBusy(false);
     }
-
-    // The moment push becomes worth asking for: a signed-in account
-    // can actually receive something.
-    await registerForPush();
-    onSignedIn();
   };
 
   return (

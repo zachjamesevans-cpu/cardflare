@@ -27,7 +27,7 @@ import {
   Title,
 } from "../ui";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
-import { NearbyLocationAsk } from "../nearby-location-ask";
+import { LOCAL_ENABLED } from "../local-enabled";
 import { colors, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
@@ -205,17 +205,15 @@ export function PostFlareScreen({
   /*
    * Where the poster is, when they have already granted it.
    *
-   * A Flare with no room is anchored to an area, and Local accepts
-   * EITHER a device coordinate or the profile ZIP as that anchor. This
-   * screen sent neither once posting moved here, so everyone who had
-   * granted location — the more precise of the two — was told
-   * "no-postal-code 409" and left with nowhere to fix it. Held in memory
-   * for the visit and never written, the same promise the tab makes.
+   * A Flare with no room goes to friends in the Feed and needs no
+   * anchor; a granted position still rides along so Local can place
+   * the Flare the day it is switched back on. Held in memory for the
+   * visit and never written, the same promise the tab makes. Nothing
+   * is asked for here: the founder, on the ZIP prompt that used to
+   * block this screen, "No need to have that requirement now because
+   * it just shows your flares to your friends in the feed."
    */
   const [at, setAt] = useState<Coords | null>(null);
-  /* The one refusal that is not a fault: it has a fix, and the fix goes
-     on this screen rather than in a sentence pointing elsewhere. */
-  const [needsPostal, setNeedsPostal] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -370,7 +368,8 @@ export function PostFlareScreen({
         });
       } else {
         /*
-         * No room: it goes up for the people near you.
+         * No room: it goes up for your friends in the Feed, and for the
+         * people near you when Local is on.
          *
          * This branch used to save a private want, which is why the app
          * had two nouns and three composers. The founder's model, and
@@ -412,22 +411,16 @@ export function PostFlareScreen({
     } catch (caught) {
       const code = caught instanceof ApiError ? caught.code : "";
 
-      /* Not knowing where somebody is is not a fault and not a bug: it
-         is one field, and the field belongs on this screen. */
-      setNeedsPostal(code === "no-postal-code");
-
       setError(
         code === "at-cap"
           ? target.kind === "room"
             ? "You have hit the Flare cap for this room."
             : "You have too many Flares up. Take one down first."
-          : code === "no-postal-code"
-            ? "Tell us roughly where you are and the card goes up."
-            : code === "already-posted"
-              ? "That card is already up."
-              : code === "not-migrated"
-                ? "Posting isn't switched on yet. The server needs its latest update."
-                : `Could not post the Flare (${describeError(caught)}). Try again.`,
+          : code === "already-posted"
+            ? "That card is already up."
+            : code === "not-migrated"
+              ? "Posting isn't switched on yet. The server needs its latest update."
+              : `Could not post the Flare (${describeError(caught)}). Try again.`,
       );
       setBusy(false);
     }
@@ -511,11 +504,13 @@ export function PostFlareScreen({
 
       <Card>
         <Title>What are you hunting?</Title>
-        {/* Said up front, so nobody thinks a couch Flare reached a room. */}
+        {/* Said up front, so nobody thinks a couch Flare reached a room.
+            The same sentence the website's form shows. */}
         {target.kind === "list" && (
           <Muted>
-            No room right now, so this saves to your list. Every room you join will
-            offer to post it.
+            {LOCAL_ENABLED
+              ? "No room needed. People near you see it, and so do your friends."
+              : "No room needed. Your friends see it in the Feed."}
           </Muted>
         )}
         <GameSearchField
@@ -743,20 +738,6 @@ export function PostFlareScreen({
                   />
 
                   <ErrorLine message={error} />
-
-                  {needsPostal ? (
-                    <NearbyLocationAsk
-                      intro={null}
-                      onDone={() => {
-                        setNeedsPostal(false);
-                        setError(null);
-                        void (async () => {
-                          const outcome = await requestCoords();
-                          if (outcome.status === "granted") setAt(outcome.coords);
-                        })();
-                      }}
-                    />
-                  ) : null}
 
                   <Button
                     /* One verb either way. It is the same act now: the

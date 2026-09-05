@@ -1,3 +1,4 @@
+import { cache } from "react";
 import "server-only";
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -78,18 +79,22 @@ export async function clearPlayerCookie(): Promise<void> {
  * it is deliberately fire-and-forget inside the repository rather than
  * something this function's caller has to think about.
  */
-export async function getPlayerSession(): Promise<PlayerSessionRow | null> {
-  if (!isSupabaseConfigured()) return null;
+/* Once per request, however many loaders ask: the room page asks from
+   several places, and each answer was a lookup and a presence write. */
+export const getPlayerSession = cache(
+  async function getPlayerSession(): Promise<PlayerSessionRow | null> {
+    if (!isSupabaseConfigured()) return null;
 
-  const token = (await cookies()).get(PLAYER_COOKIE)?.value;
-  if (!token) return null;
+    const token = (await cookies()).get(PLAYER_COOKIE)?.value;
+    if (!token) return null;
 
-  const session = await findPlayerSession(hashSessionToken(token));
-  if (!session) return null;
+    const session = await findPlayerSession(hashSessionToken(token));
+    if (!session) return null;
 
-  await touchPlayerSession(session);
-  return session;
-}
+    await touchPlayerSession(session);
+    return session;
+  },
+);
 
 /** The subset of a session a page may render. */
 export function toIdentity(session: PlayerSessionRow): PlayerIdentity {

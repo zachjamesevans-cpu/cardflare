@@ -999,15 +999,9 @@ export async function setCover(
   const admin = getSupabaseAdmin();
   const path = coverObjectPath(playerId);
 
-  const { error: uploadError } = await admin.storage
-    .from("avatars")
-    .upload(path, new Blob([new Uint8Array(encoded)], { type: "image/jpeg" }), {
-      contentType: "image/jpeg",
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("Could not store the cover", uploadError);
+  /* The same write-and-read-back the avatar uses, so a cover that did
+     not really land is a refusal here rather than a blank banner. */
+  if (!(await putAvatarObject(path, encoded, "image/jpeg"))) {
     return { ok: false, reason: "unavailable" };
   }
 
@@ -1017,13 +1011,31 @@ export async function setCover(
     .eq("id", playerId)
     .maybeSingle();
 
-  const { error } = await admin
+  /*
+   * The row is read back in the same statement. An update that matches
+   * no row is not an error to PostgREST, and "saved" with nothing saved
+   * is the founder's report: "nothing actually saves when you update".
+   * Whatever the cause, it now comes back as a refusal with a log line
+   * naming the player, instead of a success message over an old banner.
+   */
+  const { data: recorded, error } = await admin
     .from("players")
     .update({ cover_image: path })
-    .eq("id", playerId);
+    .eq("id", playerId)
+    .select("cover_image")
+    .maybeSingle();
 
-  if (error) {
-    console.error("Could not record the cover", error);
+  if (error || recorded?.cover_image !== path) {
+    console.error(
+      `Could not record the cover for player ${playerId}: ` +
+        (error
+          ? error.message
+          : `row reads ${recorded?.cover_image ?? "nothing"} back`),
+    );
+    await admin.storage
+      .from("avatars")
+      .remove([path])
+      .catch(() => {});
     return { ok: false, reason: "unavailable" };
   }
 

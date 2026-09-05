@@ -746,7 +746,10 @@ function RoomScreen({
 
         {groups.size === 0 && (
           <Card>
-            <Body>No Flares yet. Post the first one and the room will see it.</Body>
+            <Body>
+              No Flares yet. Post the first one, or say you are open to trades and let
+              people bring cards to you.
+            </Body>
           </Card>
         )}
 

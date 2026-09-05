@@ -6,6 +6,8 @@ import {
 } from "@/lib/cards/schema";
 import { searchCards } from "@/lib/cards/search";
 import { isGameSlug } from "@/lib/players/games-catalog";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
+import { clientKey } from "@/lib/request-context";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,14 @@ export async function GET(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const query = params.get("q")?.trim() ?? "";
   if (query.length < 2) return Response.json({ cards: [] });
+
+  /* The same ceiling the website's search action has had all along. */
+  const limited = tooMany(
+    `card-search:${await clientKey()}`,
+    LIMITS.search.limit,
+    LIMITS.search.windowMs,
+  );
+  if (limited) return limited;
 
   /*
    * The room's TCG, when the scan that opened the room said which one.

@@ -10,6 +10,7 @@ import {
 } from "@/lib/billing/repository";
 import { tierAllows } from "@/lib/tiers";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,13 @@ const schema = z.object({
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  const limited = tooMany(
+    `billing:${player.playerId}`,
+    LIMITS.billing.limit,
+    LIMITS.billing.windowMs,
+  );
+  if (limited) return limited;
 
   const parsed = schema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("Unrecognised purchase");

@@ -5,6 +5,21 @@ import { avatarWearFor } from "./equips";
 import { avatarPathFor, avatarSrc } from "./profile-image";
 
 /**
+ * A value inside a PostgREST `.or()` filter, quoted.
+ *
+ * The filter is a string the query builder assembles, and commas,
+ * parentheses and dots are its grammar. Left bare, a query like
+ * `zq,and(postal_code.like.941*)` would close the pattern early and
+ * become its own arm of the OR, a way to read columns this search
+ * never returns. PostgREST's rule: wrap the value in double quotes and
+ * escape the quote and the backslash inside it. Then a comma is just a
+ * comma, and a name with brackets in it finds itself.
+ */
+function quoteFilterValue(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
  * Finding a player by name - the founder's ask: "I can search up
  * someone by username and see their profile and follow them."
  *
@@ -32,7 +47,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
 
   /* Escape the LIKE wildcards so "100%" searches for a percent sign. */
   const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
-  const like = `%${escaped}%`;
+  const like = quoteFilterValue(`%${escaped}%`);
 
   /*
    * Either half of an identity finds somebody, because a person at a
@@ -40,7 +55,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
    * dropped rather than searched for: it is how a handle is written, not
    * part of the handle itself.
    */
-  const byHandle = `%${escaped.replace(/^@/, "").toLowerCase()}%`;
+  const byHandle = quoteFilterValue(`%${escaped.replace(/^@/, "").toLowerCase()}%`);
 
   const { data, error } = await getSupabaseAdmin()
     .from("players")

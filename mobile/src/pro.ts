@@ -77,6 +77,9 @@ export type BuyOutcome =
   /** Paid at the store, but our server could not confirm it yet. The
       purchase is safe: Restore purchases (or the webhook) finishes it. */
   | { kind: "unconfirmed" }
+  /** Waiting on somebody else: Ask to Buy, or a payment method Apple
+      has to check first. Nothing to do until Apple says. */
+  | { kind: "pending" }
   /** No store to talk to: old build, simulator, or store trouble. */
   | { kind: "unavailable" }
   | { kind: "failed"; message: string };
@@ -94,6 +97,10 @@ export type BuyOutcome =
  * transaction, which is how the server later proves which account a
  * renewal belongs to without trusting anything the phone said.
  */
+/** How long the sheet may sit with neither event before we stop
+    holding the button. The purchase itself is not lost by this. */
+const PURCHASE_WAIT_MS = 2 * 60 * 1000;
+
 export async function buyPro(playerId: string): Promise<BuyOutcome> {
   const iap = await store();
   if (!iap) return { kind: "unavailable" };
@@ -103,13 +110,25 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
     const finish = (outcome: BuyOutcome) => {
       if (done) return;
       done = true;
+      clearTimeout(timer);
       updated.remove();
       failed.remove();
       resolve(outcome);
     };
 
+    /* Neither listener fired: the sheet was dismissed in a way StoreKit
+       did not report, or the transaction is stuck. Let go of the
+       button; an owned transaction is picked up on the next open. */
+    const timer = setTimeout(() => finish({ kind: "unconfirmed" }), PURCHASE_WAIT_MS);
+
     const updated = iap.purchaseUpdatedListener((purchase) => {
       if (purchase.productId !== PRO_PRODUCT_ID) return;
+      /* Ask to Buy: the transaction exists but nobody has paid yet.
+         Finishing it now would throw the approval away. */
+      if ("purchaseState" in purchase && purchase.purchaseState === "pending") {
+        finish({ kind: "pending" });
+        return;
+      }
       void (async () => {
         try {
           const original =
@@ -138,7 +157,9 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
       finish(
         error.code === "user-cancelled"
           ? { kind: "cancelled" }
-          : { kind: "failed", message: error.message ?? "Purchase failed." },
+          : error.code === "deferred-payment"
+            ? { kind: "pending" }
+            : { kind: "failed", message: error.message ?? "Purchase failed." },
       );
     });
 
@@ -155,6 +176,43 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
         finish({ kind: "unavailable" });
       });
   });
+}
+
+/**
+ * Quietly finishes what the phone already owns.
+ *
+ * A purchase whose confirm call was lost, or one made from the App
+ * Store's own subscription page, is redelivered by StoreKit as an owned
+ * transaction, but nothing was listening for it outside the paywall's
+ * own buy flow. The paywall calls this on open, so a player who paid is
+ * Pro the next time they look, without hunting for Restore. Nothing is
+ * prompted: this reads, it does not ask Apple to sync.
+ */
+export async function syncOwnedPro(): Promise<boolean> {
+  const iap = await store();
+  if (!iap) return false;
+  try {
+    const owned = await iap.getAvailablePurchases();
+    let pro = false;
+    for (const purchase of (owned ?? []).filter((p) => p.productId === PRO_PRODUCT_ID)) {
+      const original =
+        ("originalTransactionIdentifierIOS" in purchase
+          ? purchase.originalTransactionIdentifierIOS
+          : null) ??
+        purchase.transactionId ??
+        null;
+      if (!original) continue;
+      try {
+        const result = await syncApplePurchase(original);
+        if (result.pro) pro = true;
+      } catch {
+        /* Next open tries again. */
+      }
+    }
+    return pro;
+  } catch {
+    return false;
+  }
 }
 
 export type RestoreOutcome =

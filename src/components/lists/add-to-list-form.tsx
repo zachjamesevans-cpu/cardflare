@@ -36,6 +36,7 @@ import {
   type CardPrinting,
   type CardResult,
 } from "@/lib/cards/schema";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * Adding a card to a Flare list or a Have list.
@@ -627,7 +628,9 @@ export function AddToListForm({
     target === "list"
       ? {
           title: "What are you hunting?",
-          hint: "Goes up for people near you. Walk into a room and it posts there too.",
+          hint: LOCAL_ENABLED
+            ? "Goes up for people near you. Walk into a room and it posts there too."
+            : "No room needed. Your friends see it in the Feed.",
           submit: "Post the Flare",
         }
       : COPY[kind];

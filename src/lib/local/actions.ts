@@ -13,6 +13,9 @@ import {
   sendThreadMessage,
   type ThreadMessage,
 } from "./threads";
+import { LIMITS } from "@/lib/api/throttle";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * The website's writes for Local. Thin: each re-establishes the player
@@ -39,13 +42,14 @@ export type LocalActionResult =
        * that decides what to render by searching the copy for the word
        * "ZIP" breaks the first time somebody rewrites the sentence.
        */
-      reason?: "sign-in" | "no-postal-code" | "already-posted" | "not-migrated";
+      reason?: "sign-in" | "already-posted" | "not-migrated";
     };
 
 /** Null when signed out or the coordinates were nonsense. */
 export type LocalFeedResult = LocalFeed | null;
 
-const SIGN_IN = "Sign in to use Local.";
+const SIGN_IN = LOCAL_ENABLED ? "Sign in to use Local." : "Sign in first.";
+const TOO_MANY = "That is a lot at once. Try again in a moment.";
 const GENERIC = "Something went wrong. Please try again in a moment.";
 
 export async function setLocalRadiusAction(radius: number): Promise<LocalActionResult> {
@@ -63,6 +67,15 @@ export async function openThreadAction(
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `thread-open:${playerId}`,
+      LIMITS.threadOpen.limit,
+      LIMITS.threadOpen.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const outcome = await openFlareThread(flareId, playerId, body);
   if (outcome.ok) return outcome;
@@ -84,6 +97,15 @@ export async function sendMessageAction(
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `message:${playerId}`,
+      LIMITS.message.limit,
+      LIMITS.message.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const outcome = await sendThreadMessage(threadId, playerId, body);
   if (outcome.ok) return { ok: true };
@@ -148,12 +170,9 @@ export async function localFeedAtAction(
 }
 
 /**
- * Posting a Flare to your area rather than to a board.
- *
- * The ZIP refusal is deliberately its own message: it is not an error, it
- * is the one missing thing, and Local already knows how to ask for five
- * digits. Anything that says "something went wrong" here sends somebody
- * looking for a bug instead of a field.
+ * Posting a Flare with no board: to your friends in the Feed, and to
+ * your area when Local is on. Nothing is asked first; a ZIP rides along
+ * when the profile has one.
  */
 export async function postAreaFlareAction(
   /* One card or a whole list. A list goes up as ONE post — see
@@ -168,6 +187,15 @@ export async function postAreaFlareAction(
 ): Promise<LocalActionResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(
+      `area-flare:${playerId}`,
+      LIMITS.areaFlare.limit,
+      LIMITS.areaFlare.windowMs,
+    ).allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
 
   const result = await postAreaFlares(
     playerId,
@@ -177,13 +205,6 @@ export async function postAreaFlareAction(
   );
   if (result.ok) return { ok: true };
 
-  if (result.reason === "no-postal-code") {
-    return {
-      ok: false,
-      reason: "no-postal-code",
-      message: "Tell us roughly where you are and the card goes up.",
-    };
-  }
   if (result.reason === "already-posted") {
     return { ok: false, reason: "already-posted", message: "That card is already up." };
   }

@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { submitClaim, decideClaim, type ClaimDecision } from "@/lib/stores/claims";
 import { readClaim, validateClaim, type ClaimState } from "@/lib/stores/claim-schema";
+import { LIMITS } from "@/lib/api/throttle";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { clientKey } from "@/lib/request-context";
 
 /**
  * A shop owner asking for their listing.
@@ -29,6 +32,21 @@ export async function submitClaimAction(
 
   if (Object.keys(errors).length > 0) {
     return { status: "error", message: null, fields, errors };
+  }
+
+  if (
+    !checkRateLimit(
+      `claim:${await clientKey()}`,
+      LIMITS.claim.limit,
+      LIMITS.claim.windowMs,
+    ).allowed
+  ) {
+    return {
+      status: "error",
+      message: "That is a lot of claims at once. Try again in a while.",
+      fields,
+      errors,
+    };
   }
 
   const result = await submitClaim(storeId, fields);

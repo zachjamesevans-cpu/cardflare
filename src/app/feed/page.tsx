@@ -154,9 +154,9 @@ export default async function FeedPage() {
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Start trading</h2>
           <p className="text-sm text-text-secondary">
-            Create a free account and the cards you hunt reach the people near you. At a
-            store right now? The code at the counter gets you into tonight&rsquo;s room,
-            no account needed.
+            Create a free account and the cards you hunt reach your friends and every
+            room you walk into. At a store right now? The code at the counter gets you
+            into tonight&rsquo;s room, no account needed.
           </p>
           {/* Both doors, in the order the copy offers them. Room holds
               the scanner for the person already standing in a shop. */}
@@ -230,9 +230,9 @@ export default async function FeedPage() {
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Nothing on right now</h2>
           <p className="text-sm text-text-secondary">
-            No rooms are open anywhere at the moment. When a board opens at one of your
-            stores, or somebody you follow starts hunting a card you&rsquo;re holding,
-            it shows up here.
+            Post a Flare for a card you are hunting, or follow a friend, and it shows up
+            here. At a store? The code at the counter gets you into tonight&rsquo;s
+            room.
           </p>
           <Link href="/room" className={buttonStyles("secondary", "sm")}>
             Go to Room
@@ -269,8 +269,8 @@ export default async function FeedPage() {
         <Card className="flex flex-col gap-2">
           <h2 className="font-semibold text-text-primary">How it works</h2>
           <p className="text-sm text-text-secondary">
-            Post a Flare for the card you&rsquo;re hunting. When somebody near you has
-            it, at your store or around town, they raise a hand and you trade in person.
+            Post a Flare for the card you&rsquo;re hunting. When a friend or somebody in
+            your room has it, they raise a hand and you trade in person.
           </p>
         </Card>
       )}

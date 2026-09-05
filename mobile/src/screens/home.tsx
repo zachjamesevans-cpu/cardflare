@@ -19,6 +19,7 @@ import {
 import type { StackParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
+import { followHref } from "../follow-href";
 import {
   getFeed,
   SECTION_TITLES,
@@ -341,32 +342,7 @@ export function HomeScreen() {
    * where its label said it would.
    */
   const follow = (href: string) => {
-    if (href.startsWith("/e/")) {
-      void enter(href.slice(3));
-      return;
-    }
-    if (href === "/room") {
-      openRoom(navigation);
-      return;
-    }
-    if (href === "/local") {
-      if (LOCAL_ENABLED) navigation.navigate("Tabs", { screen: "Local" });
-      else navigation.navigate("Messages");
-      return;
-    }
-    if (href === "/profile/settings") {
-      navigation.navigate("Settings");
-      return;
-    }
-    if (href === "/profile") {
-      navigation.navigate("Tabs", { screen: "Profile" });
-      return;
-    }
-    if (href === "/feed") {
-      navigation.navigate("Tabs", { screen: "Feed" });
-      return;
-    }
-    void Linking.openURL(`${API_BASE}${href}`).catch(() => {});
+    void followHref(navigation, href).catch(() => {});
   };
 
   /*
@@ -1349,13 +1325,28 @@ export function HomeScreen() {
        * nothing, briefly, is its own kind of disorienting — which is
        * the complaint this whole change exists to answer.
        */}
+      {hydrated && feed.length === 0 && (
+        <Card>
+          <Title>Nothing on right now</Title>
+          <Body>
+            Post a Flare for a card you are hunting, or follow a friend, and it shows up
+            here. At a store? The code at the counter gets you into tonight&rsquo;s
+            room.
+          </Body>
+          <Button
+            label="Go to Room"
+            variant="secondary"
+            onPress={() => openRoom(navigation)}
+          />
+        </Card>
+      )}
+
       {hydrated && feed.length < 3 && (
         <Card>
           <Title>How it works</Title>
           <Body>
-            Post a Flare for the card you&rsquo;re hunting. When somebody near you has
-            it, at your store or around town, they raise a hand and you trade in
-            person.
+            Post a Flare for the card you&rsquo;re hunting. When a friend or somebody
+            in your room has it, they raise a hand and you trade in person.
           </Body>
         </Card>
       )}

@@ -96,7 +96,7 @@ export default async function InboxPage() {
                 Nothing yet. When somebody offers on one of your Flares, or a board
                 opens early at a store you save, it lands here.
               </p>
-              <ButtonLink href="/join" variant="secondary">
+              <ButtonLink href="/room" variant="secondary">
                 Find a room
               </ButtonLink>
             </Card>

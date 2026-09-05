@@ -33,6 +33,7 @@ import { listWants } from "@/lib/players/wants";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { DeckListForm } from "@/components/players/deck-list-form";
 import { HandleForm } from "@/components/players/handle-form";
+import { DeleteAccountForm } from "@/components/players/delete-account-form";
 import { ownProfile } from "@/lib/players/profile";
 
 export const metadata: Metadata = {
@@ -358,6 +359,24 @@ export default async function ProfileSettingsPage() {
     </Card>
   );
 
+  /*
+   * Closing the account, last and quiet. The same act the app offers
+   * from its settings, because the App Store requires it there, and a
+   * website that could not do what the app can would be the odd one.
+   */
+  const deleteCard = playerId ? (
+    <Card key="delete" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="font-semibold text-text-primary">Delete your account</p>
+        <p className="text-sm text-text-secondary">
+          Everything goes: profile, Flares, lists, showcase and unlocks. There is no
+          undo.
+        </p>
+      </div>
+      <DeleteAccountForm handle={handle} />
+    </Card>
+  ) : null;
+
   /* A player's own things lead; sign-in housekeeping follows. */
   const cards = isPlayerHome
     ? [
@@ -368,6 +387,7 @@ export default async function ProfileSettingsPage() {
         nameCard,
         emailCard,
         passwordCard,
+        deleteCard,
       ]
     : [
         nameCard,
@@ -377,6 +397,7 @@ export default async function ProfileSettingsPage() {
         wantsCard,
         collectionCard,
         passwordCard,
+        deleteCard,
       ];
 
   return (

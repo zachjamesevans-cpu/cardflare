@@ -5,6 +5,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { AVATAR_MAX_BYTES } from "@/lib/players/profile-image";
 import { setAnimatedAvatar, setAvatar, setCover } from "@/lib/players/profile";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
 
@@ -103,10 +104,22 @@ export async function POST(request: Request): Promise<Response> {
   const admin = getSupabaseAdmin();
 
   if (body.action === "begin") {
+    const limited = tooMany(
+      `avatar-begin:${player.playerId}`,
+      LIMITS.avatarBegin.limit,
+      LIMITS.avatarBegin.windowMs,
+    );
+    if (limited) return limited;
     return Response.json({ uploadId: crypto.randomUUID() });
   }
 
   if (body.action === "chunk") {
+    const limited = tooMany(
+      `avatar-chunk:${player.playerId}`,
+      LIMITS.avatarChunk.limit,
+      LIMITS.avatarChunk.windowMs,
+    );
+    if (limited) return limited;
     const { error } = await admin.storage
       .from("avatars")
       .upload(

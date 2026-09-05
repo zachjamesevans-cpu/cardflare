@@ -364,11 +364,13 @@ export default async function JoinByCodePage({
 
   if (inRoom && session && accountPlayerId && session.player_id === null) {
     await linkSessionToPlayer(session.id, accountPlayerId);
-  }
-
-  // Being in a room signed in is what makes a store a local. Idempotent,
-  // and never in the join path's way — a failed save costs nothing here.
-  if (inRoom && accountPlayerId) {
+    /*
+     * Being in a room signed in is what makes a store a local. The join
+     * path already saves it for an account that joined as itself; this
+     * covers the one that joined as a guest and signed in afterwards.
+     * Only on that first link, never on every twelve-second refresh:
+     * the render used to write this row on every poll of every phone.
+     */
     await saveLocal(accountPlayerId, event.storeId);
   }
 
