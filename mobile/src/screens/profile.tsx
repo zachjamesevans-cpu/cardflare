@@ -57,7 +57,7 @@ import {
   Title,
 } from "../ui";
 import { colors, radius, spacing } from "../theme";
-import { GameChips } from "../game-chips";
+import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
 
@@ -1187,13 +1187,17 @@ function AddToShowcase({
     /* The same 300ms the post screen uses: long enough that a phone
        keyboard does not fire a query per character. */
     const timer = setTimeout(() => {
+      if (scopedGame && !scope.locked && remembered !== scopedGame) {
+        setRemembered(scopedGame);
+        void rememberSearchGame(scopedGame);
+      }
       void searchCards(query.trim(), scopedGame)
         .then((result) => setHits(result.cards))
         .catch(() => setHits([]));
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, scopedGame]);
+  }, [query, scopedGame, scope.locked, remembered]);
 
   if (!open) {
     return (
@@ -1252,12 +1256,13 @@ function AddToShowcase({
 
   return (
     <View style={{ gap: spacing(2) }}>
-      <GameChips scope={scope} onPick={pickGame} />
-      <Input
+      <GameSearchField
+        scope={scope}
+        playerGames={playerGames}
+        onPick={pickGame}
         value={query}
         onChangeText={setQuery}
         autoFocus
-        autoCorrect={false}
         placeholder={searchPlaceholder(scopedGame)}
       />
 
