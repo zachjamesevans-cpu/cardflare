@@ -35,7 +35,7 @@ import { GAME_SLUGS } from "@/lib/players/games-catalog";
 /**
  * The four public catalogues, normalised against fixtures shaped like
  * the real answers (read from each source's documentation and, for
- * Riftcodex, from the vendored copy in the open-source Discord bot).
+ * Riftcodex, from the client the open-source RiftBuilder runs against it).
  * The network is not touched: what is tested is that a record of that
  * shape becomes a cardflare card with the right number, game and art,
  * and that a record missing its identity is refused rather than
@@ -316,30 +316,40 @@ describe("the-fab-cube", () => {
 describe("Riftcodex", () => {
   const provider = new RiftcodexProvider();
 
+  /* One record as the API answers it: nested, snake_case, inside a
+     page. Read from the documented cards endpoint. */
   const abandon = {
     id: "69bc5be9d308c64675ca8957",
     name: "Abandon",
-    baseName: "Abandon",
-    riftboundId: "unl-131-219",
-    collectorNumber: 131,
-    type: "Spell",
-    supertype: null,
-    rarity: "Uncommon",
-    domains: ["Chaos"],
-    energy: 2,
-    might: null,
-    power: null,
-    text: "[Reaction] Counter a spell.",
-    flavour: null,
-    setId: "UNL",
-    setLabel: "Unleashed",
-    imageUrl:
-      "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/89929cfa.png?accountingTag=RB",
-    artist: "Kudos Productions",
+    riftbound_id: "unl-131-219",
+    tcgplayer_id: "684202",
+    collector_number: 131,
+    attributes: { energy: 2, might: null, power: null },
+    classification: {
+      type: "Spell",
+      supertype: null,
+      rarity: "Uncommon",
+      domain: ["Chaos"],
+    },
+    text: {
+      rich: "**[Reaction]** Counter a spell.",
+      plain: "[Reaction] Counter a spell.",
+    },
+    set: { set_id: "UNL", label: "Unleashed" },
+    media: {
+      image_url:
+        "https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/89929cfa.png?accountingTag=RB",
+      artist: "Kudos Productions",
+      accessibility_text: "Abandon",
+    },
     tags: [],
-    signature: false,
-    alternateArt: false,
-    tcgplayerId: "684202",
+    orientation: "portrait",
+    metadata: {
+      clean_name: "abandon",
+      alternate_art: false,
+      overnumbered: false,
+      signature: false,
+    },
   };
 
   it("keys the card on set and three-digit number, under Riftbound", () => {
@@ -350,25 +360,142 @@ describe("Riftcodex", () => {
     expect(result.card.cardType).toBe("spell");
     expect(result.card.colors).toEqual(["chaos"]);
     expect(result.card.cost).toBe(2);
+    expect(result.card.effectText).toBe("[Reaction] Counter a spell.");
     expect(result.card.printings[0].setName).toBe("Unleashed");
-    expect(result.card.printings[0].imageUrl).toBe(abandon.imageUrl);
+    expect(result.card.printings[0].imageUrl).toBe(abandon.media.image_url);
     expect(result.card.printings[0].isAlternateArt).toBeNull();
   });
 
   it("states an alternate art only when the record does", () => {
     const result = provider.normalizeCard({
       ...abandon,
-      alternateArt: true,
-      supertype: "Signature",
+      metadata: { ...abandon.metadata, alternate_art: true },
+      classification: { ...abandon.classification, supertype: "Signature" },
     });
     if (!result.ok) throw new Error(result.failure.reason);
     expect(result.card.printings[0].isAlternateArt).toBe(true);
     expect(result.card.printings[0].variantType).toBe("Signature");
   });
 
+  it("refuses a record with no set or number rather than guessing", () => {
+    const result = provider.normalizeCard({
+      ...abandon,
+      set: null,
+      collector_number: null,
+    });
+    expect(result.ok).toBe(false);
+  });
+
   it("pads the number the way the card prints it", () => {
     expect(riftboundNumber("ogn", 56)).toBe("OGN-056");
     expect(riftboundNumber("UNL", 131)).toBe("UNL-131");
+  });
+
+  /* The API answers pages of a hundred. What is tested is that every
+     page is read and joined, that a set is asked for as the docs spell
+     it, and that the request stops when the page count says so. */
+  it("reads every page of the listing and asks for a set as set_id", async () => {
+    const urls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      urls.push(url.toString());
+      const page = Number(url.searchParams.get("page"));
+      const items =
+        page === 1 ? [abandon] : [{ ...abandon, id: "second", collector_number: 132 }];
+      return new Response(
+        JSON.stringify({ items, total: 2, page, size: 1, pages: 2 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+    const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards, failures } = await provider.fetchCards({ setCode: "unl" });
+    expect(failures).toHaveLength(0);
+    expect(cards.map((card) => card.canonicalCardNumber)).toEqual([
+      "UNL-131",
+      "UNL-132",
+    ]);
+    expect(urls).toHaveLength(2);
+    for (const url of urls) {
+      const query = new URL(url).searchParams;
+      expect(new URL(url).pathname).toBe("/cards");
+      expect(query.get("set_id")).toBe("unl");
+      expect(query.get("size")).toBe("100");
+      expect(query.get("sort")).toBe("collector_number");
+    }
+    expect(new URL(urls[1]).searchParams.get("page")).toBe("2");
+  });
+
+  it("names the set when the API has no cards under it", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify({ items: [], total: 0, page: 1, size: 100, pages: 0 }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as unknown as typeof fetch;
+    const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards, failures } = await provider.fetchCards({ setCode: "XYZ" });
+    expect(cards).toHaveLength(0);
+    expect(failures.map((failure) => failure.reason)).toEqual([
+      "Riftcodex has no set called XYZ.",
+    ]);
+  });
+
+  it("says what a 403 means and what the gateway said", async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        "<html><head><title>Blocked</title></head><body><h1>Sorry, you have been blocked</h1></body></html>",
+        { status: 403, headers: { "content-type": "text/html" } },
+      )) as unknown as typeof fetch;
+    const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
+
+    const { cards, failures } = await provider.fetchCards({});
+    expect(cards).toHaveLength(0);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].reason).toContain("403 Forbidden");
+    expect(failures[0].reason).toContain("needs no API key");
+    expect(failures[0].reason).toContain("Blocked Sorry, you have been blocked");
+    expect(failures[0].reason).not.toContain("<");
+  });
+
+  it("lists the sets from the sets endpoint", async () => {
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      expect(new URL(String(input)).pathname).toBe("/sets");
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: "s1",
+              name: "Origins",
+              set_id: "OGN",
+              label: "Origins",
+              card_count: 298,
+            },
+            {
+              id: "s2",
+              name: "Unleashed",
+              set_id: "UNL",
+              label: "Unleashed",
+              card_count: 300,
+            },
+          ],
+          total: 2,
+          page: 1,
+          size: 100,
+          pages: 1,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+    const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
+
+    expect(await provider.fetchSets()).toEqual([
+      { code: "OGN", name: "Origins", providerExternalId: "s1" },
+      { code: "UNL", name: "Unleashed", providerExternalId: "s2" },
+    ]);
   });
 });
 
@@ -678,45 +805,36 @@ describe("Lorcana and Riftbound versions", () => {
   });
 
   it("keys a Riftbound alternate art on the card it is a version of", async () => {
+    const jinx = (
+      id: string,
+      set: string,
+      label: string,
+      number: number,
+      alternate: boolean,
+    ) => ({
+      id,
+      name: "Jinx, Loose Cannon",
+      collector_number: number,
+      classification: {
+        type: "Legend",
+        supertype: null,
+        rarity: "Rare",
+        domain: ["Chaos"],
+      },
+      set: { set_id: set, label },
+      media: { image_url: `https://cmsassets.rgpub.io/${id}.png` },
+      metadata: { alternate_art: alternate },
+    });
     const all = [
-      {
-        id: "r1",
-        name: "Jinx, Loose Cannon",
-        setId: "OGN",
-        setLabel: "Origins",
-        collectorNumber: 142,
-        type: "Legend",
-        domains: ["Chaos"],
-        alternateArt: false,
-        imageUrl: "https://cmsassets.rgpub.io/1.png",
-      },
-      {
-        id: "r2",
-        name: "Jinx, Loose Cannon",
-        setId: "OGN",
-        setLabel: "Origins",
-        collectorNumber: 300,
-        type: "Legend",
-        domains: ["Chaos"],
-        alternateArt: true,
-        imageUrl: "https://cmsassets.rgpub.io/2.png",
-      },
-      {
-        id: "r3",
-        name: "Jinx, Loose Cannon",
-        setId: "UNL",
-        setLabel: "Unleashed",
-        collectorNumber: 9,
-        type: "Legend",
-        domains: ["Chaos"],
-        alternateArt: true,
-      },
+      jinx("r1", "OGN", "Origins", 142, false),
+      jinx("r2", "OGN", "Origins", 300, true),
+      jinx("r3", "UNL", "Unleashed", 9, true),
     ];
     const fetchImpl = (async () =>
-      new Response(JSON.stringify(all), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as unknown as typeof fetch;
+      new Response(
+        JSON.stringify({ items: all, total: all.length, page: 1, size: 100, pages: 1 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as unknown as typeof fetch;
     const provider = new RiftcodexProvider({ fetchImpl, sleep: async () => {} });
 
     const { cards } = await provider.fetchCards({});
