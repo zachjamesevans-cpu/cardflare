@@ -46,7 +46,15 @@ export interface DisplayClock {
   connected: boolean;
 }
 
-export function useDisplayClock(initial: DisplayPayload, token: string): DisplayClock {
+/**
+ * `token` null means no server to ask: the store page's preview runs
+ * the real screen on a sample payload, and the only thing it needs
+ * from this hook is the ticking clock. Nothing is fetched.
+ */
+export function useDisplayClock(
+  initial: DisplayPayload,
+  token: string | null,
+): DisplayClock {
   const [payload, setPayload] = useState(initial);
   const [connected, setConnected] = useState(true);
 
@@ -62,6 +70,8 @@ export function useDisplayClock(initial: DisplayPayload, token: string): Display
   }, [initial.serverNow]);
 
   useEffect(() => {
+    if (token === null) return;
+
     let live = true;
     const controller = new AbortController();
 

@@ -103,9 +103,17 @@ const GUESS_MS = 6_000;
 export function ControlPanel({
   initial,
   token,
+  demo = false,
 }: {
   initial: DisplayPayload;
-  token: string;
+  /** Null for the store page's preview: a sample night, no polling. */
+  token: string | null;
+  /**
+   * The preview on /for-stores: every tap applies locally and nothing
+   * is written, and the voice speaks only when its Test button is
+   * pressed, never from the sample timer's own round changes.
+   */
+  demo?: boolean;
 }) {
   const { payload, now: at } = useDisplayClock(initial, token);
   const [, startAction] = useTransition();
@@ -163,6 +171,8 @@ export function ControlPanel({
       }));
     }
 
+    if (demo) return;
+
     const data = new FormData();
     data.set("timerId", timer.id);
     data.set("op", op);
@@ -173,7 +183,7 @@ export function ControlPanel({
   /* The organizer's "the round hit time" — a chime and a notification,
      without the television being involved at all — and the voice that
      says when the next round is ready. */
-  const voice = useOrganizerAlert(timers, at);
+  const voice = useOrganizerAlert(timers, at, demo);
 
   if (timers.length === 0) {
     return (
@@ -787,7 +797,11 @@ function say(line: string) {
   }
 }
 
-function useOrganizerAlert(timers: HubTimer[], now: number): OrganizerVoice {
+function useOrganizerAlert(
+  timers: HubTimer[],
+  now: number,
+  silent = false,
+): OrganizerVoice {
   const seen = useRef(new Map<string, boolean>());
   const audio = useRef<AudioContext | null>(null);
   const enabled = useSyncExternalStore(subscribeVoice, readVoicePreference, () => true);
@@ -826,9 +840,9 @@ function useOrganizerAlert(timers: HubTimer[], now: number): OrganizerVoice {
 
       if (ready === null || announced.current.get(timer.id) === ready) continue;
       announced.current.set(timer.id, ready);
-      if (enabled) say(roundReadyLine(profile, ready));
+      if (enabled && !silent) say(roundReadyLine(profile, ready));
     }
-  }, [timers, now, enabled]);
+  }, [timers, now, enabled, silent]);
 
   /* Browsers refuse audio before a gesture. The organizer taps this
      panel constantly, so the first tap quietly unlocks the chime. */
@@ -865,7 +879,7 @@ function useOrganizerAlert(timers: HubTimer[], now: number): OrganizerVoice {
 
       /* Only the TRANSITION, and only for Auto Mode tournaments: a page
          opened during time (was === undefined) stays quiet. */
-      if (!timer.autoMode || was !== false || !atTime) continue;
+      if (silent || !timer.autoMode || was !== false || !atTime) continue;
 
       organizerChime(audio.current);
 
@@ -883,7 +897,7 @@ function useOrganizerAlert(timers: HubTimer[], now: number): OrganizerVoice {
         /* Denied, unsupported, or a webview. The chime already fired. */
       }
     }
-  }, [timers, now]);
+  }, [timers, now, silent]);
 
   return {
     enabled,
