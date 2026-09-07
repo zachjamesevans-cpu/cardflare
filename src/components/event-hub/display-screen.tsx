@@ -43,7 +43,8 @@ export function DisplayScreen({
   qrSvg,
 }: {
   initial: DisplayPayload;
-  token: string;
+  /** Null for the store page's preview: a sample night, no polling. */
+  token: string | null;
   /**
    * Rendered on the server, once.
    *

@@ -38,6 +38,27 @@ test.describe("the store page", () => {
     ).toBeVisible();
   });
 
+  test("shows the real display and control panel on a sample night", async ({
+    page,
+  }) => {
+    await page.goto("/for-stores");
+
+    /* Two televisions: one mid-round, one between rounds. */
+    const frames = page.locator("iframe[src^='/display/demo']");
+    await expect(frames).toHaveCount(2);
+    await expect(frames.first()).toHaveAttribute("src", "/display/demo?scene=focus");
+    /* The organizer's phone, with Auto Mode's cockpit open. */
+    await expect(page.getByText(/round 4 target/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /start round now/i })).toBeVisible();
+  });
+
+  test("the sample display runs the real screen", async ({ page }) => {
+    await page.goto("/display/demo?scene=focus");
+    await expect(page.getByText(/wanted in the room/i)).toBeVisible();
+    await expect(page.getByText(/mox valley games/i)).toBeVisible();
+    await expect(page.getByText(/scan to join/i)).toBeVisible();
+  });
+
   test("is where the landing page sends stores", async ({ page }) => {
     await page.goto("/");
     await expect(

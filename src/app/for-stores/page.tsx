@@ -16,6 +16,11 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { UltraMark } from "@/components/stores/ultra-mark";
 import { UltraSignupForm } from "@/components/stores/ultra-signup-form";
+import {
+  AutoModePreview,
+  FlareCastPreview,
+  InventoryPreview,
+} from "@/components/stores/ultra-visuals";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Section, SectionHeading } from "@/components/ui/section";
@@ -206,6 +211,11 @@ export default async function ForStoresPage() {
               </ButtonLink>
             </div>
           </div>
+          {/* The product itself, running: the television a store leaves on
+              all night, on a sample night. It counts in real time. */}
+          <div className="mx-auto mt-12 w-full max-w-5xl">
+            <FlareCastPreview />
+          </div>
         </Section>
 
         <Section id="sales" labelledBy="sales-title" className="bg-surface">
@@ -216,6 +226,9 @@ export default async function ForStoresPage() {
             description="Every event night is a room full of people hunting specific cards. Ultra puts your case in front of the exact person looking for it."
           />
           <FeatureGrid items={SALES} />
+          <div className="mx-auto mt-8 w-full max-w-3xl">
+            <InventoryPreview />
+          </div>
         </Section>
 
         <Section id="auto-mode" labelledBy="auto-title">
@@ -225,6 +238,9 @@ export default async function ForStoresPage() {
             title="Start the tournament and let FlareCast run the room"
             description="Timers for One Piece, Pokemon, Lorcana, Riftbound, Flesh and Blood and Magic, with each game's real overtime procedure on the wall. Auto Mode takes the round changes off your plate."
           />
+          <div className="mt-12">
+            <AutoModePreview />
+          </div>
           <FeatureGrid items={AUTO} />
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-text-muted">
             Any television with a browser, or a laptop plugged into one. Nothing to
