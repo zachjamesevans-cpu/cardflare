@@ -2,11 +2,10 @@ import { Check } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { UltraMark } from "@/components/stores/ultra-mark";
+import { MaxMark, ProMark, UltraMark } from "@/components/stores/ultra-mark";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
-import { VENDOR_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
 
 /**
  * The four ways into cardflare, priced honestly.
@@ -58,9 +57,7 @@ const TIERS: Tier[] = [
       "Animated everything, including GIF profile pictures",
       "Your look follows you on web and app",
     ],
-    /* Sold through Apple in the iPhone app; no web checkout yet, and a
-       buy button that cannot buy is banned fake functionality. */
-    cta: { note: "Subscribe in the iPhone app" },
+    cta: { label: "See Pro", href: "/pro" },
   },
   {
     name: "Ultra",
@@ -73,7 +70,7 @@ const TIERS: Tier[] = [
       "FlareCast on your TV, with Auto Mode for tournaments",
       "TCGplayer inventory matched to every want in the room",
     ],
-    cta: { label: "Start your free trial", href: "/for-stores" },
+    cta: { label: "See Ultra", href: "/ultra" },
   },
   {
     name: "Max",
@@ -85,7 +82,7 @@ const TIERS: Tier[] = [
       "Inventory matching against the room's wants",
       "We set your booth up with you",
     ],
-    cta: { label: "Request an invite", href: VENDOR_PILOT_ANCHOR },
+    cta: { label: "See Max", href: "/max" },
   },
 ];
 
@@ -107,7 +104,15 @@ export function Pricing() {
           >
             <div className="flex flex-col gap-1">
               <h3 className="text-lg font-bold text-text-primary">
-                {tier.name === "Ultra" ? <UltraMark /> : tier.name}
+                {tier.name === "Ultra" ? (
+                  <UltraMark />
+                ) : tier.name === "Pro" ? (
+                  <ProMark />
+                ) : tier.name === "Max" ? (
+                  <MaxMark />
+                ) : (
+                  tier.name
+                )}
               </h3>
               <p className="text-sm text-text-secondary">{tier.audience}</p>
             </div>

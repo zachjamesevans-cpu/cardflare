@@ -24,7 +24,7 @@ import {
 const GENERIC = "Something went wrong. Please try again in a moment.";
 
 /**
- * The trial button on /for-stores.
+ * The trial button on /ultra.
  *
  * Makes the account, signs it in, and hands the browser to Stripe's
  * hosted checkout with the fourteen-day trial asked for. When Stripe is

@@ -8,7 +8,7 @@ import { siteUrl } from "@/lib/site";
 /**
  * FlareCast, running a sample night.
  *
- * The frame on /for-stores points here. It is the real display
+ * The frame on /ultra points here. It is the real display
  * component on the real payload shape, so the preview is the product;
  * the only differences are that nothing polls, nothing is written, and
  * the code on screen leads back to the store page rather than into a
@@ -29,7 +29,7 @@ export default async function DemoDisplayPage({
 }) {
   const { scene } = await searchParams;
   const chosen = isDemoScene(scene) ? scene : "focus";
-  const back = `${siteUrl()}/for-stores`;
+  const back = `${siteUrl()}/ultra`;
 
   const qrSvg = await QRCode.toString(back, {
     type: "svg",

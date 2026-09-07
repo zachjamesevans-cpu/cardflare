@@ -17,7 +17,7 @@ import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
  * One card that always says where the store stands and offers the one
  * thing to do about it: start the trial, or open Stripe's page to
  * change the card or cancel. Never a second copy of the pitch; that is
- * what /for-stores is for.
+ * what /ultra is for.
  */
 export function BillingCard({
   storeId,

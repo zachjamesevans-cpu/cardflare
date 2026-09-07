@@ -75,11 +75,14 @@ export default async function CustomizePage({
           <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
           <p className="text-sm text-text-secondary">{copy.blurb}</p>
           {/* Honest before anything is tapped: browsing is free, wearing
-              is Pro. No buy button here — Pro is sold in the app. */}
+              is Pro. The door is /pro, which sells it where it can. */}
           {!customizationAllowed && (
             <p className="rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
-              Wearing cosmetics is a cardflare Pro feature. Get Pro in the cardflare
-              app, and everything you equip shows here too.
+              Wearing cosmetics is a cardflare Pro feature.{" "}
+              <Link href="/pro" className="underline underline-offset-4">
+                Get Pro
+              </Link>
+              , and everything you equip shows here too.
             </p>
           )}
         </div>

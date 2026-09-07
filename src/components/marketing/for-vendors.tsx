@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { VENDOR_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
 
-const BENEFITS = [
+export const VENDOR_BENEFITS = [
   {
     icon: Package,
     title: "Upload before the show",
@@ -43,7 +43,7 @@ export function ForVendors() {
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2">
-        {BENEFITS.map((benefit) => (
+        {VENDOR_BENEFITS.map((benefit) => (
           <Card key={benefit.title} className="flex flex-col gap-4">
             <span className="flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-accent/30 bg-accent/10">
               <benefit.icon className="size-5 text-accent" aria-hidden="true" />

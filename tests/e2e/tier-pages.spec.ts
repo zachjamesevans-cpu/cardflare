@@ -5,9 +5,56 @@ import { expect, test } from "@playwright/test";
  * No database is needed for any of this; the form itself posts to a
  * Server Action that needs one, so submitting is not exercised here.
  */
-test.describe("the store page", () => {
-  test("pitches Ultra with the price, the trial and the voice", async ({ page }) => {
+test.describe("the tier pages", () => {
+  test("/for-stores lands on /ultra", async ({ page }) => {
     await page.goto("/for-stores");
+    await expect(page).toHaveURL(/\/ultra$/);
+  });
+
+  test("/pro pitches Pro with the app's own three lines", async ({ page }) => {
+    await page.goto("/pro");
+    await expect(page).toHaveTitle(/cardflare pro/i);
+    const title = page.getByRole("heading", { level: 1 });
+    await expect(title.locator(".gold-text")).toHaveText("Pro");
+    await expect(page.getByText("$7.99").first()).toBeVisible();
+    await expect(
+      page.getByText("Wear cosmetics: rings, auras, card borders, titles"),
+    ).toBeVisible();
+    /* Signed out: the free account comes first. */
+    await expect(
+      page.getByRole("link", { name: /create your account/i }),
+    ).toBeVisible();
+  });
+
+  test("/max pitches Max by invite", async ({ page }) => {
+    await page.goto("/max");
+    await expect(page).toHaveTitle(/cardflare max/i);
+    const title = page.getByRole("heading", { level: 1 });
+    await expect(title.locator(".shimmer-text")).toHaveText("Max");
+    await expect(page.getByText(/by invite/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /request an invite/i }).first(),
+    ).toBeVisible();
+  });
+
+  test("the pricing row sends each tier to its own page", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /^see pro$/i })).toHaveAttribute(
+      "href",
+      "/pro",
+    );
+    await expect(page.getByRole("link", { name: /^see ultra$/i })).toHaveAttribute(
+      "href",
+      "/ultra",
+    );
+    await expect(page.getByRole("link", { name: /^see max$/i })).toHaveAttribute(
+      "href",
+      "/max",
+    );
+  });
+
+  test("pitches Ultra with the price, the trial and the voice", async ({ page }) => {
+    await page.goto("/ultra");
 
     await expect(page).toHaveTitle(/ultra/i);
     const title = page.getByRole("heading", { level: 1 });
@@ -26,7 +73,7 @@ test.describe("the store page", () => {
   });
 
   test("offers the trial form with the five fields", async ({ page }) => {
-    await page.goto("/for-stores");
+    await page.goto("/ultra");
 
     await expect(page.getByLabel("Store name")).toBeVisible();
     await expect(page.getByLabel("City")).toBeVisible();
@@ -41,7 +88,7 @@ test.describe("the store page", () => {
   test("shows the real display and control panel on a sample night", async ({
     page,
   }) => {
-    await page.goto("/for-stores");
+    await page.goto("/ultra");
 
     /* Two televisions: one mid-round, one between rounds. */
     const frames = page.locator("iframe[src^='/display/demo']");
@@ -63,6 +110,6 @@ test.describe("the store page", () => {
     await page.goto("/");
     await expect(
       page.getByRole("link", { name: /see ultra and start your trial/i }),
-    ).toHaveAttribute("href", "/for-stores");
+    ).toHaveAttribute("href", "/ultra");
   });
 });
