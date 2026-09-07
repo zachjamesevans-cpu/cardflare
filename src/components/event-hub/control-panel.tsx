@@ -73,6 +73,7 @@ import {
   type HubTimer,
   type TimerPatch,
 } from "@/lib/event-hub/timer";
+import { roundReadyLine, VOICE_STORAGE_KEY } from "@/lib/event-hub/voice";
 import { useDisplayClock } from "./display-clock";
 
 /**
@@ -170,8 +171,9 @@ export function ControlPanel({
   };
 
   /* The organizer's "the round hit time" — a chime and a notification,
-     without the television being involved at all. */
-  useOrganizerAlert(timers, at);
+     without the television being involved at all — and the voice that
+     says when the next round is ready. */
+  const voice = useOrganizerAlert(timers, at);
 
   if (timers.length === 0) {
     return (
@@ -184,6 +186,7 @@ export function ControlPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      <VoiceToggle voice={voice} />
       {timers.map((timer, index) => (
         <TimerCard
           key={timer.id}
@@ -725,9 +728,107 @@ function TimerCard({
  * can fire on page load, because a phone opened mid-intermission has
  * nothing new to announce.
  */
-function useOrganizerAlert(timers: HubTimer[], now: number) {
+/**
+ * The voice on the organizer's computer.
+ *
+ * The founder's line, word for word: "(game name) is ready for (round)
+ * on the TO's computer." It speaks at the moment the next round is
+ * ready, whether Auto Mode is starting it or is waiting for a person,
+ * and once per round, so a page that keeps polling does not keep
+ * talking. On this computer only: the television never speaks, and
+ * the choice is remembered per browser.
+ */
+interface OrganizerVoice {
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
+  /** Says the sample line, which also wakes speech on browsers that
+      need a tap before they will talk. */
+  test: () => void;
+}
+
+function readVoicePreference(): boolean {
+  try {
+    return window.localStorage.getItem(VOICE_STORAGE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/* The preference is an external store: read through
+   useSyncExternalStore so the server renders "on", the browser
+   corrects it on hydration, and a change re-renders every reader. */
+const voiceListeners = new Set<() => void>();
+
+function subscribeVoice(listener: () => void): () => void {
+  voiceListeners.add(listener);
+  return () => {
+    voiceListeners.delete(listener);
+  };
+}
+
+function writeVoicePreference(value: boolean) {
+  try {
+    window.localStorage.setItem(VOICE_STORAGE_KEY, value ? "on" : "off");
+  } catch {
+    /* Not remembered, still applied for this visit. */
+  }
+  for (const listener of voiceListeners) listener();
+}
+
+function say(line: string) {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(line);
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    /* No voice on this device. The chime and the screen still work. */
+  }
+}
+
+function useOrganizerAlert(timers: HubTimer[], now: number): OrganizerVoice {
   const seen = useRef(new Map<string, boolean>());
   const audio = useRef<AudioContext | null>(null);
+  const enabled = useSyncExternalStore(subscribeVoice, readVoicePreference, () => true);
+  /* Which round each timer was last announced ready for. */
+  const announced = useRef(new Map<string, number>());
+  /* Where each timer stood on the last tick, to catch a round starting. */
+  const lastRound = useRef(new Map<string, number | null>());
+
+  const setEnabled = writeVoicePreference;
+
+  useEffect(() => {
+    for (const timer of timers) {
+      const profile = GAME_PROFILES[timer.game];
+      const intermission = intermissionFor(timer, now);
+      const previousRound = lastRound.current.get(timer.id);
+      lastRound.current.set(timer.id, timer.round);
+
+      /* The round the panel should announce, if any: the one Auto Mode
+         is about to start or is waiting to start, or the one that just
+         began by any hand. A page opened mid-round (previousRound
+         undefined) stays quiet about the round already running. */
+      let ready: number | null = null;
+      if (
+        intermission &&
+        (intermission.state === "due" || intermission.state === "waiting")
+      ) {
+        ready = intermission.nextRound;
+      } else if (
+        previousRound !== undefined &&
+        timer.round !== null &&
+        previousRound !== null &&
+        timer.round > previousRound
+      ) {
+        ready = timer.round;
+      }
+
+      if (ready === null || announced.current.get(timer.id) === ready) continue;
+      announced.current.set(timer.id, ready);
+      if (enabled) say(roundReadyLine(profile, ready));
+    }
+  }, [timers, now, enabled]);
 
   /* Browsers refuse audio before a gesture. The organizer taps this
      panel constantly, so the first tap quietly unlocks the chime. */
@@ -783,6 +884,47 @@ function useOrganizerAlert(timers: HubTimer[], now: number) {
       }
     }
   }, [timers, now]);
+
+  return {
+    enabled,
+    setEnabled,
+    test: () => say(roundReadyLine(GAME_PROFILES[timers[0]?.game ?? "one-piece"], 2)),
+  };
+}
+
+function VoiceToggle({ voice }: { voice: OrganizerVoice }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-surface px-3 py-2">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm font-semibold text-text-primary">
+          Voice on this computer
+        </span>
+        <span className="text-xs text-text-muted">
+          Says when the next round is ready. The television stays silent.
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={voice.test}
+          aria-label="Test the voice"
+        >
+          Test
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={voice.enabled ? "primary" : "secondary"}
+          onClick={() => voice.setEnabled(!voice.enabled)}
+          aria-pressed={voice.enabled}
+        >
+          {voice.enabled ? "Voice on" : "Voice off"}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /** Two rising blips — noticeable across a counter, never a klaxon. */

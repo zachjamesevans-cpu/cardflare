@@ -34,7 +34,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-const { tierForPlayer, upsertStripeSubscription } =
+const { syncStoreTierFromSubscription, tierForPlayer, upsertStripeSubscription } =
   await import("@/lib/billing/repository");
 
 const FACTS = {
@@ -131,5 +131,57 @@ describe("tierForPlayer", () => {
 
   it("answers free for a player with no subscription at all", async () => {
     await expect(tierForPlayer("player-1")).resolves.toBeNull();
+  });
+});
+
+describe("syncStoreTierFromSubscription", () => {
+  const trialing = {
+    id: "sub-row",
+    tier: "ultra",
+    store_id: "store-1",
+    player_id: null,
+    status: "trialing",
+    current_period_end: new Date(Date.now() + 86_400_000).toISOString(),
+    cancel_at_period_end: false,
+  };
+
+  it("lifts a free store to ultra while the trial entitles it", async () => {
+    queues.subscriptions = [{ data: trialing, error: null }];
+    queues.stores = [{ data: { tier: "free" }, error: null }];
+
+    await syncStoreTierFromSubscription("store-1");
+
+    expect(calls.update?.[0]).toEqual([{ tier: "ultra" }]);
+  });
+
+  it("lowers an ultra store once its subscription no longer entitles", async () => {
+    queues.subscriptions = [
+      {
+        data: {
+          ...trialing,
+          status: "canceled",
+          current_period_end: new Date(Date.now() - 86_400_000).toISOString(),
+        },
+        error: null,
+      },
+    ];
+    queues.stores = [{ data: { tier: "ultra" }, error: null }];
+
+    await syncStoreTierFromSubscription("store-1");
+
+    expect(calls.update?.[0]).toEqual([{ tier: "free" }]);
+  });
+
+  it("leaves a store alone when nothing has changed, or there is no row", async () => {
+    queues.subscriptions = [{ data: trialing, error: null }];
+    queues.stores = [{ data: { tier: "ultra" }, error: null }];
+    await syncStoreTierFromSubscription("store-1");
+    expect(calls.update).toBeUndefined();
+
+    queues.subscriptions = [{ data: null, error: null }];
+    queues.stores = [{ data: { tier: "ultra" }, error: null }];
+    await syncStoreTierFromSubscription("store-1");
+    /* An admin-granted tier with no subscription row is never touched. */
+    expect(calls.update).toBeUndefined();
   });
 });

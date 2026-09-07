@@ -57,6 +57,6 @@ export const NAV_LINKS = [
   { href: ANCHORS.howItWorks, label: "How It Works" },
   { href: ANCHORS.forPlayers, label: "For Players" },
   { href: ANCHORS.forVendors, label: "For Vendors" },
-  { href: ANCHORS.forStores, label: "For Stores" },
+  { href: "/for-stores", label: "For Stores" },
   { href: ANCHORS.pricing, label: "Pricing" },
 ] as const;

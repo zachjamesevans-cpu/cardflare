@@ -127,6 +127,13 @@ export async function createCheckoutSession(entry: {
   customerEmail?: string;
   successUrl: string;
   cancelUrl: string;
+  /**
+   * Days before the first charge. Stripe holds the card, marks the
+   * subscription `trialing`, and the webhook's first event already
+   * entitles the store; the charge lands when the trial ends unless
+   * they cancel from the billing portal first.
+   */
+  trialDays?: number;
 }): Promise<StripeResult<{ id: string; url: string }>> {
   if (!isTier(entry.tier)) return { ok: false, reason: "stripe-error" };
 
@@ -145,8 +152,13 @@ export async function createCheckoutSession(entry: {
     success_url: entry.successUrl,
     cancel_url: entry.cancelUrl,
     ...(entry.customerEmail ? { customer_email: entry.customerEmail } : {}),
+    /* A code a rep hands a store at a convention works at the till. */
+    allow_promotion_codes: true,
     metadata,
-    subscription_data: { metadata },
+    subscription_data: {
+      metadata,
+      ...(entry.trialDays ? { trial_period_days: entry.trialDays } : {}),
+    },
   });
 }
 

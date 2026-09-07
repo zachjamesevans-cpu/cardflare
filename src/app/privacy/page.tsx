@@ -46,6 +46,12 @@ export default function PrivacyPage() {
             Apple bills it and holds your payment details; we receive the transaction
             reference and its status, never your card.
           </li>
+          <li>
+            If your store subscribes to {SITE.name} Ultra, Stripe takes the payment on
+            its own page and holds the card. We store Stripe&rsquo;s customer and
+            subscription references and the subscription&rsquo;s status, never the card
+            number.
+          </li>
         </ul>
         <p>When a store or vendor requests an invite we store:</p>
         <ul>

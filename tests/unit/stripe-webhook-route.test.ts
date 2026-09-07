@@ -10,11 +10,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const upsertStripeSubscription = vi.fn();
 const markStripeSubscriptionCanceled = vi.fn();
+const syncPlayerTierFromSubscription = vi.fn();
+const syncStoreTierFromSubscription = vi.fn();
 
 vi.mock("@/lib/billing/repository", () => ({
   upsertStripeSubscription: (...a: unknown[]) => upsertStripeSubscription(...a),
   markStripeSubscriptionCanceled: (...a: unknown[]) =>
     markStripeSubscriptionCanceled(...a),
+  syncPlayerTierFromSubscription: (...a: unknown[]) =>
+    syncPlayerTierFromSubscription(...a),
+  syncStoreTierFromSubscription: (...a: unknown[]) =>
+    syncStoreTierFromSubscription(...a),
 }));
 
 const route = await import("@/app/api/webhooks/stripe/route");
@@ -89,6 +95,10 @@ describe("POST /api/webhooks/stripe", () => {
       currentPeriodEnd: 1_700_000_000,
       cancelAtPeriodEnd: false,
     });
+    /* The console and the directory badge read stores.tier, so the
+       event pushes the money table's change there. */
+    expect(syncStoreTierFromSubscription).toHaveBeenCalledWith("store-1");
+    expect(syncPlayerTierFromSubscription).not.toHaveBeenCalled();
   });
 
   it("marks a deleted subscription canceled", async () => {

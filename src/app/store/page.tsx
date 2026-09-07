@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { BillingCard, billingNotice } from "@/components/stores/billing-card";
+import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 import { SyncSinglesForm } from "@/components/singles/sync-singles-form";
 import { VendorInventoryForm } from "@/components/shows/vendor-inventory-form";
 import { VendorInventoryList } from "@/components/shows/vendor-inventory-list";
@@ -40,7 +42,7 @@ export const dynamic = "force-dynamic";
 export default async function StorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ as?: string }>;
+  searchParams: Promise<{ as?: string; checkout?: string; welcome?: string }>;
 }) {
   const viewer = await getViewer();
 
@@ -92,7 +94,8 @@ export default async function StorePage({
    * anything not in the RLS-filtered list falls back to the first store, so
    * the parameter can never reach a store this account is not a member of.
    */
-  const { as } = await searchParams;
+  const params = await searchParams;
+  const { as } = params;
   const store = stores?.find((row) => row.id === as) ?? stores?.[0];
 
   const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
@@ -164,6 +167,7 @@ export default async function StorePage({
   const counterQr = store ? await joinQrSvg(store.join_code) : null;
 
   const sync = store ? await singlesSyncFor(store.id) : null;
+  const plan = store ? await storePlan(store.id) : null;
   const lastSync = sync
     ? {
         when: new Intl.DateTimeFormat("en-US", {
@@ -185,6 +189,20 @@ export default async function StorePage({
       areas={areas}
       currentArea={currentArea}
     >
+      {store && plan && (
+        <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
+          <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
+            Your plan
+          </h2>
+          <BillingCard
+            storeId={store.id}
+            plan={plan}
+            sellable={ultraIsSellable()}
+            notice={billingNotice(params)}
+          />
+        </section>
+      )}
+
       {store && counterQr && (
         <section className="flex flex-col gap-5" aria-labelledby="counter-code-heading">
           <h2 id="counter-code-heading" className="text-xl font-bold text-text-primary">

@@ -259,6 +259,37 @@ export async function syncPlayerTierFromSubscription(playerId: string): Promise<
   if (error) console.error("Could not sync the player's tier", error);
 }
 
+/**
+ * Makes `stores.tier` agree with the money table, the store twin of the
+ * player sync above. The directory badge, the console's plan card and
+ * any future gate read the column; the subscription row is where the
+ * truth lives. An admin-granted tier with no subscription row is never
+ * touched, and a lapse lowers only a store the row itself had lifted.
+ */
+export async function syncStoreTierFromSubscription(storeId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const admin = getSupabaseAdmin();
+
+  const [subscription, { data: store }] = await Promise.all([
+    subscriptionForStore(storeId),
+    admin.from("stores").select("tier").eq("id", storeId).maybeSingle(),
+  ]);
+
+  if (!store || !subscription) return;
+
+  const entitled = entitledTier(subscription);
+  const paid = entitled === "ultra" || entitled === "max" ? entitled : null;
+
+  const next =
+    paid && store.tier !== paid ? paid : !paid && store.tier !== "free" ? "free" : null;
+
+  if (next === null) return;
+
+  const { error } = await admin.from("stores").update({ tier: next }).eq("id", storeId);
+  if (error) console.error("Could not sync the store's tier", error);
+}
+
 /** Marks a Stripe subscription ended; the entitlement tail still honours
     whatever period was already paid. */
 export async function markStripeSubscriptionCanceled(

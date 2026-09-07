@@ -2,6 +2,7 @@ import { verifyStripeSignature } from "@/lib/billing/stripe-webhook";
 import {
   markStripeSubscriptionCanceled,
   syncPlayerTierFromSubscription,
+  syncStoreTierFromSubscription,
   upsertStripeSubscription,
 } from "@/lib/billing/repository";
 
@@ -77,6 +78,9 @@ export async function POST(request: Request): Promise<Response> {
       if (subscription.metadata?.player_id) {
         await syncPlayerTierFromSubscription(subscription.metadata.player_id);
       }
+      if (subscription.metadata?.store_id) {
+        await syncStoreTierFromSubscription(subscription.metadata.store_id);
+      }
       break;
     }
 
@@ -84,6 +88,8 @@ export async function POST(request: Request): Promise<Response> {
       await markStripeSubscriptionCanceled(event.data.object.id);
       const playerId = event.data.object.metadata?.player_id ?? null;
       if (playerId) await syncPlayerTierFromSubscription(playerId);
+      const storeId = event.data.object.metadata?.store_id ?? null;
+      if (storeId) await syncStoreTierFromSubscription(storeId);
       break;
     }
 
