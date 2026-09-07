@@ -106,6 +106,17 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
+      <LegalSection heading={`${SITE.name} Ultra`}>
+        <p>
+          {SITE.name} Ultra is a monthly subscription for game stores, billed through
+          Stripe to the card on file. It starts with a free trial; if you cancel before
+          the trial ends, nothing is charged. After that it renews each month at the
+          price shown when you subscribed, until you cancel from your store console or
+          the billing page. Cancelling takes effect at the end of the period you already
+          paid for. We may change the price with notice before you are charged.
+        </p>
+      </LegalSection>
+
       <LegalSection heading="Closing your account">
         <p>
           You can delete your account at any time from your profile settings in the app

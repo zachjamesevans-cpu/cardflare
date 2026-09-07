@@ -2,9 +2,11 @@ import { Check } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { UltraMark } from "@/components/stores/ultra-mark";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
-import { STORE_PILOT_ANCHOR, VENDOR_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
+import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
+import { VENDOR_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
 
 /**
  * The four ways into cardflare, priced honestly.
@@ -63,15 +65,15 @@ const TIERS: Tier[] = [
   {
     name: "Ultra",
     audience: "Local game stores",
-    price: "By invite",
-    cadence: null,
+    price: ULTRA_PRICE_LABEL,
+    cadence: "/month",
     points: [
-      "Counter code and walk-in rooms",
-      "Event Hub: timers, boards, the TV display",
-      "FlareCast: the room's wants on your screen",
-      "We set your store up with you",
+      `${ULTRA_TRIAL_DAYS}-day free trial, cancel any time`,
+      "Counter code, walk-in rooms and every event night",
+      "FlareCast on your TV, with Auto Mode for tournaments",
+      "TCGplayer inventory matched to every want in the room",
     ],
-    cta: { label: "Request an invite", href: STORE_PILOT_ANCHOR },
+    cta: { label: "Start your free trial", href: "/for-stores" },
   },
   {
     name: "Max",
@@ -93,8 +95,8 @@ export function Pricing() {
       <SectionHeading
         id="pricing-title"
         eyebrow="Pricing"
-        title="Free for players. Invites for the counter."
-        description="A player account costs nothing and works today. Stores and vendors get set up personally, so those tiers start with a conversation."
+        title="Free for players. Fourteen days free for stores."
+        description="A player account costs nothing and works today. A store starts its trial in two minutes; vendors get set up personally, so that tier starts with a conversation."
       />
 
       <div className="mx-auto mt-12 grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -104,7 +106,9 @@ export function Pricing() {
             className={`flex flex-col gap-4 ${tier.featured ? "border-accent" : ""}`}
           >
             <div className="flex flex-col gap-1">
-              <h3 className="text-lg font-bold text-text-primary">{tier.name}</h3>
+              <h3 className="text-lg font-bold text-text-primary">
+                {tier.name === "Ultra" ? <UltraMark /> : tier.name}
+              </h3>
               <p className="text-sm text-text-secondary">{tier.audience}</p>
             </div>
 

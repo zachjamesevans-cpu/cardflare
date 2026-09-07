@@ -334,6 +334,36 @@
  * — nothing loops, nothing strobes, and the whole screen never flashes.
  * Both are inside `motion-safe:` at the call site.
  */
+/*
+ * Holo text: the foil behind "Ultra" on the store page and the
+ * pricing card. The same gradient and pan as the Holographic name
+ * cosmetic in cosmetic-art.css, kept here because this is brand, not
+ * a cosmetic anybody buys.
+ */
+.holo-text {
+  background: linear-gradient(
+    100deg,
+    #ff5e5e,
+    #ffb44d,
+    #f4e04d,
+    #6ee7a8,
+    #5eb9ff,
+    #9b8cff,
+    #ff7ad9
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cfa-pan 6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holo-text {
+    animation: none;
+  }
+}
+
 @keyframes cf-overtime-in {
   from {
     opacity: 0;

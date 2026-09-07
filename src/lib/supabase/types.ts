@@ -907,7 +907,7 @@ export type PlayerGameInsert = Omit<PlayerGameRow, "created_at"> & {
 };
 
 export type StoreClaimStatus = "unclaimed" | "pending" | "claimed";
-export type StoreTier = "free" | "ultra";
+export type StoreTier = "free" | "ultra" | "max";
 export type StoreListingState = "draft" | "published";
 export type StoreClaimState = "pending" | "approved" | "rejected" | "more-info";
 

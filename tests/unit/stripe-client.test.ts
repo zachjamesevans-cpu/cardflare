@@ -86,6 +86,51 @@ describe("createCheckoutSession", () => {
     expect(body.get("subscription_data[metadata][player_id]")).toBe("player-1");
   });
 
+  it("asks Stripe for the trial and lets a promo code through, for a store", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ id: "cs_2", url: "https://checkout.stripe.com/y" }),
+      ),
+    );
+
+    await createCheckoutSession({
+      tier: "ultra",
+      storeId: "store-1",
+      customerEmail: "owner@shop.example",
+      successUrl: "https://cardflare.gg/store?checkout=success",
+      cancelUrl: "https://cardflare.gg/store",
+      trialDays: 14,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get("line_items[0][price]")).toBe("price_ultra_1");
+    expect(body.get("subscription_data[trial_period_days]")).toBe("14");
+    expect(body.get("subscription_data[metadata][store_id]")).toBe("store-1");
+    expect(body.get("metadata[store_id]")).toBe("store-1");
+    expect(body.get("customer_email")).toBe("owner@shop.example");
+    expect(body.get("allow_promotion_codes")).toBe("true");
+  });
+
+  it("asks for no trial unless one was given", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ id: "cs_3", url: "https://checkout.stripe.com/z" }),
+      ),
+    );
+
+    await createCheckoutSession({
+      tier: "pro",
+      playerId: "player-1",
+      successUrl: "https://x",
+      cancelUrl: "https://x",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get("subscription_data[trial_period_days]")).toBeNull();
+  });
+
   it("answers not-configured for a tier with no price, without calling out", async () => {
     const result = await createCheckoutSession({
       tier: "max",

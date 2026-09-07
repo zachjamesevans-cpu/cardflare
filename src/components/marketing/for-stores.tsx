@@ -3,7 +3,9 @@ import { BarChart3, CalendarCheck, QrCode, Store, TrendingUp } from "lucide-reac
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Section, SectionHeading } from "@/components/ui/section";
-import { STORE_PILOT_ANCHOR } from "@/lib/waitlist/preselect";
+import { UltraMark } from "@/components/stores/ultra-mark";
+import { SITE } from "@/lib/site";
+import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 
 const BENEFITS = [
   {
@@ -63,15 +65,17 @@ export function ForStores() {
       <div className="mt-10 flex flex-col items-center gap-4 rounded-[var(--radius-panel)] border border-border bg-surface px-6 py-8 text-center">
         <Store className="size-6 text-accent" aria-hidden="true" />
         <p className="max-w-lg text-pretty text-text-secondary">
-          Ultra is set up with us, store by store: counter code, Event Hub, the TV on
-          the wall. Tell us about your shop and we will get you running.
+          {SITE.name} <UltraMark /> is {ULTRA_PRICE_LABEL} a month with{" "}
+          {ULTRA_TRIAL_DAYS} days free: counter code, FlareCast on the TV, Auto Mode for
+          tournaments and your inventory matched to the room. Your store is running
+          tonight.
         </p>
         <ButtonLink
-          href={STORE_PILOT_ANCHOR}
+          href="/for-stores"
           size="lg"
           data-analytics-event="store_pilot_cta_clicked"
         >
-          Request an invite
+          See Ultra and start your trial
         </ButtonLink>
       </div>
     </Section>
