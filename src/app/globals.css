@@ -358,8 +358,27 @@
   animation: cfa-pan 6s linear infinite;
 }
 
+/* Pro: the Gold name. Max: the Shimmer name. Same clip, same reason. */
+.gold-text {
+  background: linear-gradient(180deg, #fff3c4 10%, #f0c24b 45%, #8a6414 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 4px rgba(240, 194, 75, 0.45));
+}
+
+.shimmer-text {
+  background: linear-gradient(100deg, #b3becc 40%, #ffffff 50%, #b3becc 60%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cfa-pan 4s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .holo-text {
+  .holo-text,
+  .shimmer-text {
     animation: none;
   }
 }

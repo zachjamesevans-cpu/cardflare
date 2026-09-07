@@ -15,11 +15,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: `${origin}/for-stores`,
+      url: `${origin}/ultra`,
       lastModified,
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    { url: `${origin}/pro`, lastModified, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${origin}/max`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     {
       url: `${origin}/tournaments`,
       lastModified,

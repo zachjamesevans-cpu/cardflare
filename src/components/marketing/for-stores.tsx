@@ -71,7 +71,7 @@ export function ForStores() {
           tonight.
         </p>
         <ButtonLink
-          href="/for-stores"
+          href="/ultra"
           size="lg"
           data-analytics-event="store_pilot_cta_clicked"
         >

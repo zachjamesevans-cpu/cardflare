@@ -37,7 +37,7 @@ export function AutoModePreview() {
       />
       <PhoneFrame label="The organizer's phone at the same moment: hold, add two minutes, or start now.">
         <ControlPanel
-          initial={demoDisplayPayload("intermission", now, `${siteUrl()}/for-stores`)}
+          initial={demoDisplayPayload("intermission", now, `${siteUrl()}/ultra`)}
           token={null}
           demo
         />

@@ -35,8 +35,8 @@ describe("the sample night", () => {
   });
 
   it("points the code on screen back at the store page", () => {
-    const payload = demoDisplayPayload("focus", now, "https://cardflare.gg/for-stores");
-    expect(payload.joinUrl).toBe("https://cardflare.gg/for-stores");
+    const payload = demoDisplayPayload("focus", now, "https://cardflare.gg/ultra");
+    expect(payload.joinUrl).toBe("https://cardflare.gg/ultra");
     expect(payload.layout).toBe("single");
     expect(payload.timers).toHaveLength(1);
   });

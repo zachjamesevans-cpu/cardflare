@@ -109,7 +109,7 @@ export function ControlPanel({
   /** Null for the store page's preview: a sample night, no polling. */
   token: string | null;
   /**
-   * The preview on /for-stores: every tap applies locally and nothing
+   * The preview on /ultra: every tap applies locally and nothing
    * is written, and the voice speaks only when its Test button is
    * pressed, never from the sample timer's own round changes.
    */
