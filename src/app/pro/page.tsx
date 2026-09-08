@@ -21,6 +21,7 @@ import {
 import { playerForUser } from "@/lib/players/accounts";
 import { SITE } from "@/lib/site";
 import { planDate } from "@/lib/stores/ultra";
+import { reconcileCheckoutSession } from "@/lib/billing/reconcile";
 
 export const metadata: Metadata = {
   title: "cardflare Pro",
@@ -70,9 +71,9 @@ const FAQ = [
 export default async function ProPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string }>;
+  searchParams: Promise<{ checkout?: string; session_id?: string }>;
 }) {
-  const { checkout } = await searchParams;
+  const { checkout, session_id } = await searchParams;
   const viewer = await getViewer();
   const sellable = proIsSellableOnWeb();
 
@@ -82,6 +83,11 @@ export default async function ProPage({
       : viewer.kind === "anonymous"
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
+  /* Back from Stripe: read the session now rather than wait for the
+     webhook, so the page says Pro to somebody who just paid for it. */
+  if (checkout === "success" && session_id && playerId) {
+    await reconcileCheckoutSession(session_id, { playerId });
+  }
   const plan = playerId ? await proPlanForPlayer(playerId) : null;
 
   const notice =

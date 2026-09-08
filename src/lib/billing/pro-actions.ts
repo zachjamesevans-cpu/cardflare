@@ -38,7 +38,7 @@ export async function startProCheckoutAction(): Promise<void> {
     playerId,
     customerEmail:
       viewer.kind === "anonymous" ? undefined : (viewer.user.email ?? undefined),
-    successUrl: `${origin}/pro?checkout=success`,
+    successUrl: `${origin}/pro?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${origin}/pro?checkout=cancelled`,
   });
 

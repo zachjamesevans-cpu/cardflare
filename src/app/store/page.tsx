@@ -1,36 +1,26 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { CalendarDays, MonitorPlay } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
-import { BillingCard, billingNotice } from "@/components/stores/billing-card";
-import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
-import { SyncSinglesForm } from "@/components/singles/sync-singles-form";
-import { VendorInventoryForm } from "@/components/shows/vendor-inventory-form";
-import { VendorInventoryList } from "@/components/shows/vendor-inventory-list";
-import { VendorShows } from "@/components/shows/vendor-shows";
-import { EarlyBoardPicker } from "@/components/events/early-board-picker";
-import { TimeZonePicker } from "@/components/events/timezone-picker";
-import { CreateEventForm } from "@/components/events/create-event-form";
-import { EventList } from "@/components/events/event-list";
 import { AppShell } from "@/components/layout/app-shell";
+import { BillingCard, billingNotice } from "@/components/stores/billing-card";
+import {
+  SetupChecklist,
+  WelcomeHero,
+  type SetupStep,
+} from "@/components/stores/onboarding";
+import { StoreTabs } from "@/components/stores/store-tabs";
+import { VendorConsole } from "@/components/stores/vendor-console";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { areasForUser } from "@/lib/auth/areas";
-import { getViewer } from "@/lib/auth/session";
-import { defaultEventWindow } from "@/lib/events/format";
-import { countParticipants } from "@/lib/events/participants";
+import { reconcileCheckoutSession } from "@/lib/billing/reconcile";
+import { listDisplays } from "@/lib/event-hub/repository";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
-import { cardImagesEnabled } from "@/lib/cards/images";
-import { viewerGames } from "@/lib/players/viewer-games";
-import {
-  boothsForStore,
-  listClaimableShows,
-  listInventory,
-} from "@/lib/shows/repository";
 import { singlesSyncFor } from "@/lib/singles/repository";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
+import { planDate, storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
 export const metadata: Metadata = {
   title: "Your store",
@@ -39,37 +29,40 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The console's front page: what to do, and the code to print.
+ *
+ * It used to be every section of the console on one long scroll. The
+ * founder: "kind of just a massive fart of a bunch of screens." Now
+ * the front page is the welcome, the four things to do first, the
+ * counter code, and the plan; the television, the events, the case
+ * and the settings each have a tab. A store that has done all four
+ * things sees the code and the plan and nothing nagging.
+ */
 export default async function StorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ as?: string; checkout?: string; welcome?: string }>;
+  searchParams: Promise<{
+    as?: string;
+    checkout?: string;
+    welcome?: string;
+    session_id?: string;
+  }>;
 }) {
-  const viewer = await getViewer();
+  const params = await searchParams;
+  const console = await loadStoreConsole(params.as, "/store");
+  const { viewer, store, areas, currentArea } = console;
 
-  if (viewer.kind === "anonymous") redirect("/login?next=/store");
+  if (store?.kind === "vendor") return <VendorConsole console={console} />;
 
-  /*
-   * An admin who is also a member of stores (the founder testing operator
-   * features on their own account) gets the store dashboard like any other
-   * member; an admin with no memberships has nothing to see here.
-   */
-  if (viewer.kind === "admin" && viewer.storeIds.length === 0) redirect("/admin");
-
-  /*
-   * A player account has no store — the "player" kind only exists when the
-   * account holds no memberships — so the store dashboard can only ever be
-   * an error card for them. Sign-in defaults land here, so this redirect is
-   * what actually delivers a player to their account after logging in.
-   */
-  if (viewer.kind === "player") redirect("/profile");
-
-  if (viewer.kind === "unaffiliated") {
+  if (!store) {
     return (
       <AppShell
         area="Store"
         email={viewer.user.email ?? ""}
         title="No store yet"
         description="This account is signed in but is not linked to a store."
+        areas={areas}
       >
         <Card className="text-text-secondary">
           If you were invited, make sure you signed in with the same email address the
@@ -79,136 +72,97 @@ export default async function StorePage({
     );
   }
 
-  // Reads through the user's own session, so Row Level Security decides what
-  // comes back — a store can only ever see its own row.
-  const supabase = await createSupabaseServerClient();
-  const { data: stores } = await supabase
-    .from("stores")
-    .select(
-      "id, name, city, region, status, join_code, walk_in_enabled, timezone, kind, early_board_hours",
-    )
-    .order("name");
-
   /*
-   * Which of this account's stores to show. The area switcher passes `?as=`;
-   * anything not in the RLS-filtered list falls back to the first store, so
-   * the parameter can never reach a store this account is not a member of.
+   * Back from Stripe: ask Stripe what just happened rather than wait
+   * for its webhook, which can land after this page has rendered. The
+   * session id is checked against this store before anything is
+   * written, so a pasted id entitles nobody.
    */
-  const params = await searchParams;
-  const { as } = params;
-  const store = stores?.find((row) => row.id === as) ?? stores?.[0];
-
-  const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
-  const currentArea = store ? `/store?as=${store.id}` : undefined;
-
-  /*
-   * A vendor's dashboard is a different job: no rooms, no counter code — an
-   * inventory to state and booths to claim. Same account machinery, split
-   * here where the difference becomes visible.
-   */
-  if (store?.kind === "vendor") {
-    const [lines, shows, booths] = await Promise.all([
-      listInventory(store.id),
-      listClaimableShows(),
-      boothsForStore(store.id),
-    ]);
-
-    return (
-      <AppShell
-        area="Store"
-        email={viewer.user.email ?? ""}
-        title={store.name}
-        description="Upload what you're bringing, claim your booth, and attendees find you."
-        areas={areas}
-        currentArea={currentArea}
-      >
-        <section className="flex flex-col gap-5" aria-labelledby="shows-heading">
-          <div className="flex flex-col gap-1">
-            <h2 id="shows-heading" className="text-xl font-bold text-text-primary">
-              Shows
-            </h2>
-            <p className="text-sm text-text-secondary">
-              Claim a booth and everything below becomes findable by everyone who scans
-              that show&rsquo;s code.
-            </p>
-          </div>
-          <VendorShows storeId={store.id} shows={shows} booths={booths} />
-        </section>
-
-        <section className="flex flex-col gap-5" aria-labelledby="inventory-heading">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="inventory-heading" className="text-xl font-bold text-text-primary">
-              Your inventory
-            </h2>
-            <span className="text-sm text-text-muted tabular-nums">
-              {lines.length} {lines.length === 1 ? "line" : "lines"}
-            </span>
-          </div>
-
-          <VendorInventoryForm
-            storeId={store.id}
-            imagesEnabled={cardImagesEnabled()}
-            playerGames={await viewerGames()}
-          />
-          <VendorInventoryList storeId={store.id} lines={lines} />
-        </section>
-      </AppShell>
-    );
+  const justStarted = params.checkout === "success";
+  if (justStarted && params.session_id) {
+    await reconcileCheckoutSession(params.session_id, { storeId: store.id });
   }
 
-  // Close whatever ran out since anyone last looked, so the event list's
-  // status badges tell the truth instead of echoing the last scan.
   await sweepStaleRooms();
 
-  const events = store ? await listEventsForStore(store.id) : [];
-  const attendance = await countParticipants(events.map((event) => event.id));
-  const timeZone = store?.timezone ?? "UTC";
-  const window = defaultEventWindow(timeZone);
-  const counterQr = store ? await joinQrSvg(store.join_code) : null;
+  const [events, displays, sync, plan, counterQr] = await Promise.all([
+    listEventsForStore(store.id),
+    listDisplays(store.id),
+    singlesSyncFor(store.id),
+    storePlan(store.id),
+    store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
+  ]);
 
-  const sync = store ? await singlesSyncFor(store.id) : null;
-  const plan = store ? await storePlan(store.id) : null;
-  const lastSync = sync
-    ? {
-        when: new Intl.DateTimeFormat("en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-          timeZone,
-        }).format(new Date(sync.synced_at)),
-        cardsMatched: sync.cards_matched,
-        linesUnmatched: sync.lines_unmatched,
-      }
-    : null;
+  const steps: SetupStep[] = [
+    {
+      key: "flarecast",
+      title: "Put FlareCast on your TV",
+      detail:
+        "Add a screen, open its link on the television and press Enter Fullscreen once. Timers, the room's wants and your code, all night.",
+      done: displays.length > 0,
+      href: consoleHref("/store/event-hub", store.id),
+      action: "Add a screen",
+    },
+    {
+      key: "singles",
+      title: "Upload your TCGplayer inventory",
+      detail:
+        "Every Flare in your room is checked against it, and the player is told your counter may have the card.",
+      done: sync !== null,
+      href: consoleHref("/store/singles", store.id),
+      action: "Upload the export",
+    },
+    {
+      key: "event",
+      title: "Create your first event night",
+      detail:
+        "A tournament or a prerelease gets its own room, its own window and its own sheet. Your counter code sends players there while it runs.",
+      done: events.length > 0,
+      href: consoleHref("/store/events", store.id),
+      action: "Create an event",
+    },
+    {
+      key: "timezone",
+      title: "Set your time zone",
+      detail:
+        "So event windows and the early board open when your clock says, not UTC's.",
+      done: store.timezone !== "UTC",
+      href: consoleHref("/store/settings", store.id),
+      action: "Open settings",
+    },
+  ];
+  const settingUp = steps.some((step) => !step.done);
+
+  const trialUntil = plan.state === "trialing" ? planDate(plan.until) : null;
+
+  const upcoming = events.filter((event) => event.status !== "closed").slice(0, 3);
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
-      title={store?.name ?? "Your store"}
+      title={store.name}
       description="One printed code on your counter, plus a room for every event you run."
       areas={areas}
       currentArea={currentArea}
     >
-      {store && plan && (
-        <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
-          <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
-            Your plan
-          </h2>
-          <BillingCard
-            storeId={store.id}
-            plan={plan}
-            sellable={ultraIsSellable()}
-            notice={billingNotice(params)}
-          />
-        </section>
+      <StoreTabs storeId={store.id} />
+
+      {(justStarted || params.welcome === "1" || settingUp) && (
+        <WelcomeHero
+          storeName={store.name}
+          trialUntil={trialUntil}
+          fresh={justStarted || params.welcome === "1"}
+        />
       )}
 
-      {store && counterQr && (
+      {settingUp && <SetupChecklist steps={steps} />}
+
+      {counterQr && store.join_code && (
         <section className="flex flex-col gap-5" aria-labelledby="counter-code-heading">
           <h2 id="counter-code-heading" className="text-xl font-bold text-text-primary">
             Your counter code
           </h2>
-
           <CounterCode
             storeId={store.id}
             storeName={store.name}
@@ -220,108 +174,73 @@ export default async function StorePage({
         </section>
       )}
 
-      {store && (
-        <section className="flex flex-col gap-5" aria-labelledby="event-hub-heading">
-          <div className="flex flex-col gap-1">
-            <h2 id="event-hub-heading" className="text-xl font-bold text-text-primary">
-              Event Hub
-            </h2>
-            <p className="text-sm text-text-secondary">
-              Your tournament timers, what the room is looking for and your counter
-              code, on the television. Put it on at the start of the night and leave it
-              running.
-            </p>
+      <section className="grid gap-5 md:grid-cols-2" aria-label="Tonight">
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <MonitorPlay className="size-5 text-accent" aria-hidden="true" />
+            <h2 className="font-semibold text-text-primary">FlareCast</h2>
           </div>
+          <p className="text-sm text-text-secondary">
+            {displays.length === 0
+              ? "No screens yet. Add one and open its link on the television."
+              : displays.length === 1
+                ? "One screen. Open its link on the television at the start of the night."
+                : `${displays.length} screens ready for the television.`}
+          </p>
           <div>
-            <ButtonLink href={`/store/event-hub?as=${store.id}`} variant="secondary">
-              Open the Event Hub
+            <ButtonLink
+              href={consoleHref("/store/event-hub", store.id)}
+              variant="secondary"
+              size="sm"
+            >
+              Open FlareCast
             </ButtonLink>
           </div>
-        </section>
-      )}
+        </Card>
 
-      {store && (
-        <section className="flex flex-col gap-5" aria-labelledby="singles-heading">
-          <div className="flex flex-col gap-1">
-            <h2 id="singles-heading" className="text-xl font-bold text-text-primary">
-              Your singles
-            </h2>
-            <p className="text-sm text-text-secondary">
-              Upload your TCGplayer inventory export, and when someone in your room
-              posts a Flare for a card you stock, their Flare says your counter may have
-              it. Your case sells to the exact person looking for it.
-            </p>
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="size-5 text-accent" aria-hidden="true" />
+            <h2 className="font-semibold text-text-primary">Events</h2>
           </div>
-          <SyncSinglesForm storeId={store.id} lastSync={lastSync} />
-        </section>
-      )}
-
-      {store && (
-        <section className="flex flex-col gap-5" aria-labelledby="timezone-heading">
-          <h2 id="timezone-heading" className="text-xl font-bold text-text-primary">
-            Where you are
-          </h2>
-          <TimeZonePicker storeId={store.id} timeZone={timeZone} />
-        </section>
-      )}
-
-      {store && (
-        <section className="flex flex-col gap-5" aria-labelledby="early-board-heading">
-          <h2 id="early-board-heading" className="text-xl font-bold text-text-primary">
-            Before your events
-          </h2>
-          <EarlyBoardPicker storeId={store.id} hours={store.early_board_hours} />
-        </section>
-      )}
-
-      <section className="flex flex-col gap-5" aria-labelledby="new-event-heading">
-        <div className="flex flex-col gap-1">
-          <h2 id="new-event-heading" className="text-xl font-bold text-text-primary">
-            New event
-          </h2>
-          {/*
-           * Said out loud, because the counter code above makes it a fair
-           * question. An event is worth creating when it has a name and a
-           * window worth printing — a tournament, a prerelease — not for an
-           * ordinary afternoon, which the counter code already covers.
-           */}
-          <p className="text-sm text-text-secondary">
-            For a tournament or a prerelease: its own name, its own window, and its own
-            sheet. Your counter code sends players here automatically while it is
-            running.
-          </p>
-        </div>
-
-        <Card>
-          {store ? (
-            <CreateEventForm
-              storeId={store.id}
-              defaultStartsAt={window.startsAt}
-              defaultEndsAt={window.endsAt}
-            />
-          ) : (
-            <p className="text-text-secondary">
-              We could not load your store. Try reloading, and get in touch if it
-              persists.
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-text-secondary">
+              Nothing scheduled. The counter code covers an ordinary night; a tournament
+              or prerelease deserves its own event.
             </p>
+          ) : (
+            <ul className="flex flex-col gap-1 text-sm text-text-secondary">
+              {upcoming.map((event) => (
+                <li key={event.id} className="truncate">
+                  <span className="font-semibold text-text-primary">{event.name}</span>
+                  {" · "}
+                  {event.status}
+                </li>
+              ))}
+            </ul>
           )}
+          <div>
+            <ButtonLink
+              href={consoleHref("/store/events", store.id)}
+              variant="secondary"
+              size="sm"
+            >
+              Manage events
+            </ButtonLink>
+          </div>
         </Card>
       </section>
 
-      <section className="flex flex-col gap-5" aria-labelledby="events-heading">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="events-heading" className="text-xl font-bold text-text-primary">
-            Events
-          </h2>
-          <span className="text-sm text-text-muted tabular-nums">
-            {events.length} total
-          </span>
-        </div>
-
-        <EventList
-          events={events}
-          attendance={attendance}
-          fallbackTimeZone={timeZone}
+      <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
+        <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
+          Your plan
+        </h2>
+        <BillingCard
+          storeId={store.id}
+          plan={plan}
+          sellable={ultraIsSellable()}
+          notice={billingNotice(params)}
+          justStarted={justStarted}
         />
       </section>
     </AppShell>

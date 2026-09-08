@@ -111,6 +111,62 @@ async function stripeRequest<T>(
   }
 }
 
+async function stripeGet<T>(path: string): Promise<StripeResult<T>> {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return { ok: false, reason: "not-configured" };
+
+  try {
+    const response = await fetch(`${STRIPE_API}${path}`, {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = (await response.json()) as T & { error?: { message?: string } };
+    if (!response.ok) {
+      console.error("Stripe refused the read", data.error?.message ?? response.status);
+      return { ok: false, reason: "stripe-error" };
+    }
+    return { ok: true, data };
+  } catch (caught) {
+    console.error("Could not reach Stripe", caught);
+    return { ok: false, reason: "stripe-error" };
+  }
+}
+
+/** The subscription as Stripe returns it inside an expanded session. */
+export interface StripeSubscriptionObject {
+  id: string;
+  customer?: string | null;
+  status?: string;
+  cancel_at_period_end?: boolean;
+  current_period_end?: number | null;
+  items?: { data?: { current_period_end?: number | null }[] };
+  metadata?: Record<string, string>;
+}
+
+export interface StripeCheckoutSessionObject {
+  id: string;
+  status?: string;
+  metadata?: Record<string, string>;
+  subscription?: StripeSubscriptionObject | string | null;
+}
+
+/**
+ * The Checkout Session a browser just came back from, with its
+ * subscription expanded. Read once on the success page, because the
+ * webhook that normally writes the row can land a few seconds after
+ * the redirect, and a console that says "not started yet" to somebody
+ * who just typed their card in is a console that looks broken.
+ */
+export async function retrieveCheckoutSession(
+  sessionId: string,
+): Promise<StripeResult<StripeCheckoutSessionObject>> {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId))
+    return { ok: false, reason: "stripe-error" };
+  return stripeGet(
+    `/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=subscription`,
+  );
+}
+
 /**
  * A Checkout Session for one tier, owned by one player or store.
  *
