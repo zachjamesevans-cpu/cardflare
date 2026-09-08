@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ScreenCard } from "@/components/event-hub/screen-card";
+import { StoreTabs } from "@/components/stores/store-tabs";
 import { Card } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextInput } from "@/components/ui/controls";
@@ -76,13 +76,7 @@ export default async function FlareCastPage({
       areas={areas}
       currentArea={`/store?as=${storeId}`}
     >
-      <Link
-        href={`/store?as=${storeId}`}
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        Back to your store
-      </Link>
+      <StoreTabs storeId={storeId} />
 
       <section className="flex flex-col gap-5" aria-labelledby="screens-heading">
         <h2 id="screens-heading" className="text-xl font-bold text-text-primary">

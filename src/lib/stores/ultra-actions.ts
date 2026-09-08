@@ -122,7 +122,7 @@ async function sendToCheckout(
     tier: "ultra",
     storeId,
     customerEmail: email,
-    successUrl: `${origin}${console}&checkout=success`,
+    successUrl: `${origin}${console}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${origin}${console}&checkout=cancelled`,
     trialDays: ULTRA_TRIAL_DAYS,
   });

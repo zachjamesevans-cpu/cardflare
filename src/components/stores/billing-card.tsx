@@ -24,15 +24,23 @@ export function BillingCard({
   plan,
   sellable,
   notice,
+  justStarted = false,
 }: {
   storeId: string;
   plan: StorePlan;
   sellable: boolean;
   /** What the query string said on arrival, already turned into words. */
   notice: string | null;
+  /** Back from checkout this very page load. */
+  justStarted?: boolean;
 }) {
-  const line = planLine(plan);
-  const canStart = plan.state === "none" || plan.state === "ended";
+  const line =
+    justStarted && plan.state === "none"
+      ? "Stripe is confirming your trial. Refresh in a moment."
+      : planLine(plan);
+  /* Never a start button to somebody who just started: even if Stripe's
+     word has not landed yet, the offer would read as "it did not work". */
+  const canStart = !justStarted && (plan.state === "none" || plan.state === "ended");
   const canManage = "canManage" in plan && plan.canManage;
 
   return (
