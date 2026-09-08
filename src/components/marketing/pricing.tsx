@@ -1,5 +1,3 @@
-import { Check } from "lucide-react";
-
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MaxMark, ProMark, UltraMark } from "@/components/stores/ultra-mark";
@@ -8,114 +6,80 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 
 /**
- * The four ways into cardflare, priced honestly.
+ * The four ways into cardflare, priced honestly, one line each.
  *
- * Player accounts are open and free — that column's button creates one
- * right now. Pro is named with its price and marked as arriving, not
- * sold: there is no payment rail yet, and a buy button that cannot buy
- * is exactly the fake functionality the working agreement bans. Ultra
- * and Max are set up person-to-person, so their buttons request an
- * invite rather than pretending at self-serve.
- *
- * No feature is listed that has not shipped.
+ * The founder, for the homepage: "Do not use long bullet lists." So a
+ * tier is its name, its price, one sentence and a button to its own
+ * page, where the full list lives. Nothing is listed here that has
+ * not shipped.
  */
 
 interface Tier {
-  name: string;
-  audience: string;
+  name: "Player" | "Pro" | "Ultra" | "Max";
   price: string;
   cadence: string | null;
-  points: string[];
-  cta: { label: string; href: string } | { note: string };
+  line: string;
+  cta: { label: string; href: string };
   featured?: boolean;
 }
 
 const TIERS: Tier[] = [
   {
     name: "Player",
-    audience: "Players & collectors",
     price: "Free",
     cadence: null,
-    points: [
-      "Post Flares and see who has your cards",
-      ...(LOCAL_ENABLED
-        ? ["Local: every Flare near you, and messaging"]
-        : ["The room: everyone at tonight's event, on one board"]),
-      "Your binder, wants and decks on web and app",
-      "Earn Embers on confirmed trades",
-    ],
-    cta: { label: "Create your account", href: "/signup" },
+    line: LOCAL_ENABLED
+      ? "Flares, Local, your binder and wants, Embers on every trade."
+      : "Flares, the room, your binder and wants, Embers on every trade.",
+    cta: { label: "Create account", href: "/signup" },
     featured: true,
   },
   {
     name: "Pro",
-    audience: "Players who want more",
     price: "$7.99",
-    cadence: "/month",
-    points: [
-      "Wear cosmetics: rings, auras, card borders, titles",
-      "Animated everything, including GIF profile pictures",
-      "Your look follows you on web and app",
-    ],
+    cadence: "/mo",
+    line: "Cosmetics, animated everything, your look on web and app.",
     cta: { label: "See Pro", href: "/pro" },
   },
   {
     name: "Ultra",
-    audience: "Local game stores",
     price: ULTRA_PRICE_LABEL,
-    cadence: "/month",
-    points: [
-      `${ULTRA_TRIAL_DAYS}-day free trial, cancel any time`,
-      "Counter code, walk-in rooms and every event night",
-      "FlareCast on your TV, with Auto Mode for tournaments",
-      "TCGplayer inventory matched to every want in the room",
-    ],
+    cadence: "/mo",
+    line: `FlareCast, Auto Mode and inventory matching. ${ULTRA_TRIAL_DAYS} days free.`,
     cta: { label: "See Ultra", href: "/ultra" },
   },
   {
     name: "Max",
-    audience: "Card show vendors",
     price: "By invite",
     cadence: null,
-    points: [
-      "Your booth on the show floor's map",
-      "Inventory matching against the room's wants",
-      "We set your booth up with you",
-    ],
+    line: "Your booth on the show floor, matched to every search in the hall.",
     cta: { label: "See Max", href: "/max" },
   },
 ];
 
+const MARKS = {
+  Player: "Player",
+  Pro: <ProMark />,
+  Ultra: <UltraMark />,
+  Max: <MaxMark />,
+} as const;
+
 export function Pricing() {
   return (
-    <Section id="pricing" labelledBy="pricing-title">
+    <Section id="pricing" labelledBy="pricing-title" className="py-14 md:py-20">
       <SectionHeading
         id="pricing-title"
         eyebrow="Pricing"
-        title="Free for players. Fourteen days free for stores."
-        description="A player account costs nothing and works today. A store starts its trial in two minutes; vendors get set up personally, so that tier starts with a conversation."
+        title={`Free for players. ${ULTRA_TRIAL_DAYS} days free for stores.`}
       />
 
-      <div className="mx-auto mt-12 grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto mt-10 grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {TIERS.map((tier) => (
           <Card
             key={tier.name}
-            className={`flex flex-col gap-4 ${tier.featured ? "border-accent" : ""}`}
+            className={`flex flex-col gap-3 ${tier.featured ? "border-accent" : ""}`}
           >
-            <div className="flex flex-col gap-1">
-              <h3 className="text-lg font-bold text-text-primary">
-                {tier.name === "Ultra" ? (
-                  <UltraMark />
-                ) : tier.name === "Pro" ? (
-                  <ProMark />
-                ) : tier.name === "Max" ? (
-                  <MaxMark />
-                ) : (
-                  tier.name
-                )}
-              </h3>
-              <p className="text-sm text-text-secondary">{tier.audience}</p>
-            </div>
+            <h3 className="text-lg font-bold text-text-primary">{MARKS[tier.name]}</h3>
 
             <p className="flex items-baseline gap-1">
               <span className="text-3xl font-bold text-text-primary">{tier.price}</span>
@@ -124,34 +88,15 @@ export function Pricing() {
               )}
             </p>
 
-            <ul className="flex flex-1 flex-col gap-2">
-              {tier.points.map((point) => (
-                <li
-                  key={point}
-                  className="flex items-start gap-2 text-sm text-text-secondary"
-                >
-                  <Check
-                    className="mt-0.5 size-4 shrink-0 text-accent"
-                    aria-hidden="true"
-                  />
-                  {point}
-                </li>
-              ))}
-            </ul>
+            <p className="flex-1 text-sm text-text-secondary">{tier.line}</p>
 
-            {"href" in tier.cta ? (
-              <ButtonLink
-                href={tier.cta.href}
-                size="sm"
-                variant={tier.featured ? "primary" : "secondary"}
-              >
-                {tier.cta.label}
-              </ButtonLink>
-            ) : (
-              <p className="rounded-[var(--radius-control)] border border-dashed border-border py-2 text-center text-sm font-semibold text-text-muted">
-                {tier.cta.note}
-              </p>
-            )}
+            <ButtonLink
+              href={tier.cta.href}
+              size="sm"
+              variant={tier.featured ? "primary" : "secondary"}
+            >
+              {tier.cta.label}
+            </ButtonLink>
           </Card>
         ))}
       </div>

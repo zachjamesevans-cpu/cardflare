@@ -39,15 +39,16 @@ test.describe("the tier pages", () => {
 
   test("the pricing row sends each tier to its own page", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: /^see pro$/i })).toHaveAttribute(
+    const pricing = page.locator("#pricing");
+    await expect(pricing.getByRole("link", { name: /^see pro$/i })).toHaveAttribute(
       "href",
       "/pro",
     );
-    await expect(page.getByRole("link", { name: /^see ultra$/i })).toHaveAttribute(
+    await expect(pricing.getByRole("link", { name: /^see ultra$/i })).toHaveAttribute(
       "href",
       "/ultra",
     );
-    await expect(page.getByRole("link", { name: /^see max$/i })).toHaveAttribute(
+    await expect(pricing.getByRole("link", { name: /^see max$/i })).toHaveAttribute(
       "href",
       "/max",
     );
@@ -109,7 +110,7 @@ test.describe("the tier pages", () => {
   test("is where the landing page sends stores", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.getByRole("link", { name: /see ultra and start your trial/i }),
+      page.getByRole("link", { name: /start your 14-day free trial/i }),
     ).toHaveAttribute("href", "/ultra");
   });
 });

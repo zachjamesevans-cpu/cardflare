@@ -21,7 +21,7 @@ async function settleFillWindow(page: Page) {
 }
 
 async function fillValidForm(page: Page, email: string) {
-  await page.goto("/#request-invite");
+  await page.goto("/invite#request-invite");
 
   await page.getByLabel("First name").fill("Zach");
   await page.getByLabel("Email address").fill(email);
@@ -33,7 +33,7 @@ async function fillValidForm(page: Page, email: string) {
 
 test.describe("invite request form", () => {
   test("is keyboard accessible and properly labelled", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
 
     for (const label of [
       "First name",
@@ -51,7 +51,7 @@ test.describe("invite request form", () => {
   });
 
   test("shows useful messages for an empty submission", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
     await settleFillWindow(page);
 
     await page.getByRole("button", { name: /request an invite/i }).click();
@@ -73,7 +73,7 @@ test.describe("invite request form", () => {
    * shared rate-limit budget that a valid submission would.
    */
   test("does not complain about an unticked consent box", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
@@ -88,7 +88,7 @@ test.describe("invite request form", () => {
   });
 
   test("rejects a malformed email with an inline message", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
@@ -104,7 +104,7 @@ test.describe("invite request form", () => {
   test("keeps everything else the user typed when one field is invalid", async ({
     page,
   }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
@@ -129,7 +129,7 @@ test.describe("invite request form", () => {
   });
 
   test("a quick correction is not mistaken for a bot", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
@@ -149,7 +149,7 @@ test.describe("invite request form", () => {
   });
 
   test("marks invalid fields for assistive technology", async ({ page }) => {
-    await page.goto("/#request-invite");
+    await page.goto("/invite#request-invite");
     await settleFillWindow(page);
 
     await page.getByRole("button", { name: /request an invite/i }).click();

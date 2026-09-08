@@ -28,7 +28,7 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: {
-    default: `${SITE.name} | Find Cards and Trade at Local TCG Events`,
+    default: `${SITE.name} | ${SITE.title}`,
     template: `%s | ${SITE.name}`,
   },
   description: SITE.description,
@@ -38,13 +38,13 @@ export const metadata: Metadata = {
     type: "website",
     siteName: SITE.name,
     url: "/",
-    title: `${SITE.name} | Find Cards and Trade at Local TCG Events`,
+    title: `${SITE.name} | ${SITE.title}`,
     description: SITE.description,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE.name} | Find Cards and Trade at Local TCG Events`,
+    title: `${SITE.name} | ${SITE.title}`,
     description: SITE.description,
   },
   robots: {
