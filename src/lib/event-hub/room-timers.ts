@@ -1,5 +1,10 @@
-import { intermissionFor } from "./auto-mode";
-import { GAME_PROFILES, procedureFor } from "./game-profiles";
+import { intermissionFor, type IntermissionState } from "./auto-mode";
+import {
+  GAME_PROFILES,
+  nameRepeatsGame,
+  procedureFor,
+  type Bracket,
+} from "./game-profiles";
 import { listDisplays, listTimers } from "./repository";
 import {
   elapsedMs,
@@ -9,6 +14,7 @@ import {
   remainingMs,
   timerPhase,
   type HubTimer,
+  type TimerStatus,
 } from "./timer";
 import type { RoomTimerWire } from "./room-timer-wire";
 
@@ -38,15 +44,40 @@ export async function roomTimersForStore(
 }
 
 /**
- * One tournament as the screens overview shows it: what it is, and a
- * wire for its clock (null until somebody starts it).
+ * One tournament as the screens overview shows it: what it is, the
+ * colour the wall gives it, where it stands, and a wire for its clock
+ * (null until somebody starts it).
+ *
+ * The founder, running several tournaments across several screens:
+ * the overview "should have the color code of whichever tournament is
+ * on that screen too... just more helpful info on that screen". So a
+ * row carries enough to read the night at a glance and to press the
+ * next thing without opening the manage page.
  */
 export interface ScreenCardRow {
   id: string;
   gameName: string;
-  eventName: string;
+  /**
+   * What staff called it, or null when that only repeats the game: the
+   * same rule the wall follows, so "Lorcana" under LORCANA is not
+   * printed twice.
+   */
+  eventName: string | null;
+  /** The game's accent token, e.g. `--color-game-one-piece`. */
+  accentToken: string;
+  round: number | null;
+  bracket: Bracket;
+  format: string | null;
+  status: TimerStatus;
   /** The tournament runs its own between-rounds countdown. */
   autoMode: boolean;
+  /**
+   * Where Auto Mode's intermission stood when the page was built.
+   * `counting` carries on ticking through the wire's `nextRoundAt`;
+   * the rest are the organizer's business and do not change on their
+   * own.
+   */
+  intermission: IntermissionState | null;
   wire: RoomTimerWire | null;
 }
 
@@ -56,13 +87,22 @@ export async function screenRows(
   now: number = Date.now(),
 ): Promise<ScreenCardRow[]> {
   const timers = await listTimers(displayId);
-  return timers.map((timer) => ({
-    id: timer.id,
-    gameName: GAME_PROFILES[timer.game].shortName,
-    eventName: timer.eventName,
-    autoMode: timer.autoMode,
-    wire: timerWire(timer, now),
-  }));
+  return timers.map((timer) => {
+    const profile = GAME_PROFILES[timer.game];
+    return {
+      id: timer.id,
+      gameName: profile.shortName,
+      eventName: nameRepeatsGame(profile, timer.eventName) ? null : timer.eventName,
+      accentToken: profile.accentToken,
+      round: timer.round,
+      bracket: timer.bracket,
+      format: timer.format,
+      status: timer.status,
+      autoMode: timer.autoMode,
+      intermission: intermissionFor(timer, now)?.state ?? null,
+      wire: timerWire(timer, now),
+    };
+  });
 }
 
 /**

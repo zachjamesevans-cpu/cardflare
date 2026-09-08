@@ -12,6 +12,7 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { createDisplayAction } from "@/lib/event-hub/actions";
 import { RULES_DISCLAIMER } from "@/lib/event-hub/game-profiles";
+import { MAX_TIMERS } from "@/lib/event-hub/layout";
 import { listDisplays } from "@/lib/event-hub/repository";
 import { screenRows } from "@/lib/event-hub/room-timers";
 
@@ -33,6 +34,12 @@ export const dynamic = "force-dynamic";
  * manage page, one tap away. No URLs here, no instructions, and the
  * general explanation appears once at the bottom instead of under
  * every television.
+ *
+ * A round later, with several tournaments running at once, the
+ * founder asked for the opposite lean on the cards themselves: the
+ * colour code of each tournament, more of the controls, and Open TV
+ * display reachable from here. The card carries that; the page still
+ * carries nothing twice.
  */
 export default async function FlareCastPage({
   searchParams,
@@ -67,6 +74,12 @@ export default async function FlareCastPage({
     })),
   );
 
+  const tournaments = screens.reduce((sum, screen) => sum + screen.rows.length, 0);
+  const live = screens.reduce(
+    (sum, screen) => sum + screen.rows.filter((row) => row.wire !== null).length,
+    0,
+  );
+
   return (
     <AppShell
       area="Store"
@@ -79,9 +92,19 @@ export default async function FlareCastPage({
       <StoreTabs storeId={storeId} />
 
       <section className="flex flex-col gap-5" aria-labelledby="screens-heading">
-        <h2 id="screens-heading" className="text-xl font-bold text-text-primary">
-          Your screens
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="screens-heading" className="text-xl font-bold text-text-primary">
+            Your screens
+          </h2>
+          {/* The night in one line, for a glance across several TVs. */}
+          {tournaments > 0 && (
+            <p className="text-sm text-text-muted tabular-nums">
+              {live} of {tournaments} {tournaments === 1 ? "tournament" : "tournaments"}{" "}
+              on the clock across {screens.length}{" "}
+              {screens.length === 1 ? "screen" : "screens"}
+            </p>
+          )}
+        </div>
 
         {screens.length === 0 && (
           <p className="max-w-2xl text-sm text-text-secondary">
@@ -98,6 +121,12 @@ export default async function FlareCastPage({
               name={display.name}
               rows={rows}
               manageHref={`/store/event-hub/${display.id}?as=${storeId}`}
+              displayHref={`/display/${display.token}`}
+              addHref={
+                rows.length < MAX_TIMERS
+                  ? `/store/event-hub/${display.id}?as=${storeId}#add-heading`
+                  : null
+              }
             />
           ))}
 
