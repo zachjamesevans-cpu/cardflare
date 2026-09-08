@@ -27,6 +27,25 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  /**
+   * What the server bundle leaves out.
+   *
+   * Vercel stores every deployment's server files, and the free plan
+   * caps that at 10 GB across all deployments ever made. sharp ships
+   * three builds of libvips and this tracer copied all three into
+   * every route: the glibc one Vercel runs, a musl one for Alpine
+   * containers, and a WebAssembly fallback. The last two are forty
+   * megabytes of dead weight per deployment. The glibc build stays;
+   * the pin test in tests/unit/native-modules.test.ts holds it.
+   */
+  outputFileTracingExcludes: {
+    "*": [
+      "node_modules/@img/sharp-libvips-linuxmusl-x64/**",
+      "node_modules/@img/sharp-linuxmusl-x64/**",
+      "node_modules/@img/sharp-wasm32/**",
+      "node_modules/@emnapi/**",
+    ],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },
