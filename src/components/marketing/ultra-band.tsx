@@ -7,22 +7,25 @@ import { Section } from "@/components/ui/section";
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 
 /**
- * FlareCast, on the homepage, at full width.
+ * FlareCast, on the homepage, as the real product.
  *
- * The founder: "Make FlareCast much more visually prominent. Use the
- * strongest existing real FlareCast imagery." The television is the
- * real display component on a sample night, the same frame the Ultra
- * page uses, counting in real time. The button carries the analytics
- * name the old store section had, so the funnel reads the same.
+ * The founder: "make cardflare Ultra feel like a real product, not
+ * just another feature section... if we already have real FlareCast
+ * imagery, prioritize that." Both pictures are the display component
+ * itself on a sample night, counting in real time: the wall during a
+ * round, and the wall between rounds while Auto Mode counts down to
+ * the next one. The second screen only appears once there is width
+ * for it beside the first, so a phone gets the wall and nothing to
+ * scroll past.
  */
 export function UltraBand() {
   return (
     <Section
       id="for-stores"
       labelledBy="ultra-band-title"
-      className="bg-flare-wash py-16 md:py-24"
+      className="bg-flare-wash py-12 md:py-24"
     >
-      <div className="flex flex-col items-center gap-4 text-center">
+      <div className="flex flex-col items-center gap-3 text-center md:gap-4">
         <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">
           For game stores
         </p>
@@ -32,23 +35,30 @@ export function UltraBand() {
         >
           Run the room with cardflare <UltraMark />.
         </h2>
-        <p className="max-w-2xl text-pretty text-text-secondary sm:text-lg">
-          Clean tournament timers, live Flares, QR check-in, store announcements,
-          inventory matching, and more. On the TV you already have.
+        <p className="max-w-xl text-pretty text-text-secondary sm:text-lg">
+          FlareCast, live Flares, inventory matching, and tournament automation. On the
+          TV you already have.
         </p>
       </div>
 
-      <div className="mt-10">
+      <div className="mt-8 grid items-start gap-8 md:mt-10 lg:grid-cols-[1.7fr_1fr]">
         <TvFrame
           scene="focus"
           label="FlareCast on the wall during round 3: the clock, what the room is hunting, and the code to scan in."
         />
+        <div className="hidden lg:block">
+          <TvFrame
+            scene="intermission"
+            label="Between rounds: Auto Mode counts down to round 4, and the organizer's computer says so out loud."
+          />
+        </div>
       </div>
 
-      <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+      <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-10">
         <ButtonLink
           href="/ultra"
           size="lg"
+          className="w-full sm:w-auto"
           data-analytics-event="store_pilot_cta_clicked"
         >
           <Tv className="size-4" aria-hidden="true" />

@@ -52,7 +52,7 @@ export const PLACES: Record<Place, PlaceFacts> = {
     eyebrow: "At the show",
     line: "Vendor booth may have it",
     detail: "Booth 42 · PSA 9 · $38",
-    action: "Walk to booth 42",
+    action: "Go to booth 42",
     icon: Tent,
     tone: "text-gold",
   },
