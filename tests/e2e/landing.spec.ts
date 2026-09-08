@@ -50,16 +50,15 @@ test.describe("landing page", () => {
     await expect(page.getByLabel(/email/i).first()).toBeVisible();
   });
 
-  test("the store invite CTA preselects the local game store type", async ({
-    page,
-  }) => {
+  test("the store CTA opens the Ultra pitch with its own signup", async ({ page }) => {
     await page.goto("/");
 
-    /* Several tiers say "Request an invite"; the store section's own CTA
-       is the one that must preselect the store type. */
+    /* Stores no longer request an invite: the store section's own CTA
+       lands on /ultra, where the trial starts from a form on the page. */
     await page.locator('[data-analytics-event="store_pilot_cta_clicked"]').click();
 
-    await expect(page.getByLabel(/which best describes you/i)).toHaveValue("store");
+    await expect(page).toHaveURL(/\/ultra$/);
+    await expect(page.getByLabel(/store name/i)).toBeVisible();
   });
 
   test("skip link is reachable by keyboard", async ({ page }) => {

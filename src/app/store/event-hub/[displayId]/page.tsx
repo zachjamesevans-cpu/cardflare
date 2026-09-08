@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink, MonitorUp, Tv } from "lucide-react";
+import { ArrowLeft, MonitorUp, Tv } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CopyLink } from "@/components/events/copy-link";
@@ -35,7 +35,9 @@ export const dynamic = "force-dynamic";
  * about ONE of them — the live controls, what is assigned to it, where
  * to open it, and its settings. The raw URL sits behind a disclosure
  * because the founder's brief was exact: "the long raw URL should NOT
- * dominate the interface. Copy Link is enough."
+ * dominate the interface. Copy Link is enough." And the button that
+ * opens the television sits at the very top, beside the way back: the
+ * founder, a round later, "it should be higher at the top".
  */
 export default async function ManageScreenPage({
   params,
@@ -83,13 +85,30 @@ export default async function ManageScreenPage({
       areas={areas}
       currentArea={`/store?as=${storeId}`}
     >
-      <Link
-        href={backHref}
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        All screens
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href={backHref}
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          All screens
+        </Link>
+
+        {/* The two things done most on this page, before anything
+            scrolls: open the television, and copy its link for one. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyLink url={displayUrl} />
+          <a
+            href={`/display/${display.token}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={buttonStyles("primary", "sm")}
+          >
+            <Tv className="size-4" aria-hidden="true" />
+            Open TV display
+          </a>
+        </div>
+      </div>
 
       {payload.timers.length > 0 ? (
         <section className="flex flex-col gap-5" aria-labelledby="running-heading">
@@ -174,30 +193,11 @@ export default async function ManageScreenPage({
         </h2>
 
         <Card className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={`/display/${display.token}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={buttonStyles("primary", "sm")}
-            >
-              <Tv className="size-4" aria-hidden="true" />
-              Open TV display
-            </a>
-            <a
-              href={`/display/${display.token}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={buttonStyles("secondary", "sm")}
-            >
-              <ExternalLink className="size-4" aria-hidden="true" />
-              Preview
-            </a>
-            <CopyLink url={displayUrl} />
-          </div>
-          <p className="text-xs text-text-muted">
-            Open the link on whatever drives this television and press Enter Fullscreen
-            once. It asks nobody to sign in.
+          <p className="text-sm text-text-secondary">
+            Open TV display, at the top of this page, opens this screen in a new tab. Do
+            that on whatever drives the television and press Enter Fullscreen once. It
+            asks nobody to sign in. Copy link puts the same address on the clipboard for
+            a browser you cannot type into.
           </p>
           <details>
             <summary className="cursor-pointer text-xs font-semibold text-text-secondary select-none">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, type LucideIcon } from "lucide-react";
 
 import { useFormStatus } from "react-dom";
 
@@ -24,6 +24,7 @@ export function SubmitButton({
   variant = "primary",
   size = "md",
   className,
+  icon: Icon,
 }: {
   label: string;
   /** What the button says while the action runs. */
@@ -31,6 +32,8 @@ export function SubmitButton({
   variant?: "primary" | "secondary" | "ghost";
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** Drawn before the label; the spinner takes its place while pending. */
+  icon?: LucideIcon;
 }) {
   const { pending } = useFormStatus();
 
@@ -45,7 +48,11 @@ export function SubmitButton({
          pinned to the action rather than to whatever it currently reads. */
       aria-label={label}
     >
-      {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        Icon && <Icon className="size-4" aria-hidden="true" />
+      )}
       {pending ? pendingLabel : label}
     </Button>
   );
