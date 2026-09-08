@@ -23,6 +23,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${origin}/pro`, lastModified, changeFrequency: "monthly", priority: 0.8 },
     { url: `${origin}/max`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     {
+      url: `${origin}/invite`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
       url: `${origin}/tournaments`,
       lastModified,
       changeFrequency: "weekly",

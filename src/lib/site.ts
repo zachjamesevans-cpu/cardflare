@@ -4,8 +4,10 @@ export const SITE = {
   name: "cardflare",
   domain: "cardflare.gg",
   tagline: "Find the card. Make the trade.",
+  /** The page title's second half, after "cardflare | ". */
+  title: "Find Trading Cards Near You",
   description:
-    "cardflare is the hub for in-person card trading, buying and selling. Post the cards you need and cardflare connects you with the people who have them: players near you, your local game store, vendors at card shows.",
+    "Find the card. Make the trade. cardflare searches nearby collectors, local game stores and card show vendors for the cards you need, then puts you in the same room.",
   contactEmail: "hello@cardflare.gg",
   /**
    * Where the contact form delivers.
@@ -50,7 +52,7 @@ export const ANCHORS = {
   forVendors: "/#for-vendors",
   forStores: "/#for-stores",
   pricing: "/#pricing",
-  invite: "/#request-invite",
+  invite: "/invite",
 } as const;
 
 export const NAV_LINKS = [

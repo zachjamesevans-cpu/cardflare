@@ -27,15 +27,25 @@ test.describe("landing page", () => {
     await page.goto("/");
 
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(
-      page.getByRole("heading", { name: "Three steps to a trade" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "How it works" })).toBeVisible();
   });
 
-  test("says the product is live", async ({ page }) => {
+  test("says where the card is, and never says waitlist", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByText(/live now/i).first()).toBeVisible();
+    /* The hero draws the three answers twice, one layout per breakpoint,
+       so look in the strip under it, which is the same on every screen. */
+    const strip = page
+      .getByRole("list")
+      .filter({ hasText: /one piece|luffy/i })
+      .first();
+    for (const answer of [
+      /someone nearby has it/i,
+      /store may have it/i,
+      /vendor booth may have it/i,
+    ]) {
+      await expect(strip.getByText(answer)).toBeVisible();
+    }
     /* The launch deleted every waitlist mention; one reappearing means a
        beta-era component crept back in. */
     await expect(page.getByText(/waitlist/i)).toHaveCount(0);
@@ -44,7 +54,7 @@ test.describe("landing page", () => {
   test("primary hero CTA opens the free signup", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Create your free account" }).first().click();
+    await page.getByRole("link", { name: "Create free account" }).first().click();
 
     await expect(page).toHaveURL(/\/signup$/);
     await expect(page.getByLabel(/email/i).first()).toBeVisible();
@@ -194,7 +204,7 @@ test.describe("legal pages", () => {
 
       await expect(page).toHaveURL(/\/#how-it-works$/);
       await expect(
-        page.getByRole("heading", { name: "Three steps to a trade" }),
+        page.getByRole("heading", { name: "How it works" }),
       ).toBeInViewport();
     });
   }
