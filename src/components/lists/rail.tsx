@@ -99,7 +99,7 @@ export function Rail({
          * the glow before changing this, and keep the negative margin
          * above in step or the shelf stops lining up with its header.
          */
-        className="flex items-start gap-2 overflow-x-auto px-3 pt-3 pb-4"
+        className="flex items-start gap-2 overflow-x-auto px-3 pt-2 pb-2"
       >
         {children}
       </ul>

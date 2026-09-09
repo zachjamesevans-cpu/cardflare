@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -111,6 +113,129 @@ export interface ZoomCard {
   pledges?: { name: string; quantity: number }[];
   terms?: string | null;
   youHave?: { kind: "exact" | "other-printing"; count: number } | null;
+  /**
+   * The offer this viewer can make on the card, or null when it is
+   * their own, or a card on offer rather than a want. The website's
+   * `ZoomCard.offer`, with the room's calls attached.
+   */
+  offer?: ZoomOffer | null;
+}
+
+export interface ZoomOffer {
+  /** The board is open before the event: "I'll bring it", not "I got it". */
+  early: boolean;
+  /** How many the Flare asks for; more than one asks how many you have. */
+  quantity: number;
+  /** The viewer's standing offer, when they already raised a hand. */
+  own: { quantity: number; message: string | null } | null;
+  onOffer: (message?: string, quantity?: number) => Promise<void>;
+  onWithdraw: () => Promise<void>;
+}
+
+/** The website's limit on the note that rides with an offer. */
+const MAX_OFFER_MESSAGE = 80;
+
+/**
+ * The offer, inside the zoom.
+ *
+ * The founder, from a phone: the handshake under a tile "is a bit
+ * small", and once the card is open at full size there should be "a
+ * text field to message someone, offer, etc." The same three things
+ * the website's row asks: where to find you, how many, and the button.
+ * Wrapped in its own Pressable so a tap inside it does not reach the
+ * backdrop, which closes the card.
+ */
+function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
+  const [message, setMessage] = useState("");
+  const [count, setCount] = useState(1);
+  const [busy, setBusy] = useState(false);
+
+  const run = async (work: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await work();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (offer.own) {
+    return (
+      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+          <Text style={{ color: colors.accent, fontWeight: "600" }}>
+            {offer.early ? "You've got them. " : "You offered. "}
+          </Text>
+          {offer.own.quantity > 1 ? `You said ${offer.own.quantity} copies. ` : ""}
+          {offer.own.message
+            ? `They were told: \u201c${offer.own.message}\u201d`
+            : "They can see your name, so keep an eye out."}
+        </Text>
+        <Tap onPress={() => void run(offer.onWithdraw)} disabled={busy} hitSlop={6}>
+          <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+            {busy ? "Withdrawing…" : "Withdraw"}
+          </Text>
+        </Tap>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable onPress={() => undefined} style={styles.zoomOffer}>
+      <Input
+        value={message}
+        onChangeText={setMessage}
+        placeholder="Where to find you? (optional)"
+        maxLength={MAX_OFFER_MESSAGE}
+        returnKeyType="done"
+      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+        {offer.quantity > 1 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+            <Tap
+              onPress={() => setCount((current) => Math.max(1, current - 1))}
+              hitSlop={6}
+              style={styles.zoomStep}
+            >
+              <Text style={styles.zoomStepGlyph}>−</Text>
+            </Tap>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontWeight: "700",
+                minWidth: 18,
+                textAlign: "center",
+              }}
+            >
+              {count}
+            </Text>
+            <Tap
+              onPress={() => setCount((current) => Math.min(offer.quantity, current + 1))}
+              hitSlop={6}
+              style={styles.zoomStep}
+            >
+              <Text style={styles.zoomStepGlyph}>+</Text>
+            </Tap>
+          </View>
+        ) : null}
+        <View style={{ flex: 1 }}>
+          <Button
+            label={busy ? "Offering…" : offer.early ? "I'll bring it" : "I got it"}
+            busy={busy}
+            onPress={() =>
+              void run(() =>
+                offer.onOffer(
+                  message.trim() || undefined,
+                  offer.quantity > 1 ? count : undefined,
+                ),
+              )
+            }
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 /**
@@ -137,6 +262,7 @@ export function CardImage({
   pledges: ownPledges = [],
   terms: ownTerms = null,
   youHave: ownYouHave = null,
+  offer: ownOffer = null,
   siblings,
   position = 0,
 }: {
@@ -167,6 +293,8 @@ export function CardImage({
    * the glance, this sentence is the answer to the question it raises.
    */
   youHave?: { kind: "exact" | "other-printing"; count: number } | null;
+  /** The offer form, for another player's want. See `ZoomCard.offer`. */
+  offer?: ZoomOffer | null;
   /**
    * The rest of the shelf this card was opened from, so the viewer can be
    * swiped along it - the website's `siblings`, same idea and same shape.
@@ -199,6 +327,7 @@ export function CardImage({
   const pledges = shown ? (shown.pledges ?? []) : ownPledges;
   const terms = shown ? (shown.terms ?? null) : ownTerms;
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
+  const offer = shown ? (shown.offer ?? null) : ownOffer;
 
   /*
    * A swipe ends in a press, and a press anywhere here closes.
@@ -309,7 +438,12 @@ export function CardImage({
             }}
           >
             {/* A whisper of scale rides the fade, so the panel settles
-                into place instead of just appearing. */}
+                into place instead of just appearing. The keyboard, when
+                the offer's field wakes it, pushes the panel up. */}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "position" : undefined}
+              pointerEvents="box-none"
+            >
             <Animated.View
               style={[
                 styles.zoomPanel,
@@ -427,6 +561,10 @@ export function CardImage({
                     </Tap>
                   </View>
                 ) : null}
+
+                {/* Keyed on the shelf position, so a half-typed note does
+                    not ride along to the next card. */}
+                {offer ? <ZoomOfferForm key={shelf ? at : "own"} offer={offer} /> : null}
               </View>
               {/* A sibling can be a card with no art of its own; the
                   panel shows the empty frame rather than a broken box. */}
@@ -442,6 +580,7 @@ export function CardImage({
               />
               <Text style={styles.muted}>Tap anywhere to close</Text>
             </Animated.View>
+            </KeyboardAvoidingView>
           </Pressable>
         </Animated.View>
       </Modal>
@@ -687,6 +826,39 @@ const styles = StyleSheet.create({
     gap: spacing(3),
     alignItems: "center",
   },
+  zoomOffer: {
+    alignSelf: "stretch",
+    gap: spacing(2),
+    marginTop: spacing(2),
+    padding: spacing(2),
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.elevated,
+  },
+  zoomOfferOn: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(2),
+    marginTop: spacing(2),
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.accentMuted,
+    backgroundColor: colors.elevated,
+  },
+  zoomStep: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomStepGlyph: { color: colors.textPrimary, fontSize: 18, fontWeight: "700" },
   zoomNote: {
     color: colors.textSecondary,
     fontSize: 13,

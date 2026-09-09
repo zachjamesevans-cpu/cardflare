@@ -13,7 +13,11 @@ import {
   Store,
 } from "lucide-react";
 
-import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import {
+  CardImageZoom,
+  type ZoomCard,
+  type ZoomOffer,
+} from "@/components/cards/card-image-zoom";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import {
   MarkTraded,
@@ -318,6 +322,7 @@ function CarouselEntry({
   reserveCaption = false,
   siblings,
   position,
+  offer = null,
 }: {
   entry: ListEntry;
   code: string;
@@ -354,6 +359,8 @@ function CarouselEntry({
   /** The rest of this player's rail, so the viewer can walk it. */
   siblings?: ZoomCard[];
   position?: number;
+  /** The zoom's offer form, for a tile that is alone on its shelf. */
+  offer?: ZoomOffer | null;
 }) {
   /*
    * Quantity drawn instead of written — and it is the *live need*, the
@@ -417,6 +424,7 @@ function CarouselEntry({
           >
             {isRenderableImageUrl(entry.imageUrl) && (
               <Image
+                key={entry.imageUrl}
                 src={entry.imageUrl}
                 alt=""
                 fill
@@ -440,6 +448,7 @@ function CarouselEntry({
           terms={acceptsLabel(entry)}
           pledges={pledges}
           youHave={match ? { kind: match, count: heldCount } : null}
+          offer={offer}
           siblings={siblings}
           position={position}
           thumbClassName="w-full"
@@ -638,7 +647,7 @@ export function FlareBoard({
   }
 
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col gap-2">
       {groups.map((group) => {
         const isYou = group.playerSessionId === youId;
         const headingId = `flares-${group.playerSessionId}`;
@@ -679,6 +688,9 @@ export function FlareBoard({
         const zoomCardFor = (entry: ListEntry): ZoomCard => {
           const entryOffers = offers.get(entry.id) ?? [];
           const entryMatch = isYou ? null : (matches.get(entry.id) ?? null);
+          const ownOffer = entryOffers.find(
+            (offer) => offer.responderSessionId === youId,
+          );
 
           return {
             imageUrl: entry.imageUrl,
@@ -701,6 +713,21 @@ export function FlareBoard({
             youHave: entryMatch
               ? { kind: entryMatch, count: heldCounts?.get(entry.cardId) ?? 0 }
               : null,
+            /* The offer, for somebody else's want only: your own card
+               has nothing to offer on, and a card on offer is answered
+               at the table, not with a hand. */
+            offer:
+              !isYou && entry.intent !== "showcase"
+                ? {
+                    code,
+                    flareId: entry.id,
+                    early,
+                    quantity: entry.quantity,
+                    own: ownOffer
+                      ? { quantity: ownOffer.quantity, message: ownOffer.message }
+                      : null,
+                  }
+                : null,
           };
         };
 
@@ -749,6 +776,7 @@ export function FlareBoard({
               reserveCaption={railHasDecks}
               siblings={shelf}
               position={shelfAt.get(entry.id) ?? 0}
+              offer={shelf[shelfAt.get(entry.id) ?? 0]?.offer ?? null}
             />
           );
         };
@@ -862,7 +890,7 @@ export function FlareBoard({
         const shelfAt = new Map(shelfEntries.map((entry, index) => [entry.id, index]));
 
         return (
-          <Card as="li" key={group.playerSessionId} className="flex flex-col gap-3 p-4">
+          <Card as="li" key={group.playerSessionId} className="flex flex-col gap-2 p-3">
             {/*
              * The founder's synthesis, replacing the page-wide toggle:
              * the rail is every player's default face, and the chevron
