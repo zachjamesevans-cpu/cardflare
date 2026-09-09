@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "5 September 2026";
+const LAST_UPDATED = "9 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -42,17 +42,24 @@ export default function PrivacyPage() {
             it.
           </li>
           <li>
-            If you subscribe to {SITE.name} Pro, whether the subscription is active.
-            Apple bills it and holds your payment details; we receive the transaction
-            reference and its status, never your card.
-          </li>
-          <li>
-            If your store subscribes to {SITE.name} Ultra, Stripe takes the payment on
-            its own page and holds the card. We store Stripe&rsquo;s customer and
-            subscription references and the subscription&rsquo;s status, never the card
-            number.
+            If you subscribe to {SITE.name} Pro in the app, Apple bills it and holds
+            your payment details. We receive the transaction reference and whether the
+            subscription is active, never your card.
           </li>
         </ul>
+        <p>
+          <strong>Payments and subscriptions.</strong> {SITE.name} Ultra for stores, and
+          {SITE.name} Pro when bought on the website, are billed through Stripe. You
+          enter your card on a page Stripe hosts, and Stripe collects and processes your
+          payment method, billing details, contact details and transaction history under
+          its own privacy policy. {SITE.name} never receives or stores a full card
+          number. What we do keep, so the subscription works, is: your Stripe customer
+          and subscription identifiers, the plan you chose, the subscription&rsquo;s
+          status (trialing, active, past due or cancelled), the date it is paid through,
+          and whether it is set to end at that date. We send Stripe your account email
+          and an internal account reference so it can match the subscription to you.
+          Receipts and invoices live with Stripe, not with us.
+        </p>
         <p>When a store or vendor requests an invite we store:</p>
         <ul>
           <li>A first name, an email address and the business type.</li>
@@ -63,7 +70,7 @@ export default function PrivacyPage() {
         </ul>
         <p>
           We do not ask for a mailing address or phone number, and we never see your
-          payment details.
+          card number.
         </p>
       </LegalSection>
 
@@ -125,8 +132,9 @@ export default function PrivacyPage() {
       <LegalSection heading="Where your information is stored">
         <p>
           Accounts, invite requests and messages are stored in a Supabase (PostgreSQL)
-          database. The site is hosted on Vercel. Both providers process data on our
-          behalf under their own security and privacy terms.
+          database. The site is hosted on Vercel. Card payments are handled by Stripe.
+          All three providers process data on our behalf under their own security and
+          privacy terms.
         </p>
       </LegalSection>
 
@@ -142,8 +150,11 @@ export default function PrivacyPage() {
           You can delete your account yourself: in the app, open your profile, then
           settings, then Delete your account; on the website, the same card sits at the
           bottom of your profile settings. It removes your profile, Flares, lists,
-          showcase, messages and unlocks at once, and it cannot be undone. A Pro
-          subscription is cancelled separately, in your Apple subscription settings.
+          showcase, messages and unlocks at once, and it cannot be undone. A
+          subscription is cancelled separately: Pro bought in the app in your Apple
+          subscription settings, and Pro or Ultra bought on the website from the Manage
+          billing button on your plan page. Stripe keeps its own records of past
+          payments as the law requires it to.
         </p>
         <p>
           You can also email{" "}

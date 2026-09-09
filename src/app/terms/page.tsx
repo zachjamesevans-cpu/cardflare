@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "5 September 2026";
+const LAST_UPDATED = "9 September 2026";
 
 export default function TermsPage() {
   return (
@@ -93,11 +93,14 @@ export default function TermsPage() {
       <LegalSection heading={`${SITE.name} Pro`}>
         <p>
           {SITE.name} Pro is an optional monthly subscription that unlocks cosmetic
-          features. In the app it is sold through Apple and billed to your Apple ID. It
-          renews automatically each month at the price shown when you subscribe, until
-          you cancel. You can cancel at any time in your Apple ID subscription settings,
-          and it stays on until the end of the period you already paid for. Refunds are
-          handled by Apple under its own terms.
+          features. In the app it is sold through Apple and billed to your Apple ID. On
+          the website, where offered, it is billed through Stripe to the card you enter.
+          Either way it renews automatically each month at the price shown when you
+          subscribe, until you cancel. Cancel at any time: in your Apple ID subscription
+          settings for an app purchase, or from the Manage billing button on the Pro
+          page for a website purchase. It stays on until the end of the period you
+          already paid for. Refunds for app purchases are handled by Apple under its own
+          terms.
         </p>
         <p>
           Everything you unlock with Pro is a look inside {SITE.name}, not property: it
@@ -109,11 +112,16 @@ export default function TermsPage() {
       <LegalSection heading={`${SITE.name} Ultra`}>
         <p>
           {SITE.name} Ultra is a monthly subscription for game stores, billed through
-          Stripe to the card on file. It starts with a free trial; if you cancel before
-          the trial ends, nothing is charged. After that it renews each month at the
-          price shown when you subscribed, until you cancel from your store console or
-          the billing page. Cancelling takes effect at the end of the period you already
-          paid for. We may change the price with notice before you are charged.
+          Stripe to the card you enter when you start it. It begins with a free trial of
+          the length shown when you sign up. The card is not charged during the trial;
+          the first charge lands when the trial ends, and if you cancel before then
+          nothing is charged. After that it renews automatically each month at the price
+          shown when you subscribed, until you cancel from the Manage billing button in
+          your store console. Cancelling takes effect at the end of the period you
+          already paid for, and Ultra stays on until then. If a renewal payment fails,
+          Ultra stays on until the end of the period already paid for and stops after
+          that until the payment goes through. We may change the price with notice
+          before you are charged.
         </p>
       </LegalSection>
 
@@ -121,8 +129,9 @@ export default function TermsPage() {
         <p>
           You can delete your account at any time from your profile settings in the app
           or on the website. Deletion is immediate and cannot be undone. Cancelling a
-          Pro subscription is a separate step in your Apple settings. We may close an
-          account that breaks these terms.
+          subscription is a separate step: in your Apple settings for Pro bought in the
+          app, or from Manage billing for Pro or Ultra bought on the website. We may
+          close an account that breaks these terms.
         </p>
       </LegalSection>
 

@@ -38,7 +38,7 @@ const TIERS: Tier[] = [
     name: "Pro",
     price: "$7.99",
     cadence: "/mo",
-    line: "Cosmetics, animated everything, your look on web and app.",
+    line: "Cosmetics, animated profiles, and your look everywhere you play.",
     cta: { label: "See Pro", href: "/pro" },
   },
   {
