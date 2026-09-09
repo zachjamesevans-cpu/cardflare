@@ -256,8 +256,16 @@ export async function signUpWithPassword(
     redirect("/login");
   }
 
-  /* Straight to the picture. The name and handle were the setup, and
-     they were answered at the door — see `signupSchema`. */
+  /*
+   * Somebody who signed up from a room goes straight back to it: the
+   * seat they had as a guest becomes theirs the moment the page loads,
+   * and the picture and games can wait for a quieter moment (both live
+   * in profile settings). Everyone else gets the picture next. The
+   * name and handle were the setup, and they were answered at the
+   * door — see `signupSchema`.
+   */
+  const next = text(formData, "next");
+  if (next) redirect(safeNextPath(next));
   redirect("/welcome/picture");
 }
 

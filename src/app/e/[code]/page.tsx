@@ -6,6 +6,7 @@ import { CalendarClock, MapPin } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { AccountPitch } from "@/components/players/account-pitch";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { FlareBoard } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
@@ -555,6 +556,12 @@ export default async function JoinByCodePage({
         )}
       </Card>
 
+      {/* The pitch, to guests only, right under the door: the one thing
+          they lose without an account, and the way to fix it. */}
+      {inRoom && !accountPlayerId && (
+        <AccountPitch next={`/e/${normalized}`} variant="room" />
+      )}
+
       {inRoom && resumed && (
         <Card className="flex flex-col gap-1 border-accent/30">
           <h2 className="font-semibold text-text-primary">
@@ -669,34 +676,18 @@ export default async function JoinByCodePage({
             youId={session.id}
             imagesEnabled={images}
           />
-
-          {/*
-           * The quietest possible mention of accounts, and only to guests.
-           * No sign-up funnel — accounts are invite-only — and nothing about
-           * the room changes without one. Want a quick trade? You already
-           * have everything you need.
-           */}
-          {!accountPlayerId && (
-            <p className="text-center text-xs text-text-muted">
-              Have a cardflare account?{" "}
-              <Link
-                href={`/login?next=/e/${normalized}`}
-                className="text-text-secondary underline underline-offset-4 hover:text-text-primary"
-              >
-                Sign in
-              </Link>{" "}
-              and the cards you post here will follow you to other stores.
-            </p>
-          )}
         </>
       ) : (
-        <Card>
-          <JoinEventForm
-            code={normalized}
-            knownAs={session?.display_name}
-            accountName={accountName}
-          />
-        </Card>
+        <>
+          <Card>
+            <JoinEventForm
+              code={normalized}
+              knownAs={session?.display_name}
+              accountName={accountName}
+            />
+          </Card>
+          {!accountName && <AccountPitch next={`/e/${normalized}`} variant="join" />}
+        </>
       )}
     </Shell>
   );

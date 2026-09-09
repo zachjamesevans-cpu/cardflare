@@ -85,8 +85,22 @@ async function markWelcomeSeen(): Promise<void> {
 
 type Step = "splash" | "account" | "games" | "signin";
 
-export function WelcomeScreen({ onDone }: { onDone: () => void }) {
-  const [step, setStep] = useState<Step>("splash");
+export function WelcomeScreen({
+  onDone,
+  initialStep = "splash",
+  onCancel,
+}: {
+  onDone: () => void;
+  /**
+   * "account" opens straight on the sign-up form: a guest who tapped
+   * Create free account inside a room has already chosen, and the
+   * splash would only be a second door to walk through.
+   */
+  initialStep?: "splash" | "account";
+  /** Back out of the account step when this was opened from a room. */
+  onCancel?: () => void;
+}) {
+  const [step, setStep] = useState<Step>(initialStep);
 
   const done = () => {
     void markWelcomeSeen();
@@ -106,7 +120,7 @@ export function WelcomeScreen({ onDone }: { onDone: () => void }) {
         <StepShell
           step={1}
           title="Create your account"
-          onBack={() => setStep("splash")}
+          onBack={initialStep === "account" && onCancel ? onCancel : () => setStep("splash")}
         >
           <AccountStep onDone={() => setStep("games")} />
         </StepShell>

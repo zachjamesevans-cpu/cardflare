@@ -7,6 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { SignupForm } from "@/components/auth/signup-form";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { signOutToSignup } from "@/lib/auth/actions";
+import { safeNextPath } from "@/lib/auth/redirect";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -29,9 +30,18 @@ export const dynamic = "force-dynamic";
  * account is made of, and every other question gets its own screen
  * after, matching the app's flow step for step.
  */
-export default async function SignupPage() {
+export default async function SignupPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /* Where to go afterwards, when somewhere sent them: a guest signing
+     up from a room goes back to that room, seat and all. Checked with
+     the same rule the sign-in page uses, so it is always a local path. */
+  const params = await props.searchParams;
+  const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
+  const next = rawNext ? safeNextPath(rawNext) : undefined;
+
   const viewer = await getViewer();
-  if (viewer.kind === "player") redirect("/profile");
+  if (viewer.kind === "player") redirect(next ?? "/profile");
   if (viewer.kind !== "anonymous") return <AlreadySignedIn viewer={viewer} />;
 
   return (
@@ -69,7 +79,7 @@ export default async function SignupPage() {
         </li>
       </ul>
 
-      <SignupForm />
+      <SignupForm next={next} />
 
       {/* The same promise the app's welcome screen makes. */}
       <p className="text-center text-sm text-text-muted">

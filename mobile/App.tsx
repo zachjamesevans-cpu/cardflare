@@ -107,6 +107,8 @@ export type StackParams = {
   /** The conversations people already had, while Local is off. */
   Messages: undefined;
   SignIn: undefined;
+  /** The welcome screen's sign-up, opened from a room's account pitch. */
+  CreateAccount: undefined;
   Scan: undefined;
   Settings: undefined;
   /** The Embers store, the website's /profile/store. */
@@ -137,6 +139,7 @@ const Stack = createNativeStackNavigator<StackParams>();
    because the button itself is ours now (see HeaderBack). */
 const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   SignIn: "Back",
+  CreateAccount: "Back",
   Scan: "Back",
   Settings: "Profile",
   Store: "Profile",
@@ -580,6 +583,18 @@ export default function App() {
           >
             {({ navigation }) => (
               <SignInScreen onSignedIn={() => navigation.goBack()} />
+            )}
+          </Stack.Screen>
+          <Stack.Screen
+            name="CreateAccount"
+            options={{ title: "Create account", headerBackTitle: "Back" }}
+          >
+            {({ navigation }) => (
+              <WelcomeScreen
+                initialStep="account"
+                onDone={() => navigation.goBack()}
+                onCancel={() => navigation.goBack()}
+              />
             )}
           </Stack.Screen>
           <Stack.Screen

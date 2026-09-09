@@ -55,6 +55,7 @@ import {
   Title,
 } from "../ui";
 import { inRailOrder } from "../rail-order";
+import { AccountPitch } from "../account-pitch";
 import { RoomTimersCard } from "../room-timers";
 import { OpenToTradesTag } from "../open-to-trades-tag";
 import { TournamentHelpModal } from "../tournament-help";
@@ -383,6 +384,8 @@ function RoomScreen({
           />
         </Card>
 
+        {!state.account && <AccountPitch variant="join" />}
+
         {/* Nothing at the counter — but a board may already be taking
             Flares, which is exactly what someone checking from home wants. */}
         {state.earlyBoard && (
@@ -501,6 +504,10 @@ function RoomScreen({
             </>
           )}
         </Card>
+
+        {!state.account && (room.status === "open" || room.early) && (
+          <AccountPitch variant="join" />
+        )}
       </ScrollView>
     );
   }
@@ -621,6 +628,9 @@ function RoomScreen({
           open={tournamentHelp}
           onClose={() => setTournamentHelp(false)}
         />
+
+        {/* The pitch, to guests only, right under the door. */}
+        {!state.account && <AccountPitch variant="room" />}
 
         {/* The wall's clocks, for a seat that cannot see the wall — or
             somebody who stepped out with the room in their pocket. */}
