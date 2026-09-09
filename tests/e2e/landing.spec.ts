@@ -33,14 +33,9 @@ test.describe("landing page", () => {
   test("says where the card is, and never says waitlist", async ({ page }) => {
     await page.goto("/");
 
-    /* The hero's radar is desktop-only, so look in the found panel under
-       it, which is the same on every screen. */
-    const strip = page.getByRole("list").filter({ hasText: /someone nearby has it/i });
-    for (const answer of [
-      /someone nearby has it/i,
-      /store may have it/i,
-      /vendor booth may have it/i,
-    ]) {
+    /* The found panel in the hero: the want, and the three answers. */
+    const strip = page.getByRole("list").filter({ hasText: /alex has it/i });
+    for (const answer of [/alex has it/i, /store may have it/i, /booth 174/i]) {
       await expect(strip.getByText(answer)).toBeVisible();
     }
     /* The launch deleted every waitlist mention; one reappearing means a
