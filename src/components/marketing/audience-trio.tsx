@@ -16,7 +16,7 @@ const AUDIENCES = [
     id: "for-players",
     eyebrow: "Players",
     title: "The card is closer than you think.",
-    text: "Post what you need. cardflare tells you who has it, and where.",
+    text: "Post what you need. See who has it, and where.",
     href: "/signup",
     cta: "Create free account",
     analytics: "player_signup_cta_clicked",
@@ -25,7 +25,7 @@ const AUDIENCES = [
     id: "for-stores-card",
     eyebrow: "Stores",
     title: "Every night, on the TV.",
-    text: "Timers, Flares and your inventory matched to the room. One printed code on the counter.",
+    text: "Timers, Flares and your inventory on the TV. One code on the counter.",
     href: "/ultra",
     cta: "See Ultra",
     analytics: undefined,
@@ -43,13 +43,13 @@ const AUDIENCES = [
 
 export function AudienceTrio() {
   return (
-    <Section labelledBy="audience-title" className="py-14 md:py-20">
+    <Section labelledBy="audience-title" className="py-10 md:py-20">
       <h2 id="audience-title" className="sr-only">
         Who cardflare is for
       </h2>
       <div className="grid gap-4 md:grid-cols-3">
         {AUDIENCES.map((a) => (
-          <Card key={a.id} className="flex flex-col gap-3">
+          <Card key={a.id} className="flex flex-col gap-2 md:gap-3">
             {/* The anchor sits above the card so the sticky header
                 does not cover the eyebrow on arrival. */}
             <span id={a.id} className="-mt-24 block pt-24" aria-hidden="true" />

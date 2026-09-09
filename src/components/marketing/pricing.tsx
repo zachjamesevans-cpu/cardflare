@@ -66,34 +66,42 @@ const MARKS = {
 
 export function Pricing() {
   return (
-    <Section id="pricing" labelledBy="pricing-title" className="py-14 md:py-20">
+    <Section id="pricing" labelledBy="pricing-title" className="py-10 md:py-20">
       <SectionHeading
         id="pricing-title"
         eyebrow="Pricing"
         title={`Free for players. ${ULTRA_TRIAL_DAYS} days free for stores.`}
       />
 
-      <div className="mx-auto mt-10 grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Four tiles with width; on a phone, four rows, so the tiers
+          read down the screen instead of as a column of small cards. */}
+      <div className="mx-auto mt-8 grid w-full max-w-6xl gap-3 sm:grid-cols-2 md:mt-10 md:gap-4 lg:grid-cols-4">
         {TIERS.map((tier) => (
           <Card
             key={tier.name}
-            className={`flex flex-col gap-3 ${tier.featured ? "border-accent" : ""}`}
+            className={`flex flex-row flex-wrap items-center gap-x-4 gap-y-2 sm:flex-col sm:items-stretch sm:gap-3 ${tier.featured ? "border-accent" : ""}`}
           >
-            <h3 className="text-lg font-bold text-text-primary">{MARKS[tier.name]}</h3>
+            <div className="flex min-w-0 flex-1 items-baseline justify-between gap-3 sm:flex-col sm:gap-3">
+              <h3 className="text-lg font-bold text-text-primary">
+                {MARKS[tier.name]}
+              </h3>
+              <p className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-text-primary sm:text-3xl">
+                  {tier.price}
+                </span>
+                {tier.cadence && (
+                  <span className="text-sm text-text-muted">{tier.cadence}</span>
+                )}
+              </p>
+            </div>
 
-            <p className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-text-primary">{tier.price}</span>
-              {tier.cadence && (
-                <span className="text-sm text-text-muted">{tier.cadence}</span>
-              )}
-            </p>
-
-            <p className="flex-1 text-sm text-text-secondary">{tier.line}</p>
+            <p className="w-full text-sm text-text-secondary sm:flex-1">{tier.line}</p>
 
             <ButtonLink
               href={tier.cta.href}
               size="sm"
               variant={tier.featured ? "primary" : "secondary"}
+              className="w-full"
             >
               {tier.cta.label}
             </ButtonLink>

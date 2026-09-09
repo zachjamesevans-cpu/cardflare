@@ -14,16 +14,16 @@ export function HowItWorks() {
     <Section
       id="how-it-works"
       labelledBy="how-it-works-title"
-      className="border-y border-border bg-surface py-14 md:py-16"
+      className="border-y border-border bg-surface py-10 md:py-16"
     >
       <h2
         id="how-it-works-title"
-        className="mb-8 text-center text-xs font-semibold tracking-[0.18em] text-accent uppercase"
+        className="mb-6 text-center text-xs font-semibold tracking-[0.18em] text-accent uppercase"
       >
         How it works
       </h2>
 
-      <ol className="grid gap-6 md:grid-cols-3">
+      <ol className="grid gap-4 md:grid-cols-3 md:gap-6">
         {STEPS.map((step, index) => (
           <li key={step.title} className="flex items-center gap-4">
             <span className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-accent/30 bg-accent/10">

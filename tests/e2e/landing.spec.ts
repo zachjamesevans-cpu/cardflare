@@ -33,12 +33,9 @@ test.describe("landing page", () => {
   test("says where the card is, and never says waitlist", async ({ page }) => {
     await page.goto("/");
 
-    /* The hero draws the three answers twice, one layout per breakpoint,
-       so look in the strip under it, which is the same on every screen. */
-    const strip = page
-      .getByRole("list")
-      .filter({ hasText: /one piece|luffy/i })
-      .first();
+    /* The hero's radar is desktop-only, so look in the found panel under
+       it, which is the same on every screen. */
+    const strip = page.getByRole("list").filter({ hasText: /someone nearby has it/i });
     for (const answer of [
       /someone nearby has it/i,
       /store may have it/i,
