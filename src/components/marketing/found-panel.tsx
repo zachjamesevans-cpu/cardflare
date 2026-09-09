@@ -38,7 +38,7 @@ export function FoundPanel({ className }: { className?: string }) {
             <Radio className="size-3 text-accent" aria-hidden="true" />
             Want List
           </p>
-          <p className="truncate text-base font-bold text-text-primary">
+          <p className="truncate text-sm font-bold text-text-primary sm:text-base">
             {SAMPLE_CARD.name}{" "}
             <span className="hidden font-normal text-text-muted sm:inline">
               {SAMPLE_CARD.set}
@@ -73,7 +73,7 @@ export function FoundPanel({ className }: { className?: string }) {
                 >
                   {p.eyebrow}
                 </p>
-                <p className="text-[15px] leading-tight font-bold text-text-primary sm:text-base">
+                <p className="text-sm leading-tight font-bold text-text-primary sm:text-base">
                   {p.line}
                 </p>
                 <p className="text-xs text-text-muted">{p.detail}</p>
@@ -81,7 +81,7 @@ export function FoundPanel({ className }: { className?: string }) {
               <span
                 aria-hidden="true"
                 className={cn(
-                  "shrink-0 rounded-[var(--radius-control)] px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 sm:text-xs",
+                  "hidden shrink-0 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold sm:inline-flex",
                   index === 0
                     ? "bg-accent text-accent-contrast"
                     : "border border-border bg-elevated text-text-primary",
