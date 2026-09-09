@@ -3,14 +3,16 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 interface CardProps {
+  id?: string;
   as?: "div" | "li" | "article";
   className?: string;
   children: ReactNode;
 }
 
-export function Card({ as: Tag = "div", className, children }: CardProps) {
+export function Card({ as: Tag = "div", id, className, children }: CardProps) {
   return (
     <Tag
+      id={id}
       className={cn(
         "rounded-[var(--radius-card)] border border-border bg-surface p-6",
         "shadow-[var(--shadow-card)]",

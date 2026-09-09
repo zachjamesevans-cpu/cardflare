@@ -43,16 +43,17 @@ const AUDIENCES = [
 
 export function AudienceTrio() {
   return (
-    <Section labelledBy="audience-title" className="py-10 md:py-20">
+    <Section labelledBy="audience-title" padding="py-8 md:py-14">
       <h2 id="audience-title" className="sr-only">
         Who cardflare is for
       </h2>
       <div className="grid gap-4 md:grid-cols-3">
         {AUDIENCES.map((a) => (
-          <Card key={a.id} className="flex flex-col gap-2 md:gap-3">
-            {/* The anchor sits above the card so the sticky header
-                does not cover the eyebrow on arrival. */}
-            <span id={a.id} className="-mt-24 block pt-24" aria-hidden="true" />
+          <Card
+            key={a.id}
+            id={a.id}
+            className="flex scroll-mt-24 flex-col gap-2 md:gap-3"
+          >
             <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">
               {a.eyebrow}
             </p>

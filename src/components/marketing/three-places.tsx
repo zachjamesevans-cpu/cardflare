@@ -22,7 +22,7 @@ export function ThreePlaces() {
   return (
     <section
       aria-labelledby="three-places-title"
-      className="px-5 pt-2 pb-12 sm:px-6 md:pt-6 md:pb-20"
+      className="px-5 pt-2 pb-10 sm:px-6 md:pt-4 md:pb-14"
     >
       <div className="mx-auto w-full max-w-3xl">
         <div className="flex flex-col items-center gap-2 text-center">
@@ -37,7 +37,7 @@ export function ThreePlaces() {
           </h2>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface shadow-[var(--shadow-panel)] md:mt-8">
+        <div className="mt-5 overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface shadow-[var(--shadow-panel)] md:mt-6">
           {/* The want. */}
           <div className="flex items-center gap-3 border-b border-border bg-elevated/60 px-4 py-3">
             <CardTile size="sm" className="w-9" />
