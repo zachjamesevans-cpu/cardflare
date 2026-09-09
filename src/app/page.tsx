@@ -5,7 +5,6 @@ import { FinalCta } from "@/components/marketing/final-cta";
 import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Pricing } from "@/components/marketing/pricing";
-import { ThreePlaces } from "@/components/marketing/three-places";
 import { UltraBand } from "@/components/marketing/ultra-band";
 import { SITE, siteUrl } from "@/lib/site";
 
@@ -54,7 +53,6 @@ export default function HomePage() {
 
       <main id="main" className="flex-1">
         <Hero />
-        <ThreePlaces />
         <HowItWorks />
         <UltraBand />
         <AudienceTrio />

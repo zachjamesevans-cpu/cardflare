@@ -11,12 +11,11 @@ import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
  *
  * The founder: "make cardflare Ultra feel like a real product, not
  * just another feature section... if we already have real FlareCast
- * imagery, prioritize that." Both pictures are the display component
- * itself on a sample night, counting in real time: the wall during a
- * round, and the wall between rounds while Auto Mode counts down to
- * the next one. The second screen only appears once there is width
- * for it beside the first, so a phone gets the wall and nothing to
- * scroll past.
+ * imagery, prioritize that... make the FlareCast screen itself large
+ * enough to actually see." So the section breaks the page: a band on
+ * the surface colour with an accent line across the top and a glow
+ * behind one television the full width of the page, which is the
+ * display component itself on a sample night, counting in real time.
  */
 export function UltraBand() {
   return (
@@ -24,9 +23,14 @@ export function UltraBand() {
       id="for-stores"
       labelledBy="ultra-band-title"
       padding="py-10 md:py-16"
-      className="bg-flare-wash"
+      className="relative overflow-hidden border-t-2 border-accent/60 bg-surface"
     >
-      <div className="flex flex-col items-center gap-3 text-center md:gap-4">
+      {/* The glow the television throws on the wall behind it. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-[radial-gradient(ellipse_at_top,var(--color-accent)_0%,transparent_60%)] opacity-15"
+      />
+      <div className="relative flex flex-col items-center gap-3 text-center md:gap-4">
         <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">
           For game stores
         </p>
@@ -42,20 +46,14 @@ export function UltraBand() {
         </p>
       </div>
 
-      <div className="mt-6 grid items-start gap-6 md:mt-8 lg:grid-cols-[1.7fr_1fr]">
+      <div className="relative mt-6 md:mt-8">
         <TvFrame
           scene="focus"
           label="FlareCast on the wall during round 3: the clock, what the room is hunting, and the code to scan in."
         />
-        <div className="hidden lg:block">
-          <TvFrame
-            scene="intermission"
-            label="Between rounds: Auto Mode counts down to round 4, and the organizer's computer says so out loud."
-          />
-        </div>
       </div>
 
-      <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-8">
+      <div className="relative mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-8">
         <ButtonLink
           href="/ultra"
           size="lg"
