@@ -7,15 +7,28 @@ interface SectionProps {
   className?: string;
   children: ReactNode;
   labelledBy?: string;
+  /**
+   * Vertical padding classes, replacing the default rhythm rather than
+   * stacking on it: `cn` joins class names and does not merge them, so
+   * a `py-10` in `className` would sit beside the default `py-20` and
+   * lose to whichever the stylesheet lists last.
+   */
+  padding?: string;
 }
 
 /** Page section with the shared vertical rhythm and max width. */
-export function Section({ id, className, children, labelledBy }: SectionProps) {
+export function Section({
+  id,
+  className,
+  children,
+  labelledBy,
+  padding = "py-20 md:py-28",
+}: SectionProps) {
   return (
     <section
       id={id}
       aria-labelledby={labelledBy}
-      className={cn("px-5 py-20 sm:px-6 md:py-28", className)}
+      className={cn("px-5 sm:px-6", padding, className)}
     >
       <div className="mx-auto w-full max-w-6xl">{children}</div>
     </section>

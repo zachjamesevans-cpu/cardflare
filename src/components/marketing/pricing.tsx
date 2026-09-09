@@ -66,7 +66,7 @@ const MARKS = {
 
 export function Pricing() {
   return (
-    <Section id="pricing" labelledBy="pricing-title" className="py-10 md:py-20">
+    <Section id="pricing" labelledBy="pricing-title" padding="py-8 md:py-14">
       <SectionHeading
         id="pricing-title"
         eyebrow="Pricing"
@@ -75,7 +75,7 @@ export function Pricing() {
 
       {/* Four tiles with width; on a phone, four rows, so the tiers
           read down the screen instead of as a column of small cards. */}
-      <div className="mx-auto mt-8 grid w-full max-w-6xl gap-3 sm:grid-cols-2 md:mt-10 md:gap-4 lg:grid-cols-4">
+      <div className="mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-2 md:mt-8 md:gap-4 lg:grid-cols-4">
         {TIERS.map((tier) => (
           <Card
             key={tier.name}

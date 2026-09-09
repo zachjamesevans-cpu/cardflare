@@ -14,11 +14,12 @@ export function HowItWorks() {
     <Section
       id="how-it-works"
       labelledBy="how-it-works-title"
-      className="border-y border-border bg-surface py-10 md:py-16"
+      padding="py-8 md:py-12"
+      className="border-y border-border bg-surface"
     >
       <h2
         id="how-it-works-title"
-        className="mb-6 text-center text-xs font-semibold tracking-[0.18em] text-accent uppercase"
+        className="mb-5 text-center text-xs font-semibold tracking-[0.18em] text-accent uppercase"
       >
         How it works
       </h2>

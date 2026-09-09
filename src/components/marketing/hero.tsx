@@ -16,8 +16,8 @@ export const HERO_SUB =
  */
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-flare-wash px-5 pt-12 pb-10 sm:px-6 md:pt-24 md:pb-24">
-      <div className="mx-auto grid w-full max-w-6xl items-center gap-10 md:grid-cols-2 md:gap-10">
+    <section className="relative overflow-hidden bg-flare-wash px-5 pt-10 pb-8 sm:px-6 md:pt-16 md:pb-14">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-8 md:grid-cols-2 md:gap-10">
         <div className="flex flex-col items-start gap-5 md:gap-6">
           <h1 className="text-[2.75rem] leading-[1.05] font-bold tracking-tight text-balance text-text-primary sm:text-6xl lg:text-7xl">
             Find the card.

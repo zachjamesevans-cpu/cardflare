@@ -23,7 +23,8 @@ export function UltraBand() {
     <Section
       id="for-stores"
       labelledBy="ultra-band-title"
-      className="bg-flare-wash py-12 md:py-24"
+      padding="py-10 md:py-16"
+      className="bg-flare-wash"
     >
       <div className="flex flex-col items-center gap-3 text-center md:gap-4">
         <p className="text-xs font-semibold tracking-[0.18em] text-accent uppercase">
@@ -41,7 +42,7 @@ export function UltraBand() {
         </p>
       </div>
 
-      <div className="mt-8 grid items-start gap-8 md:mt-10 lg:grid-cols-[1.7fr_1fr]">
+      <div className="mt-6 grid items-start gap-6 md:mt-8 lg:grid-cols-[1.7fr_1fr]">
         <TvFrame
           scene="focus"
           label="FlareCast on the wall during round 3: the clock, what the room is hunting, and the code to scan in."
@@ -54,7 +55,7 @@ export function UltraBand() {
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-10">
+      <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-8">
         <ButtonLink
           href="/ultra"
           size="lg"
