@@ -890,7 +890,11 @@ export function FlareBoard({
         const shelfAt = new Map(shelfEntries.map((entry, index) => [entry.id, index]));
 
         return (
-          <Card as="li" key={group.playerSessionId} className="flex flex-col gap-2 p-3">
+          <Card
+            as="li"
+            key={group.playerSessionId}
+            className="flex flex-col gap-1.5 px-3 pt-2.5 pb-2"
+          >
             {/*
              * The founder's synthesis, replacing the page-wide toggle:
              * the rail is every player's default face, and the chevron
@@ -927,8 +931,8 @@ export function FlareBoard({
                       auraArt={identities.get(group.playerSessionId)?.auraArt ?? null}
                       isYou={isYou}
                       imagesEnabled={imagesEnabled}
-                      nameClassName="text-lg font-semibold"
-                      size="lg"
+                      nameClassName="text-base font-semibold"
+                      size="md"
                       className="min-w-0 flex-1"
                       /* Under the NAME, in the column beside the picture. */
                       below={alsoOpen ? <OpenToTradesTag /> : null}
@@ -956,12 +960,12 @@ export function FlareBoard({
                          * it: the picture anchors the header, and a
                          * worn ring is most of why anybody bought one.
                          */
-                        size="lg"
+                        size="md"
                       />
                       {/* The same column a peekable player gets, by hand,
                           because a guest has no profile to open. */}
                       <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                        <span className="max-w-full truncate text-lg font-semibold text-text-primary">
+                        <span className="max-w-full truncate text-base font-semibold text-text-primary">
                           {group.displayName ?? "A player"}
                         </span>
                         {alsoOpen && <OpenToTradesTag />}

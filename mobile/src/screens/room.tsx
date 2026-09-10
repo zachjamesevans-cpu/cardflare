@@ -589,8 +589,8 @@ function RoomScreen({
     <View style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(4),
-          gap: spacing(3),
+          padding: spacing(3),
+          gap: spacing(2),
           paddingBottom: spacing(24) + insets.bottom,
         }}
         refreshControl={
@@ -894,7 +894,7 @@ function RoomScreen({
           const groupOpen = Boolean(expandedGroups[sessionId]);
 
           return (
-            <Card key={sessionId} style={{ padding: spacing(3), gap: spacing(1.5) }}>
+            <Card key={sessionId} style={{ padding: spacing(2.5), gap: spacing(1) }}>
               {/*
                * The founder's synthesis, replacing the page-wide toggle:
                * the rail is every player's default face, and the chevron
@@ -919,7 +919,7 @@ function RoomScreen({
                      block of things at slightly different sizes. */
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
-                  paddingBottom: spacing(2),
+                  paddingBottom: spacing(1.5),
                 }}
               >
                 <View
@@ -960,7 +960,7 @@ function RoomScreen({
                              founder's mockup settles what this row is:
                              the picture anchors it, and a worn ring is
                              most of why anybody bought one. */
-                          size={64}
+                          size={48}
                         />
                         {/*
                          * The name and the line under it are a COLUMN
@@ -1052,7 +1052,7 @@ function RoomScreen({
                     contentContainerStyle={{
                       gap: spacing(2),
                       paddingHorizontal: spacing(2),
-                      paddingVertical: spacing(1),
+                      paddingVertical: 0,
                       alignItems: "flex-start",
                     }}
                   >

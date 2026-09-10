@@ -81,14 +81,14 @@ function Shell({
       <main
         id="main"
         className={cn(
-          "flex min-h-dvh flex-col items-center justify-start gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12",
+          "flex min-h-dvh flex-col items-center justify-start gap-3 px-5 pt-5 pb-16 sm:gap-5 sm:pt-10",
         )}
       >
         <Link href="/" aria-label={`${SITE.name} home`}>
           <Logo size={40} priority />
         </Link>
         <div
-          className={cn("flex w-full flex-col gap-5", wide ? "max-w-2xl" : "max-w-md")}
+          className={cn("flex w-full flex-col gap-3", wide ? "max-w-2xl" : "max-w-md")}
         >
           {children}
         </div>
@@ -494,7 +494,7 @@ export default async function JoinByCodePage({
 
   return (
     <Shell wide={inRoom}>
-      <Card className="flex flex-col gap-4">
+      <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium text-accent">{event.storeName}</p>
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">
