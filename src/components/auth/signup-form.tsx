@@ -85,7 +85,7 @@ function useHandleAvailability(handle: string): HandleStatus {
  * empty, is shaped as it is typed, and reports live whether the name is
  * free instead of waiting for the submit button to break the news.
  */
-export function SignupForm() {
+export function SignupForm({ next }: { next?: string }) {
   const [state, formAction] = useActionState(signUpWithPassword, PASSWORD_SIGN_IN_IDLE);
 
   const [handle, setHandle] = useState("");
@@ -106,6 +106,7 @@ export function SignupForm() {
       noValidate
       className="flex flex-col gap-5 rounded-[var(--radius-panel)] border border-border bg-surface p-6 sm:p-8"
     >
+      {next && <input type="hidden" name="next" value={next} />}
       <p
         role="alert"
         className={

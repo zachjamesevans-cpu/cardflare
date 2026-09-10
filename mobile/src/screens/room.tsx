@@ -55,6 +55,7 @@ import {
   Title,
 } from "../ui";
 import { inRailOrder } from "../rail-order";
+import { AccountPitch } from "../account-pitch";
 import { RoomTimersCard } from "../room-timers";
 import { OpenToTradesTag } from "../open-to-trades-tag";
 import { TournamentHelpModal } from "../tournament-help";
@@ -383,6 +384,8 @@ function RoomScreen({
           />
         </Card>
 
+        {!state.account && <AccountPitch variant="join" />}
+
         {/* Nothing at the counter — but a board may already be taking
             Flares, which is exactly what someone checking from home wants. */}
         {state.earlyBoard && (
@@ -501,6 +504,10 @@ function RoomScreen({
             </>
           )}
         </Card>
+
+        {!state.account && (room.status === "open" || room.early) && (
+          <AccountPitch variant="join" />
+        )}
       </ScrollView>
     );
   }
@@ -621,6 +628,9 @@ function RoomScreen({
           open={tournamentHelp}
           onClose={() => setTournamentHelp(false)}
         />
+
+        {/* The pitch, to guests only, right under the door. */}
+        {!state.account && <AccountPitch variant="room" />}
 
         {/* The wall's clocks, for a seat that cannot see the wall — or
             somebody who stepped out with the room in their pocket. */}
@@ -843,6 +853,23 @@ function RoomScreen({
               quantity: offer.quantity,
             })),
             youHave: f.match ? { kind: f.match, count: f.heldCount ?? 0 } : null,
+            /* The offer, for somebody else's want only: your own card
+               has nothing to offer on, and a card on offer is answered
+               at the table, not with a hand. */
+            offer:
+              mine || f.intent === "showcase"
+                ? null
+                : {
+                    early: room.early,
+                    quantity: f.quantity,
+                    own: (() => {
+                      const own = f.offers.find((o) => o.responderSessionId === youId);
+                      return own ? { quantity: own.quantity, message: own.message } : null;
+                    })(),
+                    onOffer: (message, quantity) =>
+                      act(() => offerOnFlare(code, f.id, message, quantity)),
+                    onWithdraw: () => act(() => withdrawOffer(code, f.id)),
+                  },
           }));
           const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
 
@@ -867,7 +894,7 @@ function RoomScreen({
           const groupOpen = Boolean(expandedGroups[sessionId]);
 
           return (
-            <Card key={sessionId}>
+            <Card key={sessionId} style={{ padding: spacing(3), gap: spacing(1.5) }}>
               {/*
                * The founder's synthesis, replacing the page-wide toggle:
                * the rail is every player's default face, and the chevron
@@ -892,7 +919,7 @@ function RoomScreen({
                      block of things at slightly different sizes. */
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
-                  paddingBottom: spacing(3),
+                  paddingBottom: spacing(2),
                 }}
               >
                 <View
@@ -1025,7 +1052,7 @@ function RoomScreen({
                     contentContainerStyle={{
                       gap: spacing(2),
                       paddingHorizontal: spacing(2),
-                      paddingVertical: spacing(2),
+                      paddingVertical: spacing(1),
                       alignItems: "flex-start",
                     }}
                   >
@@ -1612,6 +1639,7 @@ function CarouselFlare({
             youHave={
               flare.match ? { kind: flare.match, count: flare.heldCount ?? 0 } : null
             }
+            offer={siblings[position]?.offer ?? null}
             siblings={siblings}
             position={position}
             terms={acceptsLabel(flare)}

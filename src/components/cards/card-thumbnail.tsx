@@ -51,6 +51,45 @@ function Placeholder({ className }: { className?: string }) {
  * When images are disabled no `<img>` is rendered at all, so nothing is
  * requested from a third party — the flag is not just a visual preference.
  */
+/**
+ * The picture itself, remounted whenever the source changes.
+ *
+ * A browser keeps showing an <img>'s previous bitmap until the next one
+ * has decoded, so an element that changes source shows the wrong card
+ * for as long as the new one takes to arrive. The founder saw it: a
+ * freshly posted Flare's art sitting on the neighbouring tile for a
+ * moment. Keyed on the source, the element is replaced instead, and
+ * `loaded` starts over with it so the fade-in is honest.
+ */
+function Art({
+  imageUrl,
+  exactName,
+  cardNumber,
+  onFail,
+}: {
+  imageUrl: string;
+  exactName: string;
+  cardNumber: string;
+  onFail: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <Image
+      src={imageUrl}
+      alt={cardImageAlt(exactName, cardNumber)}
+      fill
+      sizes="56px"
+      className={cn(
+        "object-cover transition-opacity duration-[var(--duration-base)]",
+        loaded ? "opacity-100" : "opacity-0",
+      )}
+      onLoad={() => setLoaded(true)}
+      onError={onFail}
+    />
+  );
+}
+
 export function CardThumbnail({
   imageUrl,
   exactName,
@@ -75,7 +114,6 @@ export function CardThumbnail({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
   const renderable = enabled && !failed && isRenderableImageUrl(imageUrl);
 
@@ -97,17 +135,12 @@ export function CardThumbnail({
       <Placeholder className="absolute inset-0" />
 
       {renderable && (
-        <Image
-          src={imageUrl}
-          alt={cardImageAlt(exactName, cardNumber)}
-          fill
-          sizes="56px"
-          className={cn(
-            "object-cover transition-opacity duration-[var(--duration-base)]",
-            loaded ? "opacity-100" : "opacity-0",
-          )}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+        <Art
+          key={imageUrl}
+          imageUrl={imageUrl}
+          exactName={exactName}
+          cardNumber={cardNumber}
+          onFail={() => setFailed(true)}
         />
       )}
 

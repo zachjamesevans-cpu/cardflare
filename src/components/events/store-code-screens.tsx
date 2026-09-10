@@ -1,3 +1,4 @@
+import { AccountPitch } from "@/components/players/account-pitch";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
@@ -79,6 +80,8 @@ export function StoreLobby({
           accountName={accountName ?? undefined}
         />
       </Card>
+
+      {!accountName && <AccountPitch next={`/e/${code}`} variant="join" />}
     </>
   );
 }

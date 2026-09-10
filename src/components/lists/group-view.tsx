@@ -90,7 +90,7 @@ export function GroupView({
        * things at slightly different sizes; a rule says "this is who,
        * and below is what they have" without a word of copy.
        */}
-      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border pb-3">
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border pb-2">
         {identity}
         <button
           type="button"

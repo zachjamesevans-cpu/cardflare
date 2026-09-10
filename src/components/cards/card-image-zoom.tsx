@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/card";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
-import { youHaveLabel, type MatchKind } from "@/lib/matching/schema";
+import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
+import { MAX_OFFER_MESSAGE, youHaveLabel, type MatchKind } from "@/lib/matching/schema";
 
 /**
  * A thumbnail you can open at a readable size.
@@ -50,6 +52,113 @@ export interface ZoomCard {
   terms?: string | null;
   pledges?: { name: string; quantity: number }[];
   youHave?: { kind: MatchKind; count: number } | null;
+  /**
+   * The offer this viewer can make on the card, or null when it is
+   * their own, or a card on offer rather than a want.
+   *
+   * The founder, from a phone: the handshake under a tile "is a bit
+   * small", and once the card is open at full size there should be
+   * "a text field to message someone, offer, etc." So the zoom carries
+   * the same form the stacked row has: where to find you, how many,
+   * and the button.
+   */
+  offer?: ZoomOffer | null;
+}
+
+export interface ZoomOffer {
+  code: string;
+  flareId: string;
+  /** The board is open before the event: "I'll bring it", not "I got it". */
+  early: boolean;
+  /** How many the Flare asks for; more than one asks how many you have. */
+  quantity: number;
+  /** The viewer's standing offer, when they already raised a hand. */
+  own: { quantity: number; message: string | null } | null;
+}
+
+/**
+ * The offer, inside the zoom.
+ *
+ * A form on a dialog that closes on any click: every press in here is
+ * stopped at the block's edge, and the dialog's arrow keys ignore the
+ * field (see the keydown handler), so typing "left" does not turn the
+ * page.
+ */
+function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
+
+  if (offer.own) {
+    return (
+      <div
+        onClick={stop}
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2"
+      >
+        <p className="min-w-0 flex-1 basis-40 text-sm text-text-secondary">
+          <span className="font-medium text-accent">
+            {offer.early ? "You've got them." : "You offered."}
+          </span>{" "}
+          {offer.own.quantity > 1 && `You said ${offer.own.quantity} copies. `}
+          {offer.own.message
+            ? `They were told: \u201c${offer.own.message}\u201d`
+            : "They can see your name, so keep an eye out."}
+        </p>
+        <form action={withdrawOfferAction} className="shrink-0">
+          <input type="hidden" name="code" value={offer.code} />
+          <input type="hidden" name="flareId" value={offer.flareId} />
+          <SubmitButton
+            label="Withdraw"
+            pendingLabel="Withdrawing…"
+            variant="ghost"
+            size="sm"
+          />
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      action={offerTradeAction}
+      onClick={stop}
+      className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-2"
+    >
+      <input type="hidden" name="code" value={offer.code} />
+      <input type="hidden" name="flareId" value={offer.flareId} />
+      <input
+        type="text"
+        name="message"
+        maxLength={MAX_OFFER_MESSAGE}
+        placeholder="Where to find you? (optional)"
+        aria-label="Where can they find you?"
+        className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        {offer.quantity > 1 ? (
+          <label className="flex shrink-0 items-center gap-1.5 text-sm text-text-secondary">
+            How many
+            <input
+              type="number"
+              name="quantity"
+              min={1}
+              max={offer.quantity}
+              defaultValue={1}
+              inputMode="numeric"
+              aria-label="How many can you bring?"
+              className="w-14 rounded-[var(--radius-control)] border border-border bg-canvas px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+        ) : (
+          <span />
+        )}
+        <SubmitButton
+          label={offer.early ? "I'll bring it" : "I got it"}
+          pendingLabel="Offering…"
+          size="sm"
+          className="shrink-0"
+        />
+      </div>
+    </form>
+  );
 }
 
 /** Long enough to read as a movement, short enough not to be in the way. */
@@ -103,6 +212,7 @@ export function CardImageZoom({
   terms: ownTerms = null,
   pledges: ownPledges = [],
   youHave: ownYouHave = null,
+  offer: ownOffer = null,
   siblings,
   position = 0,
   thumbClassName,
@@ -151,6 +261,8 @@ export function CardImageZoom({
    * form that costs the most room.
    */
   youHave?: { kind: MatchKind; count: number } | null;
+  /** The offer form, for another player's want. See `ZoomCard.offer`. */
+  offer?: ZoomOffer | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
   /**
@@ -222,6 +334,7 @@ export function CardImageZoom({
   const terms = shown ? (shown.terms ?? null) : ownTerms;
   const pledges = shown ? (shown.pledges ?? []) : ownPledges;
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
+  const offer = shown ? (shown.offer ?? null) : ownOffer;
 
   /*
    * A swipe ends in a click, and a click anywhere on this dialog closes
@@ -558,6 +671,13 @@ export function CardImageZoom({
         }}
         onKeyDown={(event) => {
           if (!shelf) return;
+          /* A cursor moving inside the offer's field is not a page turn. */
+          if (
+            event.target instanceof HTMLInputElement ||
+            event.target instanceof HTMLTextAreaElement
+          ) {
+            return;
+          }
           if (event.key === "ArrowRight") {
             event.preventDefault();
             go(1);
@@ -683,6 +803,8 @@ export function CardImageZoom({
            * keyboard. `stopPropagation` because every other click on this
            * dialog closes it.
            */}
+          {offer && <ZoomOfferBlock offer={offer} />}
+
           {shelf && (
             <div className="flex items-center justify-between gap-3">
               <button
