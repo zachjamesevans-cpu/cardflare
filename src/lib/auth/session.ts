@@ -41,16 +41,30 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
 
   if (!user) return { kind: "anonymous" };
 
-  const { data: adminRow } = await supabase
-    .from("admin_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  /*
+   * Who this verified user is to us, read with the service role.
+   *
+   * The token above proved WHO is asking; these two reads say what
+   * they may see, and they used to go through the user's own client
+   * under row-level security. A failed or empty read there did not
+   * look like a failure: `data` came back null, the admin check fell
+   * through, and the founder opened /admin to find a store's console
+   * with his own name missing from the admin list. Read directly and
+   * say so when a read fails, so an outage can never quietly demote
+   * an admin to whatever their memberships make them look like.
+   */
+  const admin = getSupabaseAdmin();
 
-  const { data: memberships } = await supabase
-    .from("store_members")
-    .select("store_id")
-    .eq("user_id", user.id);
+  const [
+    { data: adminRow, error: adminError },
+    { data: memberships, error: memberError },
+  ] = await Promise.all([
+    admin.from("admin_users").select("user_id").eq("user_id", user.id).maybeSingle(),
+    admin.from("store_members").select("store_id").eq("user_id", user.id),
+  ]);
+
+  if (adminError) console.error("Could not read the admin list", adminError);
+  if (memberError) console.error("Could not read store memberships", memberError);
 
   const storeIds = (memberships ?? []).map((m) => m.store_id);
 
