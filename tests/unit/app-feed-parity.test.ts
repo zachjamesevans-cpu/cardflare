@@ -239,18 +239,58 @@ describe("the home screen's furniture", () => {
   });
 
   it("sizes a card by how many are in the row, the same way on both", () => {
-    /* "It looks a little silly to have one single card on a thing." One
-       card gets a picture, a deck gets a strip, and the thresholds are
-       one product's, not two. */
+    /*
+     * "It looks a little silly to have one single card on a thing." One
+     * card gets a picture, a row of them gets a rail, and the thresholds
+     * are one product's, not two.
+     *
+     * TWO sizes now, not three. There was a third step - "sm" on the web,
+     * 48 in the app - that a row fell to once it held four or more,
+     * because the row wrapped and four small tiles were what fitted on
+     * one line. The rows scroll sideways now, so nothing has to fit, and
+     * a 48px card is too small to recognise on the one row about which
+     * cards somebody is chasing.
+     */
     const web = readFileSync(
       resolve(import.meta.dirname, "../../src/components/feed/feed-items.tsx"),
       "utf8",
     );
 
     expect(web).toContain("if (count <= 1) return");
-    expect(web).toContain("if (count <= 3) return");
     expect(app).toContain("if (count <= 1) return 160;");
-    expect(app).toContain("if (count <= 3) return 96;");
+
+    /* The dropped step stays dropped, on both. */
+    expect(web).not.toContain("if (count <= 3) return");
+    expect(app).not.toContain("if (count <= 3) return 96;");
+  });
+
+  it("draws a card row as a rail you can scroll, on both", () => {
+    /*
+     * The founder, on a friend's hunt reading "+4 more": "it should be a
+     * carousel for these types of things... so you can see all the
+     * cards." A count told you what you were missing without showing you
+     * any of it.
+     *
+     * Asserted on both platforms because this is exactly the shape of
+     * drift this file exists for: the server sends the same cards to
+     * both, so a rail on one and a wrapped row on the other would
+     * typecheck, pass every other test, and look like two products.
+     */
+    expect(items).toContain("function CardRail");
+    expect(app).toContain("function CardRail");
+
+    /* The mechanism, so neither platform quietly goes back to wrapping. */
+    expect(items).toContain("overflow-x-auto");
+    expect(items).not.toContain("flex flex-wrap gap-2");
+    expect(app).toMatch(/<ScrollView\s+horizontal/);
+    expect(app).not.toContain('flexWrap: "wrap"');
+
+    /* And the server has to actually send enough cards to be worth a
+       rail - four was the wrapped row's number. */
+    const repo = read("src/lib/feed/repository.ts");
+    expect(repo).toContain("const CARD_RAIL_CAP");
+    expect(repo).not.toContain("const HUNT_SAMPLE");
+    expect(repo).not.toContain("const RECENT_SAMPLE");
   });
 
   it("puts finding a player on the feed, on both", () => {
@@ -279,11 +319,39 @@ describe("the home screen's furniture", () => {
     expect(entries).toContain("want.postedAt");
   });
 
-  it("says nothing rather than zero when a balance did not arrive", () => {
-    /* An app build meets servers older than itself, and "0 Embers" beside
-       somebody holding thousands is worse than an absent badge. */
-    expect(app).toContain('typeof me.player.embersBalance === "number"');
-    expect(app).not.toContain("me.player.embersBalance ?? 0");
-    expect(web).toContain("balance !== null &&");
+  it("opens on the Feed, with no header about the viewer, on both", () => {
+    /*
+     * The founder: "it's not necessary to show my username, flare
+     * points, or anything like that. remove those from the top of the
+     * main feed to allow the feed to have more vertical space. and also,
+     * make sure that this change follows to the website."
+     *
+     * Both platforms opened with the same row - face, name, want count,
+     * Embers - above the first post. All four are facts about the person
+     * reading, and all four are still on Profile.
+     *
+     * This replaces a rule about never drawing "0 Embers" from a missing
+     * balance. That rule was about THIS header, which is gone on both, and
+     * the app no longer reads a balance out of /me at all.
+     */
+    expect(app).not.toContain("EmberBadge");
+    expect(app).not.toContain("me.player.embersBalance");
+    expect(items).not.toContain("embersBalance");
+
+    expect(web).not.toContain("function Header(");
+    expect(web).not.toContain("embers_balance");
+
+    /*
+     * The want count went with it, on both, and so did the read that
+     * served it: the Feed page asks for the feed and the locals now.
+     *
+     * Keyed on the header's own empty state rather than on "want list",
+     * which several ITEMS say for their own reasons - "3 of these are on
+     * your want list" is a fact about a post, not about the viewer.
+     */
+    for (const source of [app, web]) {
+      expect(source).not.toContain("No wants saved yet");
+    }
+    expect(web).not.toContain("listWants");
   });
 });
