@@ -89,7 +89,7 @@ describe("swiping a zoomed card", () => {
    */
 
   it("turns the page with a rail that snaps to a card", () => {
-    expect(zoom).toMatch(/<ScrollView\s+ref=\{pager\}/);
+    expect(zoom).toContain("<ScrollView");
     expect(zoom).toContain("snapToInterval={page}");
     /* One card per swipe, rather than a flick that skims four. */
     expect(zoom).toContain("disableIntervalMomentum");
@@ -136,13 +136,13 @@ describe("swiping a zoomed card", () => {
      * paragraph above is not something a guard can anchor to.
      */
     expect(zoom).toMatch(
-      /height: Math\.round\(\(hero \* 88\) \/ 63\),\s*\}\}\s*>\s*<ScrollView\s+ref=\{pager\}/,
+      /height: Math\.round\(\(hero \* 88\) \/ 63\),\s*\}\}\s*>\s*<ScrollView/,
     );
 
     /* And the rail fills that box rather than negotiating its own size. */
     const rail = zoom.slice(
-      zoom.indexOf("ref={pager}"),
-      zoom.indexOf("contentContainerStyle", zoom.indexOf("ref={pager}")),
+      zoom.indexOf("<ScrollView"),
+      zoom.indexOf("contentContainerStyle", zoom.indexOf("<ScrollView")),
     );
     expect(rail).toContain("style={{ flex: 1 }}");
   });
@@ -155,6 +155,26 @@ describe("swiping a zoomed card", () => {
     expect(zoom).not.toMatch(/\$\{at \+ 1\} of /);
     expect(zoom).toMatch(/const PEEK_WIDTH = \d+;/);
     expect(zoom).toMatch(/paddingHorizontal: sidePad/);
+  });
+
+  it("carries no chrome for a gesture that explains itself", () => {
+    /*
+     * "I still would like to be able to remove the 'arrows' when looking
+     * at cards up top. no need to have those. then remove the vertical
+     * space that is dead space." The chevrons and the counter before
+     * them were both describing a rail you can see and feel, and they
+     * cost a row between the title and the art.
+     */
+    expect(zoom).not.toContain("chevron-left");
+    expect(zoom).not.toContain("chevron-right");
+    expect(zoom).not.toMatch(/const go = /);
+  });
+
+  it("centres the card's own two lines over the card", () => {
+    /* "center the text. so, for example, fire first and op15-020 should
+       be centered on that screen." */
+    expect(zoom).toMatch(/styles\.title, \{ textAlign: "center" \}/);
+    expect(zoom).toMatch(/styles\.muted, \{ textAlign: "center" \}/);
   });
 
   it("stops telling people to tap anywhere, now that a tap on the card scrolls", () => {

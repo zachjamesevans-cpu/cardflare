@@ -402,21 +402,9 @@ export function CardImage({
    * measured in, and the side padding is what lets the FIRST and LAST
    * card sit centred with their neighbour showing beside them.
    */
-  const pager = useRef<ScrollView>(null);
   const page = hero + PEEK_GAP;
   const sidePad = (large - hero) / 2;
 
-  const go = (delta: number) => {
-    if (!shelf) return;
-    /* Clamped, not wrapped. The rail itself stops at both ends, and a
-       chevron that silently animated the whole way back to the first
-       card would be the one control disagreeing with the gesture beside
-       it. */
-    const next = Math.min(Math.max(at + delta, 0), shelf.length - 1);
-    if (next === at) return;
-    setAt(next);
-    pager.current?.scrollTo({ x: next * page, animated: true });
-  };
 
   return (
     <>
@@ -471,10 +459,18 @@ export function CardImage({
               ]}
             >
               <View style={{ alignSelf: "stretch" }}>
-                <Text style={styles.title} numberOfLines={1}>
+                {/* Centred over the card they name. The founder: "center
+                    the text. so, for example, fire first and op15-020
+                    should be centered on that screen." Only these two -
+                    a note runs to several lines and centred prose is
+                    harder to read than the tidiness is worth. */}
+                <Text
+                  style={[styles.title, { textAlign: "center" }]}
+                  numberOfLines={1}
+                >
                   {name}
                 </Text>
-                <Text style={styles.muted}>
+                <Text style={[styles.muted, { textAlign: "center" }]}>
                   {cardNumber}
                   {caption ? ` · ${caption}` : ""}
                 </Text>
@@ -542,47 +538,25 @@ export function CardImage({
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
 
                 {/*
-                  * NO COUNTER. The cards either side say it better.
+                  * NOTHING BUT THE CARDS.
                   *
-                  * This row used to read "2 of 6" between the chevrons.
-                  * The founder: "i dont think the '2 of 6' thing is
-                  * necessary when viewing a full size card... really, it
-                  * should open up, and you should be able to see the card
-                  * to the left of it, and the right of, so it
-                  * contextually tells you that you can swipe."
+                  * There was a counter here reading "2 of 6" between two
+                  * chevrons. The counter went first - "i dont think the
+                  * '2 of 6' thing is necessary when viewing a full size
+                  * card... you should be able to see the card to the
+                  * left of it, and the right of, so it contextually
+                  * tells you that you can swipe" - and the chevrons
+                  * followed: "i still would like to be able to remove
+                  * the 'arrows' when looking at cards up top. no need to
+                  * have those. then remove the vertical space that is
+                  * dead space."
                   *
-                  * A number tells you a shelf exists; a sliver of the
-                  * next card's art tells you which way to push. The
-                  * peeking edges below do that job, so the number was
-                  * only ever explaining what the picture now shows.
-                  * The chevrons stay for anybody who would rather tap.
+                  * Both were explaining a gesture that now explains
+                  * itself. The rail below tracks the finger and the
+                  * neighbours are visible at both edges, so a control
+                  * that did the same job in words was a row of chrome
+                  * between the title and the art.
                   */}
-                {shelf ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      alignSelf: "stretch",
-                      marginTop: spacing(2),
-                    }}
-                  >
-                    <Tap onPress={() => go(-1)} hitSlop={12}>
-                      <MaterialCommunityIcons
-                        name="chevron-left"
-                        size={26}
-                        color={colors.textSecondary}
-                      />
-                    </Tap>
-                    <Tap onPress={() => go(1)} hitSlop={12}>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={26}
-                        color={colors.textSecondary}
-                      />
-                    </Tap>
-                  </View>
-                ) : null}
 
                 {/* Keyed on the shelf position, so a half-typed note does
                     not ride along to the next card. */}
@@ -626,7 +600,6 @@ export function CardImage({
                   }}
                 >
                 <ScrollView
-                  ref={pager}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   /* Snap to a CARD, not to a screen: the viewport is
