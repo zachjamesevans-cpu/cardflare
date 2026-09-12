@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  BarChart3,
   CalendarDays,
   FileUp,
   Flame,
@@ -16,6 +17,8 @@ import {
 import { CatalogHealth } from "@/components/admin/catalog-health";
 import { listAnnouncements } from "@/lib/announcements/repository";
 import { listImportedSets } from "@/lib/cards/imported-sets";
+import { activityReport } from "@/lib/admin/activity";
+import { rangeFor } from "@/lib/admin/activity-range";
 import { catalogForConsole } from "@/lib/admin/catalog";
 import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
@@ -121,6 +124,7 @@ export default async function AdminPage() {
     cardCount,
     lastRun,
     printingImages,
+    guestsThisMonth,
   ] = await Promise.all([
     within("listStores", [], listStores()),
     within("listAllEvents", [], listAllEvents()),
@@ -130,6 +134,11 @@ export default async function AdminPage() {
     within("countCards", 0, countCards()),
     within("latestSyncRun", null, latestSyncRun()),
     within("countPrintingImages", { total: 0, withImage: 0 }, countPrintingImages()),
+    within(
+      "guestsThisMonth",
+      0,
+      activityReport(rangeFor({ period: "30d" })).then((report) => report.guestsActive),
+    ),
   ]);
 
   /*
@@ -225,6 +234,13 @@ export default async function AdminPage() {
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AreaLink
+            href="/admin/reports"
+            icon={BarChart3}
+            label="Reports"
+            value={guestsThisMonth}
+            detail="guests in the last 30 days · Flares, seats, trades by period"
+          />
           <AreaLink
             href="/admin/stores"
             icon={StoreIcon}
