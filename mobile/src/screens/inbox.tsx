@@ -10,6 +10,7 @@ import { openRoom } from "../open-room";
 import { getNotifications, markRead, type InboxItem } from "../api";
 import { Button, Card, Muted, Tap } from "../ui";
 import { colors, spacing } from "../theme";
+import { useTabBarInset } from "../glass";
 
 /**
  * The inbox — the website's Notifications page, row for row: one card,
@@ -20,6 +21,7 @@ import { colors, spacing } from "../theme";
  */
 export function InboxScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const tabInset = useTabBarInset();
   const [items, setItems] = useState<InboxItem[] | null>(null);
 
   useEffect(() => {
@@ -37,7 +39,14 @@ export function InboxScreen() {
   }, []);
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{
+        padding: spacing(4),
+        gap: spacing(4),
+        /* Clear of the floating tab bar. */
+        paddingBottom: spacing(4) + tabInset,
+      }}
+    >
       {/* No heading here: the navigation bar above already says
           "Notifications", and printing it twice on one screen reads as a
           mistake. The website has one because it has no nav bar. */}

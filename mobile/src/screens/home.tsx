@@ -33,7 +33,16 @@ import {
   storedAccessToken,
   type Me,
 } from "../api";
-import { Body, Button, Card, CardImage, Muted, Tap, Title } from "../ui";
+import {
+  Body,
+  Button,
+  Card,
+  CardImage,
+  Muted,
+  Tap,
+  Title,
+  type ZoomCard,
+} from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
@@ -48,6 +57,7 @@ import { NearbyLocationAsk } from "../nearby-location-ask";
 import { PlayerAvatar } from "../player-avatar";
 import { API_BASE } from "../config";
 import { colors, spacing } from "../theme";
+import { useTabBarInset } from "../glass";
 
 /**
  * The Feed tab — what is on, and who needs what you are holding.
@@ -150,6 +160,15 @@ function CardRail({
   more?: number;
   width: number;
 }) {
+  /* The shelf the zoom pages along. Built from the same array the rail
+     draws, so what you swipe through is exactly what you can see. */
+  const shelf: ZoomCard[] = cards.map((card) => ({
+    imageUrl: card.imageUrl,
+    name: card.cardName,
+    cardNumber: card.cardNumber,
+    youHave: card.match ? { kind: card.match, count: 0 } : null,
+  }));
+
   return (
     <ScrollView
       horizontal
@@ -160,7 +179,7 @@ function CardRail({
         paddingVertical: spacing(0.5),
       }}
     >
-      {cards.map((card) => (
+      {cards.map((card, index) => (
         <CardImage
           key={card.cardId}
           imageUrl={card.imageUrl}
@@ -168,6 +187,20 @@ function CardRail({
           name={card.cardName}
           cardNumber={card.cardNumber}
           youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+          /*
+           * The rest of the rail, so an opened card can be swiped along
+           * it. The founder: "when there's a card u click on anywhere,
+           * for example someones flares, you cant swipe between the
+           * cards on the app. u can on the website though."
+           *
+           * The zoom has always been able to do this - `siblings` and
+           * the swipe that reads it are already in CardImage, and Room
+           * and Local both hand it a shelf. The Feed never did, so its
+           * cards opened one at a time and closed again, which is the
+           * one place somebody is browsing rather than working.
+           */
+          siblings={shelf}
+          position={index}
         />
       ))}
       {more > 0 ? <Muted>{`+${more} more`}</Muted> : null}
@@ -228,6 +261,7 @@ export function HomeScreen() {
    * all — so the whole thing is worklets. See collapsing-header.tsx.
    */
   const insets = useSafeAreaInsets();
+  const tabInset = useTabBarInset();
   const header = useHeaderScroll();
 
   const onScroll = useAnimatedScrollHandler((event) => {
@@ -483,6 +517,9 @@ export function HomeScreen() {
           /* The header floats over the list, so the first card starts
              below it rather than under it. */
           paddingTop: insets.top + HEADER_CONTENT_HEIGHT + spacing(4),
+          /* And the tab bar floats over the other end, so the last one
+             ends above it rather than under it. */
+          paddingBottom: spacing(4) + tabInset,
         }}
         refreshControl={
           <RefreshControl
