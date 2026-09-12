@@ -1,8 +1,6 @@
 import * as SecureStore from "expo-secure-store";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Animated,
-  Easing,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -37,9 +35,9 @@ import { colors, radius, spacing } from "../theme";
  * screen must not wall it off. It marks the welcome as seen and gets
  * out of the way.
  *
- * The splash's motion is plain Animated - the launch path loads no
- * Skia and no Reanimated on purpose; three dead TestFlight builds
- * taught that lesson.
+ * The splash does not move. The launch path loads no Skia and no
+ * Reanimated on purpose - three dead TestFlight builds taught that
+ * lesson - and now it runs no animation of its own either.
  */
 
 const SEEN_KEY = "cf-welcome-seen";
@@ -149,7 +147,7 @@ export function WelcomeScreen({
   );
 }
 
-/** The pitch: the mark breathing on pure black. */
+/** The pitch: the mark, still, on pure black. */
 function Splash({
   onCreate,
   onSignIn,
@@ -159,29 +157,6 @@ function Splash({
   onSignIn: () => void;
   onSkip: () => void;
 }) {
-  const glow = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, {
-          toValue: 1,
-          duration: 2600,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glow, {
-          toValue: 0,
-          duration: 2600,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [glow]);
-
   return (
     <View
       /*
@@ -204,28 +179,21 @@ function Splash({
       }}
     >
       {/*
-       * No disc behind the mark.
+       * Nothing behind the mark, and nothing happening to it.
        *
        * There was a lime circle here, faded and slowly breathing, and the
        * founder cut it: "please take off that super ugly green glow behind
-       * the cardflare logo on signup screen." On the black canvas it read
-       * as a dull olive smear rather than light. The breathing stays, on
-       * the mark itself, which is where it was doing the work.
+       * the cardflare logo on signup screen." The breathing then moved
+       * onto the mark itself - a 4% scale loop - and the founder cut that
+       * too: "the logo is pulsing on the splash screen make it static."
+       * So the first screen of the app holds still. The website's <Logo>
+       * is a plain image and always was; this is the app catching up to
+       * it rather than drifting from it.
        */}
-      <View style={{ alignItems: "center", justifyContent: "center" }}>
-        <Animated.View
-          style={{
-            transform: [
-              { scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) },
-            ],
-          }}
-        >
-          <Image
-            source={require("../../assets/cardflare-mark.png")}
-            style={{ height: 140, width: 140, resizeMode: "contain" }}
-          />
-        </Animated.View>
-      </View>
+      <Image
+        source={require("../../assets/cardflare-mark.png")}
+        style={{ height: 140, width: 140, resizeMode: "contain" }}
+      />
 
       {/* The name is the founder's wordmark art, never a font — BRAND.md:
           "Just put this everywhere." Height set, width follows the file's

@@ -41,14 +41,56 @@ const LOCALS_SHOWN = 4;
 const BOARD_SAMPLE = 4;
 
 /**
- * Cards shown on one friend's hunt. A deck is thirty; a Feed row is not.
+ * Cards carried on a row that draws them as a rail.
  *
- * Four, the same as a board's sample, because that is what fits on ONE
- * line at phone width beside the "+N more" that follows it. Six wrapped,
- * leaving a lone tile on a second row with the count stranded next to
- * it — untidy in exactly the way the founder keeps catching.
+ * This used to be four, on both the hunt and the recent row, and the
+ * reason was the layout: four tiles were what fitted on ONE wrapped line
+ * at phone width beside the "+N more" that followed them. Six wrapped and
+ * stranded a lone tile on a second row.
+ *
+ * The rows scroll sideways now, so that reason is gone — the founder,
+ * looking at a friend's hunt reading "+4 more": "it should be a carousel
+ * for these types of things... so you can see all the cards." A rail has
+ * no line to overflow, so the cap stops being about layout and starts
+ * being about weight.
+ *
+ * Twenty, because a rail is still a Feed row and not a deck list. It
+ * covers a hunt whole in nearly every case; past it the row keeps a
+ * trailing count that opens the board, where the full list lives. The
+ * payload is the reason for a ceiling at all: a pasted sixty-card deck
+ * across several rows is a lot of card art to send a phone for a screen
+ * somebody is scrolling past.
  */
-const HUNT_SAMPLE = 4;
+const CARD_RAIL_CAP = 20;
+
+/**
+ * One entry per card, keeping the first of any repeat.
+ *
+ * A Flare carries a quantity, but the same card can still arrive twice:
+ * two printings of it, or two lines of a pasted deck list. Every row that
+ * draws card art was mapping Flares straight to tiles, so a repeat drew
+ * the same picture twice - which the founder read off the simulator as a
+ * glitch - and React saw two children with the same key, because a
+ * FeedCard is identified by the CARD and a card that appears twice has
+ * that id twice.
+ *
+ * Deduped here rather than keyed around on the clients: two identical
+ * tiles are wrong on the screen whatever their keys are, and fixing it
+ * once on the server fixes it on both platforms. The "added" item has
+ * always done this with its own `unique` set; this is that rule, shared.
+ *
+ * FIRST wins, so callers sort before they call: the hunt row puts the
+ * cards the viewer can answer at the front, and those are the copies
+ * worth keeping.
+ */
+export function firstPerCard<T>(entries: T[], cardIdOf: (entry: T) => string): T[] {
+  const kept = new Map<string, T>();
+  for (const entry of entries) {
+    const id = cardIdOf(entry);
+    if (!kept.has(id)) kept.set(id, entry);
+  }
+  return [...kept.values()];
+}
 
 /** How far back "just added" and "traded recently" reach. */
 const RECENT_DAYS = 7;
@@ -97,7 +139,6 @@ const WANTED_CARDS_ASKED = 400;
 const WANTED_READ = 60;
 const WANTED_SHOWN = 4;
 const RECENT_SHOWN = 4;
-const RECENT_SAMPLE = 4;
 
 /** Cosmetics named in the shop item. Three is a look; twelve is a catalogue. */
 const SHOP_SAMPLE = 3;
@@ -971,14 +1012,26 @@ async function boardWithHunts(
       live: local.liveNow,
       startsAt: local.liveNow ? null : local.nextEventAt,
       timeZone: event.storeTimeZone,
+      /*
+       * Flares, not cards: two players wanting the same card are two
+       * people you could help, and that is what the number is for.
+       */
       youCanAnswer: answerable.length,
-      sample: answerable.slice(0, BOARD_SAMPLE).map(({ flare, match }) => ({
-        cardId: flare.cardId,
-        cardName: flare.cardName,
-        cardNumber: flare.cardNumber,
-        imageUrl: flare.imageUrl,
-        match,
-      })),
+      /*
+       * The PICTURES are one per card, though - the same rule the hunt
+       * and recent rows follow, and for the same two reasons: a board
+       * where three people want the same card drew it three times, and
+       * a FeedCard is keyed by the card, so React saw one key twice.
+       */
+      sample: firstPerCard(answerable, (entry) => entry.flare.cardId)
+        .slice(0, BOARD_SAMPLE)
+        .map(({ flare, match }) => ({
+          cardId: flare.cardId,
+          cardName: flare.cardName,
+          cardNumber: flare.cardNumber,
+          imageUrl: flare.imageUrl,
+          match,
+        })),
     },
   ];
 
@@ -1016,6 +1069,25 @@ async function boardWithHunts(
       (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
     );
 
+    /*
+     * ONE TILE PER CARD, not one per Flare.
+     *
+     * A Flare carries a quantity, but somebody can still post the same
+     * card twice - two printings of it, or the same card on two lines of
+     * a pasted deck list - and each one arrived here as its own entry.
+     * The row then drew the same picture twice, which the founder read
+     * off the simulator as a glitch, and React saw it as two children
+     * with the same key, because a FeedCard carries the CARD's id and a
+     * card that appears twice has it twice.
+     *
+     * Deduping here rather than keying around it on the client: two
+     * identical tiles are wrong on the screen whatever their keys are,
+     * and the "added" item has always done exactly this with its
+     * `unique` set. Sorted first, so the copy that survives is the one
+     * the viewer can answer.
+     */
+    const cards = firstPerCard(ordered, (entry) => entry.flare.cardId);
+
     items.push({
       kind: "hunt",
       code,
@@ -1027,9 +1099,11 @@ async function boardWithHunts(
       frame: person.frame,
       ring: person.ring,
       deckLabel: ordered[0]?.flare.deckLabel ?? null,
-      total: group.length,
-      youCanAnswer: group.filter(({ match }) => match).length,
-      cards: ordered.slice(0, HUNT_SAMPLE).map(({ flare, match }) => ({
+      /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
+         trailing "+N more" are counting the same things the tiles are. */
+      total: cards.length,
+      youCanAnswer: cards.filter(({ match }) => match).length,
+      cards: cards.slice(0, CARD_RAIL_CAP).map(({ flare, match }) => ({
         cardId: flare.cardId,
         cardName: flare.cardName,
         cardNumber: flare.cardNumber,
@@ -1345,6 +1419,15 @@ async function recentItems(
   /* One group per posting act: the batch if it had one, else the flare. */
   const groups = new Map<string, RecentItem>();
 
+  /*
+   * The cards each group has already drawn, so the same card posted
+   * twice in one act is one tile - see the hunt builder above for why.
+   * Held beside the group rather than derived from `cards`, because a
+   * group past CARD_RAIL_CAP has stopped collecting them and a duplicate
+   * must not quietly become "+1 more" either.
+   */
+  const seen = new Map<string, Set<string>>();
+
   for (const flare of usable) {
     const storeId = storeOf.get(flare.event_id);
     const store = storeId ? stores.get(storeId) : undefined;
@@ -1370,12 +1453,18 @@ async function recentItems(
 
     const existing = groups.get(key);
     if (existing) {
-      if (existing.cards.length < RECENT_SAMPLE) existing.cards.push(card);
+      const drawn = seen.get(key);
+      if (drawn?.has(flare.card_id)) continue;
+      drawn?.add(flare.card_id);
+
+      if (existing.cards.length < CARD_RAIL_CAP) existing.cards.push(card);
       else existing.more += 1;
       continue;
     }
 
     if (groups.size >= RECENT_SHOWN) continue;
+
+    seen.set(key, new Set([flare.card_id]));
 
     const person = people.get(flare.player_session_id);
     const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;

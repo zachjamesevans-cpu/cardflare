@@ -23,6 +23,7 @@ import { followHref } from "../follow-href";
 import {
   getFeed,
   SECTION_TITLES,
+  type FeedCard,
   type FeedEntry,
   getMe,
   joinRoom,
@@ -44,7 +45,6 @@ import {
   useHeaderScroll,
 } from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
-import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { API_BASE } from "../config";
 import { colors, spacing } from "../theme";
@@ -108,17 +108,71 @@ const STARTERS = {
  * as a mistake rather than as one card.
  *
  * The art carries the weight of what is in the row. One card gets a
- * picture worth looking at; two or three get something in between; a deck
- * goes back to a strip, because at that point the row is about the SIZE of
- * the hunt rather than about any one card in it.
+ * picture worth looking at; a row of them gets a rail of readable tiles.
  *
- * The same three numbers as the website's, pinned together by
+ * Two sizes, not three. There used to be a third, 48, that a row dropped
+ * to once it held four or more - because the row WRAPPED, and four small
+ * tiles were what fitted on one line at phone width. Rows scroll
+ * sideways now, so nothing has to fit, and shrinking the art was only
+ * ever paying for the wrap. A card at 48 was too small to recognise,
+ * which on a row about which cards somebody is chasing is the point of
+ * the row.
+ *
+ * The same numbers as the website's, pinned together by
  * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
  */
 function tileWidth(count: number): number {
   if (count <= 1) return 160;
-  if (count <= 3) return 96;
-  return 48;
+  return 96;
+}
+
+/**
+ * A row of cards you can see all of.
+ *
+ * The founder, on a friend's hunt that read "+4 more": "it should be a
+ * carousel for these types of things... so you can see all the cards."
+ * Four tiles and a count told you how much you were missing without
+ * showing you any of it, which on the one row about what a friend is
+ * chasing is the whole content of the row.
+ *
+ * A plain horizontal ScrollView, the same rail the showcase and the
+ * dressing picker already use - no library and no snapping. The count
+ * only survives past the server's CARD_RAIL_CAP, where it stops meaning
+ * "we hid some" and starts meaning "the rest are on the board".
+ */
+function CardRail({
+  cards,
+  more = 0,
+  width,
+}: {
+  cards: FeedCard[];
+  /** Cards past the server's cap, which live on the board. */
+  more?: number;
+  width: number;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        gap: spacing(2),
+        alignItems: "center",
+        paddingVertical: spacing(0.5),
+      }}
+    >
+      {cards.map((card) => (
+        <CardImage
+          key={card.cardId}
+          imageUrl={card.imageUrl}
+          width={width}
+          name={card.cardName}
+          cardNumber={card.cardNumber}
+          youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+        />
+      ))}
+      {more > 0 ? <Muted>{`+${more} more`}</Muted> : null}
+    </ScrollView>
+  );
 }
 
 /** How long ago, in the shortest form that is still true. */
@@ -441,55 +495,20 @@ export function HomeScreen() {
         }
       >
       {/*
-       * Who you are and what you have, before anything derived.
+       * NO IDENTITY HEADER. The Feed opens on the Feed.
        *
-       * The Feed can be short - on a quiet week it should be - and the
-       * screen still has to open with something that is true. A name and
-       * a balance are true every time, and the balance is what makes the
-       * two evergreen items at the bottom mean anything.
+       * There was a row here - your face, your name, your want count and
+       * your Embers - on the argument that a quiet week still has to open
+       * with something true. The founder cut it: "it's not necessary to
+       * show my username, flare points, or anything like that... to allow
+       * the feed to have more vertical space."
+       *
+       * He is right about what it cost. Every one of those facts is about
+       * the viewer, who already knows them, and they sat above the first
+       * post on the screen the app opens to. The balance and the want
+       * count both live on Profile, a tab away, so nothing here was the
+       * only way to reach anything.
        */}
-      {me && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing(3),
-          }}
-        >
-          <PlayerAvatar
-            displayName={me.player.displayName}
-            seed={me.player.id}
-            avatarUrl={me.player.avatarUrl ?? null}
-            size={44}
-          />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 17 }}
-              numberOfLines={1}
-            >
-              {me.player.displayName}
-            </Text>
-            <Muted>
-              {me.wants.length > 0
-                ? `${me.wants.length} ${me.wants.length === 1 ? "card" : "cards"} on your want list`
-                : "No wants saved yet"}
-            </Muted>
-          </View>
-          {/*
-           * ONLY when the server actually said a number.
-           *
-           * `?? 0` was worse than nothing: against a server that has not
-           * deployed this field yet - which is every TestFlight build
-           * that ships ahead of a web release - it drew a confident
-           * "0 Embers" at a player holding 8,760. A missing balance is
-           * not a zero balance, and the honest render of "I do not know"
-           * is to say nothing.
-           */}
-          {typeof me.player.embersBalance === "number" && (
-            <EmberBadge earned={me.player.embersBalance} size="md" />
-          )}
-        </View>
-      )}
 
       {/*
        * The Room tab's job, as a banner: gone from the bar, never gone
@@ -868,23 +887,11 @@ export function HomeScreen() {
               </View>
             ) : (
               <View style={{ gap: spacing(2) }}>
-                <View
-                  style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}
-                >
-                  {item.cards.map((card) => (
-                    <CardImage
-                      key={card.cardId}
-                      imageUrl={card.imageUrl}
-                      width={48}
-                      name={card.cardName}
-                      cardNumber={card.cardNumber}
-                      youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-                    />
-                  ))}
-                  {item.total > item.cards.length ? (
-                    <Muted>{`+${item.total - item.cards.length} more`}</Muted>
-                  ) : null}
-                </View>
+                <CardRail
+                  cards={item.cards}
+                  more={item.total - item.cards.length}
+                  width={tileWidth(item.cards.length)}
+                />
                 {item.youCanAnswer > 0 ? (
                   <Text style={{ color: colors.accent, fontWeight: "600" }}>
                     {`You can answer ${item.youCanAnswer} of ${item.total}`}
@@ -948,21 +955,11 @@ export function HomeScreen() {
               <Muted>{agoFrom(item.when)}</Muted>
             </View>
 
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-            >
-              {item.cards.map((card) => (
-                <CardImage
-                  key={card.cardId}
-                  imageUrl={card.imageUrl}
-                  width={tileWidth(item.cards.length + item.more)}
-                  name={card.cardName}
-                  cardNumber={card.cardNumber}
-                  youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-                />
-              ))}
-              {item.more > 0 ? <Muted>{`+${item.more} more`}</Muted> : null}
-            </View>
+            <CardRail
+              cards={item.cards}
+              more={item.more}
+              width={tileWidth(item.cards.length)}
+            />
 
             <Button
               label="See the board"
