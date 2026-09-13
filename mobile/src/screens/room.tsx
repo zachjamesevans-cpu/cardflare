@@ -61,6 +61,7 @@ import { OpenToTradesTag } from "../open-to-trades-tag";
 import { TournamentHelpModal } from "../tournament-help";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
+import { useTabBarInset } from "../glass";
 import { colors, radius, spacing } from "../theme";
 import { WantRow } from "../want-row";
 
@@ -160,6 +161,17 @@ function RoomScreen({
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const insets = useSafeAreaInsets();
+  /*
+   * The floating tab bar, when this room IS the tab. Zero when it has
+   * been pushed onto the stack instead, where there is no tab bar and
+   * the home indicator is the only thing to clear - which is why
+   * everything below takes the LARGER of the two rather than adding
+   * them. The tab bar's height already contains the safe-area inset, so
+   * adding would have pushed the action bar a whole indicator too high
+   * on the one screen people actually use it on.
+   */
+  const tabInset = useTabBarInset();
+  const bottomClear = Math.max(tabInset, insets.bottom);
   const [state, setState] = useState<RoomState | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -591,7 +603,7 @@ function RoomScreen({
         contentContainerStyle={{
           padding: spacing(3),
           gap: spacing(2),
-          paddingBottom: spacing(24) + insets.bottom,
+          paddingBottom: spacing(24) + bottomClear,
         }}
         refreshControl={
           <RefreshControl
@@ -1280,7 +1292,7 @@ function RoomScreen({
       {/* The action bar: the two things a thumb reaches for in a room.
           Its own padding plus the home indicator's strip, so the buttons
           stop above the swipe area rather than sitting inside it. */}
-      <View style={[styles.actionBar, { paddingBottom: spacing(3) + insets.bottom }]}>
+      <View style={[styles.actionBar, { paddingBottom: spacing(3) + bottomClear }]}>
         <View style={{ flex: 1 }}>
           <Button
             label="Post a Flare"

@@ -98,3 +98,50 @@ describe("every row that draws cards goes through it", () => {
     expect(repo).not.toContain("total: group.length");
   });
 });
+
+describe("your own Flares reach your own feed", () => {
+  /*
+   * The founder: "whenever i post a flare, it should also show in my
+   * feed, like how instagram does that for ur own posts."
+   *
+   * The Feed knew about them and would not show them. Hunt rows are
+   * built from the follow list, and nobody follows themselves, so the
+   * one thing you are certain to care about was the one thing filtered
+   * out.
+   */
+  it("carries the viewer as an author, without making them someone they follow", async () => {
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    /* A second map. `followed` also decides who can appear in "just
+       added to their binder" and who is worth suggesting, and neither
+       should start talking about you. */
+    expect(repo).toContain("const authors = new Map(followed);");
+    expect(repo).toContain("authors.set(playerId, me)");
+    expect(repo).toContain("async function viewerAsAuthor");
+  });
+
+  it("says it is yours, rather than filing it under people you follow", async () => {
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    expect(repo).toContain('yours: key.split("::")[0] === viewerId');
+    expect(repo).toContain('return item.yours ? "yours" : "people"');
+    expect(repo).toContain(
+      'return item.yours ? "You posted this" : "Because you follow them"',
+    );
+    expect(repo).toContain('yours: "Your flares"');
+  });
+
+  it("keeps your posts together at the top", async () => {
+    /*
+     * Both clients draw a heading only when the section CHANGES, so an
+     * own post between two followed ones would read "Your flares /
+     * People you follow / Your flares".
+     */
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    const own = repo.indexOf('item.kind === "hunt" && item.yours');
+    const others = repo.indexOf('item.kind === "hunt" && !item.yours');
+    expect(own).toBeGreaterThan(-1);
+    expect(others).toBeGreaterThan(own);
+  });
+});

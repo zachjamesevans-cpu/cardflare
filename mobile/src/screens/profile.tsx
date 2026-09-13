@@ -56,6 +56,7 @@ import {
   Tap,
   Title,
 } from "../ui";
+import { useTabBarInset } from "../glass";
 import { colors, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
@@ -97,6 +98,7 @@ interface CachedProfile {
 }
 
 export function ProfileScreen() {
+  const tabInset = useTabBarInset();
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -394,7 +396,13 @@ export function ProfileScreen() {
 
   if (!checked) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing(4),
+          /* Clear of the floating tab bar. */
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
         <Muted>Loading…</Muted>
       </ScrollView>
     );
@@ -402,7 +410,14 @@ export function ProfileScreen() {
 
   if (!profile && loadFailed) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(4),
+          /* Clear of the floating tab bar. */
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
         <Card>
           <Title>Signed in, but your profile could not load</Title>
           <Body>
@@ -435,7 +450,14 @@ export function ProfileScreen() {
 
   if (profile && needsSetup) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(4),
+          /* Clear of the floating tab bar. */
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
         <Card>
           <Title>Pick your name</Title>
           <Body>
@@ -466,7 +488,14 @@ export function ProfileScreen() {
 
   if (!profile) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(4),
+          /* Clear of the floating tab bar. */
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
         <Card>
           <Title>Have an account?</Title>
           <Body>
@@ -494,7 +523,14 @@ export function ProfileScreen() {
     .map(({ slug, name }) => ({ slug, name }));
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+        contentContainerStyle={{
+          padding: spacing(4),
+          gap: spacing(4),
+          /* Clear of the floating tab bar. */
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
       {/* Your own profile block, laid out exactly as View full profile
           shows anyone else - same cover, same picture, same numbers,
           same name and handle, same shelf, with Edit profile where

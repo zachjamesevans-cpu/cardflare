@@ -74,43 +74,131 @@ describe("a worn cosmetic, around a picture", () => {
 });
 
 describe("swiping a zoomed card", () => {
-  /* Reported from a phone: "swiping between card flares immediately
-     closes the card in the app". The zoom marked the swipe in
-     onTouchEnd and read it in the Pressable's onPress - two different
-     event systems, and the responder system dispatches first, so the
-     press always won and the card closed. Marking it in onTouchMove
-     makes the answer true before either handler can read it. */
-  const start = at(zoom, "onTouchStart={(event) => {");
-  /* Every touch handler on the backdrop, and nothing else: the gesture
-     runs from the first handler to the panel it wraps. */
-  const handlers = zoom.slice(start, at(zoom, "<Animated.View", start));
+  /*
+   * The zoom is a RAIL now, and the founder walked it there in three
+   * goes: "i think you should actually be able to swipe between them.
+   * and it's like a smooth animation... right now it just fades to each
+   * different card", then "i want my finger to move with the card... it
+   * should move 1:1 with my finge[r]", and finally "think of the way
+   * multiple pictures in one post work on instagram".
+   *
+   * What it took was not the ScrollView - that part is one component.
+   * It was removing the two things fighting it, both asserted below,
+   * because both were invisible in a screenshot and only showed up when
+   * a frame was taken mid-drag with the finger still down.
+   */
 
-  it("decides that a drag is a swipe while the thumb is still down", () => {
-    const move = zoom.indexOf("onTouchMove={(event) => {");
-    expect(move, "the zoom has no onTouchMove").toBeGreaterThan(-1);
-
-    const block = zoom.slice(move, zoom.indexOf("onTouchEnd=", move));
-    expect(block).toMatch(/swiped\.current = true/);
+  it("turns the page with a rail that snaps to a card", () => {
+    expect(zoom).toContain("<ScrollView");
+    expect(zoom).toContain("snapToInterval={page}");
+    /* One card per swipe, rather than a flick that skims four. */
+    expect(zoom).toContain("disableIntervalMomentum");
+    /* The page is a card plus the gap, so a snap lands on art. */
+    expect(zoom).toMatch(/const page = hero \+ PEEK_GAP;/);
   });
 
-  it("does not wait until the touch ends to decide", () => {
-    const end = at(zoom, "onTouchEnd={(event) => {");
-    const block = zoom.slice(end, zoom.indexOf("}}", zoom.indexOf("go(", end)));
-
-    expect(block).not.toMatch(/swiped\.current = true/);
+  it("opens on the card that was tapped, not on the first one", () => {
+    expect(zoom).toContain("contentOffset={{ x: position * page, y: 0 }}");
   });
 
-  it("clears the flag when the next touch starts, not when a press reads it", () => {
-    /* Clearing it inside onPress left it set whenever onPress ran
-       first, so the tap after a swipe silently refused to close. */
-    const block = zoom.slice(start, at(zoom, "onTouchMove="));
-    expect(block).toMatch(/swiped\.current = false/);
+  it("does not let the closer wrap the rail", () => {
+    /*
+     * THE BUG THAT MADE THE CARDS IMMOVABLE. The backdrop used to be a
+     * Pressable around the whole modal, and a Pressable claims the touch
+     * the moment a finger lands, so the ScrollView inside it was never
+     * handed the pan - a frame shot mid-drag was pixel-identical to the
+     * frame at rest. It sits BEHIND now, absolutely filled, with the
+     * layer above passing stray taps through to it.
+     */
+    expect(zoom).toMatch(
+      /<Pressable style=\{StyleSheet\.absoluteFill\} onPress=\{close\} \/>/,
+    );
+    expect(zoom).toMatch(/<View style=\{styles\.zoomFill\} pointerEvents="box-none">/);
   });
 
-  it("uses one threshold for both halves of the gesture", () => {
-    /* Two literals could drift into a gap where a drag is neither a
-       swipe nor a tap, and the card would just sit there. */
-    expect(handlers).not.toMatch(/< 40\b/);
-    expect(zoom).toMatch(/const SWIPE = 40;/);
+  it("lets nothing but the rail turn the page", () => {
+    /* There was a second mechanism measuring thumb travel on release and
+       calling `go()`. With the rail in place one swipe was acted on
+       twice - it scrolled with the finger, then got thrown again. */
+    expect(zoom).not.toContain("onTouchMove=");
+    expect(zoom).not.toMatch(/const SWIPE = /);
+  });
+
+  it("gives the rail a box exactly one card tall", () => {
+    /*
+     * A horizontal ScrollView does not take a height from its own style
+     * here: it grew to 665pt inside a panel that should have been 566,
+     * which stretched the panel to 831pt of an 874pt screen and pushed
+     * the title up under the dynamic island. Measured off a screenshot,
+     * not guessed.
+     *
+     * Asserted on the CODE - `bare` strips comments, by design, so the
+     * paragraph above is not something a guard can anchor to.
+     */
+    expect(zoom).toMatch(
+      /height: Math\.round\(\(hero \* 88\) \/ 63\),\s*\}\}\s*>\s*<ScrollView/,
+    );
+
+    /* And the rail fills that box rather than negotiating its own size. */
+    const rail = zoom.slice(
+      zoom.indexOf("<ScrollView"),
+      zoom.indexOf("contentContainerStyle", zoom.indexOf("<ScrollView")),
+    );
+    expect(rail).toContain("style={{ flex: 1 }}");
+  });
+
+  it("says which card you are on with the cards either side, not a counter", () => {
+    /* "i dont think the '2 of 6' thing is necessary when viewing a full
+       size card... you should be able to see the card to the left of it,
+       and the right of, so it contextually tells you that you can
+       swipe." */
+    expect(zoom).not.toMatch(/\$\{at \+ 1\} of /);
+    expect(zoom).toMatch(/const PEEK_WIDTH = \d+;/);
+    expect(zoom).toMatch(/paddingHorizontal: sidePad/);
+  });
+
+  it("carries no chrome for a gesture that explains itself", () => {
+    /*
+     * "I still would like to be able to remove the 'arrows' when looking
+     * at cards up top. no need to have those. then remove the vertical
+     * space that is dead space." The chevrons and the counter before
+     * them were both describing a rail you can see and feel, and they
+     * cost a row between the title and the art.
+     */
+    expect(zoom).not.toContain("chevron-left");
+    expect(zoom).not.toContain("chevron-right");
+    expect(zoom).not.toMatch(/const go = /);
+  });
+
+  it("centres the card's own two lines over the card", () => {
+    /* "center the text. so, for example, fire first and op15-020 should
+       be centered on that screen." */
+    expect(zoom).toMatch(/styles\.title, \{ textAlign: "center" \}/);
+    expect(zoom).toMatch(/styles\.muted, \{ textAlign: "center" \}/);
+  });
+
+  it("still closes on a tap anywhere, including on the card", () => {
+    /*
+     * The label went to "Tap outside" while the rail was the only thing
+     * a touch on the card could do, and the founder asked for the whole
+     * behaviour back: "make it so that you can still tap anywhere to
+     * close that screen. even though ther's a swipe thing now."
+     *
+     * A tap and a drag start identically, so the card cannot tell them
+     * apart on its own - and React Native does NOT cancel the press for
+     * us inside this rail; wrapping the cards in a Pressable and
+     * trusting that closed the zoom on every swipe. The RAIL answers it
+     * instead: `onScrollBeginDrag` only fires when a finger actually
+     * moved it, so a press arriving with that flag down was a tap.
+     *
+     * `delaysContentTouches` has to be off for the card to hear the tap
+     * at all - iOS holds a touch back to decide whether it is a scroll,
+     * and a quick tap ended inside that window and reached nothing.
+     */
+    expect(zoom).toContain("Tap anywhere to close");
+    expect(zoom).toContain("delaysContentTouches: false");
+    expect(zoom).toContain("{...IMMEDIATE_TOUCHES}");
+    expect(zoom).toMatch(/onScrollBeginDrag=\{\(\) => \{\s*scrolled\.current = true;/);
+    expect(zoom).toMatch(/if \(scrolled\.current\) return;\s*close\(\);/);
   });
 });
