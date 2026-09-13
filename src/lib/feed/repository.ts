@@ -7,7 +7,7 @@ import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
-import { listFollowing } from "@/lib/players/follows";
+import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
@@ -262,6 +262,21 @@ export interface HuntItem {
   total: number;
   /** How many of them the viewer's own binder answers. */
   youCanAnswer: number;
+  /**
+   * The viewer's own post, rather than somebody they follow.
+   *
+   * The founder: "whenever i post a flare, it should also show in my
+   * feed, like how instagram does that for ur own posts." Your own
+   * Flares were the one thing the Feed knew about and would not show
+   * you - the hunt builder only ever accepted authors from the follow
+   * list, and nobody follows themselves.
+   *
+   * It is a flag rather than a separate kind because it IS the same
+   * item: a person, a board, and what they are chasing. Only the
+   * heading above it and the line under it change, and both of those
+   * live in one place.
+   */
+  yours: boolean;
 }
 
 /**
@@ -631,12 +646,13 @@ async function embersBalance(playerId: string): Promise<number> {
  * than as an empty app.
  */
 export type FeedSection =
-  "wanted" | "tonight" | "people" | "walkin" | "nearby" | "store";
+  "wanted" | "tonight" | "yours" | "people" | "walkin" | "nearby" | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
+  yours: "Your flares",
   people: "People you follow",
   walkin: "Where you play",
   nearby: "Nearby stores",
@@ -667,6 +683,8 @@ function sectionFor(item: FeedItem): FeedSection {
     case "upcoming":
       return item.nextEventAt ? "tonight" : "walkin";
     case "hunt":
+      /* Your own post is not news about somebody else. */
+      return item.yours ? "yours" : "people";
     case "recent":
     case "added":
     case "traded":
@@ -701,6 +719,7 @@ function reasonFor(item: FeedItem): string {
     case "upcoming":
       return "At a store you saved";
     case "hunt":
+      return item.yours ? "You posted this" : "Because you follow them";
     case "added":
       return "Because you follow them";
     case "recent":
@@ -981,6 +1000,9 @@ async function boardWithHunts(
     }
   >,
   playerBySession: Map<string, string>,
+  /* Whose feed this is, so their own posts can be told apart from the
+     people they follow. `followed` carries them as an author. */
+  viewerId: string,
 ): Promise<FeedItem[]> {
   const code = local.liveNow ? local.joinCode : local.nextEventCode;
   if (!code) return [];
@@ -1099,6 +1121,7 @@ async function boardWithHunts(
       frame: person.frame,
       ring: person.ring,
       deckLabel: ordered[0]?.flare.deckLabel ?? null,
+      yours: key.split("::")[0] === viewerId,
       /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
          trailing "+N more" are counting the same things the tiles are. */
       total: cards.length,
@@ -1293,6 +1316,47 @@ const NO_FACE: FeedFace = {
  * WebView, and a feed row is not the place to mount four of them - the
  * profile is where uploaded art gets its full size and its own render.
  */
+/**
+ * The viewer, in the shape the hunt row draws a person in.
+ *
+ * The follow list arrives with names and faces already attached; the
+ * viewer does not, because nothing else in this file needed them. One
+ * row and the same dressing every other face gets, so your own post
+ * wears your ring and aura exactly as it does on everybody else's
+ * screen.
+ */
+async function viewerAsAuthor(playerId: string): Promise<FollowedPlayer | null> {
+  const [{ data }, faces] = await Promise.all([
+    getSupabaseAdmin()
+      .from("players")
+      .select("display_name")
+      .eq("id", playerId)
+      .maybeSingle(),
+    facesFor([playerId]),
+  ]);
+
+  if (!data?.display_name) return null;
+
+  const face = faces.get(playerId);
+  return {
+    playerId,
+    displayName: data.display_name,
+    avatarUrl: face?.avatarUrl ?? null,
+    frame: face?.frame ?? null,
+    ring: face?.ring ?? null,
+    aura: face?.aura ?? null,
+    /* The Rive files behind a ring or aura are only read for people you
+       follow, to decide what the app has to download. Your own post is
+       drawn from the same catalogue slugs above; nothing here needs a
+       file it has not already got. */
+    ringArt: null,
+    auraArt: null,
+    /* "Trade partners" is a statement about two people. You are not your
+       own partner, and the row does not ask. */
+    partners: false,
+  };
+}
+
 async function facesFor(playerIds: string[]): Promise<Map<string, FeedFace>> {
   const out = new Map<string, FeedFace>();
   const ids = [...new Set(playerIds)];
@@ -1654,6 +1718,24 @@ export async function listFeed(
   const held = heldByCard(binder);
   const followed = new Map(following.map((player) => [player.playerId, player]));
 
+  /*
+   * The people whose Flares can reach this feed: everyone followed, plus
+   * the viewer.
+   *
+   * "Whenever i post a flare, it should also show in my feed, like how
+   * instagram does that for ur own posts." Nobody follows themselves, so
+   * the hunt builder - which only ever accepted authors from the follow
+   * list - dropped the viewer's own posts on the floor.
+   *
+   * Kept SEPARATE from `followed`, deliberately. That map also decides
+   * who can appear in "just added to their binder" and who is worth
+   * suggesting, and neither of those wants to start talking about you.
+   * Only Flares are yours to see.
+   */
+  const authors = new Map(followed);
+  const me = await viewerAsAuthor(playerId);
+  if (me) authors.set(playerId, me);
+
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -1682,10 +1764,10 @@ export async function listFeed(
   const boards = (
     await Promise.all([
       ...live.map((local) =>
-        boardWithHunts(local, true, held, followed, playerBySession),
+        boardWithHunts(local, true, held, authors, playerBySession, playerId),
       ),
       ...elsewhere.map((local) =>
-        boardWithHunts(local, false, held, followed, playerBySession),
+        boardWithHunts(local, false, held, authors, playerBySession, playerId),
       ),
     ])
   ).flat();
@@ -1761,7 +1843,17 @@ export async function listFeed(
       linkLabel: notice.linkLabel,
       linkHref: notice.linkHref,
     })),
-    ...boards.filter((item) => item.kind === "hunt"),
+    /*
+     * YOUR OWN FLARES FIRST, and together.
+     *
+     * Both clients draw a heading only when the section CHANGES, so an
+     * own post sitting between two followed ones would read "Your
+     * flares / People you follow / Your flares". Hoisting them keeps
+     * one heading over one block - and puts what you just posted where
+     * Instagram puts it, at the top, so posting visibly did something.
+     */
+    ...boards.filter((item) => item.kind === "hunt" && item.yours),
+    ...boards.filter((item) => item.kind === "hunt" && !item.yours),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
