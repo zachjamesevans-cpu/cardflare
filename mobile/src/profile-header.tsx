@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Share, Text, View } from "react-native";
+import { Share, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import type { ProfileStats } from "./api";
 import { API_BASE } from "./config";
@@ -20,6 +20,12 @@ import { WornBadge, WornName, WornTitle } from "./worn-name";
  * the three numbers beside it, the name and handle under, then a row
  * of buttons the full width of the block. The same header for your own
  * profile and for anybody else's; only the buttons differ.
+ *
+ * Second pass, the founder again: the numbers want "blocks or
+ * separation... so they're not just floating", and the name, badge
+ * and title were "sporadic". So each number is a tile, and the name
+ * block is three ruled lines: name with its badge, the handle, then
+ * the title chip and the Embers pill together on one row.
  */
 export function ProfileHeader({
   avatar,
@@ -51,7 +57,7 @@ export function ProfileHeader({
     <View style={{ gap: spacing(3) }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         {avatar}
-        <View style={{ flex: 1, flexDirection: "row" }}>
+        <View style={{ flex: 1, flexDirection: "row", gap: spacing(2) }}>
           <Stat value={stats?.flares} label={stats?.flares === 1 ? "Flare" : "Flares"} />
           <Stat value={stats?.followers} label="followers" onPress={onFollowers} />
           <Stat value={stats?.following} label="following" onPress={onFollowing} />
@@ -67,9 +73,18 @@ export function ProfileHeader({
           />
           <WornBadge badge={equips.badge} />
         </View>
-        <WornTitle title={equips.title} />
         <Text style={{ color: colors.textMuted, fontSize: 14 }}>{formatHandle(handle)}</Text>
-        <EmberBadge earned={embersEarned} size="sm" />
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: spacing(2),
+          }}
+        >
+          <WornTitle title={equips.title} />
+          <EmberBadge earned={embersEarned} size="sm" />
+        </View>
       </View>
 
       <View style={{ flexDirection: "row", gap: spacing(2) }}>{actions}</View>
@@ -77,7 +92,7 @@ export function ProfileHeader({
   );
 }
 
-/** One number over its label, tappable when there is a list behind it. */
+/** One number over its label in its own tile, tappable when there is a list behind it. */
 function Stat({
   value,
   label,
@@ -95,7 +110,18 @@ function Stat({
       <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</Text>
     </>
   );
-  const style = { flex: 1, alignItems: "center" as const };
+  const style: StyleProp<ViewStyle> = {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.elevated,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(1),
+  };
   return onPress ? (
     <Tap onPress={onPress} accessibilityLabel={`${label} list`} style={style}>
       {body}

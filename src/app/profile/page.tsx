@@ -200,9 +200,19 @@ export default async function ProfilePage() {
                 worn={dressed}
                 embersEarned={profile.embersEarned}
                 stats={stats}
-                statLinks={{
-                  followers: "/profile#followers",
-                  following: "/profile#following",
+                people={{
+                  followers: (
+                    <PeopleList
+                      people={followers}
+                      empty="Nobody yet. Share your profile."
+                    />
+                  ),
+                  following: (
+                    <PeopleList
+                      people={following}
+                      empty="Nobody yet. The next time somebody impresses you at a table, tap their name."
+                    />
+                  ),
                 }}
                 actions={
                   <>
@@ -413,37 +423,6 @@ export default async function ProfilePage() {
               <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
             </span>
           </Link>
-
-          <Card id="following" className="flex scroll-mt-24 flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="font-semibold text-text-primary">
-                Following{" "}
-                <span className="font-normal text-text-muted tabular-nums">
-                  · {following.length}
-                </span>
-              </p>
-              <p className="text-sm text-text-secondary">
-                Players you follow. When they follow you back, you are Trade partners.
-              </p>
-            </div>
-            <PeopleList
-              people={following}
-              empty="Nobody yet. The next time somebody impresses you at a table, tap their name."
-            />
-          </Card>
-
-          <Card id="followers" className="flex scroll-mt-24 flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="font-semibold text-text-primary">
-                Followers{" "}
-                <span className="font-normal text-text-muted tabular-nums">
-                  · {followers.length}
-                </span>
-              </p>
-              <p className="text-sm text-text-secondary">Players who follow you.</p>
-            </div>
-            <PeopleList people={followers} empty="Nobody yet. Share your profile." />
-          </Card>
 
           <TabBarSpacer />
         </div>

@@ -34,10 +34,13 @@ export function WornNameRow({
   name,
   worn,
   className,
+  withTitle = true,
 }: {
   name: string;
   worn: Worn;
   className?: string;
+  /** False when the surface places the title chip itself. */
+  withTitle?: boolean;
 }) {
   return (
     <span className={cn("flex flex-col items-center gap-1", className)}>
@@ -56,11 +59,17 @@ export function WornNameRow({
           </span>
         )}
       </span>
-      {worn.title && (
-        <span className={cn("cfx-title-chip", `cfa-${worn.title}`)}>
-          {titleWords(worn.title)}
-        </span>
-      )}
+      {withTitle && <WornTitleChip worn={worn} />}
+    </span>
+  );
+}
+
+/** The worn title as a chip, or nothing. */
+export function WornTitleChip({ worn }: { worn: Worn }) {
+  if (!worn.title) return null;
+  return (
+    <span className={cn("cfx-title-chip", `cfa-${worn.title}`)}>
+      {titleWords(worn.title)}
     </span>
   );
 }
