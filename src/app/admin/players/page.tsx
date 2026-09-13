@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft, BarChart3, UserRound } from "lucide-react";
 
 import { AdminPlayerRow } from "@/components/admin/admin-player-row";
 import { AvatarProbe } from "@/components/admin/avatar-probe";
 import { InvitePlayerForm } from "@/components/admin/invite-player-form";
-import { OrphanSessions } from "@/components/admin/orphan-sessions";
 import { PlayerSearch } from "@/components/admin/player-search";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { avatarDiagnostics } from "@/lib/admin/avatar-check";
 import { searchPlayers } from "@/lib/admin/grants";
-import { listOrphanSessions } from "@/lib/admin/orphan-sessions";
 import { listPlayersForAdmin, playerForUser } from "@/lib/players/accounts";
 
 export const metadata: Metadata = {
@@ -52,8 +50,6 @@ export default async function AdminPlayersPage({
   const query = params.q ?? "";
 
   /* Guest sessions carrying Flares, for the merge tool below the list. */
-  const orphans = await listOrphanSessions();
-
   /*
    * The picture check runs ON REQUEST now, never as part of an ordinary
    * render. It downloads the stored avatar, decodes it with sharp, and
@@ -136,10 +132,16 @@ export default async function AdminPlayersPage({
 
         <PlayerSearch initial={query} />
 
-        {/* Flares stranded on a session with no account behind it. See
-            listOrphanSessions for why this cannot be repaired without a
-            human saying whose they are. */}
-        <OrphanSessions sessions={orphans} players={found} />
+        {/* Guests never appear here. The founder: a directory of guest
+            sessions "is not necessary, maybe just a counter somewhere";
+            the counter, with a window to choose, is the Reports page. */}
+        <Link
+          href="/admin/reports"
+          className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+        >
+          <BarChart3 className="size-4" aria-hidden="true" />
+          Guests are counted under Reports, not listed here
+        </Link>
 
         {found.length === 0 && pending.length === 0 ? (
           <Card className="flex flex-col items-center gap-3 py-12 text-center">
