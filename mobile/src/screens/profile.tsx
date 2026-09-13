@@ -128,10 +128,8 @@ export function ProfileScreen() {
      GIF controls in place rather than a separate screen. */
   const [editing, setEditing] = useState(false);
 
-  /* The followers and following numbers scroll to their lists. */
-  const scrollRef = useRef<ScrollView | null>(null);
-  const peopleY = useRef(0);
-  const followersY = useRef(0);
+  /* The list open over the page: the followers or following tile. */
+  const [people, setPeople] = useState<"followers" | "following" | null>(null);
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -496,10 +494,7 @@ export function ProfileScreen() {
     .map(({ slug, name }) => ({ slug, name }));
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
-    >
+    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
       {/* Your own profile block, laid out exactly as View full profile
           shows anyone else - same cover, same picture, same numbers,
           same name and handle, same shelf, with Edit profile where
@@ -595,15 +590,8 @@ export function ProfileScreen() {
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}
-            onFollowers={() =>
-              scrollRef.current?.scrollTo({
-                y: peopleY.current + followersY.current,
-                animated: true,
-              })
-            }
-            onFollowing={() =>
-              scrollRef.current?.scrollTo({ y: peopleY.current, animated: true })
-            }
+            onFollowers={() => setPeople("followers")}
+            onFollowing={() => setPeople("following")}
             actions={
               <>
                 <HeaderButton
@@ -897,50 +885,17 @@ export function ProfileScreen() {
         </View>
       </Card>
 
-      {/* The two lists behind the two numbers, the website's Following
-          and Followers cards in one block. */}
-      <View
-        style={{ gap: spacing(4) }}
-        onLayout={(event) => {
-          peopleY.current = event.nativeEvent.layout.y;
+      {/* The list behind a tapped number, over the page - the founder:
+          "a separate pop up", not a section at the bottom. */}
+      <PeopleSheet
+        which={people}
+        people={people === "followers" ? followers : following}
+        onClose={() => setPeople(null)}
+        onOpen={(id) => {
+          setPeople(null);
+          navigation.navigate("PlayerProfile", { playerId: id });
         }}
-      >
-        <Card>
-          <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-            Following{" "}
-            <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
-              · {following.length}
-            </Text>
-          </Text>
-          <Body>Players you follow. When they follow you back, you are Trade partners.</Body>
-          <PeopleList
-            people={following}
-            empty="Nobody yet. The next time somebody impresses you at a table, tap their name."
-            onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
-          />
-        </Card>
-
-        <View
-          onLayout={(event) => {
-            followersY.current = event.nativeEvent.layout.y;
-          }}
-        >
-          <Card>
-            <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-              Followers{" "}
-              <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
-                · {followers.length}
-              </Text>
-            </Text>
-            <Body>Players who follow you.</Body>
-            <PeopleList
-              people={followers}
-              empty="Nobody yet. Share your profile."
-              onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
-            />
-          </Card>
-        </View>
-      </View>
+      />
 
       {/*
        * The store lives on its own screen now, same as the website:
@@ -1019,6 +974,80 @@ export function ProfileScreen() {
         }}
       />
     </ScrollView>
+  );
+}
+
+/** Followers or following, in a modal over the profile: the website's PeopleDialog. */
+function PeopleSheet({
+  which,
+  people,
+  onClose,
+  onOpen,
+}: {
+  which: "followers" | "following" | null;
+  people: FollowedPlayer[];
+  onClose: () => void;
+  onOpen: (playerId: string) => void;
+}) {
+  if (!which) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.75)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing(4),
+        }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            alignSelf: "stretch",
+            maxHeight: "80%",
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            padding: spacing(4),
+            gap: spacing(3),
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: spacing(3),
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
+              {which === "followers" ? "Followers" : "Following"}{" "}
+              <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
+                · {people.length}
+              </Text>
+            </Text>
+            <Tap onPress={onClose} accessibilityLabel="Close">
+              <Ionicons name="close" size={22} color={colors.textMuted} />
+            </Tap>
+          </View>
+          <ScrollView>
+            <PeopleList
+              people={people}
+              empty={
+                which === "followers"
+                  ? "Nobody yet. Share your profile."
+                  : "Nobody yet. The next time somebody impresses you at a table, tap their name."
+              }
+              onOpen={onOpen}
+            />
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

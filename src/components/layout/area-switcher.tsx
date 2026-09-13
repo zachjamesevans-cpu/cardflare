@@ -14,6 +14,16 @@ import type { Area } from "@/lib/auth/areas";
 export function AreaSwitcher({ areas, current }: { areas: Area[]; current: string }) {
   const router = useRouter();
 
+  /*
+   * A page that is none of the options must not look like the first
+   * one. A controlled select with a value that matches nothing shows
+   * its first option, "Admin console", and choosing that option then
+   * changes nothing, so the founder sat on a store's overview with a
+   * switcher that said admin and did not go there. An unlisted page
+   * gets a placeholder instead, and every real choice is a change.
+   */
+  const listed = areas.some((area) => area.href === current);
+
   return (
     /*
      * min-w-0 so the control shrinks on a phone instead of shoving the
@@ -26,10 +36,17 @@ export function AreaSwitcher({ areas, current }: { areas: Area[]; current: strin
       </label>
       <select
         id="area-switcher"
-        value={current}
-        onChange={(event) => router.push(event.target.value)}
+        value={listed ? current : ""}
+        onChange={(event) => {
+          if (event.target.value) router.push(event.target.value);
+        }}
         className="w-full appearance-none rounded-[var(--radius-control)] border border-border bg-canvas py-1.5 pr-8 pl-3 text-sm font-medium text-text-secondary transition-colors duration-[var(--duration-base)] hover:text-text-primary"
       >
+        {!listed && (
+          <option value="" disabled>
+            Switch area
+          </option>
+        )}
         {areas.map((area) => (
           <option key={area.href} value={area.href}>
             {area.label}

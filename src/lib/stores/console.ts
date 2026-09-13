@@ -58,8 +58,20 @@ export async function loadStoreConsole(
     )
     .order("name");
 
-  const stores = (data ?? []) as ConsoleStore[];
+  /*
+   * Only the stores this account is a member of, whatever the read
+   * returned. Row Level Security lets an admin read EVERY store, so the
+   * founder opening /store with no `?as=` used to land on the first
+   * store in the alphabet - somebody else's - with the area switcher
+   * unable to name it and so showing "Admin console" while stuck on a
+   * shop's overview. Memberships come from `getViewer`'s service-role
+   * read, the same list the switcher's options are built from.
+   */
+  const stores = ((data ?? []) as ConsoleStore[]).filter((row) =>
+    viewer.storeIds.includes(row.id),
+  );
   const store = stores.find((row) => row.id === as) ?? stores[0] ?? null;
+  if (!store && viewer.kind === "admin") redirect("/admin");
   const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
 
   return {
