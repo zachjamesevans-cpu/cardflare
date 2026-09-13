@@ -30,16 +30,20 @@ import { cn } from "@/lib/cn";
 export function ProfileCover({
   coverUrl,
   className,
+  short = false,
 }: {
   coverUrl: string | null;
   /** Height, when a surface needs a shorter one than the default. */
   className?: string;
+  /** The header's banner: a strip the picture overlaps, not a backdrop for the whole block. */
+  short?: boolean;
 }) {
   return (
     <div
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden",
+        "pointer-events-none absolute inset-x-0 top-0 overflow-hidden",
+        short ? "h-36" : "h-72",
         className,
       )}
     >

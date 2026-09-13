@@ -5,14 +5,16 @@ import { ChevronRight, Flame, Settings, Sparkles, Wand2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
-import { AvatarForm } from "@/components/players/avatar-form";
-import { CoverForm } from "@/components/players/cover-form";
 import { ProfileCover } from "@/components/players/profile-cover";
+import { PeopleList } from "@/components/players/people-list";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { listFollowing } from "@/lib/players/follows";
+import { ProfileHeader } from "@/components/players/profile-header";
+import { ShareProfileButton } from "@/components/players/share-profile-button";
+import { listFollowers, listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { areasForUser } from "@/lib/auth/areas";
@@ -24,15 +26,15 @@ import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
+import { profileStats } from "@/lib/players/stats";
+import { siteUrl } from "@/lib/site";
 import {
   backgroundClass,
   WornBackdrop,
   WornCardShell,
-  WornNameRow,
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
-import { tierAllows } from "@/lib/tiers";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -91,7 +93,11 @@ export default async function ProfilePage() {
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
 
-  const following = await listFollowing(playerId);
+  const [following, followers, stats] = await Promise.all([
+    listFollowing(playerId),
+    listFollowers(playerId),
+    profileStats(playerId),
+  ]);
 
   /*
    * The wardrobe is back on this page even though the shop moved out:
@@ -147,15 +153,11 @@ export default async function ProfilePage() {
               read as duplicates: "it should all go live from the
               actual edit button... everything can be changed up top."
               One block owns the whole profile now. */}
-          <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
-            <ProfileCover coverUrl={profile.coverUrl} />
+          <Card className="relative flex flex-col gap-4 overflow-hidden">
+            <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
-            {/*
-             * The block's two controls, riding its corner: the wand
-             * dresses the profile, the cog is everything the account
-             * page used to be.
-             */}
+            {/* The two wands, top right, over the cover. */}
             <div className="absolute top-3 right-3 z-10 flex gap-2">
               <Link
                 href="/profile/customize"
@@ -175,40 +177,48 @@ export default async function ProfilePage() {
               </Link>
             </div>
 
-            {/* The picture, with its camera and remove controls: the
-                edit surface IS the display surface now. */}
-            <div className="relative mt-12">
-              <AvatarForm
-                displayName={profile.displayName}
-                seed={profile.playerId}
-                avatarUrl={profile.avatarUrl}
-                frame={worn.avatarFrame}
-                ring={dressed.ring}
-                aura={dressed.aura}
-                ringArt={dressedArt.ring}
-                auraArt={dressedArt.aura}
-                animatedAllowed={tierAllows(profile.tier, "animatedAvatar")}
-              />
-            </div>
-            <div className="relative flex flex-col items-center gap-2">
-              <WornNameRow
+            {/* The Instagram header: picture and numbers, name and
+                handle, then Edit profile and Share profile. Changing
+                the picture and cover lives behind Edit profile now. */}
+            <div className="relative mt-16">
+              <ProfileHeader
+                avatar={
+                  <PlayerAvatar
+                    displayName={profile.displayName}
+                    seed={profile.playerId}
+                    avatarUrl={profile.avatarUrl}
+                    frame={worn.avatarFrame}
+                    ring={dressed.ring}
+                    aura={dressed.aura}
+                    ringArt={dressedArt.ring}
+                    auraArt={dressedArt.aura}
+                    className="size-20 text-2xl sm:size-24"
+                  />
+                }
                 name={profile.displayName}
+                handle={profile.handle}
                 worn={dressed}
-                className="text-lg font-bold"
+                embersEarned={profile.embersEarned}
+                stats={stats}
+                statLinks={{
+                  followers: "/profile#followers",
+                  following: "/profile#following",
+                }}
+                actions={
+                  <>
+                    <Link
+                      href="/profile/edit"
+                      className={cn(buttonStyles("secondary", "sm"), "flex-1")}
+                    >
+                      Edit profile
+                    </Link>
+                    <ShareProfileButton
+                      url={`${siteUrl()}/p/${profile.playerId}`}
+                      title={`${profile.displayName} on cardflare`}
+                    />
+                  </>
+                }
               />
-              <EmberBadge earned={profile.embersEarned} size="md" />
-              <p className="text-sm text-text-muted">
-                Earned by confirming trades, and nothing else.
-              </p>
-            </div>
-
-            {/* The cover, editable where it shows. The NAME is not
-                here any more - the founder: "no need to have the name
-                editor front and center on a profile. that should be
-                buried somewhere in the profile settings." Renaming is
-                a once-a-year act; the cover is a decoration. */}
-            <div className="relative flex w-full max-w-sm flex-col gap-3 text-left">
-              <CoverForm coverUrl={profile.coverUrl} />
             </div>
 
             {/* The showcase in its own rounded panel - the founder's
@@ -404,54 +414,35 @@ export default async function ProfilePage() {
             </span>
           </Link>
 
-          <Card className="flex flex-col gap-4">
+          <Card id="following" className="flex scroll-mt-24 flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <p className="font-semibold text-text-primary">People</p>
+              <p className="font-semibold text-text-primary">
+                Following{" "}
+                <span className="font-normal text-text-muted tabular-nums">
+                  · {following.length}
+                </span>
+              </p>
               <p className="text-sm text-text-secondary">
                 Players you follow. When they follow you back, you are Trade partners.
-                Follow people from their profile popup in a room, from their profile
-                page, or find them in the search bar.
               </p>
             </div>
+            <PeopleList
+              people={following}
+              empty="Nobody yet. The next time somebody impresses you at a table, tap their name."
+            />
+          </Card>
 
-            {following.length === 0 ? (
-              <p className="text-sm text-text-muted">
-                Nobody yet. The next time somebody impresses you at a table, tap their
-                name.
+          <Card id="followers" className="flex scroll-mt-24 flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">
+                Followers{" "}
+                <span className="font-normal text-text-muted tabular-nums">
+                  · {followers.length}
+                </span>
               </p>
-            ) : (
-              <ul className="flex flex-col">
-                {following.map((person) => (
-                  <li
-                    key={person.playerId}
-                    className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0"
-                  >
-                    <PlayerAvatar
-                      displayName={person.displayName}
-                      seed={person.playerId}
-                      avatarUrl={person.avatarUrl}
-                      frame={person.frame}
-                      ring={person.ring}
-                      aura={person.aura}
-                      ringArt={person.ringArt}
-                      auraArt={person.auraArt}
-                      size="sm"
-                    />
-                    <Link
-                      href={`/p/${person.playerId}`}
-                      className="min-w-0 flex-1 truncate font-semibold text-text-primary underline-offset-4 hover:underline"
-                    >
-                      {person.displayName}
-                    </Link>
-                    {person.partners && (
-                      <span className="shrink-0 text-xs text-accent">
-                        Trade partners
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+              <p className="text-sm text-text-secondary">Players who follow you.</p>
+            </div>
+            <PeopleList people={followers} empty="Nobody yet. Share your profile." />
           </Card>
 
           <TabBarSpacer />

@@ -14,10 +14,13 @@ import { colors, radius, spacing } from "./theme";
 export function FollowButton({
   playerId,
   initial,
+  fill = false,
 }: {
   playerId: string;
   /** Null hides the button: guests and your own profile. */
   initial: FollowState | null;
+  /** Take the row's width, for the profile header's button pair. */
+  fill?: boolean;
 }) {
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -43,7 +46,9 @@ export function FollowButton({
           .finally(() => setBusy(false));
       }}
       style={{
-        alignSelf: "flex-start",
+        alignSelf: fill ? "stretch" : "flex-start",
+        flex: fill ? 1 : undefined,
+        justifyContent: "center",
         flexDirection: "row",
         alignItems: "center",
         gap: spacing(1.5),
@@ -52,7 +57,7 @@ export function FollowButton({
         borderColor: state.following ? colors.border : `${colors.accent}66`,
         backgroundColor: state.following ? colors.elevated : `${colors.accent}1a`,
         paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1.5),
+        paddingVertical: fill ? spacing(2) : spacing(1.5),
       }}
     >
       {busy && <ActivityIndicator size="small" color={colors.accent} />}

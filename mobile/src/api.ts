@@ -964,6 +964,15 @@ export interface Profile {
   equips?: Partial<Record<CustomizeKind, string | null>> | null;
   showcase: ShowcaseCard[];
   showcaseLimit: number;
+  /** The three numbers under the picture; absent from an older server. */
+  stats?: ProfileStats;
+}
+
+/** The Instagram row: Flares where posts would be, then followers, following. */
+export interface ProfileStats {
+  flares: number;
+  followers: number;
+  following: number;
 }
 
 export interface Wardrobe {
@@ -1070,6 +1079,8 @@ export interface PeekProfile {
   coverUrl: string | null;
   /** The viewer's side of the relationship; null hides the button. */
   follow: FollowState | null;
+  /** Their three numbers; absent from an older server. */
+  stats?: ProfileStats;
   embersEarned: number;
   /** The ring around their picture. */
   frame: string | null;
@@ -1118,6 +1129,10 @@ export interface FollowedPlayer {
 /** Who you follow - the Profile tab's People list. */
 export const getFollowing = () =>
   call<{ following: FollowedPlayer[] }>("GET", "/api/v1/following");
+
+/** Who follows you - the other half of the same list. */
+export const getFollowers = () =>
+  call<{ followers: FollowedPlayer[] }>("GET", "/api/v1/followers");
 
 export interface PackSeries {
   id: string;
