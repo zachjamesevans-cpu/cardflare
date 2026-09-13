@@ -7,6 +7,7 @@ import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
+import { profileStats } from "@/lib/players/stats";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
@@ -72,10 +73,14 @@ export async function GET(
      a signed-in player has a side of that relationship; a guest gets
      nulls and the clients hide the button. */
   const me = await viewerPlayerId(request);
-  const follow = me ? await followState(me, playerId) : null;
+  const [follow, stats] = await Promise.all([
+    me ? followState(me, playerId) : null,
+    profileStats(playerId),
+  ]);
 
   return Response.json({
     follow: me && me !== playerId ? follow : null,
+    stats,
     playerId: profile.playerId,
     displayName: profile.displayName,
     handle: profile.handle,

@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
-import { EmberBadge } from "@/components/players/ember-badge";
 import { FollowButton } from "@/components/players/follow-button";
+import { ProfileHeader } from "@/components/players/profile-header";
+import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { getViewer } from "@/lib/auth/session";
@@ -17,13 +20,13 @@ import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followState } from "@/lib/players/follows";
-import { formatHandle } from "@/lib/players/handle";
 import { publicProfile } from "@/lib/players/profile";
+import { profileStats } from "@/lib/players/stats";
+import { siteUrl } from "@/lib/site";
 import {
   backgroundClass,
   WornBackdrop,
   WornCardShell,
-  WornNameRow,
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
@@ -50,9 +53,10 @@ export const dynamic = "force-dynamic";
  * tried. Nor are their wants, their collection, or their email: none of
  * that is a fact about a player, it is their account.
  *
- * Signed-out visitors get nothing. This is not public in the web sense,
- * only in the room sense — the people who can reach it are people who
- * were standing next to you.
+ * Anyone with the link can open it: Share profile hands the address to
+ * people who may not have an account yet. A signed-out visitor sees
+ * exactly what a room already shows and a Follow button that starts
+ * sign-up.
  */
 export default async function PublicProfilePage({
   params,
@@ -62,13 +66,10 @@ export default async function PublicProfilePage({
   const viewer = await getViewer();
   const { playerId } = await params;
 
-  /*
-   * A signed-out visitor gets "no such page" rather than a sign-in
-   * prompt, deliberately: a prompt would confirm the id exists, which
-   * turns this route into a way to enumerate players.
-   */
-  if (viewer.kind === "anonymous") notFound();
-
+  /* Open to anyone with the link: Share profile hands the address to
+     people who may not have an account yet, and a 404 at the other end
+     would be the wrong first impression. Nothing here is more than a
+     room already shows. */
   const profile = await publicProfile(playerId);
   if (!profile) notFound();
 
@@ -85,60 +86,74 @@ export default async function PublicProfilePage({
   const me =
     viewer.kind === "player"
       ? viewer.playerId
-      : ((await playerForUser(viewer.user.id))?.id ?? null);
-  const follow = me && me !== playerId ? await followState(me, playerId) : null;
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const [follow, stats] = await Promise.all([
+    me && me !== playerId ? followState(me, playerId) : null,
+    profileStats(playerId),
+  ]);
 
   return (
     <>
       <AppShell
         area="Profile"
-        email={viewer.user.email ?? ""}
+        email={viewer.kind === "anonymous" ? "" : (viewer.user.email ?? "")}
         title={profile.displayName}
         description="What this player has traded for, and what they are showing off."
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Card className="relative flex flex-col items-center gap-4 overflow-hidden text-center">
-            {/* The cover, carrying down behind the name and badge and
-                fading out. The same component your own profile uses. */}
-            <ProfileCover coverUrl={profile.coverUrl} />
-
-            {/*
-             * One component for picture, initials and frame alike, so
-             * this page cannot drift from what a room shows. It used to
-             * render its own bare <Image> for the picture case, and a
-             * bought frame never appeared here at all.
-             */}
+          <Card className="relative flex flex-col gap-4 overflow-hidden">
+            <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
-            <PlayerAvatar
-              displayName={profile.displayName}
-              seed={profile.playerId}
-              avatarUrl={profile.avatarUrl}
-              frame={worn.avatarFrame}
-              ring={dressed.ring}
-              aura={dressed.aura}
-              ringArt={dressedArt.ring}
-              auraArt={dressedArt.aura}
-              className="relative mt-12 size-24 text-2xl"
-            />
-
-            <div className="relative flex flex-col items-center gap-2">
-              <WornNameRow
+            {/* The same header the owner sees, with Follow where they
+                have Edit profile. Share is a link anybody can open. */}
+            <div className="relative mt-16">
+              <ProfileHeader
+                avatar={
+                  <PlayerAvatar
+                    displayName={profile.displayName}
+                    seed={profile.playerId}
+                    avatarUrl={profile.avatarUrl}
+                    frame={worn.avatarFrame}
+                    ring={dressed.ring}
+                    aura={dressed.aura}
+                    ringArt={dressedArt.ring}
+                    auraArt={dressedArt.aura}
+                    className="size-20 text-2xl sm:size-24"
+                  />
+                }
                 name={profile.displayName}
+                handle={profile.handle}
                 worn={dressed}
-                className="text-lg font-bold"
+                embersEarned={profile.embersEarned}
+                stats={stats}
+                actions={
+                  <>
+                    {follow ? (
+                      <FollowButton
+                        playerId={playerId}
+                        initial={follow}
+                        className="flex-1 justify-center"
+                      />
+                    ) : viewer.kind === "anonymous" ? (
+                      <Link
+                        href={`/signup?next=${encodeURIComponent(`/p/${playerId}`)}`}
+                        className={cn(buttonStyles("primary", "sm"), "flex-1")}
+                      >
+                        Follow
+                      </Link>
+                    ) : null}
+                    <ShareProfileButton
+                      url={`${siteUrl()}/p/${profile.playerId}`}
+                      title={`${profile.displayName} on cardflare`}
+                    />
+                  </>
+                }
               />
-              {/* Under the name, quieter than it: the name is who they
-                  are, the handle is how you find them again. */}
-              <p className="-mt-1 text-sm text-text-muted">
-                {formatHandle(profile.handle)}
-              </p>
-              <EmberBadge earned={profile.embersEarned} size="md" />
-              <p className="text-sm text-text-muted">
-                Earned by confirming trades, and nothing else.
-              </p>
-              {follow && <FollowButton playerId={playerId} initial={follow} />}
             </div>
+
             {/* The showcase panel, pixel-identical to the own-profile
                 page's - the founder's spec: viewing somebody must show
                 the same block their owner sees. */}

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { AreaSwitcher } from "@/components/layout/area-switcher";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
 import type { Area } from "@/lib/auth/areas";
 import { SITE } from "@/lib/site";
@@ -11,6 +11,7 @@ import { SITE } from "@/lib/site";
 interface AppShellProps {
   /** Shown beside the logo so it is obvious which area you are in. */
   area: string;
+  /** Empty for a signed-out visitor on a page anyone can open, such as a shared profile. */
   email: string;
   title: string;
   description?: string;
@@ -64,17 +65,25 @@ export function AppShell({
              * a separate nav item for one page would be more chrome than the
              * signed-in areas need.
              */}
-            <Link
-              href="/profile/settings"
-              className="hidden truncate text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline md:block"
-            >
-              {email}
-            </Link>
-            <form action={signOut}>
-              <Button type="submit" variant="secondary" size="sm">
-                Sign out
-              </Button>
-            </form>
+            {email ? (
+              <>
+                <Link
+                  href="/profile/settings"
+                  className="hidden truncate text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline md:block"
+                >
+                  {email}
+                </Link>
+                <form action={signOut}>
+                  <Button type="submit" variant="secondary" size="sm">
+                    Sign out
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <ButtonLink href="/login" variant="secondary" size="sm">
+                Sign in
+              </ButtonLink>
+            )}
           </div>
         </div>
       </header>

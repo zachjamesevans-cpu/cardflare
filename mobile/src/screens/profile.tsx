@@ -21,6 +21,7 @@ import {
   describeError,
   dressAllShowcase,
   dressShowcase,
+  getFollowers,
   getFollowing,
   getGames,
   getProfile,
@@ -41,9 +42,8 @@ import {
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
-import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
-import { WornBadge, WornName, WornTitle } from "../worn-name";
+import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
 import { CoverBanner } from "../showcase-zoom";
 import {
   AsyncButton,
@@ -62,7 +62,9 @@ import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
 
 /** How far the cover reaches: past the name and the Embers badge. */
-const COVER_HEIGHT = 280;
+const COVER_HEIGHT = 144;
+/** How far the header sits down the card, so the picture straddles the cover's edge. */
+const HEADER_TOP = 60;
 
 /**
  * The Profile tab, which used to be Account.
@@ -117,8 +119,19 @@ export function ProfileScreen() {
   /* The card whose dressing room is open, or null. */
   const [dressing, setDressing] = useState<ShowcaseCard | null>(null);
 
-  /* Who you follow - fetched with the profile, shown as People. */
+  /* Who you follow and who follows you - fetched with the profile,
+     shown as People. */
   const [following, setFollowing] = useState<FollowedPlayer[]>([]);
+  const [followers, setFollowers] = useState<FollowedPlayer[]>([]);
+
+  /* Edit profile, Instagram's button: it opens the picture, cover and
+     GIF controls in place rather than a separate screen. */
+  const [editing, setEditing] = useState(false);
+
+  /* The followers and following numbers scroll to their lists. */
+  const scrollRef = useRef<ScrollView | null>(null);
+  const peopleY = useRef(0);
+  const followersY = useRef(0);
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -148,6 +161,9 @@ export function ProfileScreen() {
 
       getFollowing()
         .then((people) => setFollowing(people.following))
+        .catch(() => {});
+      getFollowers()
+        .then((people) => setFollowers(people.followers))
         .catch(() => {});
     } catch (caught) {
       /*
@@ -480,11 +496,15 @@ export function ProfileScreen() {
     .map(({ slug, name }) => ({ slug, name }));
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
+    >
       {/* Your own profile block, laid out exactly as View full profile
-          shows anyone else - same cover, same picture, same centered
-          name and badge, same shelf, with the edit controls added.
-          The founder's rule: what you see is what they see. */}
+          shows anyone else - same cover, same picture, same numbers,
+          same name and handle, same shelf, with Edit profile where
+          they see Follow. The founder's rule: what you see is what
+          they see. */}
       <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
         {/* The cover carries down behind the picture, the name and the
             badge, then fades into the card. No seam: the founder's
@@ -555,35 +575,45 @@ export function ProfileScreen() {
          * which is the founder's own rule for this screen: what you see
          * is what they see.
          */}
-        <View
-          style={{
-            alignItems: "center",
-            gap: spacing(2),
-          }}
-        >
-          <PlayerAvatar
-            displayName={profile.displayName}
-            seed={profile.playerId}
-            avatarUrl={profile.avatarUrl}
-            frame={profile.equipped.avatarFrame}
-            ring={profile.wear?.ring ?? null}
-            aura={profile.wear?.aura ?? null}
-            ringArt={profile.wear?.ringArt ?? null}
-            auraArt={profile.wear?.auraArt ?? null}
-            size={96}
+        <View style={{ marginTop: HEADER_TOP }}>
+          <ProfileHeader
+            avatar={
+              <PlayerAvatar
+                displayName={profile.displayName}
+                seed={profile.playerId}
+                avatarUrl={profile.avatarUrl}
+                frame={profile.equipped.avatarFrame}
+                ring={profile.wear?.ring ?? null}
+                aura={profile.wear?.aura ?? null}
+                ringArt={profile.wear?.ringArt ?? null}
+                auraArt={profile.wear?.auraArt ?? null}
+                size={88}
+              />
+            }
+            name={profile.displayName}
+            handle={profile.handle}
+            equips={profile.equips ?? {}}
+            embersEarned={profile.embersEarned}
+            stats={profile.stats}
+            onFollowers={() =>
+              scrollRef.current?.scrollTo({
+                y: peopleY.current + followersY.current,
+                animated: true,
+              })
+            }
+            onFollowing={() =>
+              scrollRef.current?.scrollTo({ y: peopleY.current, animated: true })
+            }
+            actions={
+              <>
+                <HeaderButton
+                  label={editing ? "Done" : "Edit profile"}
+                  onPress={() => setEditing((open) => !open)}
+                />
+                <ShareProfileButton playerId={profile.playerId} name={profile.displayName} />
+              </>
+            }
           />
-          {/* The name wearing its style, the badge beside it, the
-              title under - the website's WornNameRow, natively. */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-            <WornName
-              name={profile.displayName}
-              nameplate={profile.equips?.nameplate}
-              baseStyle={{ color: colors.textPrimary, fontSize: 22, fontWeight: "800" }}
-            />
-            <WornBadge badge={profile.equips?.badge} />
-          </View>
-          <WornTitle title={profile.equips?.title} />
-          <EmberBadge earned={profile.embersEarned} size="md" />
         </View>
 
         {/*
@@ -634,24 +664,26 @@ export function ProfileScreen() {
          * chunks. The button narrates each stage because a dozen small
          * requests on shop wifi takes a visible moment.
          */}
-        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label={busy === "avatar" ? (message ?? "Uploading…") : "Change picture"}
-              variant="secondary"
-              disabled={busy === "avatar" || busy === "cover"}
-              onPress={() => void changePicture("avatar")}
-            />
+        {(editing || busy === "avatar" || busy === "cover") && (
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                label={busy === "avatar" ? (message ?? "Uploading…") : "Change picture"}
+                variant="secondary"
+                disabled={busy === "avatar" || busy === "cover"}
+                onPress={() => void changePicture("avatar")}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label={busy === "cover" ? (message ?? "Uploading…") : "Change cover"}
+                variant="secondary"
+                disabled={busy === "avatar" || busy === "cover"}
+                onPress={() => void changePicture("cover")}
+              />
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label={busy === "cover" ? (message ?? "Uploading…") : "Change cover"}
-              variant="secondary"
-              disabled={busy === "avatar" || busy === "cover"}
-              onPress={() => void changePicture("cover")}
-            />
-          </View>
-        </View>
+        )}
 
         {/*
          * The GIF, on its own line and its own flow. It cannot share the
@@ -665,14 +697,26 @@ export function ProfileScreen() {
          * the paywall instead of walking them through picking a GIF
          * that then bounces — the wall goes at the door, not the till.
          */}
-        <Button
-          label={busy === "avatar" ? (message ?? "Uploading…") : "Use a GIF (Pro)"}
-          variant="secondary"
-          disabled={busy === "avatar" || busy === "cover"}
-          onPress={() =>
-            profile.pro ? void changeAnimatedPicture() : navigation.navigate("Pro")
-          }
-        />
+        {(editing || busy === "avatar" || busy === "cover") && (
+          <Button
+            label={busy === "avatar" ? (message ?? "Uploading…") : "Use a GIF (Pro)"}
+            variant="secondary"
+            disabled={busy === "avatar" || busy === "cover"}
+            onPress={() =>
+              profile.pro ? void changeAnimatedPicture() : navigation.navigate("Pro")
+            }
+          />
+        )}
+
+        {/* Name and handle live in Settings; Edit profile points there
+            too, the website's "Name and handle" card. */}
+        {editing && (
+          <Button
+            label="Name and handle"
+            variant="secondary"
+            onPress={() => navigation.navigate("Settings")}
+          />
+        )}
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the
@@ -853,57 +897,50 @@ export function ProfileScreen() {
         </View>
       </Card>
 
-      <Card>
-        <Title>People</Title>
-        <Body>
-          Players you follow. When they follow you back, you are Trade partners. Follow
-          people from their profile popup in a room, or find them in the search bar.
-        </Body>
+      {/* The two lists behind the two numbers, the website's Following
+          and Followers cards in one block. */}
+      <View
+        style={{ gap: spacing(4) }}
+        onLayout={(event) => {
+          peopleY.current = event.nativeEvent.layout.y;
+        }}
+      >
+        <Card>
+          <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
+            Following{" "}
+            <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
+              · {following.length}
+            </Text>
+          </Text>
+          <Body>Players you follow. When they follow you back, you are Trade partners.</Body>
+          <PeopleList
+            people={following}
+            empty="Nobody yet. The next time somebody impresses you at a table, tap their name."
+            onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+          />
+        </Card>
 
-        {following.length === 0 ? (
-          <Muted>
-            Nobody yet. The next time somebody impresses you at a table, tap their name.
-          </Muted>
-        ) : (
-          <View>
-            {following.map((person, index) => (
-              <Tap
-                key={person.playerId}
-                onPress={() =>
-                  navigation.navigate("PlayerProfile", { playerId: person.playerId })
-                }
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing(3),
-                  paddingVertical: spacing(2.5),
-                  borderTopWidth: index === 0 ? 0 : 1,
-                  borderTopColor: colors.border,
-                }}
-              >
-                <PlayerAvatar
-                  displayName={person.displayName}
-                  seed={person.playerId}
-                  avatarUrl={person.avatarUrl}
-                  frame={person.frame}
-                  size={32}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
-                >
-                  {person.displayName}
-                </Text>
-                {person.partners && (
-                  <Text style={{ color: colors.accent, fontSize: 12 }}>
-                    Trade partners
-                  </Text>
-                )}
-              </Tap>
-            ))}
-          </View>
-        )}
-      </Card>
+        <View
+          onLayout={(event) => {
+            followersY.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <Card>
+            <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
+              Followers{" "}
+              <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
+                · {followers.length}
+              </Text>
+            </Text>
+            <Body>Players who follow you.</Body>
+            <PeopleList
+              people={followers}
+              empty="Nobody yet. Share your profile."
+              onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+            />
+          </Card>
+        </View>
+      </View>
 
       {/*
        * The store lives on its own screen now, same as the website:
@@ -982,6 +1019,55 @@ export function ProfileScreen() {
         }}
       />
     </ScrollView>
+  );
+}
+
+/** A list of players, each a tap to their profile: the website's PeopleList. */
+function PeopleList({
+  people,
+  empty,
+  onOpen,
+}: {
+  people: FollowedPlayer[];
+  empty: string;
+  onOpen: (playerId: string) => void;
+}) {
+  if (people.length === 0) return <Muted>{empty}</Muted>;
+
+  return (
+    <View>
+      {people.map((person, index) => (
+        <Tap
+          key={person.playerId}
+          onPress={() => onOpen(person.playerId)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+            paddingVertical: spacing(2.5),
+            borderTopWidth: index === 0 ? 0 : 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <PlayerAvatar
+            displayName={person.displayName}
+            seed={person.playerId}
+            avatarUrl={person.avatarUrl}
+            frame={person.frame}
+            size={32}
+          />
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
+          >
+            {person.displayName}
+          </Text>
+          {person.partners && (
+            <Text style={{ color: colors.accent, fontSize: 12 }}>Trade partners</Text>
+          )}
+        </Tap>
+      ))}
+    </View>
   );
 }
 

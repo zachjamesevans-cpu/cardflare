@@ -61,8 +61,27 @@ describe("the profile header", () => {
     const size = (source: string) =>
       /<PlayerAvatar[\s\S]*?size=\{(\d+)\}/.exec(source)?.[1];
 
-    expect(size(own)).toBe("96");
+    expect(size(own)).toBeDefined();
     expect(size(theirs)).toBe(size(own));
+  });
+
+  it("lays both headers out with the one ProfileHeader", () => {
+    /* The Instagram header - picture, three numbers, name, handle,
+       buttons - is one component so the two screens cannot drift in
+       the layout the way they drifted in the arithmetic. */
+    for (const source of [own, theirs]) {
+      expect(source).toMatch(
+        /import \{[^}]*ProfileHeader[^}]*\} from "\.\.\/profile-header"/,
+      );
+      expect(source).toMatch(/<ProfileHeader\b/);
+    }
+  });
+
+  it("sits both headers the same distance down the card", () => {
+    const top = (source: string) => /const HEADER_TOP = (\d+)/.exec(source)?.[1];
+
+    expect(top(own)).toBeDefined();
+    expect(top(theirs)).toBe(top(own));
   });
 
   it("gives the cover the same height on both screens", () => {

@@ -21,6 +21,7 @@ import { buyCosmetic } from "@/lib/players/cosmetics";
 import { avatarWearFor, dressedEquipsFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { displayNameSchema } from "@/lib/players/profile-schema";
+import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
 
@@ -67,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
   const profile = await ownProfile(player.playerId);
   if (!profile) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const [wardrobe, worn, wearing, equips] = await Promise.all([
+  const [wardrobe, worn, wearing, equips, stats] = await Promise.all([
     wardrobeFor(
       player.playerId,
       { earned: profile.embersEarned, balance: profile.embersBalance },
@@ -76,6 +77,7 @@ export async function GET(request: Request): Promise<Response> {
     resolveEquipped(profile.equipped),
     avatarWearFor([player.playerId]),
     dressedEquipsFor(player.playerId),
+    profileStats(player.playerId),
   ]);
 
   const wear = wearing.get(player.playerId);
@@ -135,6 +137,7 @@ export async function GET(request: Request): Promise<Response> {
       equips,
       showcase: profile.showcase,
       showcaseLimit: SHOWCASE_LIMIT,
+      stats,
     },
     wardrobe,
     /* An account that never chose a username finishes that first - the

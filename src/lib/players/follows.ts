@@ -108,26 +108,43 @@ export interface FollowedPlayer {
 }
 
 /** Who this player follows, for their own People list. Newest first. */
-export async function listFollowing(playerId: string): Promise<FollowedPlayer[]> {
-  if (!isSupabaseConfigured()) return [];
+/**
+ * How many follow this player, and how many they follow.
+ *
+ * The two numbers under a picture on an Instagram profile, which is
+ * the shape the founder asked the profile to take.
+ */
+export async function followCounts(
+  playerId: string,
+): Promise<{ followers: number; following: number }> {
+  if (!isSupabaseConfigured()) return { followers: 0, following: 0 };
 
   const admin = getSupabaseAdmin();
+  const [followers, following] = await Promise.all([
+    admin
+      .from("player_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("followed_id", playerId),
+    admin
+      .from("player_follows")
+      .select("followed_id", { count: "exact", head: true })
+      .eq("follower_id", playerId),
+  ]);
 
-  const { data: edges, error } = await admin
-    .from("player_follows")
-    .select("followed_id, created_at")
-    .eq("follower_id", playerId)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  if (followers.error) console.error("Could not count followers", followers.error);
+  if (following.error) console.error("Could not count following", following.error);
 
-  if (error || !edges || edges.length === 0) {
-    if (error) console.error("Could not list follows", error);
-    return [];
-  }
+  return { followers: followers.count ?? 0, following: following.count ?? 0 };
+}
 
-  const ids = edges.map((edge) => edge.followed_id);
+/**
+ * The players behind a set of ids, dressed, with whether each one
+ * follows `playerId` back marked as `partners`.
+ */
+async function hydrate(playerId: string, ids: string[]): Promise<FollowedPlayer[]> {
+  const admin = getSupabaseAdmin();
 
-  const [{ data: rows }, { data: backEdges }, wear] = await Promise.all([
+  const [{ data: rows }, { data: mine }, { data: theirs }, wear] = await Promise.all([
     admin
       .from("players")
       .select(
@@ -136,13 +153,19 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
       .in("id", ids),
     admin
       .from("player_follows")
+      .select("followed_id")
+      .eq("follower_id", playerId)
+      .in("followed_id", ids),
+    admin
+      .from("player_follows")
       .select("follower_id")
       .eq("followed_id", playerId)
       .in("follower_id", ids),
     avatarWearFor(ids),
   ]);
 
-  const back = new Set((backEdges ?? []).map((edge) => edge.follower_id));
+  const iFollow = new Set((mine ?? []).map((edge) => edge.followed_id));
+  const followMe = new Set((theirs ?? []).map((edge) => edge.follower_id));
   const byId = new Map((rows ?? []).map((row) => [row.id, row]));
 
   return ids.flatMap((id) => {
@@ -158,8 +181,41 @@ export async function listFollowing(playerId: string): Promise<FollowedPlayer[]>
         aura: wear.get(row.id)?.aura ?? null,
         ringArt: wear.get(row.id)?.ringArt ?? null,
         auraArt: wear.get(row.id)?.auraArt ?? null,
-        partners: back.has(row.id),
+        partners: iFollow.has(row.id) && followMe.has(row.id),
       },
     ];
   });
+}
+
+async function edgeIds(
+  column: "follower_id" | "followed_id",
+  otherColumn: "follower_id" | "followed_id",
+  playerId: string,
+): Promise<string[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_follows")
+    .select(`${otherColumn}, created_at`)
+    .eq(column, playerId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    console.error("Could not list follows", error);
+    return [];
+  }
+  return (data ?? []).map((edge) => (edge as Record<string, string>)[otherColumn]);
+}
+
+/** Who this player follows, newest first. */
+export async function listFollowing(playerId: string): Promise<FollowedPlayer[]> {
+  if (!isSupabaseConfigured()) return [];
+  const ids = await edgeIds("follower_id", "followed_id", playerId);
+  return ids.length === 0 ? [] : hydrate(playerId, ids);
+}
+
+/** Who follows this player, newest first. */
+export async function listFollowers(playerId: string): Promise<FollowedPlayer[]> {
+  if (!isSupabaseConfigured()) return [];
+  const ids = await edgeIds("followed_id", "follower_id", playerId);
+  return ids.length === 0 ? [] : hydrate(playerId, ids);
 }
