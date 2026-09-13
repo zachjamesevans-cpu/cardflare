@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  type ScrollViewProps,
   StyleSheet,
   Text,
   TextInput,
@@ -107,6 +108,25 @@ export function Tap({
  * air between them. Small on purpose: the point is a hint that there is
  * more to the left and right, not a three-up gallery.
  */
+/**
+ * Hand touches to the cards immediately.
+ *
+ * iOS holds a touch back to decide whether it is the start of a scroll,
+ * and a tap that ends inside that window never reaches the card at all -
+ * which is exactly what happened: the dismiss did nothing until this was
+ * set. Safe to turn off, because whether a gesture was a drag is
+ * answered by the rail's own `onScrollBeginDrag`, not by whether the
+ * press got cancelled.
+ *
+ * Spread through a cast because `delaysContentTouches` is not in React
+ * Native 0.81's TypeScript surface for ScrollView. It is still read
+ * natively - RCTScrollView.m - and the behaviour changed the moment it
+ * was passed, so the prop is real and only the typing is missing.
+ */
+const IMMEDIATE_TOUCHES = {
+  delaysContentTouches: false,
+} as unknown as ScrollViewProps;
+
 const PEEK_WIDTH = 26;
 const PEEK_GAP = 8;
 
@@ -311,6 +331,22 @@ export function CardImage({
   /* A shelf of one is no shelf: no arrows, no counter, nothing new. */
   const shelf = siblings && siblings.length > 1 ? siblings : null;
   const [at, setAt] = useState(position);
+
+  /*
+   * Did this gesture scroll the rail?
+   *
+   * The founder wants both: "make it so that you can still tap anywhere
+   * to close that screen. even though ther's a swipe thing now." A tap
+   * on the card should dismiss, a drag on the same card should turn the
+   * page, and React Native does NOT cancel the press for us here -
+   * wrapping each card in a Pressable and trusting that closed the zoom
+   * on every swipe, measured on the simulator.
+   *
+   * So the RAIL says whether it moved. `onScrollBeginDrag` only fires
+   * when a finger actually drags it, so a press that arrives with this
+   * still false was a tap and nothing else.
+   */
+  const scrolled = useRef(false);
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
 
   /* Everything below reads these, so the panel draws whichever card the
@@ -458,7 +494,7 @@ export function CardImage({
                 },
               ]}
             >
-              <View style={{ alignSelf: "stretch" }}>
+              <Pressable style={{ alignSelf: "stretch" }} onPress={close}>
                 {/* Centred over the card they name. The founder: "center
                     the text. so, for example, fire first and op15-020
                     should be centered on that screen." Only these two -
@@ -561,7 +597,7 @@ export function CardImage({
                 {/* Keyed on the shelf position, so a half-typed note does
                     not ride along to the next card. */}
                 {offer ? <ZoomOfferForm key={shelf ? at : "own"} offer={offer} /> : null}
-              </View>
+              </Pressable>
               {/*
                 * The card, with its neighbours showing at the edges.
                 *
@@ -605,6 +641,17 @@ export function CardImage({
                   /* Snap to a CARD, not to a screen: the viewport is
                      wider than a card, because the neighbours live in
                      the margins either side of it. */
+                  {...IMMEDIATE_TOUCHES}
+                  onScrollBeginDrag={() => {
+                    scrolled.current = true;
+                  }}
+                  /* Cleared a beat after the gesture settles, so the
+                     press that ends a swipe still sees it. */
+                  onScrollEndDrag={() => {
+                    setTimeout(() => {
+                      scrolled.current = false;
+                    }, 80);
+                  }}
                   snapToInterval={page}
                   snapToAlignment="start"
                   decelerationRate="fast"
@@ -634,41 +681,55 @@ export function CardImage({
                       event.nativeEvent.contentOffset.x / page,
                     );
                     if (landed >= 0 && landed < shelf.length) setAt(landed);
+                    scrolled.current = false;
                   }}
                 >
                   {shelf.map((card, index) => (
-                    <RemoteImage
+                    /*
+                     * A tap on the card closes; a drag on it scrolls.
+                     * Both, from the same finger, because React Native
+                     * cancels a press the moment the ScrollView under it
+                     * claims the gesture - which is why the dismiss can
+                     * live INSIDE the rail without being the thing that
+                     * broke it when it was wrapped around the outside.
+                     */
+                    <Pressable
                       key={`${card.cardNumber}-${index}`}
-                      uri={card.imageUrl}
-                      contentFit="contain"
-                      style={{
-                        width: hero,
-                        height: Math.round((hero * 88) / 63),
-                        borderRadius: radius.control,
-                        backgroundColor: colors.canvas,
+                      onPress={() => {
+                        if (scrolled.current) return;
+                        close();
                       }}
-                    />
+                    >
+                      <RemoteImage
+                        uri={card.imageUrl}
+                        contentFit="contain"
+                        style={{
+                          width: hero,
+                          height: Math.round((hero * 88) / 63),
+                          borderRadius: radius.control,
+                          backgroundColor: colors.canvas,
+                        }}
+                      />
+                    </Pressable>
                   ))}
                 </ScrollView>
                 </View>
               ) : (
-                <RemoteImage
-                  uri={imageUrl}
-                  contentFit="contain"
-                  style={{
-                    width: hero,
-                    height: Math.round((hero * 88) / 63),
-                    borderRadius: radius.control,
-                    backgroundColor: colors.canvas,
-                  }}
-                />
+                <Pressable onPress={close}>
+                  <RemoteImage
+                    uri={imageUrl}
+                    contentFit="contain"
+                    style={{
+                      width: hero,
+                      height: Math.round((hero * 88) / 63),
+                      borderRadius: radius.control,
+                      backgroundColor: colors.canvas,
+                    }}
+                  />
+                </Pressable>
               )}
-              {/* Was "Tap anywhere to close", which stopped being true
-                  the moment the card became a rail you drag: a tap on
-                  the card is a tap on a scroll view, not a dismiss. The
-                  backdrop still closes, and so does this. */}
               <Tap onPress={close} hitSlop={8}>
-                <Text style={styles.muted}>Tap outside to close</Text>
+                <Text style={styles.muted}>Tap anywhere to close</Text>
               </Tap>
             </Animated.View>
             </KeyboardAvoidingView>

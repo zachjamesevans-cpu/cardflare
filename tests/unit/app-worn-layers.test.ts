@@ -177,8 +177,28 @@ describe("swiping a zoomed card", () => {
     expect(zoom).toMatch(/styles\.muted, \{ textAlign: "center" \}/);
   });
 
-  it("stops telling people to tap anywhere, now that a tap on the card scrolls", () => {
-    expect(zoom).not.toContain("Tap anywhere to close");
-    expect(zoom).toContain("Tap outside to close");
+  it("still closes on a tap anywhere, including on the card", () => {
+    /*
+     * The label went to "Tap outside" while the rail was the only thing
+     * a touch on the card could do, and the founder asked for the whole
+     * behaviour back: "make it so that you can still tap anywhere to
+     * close that screen. even though ther's a swipe thing now."
+     *
+     * A tap and a drag start identically, so the card cannot tell them
+     * apart on its own - and React Native does NOT cancel the press for
+     * us inside this rail; wrapping the cards in a Pressable and
+     * trusting that closed the zoom on every swipe. The RAIL answers it
+     * instead: `onScrollBeginDrag` only fires when a finger actually
+     * moved it, so a press arriving with that flag down was a tap.
+     *
+     * `delaysContentTouches` has to be off for the card to hear the tap
+     * at all - iOS holds a touch back to decide whether it is a scroll,
+     * and a quick tap ended inside that window and reached nothing.
+     */
+    expect(zoom).toContain("Tap anywhere to close");
+    expect(zoom).toContain("delaysContentTouches: false");
+    expect(zoom).toContain("{...IMMEDIATE_TOUCHES}");
+    expect(zoom).toMatch(/onScrollBeginDrag=\{\(\) => \{\s*scrolled\.current = true;/);
+    expect(zoom).toMatch(/if \(scrolled\.current\) return;\s*close\(\);/);
   });
 });
