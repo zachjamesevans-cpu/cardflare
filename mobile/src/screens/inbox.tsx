@@ -68,6 +68,10 @@ export function InboxScreen() {
       const playerId = item.url.slice("/p/".length);
       return () => openProfile(playerId);
     }
+    /* A nearby match lives on the Feed, where its card has the buttons. */
+    if (item.url === "/feed") {
+      return () => navigation.navigate("Tabs", { screen: "Feed" });
+    }
     return null;
   };
 

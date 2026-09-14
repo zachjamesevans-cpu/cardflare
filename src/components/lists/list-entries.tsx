@@ -1,3 +1,4 @@
+import { TradeLocallySwitch } from "@/components/nearby/trade-locally-switch";
 import Image from "next/image";
 import {
   ArrowLeftRight,
@@ -140,6 +141,13 @@ function Entry({
               />
             )}
           </div>
+
+          {/* Nearby matching's per-card switch, on the binder only. */}
+          {kind === "have" && (
+            <div className="mt-1 flex items-center gap-2">
+              <TradeLocallySwitch entryId={entry.id} on={entry.localTrade} />
+            </div>
+          )}
 
           <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
             <span>{entry.cardNumber}</span>

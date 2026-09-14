@@ -19,8 +19,11 @@ import {
   readLocalThread,
   sendLocalMessage,
   type LocalThreadMessage,
+  type MeetSuggestion,
 } from "../api";
 import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
+import { meetLine, suggestText } from "../meet";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Muted } from "../ui";
 
@@ -41,6 +44,7 @@ export function ThreadScreen() {
   const [messages, setMessages] = useState<LocalThreadMessage[] | null>(null);
   const [withName, setWithName] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
+  const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +95,7 @@ export function ThreadScreen() {
         setMessages(thread.messages);
         setWithName(thread.withName);
         setCardName(thread.cardName);
+        setMeet(thread.meet ?? null);
         setClosed(thread.closed);
         navigation.setOptions({ title: thread.withName ?? "Conversation" });
       } catch {
@@ -223,6 +228,39 @@ export function ThreadScreen() {
           <Muted>This conversation was ended. Ended conversations stay ended.</Muted>
         ) : (
           <>
+            {/* Somewhere public to meet, suggested rather than asked for:
+                a store, never an address. The website's chip. */}
+            {meet ? (
+              <View
+                style={{
+                  gap: spacing(2),
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+                >
+                  <Ionicons name="storefront-outline" size={16} color={colors.accent} />
+                  <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 13 }}>
+                    Meet somewhere public
+                  </Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                  {meetLine(meet)}
+                </Text>
+                <View style={{ alignSelf: "flex-start" }}>
+                  <Button
+                    label={`Suggest ${meet.storeName}`}
+                    variant="secondary"
+                    onPress={() => setDraft((current) => suggestText(current, meet))}
+                  />
+                </View>
+              </View>
+            ) : null}
             <View
               style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing(2) }}
             >

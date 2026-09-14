@@ -121,7 +121,8 @@ async function record(entry: {
     | "board-open"
     | "new-follower"
     | "room-flare"
-    | "message-received";
+    | "message-received"
+    | "nearby-match";
   title: string;
   body: string | null;
   url: string;
@@ -938,5 +939,48 @@ export async function notifyMessageReceived(
     if (id) await deliverByPush(recipientId, title, preview, path);
   } catch (error) {
     console.error("Could not announce the message", error);
+  }
+}
+
+/**
+ * "Tyler is looking for your OP17 Shanks", to the HOLDER only.
+ *
+ * Nearby matching's one notice. The wanter hears nothing until the
+ * holder answers, which keeps the room's oldest rule: a binder is never
+ * broadcast, and a holder chooses to be found. The dedupe key is the
+ * pair of rows, so one want and one card tell one person once however
+ * often either side re-saves.
+ */
+export async function notifyNearbyMatch(match: {
+  holderId: string;
+  /** "want:<id>" or "flare:<id>": the ask this answers. */
+  askKey: string;
+  haveEntryId: string;
+  /** The wanter, whose face leads the inbox row. */
+  wanterId: string;
+  wanterName: string;
+  cardName: string;
+  milesLabel: string;
+}): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const title = `${match.wanterName} is looking for your ${match.cardName}`;
+    const body = `${match.milesLabel}. Tap to say you have it.`;
+    const path = "/feed";
+
+    const id = await record({
+      playerId: match.holderId,
+      kind: "nearby-match",
+      title,
+      body,
+      url: path,
+      dedupeKey: `nearby:${match.askKey}:${match.haveEntryId}`,
+      actorId: match.wanterId,
+    });
+
+    if (id) await deliverByPush(match.holderId, title, body, path);
+  } catch (error) {
+    console.error("Could not notify the nearby match", error);
   }
 }

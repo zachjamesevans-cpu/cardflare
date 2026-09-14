@@ -21,7 +21,7 @@ import { Select, TextInput } from "@/components/ui/controls";
 import { Card } from "@/components/ui/card";
 import { addToListAction } from "@/lib/lists/actions";
 import { composerMode } from "@/lib/lists/composer-mode";
-import { saveWantAction } from "@/lib/players/account-actions";
+import { saveHaveAction, saveWantAction } from "@/lib/players/account-actions";
 import {
   LIST_IDLE,
   MAX_DECK_LABEL,
@@ -508,7 +508,11 @@ export function AddToListForm({
   const inline = composerMode() === "inline";
 
   const [state, formAction] = useActionState(
-    target === "list" ? saveWantAction : addToListAction,
+    target === "list"
+      ? kind === "have"
+        ? saveHaveAction
+        : saveWantAction
+      : addToListAction,
     LIST_IDLE,
   );
 
@@ -625,15 +629,21 @@ export function AddToListForm({
   /* One verb either way: it is the same act, and where it lands is
      derived from whether somebody is standing in a room. */
   const copy =
-    target === "list"
+    target === "list" && kind === "have"
       ? {
-          title: "What are you hunting?",
-          hint: LOCAL_ENABLED
-            ? "Goes up for people near you. Walk into a room and it posts there too."
-            : "No room needed. Your friends see it in the Feed.",
-          submit: "Post the Flare",
+          title: "Add a card you have",
+          hint: "Only you can see your Have list. Mark a card Trade locally and people nearby hunting it are told they can answer you, nothing more.",
+          submit: "Add to my list",
         }
-      : COPY[kind];
+      : target === "list"
+        ? {
+            title: "What are you hunting?",
+            hint: LOCAL_ENABLED
+              ? "Goes up for people near you. Walk into a room and it posts there too."
+              : "No room needed. Your friends see it in the Feed.",
+            submit: "Post the Flare",
+          }
+        : COPY[kind];
 
   /* Only a Flare on a live board points a direction or names terms. */
   const onBoard = kind === "flare" && target === "room";
@@ -647,7 +657,7 @@ export function AddToListForm({
         <p className="text-sm text-text-secondary">{copy.hint}</p>
       </div>
 
-      <Outcome state={state} saved={target === "list"} />
+      <Outcome state={state} saved={target === "list" && kind !== "have"} />
 
       {inline ? (
         /*

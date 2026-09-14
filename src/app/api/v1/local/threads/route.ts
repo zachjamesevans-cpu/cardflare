@@ -4,7 +4,7 @@ import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { MESSAGE_MAX_LENGTH } from "@/lib/local/shared";
-import { listThreads, openFlareThread } from "@/lib/local/threads";
+import { listThreads, openFlareThread, openWantThread } from "@/lib/local/threads";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +19,17 @@ export async function GET(request: Request): Promise<Response> {
   );
 }
 
-const openSchema = z.object({
-  flareId: z.string().uuid(),
-  body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
-});
+/* One of the two anchors: a posted Flare, or a saved want a nearby
+   match pointed at. */
+const openSchema = z
+  .object({
+    flareId: z.string().uuid().optional(),
+    wantId: z.string().uuid().optional(),
+    body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
+  })
+  .refine((value) => Boolean(value.flareId) !== Boolean(value.wantId), {
+    message: "one of flareId or wantId",
+  });
 
 /**
  * "I have this": opens the thread for a Flare and sends the first
@@ -40,13 +47,13 @@ export async function POST(request: Request): Promise<Response> {
   if (limited) return limited;
 
   const parsed = openSchema.safeParse(await readJsonPayload(request));
-  if (!parsed.success) return badRequest("flareId and a message are needed");
+  if (!parsed.success) {
+    return badRequest("flareId or wantId, and a message, are needed");
+  }
 
-  const outcome = await openFlareThread(
-    parsed.data.flareId,
-    player.playerId,
-    parsed.data.body,
-  );
+  const outcome = parsed.data.flareId
+    ? await openFlareThread(parsed.data.flareId, player.playerId, parsed.data.body)
+    : await openWantThread(parsed.data.wantId!, player.playerId, parsed.data.body);
 
   if (!outcome.ok) {
     /* The reasons a client can do something about, in words it can show. */

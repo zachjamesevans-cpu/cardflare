@@ -14,6 +14,7 @@ import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
+import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { cardImagesEnabled } from "@/lib/cards/images";
@@ -501,6 +502,44 @@ export function Item({ item }: { item: FeedItem }) {
             </Link>
           </div>
         ))}
+      </Card>
+    );
+  }
+
+  if (item.kind === "nearbyMatch") {
+    return (
+      <Card className="flex flex-col gap-3 border-accent/40 bg-gradient-to-b from-accent/5 to-transparent p-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-[11px] font-bold tracking-[0.16em] text-accent uppercase">
+            You can answer a Flare
+          </p>
+          <p className="text-xs text-text-muted">
+            Only you see this. They hear from you when you answer.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {item.matches.slice(0, 5).map((match) => (
+            <MatchRow
+              key={`${match.ask.kind}-${match.ask.id}`}
+              match={match}
+              tile={
+                <FeedTile
+                  imageUrl={match.card.imageUrl}
+                  name={match.card.cardName}
+                  cardNumber={match.card.cardNumber}
+                  match={match.card.match}
+                />
+              }
+            />
+          ))}
+        </div>
+
+        {item.matches.length > 5 && (
+          <p className="text-xs text-text-muted">
+            +{item.matches.length - 5} more nearby
+          </p>
+        )}
       </Card>
     );
   }

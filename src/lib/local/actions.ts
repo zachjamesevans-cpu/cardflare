@@ -9,9 +9,10 @@ import { isLocalRadius } from "./shared";
 import {
   closeThread,
   openFlareThread,
+  openWantThread,
   readThread,
   sendThreadMessage,
-  type ThreadMessage,
+  type ThreadRead,
 } from "./threads";
 import { LIMITS } from "@/lib/api/throttle";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -65,6 +66,21 @@ export async function openThreadAction(
   flareId: string,
   body: string,
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
+  return openAnyThread({ flareId }, body);
+}
+
+/** "I have this" on a nearby match: the thread opens on the saved want. */
+export async function openWantThreadAction(
+  wantId: string,
+  body: string,
+): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
+  return openAnyThread({ wantId }, body);
+}
+
+async function openAnyThread(
+  on: { flareId: string } | { wantId: string },
+  body: string,
+): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
   if (
@@ -77,7 +93,10 @@ export async function openThreadAction(
     return { ok: false, message: TOO_MANY };
   }
 
-  const outcome = await openFlareThread(flareId, playerId, body);
+  const outcome =
+    "flareId" in on
+      ? await openFlareThread(on.flareId, playerId, body)
+      : await openWantThread(on.wantId, playerId, body);
   if (outcome.ok) return outcome;
 
   const message =
@@ -123,19 +142,20 @@ export async function closeThreadAction(threadId: string): Promise<LocalActionRe
   return outcome.ok ? { ok: true } : { ok: false, message: GENERIC };
 }
 
-export interface ThreadReadResult {
-  ok: boolean;
-  closed: boolean;
-  cardName: string | null;
-  withName: string | null;
-  messages: ThreadMessage[];
-}
+export type ThreadReadResult = ThreadRead;
 
 /** One conversation, read fresh — reading is what marks it read. */
 export async function readThreadAction(threadId: string): Promise<ThreadReadResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) {
-    return { ok: false, closed: false, cardName: null, withName: null, messages: [] };
+    return {
+      ok: false,
+      closed: false,
+      cardName: null,
+      withName: null,
+      messages: [],
+      meet: null,
+    };
   }
 
   return readThread(threadId, playerId);

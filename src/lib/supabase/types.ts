@@ -613,17 +613,20 @@ export type PlayerCardRow = {
   note: string | null;
   /** When the player last confirmed they still have this. */
   confirmed_at: string;
+  /** The owner will trade this one with people nearby. */
+  local_trade: boolean;
 };
 
 export type PlayerCardInsert = Omit<
   PlayerCardRow,
-  "id" | "created_at" | "updated_at" | "quantity" | "confirmed_at"
+  "id" | "created_at" | "updated_at" | "quantity" | "confirmed_at" | "local_trade"
 > & {
   id?: string;
   created_at?: string;
   updated_at?: string;
   quantity?: number;
   confirmed_at?: string;
+  local_trade?: boolean;
 };
 
 export type PlayerSessionRow = {
@@ -731,6 +734,8 @@ export type PlayerRow = {
    * repeats the list in src/lib/local/shared.ts.
    */
   local_radius_miles: number;
+  /** Nearby matching opt-in: Flares against cards nearby, both directions. */
+  nearby_matching: boolean;
 };
 
 /**
@@ -743,7 +748,10 @@ export type PlayerRow = {
 export type FlareThreadRow = {
   id: string;
   created_at: string;
-  flare_id: string;
+  /** The posted Flare this is about, or null for a thread on a saved want. */
+  flare_id: string | null;
+  /** The saved want a nearby match opened this on. Exactly one of the two. */
+  want_id: string | null;
   author_player_id: string;
   responder_player_id: string;
   last_message_at: string;
@@ -753,10 +761,18 @@ export type FlareThreadRow = {
 
 export type FlareThreadInsert = Omit<
   FlareThreadRow,
-  "id" | "created_at" | "last_message_at" | "closed_at" | "closed_by"
+  | "id"
+  | "created_at"
+  | "last_message_at"
+  | "closed_at"
+  | "closed_by"
+  | "flare_id"
+  | "want_id"
 > & {
   id?: string;
   created_at?: string;
+  flare_id?: string | null;
+  want_id?: string | null;
   last_message_at?: string;
   closed_at?: string | null;
   closed_by?: string | null;
@@ -800,6 +816,7 @@ export type PlayerInsert = Omit<
   | "onboarded_at"
   | "postal_code"
   | "local_radius_miles"
+  | "nearby_matching"
 > & {
   id?: string;
   created_at?: string;
@@ -814,6 +831,7 @@ export type PlayerInsert = Omit<
   equipped_avatar_frame?: string | null;
   postal_code?: string | null;
   local_radius_miles?: number;
+  nearby_matching?: boolean;
   cosmetics_unlocked?: boolean;
   cosmetics_unlocked_draft?: boolean;
   onboarded_at?: string | null;
@@ -1314,7 +1332,8 @@ export type NotificationRow = {
     | "board-open"
     | "new-follower"
     | "room-flare"
-    | "message-received";
+    | "message-received"
+    | "nearby-match";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */

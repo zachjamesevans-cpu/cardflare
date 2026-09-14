@@ -32,7 +32,11 @@ export const dynamic = "force-dynamic";
  * prompt is worse than five typed digits on every axis that matters —
  * and the app's is the device, per request. Same feed either way.
  */
-export default async function LocalPage() {
+export default async function LocalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ thread?: string }>;
+}) {
   const viewer = await getViewer();
   const playerId =
     viewer.kind === "player"
@@ -87,7 +91,12 @@ export default async function LocalPage() {
         )}
       </div>
 
-      <LocalScreen feed={feed} threads={threads} postalCode={postalCode} />
+      <LocalScreen
+        feed={feed}
+        threads={threads}
+        postalCode={postalCode}
+        initialThreadId={(await searchParams).thread ?? null}
+      />
     </Shell>
   );
 }

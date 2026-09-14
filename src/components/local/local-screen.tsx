@@ -2,7 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Check, ChevronLeft, Loader2, MapPin, MessageCircle, Send } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Send,
+  Store,
+} from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
@@ -24,7 +32,8 @@ import {
   agoLabel,
   milesLabel,
 } from "@/lib/local/shared";
-import type { ThreadMessage, ThreadSummary } from "@/lib/local/threads";
+import type { MeetSuggestion, ThreadMessage, ThreadSummary } from "@/lib/local/threads";
+import { meetLine, suggestText } from "@/lib/nearby/meet";
 import { cn } from "@/lib/cn";
 
 /** One bit in the browser: "they chose device location here before". */
@@ -50,13 +59,18 @@ export function LocalScreen({
   feed: serverFeed,
   threads,
   postalCode,
+  initialThreadId = null,
 }: {
   /** Null with Local switched off: then this is the Messages list only. */
   feed: LocalFeed | null;
   threads: ThreadSummary[];
   postalCode: string | null;
+  /** A thread to open straight away: the Feed's "I have this" lands here. */
+  initialThreadId?: string | null;
 }) {
-  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const [openThreadId, setOpenThreadId] = useState<string | null>(
+    initialThreadId ?? null,
+  );
 
   /*
    * The browser-location override. The server rendered the ZIP's view;
@@ -528,6 +542,7 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
   const [withName, setWithName] = useState<string | null>(null);
+  const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -543,6 +558,7 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
       setMessages(thread.messages);
       setCardName(thread.cardName);
       setWithName(thread.withName);
+      setMeet(thread.meet);
       setClosed(thread.closed);
     });
     /* onBack is stable enough for a mount effect; re-running on its
@@ -636,6 +652,27 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
         </p>
       ) : (
         <div className="flex flex-col gap-2">
+          {/* Somewhere public to meet, suggested rather than asked for.
+              A store, never an address: the mission is the trade at a
+              counter or an event, and this is the nudge towards it. */}
+          {meet && (
+            <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3">
+              <p className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+                <Store className="size-4 text-accent" aria-hidden="true" />
+                Meet somewhere public
+              </p>
+              <p className="text-xs text-text-secondary">{meetLine(meet)}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="self-start"
+                onClick={() => setDraft((current) => suggestText(current, meet))}
+              >
+                Suggest {meet.storeName}
+              </Button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <Textarea
               rows={2}
