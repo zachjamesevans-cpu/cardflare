@@ -9,6 +9,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { addFlare, cancelFlare } from "@/lib/lists/repository";
 import { announceShowcase } from "@/lib/lists/showcase";
+import { keepShowcaseAsHave } from "@/lib/nearby/showcase";
 import { acceptsSchema, addEntrySchema } from "@/lib/lists/schema";
 import { saveWant } from "@/lib/players/wants";
 import { afterResponse } from "@/lib/after-response";
@@ -101,6 +102,17 @@ export async function POST(
       { eventId: resolved.room.id, playerSessionId: session.id },
       parsed.data,
       session.display_name ?? "A player",
+    );
+    /* And onto the Have list, marked for nearby matching: a showcase
+       is "I have this" said out loud. See nearby/showcase.ts. */
+    void keepShowcaseAsHave(
+      { playerSessionId: session.id, playerId: session.player_id ?? null },
+      {
+        cardId: parsed.data.cardId,
+        printingId: parsed.data.printingId ?? null,
+        quantity: parsed.data.quantity,
+        note: parsed.data.note ?? null,
+      },
     );
   }
 
