@@ -349,6 +349,48 @@ export function describeError(caught: unknown): string {
   return caught instanceof Error ? caught.message : "unknown";
 }
 
+/**
+ * When the access token runs out, read off the token itself.
+ *
+ * A Supabase access token is a JWT, and its `exp` claim is public: no
+ * secret is needed to read when it stops working. Null for anything
+ * that does not parse, which is treated as "cannot tell" rather than
+ * "expired", so a token this code cannot read is still sent.
+ */
+function tokenExpiry(token: string): number | null {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The access token, refreshed FIRST when it is about to run out.
+ *
+ * The founder's report: "when I join a room and I'm signed in, this
+ * sign up screen still appears. It goes away after a few seconds."
+ * The room endpoint does not require an account, so a stale token
+ * there is not a 401 - the server quietly answers "no account" and
+ * the guest pitch renders. Only a later call that does require one
+ * came back 401, refreshed the token, and the next poll fixed the
+ * screen. Refreshing a minute ahead of expiry means the first call
+ * after a night away already carries a token the server accepts.
+ */
+async function freshAccessToken(): Promise<string | null> {
+  const access = await storedAccessToken();
+  if (!access) return null;
+  const expiresAt = tokenExpiry(access);
+  if (expiresAt !== null && expiresAt - Date.now() < 60_000) {
+    if (await refreshAccessToken()) return storedAccessToken();
+  }
+  return access;
+}
+
 async function call<T>(
   method: string,
   path: string,
@@ -358,7 +400,7 @@ async function call<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
 
-  const access = await storedAccessToken();
+  const access = await freshAccessToken();
   if (access) {
     headers.authorization = `Bearer ${access}`;
     /*

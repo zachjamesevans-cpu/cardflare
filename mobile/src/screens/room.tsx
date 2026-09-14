@@ -231,6 +231,31 @@ function RoomScreen({
      screen dies at exactly the moment a room comes up. */
   const [peek, setPeek] = useState<string | null>(null);
 
+  /*
+   * Whether this phone holds an account, known before the room answers.
+   *
+   * The guest pitch used to key off the server's `account` alone, and a
+   * stale token got a room back with no account in it - so a signed-in
+   * player saw "You're in as a guest" for a poll or two. The keychain
+   * is the faster witness: with a token on the phone the pitch is never
+   * the right thing to show, whatever one response said.
+   */
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    storedAccessToken()
+      .then((token) => {
+        if (live) setSignedIn(Boolean(token));
+      })
+      .catch(() => {
+        if (live) setSignedIn(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const guest = signedIn === false && !state?.account;
+
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -384,7 +409,7 @@ function RoomScreen({
           />
         </Card>
 
-        {!state.account && <AccountPitch variant="join" />}
+        {guest && <AccountPitch variant="join" />}
 
         {/* Nothing at the counter — but a board may already be taking
             Flares, which is exactly what someone checking from home wants. */}
@@ -505,7 +530,7 @@ function RoomScreen({
           )}
         </Card>
 
-        {!state.account && (room.status === "open" || room.early) && (
+        {guest && (room.status === "open" || room.early) && (
           <AccountPitch variant="join" />
         )}
       </ScrollView>
@@ -630,7 +655,7 @@ function RoomScreen({
         />
 
         {/* The pitch, to guests only, right under the door. */}
-        {!state.account && <AccountPitch variant="room" />}
+        {guest && <AccountPitch variant="room" />}
 
         {/* The wall's clocks, for a seat that cannot see the wall — or
             somebody who stepped out with the room in their pocket. */}
