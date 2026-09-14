@@ -22,6 +22,7 @@ import {
   ApiError,
   getTrades,
   type TradeRecord,
+  acknowledgeTrade,
   confirmTrade,
   dropWant,
   forgetRoom,
@@ -1175,41 +1176,94 @@ function RoomScreen({
               traded what.
             </Body>
             <View>
-              {trades.map((trade) => (
-                <View
-                  key={trade.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: spacing(1.5),
-                    borderTopWidth: 1,
-                    borderTopColor: colors.border,
-                    paddingVertical: spacing(2),
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="check-circle-outline"
-                    size={15}
-                    color={colors.accent}
-                  />
-                  <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-                    {trade.cardName}
-                  </Text>
-                  {trade.quantity > 1 && (
-                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                      {`×${trade.quantity}`}
+              {trades.map((trade) =>
+                trade.awaitingYou ? (
+                  /* The second hand: the partner is asked, and their Yes
+                     is what pays both sides. The website's row, natively. */
+                  <View
+                    key={trade.id}
+                    style={{
+                      gap: spacing(2),
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      paddingVertical: spacing(2.5),
+                    }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontSize: 15 }}>
+                      <Text style={{ fontWeight: "700" }}>
+                        {trade.partnerName ?? "A player"}
+                      </Text>
+                      {" says you traded "}
+                      <Text style={{ fontWeight: "700" }}>{trade.cardName}</Text>
+                      {trade.quantity > 1 ? ` ×${trade.quantity}` : ""}
+                      {". Did you?"}
                     </Text>
-                  )}
-                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                    {trade.youWere === "requester"
-                      ? trade.partnerName
-                        ? `from ${trade.partnerName}`
-                        : "found in the room"
-                      : `to ${trade.partnerName ?? "a player"}`}
-                  </Text>
-                </View>
-              ))}
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+                    >
+                      <Button
+                        label="Yes, we traded"
+                        onPress={() =>
+                          void act(() =>
+                            acknowledgeTrade(
+                              code,
+                              trade.id,
+                              trade.flareId,
+                              trade.requesterSessionId,
+                            ),
+                          )
+                        }
+                      />
+                      <Muted>Your tap pays you both Embers.</Muted>
+                    </View>
+                  </View>
+                ) : (
+                  <View
+                    key={trade.id}
+                    style={{
+                      gap: 2,
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      paddingVertical: spacing(2),
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: spacing(1.5),
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check-circle-outline"
+                        size={15}
+                        color={colors.accent}
+                      />
+                      <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                        {trade.cardName}
+                      </Text>
+                      {trade.quantity > 1 && (
+                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                          {`×${trade.quantity}`}
+                        </Text>
+                      )}
+                      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                        {trade.youWere === "requester"
+                          ? trade.partnerName
+                            ? `from ${trade.partnerName}`
+                            : "found in the room"
+                          : `to ${trade.partnerName ?? "a player"}`}
+                      </Text>
+                    </View>
+                    {tradeStatusLine(trade) ? (
+                      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                        {tradeStatusLine(trade)}
+                      </Text>
+                    ) : null}
+                  </View>
+                ),
+              )}
             </View>
           </Card>
         )}
@@ -2298,4 +2352,24 @@ function JoiningAs({ name }: { name: string }) {
       </Text>
     </View>
   );
+}
+
+/** What a settled trade says under itself about its Embers, or nothing. */
+function tradeStatusLine(trade: TradeRecord): string | null {
+  switch (trade.status) {
+    case "pending":
+      return trade.youWere === "requester"
+        ? `Waiting for ${trade.partnerName ?? "them"} to confirm`
+        : null;
+    case "late":
+      return trade.youWere === "requester"
+        ? `${trade.partnerName ?? "They"} never confirmed, so it paid the unconfirmed rate`
+        : "Not confirmed in time, so it paid nothing";
+    case "disputed":
+      return "Reversed. Its Embers were taken back.";
+    case "unnamed":
+      return "Nobody named, so it earned nothing";
+    default:
+      return null;
+  }
 }

@@ -116,7 +116,7 @@ export async function searchPlayers(query: string): Promise<AdminPlayer[]> {
     handle: row.handle ?? "",
     tier: row.tier,
     avatarUrl: avatarSrc(row.avatar_url),
-    embersEarned: row.embers_earned,
+    embersEarned: row.embers_badge ?? row.embers_earned,
     embersBalance: row.embers_balance,
     cosmeticsUnlocked: row.cosmetics_unlocked,
     cosmeticsUnlockedDraft: row.cosmetics_unlocked_draft ?? false,

@@ -662,7 +662,11 @@ export default async function JoinByCodePage({
            * collection still power the "You have this" badges on the
            * board above — silently, which is all they were ever good for.
            */}
-          <TradedTonight trades={myTrades} timeZone={event.storeTimeZone} />
+          <TradedTonight
+            trades={myTrades}
+            timeZone={event.storeTimeZone}
+            code={normalized}
+          />
 
           {/*
            * Who is here, parked at the foot of the page — the founder's

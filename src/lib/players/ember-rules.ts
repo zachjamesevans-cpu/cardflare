@@ -6,60 +6,122 @@
  * lives in `embers.ts`; this file only answers "how much".
  *
  * The founder's rule, unchanged: only a CONFIRMED trade earns anything.
- * Posting a Flare earns nothing, pledging earns nothing, turning up
- * earns nothing. The one act the whole product exists to cause is the
- * only one that pays.
+ * Posting a Flare earns nothing, pledging earns nothing. The one act
+ * the whole product exists to cause is the one that pays.
+ *
+ * The second round, the founder's "fix all holes": a trade pays when
+ * BOTH hands are on it, the amount tapers per pair, per room and per
+ * week, a young account earns at half rate, and a trade nobody was
+ * named on pays nothing at all. Every curve here is a guard against a
+ * specific way two friends could tap the badge into meaninglessness,
+ * and every one of them leaves a real Friday night untouched.
  */
 
-/**
- * A trade with somebody you have not traded with before.
- *
- * The big one, because meeting a new person is the thing cardflare is
- * actually for. Ten is chosen against the catalogue rather than in the
- * abstract: the cheapest paid cosmetic is 150, so a new player has
- * something to aim at after a handful of nights rather than after one.
- */
-export const EMBERS_NEW_PARTNER = 10;
+/** A season: how long a pair's history counts against them. */
+export const SEASON_DAYS = 90;
 
 /**
- * A trade with somebody you have already traded with.
- *
- * WORTH SAYING PLAINLY: this taper is a proposal, not something the
- * founder asked for. Without it two friends can sit at a table and tap
- * confirm at each other until the badge means nothing, and the badge is
- * the entire point of `embers_earned`. Two rather than zero because
- * regulars trading with regulars is a real night at a store, not an
- * exploit, and it should still count for something.
- *
- * Set this to EMBERS_NEW_PARTNER to turn the taper off.
+ * The pair ladder: what the first, second and third paid trade with
+ * the same person earn inside a season. After that, nothing until the
+ * season rolls over. Ten first because meeting somebody new is the
+ * thing cardflare is for; the cheapest paid cosmetic is 150, so a new
+ * player has something to aim at after a handful of nights.
  */
-export const EMBERS_REPEAT_PARTNER = 2;
+export const PAIR_LADDER = [10, 4, 2] as const;
+export const EMBERS_NEW_PARTNER = PAIR_LADDER[0];
+
+/** Per room: this many paid trades at full rate, this many at half, then zero. */
+export const ROOM_FULL_TRADES = 5;
+export const ROOM_HALF_TRADES = 5;
+
+/** Per week: a soft ceiling. Past it a trade still counts, and pays this. */
+export const WEEKLY_CEILING = 60;
+export const EMBERS_PAST_CEILING = 1;
+
+/** An account this young earns at half rate; two of them together earn this. */
+export const NEW_ACCOUNT_DAYS = 14;
+export const EMBERS_BOTH_NEW = 1;
+
+/** A trade nobody was named on: on the store's tally, off the badge. */
+export const EMBERS_UNNAMED_PARTNER = 0;
 
 /**
- * A trade recorded with no partner named.
- *
- * The board allows this: you traded with someone who never tapped
- * "offer", and it is still a tally mark. It pays less than a named trade
- * because nothing corroborates it — there is no second person whose
- * account also moved, so it is the one shape a player can write alone.
+ * The partner never answered. After the window the trade still pays
+ * the author, at the corroborated-by-nobody rate, and the partner
+ * nothing. One tap from them turns this into the full amount.
  */
-export const EMBERS_UNNAMED_PARTNER = 3;
+export const ACKNOWLEDGE_WINDOW_HOURS = 24;
+export const EMBERS_LATE_ACKNOWLEDGE = 3;
 
-/**
- * How much a confirmed trade pays one side of it.
- *
- * `partnerKnown` is false when nobody was named on the confirm. In that
- * case there is only one side to pay and no history to consult.
- */
-export function embersForTrade({
-  partnerKnown,
-  tradedBefore,
-}: {
+/** Turning up at a store you have saved: once per store per day, capped per week. */
+export const EMBERS_ATTENDANCE = 1;
+export const ATTENDANCE_WEEKLY_CAP = 3;
+
+export interface TradeAwardInput {
+  /** Somebody was named and raised a hand. False pays nothing. */
   partnerKnown: boolean;
-  tradedBefore: boolean;
-}): number {
-  if (!partnerKnown) return EMBERS_UNNAMED_PARTNER;
-  return tradedBefore ? EMBERS_REPEAT_PARTNER : EMBERS_NEW_PARTNER;
+  /** Paid trades between these two people this season, before this one. */
+  pairTradesThisSeason: number;
+  /** This player's paid trades in this room, before this one. */
+  roomPaidTrades: number;
+  /** Embers this player earned from trades in the last seven days. */
+  weekEarned: number;
+  /** How old this player's account is, in days. */
+  accountAgeDays: number;
+  /** How old the partner's account is, in days. */
+  partnerAgeDays: number;
+}
+
+/**
+ * How much a confirmed, acknowledged trade pays ONE side of it.
+ *
+ * The curves stack in a fixed order: the pair ladder sets the base,
+ * the room taper scales it, account age scales it again, and the
+ * weekly ceiling caps whatever is left. A base of zero is zero
+ * whatever else is true; a positive base never rounds below one.
+ */
+export function embersForTrade(input: TradeAwardInput): number {
+  if (!input.partnerKnown) return EMBERS_UNNAMED_PARTNER;
+
+  const base: number = PAIR_LADDER[input.pairTradesThisSeason] ?? 0;
+  if (base === 0) return 0;
+
+  const roomFactor =
+    input.roomPaidTrades < ROOM_FULL_TRADES
+      ? 1
+      : input.roomPaidTrades < ROOM_FULL_TRADES + ROOM_HALF_TRADES
+        ? 0.5
+        : 0;
+  if (roomFactor === 0) return 0;
+
+  const youngYou = input.accountAgeDays < NEW_ACCOUNT_DAYS;
+  const youngThem = input.partnerAgeDays < NEW_ACCOUNT_DAYS;
+  if (youngYou && youngThem) return EMBERS_BOTH_NEW;
+  const ageFactor = youngYou ? 0.5 : 1;
+
+  const amount = Math.max(1, Math.floor(base * roomFactor * ageFactor));
+
+  return input.weekEarned >= WEEKLY_CEILING
+    ? Math.min(amount, EMBERS_PAST_CEILING)
+    : amount;
+}
+
+/** What the author gets when the partner never answered inside the window. */
+export function embersForLateTrade(weekEarned: number): number {
+  return weekEarned >= WEEKLY_CEILING
+    ? Math.min(EMBERS_LATE_ACKNOWLEDGE, EMBERS_PAST_CEILING)
+    : EMBERS_LATE_ACKNOWLEDGE;
+}
+
+/** Whether a join at a saved store pays today, given this week's count. */
+export function attendancePays(attendedThisWeek: number): boolean {
+  return attendedThisWeek < ATTENDANCE_WEEKLY_CAP;
+}
+
+/** Days between two instants, floored, never negative. */
+export function ageInDays(createdAt: string, now: number = Date.now()): number {
+  const ms = now - Date.parse(createdAt);
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms / (24 * 60 * 60 * 1000)) : 0;
 }
 
 /**
@@ -72,6 +134,16 @@ export function embersForTrade({
  */
 export function tradeAwardRef(tradeId: string, playerId: string): string {
   return `trade:${tradeId}:${playerId}`;
+}
+
+/** The key that takes a trade's award back: one reversal per award. */
+export function tradeReversalRef(tradeId: string, playerId: string): string {
+  return `reversal:trade:${tradeId}:${playerId}`;
+}
+
+/** The key for one day's attendance at one store. */
+export function attendanceRef(playerId: string, storeId: string, day: string): string {
+  return `attend:${playerId}:${storeId}:${day}`;
 }
 
 /** The idempotency key for buying one cosmetic once. */

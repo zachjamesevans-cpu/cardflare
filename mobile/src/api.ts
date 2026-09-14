@@ -873,7 +873,31 @@ export interface TradeRecord {
   youWere: "requester" | "holder";
   partnerName: string | null;
   confirmedAt: string;
+  /**
+   * Where the Embers stand: waiting on the partner, both hands on it,
+   * nobody named, paid late to the author alone, or taken back.
+   * Optional so an older server still lists trades.
+   */
+  status?: "pending" | "confirmed" | "unnamed" | "late" | "disputed";
+  /** True while the viewer's own tap is what the trade waits for. */
+  awaitingYou?: boolean;
+  flareId?: string | null;
+  requesterSessionId?: string | null;
 }
+
+/** The partner's "yes, we traded": the tap that pays both sides. */
+export const acknowledgeTrade = (
+  code: string,
+  tradeId: string,
+  flareId?: string | null,
+  requesterSessionId?: string | null,
+) =>
+  call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/trades`, {
+    action: "acknowledge",
+    tradeId,
+    flareId: flareId ?? undefined,
+    requesterSessionId: requesterSessionId ?? undefined,
+  });
 
 export const getTrades = (code: string) =>
   call<{ trades: TradeRecord[] }>(

@@ -1,3 +1,4 @@
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
@@ -47,6 +48,15 @@ export async function POST(
 ): Promise<Response> {
   const found = await membership(request, (await params).code);
   if (!found) return unauthorized();
+
+  /* Per room identity: a hand raised thirty times in an hour is not a
+     night at a store. */
+  const limited = tooMany(
+    `offer-session:${found.session.id}`,
+    LIMITS.offer.limit,
+    LIMITS.offer.windowMs,
+  );
+  if (limited) return limited;
 
   const parsed = offerSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");

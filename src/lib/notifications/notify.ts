@@ -857,8 +857,10 @@ export async function notifyTradeConfirmed(
     ]);
     if (!recipient) return;
 
-    const title = `Trade confirmed: ${context.cardName}`;
-    const body = `${confirmerName} marked your trade done. Good trade.`;
+    /* The second hand: the partner is asked, not told. Their tap in the
+       room is what pays both sides. */
+    const title = `${confirmerName} says you traded ${context.cardName}. Did you?`;
+    const body = "Tap Yes in the room and you both earn Embers.";
     const path = `/e/${context.code}`;
 
     const id = await record({
@@ -982,5 +984,47 @@ export async function notifyNearbyMatch(match: {
     if (id) await deliverByPush(match.holderId, title, body, path);
   } catch (error) {
     console.error("Could not notify the nearby match", error);
+  }
+}
+
+/**
+ * The partner said yes: the author hears the trade is confirmed. Both
+ * sides are paid by then, so this can say so.
+ */
+export async function notifyTradeAcknowledged(
+  flareId: string,
+  requesterSessionId: string,
+  partnerName: string,
+  partnerSessionId: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const context = await flareContext(flareId);
+    if (!context) return;
+
+    const [recipient, actorId] = await Promise.all([
+      notifiablePlayerForSession(requesterSessionId),
+      playerIdForSession(partnerSessionId),
+    ]);
+    if (!recipient) return;
+
+    const title = `Trade confirmed: ${context.cardName}`;
+    const body = `${partnerName} confirmed it. You both earned Embers.`;
+    const path = `/e/${context.code}`;
+
+    const id = await record({
+      playerId: recipient.playerId,
+      kind: "trade-confirmed",
+      title,
+      body,
+      url: path,
+      dedupeKey: `trade-ack:${flareId}:${requesterSessionId}`,
+      actorId,
+    });
+
+    if (id) await deliverByPush(recipient.playerId, title, body, path);
+  } catch (error) {
+    console.error("Could not notify the trade's author", error);
   }
 }

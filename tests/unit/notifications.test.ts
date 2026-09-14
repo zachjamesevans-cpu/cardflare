@@ -208,7 +208,7 @@ describe("push delivery", () => {
 });
 
 describe("notifyTradeConfirmed", () => {
-  it("notifies the partner, not the confirmer", async () => {
+  it("asks the partner, not the confirmer, whether the trade happened", async () => {
     queueFlareContext();
     queue("player_sessions", { data: { player_id: "player-2" }, error: null });
     queue("players", { data: { id: "player-2", user_id: "u2" }, error: null });
@@ -223,7 +223,9 @@ describe("notifyTradeConfirmed", () => {
     expect(calls.notifications.insert?.[0]?.[0]).toMatchObject({
       player_id: "player-2",
       kind: "trade-confirmed",
-      title: "Trade confirmed: Perona",
+      /* The second hand: the partner is asked, and their Yes in the
+         room is what pays both sides. */
+      title: "CHUNC says you traded Perona. Did you?",
       dedupe_key: "trade:f1:partner-sess",
     });
     expect(sendEmail).toHaveBeenCalledWith(

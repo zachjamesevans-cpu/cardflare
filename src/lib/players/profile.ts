@@ -109,7 +109,9 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
      */
     avatarUrl: await verifiedAvatar(playerId, avatarPathFor(player)),
     coverUrl: avatarSrc(player.cover_image),
-    embersEarned: player.embers_earned,
+    /* The badge: lifetime minus anything a dispute took back. The old
+       column stands in until the migration lands. */
+    embersEarned: player.embers_badge ?? player.embers_earned,
     embersBalance: player.embers_balance,
     tier: player.tier,
     equipped: {
@@ -251,7 +253,7 @@ export async function roomIdentitiesFor(
     getSupabaseAdmin()
       .from("players")
       .select(
-        "id, embers_earned, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+        "id, embers_earned, embers_badge, avatar_url, avatar_animated, tier, equipped_avatar_frame",
       )
       .in("id", [...new Set(playerIds)]),
     avatarWearFor(playerIds),
@@ -273,7 +275,7 @@ export async function roomIdentitiesFor(
 
   for (const row of data ?? []) {
     identities.set(row.id, {
-      embersEarned: row.embers_earned,
+      embersEarned: row.embers_badge ?? row.embers_earned,
       avatarUrl: avatarSrc(avatarPathFor(row)),
       frame: row.equipped_avatar_frame ?? freeFrame,
       ring: wear.get(row.id)?.ring ?? null,

@@ -8,6 +8,7 @@ import { resolveCode } from "@/lib/events/rooms";
 import { text } from "@/lib/form-value";
 import { notifyOfferReceived } from "@/lib/notifications/notify";
 import { getPlayerSession } from "@/lib/players/session";
+import { LIMITS } from "@/lib/api/throttle";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { offerTrade, withdrawOffer } from "./repository";
@@ -69,6 +70,18 @@ export async function offerTradeAction(formData: FormData): Promise<void> {
 
   const membership = await requirePlayerInRoom(code);
   if (!membership) return;
+
+  /* And per room identity: a hand raised thirty times in an hour is
+     not a night at a store, whatever network it came from. */
+  if (
+    !checkRateLimit(
+      `offer-session:${membership.playerSessionId}`,
+      LIMITS.offer.limit,
+      LIMITS.offer.windowMs,
+    ).allowed
+  ) {
+    return;
+  }
 
   const message = offerMessageSchema.safeParse(text(formData, "message") ?? "");
 

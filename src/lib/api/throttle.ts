@@ -31,6 +31,10 @@ const MINUTE = 60 * 1000;
 export const LIMITS = {
   /** New conversations started, per account. */
   threadOpen: { limit: 10, windowMs: 60 * MINUTE },
+  /** Trades confirmed, per room identity: a real night is a handful. */
+  tradeConfirm: { limit: 10, windowMs: 60 * MINUTE },
+  /** Hands raised, per room identity. */
+  offer: { limit: 30, windowMs: 60 * MINUTE },
   /** Messages sent, per account. */
   message: { limit: 60, windowMs: 10 * MINUTE },
   /** Flares posted with no room (one call may carry a deck), per account. */

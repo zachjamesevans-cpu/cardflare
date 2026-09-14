@@ -27,6 +27,10 @@ function trade(overrides: Partial<TradeRecord> = {}): TradeRecord {
     youWere: "holder",
     partnerName: "Kaito",
     confirmedAt: TRADE_AT,
+    status: "confirmed",
+    awaitingYou: false,
+    flareId: "flare-1",
+    requesterSessionId: "asker",
     ...overrides,
   };
 }
