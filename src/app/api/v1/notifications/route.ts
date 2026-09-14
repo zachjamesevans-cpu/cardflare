@@ -1,44 +1,30 @@
 import { z } from "zod";
 
+import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
+import { listInbox } from "@/lib/notifications/inbox";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 /**
  * The player's inbox — the same rows the notification backbone records
- * and email delivers, read back by the app. Marking read is scoped to the
- * caller's own rows; there is nothing else here to authorize because the
- * query itself is keyed on the authenticated player.
+ * and email delivers, read back by the app. The website's own loader
+ * builds the page, faces included, so the two inboxes are one list;
+ * the only thing this route adds is absolute picture URLs, because a
+ * phone has no origin to resolve `/api/avatars/...` against. Marking
+ * read is scoped to the caller's own rows; there is nothing else here
+ * to authorize because the query itself is keyed on the authenticated
+ * player.
  */
 export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("notifications")
-    .select("id, kind, title, body, url, created_at, read_at")
-    .eq("player_id", player.playerId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const notifications = await listInbox(player.playerId);
 
-  if (error) {
-    console.error("Could not list notifications", error);
-    return Response.json({ error: "unavailable" }, { status: 503 });
-  }
-
-  return Response.json({
-    notifications: (data ?? []).map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      title: row.title,
-      body: row.body,
-      url: row.url,
-      createdAt: row.created_at,
-      readAt: row.read_at,
-    })),
-  });
+  return Response.json({ notifications: absoluteImageUrls(notifications) });
 }
 
 const readSchema = z.object({ ids: z.array(z.string()).min(1).max(100) });

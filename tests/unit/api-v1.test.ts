@@ -335,7 +335,60 @@ describe("notifications inbox", () => {
     expect(body.notifications[0]).toMatchObject({
       id: "n1",
       title: "Kaito has your Perona",
+      actor: null,
     });
+  });
+
+  it("leads each row with the person who did it, dressed, with an absolute picture", async () => {
+    queue("notifications", {
+      data: [
+        {
+          id: "n2",
+          kind: "new-follower",
+          title: "Kaito followed you",
+          body: "Follow back and you are Trade partners.",
+          url: "/p/kaito",
+          created_at: "2026-08-07T00:00:00Z",
+          read_at: null,
+          actor_id: "kaito",
+        },
+      ],
+      error: null,
+    });
+    /* The people read, then the tier read the wardrobe makes for the
+       same ids; the wardrobe's own tables answer empty. */
+    queue(
+      "players",
+      {
+        data: [
+          {
+            id: "kaito",
+            display_name: "Kaito",
+            avatar_url: "avatars/kaito/1.jpg",
+            avatar_animated: null,
+            tier: "free",
+            equipped_avatar_frame: "ember-edge",
+          },
+        ],
+        error: null,
+      },
+      { data: [{ id: "kaito", tier: "free" }], error: null },
+    );
+
+    const response = await notifications.GET(request("GET"));
+    const body = await response.json();
+
+    expect(calls.players.in[0]).toEqual(["id", ["kaito"]]);
+    expect(body.notifications[0].actor).toMatchObject({
+      playerId: "kaito",
+      displayName: "Kaito",
+      frame: "ember-edge",
+      ring: null,
+    });
+    /* A phone has no origin to resolve `/api/avatars/...` against. */
+    expect(body.notifications[0].actor.avatarUrl).toMatch(
+      /^https?:\/\/.+\/api\/avatars\/avatars\/kaito\/1\.jpg$/,
+    );
   });
 
   it("marks read only within the caller's own rows", async () => {

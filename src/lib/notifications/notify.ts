@@ -46,6 +46,23 @@ async function notifiablePlayerForSession(
   return { playerId: player.id, email: user?.user?.email ?? null };
 }
 
+/**
+ * The account behind a room session, or null for a guest.
+ *
+ * The actor on a notice: the responder who offered, the poster whose
+ * card went up, the requester who confirmed. A guest has no profile
+ * to lead with, so their notice keeps the kind's icon instead.
+ */
+async function playerIdForSession(sessionId: string): Promise<string | null> {
+  const { data } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .select("player_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  return data?.player_id ?? null;
+}
+
 /** The Flare's card name and its room's join code, for the message. */
 async function flareContext(flareId: string): Promise<{
   ownerSessionId: string;
@@ -109,6 +126,13 @@ async function record(entry: {
   body: string | null;
   url: string;
   dedupeKey: string;
+  /**
+   * The player who did it, when a person did. The inbox leads with
+   * their face, the way Instagram's does, and the name in the title
+   * is not enough for that: names change, and a title is prose.
+   * Null for the notices nobody sends - a board opening at a store.
+   */
+  actorId: string | null;
 }): Promise<string | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("notifications")
@@ -119,6 +143,7 @@ async function record(entry: {
       body: entry.body,
       url: entry.url,
       dedupe_key: entry.dedupeKey,
+      actor_id: entry.actorId,
     })
     .select("id")
     .maybeSingle();
@@ -252,7 +277,10 @@ export async function notifyOfferReceived(
     const context = await flareContext(flareId);
     if (!context) return;
 
-    const recipient = await notifiablePlayerForSession(context.ownerSessionId);
+    const [recipient, actorId] = await Promise.all([
+      notifiablePlayerForSession(context.ownerSessionId),
+      playerIdForSession(responderSessionId),
+    ]);
     if (!recipient) return;
 
     /*
@@ -280,6 +308,7 @@ export async function notifyOfferReceived(
       body,
       url: path,
       dedupeKey: `offer:${flareId}:${responderSessionId}`,
+      actorId,
     });
 
     if (id) {
@@ -370,6 +399,7 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
       const id = await record({
         playerId: saver.player_id,
         kind: "early-board",
+        actorId: null,
         title,
         body,
         url: path,
@@ -415,6 +445,7 @@ export async function notifyShowcaseMatch(
     const title = `${showcaserName} has your ${context.cardName}`;
     const body = "They posted it as a card they will let go. Go find them in the room.";
     const path = `/e/${context.code}`;
+    const actorId = await playerIdForSession(context.ownerSessionId);
 
     for (const hunter of hunters) {
       const recipient = await notifiablePlayerForSession(hunter.playerSessionId);
@@ -427,6 +458,7 @@ export async function notifyShowcaseMatch(
         body,
         url: path,
         dedupeKey: `showcase:${showcaseFlareId}:${hunter.flareId}`,
+        actorId,
       });
 
       if (id) {
@@ -517,6 +549,7 @@ export async function notifyBoardOpen(eventId: string): Promise<void> {
       const id = await record({
         playerId: saver.player_id,
         kind: "board-open",
+        actorId: null,
         title,
         body,
         url: path,
@@ -600,6 +633,10 @@ export async function sendTestNotice(
     body: sample.body,
     url: path,
     dedupeKey: `test:${kind}:${playerId}:${crypto.randomUUID()}`,
+    /* The recipient stands in for the sample's CHUNC, so a test notice
+       shows the inbox row the way a real one lands: face first. The
+       two board kinds have nobody behind them for real either. */
+    actorId: kind === "board-open" || kind === "early-board" ? null : playerId,
   });
 
   if (id) await deliverByPush(playerId, sample.title, sample.body, path);
@@ -656,6 +693,7 @@ export async function notifyNewFollower(
       body,
       url: path,
       dedupeKey: `follow:${followerId}:${followedId}`,
+      actorId: followerId,
     });
 
     if (id) await deliverByPush(followedId, title, body, path);
@@ -704,7 +742,7 @@ export async function notifyRoomFlare(
     const unique = [...new Set(cardIds)];
     if (unique.length === 0) return;
 
-    const [{ data: event }, { data: participants }, { data: cards }] =
+    const [{ data: event }, { data: participants }, { data: cards }, actorId] =
       await Promise.all([
         admin.from("events").select("join_code").eq("id", eventId).maybeSingle(),
         admin
@@ -717,6 +755,7 @@ export async function notifyRoomFlare(
            push. Only the first is needed, but reading one row and
            counting the rest would be two queries for one sentence. */
         admin.from("cards").select("exact_name").in("id", unique).limit(2),
+        playerIdForSession(posterSessionId),
       ]);
 
     if (!event?.join_code) return;
@@ -780,6 +819,7 @@ export async function notifyRoomFlare(
             body,
             url: path,
             dedupeKey: `room-flare:${eventId}:${posterSessionId}:${key}:${playerId}`,
+            actorId,
           });
 
           if (id) await deliverByPush(playerId, title, body, path);
@@ -808,7 +848,12 @@ export async function notifyTradeConfirmed(
     const context = await flareContext(flareId);
     if (!context) return;
 
-    const recipient = await notifiablePlayerForSession(partnerSessionId);
+    /* Only the requester can confirm, and the requester owns the Flare:
+       the face on this notice is the Flare's owner. */
+    const [recipient, actorId] = await Promise.all([
+      notifiablePlayerForSession(partnerSessionId),
+      playerIdForSession(context.ownerSessionId),
+    ]);
     if (!recipient) return;
 
     const title = `Trade confirmed: ${context.cardName}`;
@@ -822,6 +867,7 @@ export async function notifyTradeConfirmed(
       body,
       url: path,
       dedupeKey: `trade:${flareId}:${partnerSessionId}`,
+      actorId,
     });
 
     if (id) {
@@ -886,6 +932,7 @@ export async function notifyMessageReceived(
       body: preview,
       url: path,
       dedupeKey: `message:${threadId}:${recipientId}`,
+      actorId: senderId,
     });
 
     if (id) await deliverByPush(recipientId, title, preview, path);

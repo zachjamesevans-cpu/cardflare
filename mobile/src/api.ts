@@ -845,6 +845,22 @@ export const registerDevice = (platform: "ios" | "android", pushToken: string) =
 export const unregisterDevice = (pushToken: string) =>
   call<{ ok: true }>("DELETE", "/api/v1/devices", { pushToken });
 
+/**
+ * The person behind a notice, dressed: the website's `InboxActor`.
+ * The same fields a People row carries, so the face on a notice is the
+ * face on the profile, worn ring and all.
+ */
+export interface InboxActor {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+  ringArt: ArtFile | null;
+  auraArt: ArtFile | null;
+}
+
 export interface InboxItem {
   id: string;
   kind: string;
@@ -853,6 +869,11 @@ export interface InboxItem {
   url: string | null;
   createdAt: string;
   readAt: string | null;
+  /**
+   * Who did it. Null for a board opening, or a person who has since
+   * left; absent from an older server, which reads the same way.
+   */
+  actor?: InboxActor | null;
 }
 
 export const getNotifications = () =>
