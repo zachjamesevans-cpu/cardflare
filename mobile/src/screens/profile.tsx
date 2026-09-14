@@ -9,7 +9,6 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import {
-  formatHandle,
   HANDLE_MAX,
   HANDLE_MIN,
   handleSeedFrom,
@@ -43,6 +42,7 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
+import { PeopleSheet } from "../people-sheet";
 import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
 import { CoverBanner } from "../showcase-zoom";
 import {
@@ -1010,129 +1010,6 @@ export function ProfileScreen() {
         }}
       />
     </ScrollView>
-  );
-}
-
-/** Followers or following, in a modal over the profile: the website's PeopleDialog. */
-function PeopleSheet({
-  which,
-  people,
-  onClose,
-  onOpen,
-}: {
-  which: "followers" | "following" | null;
-  people: FollowedPlayer[];
-  onClose: () => void;
-  onOpen: (playerId: string) => void;
-}) {
-  if (!which) return null;
-
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: spacing(4),
-        }}
-      >
-        <Pressable
-          onPress={() => {}}
-          style={{
-            alignSelf: "stretch",
-            maxHeight: "80%",
-            borderRadius: radius.card,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            padding: spacing(4),
-            gap: spacing(3),
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: spacing(3),
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
-              {which === "followers" ? "Followers" : "Following"}{" "}
-              <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
-                · {people.length}
-              </Text>
-            </Text>
-            <Tap onPress={onClose} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={colors.textMuted} />
-            </Tap>
-          </View>
-          <ScrollView>
-            <PeopleList
-              people={people}
-              empty={
-                which === "followers"
-                  ? "Nobody yet. Share your profile."
-                  : "Nobody yet. The next time somebody impresses you at a table, tap their name."
-              }
-              onOpen={onOpen}
-            />
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-/** A list of players, each a tap to their profile: the website's PeopleList. */
-function PeopleList({
-  people,
-  empty,
-  onOpen,
-}: {
-  people: FollowedPlayer[];
-  empty: string;
-  onOpen: (playerId: string) => void;
-}) {
-  if (people.length === 0) return <Muted>{empty}</Muted>;
-
-  return (
-    <View>
-      {people.map((person, index) => (
-        <Tap
-          key={person.playerId}
-          onPress={() => onOpen(person.playerId)}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing(3),
-            paddingVertical: spacing(2.5),
-            borderTopWidth: index === 0 ? 0 : 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <PlayerAvatar
-            displayName={person.displayName}
-            seed={person.playerId}
-            avatarUrl={person.avatarUrl}
-            frame={person.frame}
-            size={32}
-          />
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontWeight: "600", flex: 1 }}
-          >
-            {person.displayName}
-          </Text>
-          {person.partners && (
-            <Text style={{ color: colors.accent, fontSize: 12 }}>Trade partners</Text>
-          )}
-        </Tap>
-      ))}
-    </View>
   );
 }
 
