@@ -10,11 +10,13 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
+import { cardImagesEnabled } from "@/lib/cards/images";
 import type { FeedCard, FeedItem } from "@/lib/feed/repository";
 
 /**
@@ -114,15 +116,27 @@ function CardRail({
   more?: number;
   size?: "lg" | "md";
 }) {
+  /* The shelf the zoom pages along. Built from the same array the rail
+     draws, so what you swipe through is exactly what you can see. */
+  const shelf: ZoomCard[] = cards.map((card) => ({
+    imageUrl: card.imageUrl,
+    exactName: card.cardName,
+    cardNumber: card.cardNumber,
+    youHave: card.match ? { kind: card.match, count: 0 } : null,
+  }));
+
   return (
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-      {cards.map((card) => (
-        <div key={card.cardId} className="shrink-0">
+      {cards.map((card, index) => (
+        <div key={card.cardId} className="flex shrink-0">
           <FeedTile
             imageUrl={card.imageUrl}
             name={card.cardName}
+            cardNumber={card.cardNumber}
             match={card.match}
             size={size}
+            siblings={shelf}
+            position={index}
           />
         </div>
       ))}
@@ -135,16 +149,34 @@ function CardRail({
   );
 }
 
-/** One card, at the size the feed shows cards. */
+/**
+ * One card, at the size the feed shows cards, and the way to see it big.
+ *
+ * The founder, on the phone: "I can't click the images in the feed to
+ * open the bigger view." The app's feed has opened the zoom since the
+ * rails were made swipeable; the website's drew the same art as a plain
+ * picture. So the tile is now the opener for the same `CardImageZoom`
+ * every board and shelf on the site uses - tap for the large view, and
+ * a rail hands over the whole shelf so the viewer pages along it
+ * without closing. The picture itself is unchanged: when art is off or
+ * a card has none, the zoom returns the tile as it was.
+ */
 function FeedTile({
   imageUrl,
   name,
+  cardNumber,
   match,
   size = "sm",
+  siblings,
+  position,
 }: {
   imageUrl: string | null;
   name: string;
+  cardNumber: string;
   size?: "lg" | "md" | "sm";
+  /** The rest of the rail this tile sits in, and where in it. */
+  siblings?: ZoomCard[];
+  position?: number;
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -156,7 +188,7 @@ function FeedTile({
    */
   match: "exact" | "other-printing" | null;
 }) {
-  return (
+  const art = (
     <span
       title={
         match === "exact"
@@ -189,6 +221,21 @@ function FeedTile({
         </span>
       )}
     </span>
+  );
+
+  return (
+    <CardImageZoom
+      imageUrl={imageUrl}
+      exactName={name}
+      cardNumber={cardNumber}
+      enabled={cardImagesEnabled()}
+      /* The ring already says it across the row; the sentence is what
+         the tap is for, same as the board and the app. */
+      youHave={match ? { kind: match, count: 0 } : null}
+      siblings={siblings}
+      position={position}
+      thumb={art}
+    />
   );
 }
 
@@ -294,6 +341,7 @@ export function Item({ item }: { item: FeedItem }) {
             <FeedTile
               imageUrl={item.cards[0].imageUrl}
               name={item.cards[0].cardName}
+              cardNumber={item.cards[0].cardNumber}
               match={item.cards[0].match}
             />
             <div className="flex min-w-0 flex-col gap-1">
@@ -481,6 +529,7 @@ export function Item({ item }: { item: FeedItem }) {
               <FeedTile
                 imageUrl={entry.card.imageUrl}
                 name={entry.card.cardName}
+                cardNumber={entry.card.cardNumber}
                 match={entry.card.match}
               />
               {/* Whose it is. "Who do I walk over to" is half the
@@ -797,6 +846,7 @@ export function Item({ item }: { item: FeedItem }) {
                 key={card.cardId}
                 imageUrl={card.imageUrl}
                 name={card.cardName}
+                cardNumber={card.cardNumber}
                 match={card.match}
               />
             ))}

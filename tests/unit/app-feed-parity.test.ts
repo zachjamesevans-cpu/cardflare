@@ -355,3 +355,20 @@ describe("the home screen's furniture", () => {
     expect(web).not.toContain("listWants");
   });
 });
+
+describe("a card in the Feed opens larger", () => {
+  /*
+   * The founder, on the phone: "I can't click the images in the feed to
+   * open the bigger view." The app had it; the website drew the same
+   * art as a plain picture. Both open the one zoom now, and a rail hands
+   * it the whole shelf so the viewer pages along it without closing.
+   */
+  it("on the website, through the same zoom as every board", () => {
+    expect(items).toContain("<CardImageZoom");
+    expect(items).toContain("siblings={shelf}");
+  });
+
+  it("in the app, with the rail to swipe along", () => {
+    expect(app).toContain("siblings={shelf}");
+  });
+});
