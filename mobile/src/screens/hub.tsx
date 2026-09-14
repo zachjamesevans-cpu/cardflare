@@ -17,6 +17,7 @@ import { PostFlareScreen, type PostTarget } from "./post-flare";
 import { Body, Button, Card, Muted, Title } from "../ui";
 import { spacing } from "../theme";
 import { WantRow } from "../want-row";
+import { HaveList, NearbyCard } from "../nearby";
 
 /**
  * The centre tab — the mark itself, and behind it the list the whole
@@ -162,6 +163,8 @@ export function HubScreen() {
       onPosted={() => void loadWants()}
       footer={
         wants !== null ? (
+          <>
+          <NearbyCard />
           <Card>
             <View
               style={{
@@ -196,6 +199,8 @@ export function HubScreen() {
               </View>
             )}
           </Card>
+          <HaveList />
+          </>
         ) : undefined
       }
     />

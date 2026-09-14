@@ -1,3 +1,4 @@
+import { nearbyMatchesForHolder, type NearbyMatch } from "@/lib/nearby/matching";
 import "server-only";
 
 import { showingAnnouncements } from "@/lib/announcements/repository";
@@ -547,8 +548,22 @@ export interface ShopItem {
   balance: number;
 }
 
+/**
+ * Somebody near you is hunting a card you marked Trade locally.
+ *
+ * Nearby matching's card, and the only place a match is seen before a
+ * conversation exists. Computed for the reader at read time from
+ * their own list and the asks nearby; nobody else's Feed carries it,
+ * and the wanter is not told until the reader answers.
+ */
+export interface NearbyMatchItem {
+  kind: "nearbyMatch";
+  matches: NearbyMatch[];
+}
+
 export type FeedItem =
   | AnnouncementItem
+  | NearbyMatchItem
   | WantedItem
   | BoardItem
   | HuntItem
@@ -605,6 +620,7 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
 function sectionFor(item: FeedItem): FeedSection {
   switch (item.kind) {
     case "wanted":
+    case "nearbyMatch":
       return "wanted";
     case "announcement":
     case "board":
@@ -653,6 +669,8 @@ function reasonFor(item: FeedItem): string {
   switch (item.kind) {
     case "wanted":
       return "Because these are in your collection";
+    case "nearbyMatch":
+      return "Because you marked these Trade locally";
     case "announcement":
       return "From cardflare";
     case "board":
@@ -1644,7 +1662,12 @@ export async function listFeed(
 
   /* The lead item, and the one that needs nothing from anybody else
      having posted this week. See wantedItems. */
-  const wantedFromYou = await wantedItems(sessionId, held);
+  const [wantedFromYou, nearby] = await Promise.all([
+    wantedItems(sessionId, held),
+    nearbyMatchesForHolder(playerId).catch(() => []),
+  ]);
+  const nearbyItems: NearbyMatchItem[] =
+    nearby.length > 0 ? [{ kind: "nearbyMatch", matches: nearby }] : [];
 
   const upcoming = upcomingItems(locals, shown, wanted.size);
 
@@ -1663,6 +1686,9 @@ export async function listFeed(
    * bottom where it is found rather than pushed.
    */
   const items: FeedItem[] = [
+    /* A person nearby who wants your card, before anything about rooms:
+       it is the one item that can turn into a trade this week. */
+    ...nearbyItems,
     ...wantedFromYou,
     ...notices.map((notice): AnnouncementItem => ({
       kind: "announcement",

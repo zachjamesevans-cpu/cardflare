@@ -42,6 +42,8 @@ export interface ListEntry {
   displayName: string | null;
   /** Binder entries only: when the owner last said they still had it. */
   confirmedAt: string | null;
+  /** Binder entries only: the owner will trade this with people nearby. */
+  localTrade: boolean;
   /**
    * Which way the card points. "want" is the original Flare — I need
    * this. "showcase" is the founder's reverse: I have this and would
@@ -68,7 +70,7 @@ const UNIQUE_VIOLATION = "23505";
 const FLARE_COLUMNS =
   "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id";
 const BINDER_COLUMNS =
-  "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at";
+  "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at, local_trade";
 
 interface EntryRow {
   id: string;
@@ -85,6 +87,7 @@ interface EntryRow {
   printing_id: string | null;
   player_session_id: string;
   confirmed_at?: string;
+  local_trade?: boolean;
 }
 
 interface Lookups {
@@ -238,6 +241,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     playerSessionId: row.player_session_id,
     displayName: lookups.names.get(row.player_session_id) ?? null,
     confirmedAt: row.confirmed_at ?? null,
+    localTrade: row.local_trade ?? false,
     /* Binder rows never carry one, and a binder entry is a thing you
        have rather than a thing pointing anywhere. */
     intent: row.intent ?? "want",
@@ -521,6 +525,31 @@ export async function removeFromBinder(
 
   if (error) {
     console.error("Could not remove a card from the binder", error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Marks one binder entry as available to trade locally, or takes it
+ * back. Scoped to the owning session, as every binder write is.
+ */
+export async function setLocalTrade(
+  entryId: string,
+  playerSessionId: string,
+  on: boolean,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_cards")
+    .update({ local_trade: on, updated_at: new Date().toISOString() })
+    .eq("id", entryId)
+    .eq("player_session_id", playerSessionId);
+
+  if (error) {
+    console.error("Could not mark the card for local trade", error);
     return false;
   }
 

@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { nearestPostalCode, normalisePostalCode, type Point } from "@/lib/geo/zip";
+import { afterWantSaved } from "@/lib/nearby/matching";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -166,6 +167,9 @@ export async function postAreaFlare(
     console.error("Could not post the area Flare", error);
     return { ok: false, reason: "unavailable" };
   }
+
+  /* A Flare posted with no room is an ask nearby matching can answer. */
+  void afterWantSaved(playerId, input.cardId);
 
   return { ok: true, flareId: data.id };
 }

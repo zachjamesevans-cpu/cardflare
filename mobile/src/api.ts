@@ -1183,6 +1183,87 @@ export const getPlayerPeople = (playerId: string) =>
     `/api/players/${encodeURIComponent(playerId)}/people`,
   );
 
+/* ------------------------------------------------------------------ */
+/* The Have list and nearby matching                                   */
+/* ------------------------------------------------------------------ */
+
+/** One card on the Have list: the room's binder row, with the switch. */
+export interface HaveEntry {
+  id: string;
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  printingId: string | null;
+  printingLabel: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  note: string | null;
+  /** The owner will trade this one with people nearby. */
+  localTrade: boolean;
+}
+
+/** The account's Have list, no room needed. Private to its owner. */
+export const getHaves = () => call<{ haves: HaveEntry[] }>("GET", "/api/v1/haves");
+
+export const addHave = (cardId: string, printingId: string | null, quantity = 1) =>
+  call<{ ok: true }>("POST", "/api/v1/haves", { cardId, printingId, quantity });
+
+export const removeHave = (entryId: string) =>
+  call<{ ok: boolean }>("DELETE", "/api/v1/haves", { entryId });
+
+/** Trade locally on or off, for one card. */
+export const setHaveLocalTrade = (entryId: string, localTrade: boolean) =>
+  call<{ ok: true }>("PUT", "/api/v1/haves", { entryId, localTrade });
+
+export interface NearbySettings {
+  enabled: boolean;
+  /** Null means nothing can match until a ZIP is saved. */
+  postalCode: string | null;
+}
+
+export const getNearbySettings = () =>
+  call<NearbySettings>("GET", "/api/v1/me/nearby");
+
+export const setNearbyMatching = (enabled: boolean) =>
+  call<NearbySettings>("PUT", "/api/v1/me/nearby", { enabled });
+
+/** What the wanter said, and where the thread opens: a saved want or a room-less Flare. */
+export type NearbyAsk = { kind: "want" | "flare"; id: string };
+
+/** One nearby match, as the Feed shows it to the holder. */
+export interface NearbyMatch {
+  ask: NearbyAsk;
+  haveEntryId: string;
+  wanter: {
+    playerId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    frame: string | null;
+    ring: string | null;
+    aura: string | null;
+    ringArt: ArtFile | null;
+    auraArt: ArtFile | null;
+  };
+  card: {
+    cardId: string;
+    cardName: string;
+    cardNumber: string;
+    imageUrl: string | null;
+    match: "exact" | "other-printing";
+  };
+  miles: number;
+  milesLabel: string;
+  threadId: string | null;
+}
+
+/** "I have this": opens the conversation on the ask with a first message. */
+export const openMatchThread = (ask: NearbyAsk, body: string) =>
+  call<{ ok: boolean; threadId?: string; message?: string }>(
+    "POST",
+    "/api/v1/local/threads",
+    ask.kind === "want" ? { wantId: ask.id, body } : { flareId: ask.id, body },
+  );
+
 export interface PackSeries {
   id: string;
   name: string;
@@ -1472,6 +1553,12 @@ export type FeedItem =
    * event - true whether or not you own the card. This one is a fact
    * about YOU, it moves on its own, and its only resolution is a trade.
    */
+  /**
+   * Somebody near you is hunting a card you marked Trade locally. Only
+   * the holder's Feed carries it; the wanter hears nothing until the
+   * holder answers.
+   */
+  | { kind: "nearbyMatch"; matches: NearbyMatch[] }
   | {
       kind: "wanted";
       total: number;
@@ -1869,7 +1956,9 @@ export const setLocalRadius = (radius: number) =>
 /** One conversation on the Messages list. */
 export interface LocalThread {
   threadId: string;
-  flareId: string;
+  /** Null for a thread on a saved want (a nearby match). */
+  flareId: string | null;
+  wantId?: string | null;
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
@@ -1900,6 +1989,16 @@ export const openLocalThread = (flareId: string, body: string) =>
     { flareId, body },
   );
 
+/** Somewhere public to suggest meeting: a store, never an address. */
+export interface MeetSuggestion {
+  storeName: string;
+  joinCode: string;
+  nextEventName: string | null;
+  nextEventAt: string | null;
+  timeZone: string;
+  shared: boolean;
+}
+
 /** Reading a thread is what marks it read. */
 export const readLocalThread = (threadId: string) =>
   call<{
@@ -1908,6 +2007,8 @@ export const readLocalThread = (threadId: string) =>
     cardName: string | null;
     withName: string | null;
     messages: LocalThreadMessage[];
+    /** Optional: an older server does not send one. */
+    meet?: MeetSuggestion | null;
   }>("GET", `/api/v1/local/threads/${encodeURIComponent(threadId)}`);
 
 export const sendLocalMessage = (threadId: string, body: string) =>

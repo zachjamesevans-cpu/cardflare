@@ -110,7 +110,7 @@ export function zipsWithin(origin: Point, miles: number): string[] {
 const EARTH_MILES = 3958.8;
 
 /** Haversine, kept here so this module owes nothing to the store code. */
-function milesApart(a: Point, b: Point): number {
+export function milesApart(a: Point, b: Point): number {
   const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
   const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
   const lat1 = (a.latitude * Math.PI) / 180;

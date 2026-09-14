@@ -3,6 +3,7 @@ import "server-only";
 import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
+import { afterWantSaved } from "@/lib/nearby/matching";
 
 /**
  * Saved wants: the durable version of a Flare.
@@ -87,6 +88,10 @@ export async function saveWant(
     console.error("Could not save the want", error);
     return "unavailable";
   }
+
+  /* Nearby matching looks for holders the moment a want lands. Fire
+     and forget: the want is saved, and the notice dedupes itself. */
+  void afterWantSaved(playerId, entry.cardId);
 
   return "saved";
 }

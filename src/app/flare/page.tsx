@@ -14,6 +14,10 @@ import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { getPlayerSession } from "@/lib/players/session";
 import { listWants, postedCardStores } from "@/lib/players/wants";
+import { listHaves } from "@/lib/lists/haves";
+import { nearbySettingsFor } from "@/lib/nearby/settings";
+import { HaveListCard } from "@/components/nearby/have-list-card";
+import { NearbyCard } from "@/components/nearby/nearby-card";
 import { SITE } from "@/lib/site";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
@@ -51,9 +55,14 @@ export default async function FlarePage() {
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
   const games = await viewerGames();
-  const [wants, posted] = playerId
-    ? await Promise.all([listWants(playerId), postedCardStores(playerId)])
-    : [null, new Map<string, string>()];
+  const [wants, posted, haves, nearby] = playerId
+    ? await Promise.all([
+        listWants(playerId),
+        postedCardStores(playerId),
+        listHaves(playerId),
+        nearbySettingsFor(playerId),
+      ])
+    : [null, new Map<string, string>(), null, null];
 
   return (
     <>
@@ -66,6 +75,13 @@ export default async function FlarePage() {
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-5">
+          {/* The one switch for nearby matching, above the two lists it
+              governs. Signed-in only: matching needs an account on both
+              ends. */}
+          {nearby && (
+            <NearbyCard enabled={nearby.enabled} postalCode={nearby.postalCode} />
+          )}
+
           {room ? (
             <>
               <Card className="flex flex-col gap-1">
@@ -142,6 +158,21 @@ export default async function FlarePage() {
                 />
               )}
             </Card>
+          )}
+
+          {/* The Have list, with no room: the cards you would trade, and
+              the switch that lets people nearby find one. */}
+          {haves !== null && playerId && (
+            <>
+              <AddToListForm
+                code=""
+                kind="have"
+                imagesEnabled={images}
+                playerGames={games}
+                target="list"
+              />
+              <HaveListCard entries={haves} imagesEnabled={images} />
+            </>
           )}
         </div>
 

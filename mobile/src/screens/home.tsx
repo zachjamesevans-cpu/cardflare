@@ -44,6 +44,7 @@ import {
   useHeaderScroll,
 } from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
+import { MatchRow } from "../nearby";
 import { EmberBadge } from "../ember-badge";
 import { PlayerAvatar } from "../player-avatar";
 import { API_BASE } from "../config";
@@ -553,7 +554,39 @@ export function HomeScreen() {
        */}
       {feed.map((item, index) => {
         const body =
-        item.kind === "wanted" ? (
+        item.kind === "nearbyMatch" ? (
+          <Card
+            key={`nearby-match-${index}`}
+            style={{ borderColor: `${colors.accent}66` }}
+          >
+            <Text
+              style={{
+                color: colors.accent,
+                fontSize: 11,
+                fontWeight: "700",
+                letterSpacing: 1.6,
+                textTransform: "uppercase",
+              }}
+            >
+              You can answer a Flare
+            </Text>
+            <Muted>Only you see this. They hear from you when you answer.</Muted>
+
+            <View style={{ gap: spacing(4) }}>
+              {item.matches.slice(0, 5).map((match) => (
+                <MatchRow
+                  key={`${match.ask.kind}-${match.ask.id}`}
+                  match={match}
+                  onOpen={(threadId) => navigation.navigate("LocalThread", { threadId })}
+                />
+              ))}
+            </View>
+
+            {item.matches.length > 5 ? (
+              <Muted>{`+${item.matches.length - 5} more nearby`}</Muted>
+            ) : null}
+          </Card>
+        ) : item.kind === "wanted" ? (
           <Card
             key={`wanted-${index}`}
             style={{ borderColor: `${colors.accent}66` }}

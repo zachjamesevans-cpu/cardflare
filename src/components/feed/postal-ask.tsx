@@ -20,12 +20,12 @@ import { POSTAL_IDLE, type PostalState } from "@/lib/players/location-schema";
  * The copy says what it is for and what it is not, because a location
  * field with no explanation is a field people close the tab on.
  */
-function SaveButton() {
+function SaveButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" size="sm" disabled={pending}>
-      {pending ? "Saving…" : "Show stores"}
+      {pending ? "Saving…" : label}
     </Button>
   );
 }
@@ -41,9 +41,12 @@ export function PostalAsk({
    * "Location cleared." where his stores should have appeared.
    */
   allowClear = false,
+  submitLabel = "Show stores",
 }: {
   defaultValue?: string;
   allowClear?: boolean;
+  /** What the button promises: stores on the Feed, a plain save elsewhere. */
+  submitLabel?: string;
 }) {
   const [state, action] = useActionState<PostalState, FormData>(
     savePostalCodeAction,
@@ -67,7 +70,7 @@ export function PostalAsk({
             aria-label="ZIP code"
           />
         </label>
-        <SaveButton />
+        <SaveButton label={submitLabel} />
       </div>
 
       <p className="text-xs text-text-muted">

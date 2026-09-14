@@ -78,11 +78,13 @@ export function InboxScreen() {
                */
               <Tap
                 key={item.id}
-                disabled={item.url !== "/local"}
+                disabled={item.url !== "/local" && item.url !== "/feed"}
                 onPress={() =>
-                  LOCAL_ENABLED
-                    ? navigation.navigate("Tabs", { screen: "Local" })
-                    : navigation.navigate("Messages")
+                  item.url === "/feed"
+                    ? navigation.navigate("Tabs", { screen: "Feed" })
+                    : LOCAL_ENABLED
+                      ? navigation.navigate("Tabs", { screen: "Local" })
+                      : navigation.navigate("Messages")
                 }
                 style={{
                   gap: spacing(1),

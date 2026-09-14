@@ -34,6 +34,7 @@ const appRoot = read("mobile/App.tsx");
 /** Every item kind the server can produce, from the union itself. */
 const KINDS = [
   "wanted",
+  "nearbyMatch",
   "nearbyStores",
   "announcement",
   "board",

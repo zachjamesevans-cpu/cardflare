@@ -12,7 +12,8 @@ import { postAreaFlare, postAreaFlares } from "@/lib/local/area";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
-import { addFlareBatch } from "@/lib/lists/repository";
+import { addFlareBatch, addToBinder } from "@/lib/lists/repository";
+import { binderSessionFor } from "@/lib/lists/haves";
 import { deckLabelSchema } from "@/lib/lists/schema";
 import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
@@ -324,6 +325,72 @@ export async function repostWantsAction(
 
   revalidatePath(`/e/${code}`);
   return { status: "posted", count: posted.length };
+}
+
+/**
+ * Adds a card to the Have list from the Flare tab, no room involved.
+ *
+ * The binder used to be reachable only from inside a room. Nearby
+ * matching needs it on the couch too: a card marked "Trade locally"
+ * has to be somewhere before there is a room to mark it in. Same
+ * table, same cap, same session as the room's binder; see haves.ts.
+ */
+export async function saveHaveAction(
+  _previous: ListState,
+  formData: FormData,
+): Promise<ListState> {
+  const viewer = await getViewer();
+  const playerId = await playerIdFor(viewer);
+
+  if (!playerId || viewer.kind === "anonymous") {
+    return { status: "error", message: "Sign in to keep a Have list." };
+  }
+
+  const parsed = addEntrySchema.safeParse({
+    cardId: text(formData, "cardId"),
+    printingId: text(formData, "printingId"),
+    quantity: text(formData, "quantity") || 1,
+    note: text(formData, "note"),
+    deckLabel: text(formData, "deckLabel"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Please check the details.",
+    };
+  }
+
+  const name =
+    viewer.kind === "player"
+      ? viewer.playerName
+      : ((await playerForUser(viewer.user.id))?.display_name ?? "A player");
+  const session = await binderSessionFor(playerId, name, true);
+  if (!session) {
+    return {
+      status: "error",
+      message: "Something went wrong. Please try again in a moment.",
+    };
+  }
+
+  const result = await addToBinder(session.id, parsed.data);
+  if (!result.ok) {
+    return {
+      status: "error",
+      message:
+        result.reason === "at-cap"
+          ? "Your Have list is full. Remove a card to add another."
+          : "Something went wrong. Please try again in a moment.",
+    };
+  }
+
+  revalidatePath("/flare");
+
+  return {
+    status: "added",
+    kind: "have",
+    cardName: text(formData, "cardName").slice(0, 200),
+  };
 }
 
 /**

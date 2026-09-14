@@ -1,5 +1,6 @@
 import "server-only";
 
+import { listLocals } from "@/lib/players/locals";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
 import { MESSAGE_MAX_LENGTH } from "./shared";
@@ -34,7 +35,10 @@ export type ThreadFailure =
 
 export interface ThreadSummary {
   threadId: string;
-  flareId: string;
+  /** The posted Flare it is about, or null for a thread on a saved want. */
+  flareId: string | null;
+  /** The saved want a nearby match opened it on, or null. */
+  wantId: string | null;
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
@@ -162,20 +166,96 @@ export async function openFlareThread(
   return sent ? { ok: true, threadId } : { ok: false, reason: "unavailable" };
 }
 
+/**
+ * "I have this", outside a room: opens (or reuses) the thread on a
+ * saved want and sends the first message.
+ *
+ * Nearby matching's door. A want is a private note on the wanter's own
+ * list, so the thread is the FIRST the wanter hears of the match; the
+ * holder chose to be found by opening it. Same shape as a Flare's
+ * thread from here on: one conversation per pair, either side can end
+ * it, the message notice rings the wanter.
+ */
+export async function openWantThread(
+  wantId: string,
+  responderPlayerId: string,
+  rawBody: string,
+): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  const body = trimmedBody(rawBody);
+  if (!body) return { ok: false, reason: "empty" };
+
+  const admin = getSupabaseAdmin();
+
+  const { data: want } = await admin
+    .from("player_wants")
+    .select("id, player_id, card_id")
+    .eq("id", wantId)
+    .maybeSingle();
+
+  if (!want) return { ok: false, reason: "not-found" };
+  if (want.player_id === responderPlayerId) return { ok: false, reason: "yourself" };
+
+  const { data: existing } = await admin
+    .from("flare_threads")
+    .select("id, closed_at")
+    .eq("want_id", wantId)
+    .eq("responder_player_id", responderPlayerId)
+    .maybeSingle();
+
+  if (existing?.closed_at) return { ok: false, reason: "closed" };
+
+  let threadId = existing?.id ?? null;
+
+  if (!threadId) {
+    const { data: made, error } = await admin
+      .from("flare_threads")
+      .insert({
+        want_id: wantId,
+        author_player_id: want.player_id,
+        responder_player_id: responderPlayerId,
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (error && error.code === "23505") {
+      const { data: raced } = await admin
+        .from("flare_threads")
+        .select("id")
+        .eq("want_id", wantId)
+        .eq("responder_player_id", responderPlayerId)
+        .maybeSingle();
+      threadId = raced?.id ?? null;
+    } else {
+      threadId = made?.id ?? null;
+    }
+  }
+
+  if (!threadId) return { ok: false, reason: "unavailable" };
+
+  const sent = await appendMessage(threadId, responderPlayerId, want.player_id, body, {
+    flareCardId: want.card_id,
+  });
+
+  return sent ? { ok: true, threadId } : { ok: false, reason: "unavailable" };
+}
+
 /** The two ends of a thread, or null when the viewer is neither. */
 async function threadForViewer(
   threadId: string,
   viewerId: string,
 ): Promise<{
   id: string;
-  flareId: string;
+  flareId: string | null;
+  wantId: string | null;
   authorId: string;
   responderId: string;
   closed: boolean;
 } | null> {
   const { data } = await getSupabaseAdmin()
     .from("flare_threads")
-    .select("id, flare_id, author_player_id, responder_player_id, closed_at")
+    .select("id, flare_id, want_id, author_player_id, responder_player_id, closed_at")
     .eq("id", threadId)
     .maybeSingle();
 
@@ -188,6 +268,7 @@ async function threadForViewer(
   return {
     id: data.id,
     flareId: data.flare_id,
+    wantId: data.want_id,
     authorId: data.author_player_id,
     responderId: data.responder_player_id,
     closed: data.closed_at !== null,
@@ -278,7 +359,7 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   const { data: threads, error } = await admin
     .from("flare_threads")
     .select(
-      "id, flare_id, author_player_id, responder_player_id, last_message_at, closed_at",
+      "id, flare_id, want_id, author_player_id, responder_player_id, last_message_at, closed_at",
     )
     .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
     .order("last_message_at", { ascending: false })
@@ -302,25 +383,34 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       ),
     ),
   ];
-  const flareIds = [...new Set(rows.map((row) => row.flare_id))];
+  const flareIds = [
+    ...new Set(rows.flatMap((row) => (row.flare_id ? [row.flare_id] : []))),
+  ];
+  const wantIds = [
+    ...new Set(rows.flatMap((row) => (row.want_id ? [row.want_id] : []))),
+  ];
 
-  const [{ data: others }, { data: flares }, { data: messages }] = await Promise.all([
-    admin.from("players").select("id, display_name").in("id", otherIds),
-    admin.from("flares").select("id, card_id").in("id", flareIds),
-    /* Recent messages for previews and unread counts, one query. 50
+  const [{ data: others }, { data: flares }, { data: wants }, { data: messages }] =
+    await Promise.all([
+      admin.from("players").select("id, display_name").in("id", otherIds),
+      admin.from("flares").select("id, card_id").in("id", flareIds),
+      /* A thread on a saved want names its card the same way. */
+      admin.from("player_wants").select("id, card_id").in("id", wantIds),
+      /* Recent messages for previews and unread counts, one query. 50
        threads × a busy conversation still fits comfortably. */
-    admin
-      .from("flare_messages")
-      .select("thread_id, sender_player_id, body, created_at, read_at")
-      .in("thread_id", threadIds)
-      .order("created_at", { ascending: false })
-      .limit(500),
-  ]);
+      admin
+        .from("flare_messages")
+        .select("thread_id, sender_player_id, body, created_at, read_at")
+        .in("thread_id", threadIds)
+        .order("created_at", { ascending: false })
+        .limit(500),
+    ]);
 
   const nameById = new Map((others ?? []).map((row) => [row.id, row.display_name]));
   const flareCard = new Map((flares ?? []).map((row) => [row.id, row.card_id]));
+  const wantCard = new Map((wants ?? []).map((row) => [row.id, row.card_id]));
 
-  const cardIds = [...new Set([...flareCard.values()])];
+  const cardIds = [...new Set([...flareCard.values(), ...wantCard.values()])];
   const { data: cards } = await admin
     .from("cards")
     .select("id, exact_name, canonical_card_number")
@@ -358,7 +448,11 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       row.author_player_id === playerId
         ? row.responder_player_id
         : row.author_player_id;
-    const cardId = flareCard.get(row.flare_id);
+    const cardId = row.flare_id
+      ? flareCard.get(row.flare_id)
+      : row.want_id
+        ? wantCard.get(row.want_id)
+        : undefined;
     const card = cardId ? cardById.get(cardId) : undefined;
     if (!card) return [];
 
@@ -366,6 +460,7 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       {
         threadId: row.id,
         flareId: row.flare_id,
+        wantId: row.want_id,
         cardName: card.exact_name,
         cardNumber: card.canonical_card_number,
         imageUrl: (cardId && artByCard.get(cardId)) || null,
@@ -390,22 +485,77 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
  * inbox notice for this thread is cleared so the NEXT message can ring
  * again.
  */
-export async function readThread(
-  threadId: string,
+/**
+ * Somewhere public to meet, suggested rather than asked for.
+ *
+ * CardFlare's mission is the in-person trade at a store or a card
+ * event, and never at anybody's home. So a thread carries one store to
+ * suggest: a local you BOTH go to when there is one, otherwise one of
+ * the viewer's own, with the next night on its calendar. Nothing here
+ * is an address; a store is a name and a code, as everywhere else.
+ */
+export interface MeetSuggestion {
+  storeName: string;
+  joinCode: string;
+  nextEventName: string | null;
+  nextEventAt: string | null;
+  timeZone: string;
+  /** True when the store is one both people have saved. */
+  shared: boolean;
+}
+
+async function meetSuggestion(
   viewerId: string,
-): Promise<{
+  otherId: string,
+): Promise<MeetSuggestion | null> {
+  const [mine, theirs] = await Promise.all([listLocals(viewerId), listLocals(otherId)]);
+  if (mine.length === 0) return null;
+
+  const theirIds = new Set(theirs.map((local) => local.storeId));
+  const shared = mine.filter((local) => theirIds.has(local.storeId));
+  const pool = shared.length > 0 ? shared : mine;
+
+  /* The one with a night coming soonest wins; a store with nothing on
+     the calendar still beats no suggestion at all. */
+  const pick = [...pool].sort((a, b) => {
+    if (a.nextEventAt && b.nextEventAt) return a.nextEventAt < b.nextEventAt ? -1 : 1;
+    if (a.nextEventAt) return -1;
+    if (b.nextEventAt) return 1;
+    return 0;
+  })[0];
+  if (!pick) return null;
+
+  return {
+    storeName: pick.name,
+    joinCode: pick.joinCode,
+    nextEventName: pick.nextEventName,
+    nextEventAt: pick.nextEventAt,
+    timeZone: pick.timeZone,
+    shared: shared.length > 0,
+  };
+}
+
+export interface ThreadRead {
   ok: boolean;
   closed: boolean;
   cardName: string | null;
   withName: string | null;
   messages: ThreadMessage[];
-}> {
-  const empty = {
+  /** A public place to suggest meeting, or null when neither side has a local. */
+  meet: MeetSuggestion | null;
+}
+
+export async function readThread(
+  threadId: string,
+  viewerId: string,
+): Promise<ThreadRead> {
+  const empty: ThreadRead = {
     ok: false,
     closed: false,
     cardName: null,
     withName: null,
     messages: [],
+    meet: null,
   };
   if (!isSupabaseConfigured()) return empty;
 
@@ -415,7 +565,7 @@ export async function readThread(
   const admin = getSupabaseAdmin();
   const otherId = thread.authorId === viewerId ? thread.responderId : thread.authorId;
 
-  const [{ data: messages }, { data: other }, { data: flare }] = await Promise.all([
+  const [{ data: messages }, { data: other }, anchor, meet] = await Promise.all([
     admin
       .from("flare_messages")
       .select("id, sender_player_id, body, created_at")
@@ -423,14 +573,29 @@ export async function readThread(
       .order("created_at", { ascending: true })
       .limit(200),
     admin.from("players").select("display_name").eq("id", otherId).maybeSingle(),
-    admin.from("flares").select("card_id").eq("id", thread.flareId).maybeSingle(),
+    thread.flareId
+      ? admin
+          .from("flares")
+          .select("card_id")
+          .eq("id", thread.flareId)
+          .maybeSingle()
+          .then((result) => result.data)
+      : thread.wantId
+        ? admin
+            .from("player_wants")
+            .select("card_id")
+            .eq("id", thread.wantId)
+            .maybeSingle()
+            .then((result) => result.data)
+        : Promise.resolve(null),
+    meetSuggestion(viewerId, otherId).catch(() => null),
   ]);
 
-  const { data: card } = flare?.card_id
+  const { data: card } = anchor?.card_id
     ? await admin
         .from("cards")
         .select("exact_name")
-        .eq("id", flare.card_id)
+        .eq("id", anchor.card_id)
         .maybeSingle()
     : { data: null };
 
@@ -462,5 +627,6 @@ export async function readThread(
       sentAt: message.created_at,
       yours: message.sender_player_id === viewerId,
     })),
+    meet,
   };
 }
