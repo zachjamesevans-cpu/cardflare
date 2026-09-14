@@ -1134,6 +1134,13 @@ export const getFollowing = () =>
 export const getFollowers = () =>
   call<{ followers: FollowedPlayer[] }>("GET", "/api/v1/followers");
 
+/** Somebody else's two lists, behind the numbers on their profile. */
+export const getPlayerPeople = (playerId: string) =>
+  call<{ followers: FollowedPlayer[]; following: FollowedPlayer[] }>(
+    "GET",
+    `/api/players/${encodeURIComponent(playerId)}/people`,
+  );
+
 export interface PackSeries {
   id: string;
   name: string;

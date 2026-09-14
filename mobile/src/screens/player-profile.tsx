@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { peekPlayer, storedAccessToken, type PeekProfile } from "../api";
+import {
+  getPlayerPeople,
+  peekPlayer,
+  storedAccessToken,
+  type FollowedPlayer,
+  type PeekProfile,
+} from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { FollowButton } from "../follow-button";
+import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
@@ -40,6 +47,21 @@ export function PlayerProfileScreen() {
   /* A guest sees Follow too; theirs starts sign-up, the website's
      Follow link for a visitor without an account. */
   const [guest, setGuest] = useState(false);
+  /* Their lists, fetched the first time a number is tapped. */
+  const [people, setPeople] = useState<"followers" | "following" | null>(null);
+  const [lists, setLists] = useState<{
+    followers: FollowedPlayer[];
+    following: FollowedPlayer[];
+  } | null>(null);
+
+  const openPeople = (which: "followers" | "following") => {
+    setPeople(which);
+    if (!lists) {
+      getPlayerPeople(playerId)
+        .then(setLists)
+        .catch(() => setLists({ followers: [], following: [] }));
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -128,6 +150,8 @@ export function PlayerProfileScreen() {
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}
+            onFollowers={() => openPeople("followers")}
+            onFollowing={() => openPeople("following")}
             actions={
               <>
                 {profile.follow ? (
@@ -204,6 +228,16 @@ export function PlayerProfileScreen() {
       </Card>
 
       <ShowcaseZoom card={zoomed} onClose={() => setZoomed(null)} />
+
+      <PeopleSheet
+        which={people}
+        people={lists ? (people === "followers" ? lists.followers : lists.following) : null}
+        onClose={() => setPeople(null)}
+        onOpen={(id) => {
+          setPeople(null);
+          navigation.push("PlayerProfile", { playerId: id });
+        }}
+      />
     </ScrollView>
   );
 }

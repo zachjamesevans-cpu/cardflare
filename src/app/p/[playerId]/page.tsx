@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FollowButton } from "@/components/players/follow-button";
+import { PeopleList } from "@/components/players/people-list";
 import { ProfileHeader } from "@/components/players/profile-header";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -19,7 +20,7 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
-import { followState } from "@/lib/players/follows";
+import { followState, listFollowers, listFollowing } from "@/lib/players/follows";
 import { publicProfile } from "@/lib/players/profile";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
@@ -89,9 +90,11 @@ export default async function PublicProfilePage({
       : viewer.kind === "anonymous"
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
-  const [follow, stats] = await Promise.all([
+  const [follow, stats, followers, following] = await Promise.all([
     me && me !== playerId ? followState(me, playerId) : null,
     profileStats(playerId),
+    listFollowers(playerId),
+    listFollowing(playerId),
   ]);
 
   return (
@@ -129,6 +132,12 @@ export default async function PublicProfilePage({
                 worn={dressed}
                 embersEarned={profile.embersEarned}
                 stats={stats}
+                /* Their lists open too, as Instagram's do. The Trade
+                   partners mark is theirs, not the viewer's. */
+                people={{
+                  followers: <PeopleList people={followers} empty="Nobody yet." />,
+                  following: <PeopleList people={following} empty="Nobody yet." />,
+                }}
                 actions={
                   <>
                     {follow ? (
