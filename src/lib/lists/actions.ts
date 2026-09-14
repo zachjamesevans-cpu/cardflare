@@ -8,6 +8,7 @@ import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/not
 import { hasFeature } from "@/lib/billing/features";
 import { tierForPlayer } from "@/lib/billing/repository";
 import { announceShowcase } from "./showcase";
+import { keepShowcaseAsHave } from "@/lib/nearby/showcase";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
@@ -213,6 +214,17 @@ export async function addToListAction(
       room,
       parsed.data,
       (await getPlayerSession())?.display_name ?? "A player",
+    );
+    /* And onto the Have list, marked for nearby matching: a showcase
+       is "I have this" said out loud. See nearby/showcase.ts. */
+    void keepShowcaseAsHave(
+      { playerSessionId: room.playerSessionId, playerId: room.playerId },
+      {
+        cardId: parsed.data.cardId,
+        printingId: parsed.data.printingId ?? null,
+        quantity: parsed.data.quantity,
+        note: parsed.data.note ?? null,
+      },
     );
   }
 
