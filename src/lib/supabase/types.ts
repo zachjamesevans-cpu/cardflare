@@ -1341,11 +1341,24 @@ export type NotificationRow = {
   dedupe_key: string | null;
   read_at: string | null;
   emailed_at: string | null;
+  /**
+   * The player who did the thing, when it was a person: the follower,
+   * the responder, the poster, the sender. Null for a board opening.
+   * What lets the inbox lead with a face the way Instagram's does.
+   */
+  actor_id: string | null;
 };
 
 export type NotificationInsert = Omit<
   NotificationRow,
-  "id" | "created_at" | "body" | "url" | "dedupe_key" | "read_at" | "emailed_at"
+  | "id"
+  | "created_at"
+  | "body"
+  | "url"
+  | "dedupe_key"
+  | "read_at"
+  | "emailed_at"
+  | "actor_id"
 > & {
   id?: string;
   created_at?: string;
@@ -1353,6 +1366,7 @@ export type NotificationInsert = Omit<
   url?: string | null;
   dedupe_key?: string | null;
   read_at?: string | null;
+  actor_id?: string | null;
   emailed_at?: string | null;
 };
 

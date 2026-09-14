@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Bell } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { InboxList } from "@/components/inbox/inbox-list";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,23 +20,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-/** "3 minutes ago" beats a timestamp for something that just happened. */
-function ago(iso: string): string {
-  const minutes = Math.max(
-    0,
-    Math.round((Date.now() - new Date(iso).getTime()) / 60000),
-  );
-
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  const days = Math.round(hours / 24);
-  return days === 1 ? "yesterday" : `${days}d ago`;
-}
 
 /**
  * The app's Inbox tab, on the website.
@@ -101,58 +85,8 @@ export default async function InboxPage() {
               </ButtonLink>
             </Card>
           ) : (
-            <Card className="p-4">
-              <ul className="flex flex-col">
-                {items.map((item) => {
-                  const body = (
-                    <>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                        <p
-                          className={
-                            item.readAt
-                              ? "font-medium text-text-secondary"
-                              : "font-semibold text-text-primary"
-                          }
-                        >
-                          {!item.readAt && (
-                            <span
-                              aria-label="Unread"
-                              className="mr-2 inline-block size-2 rounded-full bg-accent align-middle"
-                            />
-                          )}
-                          {item.title}
-                        </p>
-                        <span className="text-xs text-text-muted">
-                          {ago(item.createdAt)}
-                        </span>
-                      </div>
-                      {item.body && (
-                        <p className="text-sm text-text-secondary">{item.body}</p>
-                      )}
-                    </>
-                  );
-
-                  return (
-                    <li
-                      key={item.id}
-                      className="flex flex-col gap-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-                    >
-                      {/* Most of these happened somewhere; the row is the
-                          way back to it. */}
-                      {item.url ? (
-                        <Link
-                          href={item.url}
-                          className="flex flex-col gap-1 rounded-[var(--radius-control)] transition-colors hover:text-text-primary"
-                        >
-                          {body}
-                        </Link>
-                      ) : (
-                        body
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+            <Card className="p-2 sm:p-3">
+              <InboxList items={items} />
             </Card>
           )}
         </div>

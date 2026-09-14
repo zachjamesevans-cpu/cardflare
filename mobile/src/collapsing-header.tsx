@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
-import { Image, View } from "react-native";
+import { Image, View, type ViewStyle } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
 
@@ -52,6 +53,37 @@ const WORDMARK_ASPECT = WORDMARK_SOURCE.width / WORDMARK_SOURCE.height;
  * from JavaScript stutters against the very scroll it is following,
  * which reads as cheaper than no animation at all.
  */
+/**
+ * The material the bar is made of.
+ *
+ * Liquid Glass on iOS 26, and the frosted blur this bar has always used
+ * everywhere else. Written as a fork rather than as a fallback colour
+ * because the two are not interchangeable: `GlassSurface` falls back to
+ * a FLAT colour, and a flat bar over a scrolling feed would be a
+ * regression on every phone that cannot do glass.
+ */
+function HeaderSurface({
+  style,
+  children,
+}: {
+  style: ViewStyle;
+  children: React.ReactNode;
+}) {
+  if (GLASS_AVAILABLE) {
+    return (
+      <GlassSurface style={style} fallback="transparent">
+        {children}
+      </GlassSurface>
+    );
+  }
+
+  return (
+    <BlurView intensity={40} tint="dark" style={style}>
+      {children}
+    </BlurView>
+  );
+}
+
 export const HEADER_CONTENT_HEIGHT = 52;
 
 export interface HeaderScroll {
@@ -124,11 +156,24 @@ export function CollapsingHeader({
 
   const bar = useAnimatedStyle(() => ({
     transform: [{ translateY: -state.hidden.value }],
-    /*
-     * Fades as it leaves. Sliding alone leaves the wordmark legible
-     * while it is halfway under the status bar, which reads as the
-     * text escaping rather than the bar retiring.
-     */
+  }));
+
+  /*
+   * The fade is on the CONTENTS, not on the bar.
+   *
+   * It still exists for the reason it always did: sliding alone leaves
+   * the wordmark legible while it is halfway under the status bar,
+   * which reads as the text escaping rather than the bar retiring.
+   *
+   * But it cannot live on the wrapper any more. The wrapper is now the
+   * parent of a Liquid Glass surface, and Expo is explicit that an
+   * opacity below 1 anywhere above a GlassView renders the material
+   * incorrectly - so the old style would have broken the glass on every
+   * scroll, in the one state nobody screenshots. The bar itself needs
+   * no fade regardless: it travels its own full height and ends
+   * completely off-screen.
+   */
+  const contents = useAnimatedStyle(() => ({
     opacity: interpolate(state.hidden.value, [0, HEADER_CONTENT_HEIGHT], [1, 0]),
   }));
 
@@ -149,9 +194,7 @@ export function CollapsingHeader({
          the moment it starts to slide away. */
       pointerEvents="box-none"
     >
-      <BlurView
-        intensity={40}
-        tint="dark"
+      <HeaderSurface
         style={{
           /*
            * The blur covers the status bar too, and the inset is padding
@@ -175,14 +218,17 @@ export function CollapsingHeader({
           borderBottomColor: colors.border,
         }}
       >
-        <Image
+        <Animated.Image
           source={wordmark}
           accessibilityLabel="cardflare"
-          style={{
-            height: WORDMARK_HEIGHT,
-            width: WORDMARK_HEIGHT * WORDMARK_ASPECT,
-            resizeMode: "contain",
-          }}
+          style={[
+            {
+              height: WORDMARK_HEIGHT,
+              width: WORDMARK_HEIGHT * WORDMARK_ASPECT,
+              resizeMode: "contain",
+            },
+            contents,
+          ]}
         />
 
         {/*
@@ -195,16 +241,19 @@ export function CollapsingHeader({
           * lands under the wordmark instead of right of it. Which is
           * exactly what it did.
           */}
-        <View
-          style={{
-            position: "absolute",
-            right: 0,
-            /* Below the inset, so the glyph lines up with the wordmark
-               rather than centring against the notch as well. */
-            top: insets.top,
-            bottom: 0,
-            justifyContent: "center",
-          }}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              right: 0,
+              /* Below the inset, so the glyph lines up with the wordmark
+                 rather than centring against the notch as well. */
+              top: insets.top,
+              bottom: 0,
+              justifyContent: "center",
+            },
+            contents,
+          ]}
         >
           <Tap
             accessibilityLabel="Find a player"
@@ -217,8 +266,8 @@ export function CollapsingHeader({
           >
             <Ionicons name="search" size={20} color={colors.textSecondary} />
           </Tap>
-        </View>
-      </BlurView>
+        </Animated.View>
+      </HeaderSurface>
     </Animated.View>
   );
 }

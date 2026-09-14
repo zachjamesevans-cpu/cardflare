@@ -34,10 +34,34 @@ export class ProviderHttpError extends Error {
     message: string,
     readonly status: number | null,
     readonly retryable: boolean,
+    /**
+     * What the server said in the body of a refused response, one line,
+     * tags stripped. A 403 from a gateway in front of an API arrives
+     * as an HTML page whose one sentence ("Sorry, you have been
+     * blocked") is the only clue to who refused the request and why.
+     */
+    readonly detail: string | null = null,
   ) {
     super(message);
     this.name = "ProviderHttpError";
   }
+}
+
+const DETAIL_CAP = 200;
+
+/**
+ * The first sentence of a refused response, or null when it said
+ * nothing readable. Markup and whitespace are collapsed so an HTML
+ * error page reads as its text.
+ */
+export function responseDetail(body: string): string | null {
+  const text = body
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+  return text.length > DETAIL_CAP ? `${text.slice(0, DETAIL_CAP - 1)}…` : text;
 }
 
 /**
@@ -161,10 +185,12 @@ export class ProviderHttp {
 
         if (!response.ok) {
           const retryable = RETRYABLE_STATUSES.has(response.status);
+          const detail = responseDetail(await response.text().catch(() => ""));
           lastError = new ProviderHttpError(
             `HTTP ${response.status} for ${url}`,
             response.status,
             retryable,
+            detail,
           );
 
           if (!retryable) throw lastError;

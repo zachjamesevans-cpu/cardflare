@@ -10,13 +10,15 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
-import type { FeedItem } from "@/lib/feed/repository";
+import { cardImagesEnabled } from "@/lib/cards/images";
+import type { FeedCard, FeedItem } from "@/lib/feed/repository";
 
 /**
  * What one item of the Feed looks like.
@@ -74,27 +76,108 @@ function agoFrom(iso: string): string {
  * and a deck goes back to a strip of thumbnails because at that point the
  * row is about the SIZE of the hunt rather than about any one card in it.
  *
+ * Two sizes, not three. The old ramp shrank tiles to "sm" as a row filled
+ * up, because the row WRAPPED and four small tiles were what fitted on one
+ * line. Rows are rails now, so nothing has to fit: a lone card still gets a
+ * picture, and every rail gets the same readable tile whether it holds two
+ * cards or twenty. Shrinking them was only ever paying for the wrap.
+ *
  * Thresholds are duplicated in the app deliberately and pinned together by
  * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
  */
-export function tileWidth(count: number): "lg" | "md" | "sm" {
+export function tileWidth(count: number): "lg" | "md" {
   if (count <= 1) return "lg";
-  if (count <= 3) return "md";
-  return "sm";
+  return "md";
 }
 
 const TILE_CLASS = { lg: "w-40", md: "w-24", sm: "w-14" } as const;
 
-/** One card, at the size the feed shows cards. */
+/**
+ * A row of cards you can see all of.
+ *
+ * The founder, on a friend's hunt that read "+4 more": "it should be a
+ * carousel for these types of things... so you can see all the cards."
+ * Four tiles and a count told you how much you were missing without
+ * showing you any of it, which on the one row about what a friend is
+ * chasing is the whole content of the row.
+ *
+ * So it scrolls. `overflow-x-auto` with `shrink-0` tiles is the whole
+ * mechanism - no library, no snapping, and it stays a plain flex row for
+ * anyone whose rail is short enough not to scroll at all. The count only
+ * survives past CARD_RAIL_CAP on the server, where it stops being "we
+ * hid some" and becomes "the rest are on the board".
+ */
+function CardRail({
+  cards,
+  more,
+  size = "md",
+}: {
+  cards: FeedCard[];
+  /** Cards past the server's cap, which live on the board. */
+  more?: number;
+  size?: "lg" | "md";
+}) {
+  /* The shelf the zoom pages along. Built from the same array the rail
+     draws, so what you swipe through is exactly what you can see. */
+  const shelf: ZoomCard[] = cards.map((card) => ({
+    imageUrl: card.imageUrl,
+    exactName: card.cardName,
+    cardNumber: card.cardNumber,
+    youHave: card.match ? { kind: card.match, count: 0 } : null,
+  }));
+
+  return (
+    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      {cards.map((card, index) => (
+        <div key={card.cardId} className="flex shrink-0">
+          <FeedTile
+            imageUrl={card.imageUrl}
+            name={card.cardName}
+            cardNumber={card.cardNumber}
+            match={card.match}
+            size={size}
+            siblings={shelf}
+            position={index}
+          />
+        </div>
+      ))}
+      {more && more > 0 ? (
+        <p className="shrink-0 self-center text-xs whitespace-nowrap text-text-muted tabular-nums">
+          +{more} more
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One card, at the size the feed shows cards, and the way to see it big.
+ *
+ * The founder, on the phone: "I can't click the images in the feed to
+ * open the bigger view." The app's feed has opened the zoom since the
+ * rails were made swipeable; the website's drew the same art as a plain
+ * picture. So the tile is now the opener for the same `CardImageZoom`
+ * every board and shelf on the site uses - tap for the large view, and
+ * a rail hands over the whole shelf so the viewer pages along it
+ * without closing. The picture itself is unchanged: when art is off or
+ * a card has none, the zoom returns the tile as it was.
+ */
 function FeedTile({
   imageUrl,
   name,
+  cardNumber,
   match,
   size = "sm",
+  siblings,
+  position,
 }: {
   imageUrl: string | null;
   name: string;
+  cardNumber: string;
   size?: "lg" | "md" | "sm";
+  /** The rest of the rail this tile sits in, and where in it. */
+  siblings?: ZoomCard[];
+  position?: number;
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -106,7 +189,7 @@ function FeedTile({
    */
   match: "exact" | "other-printing" | null;
 }) {
-  return (
+  const art = (
     <span
       title={
         match === "exact"
@@ -139,6 +222,21 @@ function FeedTile({
         </span>
       )}
     </span>
+  );
+
+  return (
+    <CardImageZoom
+      imageUrl={imageUrl}
+      exactName={name}
+      cardNumber={cardNumber}
+      enabled={cardImagesEnabled()}
+      /* The ring already says it across the row; the sentence is what
+         the tap is for, same as the board and the app. */
+      youHave={match ? { kind: match, count: 0 } : null}
+      siblings={siblings}
+      position={position}
+      thumb={art}
+    />
   );
 }
 
@@ -244,6 +342,7 @@ export function Item({ item }: { item: FeedItem }) {
             <FeedTile
               imageUrl={item.cards[0].imageUrl}
               name={item.cards[0].cardName}
+              cardNumber={item.cards[0].cardNumber}
               match={item.cards[0].match}
             />
             <div className="flex min-w-0 flex-col gap-1">
@@ -264,22 +363,11 @@ export function Item({ item }: { item: FeedItem }) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-2">
-              {item.cards.map((card) => (
-                <FeedTile
-                  key={card.cardId}
-                  imageUrl={card.imageUrl}
-                  name={card.cardName}
-                  match={card.match}
-                  size={tileWidth(item.total)}
-                />
-              ))}
-              {item.total > item.cards.length && (
-                <span className="self-center text-xs text-text-muted tabular-nums">
-                  +{item.total - item.cards.length} more
-                </span>
-              )}
-            </div>
+            <CardRail
+              cards={item.cards}
+              more={item.total - item.cards.length}
+              size={tileWidth(item.cards.length)}
+            />
             {item.youCanAnswer > 0 && (
               /* The line that earns the tap. Absent when it would read
                  "you can answer 0", which is not news. */
@@ -439,6 +527,7 @@ export function Item({ item }: { item: FeedItem }) {
                 <FeedTile
                   imageUrl={match.card.imageUrl}
                   name={match.card.cardName}
+                  cardNumber={match.card.cardNumber}
                   match={match.card.match}
                 />
               }
@@ -479,6 +568,7 @@ export function Item({ item }: { item: FeedItem }) {
               <FeedTile
                 imageUrl={entry.card.imageUrl}
                 name={entry.card.cardName}
+                cardNumber={entry.card.cardNumber}
                 match={entry.card.match}
               />
               {/* Whose it is. "Who do I walk over to" is half the
@@ -595,20 +685,11 @@ export function Item({ item }: { item: FeedItem }) {
           <p className="shrink-0 text-xs text-text-muted">{agoFrom(item.when)}</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {item.cards.map((card) => (
-            <FeedTile
-              key={card.cardId}
-              imageUrl={card.imageUrl}
-              name={card.cardName}
-              match={card.match}
-              size={tileWidth(item.cards.length + item.more)}
-            />
-          ))}
-          {item.more > 0 && (
-            <p className="text-xs text-text-muted">+{item.more} more</p>
-          )}
-        </div>
+        <CardRail
+          cards={item.cards}
+          more={item.more}
+          size={tileWidth(item.cards.length)}
+        />
 
         <Link href={`/e/${item.joinCode}`} className={buttonStyles("secondary", "sm")}>
           See the board
@@ -804,6 +885,7 @@ export function Item({ item }: { item: FeedItem }) {
                 key={card.cardId}
                 imageUrl={card.imageUrl}
                 name={card.cardName}
+                cardNumber={card.cardNumber}
                 match={card.match}
               />
             ))}

@@ -2,7 +2,7 @@ diff --git a/node_modules/react-native/ReactCommon/react/nativemodule/core/platf
 index 2a67797..4e4bc9a 100644
 --- a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
 +++ b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
-@@ -435,7 +435,22 @@ void ObjCTurboModule::performVoidMethodInvocation(
+@@ -435,7 +435,22 @@ TraceSection s(
      @try {
        [inv invokeWithTarget:strongModule];
      } @catch (NSException *exception) {
@@ -26,3 +26,33 @@ index 2a67797..4e4bc9a 100644
      } @finally {
        [retainedObjectsForInvocation removeAllObjects];
      }
+diff --git a/node_modules/react-native/third-party-podspecs/fmt.podspec b/node_modules/react-native/third-party-podspecs/fmt.podspec
+index 2f38990..9f4701f 100644
+--- a/node_modules/react-native/third-party-podspecs/fmt.podspec
++++ b/node_modules/react-native/third-party-podspecs/fmt.podspec
+@@ -26,4 +26,25 @@ Pod::Spec.new do |spec|
+   spec.public_header_files = "include/fmt/*.h"
+   spec.header_mappings_dir = "include"
+   spec.source_files = ["include/fmt/*.h", "src/format.cc"]
++
++  # fmt 11.0.2 does not compile under Xcode 26 / Apple clang 21: every
++  # FMT_STRING site in format-inl.h fails with "call to consteval
++  # function ... is not a constant expression". Upstream fixed it in fmt
++  # 11.1, but RCT-Folly pins 11.0.2 exactly, so the version cannot move
++  # without moving folly too.
++  #
++  # base.h decides FMT_USE_CONSTEVAL from a compiler-detection ladder and
++  # #defines it unconditionally, so -DFMT_USE_CONSTEVAL=0 loses to the
++  # header. Turning the two "1" branches into "0" at unpack time is the
++  # whole fix: FMT_CONSTEVAL becomes empty and the format strings are
++  # checked at runtime instead of compile time. Nothing in React Native
++  # relies on fmt's compile-time checking.
++  #
++  # This only matters because app.json sets buildReactNativeFromSource -
++  # see the M36b commit; the prebuilt artifacts would sidestep fmt, and
++  # also sidestep patches/react-native+0.81.5.patch, which is a crash fix
++  # we need to ship.
++  spec.prepare_command = <<-CMD
++    sed -i '' 's/#  define FMT_USE_CONSTEVAL 1/#  define FMT_USE_CONSTEVAL 0/g' include/fmt/base.h
++  CMD
+ end

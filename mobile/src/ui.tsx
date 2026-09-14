@@ -8,6 +8,8 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
+  type ScrollViewProps,
   StyleSheet,
   Text,
   TextInput,
@@ -101,6 +103,33 @@ export function Tap({
  * One card as the large view draws it - the app's copy of the website's
  * `ZoomCard`, so a shelf can be handed over in one array.
  */
+/**
+ * How much of each neighbour shows beside the card being read, and the
+ * air between them. Small on purpose: the point is a hint that there is
+ * more to the left and right, not a three-up gallery.
+ */
+/**
+ * Hand touches to the cards immediately.
+ *
+ * iOS holds a touch back to decide whether it is the start of a scroll,
+ * and a tap that ends inside that window never reaches the card at all -
+ * which is exactly what happened: the dismiss did nothing until this was
+ * set. Safe to turn off, because whether a gesture was a drag is
+ * answered by the rail's own `onScrollBeginDrag`, not by whether the
+ * press got cancelled.
+ *
+ * Spread through a cast because `delaysContentTouches` is not in React
+ * Native 0.81's TypeScript surface for ScrollView. It is still read
+ * natively - RCTScrollView.m - and the behaviour changed the moment it
+ * was passed, so the prop is real and only the typing is missing.
+ */
+const IMMEDIATE_TOUCHES = {
+  delaysContentTouches: false,
+} as unknown as ScrollViewProps;
+
+const PEEK_WIDTH = 26;
+const PEEK_GAP = 8;
+
 export interface ZoomCard {
   imageUrl: string | null;
   name: string;
@@ -238,16 +267,6 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
   );
 }
 
-/**
- * How far a thumb travels before it stops being a tap.
- *
- * Forty points: a shaky thumb is still a tap, a flick is a flick. The
- * same number the website uses, and used by BOTH halves of the zoom's
- * gesture, which is the point of it being a constant - the two used to
- * be two literals and could have drifted into a gap where a drag was
- * neither a swipe nor a press.
- */
-const SWIPE = 40;
 
 export function CardImage({
   imageUrl: ownImageUrl,
@@ -312,6 +331,22 @@ export function CardImage({
   /* A shelf of one is no shelf: no arrows, no counter, nothing new. */
   const shelf = siblings && siblings.length > 1 ? siblings : null;
   const [at, setAt] = useState(position);
+
+  /*
+   * Did this gesture scroll the rail?
+   *
+   * The founder wants both: "make it so that you can still tap anywhere
+   * to close that screen. even though ther's a swipe thing now." A tap
+   * on the card should dismiss, a drag on the same card should turn the
+   * page, and React Native does NOT cancel the press for us here -
+   * wrapping each card in a Pressable and trusting that closed the zoom
+   * on every swipe, measured on the simulator.
+   *
+   * So the RAIL says whether it moved. `onScrollBeginDrag` only fires
+   * when a finger actually drags it, so a press that arrives with this
+   * still false was a tap and nothing else.
+   */
+  const scrolled = useRef(false);
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
 
   /* Everything below reads these, so the panel draws whichever card the
@@ -329,30 +364,9 @@ export function CardImage({
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
 
-  /*
-   * A swipe ends in a press, and a press anywhere here closes.
-   *
-   * WHICH IS WHY THE FLAG IS SET WHILE THE THUMB IS STILL DOWN. The
-   * first cut set it in `onTouchEnd` and read it in the Pressable's
-   * `onPress`, which reads like it happens in that order and does not:
-   * a press comes out of the responder system and a touch event comes
-   * out of the touch system, and the responder plugin is dispatched
-   * first. So every swipe closed the card - reported from a phone as
-   * "swiping between card flares immediately closes the card" - and
-   * left the flag set behind it, so the next tap refused to close.
-   *
-   * Setting it in `onTouchMove` takes the ordering out of it entirely.
-   * By the time either handler runs, the thumb has already travelled
-   * and the answer is already recorded.
-   */
-  const swiped = useRef(false);
-  const touchFrom = useRef<number | null>(null);
 
-  const go = (delta: number) => {
-    if (!shelf) return;
-    setAt((current) => (current + delta + shelf.length) % shelf.length);
-  };
   const window = useWindowDimensions();
+
 
   /*
    * The zoom's fade is driven by hand, not by the Modal. The built-in
@@ -396,6 +410,38 @@ export function CardImage({
 
   const large = Math.min(window.width - spacing(14), 380);
 
+  /*
+   * With neighbours showing, the hero gives up the width they occupy.
+   *
+   * That is the whole trade the founder asked for - "you should be able
+   * to see the card to the left of it, and the right of" - and on a
+   * phone there is no version of it that keeps the hero at full width.
+   * PEEK is deliberately small: enough card to recognise as a card,
+   * little enough that the one being read still dominates.
+   */
+  const hero = shelf ? large - 2 * (PEEK_WIDTH + PEEK_GAP) : large;
+
+
+  /*
+   * THE SHELF IS A PAGER, not a slideshow.
+   *
+   * It used to read the thumb's travel itself and swap `at` when the
+   * distance crossed a threshold, so the card CHANGED rather than moved
+   * - the founder: "i think you should actually be able to swipe
+   * between them. and it's like a smooth animation... right now it just
+   * fades to each different card."
+   *
+   * A horizontal ScrollView does the whole thing natively: the cards
+   * follow the finger, they rubber-band at the ends, and momentum lands
+   * them on a card instead of nearest-neighbour-ing them. `page` is the
+   * distance between two cards' left edges, which is what snapping is
+   * measured in, and the side padding is what lets the FIRST and LAST
+   * card sit centred with their neighbour showing beside them.
+   */
+  const page = hero + PEEK_GAP;
+  const sidePad = (large - hero) / 2;
+
+
   return (
     <>
       <Tap
@@ -409,34 +455,23 @@ export function CardImage({
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>
         <Animated.View style={[styles.zoomBackdrop, { opacity: fade }]}>
-          <Pressable
-            style={styles.zoomFill}
-            onPress={() => {
-              if (swiped.current) return;
-              close();
-            }}
-            onTouchStart={(event) => {
-              touchFrom.current = event.nativeEvent.pageX;
-              swiped.current = false;
-            }}
-            onTouchMove={(event) => {
-              const from = touchFrom.current;
-              if (from === null) return;
-              if (Math.abs(event.nativeEvent.pageX - from) >= SWIPE) {
-                swiped.current = true;
-              }
-            }}
-            onTouchEnd={(event) => {
-              const from = touchFrom.current;
-              touchFrom.current = null;
-              if (from === null || !shelf) return;
-
-              const travelled = event.nativeEvent.pageX - from;
-              if (Math.abs(travelled) < SWIPE) return;
-
-              go(travelled < 0 ? 1 : -1);
-            }}
-          >
+          {/*
+           * THE CLOSER SITS BEHIND, IT DOES NOT WRAP.
+           *
+           * It used to be a Pressable around the whole modal, and that
+           * is what stopped the card rail working: a Pressable claims
+           * the touch when a finger lands, so the horizontal ScrollView
+           * inside it was never handed the pan and the cards did not
+           * move a pixel - measured, not guessed, by shooting a frame
+           * mid-drag with the finger still down and finding it identical
+           * to the frame at rest.
+           *
+           * Behind and absolutely filled, the rail owns its own gesture
+           * and a tap anywhere off the panel still closes. `box-none` on
+           * the layer above lets those taps through to it.
+           */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+          <View style={styles.zoomFill} pointerEvents="box-none">
             {/* A whisper of scale rides the fade, so the panel settles
                 into place instead of just appearing. The keyboard, when
                 the offer's field wakes it, pushes the panel up. */}
@@ -459,11 +494,19 @@ export function CardImage({
                 },
               ]}
             >
-              <View style={{ alignSelf: "stretch" }}>
-                <Text style={styles.title} numberOfLines={1}>
+              <Pressable style={{ alignSelf: "stretch" }} onPress={close}>
+                {/* Centred over the card they name. The founder: "center
+                    the text. so, for example, fire first and op15-020
+                    should be centered on that screen." Only these two -
+                    a note runs to several lines and centred prose is
+                    harder to read than the tidiness is worth. */}
+                <Text
+                  style={[styles.title, { textAlign: "center" }]}
+                  numberOfLines={1}
+                >
                   {name}
                 </Text>
-                <Text style={styles.muted}>
+                <Text style={[styles.muted, { textAlign: "center" }]}>
                   {cardNumber}
                   {caption ? ` · ${caption}` : ""}
                 </Text>
@@ -530,58 +573,167 @@ export function CardImage({
                     it gets read. */}
                 {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
 
-                {/* The swipe is the gesture and the one nobody can see;
-                    this row says it exists, and is the whole feature for
-                    anybody who does not think to try. */}
-                {shelf ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginTop: spacing(2),
-                    }}
-                  >
-                    <Tap onPress={() => go(-1)} hitSlop={12}>
-                      <MaterialCommunityIcons
-                        name="chevron-left"
-                        size={26}
-                        color={colors.textSecondary}
-                      />
-                    </Tap>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                      {`${at + 1} of ${shelf.length}`}
-                    </Text>
-                    <Tap onPress={() => go(1)} hitSlop={12}>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={26}
-                        color={colors.textSecondary}
-                      />
-                    </Tap>
-                  </View>
-                ) : null}
+                {/*
+                  * NOTHING BUT THE CARDS.
+                  *
+                  * There was a counter here reading "2 of 6" between two
+                  * chevrons. The counter went first - "i dont think the
+                  * '2 of 6' thing is necessary when viewing a full size
+                  * card... you should be able to see the card to the
+                  * left of it, and the right of, so it contextually
+                  * tells you that you can swipe" - and the chevrons
+                  * followed: "i still would like to be able to remove
+                  * the 'arrows' when looking at cards up top. no need to
+                  * have those. then remove the vertical space that is
+                  * dead space."
+                  *
+                  * Both were explaining a gesture that now explains
+                  * itself. The rail below tracks the finger and the
+                  * neighbours are visible at both edges, so a control
+                  * that did the same job in words was a row of chrome
+                  * between the title and the art.
+                  */}
 
                 {/* Keyed on the shelf position, so a half-typed note does
                     not ride along to the next card. */}
                 {offer ? <ZoomOfferForm key={shelf ? at : "own"} offer={offer} /> : null}
-              </View>
-              {/* A sibling can be a card with no art of its own; the
-                  panel shows the empty frame rather than a broken box. */}
-              <RemoteImage
-                uri={imageUrl}
-                contentFit="contain"
-                style={{
-                  width: large,
-                  height: Math.round((large * 88) / 63),
-                  borderRadius: radius.control,
-                  backgroundColor: colors.canvas,
-                }}
-              />
-              <Text style={styles.muted}>Tap anywhere to close</Text>
+              </Pressable>
+              {/*
+                * The card, with its neighbours showing at the edges.
+                *
+                * A sibling can be a card with no art of its own; the
+                * panel shows the empty frame rather than a broken box.
+                *
+                * Each neighbour is drawn at the SAME size as the hero
+                * inside a narrow window that clips it, so what peeks out
+                * is a real card edge at the right scale rather than a
+                * squashed thumbnail. The left one is pushed over so its
+                * RIGHT edge is the part that shows, which is the edge
+                * that would come into view if you pulled it across.
+                */}
+              {shelf ? (
+                /*
+                 * THE RAIL LIVES IN A BOX OF EXACTLY ONE CARD.
+                 *
+                 * A horizontal ScrollView does not take a height from
+                 * its own style here - it grew to 665pt inside a panel
+                 * that should have been 566, which stretched the panel
+                 * to the full height of the screen and pushed the title
+                 * up under the dynamic island. The founder: "it should
+                 * not take up the whole screen... it didn't have this
+                 * issue like 30 mins ago." Measured off the screenshot,
+                 * not guessed: the panel came back 831pt on an 874pt
+                 * screen.
+                 *
+                 * A parent with a fixed width and height is not
+                 * negotiable, and `flex: 1` inside it makes the rail
+                 * fill exactly that and no more.
+                 */
+                <View
+                  style={{
+                    width: large,
+                    height: Math.round((hero * 88) / 63),
+                  }}
+                >
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  /* Snap to a CARD, not to a screen: the viewport is
+                     wider than a card, because the neighbours live in
+                     the margins either side of it. */
+                  {...IMMEDIATE_TOUCHES}
+                  onScrollBeginDrag={() => {
+                    scrolled.current = true;
+                  }}
+                  /* Cleared a beat after the gesture settles, so the
+                     press that ends a swipe still sees it. */
+                  onScrollEndDrag={() => {
+                    setTimeout(() => {
+                      scrolled.current = false;
+                    }, 80);
+                  }}
+                  snapToInterval={page}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  disableIntervalMomentum
+                  contentOffset={{ x: position * page, y: 0 }}
+                  /*
+                   * BOTH dimensions, explicitly.
+                   *
+                   * A horizontal ScrollView with no height does not size
+                   * itself to its cards - it takes the room that is
+                   * going, which made the panel taller than its own
+                   * content and pushed the title up off the top of the
+                   * screen. The founder saw it as "it like clips into
+                   * the top now."
+                   */
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{
+                    paddingHorizontal: sidePad,
+                    gap: PEEK_GAP,
+                    alignItems: "center",
+                  }}
+                  /* The panel above follows the card you LANDED on, and
+                     only once you have landed - retitling it mid-drag
+                     reads as the text flickering. */
+                  onMomentumScrollEnd={(event) => {
+                    const landed = Math.round(
+                      event.nativeEvent.contentOffset.x / page,
+                    );
+                    if (landed >= 0 && landed < shelf.length) setAt(landed);
+                    scrolled.current = false;
+                  }}
+                >
+                  {shelf.map((card, index) => (
+                    /*
+                     * A tap on the card closes; a drag on it scrolls.
+                     * Both, from the same finger, because React Native
+                     * cancels a press the moment the ScrollView under it
+                     * claims the gesture - which is why the dismiss can
+                     * live INSIDE the rail without being the thing that
+                     * broke it when it was wrapped around the outside.
+                     */
+                    <Pressable
+                      key={`${card.cardNumber}-${index}`}
+                      onPress={() => {
+                        if (scrolled.current) return;
+                        close();
+                      }}
+                    >
+                      <RemoteImage
+                        uri={card.imageUrl}
+                        contentFit="contain"
+                        style={{
+                          width: hero,
+                          height: Math.round((hero * 88) / 63),
+                          borderRadius: radius.control,
+                          backgroundColor: colors.canvas,
+                        }}
+                      />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                </View>
+              ) : (
+                <Pressable onPress={close}>
+                  <RemoteImage
+                    uri={imageUrl}
+                    contentFit="contain"
+                    style={{
+                      width: hero,
+                      height: Math.round((hero * 88) / 63),
+                      borderRadius: radius.control,
+                      backgroundColor: colors.canvas,
+                    }}
+                  />
+                </Pressable>
+              )}
+              <Tap onPress={close} hitSlop={8}>
+                <Text style={styles.muted}>Tap anywhere to close</Text>
+              </Tap>
             </Animated.View>
             </KeyboardAvoidingView>
-          </Pressable>
+          </View>
         </Animated.View>
       </Modal>
     </>

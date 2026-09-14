@@ -28,6 +28,7 @@ import {
 } from "../ui";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { LOCAL_ENABLED } from "../local-enabled";
+import { useTabBarInset } from "../glass";
 import { colors, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
@@ -172,6 +173,7 @@ export function PostFlareScreen({
   /** The Flare tab's standing list, rendered under the search. */
   footer?: React.ReactNode;
 }) {
+  const tabInset = useTabBarInset();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
 
@@ -427,7 +429,14 @@ export function PostFlareScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
+    <ScrollView
+      contentContainerStyle={{
+        padding: spacing(4),
+        gap: spacing(3),
+        /* Clear of the floating tab bar - this screen IS the Flare tab. */
+        paddingBottom: spacing(4) + tabInset,
+      }}
+    >
       {/*
        * The group, before the cards rather than after them.
        *

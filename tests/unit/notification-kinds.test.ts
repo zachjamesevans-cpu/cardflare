@@ -45,6 +45,27 @@ describe("notification kinds", () => {
     expect(allowedByMigrations).toContain("room-flare");
   });
 
+  it("the actor column reached the schema", () => {
+    expect(migrationSql).toMatch(
+      /alter table public\.notifications\s+add column actor_id uuid references public\.players/,
+    );
+  });
+
+  it("every recorded notice says who did it, or that nobody did", () => {
+    /* A site that forgets the actor would compile — the column is
+       nullable — and ship a row with no face. Each `record({` block
+       has to name one, even if only to say null. */
+    const notify = readFileSync(
+      join(process.cwd(), "src/lib/notifications/notify.ts"),
+      "utf8",
+    );
+    const sites = [...notify.matchAll(/await record\(\{([\s\S]*?)\}\);/g)];
+    expect(sites.length).toBeGreaterThanOrEqual(9);
+    for (const [, block] of sites) {
+      expect(block, block).toMatch(/actorId/);
+    }
+  });
+
   it("every testable kind has a label for the console's picker", () => {
     for (const kind of TEST_NOTICE_KINDS) {
       expect(TEST_NOTICE_LABELS[kind]?.length ?? 0).toBeGreaterThan(0);

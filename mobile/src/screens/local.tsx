@@ -24,6 +24,7 @@ import { haveLocationPermission, requestCoords, type Coords } from "../location"
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { RemoteImage } from "../remote-image";
 import { colors, radius, spacing } from "../theme";
+import { useTabBarInset } from "../glass";
 import {
   AsyncButton,
   Body,
@@ -73,6 +74,7 @@ export function LocalScreen({
   threadsOnly?: boolean;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const tabInset = useTabBarInset();
 
   const [feed, setFeed] = useState<LocalFeed | null>(null);
   const [threads, setThreads] = useState<LocalThread[]>([]);
@@ -216,7 +218,12 @@ export function LocalScreen({
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}
+      contentContainerStyle={{
+        padding: spacing(4),
+        gap: spacing(3),
+        /* Clear of the floating tab bar. */
+        paddingBottom: spacing(4) + tabInset,
+      }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       data={rows}
       keyExtractor={(row, index) =>

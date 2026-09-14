@@ -310,6 +310,7 @@ async function tellHolder(holderId: string, onlyCardId?: string): Promise<void> 
       holderId,
       askKey: `${match.ask.kind}:${match.ask.id}`,
       haveEntryId: match.haveEntryId,
+      wanterId: match.wanter.playerId,
       wanterName: match.wanter.displayName,
       cardName: match.card.cardName,
       milesLabel: match.milesLabel,

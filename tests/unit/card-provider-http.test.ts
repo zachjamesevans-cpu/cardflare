@@ -68,6 +68,27 @@ describe("ProviderHttp", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps what a refused response said, without its markup", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        "<html><head><title>Blocked</title><style>h1{}</style></head><body><h1>Sorry, you have been blocked</h1><script>x()</script></body></html>",
+        { status: 403, headers: { "content-type": "text/html" } },
+      ),
+    );
+
+    const error = await client()
+      .getJson("/cards")
+      .then(
+        () => null,
+        (thrown: unknown) => thrown,
+      );
+    expect(error).toBeInstanceOf(ProviderHttpError);
+    expect((error as ProviderHttpError).status).toBe(403);
+    expect((error as ProviderHttpError).detail).toBe(
+      "Blocked Sorry, you have been blocked",
+    );
+  });
+
   it("retries a temporary failure and succeeds", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({}, 503))

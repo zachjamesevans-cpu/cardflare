@@ -1,20 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame } from "lucide-react";
 
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
 import { SECTION_TITLES } from "@/lib/feed/repository";
-import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser, sessionForPlayer } from "@/lib/players/accounts";
 import { listFeed } from "@/lib/feed/repository";
 import { listLocals } from "@/lib/players/locals";
-import { listWants } from "@/lib/players/wants";
-import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Feed",
@@ -44,58 +41,23 @@ export const dynamic = "force-dynamic";
  * carries the expiry that takes it away again.
  */
 
-/**
- * Who you are and what you have.
+/*
+ * NO IDENTITY HEADER. The Feed opens on the Feed.
  *
- * The Feed can be short - on a quiet week it should be - and the screen
- * still has to open with something true. A name and a balance are true
- * every time, and the balance is what makes the two evergreen items at
- * the bottom mean anything.
+ * There was a Header here - your face, your name, your want count and
+ * your Embers balance - on the argument that a quiet week still has to
+ * open with something true. The founder cut it: "it's not necessary to
+ * show my username, flare points, or anything like that... to allow the
+ * feed to have more vertical space."
+ *
+ * He is right about what it cost. Every one of those facts is about the
+ * viewer, who already knows them, and they sat above the first post on
+ * the page. Both the balance and the want count live on /profile, so
+ * nothing here was the only way to reach anything.
+ *
+ * Two reads went with it: the want list, and the players row for the
+ * name, face and balance. The Feed page no longer asks for either.
  */
-function Header({
-  playerId,
-  displayName,
-  avatarUrl,
-  wants,
-  balance,
-}: {
-  playerId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  wants: number;
-  balance: number | null;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <PlayerAvatar
-          displayName={displayName}
-          seed={playerId}
-          avatarUrl={avatarUrl}
-          frame={null}
-          size="md"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-text-primary">{displayName}</p>
-          <p className="text-sm text-text-muted">
-            {wants > 0
-              ? `${wants} ${wants === 1 ? "card" : "cards"} on your want list`
-              : "No wants saved yet"}
-          </p>
-        </div>
-        {/* Only when a balance actually arrived: a missing one is not a
-            zero one, and "0 Embers" beside somebody holding thousands is
-            worse than saying nothing. */}
-        {balance !== null && (
-          <p className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent">
-            <Flame className="size-4" aria-hidden="true" />
-            {balance.toLocaleString()}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -174,16 +136,8 @@ export default async function FeedPage() {
   }
 
   const session = await sessionForPlayer(playerId);
-  const [items, wants, account, locals] = await Promise.all([
+  const [items, locals] = await Promise.all([
     listFeed(playerId, session?.id ?? null),
-    listWants(playerId),
-    /* The face and the balance the header opens with. Two columns off an
-       indexed row, the same read the app's /me makes for the same job. */
-    getSupabaseAdmin()
-      .from("players")
-      .select("display_name, avatar_url, embers_balance")
-      .eq("id", playerId)
-      .maybeSingle(),
     /* For the live-room banner below. Room lost its tab to Local, so
        the Feed is where a live room announces itself now. */
     listLocals(playerId),
@@ -193,16 +147,6 @@ export default async function FeedPage() {
 
   return (
     <Shell>
-      {account.data && (
-        <Header
-          playerId={playerId}
-          displayName={account.data.display_name}
-          avatarUrl={account.data.avatar_url}
-          wants={wants.length}
-          balance={account.data.embers_balance ?? null}
-        />
-      )}
-
       {/* The Room tab's job, as a banner: gone from the bar, never gone
           from reach. Shows the moment a room is open at one of your
           stores and takes you straight onto its board. */}

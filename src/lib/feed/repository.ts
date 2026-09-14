@@ -8,7 +8,7 @@ import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
-import { listFollowing } from "@/lib/players/follows";
+import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
@@ -42,14 +42,56 @@ const LOCALS_SHOWN = 4;
 const BOARD_SAMPLE = 4;
 
 /**
- * Cards shown on one friend's hunt. A deck is thirty; a Feed row is not.
+ * Cards carried on a row that draws them as a rail.
  *
- * Four, the same as a board's sample, because that is what fits on ONE
- * line at phone width beside the "+N more" that follows it. Six wrapped,
- * leaving a lone tile on a second row with the count stranded next to
- * it — untidy in exactly the way the founder keeps catching.
+ * This used to be four, on both the hunt and the recent row, and the
+ * reason was the layout: four tiles were what fitted on ONE wrapped line
+ * at phone width beside the "+N more" that followed them. Six wrapped and
+ * stranded a lone tile on a second row.
+ *
+ * The rows scroll sideways now, so that reason is gone — the founder,
+ * looking at a friend's hunt reading "+4 more": "it should be a carousel
+ * for these types of things... so you can see all the cards." A rail has
+ * no line to overflow, so the cap stops being about layout and starts
+ * being about weight.
+ *
+ * Twenty, because a rail is still a Feed row and not a deck list. It
+ * covers a hunt whole in nearly every case; past it the row keeps a
+ * trailing count that opens the board, where the full list lives. The
+ * payload is the reason for a ceiling at all: a pasted sixty-card deck
+ * across several rows is a lot of card art to send a phone for a screen
+ * somebody is scrolling past.
  */
-const HUNT_SAMPLE = 4;
+const CARD_RAIL_CAP = 20;
+
+/**
+ * One entry per card, keeping the first of any repeat.
+ *
+ * A Flare carries a quantity, but the same card can still arrive twice:
+ * two printings of it, or two lines of a pasted deck list. Every row that
+ * draws card art was mapping Flares straight to tiles, so a repeat drew
+ * the same picture twice - which the founder read off the simulator as a
+ * glitch - and React saw two children with the same key, because a
+ * FeedCard is identified by the CARD and a card that appears twice has
+ * that id twice.
+ *
+ * Deduped here rather than keyed around on the clients: two identical
+ * tiles are wrong on the screen whatever their keys are, and fixing it
+ * once on the server fixes it on both platforms. The "added" item has
+ * always done this with its own `unique` set; this is that rule, shared.
+ *
+ * FIRST wins, so callers sort before they call: the hunt row puts the
+ * cards the viewer can answer at the front, and those are the copies
+ * worth keeping.
+ */
+export function firstPerCard<T>(entries: T[], cardIdOf: (entry: T) => string): T[] {
+  const kept = new Map<string, T>();
+  for (const entry of entries) {
+    const id = cardIdOf(entry);
+    if (!kept.has(id)) kept.set(id, entry);
+  }
+  return [...kept.values()];
+}
 
 /** How far back "just added" and "traded recently" reach. */
 const RECENT_DAYS = 7;
@@ -98,7 +140,6 @@ const WANTED_CARDS_ASKED = 400;
 const WANTED_READ = 60;
 const WANTED_SHOWN = 4;
 const RECENT_SHOWN = 4;
-const RECENT_SAMPLE = 4;
 
 /** Cosmetics named in the shop item. Three is a look; twelve is a catalogue. */
 const SHOP_SAMPLE = 3;
@@ -222,6 +263,21 @@ export interface HuntItem {
   total: number;
   /** How many of them the viewer's own binder answers. */
   youCanAnswer: number;
+  /**
+   * The viewer's own post, rather than somebody they follow.
+   *
+   * The founder: "whenever i post a flare, it should also show in my
+   * feed, like how instagram does that for ur own posts." Your own
+   * Flares were the one thing the Feed knew about and would not show
+   * you - the hunt builder only ever accepted authors from the follow
+   * list, and nobody follows themselves.
+   *
+   * It is a flag rather than a separate kind because it IS the same
+   * item: a person, a board, and what they are chasing. Only the
+   * heading above it and the line under it change, and both of those
+   * live in one place.
+   */
+  yours: boolean;
 }
 
 /**
@@ -605,12 +661,13 @@ async function embersBalance(playerId: string): Promise<number> {
  * than as an empty app.
  */
 export type FeedSection =
-  "wanted" | "tonight" | "people" | "walkin" | "nearby" | "store";
+  "wanted" | "tonight" | "yours" | "people" | "walkin" | "nearby" | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
+  yours: "Your flares",
   people: "People you follow",
   walkin: "Where you play",
   nearby: "Nearby stores",
@@ -642,6 +699,8 @@ function sectionFor(item: FeedItem): FeedSection {
     case "upcoming":
       return item.nextEventAt ? "tonight" : "walkin";
     case "hunt":
+      /* Your own post is not news about somebody else. */
+      return item.yours ? "yours" : "people";
     case "recent":
     case "added":
     case "traded":
@@ -678,6 +737,7 @@ function reasonFor(item: FeedItem): string {
     case "upcoming":
       return "At a store you saved";
     case "hunt":
+      return item.yours ? "You posted this" : "Because you follow them";
     case "added":
       return "Because you follow them";
     case "recent":
@@ -958,6 +1018,9 @@ async function boardWithHunts(
     }
   >,
   playerBySession: Map<string, string>,
+  /* Whose feed this is, so their own posts can be told apart from the
+     people they follow. `followed` carries them as an author. */
+  viewerId: string,
 ): Promise<FeedItem[]> {
   const code = local.liveNow ? local.joinCode : local.nextEventCode;
   if (!code) return [];
@@ -989,14 +1052,26 @@ async function boardWithHunts(
       live: local.liveNow,
       startsAt: local.liveNow ? null : local.nextEventAt,
       timeZone: event.storeTimeZone,
+      /*
+       * Flares, not cards: two players wanting the same card are two
+       * people you could help, and that is what the number is for.
+       */
       youCanAnswer: answerable.length,
-      sample: answerable.slice(0, BOARD_SAMPLE).map(({ flare, match }) => ({
-        cardId: flare.cardId,
-        cardName: flare.cardName,
-        cardNumber: flare.cardNumber,
-        imageUrl: flare.imageUrl,
-        match,
-      })),
+      /*
+       * The PICTURES are one per card, though - the same rule the hunt
+       * and recent rows follow, and for the same two reasons: a board
+       * where three people want the same card drew it three times, and
+       * a FeedCard is keyed by the card, so React saw one key twice.
+       */
+      sample: firstPerCard(answerable, (entry) => entry.flare.cardId)
+        .slice(0, BOARD_SAMPLE)
+        .map(({ flare, match }) => ({
+          cardId: flare.cardId,
+          cardName: flare.cardName,
+          cardNumber: flare.cardNumber,
+          imageUrl: flare.imageUrl,
+          match,
+        })),
     },
   ];
 
@@ -1034,6 +1109,25 @@ async function boardWithHunts(
       (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
     );
 
+    /*
+     * ONE TILE PER CARD, not one per Flare.
+     *
+     * A Flare carries a quantity, but somebody can still post the same
+     * card twice - two printings of it, or the same card on two lines of
+     * a pasted deck list - and each one arrived here as its own entry.
+     * The row then drew the same picture twice, which the founder read
+     * off the simulator as a glitch, and React saw it as two children
+     * with the same key, because a FeedCard carries the CARD's id and a
+     * card that appears twice has it twice.
+     *
+     * Deduping here rather than keying around it on the client: two
+     * identical tiles are wrong on the screen whatever their keys are,
+     * and the "added" item has always done exactly this with its
+     * `unique` set. Sorted first, so the copy that survives is the one
+     * the viewer can answer.
+     */
+    const cards = firstPerCard(ordered, (entry) => entry.flare.cardId);
+
     items.push({
       kind: "hunt",
       code,
@@ -1045,9 +1139,12 @@ async function boardWithHunts(
       frame: person.frame,
       ring: person.ring,
       deckLabel: ordered[0]?.flare.deckLabel ?? null,
-      total: group.length,
-      youCanAnswer: group.filter(({ match }) => match).length,
-      cards: ordered.slice(0, HUNT_SAMPLE).map(({ flare, match }) => ({
+      yours: key.split("::")[0] === viewerId,
+      /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
+         trailing "+N more" are counting the same things the tiles are. */
+      total: cards.length,
+      youCanAnswer: cards.filter(({ match }) => match).length,
+      cards: cards.slice(0, CARD_RAIL_CAP).map(({ flare, match }) => ({
         cardId: flare.cardId,
         cardName: flare.cardName,
         cardNumber: flare.cardNumber,
@@ -1237,6 +1334,47 @@ const NO_FACE: FeedFace = {
  * WebView, and a feed row is not the place to mount four of them - the
  * profile is where uploaded art gets its full size and its own render.
  */
+/**
+ * The viewer, in the shape the hunt row draws a person in.
+ *
+ * The follow list arrives with names and faces already attached; the
+ * viewer does not, because nothing else in this file needed them. One
+ * row and the same dressing every other face gets, so your own post
+ * wears your ring and aura exactly as it does on everybody else's
+ * screen.
+ */
+async function viewerAsAuthor(playerId: string): Promise<FollowedPlayer | null> {
+  const [{ data }, faces] = await Promise.all([
+    getSupabaseAdmin()
+      .from("players")
+      .select("display_name")
+      .eq("id", playerId)
+      .maybeSingle(),
+    facesFor([playerId]),
+  ]);
+
+  if (!data?.display_name) return null;
+
+  const face = faces.get(playerId);
+  return {
+    playerId,
+    displayName: data.display_name,
+    avatarUrl: face?.avatarUrl ?? null,
+    frame: face?.frame ?? null,
+    ring: face?.ring ?? null,
+    aura: face?.aura ?? null,
+    /* The Rive files behind a ring or aura are only read for people you
+       follow, to decide what the app has to download. Your own post is
+       drawn from the same catalogue slugs above; nothing here needs a
+       file it has not already got. */
+    ringArt: null,
+    auraArt: null,
+    /* "Trade partners" is a statement about two people. You are not your
+       own partner, and the row does not ask. */
+    partners: false,
+  };
+}
+
 async function facesFor(playerIds: string[]): Promise<Map<string, FeedFace>> {
   const out = new Map<string, FeedFace>();
   const ids = [...new Set(playerIds)];
@@ -1363,6 +1501,15 @@ async function recentItems(
   /* One group per posting act: the batch if it had one, else the flare. */
   const groups = new Map<string, RecentItem>();
 
+  /*
+   * The cards each group has already drawn, so the same card posted
+   * twice in one act is one tile - see the hunt builder above for why.
+   * Held beside the group rather than derived from `cards`, because a
+   * group past CARD_RAIL_CAP has stopped collecting them and a duplicate
+   * must not quietly become "+1 more" either.
+   */
+  const seen = new Map<string, Set<string>>();
+
   for (const flare of usable) {
     const storeId = storeOf.get(flare.event_id);
     const store = storeId ? stores.get(storeId) : undefined;
@@ -1388,12 +1535,18 @@ async function recentItems(
 
     const existing = groups.get(key);
     if (existing) {
-      if (existing.cards.length < RECENT_SAMPLE) existing.cards.push(card);
+      const drawn = seen.get(key);
+      if (drawn?.has(flare.card_id)) continue;
+      drawn?.add(flare.card_id);
+
+      if (existing.cards.length < CARD_RAIL_CAP) existing.cards.push(card);
       else existing.more += 1;
       continue;
     }
 
     if (groups.size >= RECENT_SHOWN) continue;
+
+    seen.set(key, new Set([flare.card_id]));
 
     const person = people.get(flare.player_session_id);
     const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;
@@ -1583,6 +1736,24 @@ export async function listFeed(
   const held = heldByCard(binder);
   const followed = new Map(following.map((player) => [player.playerId, player]));
 
+  /*
+   * The people whose Flares can reach this feed: everyone followed, plus
+   * the viewer.
+   *
+   * "Whenever i post a flare, it should also show in my feed, like how
+   * instagram does that for ur own posts." Nobody follows themselves, so
+   * the hunt builder - which only ever accepted authors from the follow
+   * list - dropped the viewer's own posts on the floor.
+   *
+   * Kept SEPARATE from `followed`, deliberately. That map also decides
+   * who can appear in "just added to their binder" and who is worth
+   * suggesting, and neither of those wants to start talking about you.
+   * Only Flares are yours to see.
+   */
+  const authors = new Map(followed);
+  const me = await viewerAsAuthor(playerId);
+  if (me) authors.set(playerId, me);
+
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -1611,10 +1782,10 @@ export async function listFeed(
   const boards = (
     await Promise.all([
       ...live.map((local) =>
-        boardWithHunts(local, true, held, followed, playerBySession),
+        boardWithHunts(local, true, held, authors, playerBySession, playerId),
       ),
       ...elsewhere.map((local) =>
-        boardWithHunts(local, false, held, followed, playerBySession),
+        boardWithHunts(local, false, held, authors, playerBySession, playerId),
       ),
     ])
   ).flat();
@@ -1698,7 +1869,17 @@ export async function listFeed(
       linkLabel: notice.linkLabel,
       linkHref: notice.linkHref,
     })),
-    ...boards.filter((item) => item.kind === "hunt"),
+    /*
+     * YOUR OWN FLARES FIRST, and together.
+     *
+     * Both clients draw a heading only when the section CHANGES, so an
+     * own post sitting between two followed ones would read "Your
+     * flares / People you follow / Your flares". Hoisting them keeps
+     * one heading over one block - and puts what you just posted where
+     * Instagram puts it, at the top, so posting visibly did something.
+     */
+    ...boards.filter((item) => item.kind === "hunt" && item.yours),
+    ...boards.filter((item) => item.kind === "hunt" && !item.yours),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,

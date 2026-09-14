@@ -23,6 +23,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -54,6 +55,7 @@ import { Tap } from "./src/ui";
 import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
+import { GLASS_AVAILABLE, GlassFill } from "./src/glass";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -303,7 +305,36 @@ function Tabs() {
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { fontWeight: "700" },
         tabBarButton: (props) => <TabButton {...props} />,
-        tabBarStyle: { backgroundColor: colors.canvas, borderTopColor: colors.border },
+        /*
+         * LIQUID GLASS, which means the bar stops being a floor and
+         * starts being a surface the list runs under.
+         *
+         * The founder asked for the iOS 26 material on "the tabs at the
+         * bottom", and the material only reads as glass when there is
+         * something behind it to refract. An opaque bar in the layout
+         * flow has the page ABOVE it and black underneath, so glassing
+         * it in place would have drawn an expensive rectangle of
+         * nothing. So the bar floats and the screens pad for it - the
+         * same trade the Feed's header already makes at the other end
+         * of the screen (src/collapsing-header.tsx), and the reason
+         * `useTabBarInset` exists.
+         *
+         * The hairline goes with it. A Liquid Glass bar carries its own
+         * edge - the material has a specular rim - and a border on top
+         * of that reads as a seam drawn over a seam. Without glass the
+         * hairline is still the only thing separating bar from page, so
+         * it stays.
+         */
+        tabBarBackground: () => <GlassFill />,
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: "transparent",
+          borderTopWidth: GLASS_AVAILABLE ? 0 : StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          /* The bar draws its own material; a shadow under a glass
+             surface is the one thing that makes it look pasted on. */
+          elevation: 0,
+        },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarIcon: ({ color, size, focused }) => {
@@ -537,10 +568,32 @@ export default function App() {
             headerStyle: { backgroundColor: colors.surface },
             headerTintColor: colors.textPrimary,
             headerTitleStyle: { fontWeight: "700" },
-            // Swipe back from anywhere on the screen, not just the left
-            // edge — the whole surface is the back gesture, like Instagram.
+            /*
+             * Back is a LEFT-EDGE swipe, not a whole-screen one.
+             *
+             * This used to be `fullScreenGestureEnabled: true` - the
+             * whole surface was the back gesture, on the Instagram
+             * argument. It works too well: the founder, "you can swipe
+             * from any portion of the screen to go back... this should
+             * only exist on a smallish lefthand side of the screen so
+             * you dont accidentally swipe back." Every horizontal drag
+             * anywhere was a pop, which on a screen with a card rail to
+             * scroll sideways is a trap rather than a shortcut.
+             *
+             * Turning the full-screen gesture off hands it back to
+             * UIKit's own interactive pop, which lives on the left edge
+             * and is the one every other iOS app trained people on.
+             *
+             * `gestureResponseDistance: { start: 50 }` was tried first,
+             * to keep the full-screen gesture but pen it into a left
+             * strip. It does nothing: with the full-screen gesture on
+             * and that distance set, a drag from the middle of the
+             * screen still pops. Measured on the simulator, not assumed
+             * - so the knob is gone rather than left in looking load
+             * bearing.
+             */
             gestureEnabled: true,
-            fullScreenGestureEnabled: true,
+            fullScreenGestureEnabled: false,
             headerLeft: ({ canGoBack }) =>
               canGoBack ? (
                 <HeaderBack
