@@ -199,3 +199,61 @@ describe("a Flare posted with no board still reaches your feed", () => {
     }
   });
 });
+
+describe("a Flare posted at a store is drawn as a post", () => {
+  /*
+   * The founder, with the two tabs side by side: "look at the my flares
+   * section. the goal is to have that design be the main feed, but also
+   * so I can revert back to what it ats now if i dont like it."
+   *
+   * My Flares looked better because it was a different KIND. Your own
+   * Flares are hunts, drawn by FlareFeedCard - a post with a card, its
+   * chips, a heart and a thread. A Flare somebody posted at a shop was a
+   * "recent", drawn by an older row with a cramped rail, a button and no
+   * way to answer it. Same event, two shapes, purely by accident of the
+   * order they were written in.
+   */
+  it("turns store Flares into the same post shape as every other Flare", async () => {
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    expect(repo).toContain("function asPost(item: RecentItem): FeedItem");
+    expect(repo).toContain("...recent.map(asPost)");
+    /* Inherits the post design, the heart and the thread by BEING a
+       hunt, rather than by having all of that written twice. */
+    expect(repo).toMatch(/return \{\s*kind: "hunt",\s*postId: item\.postId,/);
+  });
+
+  it("can be turned off again without touching anything else", async () => {
+    /* "so I can revert back to what it ats now if i dont like it." The
+       old row is still built, still typed and still drawn by both
+       clients; the flag decides which one leaves the server. */
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    expect(repo).toContain("const FLARES_AS_POSTS = true;");
+    expect(repo).toContain("if (!FLARES_AS_POSTS || !item.playerId || !item.postId)");
+    /* The old kind is still a kind, so flipping the flag is the whole
+       revert. */
+    expect(repo).toContain('kind: "recent";');
+  });
+
+  it("leaves a guest's Flare as the old row", async () => {
+    /* A post hangs off a person. Somebody who scanned a counter code and
+       typed a name has no profile to open, and is answerable in the room
+       they posted in. */
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+    expect(repo).toContain("!item.playerId");
+  });
+
+  it("says which way the card points, now that both directions arrive", async () => {
+    /* A hunt was always a want, so the line was a constant. A showcase
+       post reading "is hunting" would be backwards. */
+    for (const path of [
+      "src/components/feed/flare-feed-card.tsx",
+      "mobile/src/flare-feed-card.tsx",
+    ]) {
+      const source = await readFile(path, "utf8");
+      expect(source).toContain("function statusLabel(");
+      expect(source).toContain("is letting go of");
+    }
+  });
+});

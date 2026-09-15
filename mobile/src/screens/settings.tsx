@@ -22,7 +22,7 @@ import {
   type Profile,
 } from "../api";
 import { HandleField, NameField } from "./profile";
-import { AsyncButton, Body, Card, Input, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { parseDeckList } from "../deck-list";
 import { colors, spacing } from "../theme";
 
@@ -248,6 +248,24 @@ export function SettingsScreen() {
        * act - done once, at home, with a keyboard - and it has nowhere
        * better to live yet.
        */}
+      {/*
+       * The Lab, from Settings rather than from a gesture nobody would
+       * find. It ships in the binary on purpose: the person who needs it
+       * is holding a TestFlight build, not a debug one.
+       */}
+      <Card>
+        <Title>Design lab</Title>
+        <Body>
+          Every shape a Feed post can take, drawn with made-up data. Nothing in
+          it reaches the server.
+        </Body>
+        <Button
+          label="Open the design lab"
+          variant="secondary"
+          onPress={() => navigation.navigate("Lab")}
+        />
+      </Card>
+
       <Card>
         <Title>Paste a deck list</Title>
         <Body>

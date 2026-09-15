@@ -1667,6 +1667,8 @@ export type FeedItem =
       frame: string | null;
       ring: string | null;
       /** The hunt's name, when they gave it one. */
+      /** Which way the card points: wanted, or offered up. */
+      direction?: "want" | "showcase";
       deckLabel: string | null;
       /** When it went up. Absent from an older server. */
       postedAt?: string;

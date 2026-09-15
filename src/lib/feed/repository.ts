@@ -289,6 +289,14 @@ export interface HuntItem {
   avatarUrl: string | null;
   frame: string | null;
   ring: string | null;
+  /**
+   * Which way the card points: wanted, or offered up.
+   *
+   * A hunt was always a want, so this did not exist. The rows that used
+   * to be a separate "recent" kind carry both directions, and a
+   * showcase post that said "is hunting" would be backwards.
+   */
+  direction?: "want" | "showcase";
   /** The hunt's name, when they gave it one ("Red Luffy"). */
   deckLabel: string | null;
   /** When it went up, so the card can say "12m ago". */
@@ -563,6 +571,15 @@ export interface RecentItem {
   cards: FeedCard[];
   /** Cards in the group beyond the ones named. */
   more: number;
+  /*
+   * What the row needs to become a POST, carried so `asPost` below does
+   * not have to read the table a second time. Optional because an older
+   * row - or this file with FLARES_AS_POSTS off - has no use for them.
+   */
+  postId?: string;
+  note?: string | null;
+  acceptsTrade?: boolean;
+  acceptsCash?: boolean;
 }
 
 /**
@@ -849,6 +866,76 @@ export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
     return "following";
   }
   return "nearby";
+}
+
+/**
+ * Draw a Flare somebody posted at a store as a POST, like every other
+ * Flare in the Feed, rather than as the older row with a rail and a
+ * button.
+ *
+ * The founder, looking at the two side by side: "look at the my flares
+ * section. the goal is to have that design be the main feed, but also so
+ * I can revert back to what it ats now if i dont like it."
+ *
+ * So it is one constant. The old row is still built, still typed, still
+ * drawn by both clients - flip this to false and the Feed goes back to
+ * exactly what it was, with no other edit anywhere.
+ *
+ * What changes when it is true: these rows become the same `hunt` shape
+ * the rest of the Feed uses, which means they inherit the post design,
+ * the heart, the thread and "I have this" without any of that being
+ * written a second time. It is the same event either way - somebody
+ * posted Flares at a shop - and it was only ever two shapes by accident.
+ */
+const FLARES_AS_POSTS = true;
+
+/**
+ * A store Flare, redrawn as the post every other Flare is.
+ *
+ * It is the same event in both shapes: somebody posted cards at a shop.
+ * One shape had a rail, a button and no way to answer; the other has the
+ * card, the chips, a heart and a thread. Keeping two was an accident of
+ * the order they were written in.
+ *
+ * Returns the row UNCHANGED when the flag is off, or when the poster has
+ * no account behind their session - a post hangs off a person, and a
+ * guest in a room is answerable there rather than followable here.
+ */
+function asPost(item: RecentItem): FeedItem {
+  if (!FLARES_AS_POSTS || !item.playerId || !item.postId) return item;
+
+  return {
+    kind: "hunt",
+    postId: item.postId,
+    /* Filled in by decorateHunts, one query for every post on screen. */
+    likes: 0,
+    comments: 0,
+    liked: false,
+    code: item.joinCode,
+    storeName: item.storeName,
+    /* A store row names the shop, never the night. */
+    eventName: null,
+    playerId: item.playerId,
+    displayName: item.displayName ?? "A player",
+    avatarUrl: item.avatarUrl,
+    frame: item.frame,
+    ring: item.ring,
+    direction: item.direction,
+    deckLabel: item.deckLabel,
+    postedAt: item.when,
+    /* Distance belongs to an area Flare, which knows a postcode. This
+       one knows a shop, and says so in the button instead. */
+    milesAway: null,
+    storeId: null,
+    acceptsTrade: item.acceptsTrade ?? true,
+    acceptsCash: item.acceptsCash ?? false,
+    note: item.note ?? null,
+    offers: 0,
+    total: item.cards.length + item.more,
+    youCanAnswer: item.cards.filter((card) => card.match).length,
+    cards: item.cards,
+    yours: false,
+  };
 }
 
 /** ISO for "this many days ago", the cut both recent items share. */
@@ -1755,7 +1842,9 @@ async function recentItems(
 
   const { data: flares, error } = await admin
     .from("flares")
-    .select("id, created_at, event_id, player_session_id, card_id, intent, deck_label")
+    .select(
+      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, accepts_trade, accepts_cash",
+    )
     .eq("status", "open")
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
@@ -1862,6 +1951,12 @@ async function recentItems(
       deckLabel: flare.deck_label,
       cards: [card],
       more: 0,
+      /* Carried so the row can be turned into a post below without
+         reading the table twice. Never sent: `asPost` strips them. */
+      postId: flare.posted_batch ?? flare.id,
+      note: flare.note ?? null,
+      acceptsTrade: flare.accepts_trade ?? true,
+      acceptsCash: flare.accepts_cash ?? false,
     });
   }
 
@@ -2189,7 +2284,7 @@ export async function listFeed(
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
     ...boards.filter((item) => item.kind === "board" && !item.yours),
-    ...recent,
+    ...recent.map(asPost),
     ...added,
     ...traded,
     ...suggested,
