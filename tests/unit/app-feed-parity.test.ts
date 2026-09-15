@@ -257,8 +257,12 @@ describe("the home screen's furniture", () => {
       "utf8",
     );
 
-    expect(web).toContain("if (count <= 1) return");
-    expect(app).toContain("if (count <= 1) return 160;");
+    /* The tiles moved out of the item files into modules of their own
+       when the Flare post got its card (feed-tile.tsx, card-rail.tsx). */
+    expect(read("src/components/feed/feed-tile.tsx")).toContain(
+      "if (count <= 1) return",
+    );
+    expect(read("mobile/src/card-rail.tsx")).toContain("if (count <= 1) return 160;");
 
     /* The dropped step stays dropped, on both. */
     expect(web).not.toContain("if (count <= 3) return");
@@ -277,14 +281,16 @@ describe("the home screen's furniture", () => {
      * both, so a rail on one and a wrapped row on the other would
      * typecheck, pass every other test, and look like two products.
      */
-    expect(items).toContain("function CardRail");
-    expect(app).toContain("function CardRail");
+    expect(read("src/components/feed/feed-tile.tsx")).toContain("function CardRail");
+    expect(read("mobile/src/card-rail.tsx")).toContain("function CardRail");
 
     /* The mechanism, so neither platform quietly goes back to wrapping. */
-    expect(items).toContain("overflow-x-auto");
-    expect(items).not.toContain("flex flex-wrap gap-2");
-    expect(app).toMatch(/<ScrollView\s+horizontal/);
-    expect(app).not.toContain('flexWrap: "wrap"');
+    const tile = read("src/components/feed/feed-tile.tsx");
+    const rail = read("mobile/src/card-rail.tsx");
+    expect(tile).toContain("overflow-x-auto");
+    expect(tile).not.toContain("flex flex-wrap gap-2");
+    expect(rail).toMatch(/<ScrollView\s+horizontal/);
+    expect(rail).not.toContain('flexWrap: "wrap"');
 
     /* And the server has to actually send enough cards to be worth a
        rail - four was the wrapped row's number. */
@@ -365,12 +371,14 @@ describe("a card in the Feed opens larger", () => {
    * it the whole shelf so the viewer pages along it without closing.
    */
   it("on the website, through the same zoom as every board", () => {
-    expect(items).toContain("<CardImageZoom");
-    expect(items).toContain("siblings={shelf}");
+    const tile = read("src/components/feed/feed-tile.tsx");
+    expect(tile).toContain("<CardImageZoom");
+    expect(tile).toContain("siblings={shelf}");
   });
 
   it("in the app, with the rail to swipe along", () => {
-    expect(app).toContain("siblings={shelf}");
+    expect(read("mobile/src/card-rail.tsx")).toContain("siblings={shelf}");
+    expect(read("mobile/src/flare-feed-card.tsx")).toContain("siblings={shelf}");
   });
 });
 

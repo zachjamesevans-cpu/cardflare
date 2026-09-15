@@ -54,6 +54,8 @@ export interface ListEntry {
   acceptsTrade: boolean;
   /** The poster will use money for this. Never a price. */
   acceptsCash: boolean;
+  /** When it was posted, so the Feed can say "12m ago". */
+  createdAt: string;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -249,6 +251,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
        what the board has always meant. */
     acceptsTrade: row.accepts_trade ?? true,
     acceptsCash: row.accepts_cash ?? false,
+    createdAt: row.created_at,
   };
 }
 

@@ -15,7 +15,7 @@ import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosme
 import { listWants } from "@/lib/players/wants";
 import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
-import type { Point } from "@/lib/geo/zip";
+import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
 
@@ -291,6 +291,23 @@ export interface HuntItem {
   ring: string | null;
   /** The hunt's name, when they gave it one ("Red Luffy"). */
   deckLabel: string | null;
+  /** When it went up, so the card can say "12m ago". */
+  postedAt: string;
+  /**
+   * How far the post is from the viewer, or null when either side has
+   * no position: a store's pin for a board Flare, the posted postcode
+   * for an area one, against the viewer's device or ZIP.
+   */
+  milesAway: number | null;
+  /** The store behind a board Flare, for the distance above. */
+  storeId: string | null;
+  /** What the poster will do for it. Drawn as the Trade and Cash chips. */
+  acceptsTrade: boolean;
+  acceptsCash: boolean;
+  /** What they wrote with it, or null. Collapsed entirely when absent. */
+  note: string | null;
+  /** How many people have raised a hand on any card in it. */
+  offers: number;
   /** Every card in this batch, the ones the viewer holds first. */
   cards: FeedCard[];
   /** How many they posted, which can exceed what is shown. */
@@ -771,7 +788,10 @@ function reasonFor(item: FeedItem): string {
     case "upcoming":
       return "At a store you saved";
     case "hunt":
-      return item.yours ? "You posted this" : "Because you follow them";
+      /* Drawn as a small label inside the post's header, never as a
+         line between cards - the founder: "do not interrupt the feed
+         with separate text between cards." */
+      return item.yours ? "Your Flare" : "Because you follow them";
     case "added":
       return "Because you follow them";
     case "recent":
@@ -799,7 +819,37 @@ function reasonFor(item: FeedItem): string {
 }
 
 /** One item, with the two things the screen needs to place it. */
-export type FeedEntry = FeedItem & { section: FeedSection; reason: string };
+export type FeedEntry = FeedItem & {
+  section: FeedSection;
+  reason: string;
+  tab: FeedTab;
+};
+
+/**
+ * The three filters over the Feed, the founder's redesign: Following,
+ * Nearby, My Flares. Decided here so the two clients cannot file the
+ * same item under different tabs.
+ *
+ * Following is people: their Flares, what they added and traded, who
+ * to follow next, and the store's own news at the tail. Nearby is
+ * places and the cards wanted around you. My Flares is yours.
+ */
+export type FeedTab = "following" | "nearby" | "mine";
+
+export const TAB_TITLES: Record<FeedTab, string> = {
+  following: "Following",
+  nearby: "Nearby",
+  mine: "My Flares",
+};
+
+export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
+  if (section === "yours") return "mine";
+  if (item.kind === "start" && item.topic === "deck") return "mine";
+  if (section === "people" || section === "store" || item.kind === "announcement") {
+    return "following";
+  }
+  return "nearby";
+}
 
 /** ISO for "this many days ago", the cut both recent items share. */
 function since(days: number): string {
@@ -1179,6 +1229,14 @@ async function boardWithHunts(
       frame: person.frame,
       ring: person.ring,
       deckLabel: ordered[0]?.flare.deckLabel ?? null,
+      postedAt: ordered[0]?.flare.createdAt ?? new Date().toISOString(),
+      /* Filled in by decorateHunts from the store's pin. */
+      milesAway: null,
+      storeId: local.storeId,
+      acceptsTrade: ordered.some(({ flare }) => flare.acceptsTrade),
+      acceptsCash: ordered.some(({ flare }) => flare.acceptsCash),
+      note: ordered.find(({ flare }) => flare.note)?.flare.note ?? null,
+      offers: 0,
       yours: key.split("::")[0] === viewerId,
       /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
          trailing "+N more" are counting the same things the tiles are. */
@@ -1230,10 +1288,14 @@ async function boardWithHunts(
 async function areaHuntsFor(
   author: FollowedPlayer,
   held: ReturnType<typeof heldByCard>,
+  /* Where the viewer is, for "2 mi away". Null says nothing. */
+  origin: Point | null,
 ): Promise<HuntItem[]> {
   const { data: flares } = await getSupabaseAdmin()
     .from("flares")
-    .select("id, created_at, card_id, printing_id, posted_batch, deck_label, quantity")
+    .select(
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code",
+    )
     .eq("player_id", author.playerId)
     .eq("status", "open")
     .eq("intent", "want")
@@ -1255,6 +1317,9 @@ async function areaHuntsFor(
   }
 
   return [...groups.entries()].map(([postId, group]) => {
+    const posted = pointForPostalCode(group[0]?.posted_postal_code);
+    const milesAway =
+      origin && posted ? Math.round(milesApart(origin, posted) * 10) / 10 : null;
     const cards = firstPerCard(group, (flare) => flare.card_id).map((flare) => {
       const fact = facts.get(flare.card_id);
       return {
@@ -1285,6 +1350,13 @@ async function areaHuntsFor(
       frame: author.frame,
       ring: author.ring,
       deckLabel: group[0]?.deck_label ?? null,
+      postedAt: group[0]?.created_at ?? new Date().toISOString(),
+      milesAway,
+      storeId: null,
+      acceptsTrade: group.some((flare) => flare.accepts_trade ?? true),
+      acceptsCash: group.some((flare) => flare.accepts_cash ?? false),
+      note: group.find((flare) => flare.note)?.note ?? null,
+      offers: 0,
       total: cards.length,
       youCanAnswer: cards.filter((card) => card.match).length,
       cards: cards.slice(0, CARD_RAIL_CAP),
@@ -1293,7 +1365,12 @@ async function areaHuntsFor(
   });
 }
 
-async function decorateHunts(items: FeedItem[], viewerId: string): Promise<void> {
+async function decorateHunts(
+  items: FeedItem[],
+  viewerId: string,
+  /* Where the viewer is, for a board Flare's "2 mi away". */
+  origin: Point | null,
+): Promise<void> {
   const hunts = items.filter((item): item is HuntItem => item.kind === "hunt");
   if (hunts.length === 0) return;
 
@@ -1301,16 +1378,38 @@ async function decorateHunts(items: FeedItem[], viewerId: string): Promise<void>
   const flareIds = hunts.flatMap((hunt) =>
     hunt.cards.flatMap((card) => (card.flareId ? [card.flareId] : [])),
   );
+  const storeIds = [
+    ...new Set(hunts.flatMap((hunt) => (hunt.storeId ? [hunt.storeId] : []))),
+  ];
 
-  const [social, sessions, found] = await Promise.all([
+  const [social, sessions, found, pins] = await Promise.all([
     socialForPosts(postIds, viewerId),
     sessionsForPlayers([viewerId]),
     foundInPosts(postIds),
+    origin && storeIds.length > 0
+      ? getSupabaseAdmin()
+          .from("stores")
+          .select("id, latitude, longitude")
+          .in("id", storeIds)
+          .then((result) => result.data ?? [])
+      : Promise.resolve([]),
   ]);
   const [answers, facts] = await Promise.all([
     answersFor(flareIds, new Set(sessions.keys())),
     cardFacts(found.map((flare) => flare.cardId)),
   ]);
+  const pinByStore = new Map(
+    pins.flatMap((store) =>
+      store.latitude != null && store.longitude != null
+        ? [
+            [
+              store.id,
+              { latitude: store.latitude, longitude: store.longitude },
+            ] as const,
+          ]
+        : [],
+    ),
+  );
 
   for (const hunt of hunts) {
     const counts = social.get(hunt.postId);
@@ -1320,11 +1419,18 @@ async function decorateHunts(items: FeedItem[], viewerId: string): Promise<void>
       hunt.liked = counts.liked;
     }
 
+    /* Hands up across the whole post, each person once. */
+    const hands = new Set<string>();
     for (const card of hunt.cards) {
       const answer = card.flareId ? answers.get(card.flareId) : undefined;
       if (answer?.offered) card.state = "offered";
       if (answer?.youOffered) card.youOffered = true;
+      for (const responder of answer?.responders ?? []) hands.add(responder);
     }
+    hunt.offers = hands.size;
+
+    const pin = hunt.storeId ? pinByStore.get(hunt.storeId) : undefined;
+    if (origin && pin) hunt.milesAway = Math.round(milesApart(origin, pin) * 10) / 10;
 
     /* The traded ones, after the open ones: crossed off, not cut out. */
     const shownCards = new Set(hunt.cards.map((card) => card.cardId));
@@ -1945,9 +2051,12 @@ export async function listFeed(
   const me = await viewerAsAuthor(playerId);
   if (me) authors.set(playerId, me);
 
+  /* Where the viewer is, once, for every "2 mi away" on the screen. */
+  const origin = (await originForPlayer(playerId, device)).point;
+
   /* The Flares you posted with no board behind them. They belong to no
      store, so they are read here rather than per-local like the rest. */
-  const areaHunts = me ? await areaHuntsFor(me, held) : [];
+  const areaHunts = me ? await areaHuntsFor(me, held, origin) : [];
 
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
@@ -2092,15 +2201,19 @@ export async function listFeed(
     ...shop,
   ];
 
-  await decorateHunts(items, playerId);
+  await decorateHunts(items, playerId, origin);
 
   /*
    * Every item leaves here knowing where it goes and why it is here.
    * One place, so a new kind cannot ship without an answer to both.
    */
-  return items.map((item) => ({
-    ...item,
-    section: sectionFor(item),
-    reason: reasonFor(item),
-  }));
+  return items.map((item) => {
+    const section = sectionFor(item);
+    return {
+      ...item,
+      section,
+      reason: reasonFor(item),
+      tab: tabFor(item, section),
+    };
+  });
 }

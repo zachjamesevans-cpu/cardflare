@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { Logo } from "@/components/brand/logo";
+import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
-import { SECTION_TITLES } from "@/lib/feed/repository";
+import { SECTION_TITLES, type FeedTab } from "@/lib/feed/repository";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
@@ -66,12 +68,14 @@ function Shell({ children }: { children: React.ReactNode }) {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-4 px-4 pt-6 pb-16"
       >
-        {/* The title, and the one door out to other people. Same place on
-            both platforms: top right of the main feed. */}
+        {/* The wordmark, centred, and the one door out to other people
+            on the right. Same place on both platforms. */}
         <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
-          <h1 className="flex-1 text-2xl font-bold tracking-tight text-text-primary">
-            Feed
-          </h1>
+          <h1 className="sr-only">Feed</h1>
+          <span aria-hidden="true" className="size-9 shrink-0" />
+          <span className="flex flex-1 justify-center">
+            <Logo size={30} priority />
+          </span>
           <FeedSearch />
         </div>
 
@@ -83,7 +87,18 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function FeedPage() {
+const TABS: FeedTab[] = ["following", "nearby", "mine"];
+
+export default async function FeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab: rawTab } = await searchParams;
+  const tab: FeedTab = TABS.includes(rawTab as FeedTab)
+    ? (rawTab as FeedTab)
+    : "following";
+
   if (!isSupabaseConfigured()) {
     return (
       <Shell>
@@ -145,8 +160,16 @@ export default async function FeedPage() {
 
   const liveLocal = locals.find((local) => local.liveNow) ?? null;
 
+  /* Following | Nearby | My Flares: the server filed every item under
+     one, so this is a filter and never a second opinion. Headings only
+     where a tab holds more than one section. */
+  const shown = items.filter((item) => item.tab === tab);
+  const sectionsShown = new Set(shown.map((item) => item.section)).size;
+
   return (
     <Shell>
+      <FeedFilterTabs value={tab} />
+
       {/* The Room tab's job, as a banner: gone from the bar, never gone
           from reach. Shows the moment a room is open at one of your
           stores and takes you straight onto its board. */}
@@ -170,7 +193,15 @@ export default async function FeedPage() {
         </Link>
       )}
 
-      {items.length === 0 ? (
+      {shown.length === 0 && tab === "following" ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-text-primary">Nothing from people yet</h2>
+          <p className="text-sm text-text-secondary">
+            Follow a friend and their Flares show up here. Find them by name from the
+            search up top.
+          </p>
+        </Card>
+      ) : shown.length === 0 && tab === "nearby" ? (
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Nothing on right now</h2>
           <p className="text-sm text-text-secondary">
@@ -182,21 +213,37 @@ export default async function FeedPage() {
             Go to Room
           </Link>
         </Card>
+      ) : shown.length === 0 ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-text-primary">No Flares of yours yet</h2>
+          <p className="text-sm text-text-secondary">
+            Post one for the card you are hunting and it shows up here, with every hand
+            that goes up on it.
+          </p>
+          <Link href="/flare" className={buttonStyles("secondary", "sm")}>
+            Post a Flare
+          </Link>
+        </Card>
       ) : (
-        items.map((item, index) => (
+        shown.map((item, index) => (
           <div key={`${item.kind}-${index}`} className="flex flex-col gap-3">
             {/* The heading, only where the section changes. The order was
                 always an argument about what is worth a tap; this is the
                 argument said out loud. */}
-            {(index === 0 || items[index - 1].section !== item.section) && (
-              <h2 className="mt-2 text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
-                {SECTION_TITLES[item.section]}
-              </h2>
-            )}
+            {sectionsShown > 1 &&
+              (index === 0 || shown[index - 1].section !== item.section) && (
+                <h2 className="mt-2 text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+                  {SECTION_TITLES[item.section]}
+                </h2>
+              )}
             <Item item={item} />
             {/* Why this is on your screen. A feed that explains itself
-                stops feeling arbitrary even when it is thin. */}
-            <p className="-mt-1 text-xs text-text-muted">{item.reason}</p>
+                stops feeling arbitrary even when it is thin. A post
+                carries its own label in its header instead - the
+                founder: no separate text between cards. */}
+            {item.kind !== "hunt" && (
+              <p className="-mt-1 text-xs text-text-muted">{item.reason}</p>
+            )}
           </div>
         ))
       )}

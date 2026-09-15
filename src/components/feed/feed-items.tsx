@@ -4,26 +4,20 @@ import {
   ClipboardList,
   MapPin,
   PackageCheck,
-  Layers,
   Sparkles,
   BadgeCheck,
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
-import {
-  CardImageZoom,
-  type ZoomCard,
-  type ZoomHave,
-} from "@/components/cards/card-image-zoom";
-import { PostSocial } from "@/components/feed/post-social";
+import { FlareFeedCard } from "@/components/feed/flare-feed-card";
+import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
-import { cardImagesEnabled } from "@/lib/cards/images";
-import type { FeedCard, FeedItem } from "@/lib/feed/repository";
+import type { FeedItem } from "@/lib/feed/repository";
 
 /**
  * What one item of the Feed looks like.
@@ -90,216 +84,7 @@ function agoFrom(iso: string): string {
  * Thresholds are duplicated in the app deliberately and pinned together by
  * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
  */
-export function tileWidth(count: number): "lg" | "md" {
-  if (count <= 1) return "lg";
-  return "md";
-}
-
-const TILE_CLASS = { lg: "w-40", md: "w-24", sm: "w-14" } as const;
-
-/**
- * A row of cards you can see all of.
- *
- * The founder, on a friend's hunt that read "+4 more": "it should be a
- * carousel for these types of things... so you can see all the cards."
- * Four tiles and a count told you how much you were missing without
- * showing you any of it, which on the one row about what a friend is
- * chasing is the whole content of the row.
- *
- * So it scrolls. `overflow-x-auto` with `shrink-0` tiles is the whole
- * mechanism - no library, no snapping, and it stays a plain flex row for
- * anyone whose rail is short enough not to scroll at all. The count only
- * survives past CARD_RAIL_CAP on the server, where it stops being "we
- * hid some" and becomes "the rest are on the board".
- */
-/**
- * "I have this" for one card of a post, or null where it makes no sense:
- * your own post, a card that already traded, an item that is not a post.
- */
-function haveFor(
-  card: FeedCard,
-  post: { postId: string; yours: boolean } | undefined,
-): ZoomHave | null {
-  if (!post || post.yours || !card.flareId || card.state === "found") return null;
-  return {
-    postId: post.postId,
-    flareId: card.flareId,
-    state: card.state ?? "open",
-    youOffered: card.youOffered ?? false,
-  };
-}
-
-function CardRail({
-  cards,
-  more,
-  size = "md",
-  post,
-}: {
-  cards: FeedCard[];
-  /** Cards past the server's cap, which live on the board. */
-  more?: number;
-  size?: "lg" | "md";
-  /** The post these cards belong to, when they can be answered. */
-  post?: { postId: string; yours: boolean };
-}) {
-  /* The shelf the zoom pages along. Built from the same array the rail
-     draws, so what you swipe through is exactly what you can see. */
-  const shelf: ZoomCard[] = cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    exactName: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
-  }));
-
-  return (
-    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-      {cards.map((card, index) => (
-        <div key={card.cardId} className="flex shrink-0">
-          <FeedTile
-            imageUrl={card.imageUrl}
-            name={card.cardName}
-            cardNumber={card.cardNumber}
-            match={card.match}
-            size={size}
-            siblings={shelf}
-            position={index}
-            state={card.state}
-            have={haveFor(card, post)}
-          />
-        </div>
-      ))}
-      {more && more > 0 ? (
-        <p className="shrink-0 self-center text-xs whitespace-nowrap text-text-muted tabular-nums">
-          +{more} more
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * One card, at the size the feed shows cards, and the way to see it big.
- *
- * The founder, on the phone: "I can't click the images in the feed to
- * open the bigger view." The app's feed has opened the zoom since the
- * rails were made swipeable; the website's drew the same art as a plain
- * picture. So the tile is now the opener for the same `CardImageZoom`
- * every board and shelf on the site uses - tap for the large view, and
- * a rail hands over the whole shelf so the viewer pages along it
- * without closing. The picture itself is unchanged: when art is off or
- * a card has none, the zoom returns the tile as it was.
- */
-function FeedTile({
-  imageUrl,
-  name,
-  cardNumber,
-  match,
-  size = "sm",
-  siblings,
-  position,
-  state = "open",
-  have = null,
-}: {
-  imageUrl: string | null;
-  name: string;
-  cardNumber: string;
-  size?: "lg" | "md" | "sm";
-  /** The rest of the rail this tile sits in, and where in it. */
-  siblings?: ZoomCard[];
-  position?: number;
-  /**
-   * OFFERED or FOUND, on a post's card. Only this tile dims - the
-   * founder: "do not gray out the whole Flare". The badge says which.
-   */
-  state?: "open" | "offered" | "found";
-  /** "I have this" in the large view, when the viewer can say so. */
-  have?: ZoomHave | null;
-  /**
-   * What the viewer's binder says, or null for nothing.
-   *
-   * Nullable since a friend's hunt shows cards the viewer does NOT hold
-   * — seeing what a friend is chasing is the point. An unheld card is
-   * drawn plain: the green ring means "you have this" everywhere in the
-   * product, and a ring on a card you do not own would be a lie in the
-   * one place it is loudest.
-   */
-  match: "exact" | "other-printing" | null;
-}) {
-  const art = (
-    <span
-      title={
-        match === "exact"
-          ? `You have ${name}`
-          : match
-            ? "You have another printing"
-            : name
-      }
-      /* The board's own mark for a card you are holding, so the feed and
-         the room are not two dialects of the same fact. */
-      className={`relative block ${TILE_CLASS[size]} shrink-0 overflow-hidden rounded-[6px] border bg-elevated ${
-        match
-          ? "border-border shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
-          : "border-border"
-      }`}
-    >
-      <span
-        className={`block aspect-[60/84] w-full ${
-          state === "offered"
-            ? "opacity-50 grayscale"
-            : state === "found"
-              ? "opacity-70"
-              : ""
-        }`}
-      >
-        {imageUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="size-full object-cover" />
-        )}
-      </span>
-      {state !== "open" && (
-        /* The one-word state, pinned to the foot of the card so the
-           art above it still reads as the card it is. */
-        <span
-          className={`pointer-events-none absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] font-bold tracking-wider uppercase ${
-            state === "found"
-              ? "bg-accent text-accent-contrast"
-              : "bg-surface/90 text-text-secondary"
-          }`}
-        >
-          {state}
-        </span>
-      )}
-      {match && (
-        <span className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-surface/90 p-0.5">
-          {match === "exact" ? (
-            <PackageCheck className="size-3 text-accent" aria-hidden="true" />
-          ) : (
-            <Layers className="size-3 text-accent" aria-hidden="true" />
-          )}
-        </span>
-      )}
-    </span>
-  );
-
-  return (
-    <CardImageZoom
-      imageUrl={imageUrl}
-      exactName={name}
-      cardNumber={cardNumber}
-      enabled={cardImagesEnabled()}
-      /* The ring already says it across the row; the sentence is what
-         the tap is for, same as the board and the app. */
-      youHave={match ? { kind: match, count: 0 } : null}
-      have={have}
-      siblings={siblings}
-      position={position}
-      thumb={art}
-    />
-  );
-}
-
-/**
+export /**
  * What the two starter items say.
  *
  * Kept as data rather than two more branches below, because the pair
@@ -378,98 +163,7 @@ export function Item({ item }: { item: FeedItem }) {
   }
 
   if (item.kind === "hunt") {
-    return (
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex items-center gap-3">
-          <FeedPerson
-            playerId={item.playerId}
-            displayName={item.displayName}
-            avatarUrl={item.avatarUrl}
-            frame={item.frame}
-            ring={item.ring}
-            /* The event only when there IS one: a Flare posted with no
-               board has nowhere to name, and interpolating the absence
-               printed the word "null" after the deck. */
-            detail={`${
-              item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-            }${item.deckLabel ? ` · ${item.deckLabel}` : ""}${
-              item.eventName ? ` · ${item.eventName}` : ""
-            }`}
-          />
-        </div>
-
-        {/* One card reads as a card; a deck reads as a row of them. The
-            founder's rule for the whole Feed: a person posting thirty
-            cards is one thing that happened, not thirty. */}
-        {item.total === 1 && item.cards[0] ? (
-          <div className="flex items-center gap-3">
-            <FeedTile
-              imageUrl={item.cards[0].imageUrl}
-              name={item.cards[0].cardName}
-              cardNumber={item.cards[0].cardNumber}
-              match={item.cards[0].match}
-              state={item.cards[0].state}
-              have={haveFor(item.cards[0], { postId: item.postId, yours: item.yours })}
-            />
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="truncate font-semibold text-text-primary">
-                {item.cards[0].cardName}
-              </p>
-              <p className="font-mono text-xs text-text-muted">
-                {item.cards[0].cardNumber}
-              </p>
-              {item.cards[0].match && (
-                <p className="text-sm font-medium text-accent">
-                  {item.cards[0].match === "exact"
-                    ? "You have this"
-                    : "You have another printing"}
-                </p>
-              )}
-              {item.cards[0].state === "found" ? (
-                <p className="text-sm font-medium text-accent">Found</p>
-              ) : item.cards[0].youOffered ? (
-                <p className="text-sm text-text-secondary">You said you have this</p>
-              ) : item.cards[0].state === "offered" ? (
-                <p className="text-sm text-text-secondary">Somebody offered</p>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <CardRail
-              cards={item.cards}
-              more={item.total - item.cards.length}
-              size={tileWidth(item.cards.length)}
-              post={{ postId: item.postId, yours: item.yours }}
-            />
-            {item.youCanAnswer > 0 && (
-              /* The line that earns the tap. Absent when it would read
-                 "you can answer 0", which is not news. */
-              <p className="text-sm font-medium text-accent">
-                You can answer {item.youCanAnswer} of {item.total}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* The heart, the thread, and "I have this" on any card above:
-            the founder's ask that a Flare post feel like a post. */}
-        <PostSocial
-          postId={item.postId}
-          likes={item.likes}
-          liked={item.liked}
-          comments={item.comments}
-        />
-
-        {/* Every item that HAS a place ends in one. A Flare posted to
-            your area has no room to walk into, so it ends at the post. */}
-        {item.code && item.storeName ? (
-          <Link href={`/e/${item.code}`} className={buttonStyles("primary", "sm")}>
-            Go to {item.storeName}
-          </Link>
-        ) : null}
-      </Card>
-    );
+    return <FlareFeedCard item={item} />;
   }
 
   if (item.kind === "traded") {

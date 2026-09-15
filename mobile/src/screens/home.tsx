@@ -23,8 +23,8 @@ import { followHref } from "../follow-href";
 import {
   getFeed,
   SECTION_TITLES,
-  type FeedCard,
   type FeedEntry,
+  type FeedTab,
   getMe,
   joinRoom,
   likePost,
@@ -35,6 +35,10 @@ import {
   storedAccessToken,
   type Me,
 } from "../api";
+import { CardRail, tileWidth } from "../card-rail";
+import { FlareFeedCard } from "../flare-feed-card";
+import { FeedFilterTabs } from "../feed-filter-tabs";
+import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import {
   Body,
@@ -136,88 +140,6 @@ const STARTERS = {
  * The same numbers as the website's, pinned together by
  * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
  */
-function tileWidth(count: number): number {
-  if (count <= 1) return 160;
-  return 96;
-}
-
-/**
- * A row of cards you can see all of.
- *
- * The founder, on a friend's hunt that read "+4 more": "it should be a
- * carousel for these types of things... so you can see all the cards."
- * Four tiles and a count told you how much you were missing without
- * showing you any of it, which on the one row about what a friend is
- * chasing is the whole content of the row.
- *
- * A plain horizontal ScrollView, the same rail the showcase and the
- * dressing picker already use - no library and no snapping. The count
- * only survives past the server's CARD_RAIL_CAP, where it stops meaning
- * "we hid some" and starts meaning "the rest are on the board".
- */
-function CardRail({
-  cards,
-  more = 0,
-  width,
-  post,
-}: {
-  cards: FeedCard[];
-  /** Cards past the server's cap, which live on the board. */
-  more?: number;
-  width: number;
-  /** The post these cards belong to, when they can be answered. */
-  post?: PostRef;
-}) {
-  /* The shelf the zoom pages along. Built from the same array the rail
-     draws, so what you swipe through is exactly what you can see. */
-  const shelf: ZoomCard[] = cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    name: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
-  }));
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        gap: spacing(2),
-        alignItems: "center",
-        paddingVertical: spacing(0.5),
-      }}
-    >
-      {cards.map((card, index) => (
-        <CardImage
-          key={card.cardId}
-          imageUrl={card.imageUrl}
-          width={width}
-          name={card.cardName}
-          cardNumber={card.cardNumber}
-          youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-          state={card.state}
-          have={haveFor(card, post)}
-          /*
-           * The rest of the rail, so an opened card can be swiped along
-           * it. The founder: "when there's a card u click on anywhere,
-           * for example someones flares, you cant swipe between the
-           * cards on the app. u can on the website though."
-           *
-           * The zoom has always been able to do this - `siblings` and
-           * the swipe that reads it are already in CardImage, and Room
-           * and Local both hand it a shelf. The Feed never did, so its
-           * cards opened one at a time and closed again, which is the
-           * one place somebody is browsing rather than working.
-           */
-          siblings={shelf}
-          position={index}
-        />
-      ))}
-      {more > 0 ? <Muted>{`+${more} more`}</Muted> : null}
-    </ScrollView>
-  );
-}
 
 /** How long ago, in the shortest form that is still true. */
 function agoFrom(iso: string): string {
@@ -251,6 +173,13 @@ export function HomeScreen() {
   const [rsvping, setRsvping] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const locals = me?.locals ?? [];
+  /* Following | Nearby | My Flares. The server files every item under
+     one; an older server that sent no `tab` shows everything on each. */
+  const [tab, setTab] = useState<FeedTab>("following");
+  const shown = feed.filter((item) => item.tab === undefined || item.tab === tab);
+  const sectionsShown = new Set(shown.map((item) => item.section)).size;
+  /* The Flare being messaged from its paper plane, or null. */
+  const [messaging, setMessaging] = useState<MessageTarget | null>(null);
 
   /*
    * Refs beside the state, because `load` is a stable useCallback with
@@ -587,6 +516,9 @@ export function HomeScreen() {
        * only way to reach anything.
        */}
 
+      {/* The three filters, first thing under the wordmark. */}
+      <FeedFilterTabs value={tab} onChange={setTab} />
+
       {/*
        * The Room tab's job, as a banner: gone from the bar, never gone
        * from reach. The moment a room is open at one of your stores it
@@ -647,7 +579,7 @@ export function HomeScreen() {
        * to an undefined room. That is how the website and the app came to
        * show different feeds the week the new kinds landed.
        */}
-      {feed.map((item, index) => {
+      {shown.map((item, index) => {
         const body =
         item.kind === "nearbyMatch" ? (
           <Card
@@ -945,108 +877,25 @@ export function HomeScreen() {
             ))}
           </Card>
         ) : item.kind === "hunt" ? (
-          <Card key={`hunt-${index}`}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-            >
-              <FeedPerson
-                playerId={item.playerId}
-                displayName={item.displayName}
-                avatarUrl={item.avatarUrl}
-                frame={item.frame}
-                ring={item.ring}
-                /* The event only when there IS one: a Flare posted
-                   with no board has nowhere to name, and interpolating
-                   the absence printed the word "null" after the deck. */
-                detail={`${
-                  item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-                }${item.deckLabel ? ` · ${item.deckLabel}` : ""}${
-                  item.eventName ? ` · ${item.eventName}` : ""
-                }`}
-                onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
-              />
-            </View>
-
-            {/* One card reads as a card; a deck reads as a row of them.
-                A player posting thirty cards is one thing that happened,
-                not thirty — the founder's rule for the whole Feed. */}
-            {item.total === 1 && item.cards[0] ? (
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-              >
-                <CardImage
-                  imageUrl={item.cards[0].imageUrl}
-                  width={56}
-                  name={item.cards[0].cardName}
-                  cardNumber={item.cards[0].cardNumber}
-                  youHave={
-                    item.cards[0].match
-                      ? { kind: item.cards[0].match, count: 0 }
-                      : undefined
-                  }
-                  state={item.cards[0].state}
-                  have={haveFor(item.cards[0], postRef(item))}
-                />
-                <View style={{ flexShrink: 1 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                    {item.cards[0].cardName}
-                  </Text>
-                  <Muted>{item.cards[0].cardNumber}</Muted>
-                  {item.cards[0].match ? (
-                    <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                      {item.cards[0].match === "exact"
-                        ? "You have this"
-                        : "You have another printing"}
-                    </Text>
-                  ) : null}
-                  {item.cards[0].state === "found" ? (
-                    <Text style={{ color: colors.accent, fontWeight: "600" }}>Found</Text>
-                  ) : item.cards[0].youOffered ? (
-                    <Muted>You said you have this</Muted>
-                  ) : item.cards[0].state === "offered" ? (
-                    <Muted>Somebody offered</Muted>
-                  ) : null}
-                </View>
-              </View>
-            ) : (
-              <View style={{ gap: spacing(2) }}>
-                <CardRail
-                  cards={item.cards}
-                  more={item.total - item.cards.length}
-                  width={tileWidth(item.cards.length)}
-                  post={postRef(item)}
-                />
-                {item.youCanAnswer > 0 ? (
-                  <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                    {`You can answer ${item.youCanAnswer} of ${item.total}`}
-                  </Text>
-                ) : null}
-              </View>
-            )}
-
-            {/* The heart, the thread, and "I have this" on any card
-                above: the founder's ask that a Flare post feel like a
-                post. The thread is its own screen here. */}
-            <PostSocialRow
-              likes={item.likes ?? 0}
-              liked={item.liked ?? false}
-              comments={item.comments ?? 0}
-              onLike={(liked) => likePost(item.postId, liked)}
-              onOpenThread={() =>
-                navigation.navigate("FlarePost", { postId: item.postId })
-              }
-            />
-
-            {/* Every item that HAS a place ends in one. A Flare posted
-                to your area has no room to walk into, so it ends at the
-                post. */}
-            {item.code && item.storeName ? (
-              <Button
-                label={`Go to ${item.storeName}`}
-                onPress={() => void enter(item.code as string)}
-              />
-            ) : null}
-          </Card>
+          <FlareFeedCard
+            key={`hunt-${index}`}
+            item={item}
+            post={postRef(item)}
+            onOpenProfile={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+            onLike={(liked) => likePost(item.postId, liked)}
+            onOpenThread={() => navigation.navigate("FlarePost", { postId: item.postId })}
+            onMessage={
+              item.yours || !item.cards[0]?.flareId
+                ? undefined
+                : () =>
+                    setMessaging({
+                      flareId: item.cards[0]?.flareId ?? "",
+                      cardName: item.cards[0]?.cardName ?? "your card",
+                      posterName: item.displayName,
+                    })
+            }
+            onEnterRoom={(code) => void enter(code)}
+          />
         ) : item.kind === "upcoming" ? (
           <Card key={`upcoming-${index}`}>
             <Muted>
@@ -1328,7 +1177,8 @@ export function HomeScreen() {
            argument said out loud. */
         const opensSection =
           item.section !== undefined &&
-          (index === 0 || feed[index - 1].section !== item.section);
+          sectionsShown > 1 &&
+          (index === 0 || shown[index - 1].section !== item.section);
 
         return (
           <View key={`entry-${index}`} style={{ gap: spacing(2) }}>
@@ -1348,8 +1198,10 @@ export function HomeScreen() {
             ) : null}
             {body}
             {/* Why this is on your screen. A feed that explains itself
-                stops feeling arbitrary even when it is thin. */}
-            {item.reason ? <Muted>{item.reason}</Muted> : null}
+                stops feeling arbitrary even when it is thin. A post
+                carries its own label in its header instead - the
+                founder: no separate text between cards. */}
+            {item.reason && item.kind !== "hunt" ? <Muted>{item.reason}</Muted> : null}
           </View>
         );
       })}
@@ -1463,7 +1315,21 @@ export function HomeScreen() {
        * nothing, briefly, is its own kind of disorienting — which is
        * the complaint this whole change exists to answer.
        */}
-      {hydrated && feed.length === 0 && (
+      {hydrated && shown.length === 0 && tab === "following" && (
+        <Card>
+          <Title>Nothing from people yet</Title>
+          <Body>
+            Follow a friend and their Flares show up here. Find them by name from the
+            search up top.
+          </Body>
+          <Button
+            label="Find a player"
+            variant="secondary"
+            onPress={() => navigation.navigate("FindPlayer")}
+          />
+        </Card>
+      )}
+      {hydrated && shown.length === 0 && tab === "nearby" && (
         <Card>
           <Title>Nothing on right now</Title>
           <Body>
@@ -1478,6 +1344,29 @@ export function HomeScreen() {
           />
         </Card>
       )}
+      {hydrated && shown.length === 0 && tab === "mine" && (
+        <Card>
+          <Title>No Flares of yours yet</Title>
+          <Body>
+            Post one for the card you are hunting and it shows up here, with every
+            hand that goes up on it.
+          </Body>
+          <Button
+            label="Post a Flare"
+            variant="secondary"
+            onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+          />
+        </Card>
+      )}
+
+      <FlareMessageSheet
+        target={messaging}
+        onClose={() => setMessaging(null)}
+        onOpened={(threadId) => {
+          setMessaging(null);
+          navigation.navigate("LocalThread", { threadId });
+        }}
+      />
 
       {hydrated && feed.length < 3 && (
         <Card>
