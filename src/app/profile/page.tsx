@@ -13,6 +13,7 @@ import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { listFollowers, listFollowing } from "@/lib/players/follows";
 import { ShowcaseEditor } from "@/components/players/showcase-editor";
 import { EmberBadge } from "@/components/players/ember-badge";
+import { TradeHistoryCard } from "@/components/trades/history";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { needsSetup, ownProfile, SHOWCASE_LIMIT } from "@/lib/players/profile";
+import { listTradeHistory } from "@/lib/trades/history";
 import { removeShowcaseAction } from "@/lib/players/profile-actions";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
@@ -93,10 +95,11 @@ export default async function ProfilePage() {
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
 
-  const [following, followers, stats] = await Promise.all([
+  const [following, followers, stats, history] = await Promise.all([
     listFollowing(playerId),
     listFollowers(playerId),
     profileStats(playerId),
+    listTradeHistory(playerId, profile.tier),
   ]);
 
   /*
@@ -392,6 +395,16 @@ export default async function ProfilePage() {
               </div>
             </div>
           </Card>
+
+          {/* Under Embers, because the trades are where they came from.
+              Three recent rows and the door to the rest; locked, the
+              card is the Pro pitch. The rows never reach a free
+              player's page - listTradeHistory withholds them. */}
+          <TradeHistoryCard
+            locked={history.locked}
+            totals={history.totals}
+            trades={history.trades}
+          />
 
           {/*
            * The store lives on its own page now — the founder's call.

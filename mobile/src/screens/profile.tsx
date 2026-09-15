@@ -24,6 +24,7 @@ import {
   getFollowing,
   getGames,
   getProfile,
+  getTradeHistory,
   lastSearchGame,
   rememberSearchGame,
   removeFromShowcase,
@@ -39,6 +40,7 @@ import {
   type FollowedPlayer,
   type Profile,
   type ShowcaseCard,
+  type TradeHistory,
   type Wardrobe,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
@@ -47,6 +49,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
 import { CoverBanner } from "../showcase-zoom";
+import { LockedRows, TradeHistoryRow, TradeHistoryWall } from "../trade-history";
 import {
   AsyncButton,
   Body,
@@ -127,6 +130,8 @@ export function ProfileScreen() {
      shown as People. */
   const [following, setFollowing] = useState<FollowedPlayer[]>([]);
   const [followers, setFollowers] = useState<FollowedPlayer[]>([]);
+  /* The trade history's counts and, for Pro, its three newest rows. */
+  const [history, setHistory] = useState<TradeHistory | null>(null);
 
   /* Edit profile, Instagram's button: it opens the picture, cover and
      GIF controls in place rather than a separate screen. */
@@ -166,6 +171,9 @@ export function ProfileScreen() {
         .catch(() => {});
       getFollowers()
         .then((people) => setFollowers(people.followers))
+        .catch(() => {});
+      getTradeHistory()
+        .then((result) => setHistory(result.history))
         .catch(() => {});
     } catch (caught) {
       /*
@@ -921,6 +929,76 @@ export function ProfileScreen() {
             accent
           />
         </View>
+      </Card>
+
+      {/* Under Embers, because the trades are where they came from:
+          the website's card, natively. Three recent rows and the door
+          to the rest; locked, the card is the Pro pitch. */}
+      <Card>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: spacing(2),
+          }}
+        >
+          <View style={{ flex: 1, gap: spacing(1) }}>
+            <Title>Trade history</Title>
+            <Body>Every card you got and gave, so the binder never surprises you.</Body>
+          </View>
+          {history?.locked ? (
+            <View
+              style={{
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.accentMuted,
+                backgroundColor: colors.elevated,
+                paddingHorizontal: spacing(2.5),
+                paddingVertical: spacing(1),
+              }}
+            >
+              <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
+                Pro
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {!history ? (
+          <Muted>Loading…</Muted>
+        ) : history.locked ? (
+          <View>
+            <LockedRows count={3} />
+            <TradeHistoryWall
+              count={history.totals.trades}
+              onGetPro={() => navigation.navigate("Pro")}
+            />
+          </View>
+        ) : history.trades.length === 0 ? (
+          <Muted>Nothing traded yet. Confirm a trade in a room and it lands here.</Muted>
+        ) : (
+          <>
+            <View>
+              {history.trades.slice(0, 3).map((trade, index, all) => (
+                <TradeHistoryRow
+                  key={trade.id}
+                  trade={trade}
+                  compact
+                  last={index === all.length - 1}
+                />
+              ))}
+            </View>
+            <Button
+              label={
+                history.totals.trades > 3
+                  ? `See all ${history.totals.trades} trades`
+                  : "See your trade history"
+              }
+              variant="secondary"
+              onPress={() => navigation.navigate("TradeHistory")}
+            />
+          </>
+        )}
       </Card>
 
       {/* The list behind a tapped number, over the page - the founder:
