@@ -37,6 +37,8 @@ import {
   WornSceneLayer,
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
+import { HuntsPanel } from "@/components/players/hunts-panel";
+import { huntLimitFor } from "@/lib/players/hunts";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -233,6 +235,15 @@ export default async function ProfilePage() {
                 }
               />
             </div>
+
+            {/* Your hunts, above the shelf. What you are looking for is
+                the live thing; the showcase is what you are done with.
+                The public page shows the same panel in the same place. */}
+            <HuntsPanel
+              hunts={profile.hunts}
+              limit={huntLimitFor(profile.tier)}
+              yours
+            />
 
             {/* The showcase in its own rounded panel - the founder's
                 call: one connected profile block, with the shelf

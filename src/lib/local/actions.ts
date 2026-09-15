@@ -3,6 +3,7 @@
 import { pointFromCoords } from "@/lib/geo/zip";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { canStartHunt } from "@/lib/players/hunts";
 import { postAreaFlares, withdrawAreaFlare, type AreaFlareInput } from "./area";
 import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
@@ -215,6 +216,25 @@ export async function postAreaFlareAction(
     ).allowed
   ) {
     return { ok: false, message: TOO_MANY };
+  }
+
+  /*
+   * THE LIMIT IS CHECKED WHERE A HUNT IS STARTED, not where one is read.
+   *
+   * The founder: "free users can do two flare groups... pro players get
+   * 50 of these." Naming a group is the only way to start a hunt, so
+   * this is the only door it has to guard - and adding to one they
+   * already keep is never refused, because the limit is on how many sets
+   * somebody keeps, not on how many cards go in them.
+   */
+  if (deckLabel?.trim()) {
+    const room = await canStartHunt(playerId, deckLabel);
+    if (!room.allowed) {
+      return {
+        ok: false,
+        message: `You are keeping ${room.kept} hunts, which is the limit on your plan. Rename this one to match a hunt you already have, or finish one first.`,
+      };
+    }
   }
 
   const result = await postAreaFlares(

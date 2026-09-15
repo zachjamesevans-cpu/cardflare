@@ -25,4 +25,13 @@ export const manifest = {
    * blurred stand-in, never the rows.
    */
   tradeHistory: true,
+  /*
+   * Fifty hunts instead of two. The founder: "free users can do two
+   * flare groups... pro players get 50 of these." Two is enough to prove
+   * the idea - a deck you are building and the loose chase cards beside
+   * it - and fifty is past the point where the number is what stops
+   * anybody. The limit itself lives in lib/players/hunts.ts; this is
+   * only the switch that says which one applies.
+   */
+  moreHunts: true,
 } as const;
