@@ -41,6 +41,23 @@ export function awayLabel(miles: number): string {
 }
 
 /**
+ * What the person did, in the words the board uses.
+ *
+ * A Flare points one of two ways: wanted, or offered up. Everything in
+ * the Feed used to be a want, so the line was a constant - the rows that
+ * carry a direction arrived when the separate "recent" kind was folded
+ * into this one, and a showcase post reading "is hunting" would have
+ * been backwards.
+ */
+function statusLabel(item: Extract<FeedEntry, { kind: "hunt" }>): string {
+  const offering = item.direction === "showcase";
+  if (item.total === 1) return offering ? "is letting go of" : "is hunting";
+  return offering
+    ? `is letting go of ${item.total} cards`
+    : `is hunting ${item.total} cards`;
+}
+
+/**
  * The crosshair and the words: CardFlare's status line.
  *
  * A targeting reticle in the accent with a faint glow behind it, then
@@ -278,11 +295,10 @@ export function FlareFeedCard({
                 </Text>
               ) : null}
             </View>
-              <FlareStatus
-                label={
-                  item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-                }
-              />
+              {/* Main's wrapper, which is what stopped the name column
+                  collapsing, and this branch's label, which is what
+                  stops a showcase post reading "is hunting". */}
+              <FlareStatus label={statusLabel(item)} />
             </View>
           </Tap>
         </View>

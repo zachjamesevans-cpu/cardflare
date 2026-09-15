@@ -39,6 +39,7 @@ import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
+import { LabScreen } from "./src/screens/lab";
 import { PostFlareScreen } from "./src/screens/post-flare";
 import { LocalScreen } from "./src/screens/local";
 import { RoomTab } from "./src/screens/room";
@@ -115,6 +116,9 @@ export type StackParams = {
   CreateAccount: undefined;
   Scan: undefined;
   Settings: undefined;
+  /** Every shape a Feed post can take, drawn with made-up data. See
+      src/screens/lab.tsx - it reaches nothing and posts nothing. */
+  Lab: undefined;
   /** The Embers store, the website's /profile/store. */
   Store: undefined;
   /** Getting dressed, the website's /profile/customize. Two wands, two
@@ -664,6 +668,11 @@ export default function App() {
               <ScanScreen onCode={() => openRoom(navigation)} />
             )}
           </Stack.Screen>
+          <Stack.Screen
+            name="Lab"
+            component={LabScreen}
+            options={{ title: "Design lab", headerBackTitle: "Settings" }}
+          />
           <Stack.Screen
             name="Settings"
             component={SettingsScreen}
