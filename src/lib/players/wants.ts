@@ -4,6 +4,7 @@ import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { afterWantSaved } from "@/lib/nearby/matching";
+import { liveEventIds } from "@/lib/events/rooms";
 
 /**
  * Saved wants: the durable version of a Flare.
@@ -367,10 +368,30 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
   ];
 
   if (eventIds.length > 0) {
+    /*
+     * ONLY ROOMS THAT ARE ACTUALLY LIVE.
+     *
+     * The founder, looking at his want list: "notice how it says these
+     * flares are live at x stores. they are not. those rooms are all
+     * closed."
+     *
+     * This asked whether the FLARE was open, which it was - a Flare is
+     * not closed when the room it sits on closes - and never asked
+     * anything about the room. Reading `status = 'open'` would not have
+     * saved it either: a room stays open in the table long after it
+     * stops being live, which is why liveness is a set of rules in
+     * lib/events/rooms.ts and not a column. One answer, one place.
+     *
+     * A Flare on a room that has closed is not a lie waiting to happen
+     * any more; it simply has no store to name, falls through to the
+     * area label below, and failing that reads as saved.
+     */
+    const live = await liveEventIds(eventIds);
+
     const { data: events } = await admin
       .from("events")
       .select("id, store_id")
-      .in("id", eventIds);
+      .in("id", [...live]);
 
     const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
 
@@ -381,10 +402,28 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
 
     const nameOf = new Map((stores ?? []).map((store) => [store.id, store.name]));
 
+    /*
+     * A card can be up at more than one shop at once, and naming
+     * whichever row came back first was a coin toss dressed as a fact -
+     * the founder: "they're live at different stores". Two or more and
+     * it counts them instead, which is true however many there are and
+     * does not pretend to know which one you meant.
+     */
+    const shopsFor = new Map<string, Set<string>>();
     for (const flare of boardFlares) {
       const storeId = flare.event_id ? storeOf.get(flare.event_id) : undefined;
       const name = storeId ? nameOf.get(storeId) : undefined;
-      if (name && !out.has(flare.card_id)) out.set(flare.card_id, name);
+      if (!name) continue;
+
+      const shops = shopsFor.get(flare.card_id) ?? new Set<string>();
+      shops.add(name);
+      shopsFor.set(flare.card_id, shops);
+    }
+
+    for (const [cardId, shops] of shopsFor) {
+      if (out.has(cardId)) continue;
+      const [only] = shops;
+      out.set(cardId, shops.size === 1 ? only : `${shops.size} stores`);
     }
   }
 
