@@ -337,6 +337,37 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
   return opened.room;
 }
 
+/**
+ * Of these events, which are actually LIVE right now.
+ *
+ * THE ONE ANSWER TO THAT QUESTION, and the reason it exists is a bug the
+ * founder caught: the want list told him his Flares were "live at" three
+ * shops whose rooms had all closed. It had asked whether the FLARE was
+ * open - which it was, flares are not closed when a room is - and never
+ * asked anything about the room at all.
+ *
+ * `status = 'open'` would not have been enough either. A room is open in
+ * the table long after it stops being live: a scheduled night that has
+ * ended, a walk-in room nobody has touched for hours. Liveness is those
+ * rules, not a column, and they live in `listLiveRooms` above.
+ *
+ * So anything that wants to say "live" asks this, and gets the same
+ * answer the console and the scan path get. A caller that reads
+ * `events` itself and decides for itself is the bug, which is why
+ * tests/unit/live-rooms.test.ts fails anyone who does.
+ */
+export async function liveEventIds(
+  eventIds: string[],
+  now: number = Date.now(),
+): Promise<Set<string>> {
+  if (eventIds.length === 0) return new Set();
+
+  const wanted = new Set(eventIds);
+  const live = await listLiveRooms(now);
+
+  return new Set(live.filter((room) => wanted.has(room.eventId)).map((r) => r.eventId));
+}
+
 /** A room that is live right now, for the console's store list. */
 export interface LiveRoom {
   eventId: string;
