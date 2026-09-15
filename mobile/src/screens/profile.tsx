@@ -66,6 +66,7 @@ import { colors, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
+import { HuntsPanel } from "../hunts-panel";
 
 /** How far the cover reaches: past the name and the Embers badge. */
 const COVER_HEIGHT = 144;
@@ -751,6 +752,14 @@ export function ProfileScreen() {
             onPress={() => navigation.navigate("Settings")}
           />
         )}
+
+        {/* Your hunts, above the shelf. What you are looking for is the
+            live thing; the showcase is what you are done with. */}
+        <HuntsPanel
+          hunts={profile.hunts ?? []}
+          limit={profile.huntLimit}
+          yours
+        />
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the

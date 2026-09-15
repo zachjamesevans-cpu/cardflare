@@ -16,6 +16,7 @@ import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
+import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap } from "../ui";
 import { colors, radius, spacing } from "../theme";
@@ -182,6 +183,11 @@ export function PlayerProfileScreen() {
             }
           />
         </View>
+
+        {/* What they are looking for, before what they are showing off:
+            somebody opening a profile is usually deciding whether they
+            can help. Same order as the website. */}
+        <HuntsPanel hunts={profile.hunts ?? []} />
 
         {/* The showcase panel, same as the website: its own rounded
             rectangle inside the one connected profile block. */}

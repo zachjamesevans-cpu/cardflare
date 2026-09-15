@@ -26,6 +26,7 @@ import { displayNameSchema } from "@/lib/players/profile-schema";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
+import { huntLimitFor } from "@/lib/players/hunts";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +140,11 @@ export async function GET(request: Request): Promise<Response> {
       equips,
       showcase: profile.showcase,
       showcaseLimit: SHOWCASE_LIMIT,
+      /* The named sets they are looking for, and how many their tier
+         lets them keep. Both read off the profile the server already
+         built, so this costs no extra round trip. */
+      hunts: profile.hunts,
+      huntLimit: huntLimitFor(profile.tier),
       stats,
     },
     wardrobe,

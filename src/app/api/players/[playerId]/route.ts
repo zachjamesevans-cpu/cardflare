@@ -117,6 +117,9 @@ export async function GET(
     equips: dressed,
     /* Per-card dressing, resolved here so the client never needs the
        null-means-default rule. */
+    /* Their hunts, so the app's profile screen draws the same panel the
+       website does rather than an empty one. */
+    hunts: profile.hunts,
     showcase: profile.showcase.map((entry) => ({
       id: entry.id,
       name: entry.name,

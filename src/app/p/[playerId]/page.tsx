@@ -32,6 +32,7 @@ import {
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
 import { ProfileCover } from "@/components/players/profile-cover";
+import { HuntsPanel } from "@/components/players/hunts-panel";
 
 export const metadata: Metadata = {
   title: "Player",
@@ -174,6 +175,11 @@ export default async function PublicProfilePage({
                 }
               />
             </div>
+
+            {/* What they are looking for, before what they are showing
+                off: somebody opening a profile is usually deciding
+                whether they can help. */}
+            <HuntsPanel hunts={profile.hunts} />
 
             {/* The showcase panel, pixel-identical to the own-profile
                 page's - the founder's spec: viewing somebody must show

@@ -961,6 +961,21 @@ export const markRead = (ids: string[]) =>
  * fetched for somebody else comes back without it, because the server
  * builds those from a type that has no field for it.
  */
+/**
+ * A named set of cards somebody is looking for - "Sabo", "Red Luffy".
+ *
+ * Optional wherever it appears, because an app build meets servers older
+ * than itself routinely and a profile with no hunts should draw a
+ * profile, not a crash.
+ */
+export interface Hunt {
+  name: string;
+  looking: number;
+  lookingCopies: number;
+  found: number;
+  lastPostedAt: string;
+}
+
 export interface ShowcaseCard {
   id: string;
   cardId: string;
@@ -1056,6 +1071,10 @@ export interface Profile {
   equips?: Partial<Record<CustomizeKind, string | null>> | null;
   showcase: ShowcaseCard[];
   showcaseLimit: number;
+  /** Their named hunts. Absent from an older server. */
+  hunts?: Hunt[];
+  /** How many they may keep, which their tier decides. */
+  huntLimit?: number;
   /** The three numbers under the picture; absent from an older server. */
   stats?: ProfileStats;
 }
@@ -1194,6 +1213,8 @@ export interface PeekProfile {
   effect: string | null;
   /** Every catalogue slot they wear; see Profile.equips. */
   equips?: Partial<Record<CustomizeKind, string | null>> | null;
+  /** Their named hunts. Absent from an older server. */
+  hunts?: Hunt[];
   showcase: {
     id: string;
     name: string;

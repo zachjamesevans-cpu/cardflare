@@ -1,5 +1,7 @@
 import "server-only";
 
+import { huntsFor, type Hunt } from "@/lib/players/hunts";
+
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
@@ -78,6 +80,17 @@ export interface PublicProfile {
   tier: string;
   equipped: Equipped;
   showcase: ShowcaseCard[];
+  /**
+   * The named sets of cards they are looking for, newest first.
+   *
+   * The founder: "I can go to someone's proifle and they can have a
+   * section for their flaregroups with cards they already found, and
+   * cards they're still looking for." Read here rather than from a
+   * second request, because it is drawn on the same screen as
+   * everything else in this object and a profile that arrives in two
+   * pieces arrives twice.
+   */
+  hunts: Hunt[];
   joinedAt: string;
 }
 
@@ -109,6 +122,9 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
     playerId: player.id,
     displayName: player.display_name,
     handle: player.handle,
+    /* Read here so both the owner's profile and the public one carry
+       them, rather than each caller remembering to ask. */
+    hunts: await huntsFor(playerId),
     /*
      * Resolved to a src here rather than at every render point, and
      * VERIFIED against storage — see `verifiedAvatar`. This is the page
