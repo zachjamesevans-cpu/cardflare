@@ -826,25 +826,37 @@ export type FeedEntry = FeedItem & {
 };
 
 /**
- * The three filters over the Feed, the founder's redesign: Following,
- * Nearby, My Flares. Decided here so the two clients cannot file the
- * same item under different tabs.
+ * The two filters over the Feed: Following and Nearby. Decided here so
+ * the two clients cannot file the same item under different tabs.
  *
- * Following is people: their Flares, what they added and traded, who
- * to follow next, and the store's own news at the tail. Nearby is
- * places and the cards wanted around you. My Flares is yours.
+ * Following is people: their Flares, YOURS, what everyone added and
+ * traded, who to follow next, and the store's own news at the tail.
+ * Nearby is places and the cards wanted around you.
+ *
+ * THERE WAS A THIRD, "My Flares", and the founder cut it: "its
+ * reundant to have a 'my flares' section when that is already listed
+ * elsewhere in the app imo. remove that tab. all of my flares should
+ * also go in the main feed when I post them."
+ *
+ * He is right on both counts. Your standing list already has a whole
+ * tab of its own, so the third filter was a second door to it - and
+ * putting your posts behind that door meant posting something made the
+ * main feed look unchanged. Instagram shows you your own post in the
+ * feed; so does this now.
  */
-export type FeedTab = "following" | "nearby" | "mine";
+export type FeedTab = "following" | "nearby";
 
 export const TAB_TITLES: Record<FeedTab, string> = {
   following: "Following",
   nearby: "Nearby",
-  mine: "My Flares",
 };
 
 export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
-  if (section === "yours") return "mine";
-  if (item.kind === "start" && item.topic === "deck") return "mine";
+  /* Your own Flares sit in the main feed with everyone else's, still
+     under their own "Your flares" heading so they are not mistaken for
+     somebody you follow. */
+  if (section === "yours") return "following";
+  if (item.kind === "start" && item.topic === "deck") return "following";
   if (section === "people" || section === "store" || item.kind === "announcement") {
     return "following";
   }

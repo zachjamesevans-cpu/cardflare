@@ -37,7 +37,7 @@ import {
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
 import { FlareFeedCard } from "../flare-feed-card";
-import { FeedFilterTabs } from "../feed-filter-tabs";
+import { FEED_TABS, FeedFilterTabs } from "../feed-filter-tabs";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import {
@@ -173,10 +173,25 @@ export function HomeScreen() {
   const [rsvping, setRsvping] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const locals = me?.locals ?? [];
-  /* Following | Nearby | My Flares. The server files every item under
-     one; an older server that sent no `tab` shows everything on each. */
+  /* Following | Nearby. The server files every item under one; an older
+     server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
-  const shown = feed.filter((item) => item.tab === undefined || item.tab === tab);
+  /*
+   * An item shows when it belongs to this filter, or when we cannot
+   * tell which filter it belongs to.
+   *
+   * Both halves matter, and the second is about version skew. The app
+   * ships on TestFlight's clock and the server on Vercel's, so a build
+   * carrying this change will meet a server that still files your own
+   * Flares under the tab that no longer exists. Matching only the known
+   * two would hide them completely - the exact thing this round is
+   * meant to fix - so a tab we do not recognise is treated like no tab
+   * at all and shown on every filter.
+   */
+  const shown = feed.filter(
+    (item) =>
+      !item.tab || item.tab === tab || !FEED_TABS.includes(item.tab as FeedTab),
+  );
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
@@ -1341,20 +1356,6 @@ export function HomeScreen() {
             label="Go to Room"
             variant="secondary"
             onPress={() => openRoom(navigation)}
-          />
-        </Card>
-      )}
-      {hydrated && shown.length === 0 && tab === "mine" && (
-        <Card>
-          <Title>No Flares of yours yet</Title>
-          <Body>
-            Post one for the card you are hunting and it shows up here, with every
-            hand that goes up on it.
-          </Body>
-          <Button
-            label="Post a Flare"
-            variant="secondary"
-            onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
           />
         </Card>
       )}

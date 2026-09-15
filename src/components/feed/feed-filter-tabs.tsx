@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, Star, Users } from "lucide-react";
+import { MapPin, Users } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { TAB_TITLES, type FeedTab } from "@/lib/feed/repository";
@@ -7,14 +7,14 @@ import { TAB_TITLES, type FeedTab } from "@/lib/feed/repository";
 /**
  * Following | Nearby | My Flares, under the wordmark.
  *
- * Three rounded segments. The one that is on wears the accent as a
+ * Two rounded segments. The one that is on wears the accent as a
  * border and a faint glow, the CardFlare green kept for the active
  * state; the others sit in muted grey. Same words and order as the
  * app's tabs, which read the same `tab` off every item.
  */
-const ICONS = { following: Users, nearby: MapPin, mine: Star } as const;
+const ICONS = { following: Users, nearby: MapPin } as const;
 
-export const FEED_TABS: FeedTab[] = ["following", "nearby", "mine"];
+export const FEED_TABS: FeedTab[] = ["following", "nearby"];
 
 export function FeedFilterTabs({ value }: { value: FeedTab }) {
   return (

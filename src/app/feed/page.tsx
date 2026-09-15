@@ -87,7 +87,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const TABS: FeedTab[] = ["following", "nearby", "mine"];
+const TABS: FeedTab[] = ["following", "nearby"];
 
 export default async function FeedPage({
   searchParams,
@@ -160,7 +160,7 @@ export default async function FeedPage({
 
   const liveLocal = locals.find((local) => local.liveNow) ?? null;
 
-  /* Following | Nearby | My Flares: the server filed every item under
+  /* Following | Nearby: the server filed every item under
      one, so this is a filter and never a second opinion. Headings only
      where a tab holds more than one section. */
   const shown = items.filter((item) => item.tab === tab);
