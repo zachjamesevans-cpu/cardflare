@@ -18,7 +18,12 @@ export function tileWidth(count: number): "lg" | "md" {
   return "md";
 }
 
-export const TILE_CLASS = { lg: "w-40", md: "w-24", sm: "w-14" } as const;
+export const TILE_CLASS = {
+  lg: "w-40",
+  md: "w-24",
+  sm: "w-14",
+  pager: "w-28",
+} as const;
 
 /**
  * A row of cards you can see all of.
@@ -127,7 +132,7 @@ export function FeedTile({
   imageUrl: string | null;
   name: string;
   cardNumber: string;
-  size?: "lg" | "md" | "sm";
+  size?: "lg" | "md" | "sm" | "pager";
   /** The rest of the rail this tile sits in, and where in it. */
   siblings?: ZoomCard[];
   position?: number;

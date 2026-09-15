@@ -2,8 +2,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, useWindowDimensions, View } from "react-native";
 
 import type { FeedEntry } from "./api";
-import { CardRail } from "./card-rail";
 import { GuestChip } from "./feed-person";
+import { FlareDeckPager } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
@@ -125,6 +125,14 @@ export function FlareFeedCard({
     have: haveFor(card, post),
   }));
 
+  const chips = (
+    <>
+      <FlareTypeChip label="Want" primary />
+      {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
+      {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
+    </>
+  );
+
   const details = (
     <View style={{ flex: 1, gap: spacing(2), minWidth: 0 }}>
       {single ? (
@@ -152,9 +160,7 @@ export function FlareFeedCard({
       )}
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        <FlareTypeChip label="Want" primary />
-        {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
-        {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
+        {chips}
       </View>
 
       {single && lead.match ? (
@@ -279,15 +285,13 @@ export function FlareFeedCard({
           {details}
         </View>
       ) : (
-        <View style={{ gap: spacing(3) }}>
-          <CardRail
-            cards={item.cards}
-            more={item.total - item.cards.length}
-            width={Math.round(cardWidth * 0.72)}
-            post={post}
-          />
-          {details}
-        </View>
+        <FlareDeckPager
+          cards={item.cards}
+          total={item.total}
+          post={post}
+          chips={chips}
+          note={item.note ?? null}
+        />
       )}
 
       {/* A hairline, then the counts. Understated until touched. */}
