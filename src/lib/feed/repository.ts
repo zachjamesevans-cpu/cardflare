@@ -826,25 +826,37 @@ export type FeedEntry = FeedItem & {
 };
 
 /**
- * The three filters over the Feed, the founder's redesign: Following,
- * Nearby, My Flares. Decided here so the two clients cannot file the
- * same item under different tabs.
+ * The two filters over the Feed: Following and Nearby. Decided here so
+ * the two clients cannot file the same item under different tabs.
  *
- * Following is people: their Flares, what they added and traded, who
- * to follow next, and the store's own news at the tail. Nearby is
- * places and the cards wanted around you. My Flares is yours.
+ * Following is people: their Flares, YOURS, what everyone added and
+ * traded, who to follow next, and the store's own news at the tail.
+ * Nearby is places and the cards wanted around you.
+ *
+ * THERE WAS A THIRD, "My Flares", and the founder cut it: "its
+ * reundant to have a 'my flares' section when that is already listed
+ * elsewhere in the app imo. remove that tab. all of my flares should
+ * also go in the main feed when I post them."
+ *
+ * He is right on both counts. Your standing list already has a whole
+ * tab of its own, so the third filter was a second door to it - and
+ * putting your posts behind that door meant posting something made the
+ * main feed look unchanged. Instagram shows you your own post in the
+ * feed; so does this now.
  */
-export type FeedTab = "following" | "nearby" | "mine";
+export type FeedTab = "following" | "nearby";
 
 export const TAB_TITLES: Record<FeedTab, string> = {
   following: "Following",
   nearby: "Nearby",
-  mine: "My Flares",
 };
 
 export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
-  if (section === "yours") return "mine";
-  if (item.kind === "start" && item.topic === "deck") return "mine";
+  /* Your own Flares sit in the main feed with everyone else's, still
+     under their own "Your flares" heading so they are not mistaken for
+     somebody you follow. */
+  if (section === "yours") return "following";
+  if (item.kind === "start" && item.topic === "deck") return "following";
   if (section === "people" || section === "store" || item.kind === "announcement") {
     return "following";
   }
@@ -1278,25 +1290,32 @@ async function boardWithHunts(
  * and the composer's own promise - "No room needed. Your friends see it
  * in the Feed" - was not true.
  *
- * This closes the half the founder asked for: your own. Somebody else's
- * area Flare still does not reach the people who follow them, which is
- * the same gap seen from the other side and wants its own round.
+ * Read for EVERY author the feed cares about - the follow list and the
+ * viewer together - because the other half of the same gap is the one
+ * that mattered most. Following somebody showed you almost nothing:
+ * their Flares reached you only if they had posted to a board at a shop
+ * you had also saved, and a Flare posted the ordinary way reached
+ * nobody. The founder, on being told: "yep I want it."
  *
  * Grouped by posting action, like a board's hunts, so a pasted deck is
  * one post with one thread rather than thirty rows.
  */
 async function areaHuntsFor(
-  author: FollowedPlayer,
+  authors: Map<string, FollowedPlayer>,
+  viewerId: string,
   held: ReturnType<typeof heldByCard>,
   /* Where the viewer is, for "2 mi away". Null says nothing. */
   origin: Point | null,
 ): Promise<HuntItem[]> {
+  if (authors.size === 0) return [];
+
   const { data: flares } = await getSupabaseAdmin()
     .from("flares")
     .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code",
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id",
     )
-    .eq("player_id", author.playerId)
+    /* One query for everybody rather than one per person followed. */
+    .in("player_id", [...authors.keys()])
     .eq("status", "open")
     .eq("intent", "want")
     .is("event_id", null)
@@ -1309,14 +1328,21 @@ async function areaHuntsFor(
   const facts = await cardFacts(flares.map((flare) => flare.card_id));
 
   /* One group per posting act: the batch if it had one, else the Flare.
-     The same key a board's hunts use, so `postId` means one thing. */
+     Keyed by author as well, the way a board's hunts are. `postId` stays
+     the batch alone, because that is what a heart and a thread hang
+     off. */
   const groups = new Map<string, typeof flares>();
   for (const flare of flares) {
-    const key = flare.posted_batch ?? flare.id;
+    if (!flare.player_id) continue;
+    const key = `${flare.player_id}::${flare.posted_batch ?? flare.id}`;
     groups.set(key, [...(groups.get(key) ?? []), flare]);
   }
 
-  return [...groups.entries()].map(([postId, group]) => {
+  return [...groups.entries()].flatMap(([key, group]) => {
+    const authorId = key.split("::")[0];
+    const author = authors.get(authorId);
+    if (!author) return [];
+    const postId = key.slice(authorId.length + 2);
     const posted = pointForPostalCode(group[0]?.posted_postal_code);
     const milesAway =
       origin && posted ? Math.round(milesApart(origin, posted) * 10) / 10 : null;
@@ -1334,34 +1360,36 @@ async function areaHuntsFor(
       };
     });
 
-    return {
-      kind: "hunt" as const,
-      postId,
-      likes: 0,
-      comments: 0,
-      liked: false,
-      /* No room to send anyone to. */
-      code: null,
-      storeName: null,
-      eventName: null,
-      playerId: author.playerId,
-      displayName: author.displayName,
-      avatarUrl: author.avatarUrl,
-      frame: author.frame,
-      ring: author.ring,
-      deckLabel: group[0]?.deck_label ?? null,
-      postedAt: group[0]?.created_at ?? new Date().toISOString(),
-      milesAway,
-      storeId: null,
-      acceptsTrade: group.some((flare) => flare.accepts_trade ?? true),
-      acceptsCash: group.some((flare) => flare.accepts_cash ?? false),
-      note: group.find((flare) => flare.note)?.note ?? null,
-      offers: 0,
-      total: cards.length,
-      youCanAnswer: cards.filter((card) => card.match).length,
-      cards: cards.slice(0, CARD_RAIL_CAP),
-      yours: true,
-    };
+    return [
+      {
+        kind: "hunt" as const,
+        postId,
+        likes: 0,
+        comments: 0,
+        liked: false,
+        /* No room to send anyone to. */
+        code: null,
+        storeName: null,
+        eventName: null,
+        playerId: author.playerId,
+        displayName: author.displayName,
+        avatarUrl: author.avatarUrl,
+        frame: author.frame,
+        ring: author.ring,
+        deckLabel: group[0]?.deck_label ?? null,
+        postedAt: group[0]?.created_at ?? new Date().toISOString(),
+        milesAway,
+        storeId: null,
+        acceptsTrade: group.some((flare) => flare.accepts_trade ?? true),
+        acceptsCash: group.some((flare) => flare.accepts_cash ?? false),
+        note: group.find((flare) => flare.note)?.note ?? null,
+        offers: 0,
+        total: cards.length,
+        youCanAnswer: cards.filter((card) => card.match).length,
+        cards: cards.slice(0, CARD_RAIL_CAP),
+        yours: authorId === viewerId,
+      },
+    ];
   });
 }
 
@@ -2054,9 +2082,10 @@ export async function listFeed(
   /* Where the viewer is, once, for every "2 mi away" on the screen. */
   const origin = (await originForPlayer(playerId, device)).point;
 
-  /* The Flares you posted with no board behind them. They belong to no
-     store, so they are read here rather than per-local like the rest. */
-  const areaHunts = me ? await areaHuntsFor(me, held, origin) : [];
+  /* Flares with no board behind them - yours and your followed players'.
+     They belong to no store, so they are read once here rather than
+     per-local like everything else. */
+  const areaHunts = await areaHuntsFor(authors, playerId, held, origin);
 
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
@@ -2182,9 +2211,13 @@ export async function listFeed(
      * one heading over one block - and puts what you just posted where
      * Instagram puts it, at the top, so posting visibly did something.
      */
-    ...areaHunts,
+    ...areaHunts.filter((item) => item.yours),
     ...boards.filter((item) => item.kind === "hunt" && item.yours),
     ...boards.filter((item) => item.kind === "hunt" && !item.yours),
+    /* Somebody you follow, posting from anywhere rather than onto a
+       board at a shop you happen to share. Without this, following a
+       player showed you almost nothing. */
+    ...areaHunts.filter((item) => !item.yours),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,

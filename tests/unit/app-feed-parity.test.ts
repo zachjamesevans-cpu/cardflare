@@ -228,10 +228,46 @@ describe("the home screen's furniture", () => {
     expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
-  it("lets the feed be asked for again", () => {
-    /* The most-reopened screen in the app had no pull to refresh, which
-       quietly teaches that reopening is pointless. */
-    expect(app).toContain("<RefreshControl");
+  it("lets the feed be asked for again, with a spinner that actually draws", () => {
+    /*
+     * The most-reopened screen in the app had no pull to refresh, which
+     * quietly teaches that reopening is pointless. It then had one that
+     * DID NOT WORK for longer, and this test is why nobody noticed: it
+     * asserted the string "<RefreshControl" was in the file.
+     *
+     * It was. React Native's RefreshControl does not render in this app
+     * at all - not here and not on Room, which asks for one too. Pinning
+     * `refreshing` true produced no spinner and did not even displace
+     * the content, at any offset, on a plain ScrollView as well as the
+     * animated one. Measured on the simulator.
+     *
+     * So the Feed draws its own, off the scroll it already follows for
+     * the header. Asserted on the MECHANISM now rather than a component
+     * name, because a name is exactly what fooled this file.
+     */
+    expect(app).not.toContain("<RefreshControl");
+    expect(app).toContain("function PullSpinner");
+    expect(app).toContain("const PULL_TRIGGER");
+    expect(app).toMatch(
+      /pull\.value = Math\.max\(0, -\(event\.contentOffset\.y \+ headerRoom\)\)/,
+    );
+    expect(app).toMatch(
+      /if \(pull\.value >= PULL_TRIGGER\) runOnJS\(askForRefresh\)\(\)/,
+    );
+  });
+
+  it("gives the header its room as an inset, so the spinner has somewhere to sit", () => {
+    /*
+     * The room used to be padding INSIDE the content, which is why even
+     * a working spinner would have been hidden: iOS draws it against the
+     * scroll view's own top edge, above the content rather than above
+     * the content's padding, and that edge sits under the floating
+     * header. An inset moves the edge itself.
+     */
+    expect(app).toContain("const headerRoom = insets.top + HEADER_CONTENT_HEIGHT;");
+    expect(app).toContain("contentInset={{ top: headerRoom }}");
+    expect(app).toContain("contentOffset={{ x: 0, y: -headerRoom }}");
+    expect(app).toContain("automaticallyAdjustContentInsets={false}");
   });
 
   it("hides the explainer once the screen has filled up", () => {
@@ -419,5 +455,53 @@ describe("posting a Flare wakes the Feed", () => {
      * viewer did not ask to watch is a screen twitching on its own.
      */
     expect(app).not.toMatch(/onFeedStale\(\(\) => void refresh\(\)\)/);
+  });
+});
+
+describe("the Feed has two filters, and your own Flares are in the main one", () => {
+  /*
+   * The founder: "its reundant to have a 'my flares' section when that
+   * is already listed elsewhere in the app imo. remove that tab. all of
+   * my flares should also go in the main feed when I post them."
+   *
+   * Right on both counts. Your standing list already has a tab of its
+   * own, so the third filter was a second door to it - and putting your
+   * posts behind that door meant posting something left the main feed
+   * looking unchanged.
+   */
+  const repo = read("src/lib/feed/repository.ts");
+
+  it("offers Following and Nearby, and nothing else", () => {
+    expect(repo).toContain('export type FeedTab = "following" | "nearby";');
+    /* The MAP ENTRY, not the words - the file explains at length why
+       the third tab went, and that explanation names it. */
+    expect(repo).not.toMatch(/mine: "My Flares"/);
+
+    /* Both clients read the same two, in the same order. */
+    for (const source of [
+      read("src/components/feed/feed-filter-tabs.tsx"),
+      read("mobile/src/feed-filter-tabs.tsx"),
+    ]) {
+      expect(source).toContain('FEED_TABS: FeedTab[] = ["following", "nearby"]');
+      expect(source).not.toMatch(/mine:/);
+    }
+  });
+
+  it("files your own Flares into the main feed", () => {
+    expect(repo).toContain('if (section === "yours") return "following";');
+    /* Still under their own heading, so they are not mistaken for
+       somebody you follow. */
+    expect(repo).toContain('yours: "Your flares"');
+  });
+
+  it("shows an item whose tab it does not recognise, rather than hiding it", () => {
+    /*
+     * Version skew, and the reason this one is worth a test. The app
+     * ships on TestFlight's clock and the server on Vercel's, so a build
+     * carrying this change meets a server still filing your Flares under
+     * "mine". Matching only the two known tabs would hide them entirely
+     * - the exact thing this round exists to fix.
+     */
+    expect(app).toContain("!FEED_TABS.includes(item.tab as FeedTab)");
   });
 });

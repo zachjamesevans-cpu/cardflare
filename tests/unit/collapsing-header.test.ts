@@ -91,13 +91,30 @@ describe("the two mistakes made building it", () => {
 
 describe("the list makes room for it", () => {
   it("starts its content below the floating bar", () => {
-    expect(home).toContain(
-      "paddingTop: insets.top + HEADER_CONTENT_HEIGHT + spacing(4)",
-    );
+    /*
+     * An INSET, not padding. Padding sits inside the content and moves
+     * the first card down; an inset moves the scroll view's own top
+     * edge, which is what a pull-to-refresh spinner is measured
+     * against. With padding, the spinner landed under the bar.
+     */
+    expect(home).toContain("const headerRoom = insets.top + HEADER_CONTENT_HEIGHT;");
+    expect(home).toContain("contentInset={{ top: headerRoom }}");
+    /* Or the list opens already scrolled by the size of the inset. */
+    expect(home).toContain("contentOffset={{ x: 0, y: -headerRoom }}");
   });
 
   it("hangs the refresh spinner below the bar, not behind it", () => {
-    expect(home).toContain("progressViewOffset={insets.top + HEADER_CONTENT_HEIGHT}");
+    /*
+     * This test asserted `progressViewOffset`, and passed for as long as
+     * the spinner did not exist at all. React Native's RefreshControl
+     * never rendered here - no spinner and no content displacement even
+     * with `refreshing` pinned true - and that prop is ignored on iOS
+     * besides. The Feed draws its own now, against the same measurement
+     * the inset uses.
+     */
+    expect(home).not.toContain("progressViewOffset={");
+    expect(home).toContain("<PullSpinner");
+    expect(home).toContain("top={headerRoom}");
   });
 
   it("blurs the status bar too", () => {
