@@ -58,6 +58,17 @@ function statusLabel(item: Extract<FeedEntry, { kind: "hunt" }>): string {
 }
 
 /**
+ * Draw a Flare as one compact row rather than a tall card.
+ *
+ * "Give me some options on how to make it more clean looking" - this is
+ * the one the founder picked: the art as a thumbnail beside its details,
+ * the meta on a single line, and the counts up in the header instead of
+ * below a rule. Set this to false and the tall card comes back exactly
+ * as it was; nothing else needs touching.
+ */
+const COMPACT_POSTS = true;
+
+/**
  * The crosshair and the words: CardFlare's status line.
  *
  * A targeting reticle in the accent with a faint glow behind it, then
@@ -143,8 +154,26 @@ export function FlareFeedCard({
    * which is what this picture is for, and it takes roughly fifty
    * points of nothing out of every post in the feed.
    */
+  /*
+   * A THUMBNAIL, not a hero.
+   *
+   * The founder, on the Following tab: "this mUST be more concise for
+   * the flares. it is HUGEEEEE. and way too big. look at how much dead
+   * space there is."
+   *
+   * Measured before changing anything: a post stood 295pt on an 874pt
+   * screen, so two filled it. The art was 176pt of that, and the name,
+   * number and two chips beside it needed about ninety - so a third of
+   * the art's height was empty on both sides of the details however they
+   * were aligned.
+   *
+   * At 72 the card is still recognisable - the art, the cost and the
+   * colour all read - and the row is as tall as the details rather than
+   * twice as tall. The whole post lands near 150pt, which is four to a
+   * screen instead of two.
+   */
   const cardWidth = Math.round(
-    Math.min(132, Math.max(104, (window.width - spacing(16)) * 0.34)),
+    Math.min(COMPACT_POSTS ? 72 : 132, Math.max(COMPACT_POSTS ? 64 : 104, (window.width - spacing(16)) * (COMPACT_POSTS ? 0.19 : 0.34))),
   );
 
   const lead = item.cards[0];
@@ -230,8 +259,8 @@ export function FlareFeedCard({
         borderColor: colors.border,
         borderWidth: 1,
         borderRadius: radius.panel,
-        padding: spacing(4),
-        gap: spacing(3),
+        padding: spacing(COMPACT_POSTS ? 3 : 4),
+        gap: spacing(COMPACT_POSTS ? 2 : 3),
       }}
     >
       {/* The header: face, name, the status line; time and distance on
@@ -265,7 +294,7 @@ export function FlareFeedCard({
             avatarUrl={item.avatarUrl}
             frame={item.frame}
             ring={item.ring}
-            size={44}
+            size={COMPACT_POSTS ? 34 : 44}
           />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
@@ -302,13 +331,28 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        <View style={{ alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+        {/* One line, not a stacked block. Two muted facts sitting on
+            top of each other made the header as tall as the avatar for
+            no reason; a middle dot costs nothing and reads the same. */}
+        <View
+          style={
+            COMPACT_POSTS
+              ? { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }
+              : { alignItems: "flex-end", gap: 3, flexShrink: 0 }
+          }
+        >
           {item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>{agoFrom(item.postedAt)}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              {agoFrom(item.postedAt)}
+            </Text>
           ) : null}
           {typeof item.milesAway === "number" ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+              {COMPACT_POSTS && item.postedAt ? (
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
+              ) : (
+                <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+              )}
               <Text style={{ color: colors.textMuted, fontSize: 13 }}>
                 {awayLabel(item.milesAway)}
               </Text>
@@ -350,8 +394,12 @@ export function FlareFeedCard({
         />
       )}
 
-      {/* A hairline, then the counts. Understated until touched. */}
-      <View style={{ height: 1, backgroundColor: colors.border }} />
+      {/* A hairline, then the counts. Understated until touched. In
+          compact the rule goes and the counts sit under the details,
+          which saves the rule, a gap and a row of its own. */}
+      {COMPACT_POSTS ? null : (
+        <View style={{ height: 1, backgroundColor: colors.border }} />
+      )}
       <PostSocialRow
         likes={item.likes ?? 0}
         liked={item.liked ?? false}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Crosshair, MapPin } from "lucide-react";
+import { Crosshair } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareDeckPager } from "@/components/feed/flare-deck-pager";
@@ -174,7 +174,7 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
   );
 
   return (
-    <article className="flex flex-col gap-3 rounded-[20px] border border-border bg-surface p-4 shadow-[var(--shadow-card)]">
+    <article className="flex flex-col gap-2 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
       {/* The header: face, name, the status line; time and distance on
           the right. "Your Flare" is a small label inside this row, never
           a line between posts. */}
@@ -206,11 +206,14 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
             <FlareStatus label={statusLabel(item)} />
           </span>
         </Link>
-        <div className="flex shrink-0 flex-col items-end gap-0.5 text-[13px] text-text-muted">
+        {/* One line, not a stacked block. Two muted facts on top of
+            each other made the header as tall as the avatar for no
+            reason; a middle dot costs nothing and reads the same. */}
+        <div className="flex shrink-0 items-center gap-1 text-[13px] text-text-muted">
           <span>{agoFrom(item.postedAt)}</span>
           {typeof item.milesAway === "number" && (
             <span className="flex items-center gap-1">
-              <MapPin className="size-3.5" aria-hidden="true" />
+              <span aria-hidden="true">·</span>
               {awayLabel(item.milesAway)}
             </span>
           )}
@@ -239,7 +242,16 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
             name={lead.cardName}
             cardNumber={lead.cardNumber}
             match={lead.match}
-            size="md"
+            /*
+             * A THUMBNAIL, not a hero. The founder, on the Following
+             * tab: "this mUST be more concise for the flares. it is
+             * HUGEEEEE." Measured on the phone first: a post stood 284pt
+             * on an 874pt screen, the art was most of it, and the
+             * details beside it needed a third of that - so the rest was
+             * empty however it was aligned. Small enough to keep the row
+             * as tall as its details, big enough to recognise the card.
+             */
+            size="sm"
             state={lead.state}
             have={haveFor(lead, post)}
           />
@@ -269,7 +281,9 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
       )}
 
       {/* A hairline, then the counts. Understated until touched. */}
-      <div className="border-t border-border pt-3">
+      {/* No rule. It cost a line, a gap above it and a gap below, to
+          separate two things that read as separate anyway. */}
+      <div>
         <PostSocial
           postId={item.postId}
           likes={item.likes}
