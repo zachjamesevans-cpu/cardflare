@@ -373,3 +373,43 @@ describe("a card in the Feed opens larger", () => {
     expect(app).toContain("siblings={shelf}");
   });
 });
+
+describe("posting a Flare wakes the Feed", () => {
+  /*
+   * The founder: "make sure that when I post a flare, it immediately
+   * begins a refresh on the main feed so i can click feed instantly and
+   * itll already be there."
+   *
+   * The Feed already reloaded on arrival, which is why a post did
+   * eventually appear. But a tab screen stays MOUNTED behind the tab you
+   * are looking at, so that reload only began at the tap and you watched
+   * it happen. Starting it at the moment of posting means the answer is
+   * usually already in hand.
+   */
+  const refresh = read("mobile/src/feed-refresh.ts");
+  const composer = read("mobile/src/screens/post-flare.tsx");
+
+  it("has one place that says the Feed is out of date", () => {
+    expect(refresh).toContain("export function onFeedStale");
+    expect(refresh).toContain("export function markFeedStale");
+  });
+
+  it("fires it when a Flare lands, whichever way it was posted", () => {
+    /* Both branches of the composer - a room's board and an area Flare -
+       run through the same success path, so one call covers both. */
+    expect(composer).toContain("markFeedStale()");
+  });
+
+  it("makes the Feed listen while it is mounted", () => {
+    expect(app).toContain("onFeedStale(() => void load(() => true))");
+  });
+
+  it("does not raise the pull-to-refresh spinner for it", () => {
+    /*
+     * `refresh()` is the pull handler and sets `refreshing`. The wake-up
+     * calls `load` directly instead, because a spinner for something the
+     * viewer did not ask to watch is a screen twitching on its own.
+     */
+    expect(app).not.toMatch(/onFeedStale\(\(\) => void refresh\(\)\)/);
+  });
+});

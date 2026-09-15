@@ -270,9 +270,20 @@ export interface HuntItem {
   comments: number;
   /** The viewer's own heart. */
   liked: boolean;
-  code: string;
-  storeName: string;
-  eventName: string;
+  /**
+   * The board it was posted to, or null when it was posted to nobody's
+   * board at all.
+   *
+   * A Flare from the Flare tab is an AREA Flare: `event_id` null,
+   * anchored to a postcode rather than a room. Every builder in this
+   * file used to require an event, so those Flares reached no feed -
+   * the founder posted one and watched nothing happen. They are hunts
+   * like any other; they just have no room to send you to, so the three
+   * fields that name one are absent rather than invented.
+   */
+  code: string | null;
+  storeName: string | null;
+  eventName: string | null;
   playerId: string;
   displayName: string;
   avatarUrl: string | null;
@@ -1197,6 +1208,91 @@ async function boardWithHunts(
  * that already traded, which the room's open-only list never returns
  * and which the founder wants kept and marked FOUND rather than gone.
  */
+/**
+ * Your own Flares that went up without a board.
+ *
+ * The founder: "when i post a flare. it should also show in my feed.
+ * like how instagram does." It did not, and the reason was not the
+ * follow list this time - it was that a Flare posted from the Flare tab
+ * is an AREA Flare, written with `event_id: null` and `player_id` set
+ * directly, while every builder in this file reads flares through an
+ * event and a session. So those posts reached no feed at all, anyone's,
+ * and the composer's own promise - "No room needed. Your friends see it
+ * in the Feed" - was not true.
+ *
+ * This closes the half the founder asked for: your own. Somebody else's
+ * area Flare still does not reach the people who follow them, which is
+ * the same gap seen from the other side and wants its own round.
+ *
+ * Grouped by posting action, like a board's hunts, so a pasted deck is
+ * one post with one thread rather than thirty rows.
+ */
+async function areaHuntsFor(
+  author: FollowedPlayer,
+  held: ReturnType<typeof heldByCard>,
+): Promise<HuntItem[]> {
+  const { data: flares } = await getSupabaseAdmin()
+    .from("flares")
+    .select("id, created_at, card_id, printing_id, posted_batch, deck_label, quantity")
+    .eq("player_id", author.playerId)
+    .eq("status", "open")
+    .eq("intent", "want")
+    .is("event_id", null)
+    .gte("created_at", since(RECENT_DAYS))
+    .order("created_at", { ascending: false })
+    .limit(RECENT_READ);
+
+  if (!flares || flares.length === 0) return [];
+
+  const facts = await cardFacts(flares.map((flare) => flare.card_id));
+
+  /* One group per posting act: the batch if it had one, else the Flare.
+     The same key a board's hunts use, so `postId` means one thing. */
+  const groups = new Map<string, typeof flares>();
+  for (const flare of flares) {
+    const key = flare.posted_batch ?? flare.id;
+    groups.set(key, [...(groups.get(key) ?? []), flare]);
+  }
+
+  return [...groups.entries()].map(([postId, group]) => {
+    const cards = firstPerCard(group, (flare) => flare.card_id).map((flare) => {
+      const fact = facts.get(flare.card_id);
+      return {
+        cardId: flare.card_id,
+        cardName: fact?.cardName ?? "Unknown card",
+        cardNumber: fact?.cardNumber ?? "",
+        imageUrl: fact?.imageUrl ?? null,
+        match: matchFor({ cardId: flare.card_id, printingId: flare.printing_id }, held),
+        flareId: flare.id,
+        state: "open" as const,
+        youOffered: false,
+      };
+    });
+
+    return {
+      kind: "hunt" as const,
+      postId,
+      likes: 0,
+      comments: 0,
+      liked: false,
+      /* No room to send anyone to. */
+      code: null,
+      storeName: null,
+      eventName: null,
+      playerId: author.playerId,
+      displayName: author.displayName,
+      avatarUrl: author.avatarUrl,
+      frame: author.frame,
+      ring: author.ring,
+      deckLabel: group[0]?.deck_label ?? null,
+      total: cards.length,
+      youCanAnswer: cards.filter((card) => card.match).length,
+      cards: cards.slice(0, CARD_RAIL_CAP),
+      yours: true,
+    };
+  });
+}
+
 async function decorateHunts(items: FeedItem[], viewerId: string): Promise<void> {
   const hunts = items.filter((item): item is HuntItem => item.kind === "hunt");
   if (hunts.length === 0) return;
@@ -1849,6 +1945,10 @@ export async function listFeed(
   const me = await viewerAsAuthor(playerId);
   if (me) authors.set(playerId, me);
 
+  /* The Flares you posted with no board behind them. They belong to no
+     store, so they are read here rather than per-local like the rest. */
+  const areaHunts = me ? await areaHuntsFor(me, held) : [];
+
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -1973,6 +2073,7 @@ export async function listFeed(
      * one heading over one block - and puts what you just posted where
      * Instagram puts it, at the top, so posting visibly did something.
      */
+    ...areaHunts,
     ...boards.filter((item) => item.kind === "hunt" && item.yours),
     ...boards.filter((item) => item.kind === "hunt" && !item.yours),
     ...boards.filter((item) => item.kind === "board" && item.yours),

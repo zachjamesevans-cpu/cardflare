@@ -145,3 +145,55 @@ describe("your own Flares reach your own feed", () => {
     expect(others).toBeGreaterThan(own);
   });
 });
+
+describe("a Flare posted with no board still reaches your feed", () => {
+  /*
+   * The founder posted one and watched nothing happen: "when i post a
+   * flare. it should also show in my feed. like how instagram does."
+   *
+   * The follow list was not the problem this time. A Flare from the
+   * Flare tab is an AREA Flare, written with `event_id: null` and
+   * `player_id` set directly - while every builder in the feed reads
+   * flares through an event and a player_session. So those posts
+   * reached NO feed at all, anyone's, and the composer's own promise
+   * ("No room needed. Your friends see it in the Feed") was untrue.
+   */
+  it("reads the boardless ones, by player rather than by session", async () => {
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    expect(repo).toContain("async function areaHuntsFor");
+    expect(repo).toContain('.is("event_id", null)');
+    expect(repo).toContain('.eq("player_id", author.playerId)');
+    /* Grouped by posting act, so a pasted deck is one post with one
+       thread rather than thirty rows. */
+    expect(repo).toContain("flare.posted_batch ?? flare.id");
+  });
+
+  it("lets a hunt have no room, rather than inventing one", async () => {
+    const repo = await readFile("src/lib/feed/repository.ts", "utf8");
+
+    const hunt = repo.slice(
+      repo.indexOf("export interface HuntItem"),
+      repo.indexOf("export interface TradedItem"),
+    );
+    expect(hunt).toContain("code: string | null;");
+    expect(hunt).toContain("storeName: string | null;");
+    expect(hunt).toContain("eventName: string | null;");
+  });
+
+  it("draws neither a room's name nor a button to it, on both platforms", async () => {
+    /*
+     * Both clients interpolated `eventName` straight into the detail
+     * line and linked to `/e/${code}`, so a boardless Flare would have
+     * printed the word "null" and offered a door to nowhere. A type
+     * error would not have caught it - both were template strings.
+     */
+    const items = await readFile("src/components/feed/feed-items.tsx", "utf8");
+    const app = await readFile("mobile/src/screens/home.tsx", "utf8");
+
+    for (const source of [items, app]) {
+      expect(source).toContain('item.eventName ? ` · ${item.eventName}` : ""');
+      expect(source).toMatch(/item\.code && item\.storeName \?/);
+    }
+  });
+});

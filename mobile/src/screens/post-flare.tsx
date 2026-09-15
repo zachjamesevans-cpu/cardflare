@@ -28,6 +28,7 @@ import {
 } from "../ui";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { LOCAL_ENABLED } from "../local-enabled";
+import { markFeedStale } from "../feed-refresh";
 import { useTabBarInset } from "../glass";
 import { colors, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
@@ -396,6 +397,10 @@ export function PostFlareScreen({
           acceptsCash,
         });
       }
+
+      /* The Feed starts catching up now, not when it is next looked
+         at. See src/feed-refresh.ts. */
+      markFeedStale();
 
       // The confirmation happens on the button that was pressed —
       // "Posted ✓" and a success buzz — then the row folds itself up,
