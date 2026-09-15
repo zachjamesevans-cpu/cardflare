@@ -163,7 +163,13 @@ describe("a Flare posted with no board still reaches your feed", () => {
 
     expect(repo).toContain("async function areaHuntsFor");
     expect(repo).toContain('.is("event_id", null)');
-    expect(repo).toContain('.eq("player_id", author.playerId)');
+    /*
+     * EVERY author, not just the viewer. Reading only your own is what
+     * made following somebody nearly pointless: their Flares reached you
+     * only if they had posted onto a board at a shop you had also saved.
+     */
+    expect(repo).toContain('.in("player_id", [...authors.keys()])');
+    expect(repo).toContain("yours: authorId === viewerId");
     /* Grouped by posting act, so a pasted deck is one post with one
        thread rather than thirty rows. */
     expect(repo).toContain("flare.posted_batch ?? flare.id");

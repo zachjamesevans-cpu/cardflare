@@ -6,9 +6,9 @@ import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
 /**
- * Following | Nearby | My Flares, under the wordmark.
+ * Following | Nearby, under the wordmark.
  *
- * Three rounded segments. The one that is on wears the accent as a
+ * Two rounded segments. The one that is on wears the accent as a
  * border and a faint glow, the CardFlare green kept for the active
  * state; the others sit in muted grey. Same words and order as the
  * website's tabs, which read the same `tab` off every item.
@@ -16,10 +16,9 @@ import { Tap } from "./ui";
 const ICONS: Record<FeedTab, keyof typeof Ionicons.glyphMap> = {
   following: "people-outline",
   nearby: "location-outline",
-  mine: "star-outline",
 };
 
-export const FEED_TABS: FeedTab[] = ["following", "nearby", "mine"];
+export const FEED_TABS: FeedTab[] = ["following", "nearby"];
 
 export function FeedFilterTabs({
   value,

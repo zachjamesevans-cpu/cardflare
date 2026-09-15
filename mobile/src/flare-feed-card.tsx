@@ -128,9 +128,24 @@ export function FlareFeedCard({
   onEnterRoom: (code: string) => void;
 }) {
   const window = useWindowDimensions();
-  /* The card takes a real share of the row on any phone, and stops
-     growing on a tablet so the details keep their column. */
-  const cardWidth = Math.round(Math.min(168, Math.max(120, (window.width - spacing(16)) * 0.42)));
+  /*
+   * The card takes a real share of the row on any phone, and stops
+   * growing on a tablet so the details keep their column.
+   *
+   * SMALLER THAN IT WAS. At 0.42 of the row the art stood about 235pt
+   * tall while the name, number and two chips beside it needed barely
+   * ninety - so every post carried a column of black down its right
+   * hand side. The founder: "notice how the cards are so large and
+   * there's a lot of dead space? lessen card size a bit so it looks
+   * better."
+   *
+   * A third of the row is still big enough to read a card at a glance,
+   * which is what this picture is for, and it takes roughly fifty
+   * points of nothing out of every post in the feed.
+   */
+  const cardWidth = Math.round(
+    Math.min(132, Math.max(104, (window.width - spacing(16)) * 0.34)),
+  );
 
   const lead = item.cards[0];
   const single = item.total === 1 && lead;
@@ -223,11 +238,27 @@ export function FlareFeedCard({
           the right. "Your Flare" is a small label inside this row, never
           a line between posts. */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}>
-        <Tap
-          onPress={() => onOpenProfile(item.playerId)}
-          accessibilityLabel={`Open ${item.displayName}'s profile`}
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5), flex: 1, minWidth: 0 }}
-        >
+        {/*
+          * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
+          *
+          * Tap puts its `style` on an inner Animated.View rather than on
+          * the Pressable, so `flex: 1` there never reaches the thing
+          * being laid out: the Pressable sized itself to its content,
+          * the name column inside it collapsed to nothing, and the post
+          * drew a face, a crushed "YOUR FLARE" pill and no name at all.
+          * The same trap is written up in src/collapsing-header.tsx,
+          * where it swallowed the search icon.
+          */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Tap
+            onPress={() => onOpenProfile(item.playerId)}
+            accessibilityLabel={`Open ${item.displayName}'s profile`}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(2.5),
+            }}
+          >
           <PlayerAvatar
             displayName={item.displayName}
             seed={item.playerId}
@@ -264,11 +295,13 @@ export function FlareFeedCard({
                 </Text>
               ) : null}
             </View>
-            <FlareStatus
-              label={statusLabel(item)}
-            />
-          </View>
-        </Tap>
+              {/* Main's wrapper, which is what stopped the name column
+                  collapsing, and this branch's label, which is what
+                  stops a showcase post reading "is hunting". */}
+              <FlareStatus label={statusLabel(item)} />
+            </View>
+          </Tap>
+        </View>
         <View style={{ alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
           {item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>{agoFrom(item.postedAt)}</Text>
@@ -287,7 +320,13 @@ export function FlareFeedCard({
       {/* The card, big, with its details beside it. A deck keeps its
           rail across the width and the details underneath. */}
       {single ? (
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3.5) }}>
+        /* Centred, not top-aligned. The details are shorter than the
+           art whatever size it is, and hanging them from the top put
+           all of the slack in one block at the bottom - which is what
+           read as dead space. Split evenly it reads as breathing room. */
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+        >
           <CardImage
             imageUrl={lead.imageUrl}
             width={cardWidth}

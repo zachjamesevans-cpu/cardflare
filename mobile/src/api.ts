@@ -1851,17 +1851,24 @@ export type FeedItem =
 export type FeedEntry = FeedItem & {
   section?: FeedSection;
   reason?: string;
-  /** Which of the three filters it belongs to. Absent from an older server. */
+  /** Which of the two filters it belongs to. Absent from an older server. */
   tab?: FeedTab;
 };
 
-/** The Feed's three filters. Decided by the server, same as the sections. */
-export type FeedTab = "following" | "nearby" | "mine";
+/**
+ * The Feed's two filters. Decided by the server, same as the sections.
+ *
+ * There was a third, "My Flares", and the founder cut it as redundant
+ * with the Flare tab - your own posts go in the main feed now. An older
+ * server can still send `tab: "mine"`, and an item whose tab is not one
+ * of these simply shows on every filter, which is the same forgiving
+ * path an older server with no `tab` at all already takes.
+ */
+export type FeedTab = "following" | "nearby";
 
 export const TAB_TITLES: Record<FeedTab, string> = {
   following: "Following",
   nearby: "Nearby",
-  mine: "My Flares",
 };
 
 /**
