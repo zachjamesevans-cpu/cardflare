@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Crosshair, MapPin } from "lucide-react";
 
-import { CardRail, FeedTile, haveFor, tileWidth } from "@/components/feed/feed-tile";
+import { FeedTile, haveFor } from "@/components/feed/feed-tile";
+import { FlareDeckPager } from "@/components/feed/flare-deck-pager";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { HuntItem } from "@/lib/feed/repository";
 
 /**
@@ -87,6 +89,23 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours };
 
+  const chips = (
+    <>
+      <FlareTypeChip label="Want" primary />
+      {item.acceptsTrade && <FlareTypeChip label="Trade" />}
+      {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
+    </>
+  );
+
+  /* The zoom pages along the whole deck from any card. */
+  const shelf: ZoomCard[] = item.cards.map((card) => ({
+    imageUrl: card.imageUrl,
+    exactName: card.cardName,
+    cardNumber: card.cardNumber,
+    youHave: card.match ? { kind: card.match, count: 0 } : null,
+    have: haveFor(card, post),
+  }));
+
   const details = (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
       {single ? (
@@ -107,11 +126,7 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
-        <FlareTypeChip label="Want" primary />
-        {item.acceptsTrade && <FlareTypeChip label="Trade" />}
-        {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
-      </div>
+      <div className="flex flex-wrap gap-1.5">{chips}</div>
 
       {single && lead.match && (
         <p className="text-sm font-semibold text-accent">
@@ -203,15 +218,26 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
           {details}
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          <CardRail
-            cards={item.cards}
-            more={item.total - item.cards.length}
-            size={tileWidth(item.cards.length)}
-            post={post}
-          />
-          {details}
-        </div>
+        <FlareDeckPager
+          cards={item.cards}
+          total={item.total}
+          chips={chips}
+          note={item.note}
+          tiles={item.cards.map((card, index) => (
+            <FeedTile
+              key={card.cardId}
+              imageUrl={card.imageUrl}
+              name={card.cardName}
+              cardNumber={card.cardNumber}
+              match={card.match}
+              size="pager"
+              state={card.state}
+              have={haveFor(card, post)}
+              siblings={shelf}
+              position={index}
+            />
+          ))}
+        />
       )}
 
       {/* A hairline, then the counts. Understated until touched. */}
