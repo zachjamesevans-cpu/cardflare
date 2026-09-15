@@ -1584,6 +1584,12 @@ export const offerFromPost = (postId: string, flareId: string, note: string) =>
 export type FeedSection =
   | "wanted"
   | "tonight"
+  /* Your own Flares. The app was missing this one while the server was
+     already sending it, so every heading over your own posts looked up
+     an undefined title and drew an empty line - forty-three points of
+     nothing above the first card. The founder: "see how under
+     'following' there's a big gap? close that gap." */
+  | "yours"
   | "people"
   | "walkin"
   | "nearby"
@@ -1593,6 +1599,7 @@ export type FeedSection =
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
   tonight: "Tonight",
+  yours: "Your flares",
   people: "People you follow",
   walkin: "Where you play",
   nearby: "Nearby stores",
@@ -1888,12 +1895,61 @@ export type FeedEntry = FeedItem & {
  * of these simply shows on every filter, which is the same forgiving
  * path an older server with no `tab` at all already takes.
  */
-export type FeedTab = "following" | "nearby";
+/**
+ * The heading a section is drawn under, or null when it should not be
+ * drawn at all.
+ *
+ * "YOUR FLARES" is the one section whose every post already says so:
+ * each carries a "Your Flare" badge in its own header, and since the
+ * filter came back there is a whole tab with the same name. A heading
+ * over them is the third telling of one fact, and it was spending the
+ * vertical space the founder asked to get back - "see how under
+ * 'following' there's a big gap? close that gap."
+ *
+ * A heading earns its line by saying something the posts beneath it do
+ * not. "People you follow" and "Nearby stores" do; this one does not.
+ */
+export function sectionHeading(section: FeedSection | undefined): string | null {
+  if (!section) return null;
+  if (section === "yours") return null;
+  return SECTION_TITLES[section] ?? null;
+}
+
+export type FeedTab = "following" | "nearby" | "mine";
 
 export const TAB_TITLES: Record<FeedTab, string> = {
   following: "Following",
   nearby: "Nearby",
+  mine: "My Flares",
 };
+
+/** The filters this build knows, in the order they are drawn. */
+export const FEED_TAB_VALUES: FeedTab[] = ["following", "nearby", "mine"];
+
+/**
+ * Whether an item shows under a filter. The app's half of
+ * `belongsToTab` in src/lib/feed/repository.ts - same rules, so the two
+ * platforms can never disagree about what a tab contains.
+ *
+ * My Flares is a VIEW of your posts, not a place they are moved to:
+ * they stay in Following with everyone else's, which is what the
+ * Instagram round was for. So this reads the post's own `yours` rather
+ * than its `tab`, and one item can sit under two filters.
+ *
+ * An item with no tab, or one filed under a tab this build has never
+ * heard of, shows everywhere rather than nowhere. The app ships on
+ * TestFlight's clock and the server on Vercel's; matching only the
+ * known tabs is how a new server silently empties an old phone's feed.
+ */
+export function belongsToTab(
+  item: { tab?: FeedTab; yours?: boolean },
+  tab: FeedTab,
+): boolean {
+  if (tab === "mine") return item.yours === true;
+  if (!item.tab) return true;
+  if (item.tab === tab) return true;
+  return !FEED_TAB_VALUES.includes(item.tab);
+}
 
 /**
  * The Feed, optionally saying where the phone is.

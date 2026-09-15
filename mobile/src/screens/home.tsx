@@ -26,8 +26,9 @@ import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
 import { followHref } from "../follow-href";
 import {
+  belongsToTab,
   getFeed,
-  SECTION_TITLES,
+  sectionHeading,
   type FeedEntry,
   type FeedTab,
   getMe,
@@ -42,7 +43,7 @@ import {
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
 import { FlareFeedCard } from "../flare-feed-card";
-import { FEED_TABS, FeedFilterTabs } from "../feed-filter-tabs";
+import { FeedFilterTabs } from "../feed-filter-tabs";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import { Body, Button, Card, CardImage, Muted, Tap, Title, type ZoomCard } from "../ui";
@@ -234,21 +235,9 @@ export function HomeScreen() {
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
-  /*
-   * An item shows when it belongs to this filter, or when we cannot
-   * tell which filter it belongs to.
-   *
-   * Both halves matter, and the second is about version skew. The app
-   * ships on TestFlight's clock and the server on Vercel's, so a build
-   * carrying this change will meet a server that still files your own
-   * Flares under the tab that no longer exists. Matching only the known
-   * two would hide them completely - the exact thing this round is
-   * meant to fix - so a tab we do not recognise is treated like no tab
-   * at all and shown on every filter.
-   */
-  const shown = feed.filter(
-    (item) => !item.tab || item.tab === tab || !FEED_TABS.includes(item.tab as FeedTab),
-  );
+  /* Which filter an item belongs under is decided in one place for both
+     platforms, version skew and all. See `belongsToTab`. */
+  const shown = feed.filter((item) => belongsToTab(item, tab));
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
@@ -1345,14 +1334,25 @@ export function HomeScreen() {
           /* The heading, only where the section changes. The order was
            always an argument about what is worth a tap; this is that
            argument said out loud. */
+          /*
+           * A SECTION WE HAVE NO TITLE FOR DRAWS NOTHING.
+           *
+           * `SECTION_TITLES[item.section]` used to be read straight into
+           * a <Text>. A server filing items under a section newer than
+           * the app returned undefined, and an empty Text still takes a
+           * line box - so the Feed opened on forty-three points of pure
+           * black above the first card, with nothing in it to see or to
+           * blame. Same forgiving rule the item kinds already follow.
+           */
+          const heading = sectionHeading(item.section);
           const opensSection =
-            item.section !== undefined &&
+            heading !== null &&
             sectionsShown > 1 &&
             (index === 0 || shown[index - 1].section !== item.section);
 
           return (
             <View key={`entry-${index}`} style={{ gap: spacing(2) }}>
-              {opensSection && item.section ? (
+              {opensSection ? (
                 <Text
                   style={{
                     color: colors.textMuted,
@@ -1360,10 +1360,9 @@ export function HomeScreen() {
                     fontWeight: "600",
                     letterSpacing: 1.4,
                     textTransform: "uppercase",
-                    marginTop: spacing(1),
                   }}
                 >
-                  {SECTION_TITLES[item.section]}
+                  {heading}
                 </Text>
               ) : null}
               {body}
@@ -1501,6 +1500,23 @@ export function HomeScreen() {
             />
           </Card>
         )}
+        {/* The restored filter needs its own words. Without them it
+            fell through to Nearby's, which talks about store rooms. */}
+        {hydrated && shown.length === 0 && tab === "mine" && (
+          <Card>
+            <Title>You have not posted yet</Title>
+            <Body>
+              Post a Flare for a card you are hunting and it shows up here, and in
+              Following with everyone else&rsquo;s.
+            </Body>
+            <Button
+              label="Post a Flare"
+              variant="secondary"
+              onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+            />
+          </Card>
+        )}
+
         {hydrated && shown.length === 0 && tab === "nearby" && (
           <Card>
             <Title>Nothing on right now</Title>

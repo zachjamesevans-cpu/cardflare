@@ -843,30 +843,82 @@ export type FeedEntry = FeedItem & {
 };
 
 /**
- * The two filters over the Feed: Following and Nearby. Decided here so
- * the two clients cannot file the same item under different tabs.
+ * The three filters over the Feed: Following, Nearby and My Flares.
+ * Decided here so the two clients cannot file the same item under
+ * different tabs.
  *
  * Following is people: their Flares, YOURS, what everyone added and
  * traded, who to follow next, and the store's own news at the tail.
- * Nearby is places and the cards wanted around you.
+ * Nearby is places and the cards wanted around you. My Flares is
+ * yours.
  *
- * THERE WAS A THIRD, "My Flares", and the founder cut it: "its
- * reundant to have a 'my flares' section when that is already listed
- * elsewhere in the app imo. remove that tab. all of my flares should
- * also go in the main feed when I post them."
+ * MY FLARES WENT AND CAME BACK, and the way it came back is the part
+ * worth reading. It was cut as "a second door" to a list that already
+ * had a tab, and the founder asked for it again: "bring back the my
+ * flares tab so everything is equally split into 3 tabs at the top."
  *
- * He is right on both counts. Your standing list already has a whole
- * tab of its own, so the third filter was a second door to it - and
- * putting your posts behind that door meant posting something made the
- * main feed look unchanged. Instagram shows you your own post in the
- * feed; so does this now.
+ * It is NOT a third destination for your posts. `tabFor` still files
+ * them under Following, so posting still changes the feed you are
+ * looking at - the thing the cut was really about, and the Instagram
+ * behaviour the founder asked for before it. My Flares is a view of
+ * the same posts, not a place they are moved to, so `belongsToTab`
+ * reads the post's own `yours` rather than its `tab`. One item can sit
+ * under two filters; nothing has to agree about which one owns it.
  */
-export type FeedTab = "following" | "nearby";
+/**
+ * The heading a section is drawn under, or null when it should not be
+ * drawn at all.
+ *
+ * "YOUR FLARES" is the one section whose every post already says so:
+ * each carries a "Your Flare" badge in its own header, and since the
+ * filter came back there is a whole tab with the same name. A heading
+ * over them is the third telling of one fact, and it was spending the
+ * vertical space the founder asked to get back - "see how under
+ * 'following' there's a big gap? close that gap."
+ *
+ * A heading earns its line by saying something the posts beneath it do
+ * not. "People you follow" and "Nearby stores" do; this one does not.
+ */
+export function sectionHeading(section: FeedSection | undefined): string | null {
+  if (!section) return null;
+  if (section === "yours") return null;
+  return SECTION_TITLES[section] ?? null;
+}
+
+export type FeedTab = "following" | "nearby" | "mine";
 
 export const TAB_TITLES: Record<FeedTab, string> = {
   following: "Following",
   nearby: "Nearby",
+  mine: "My Flares",
 };
+
+/**
+ * Whether an item shows under a filter. Both clients call this, so the
+ * website and the app can never disagree about what a tab contains.
+ *
+ * Two forgiving cases, both about version skew - the app ships on
+ * TestFlight's clock and the server on Vercel's:
+ *
+ * - An item with NO tab is from a server older than tabs, and shows
+ *   everywhere rather than nowhere.
+ * - An item filed under a tab THIS BUILD HAS NEVER HEARD OF shows
+ *   everywhere too. Matching only the known tabs would hide it
+ *   completely, which is how a new server would silently empty an old
+ *   phone's feed.
+ */
+export function belongsToTab(
+  item: { tab?: FeedTab; yours?: boolean },
+  tab: FeedTab,
+): boolean {
+  if (tab === "mine") return item.yours === true;
+  if (!item.tab) return true;
+  if (item.tab === tab) return true;
+  return !FEED_TAB_VALUES.includes(item.tab);
+}
+
+/** The filters this build knows, in the order they are drawn. */
+export const FEED_TAB_VALUES: FeedTab[] = ["following", "nearby", "mine"];
 
 export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
   /* Your own Flares sit in the main feed with everyone else's, still

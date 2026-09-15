@@ -6,7 +6,12 @@ import { Logo } from "@/components/brand/logo";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
-import { SECTION_TITLES, type FeedTab } from "@/lib/feed/repository";
+import {
+  belongsToTab,
+  FEED_TAB_VALUES,
+  sectionHeading,
+  type FeedTab,
+} from "@/lib/feed/repository";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
@@ -87,7 +92,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const TABS: FeedTab[] = ["following", "nearby"];
+const TABS: FeedTab[] = FEED_TAB_VALUES;
 
 export default async function FeedPage({
   searchParams,
@@ -160,10 +165,14 @@ export default async function FeedPage({
 
   const liveLocal = locals.find((local) => local.liveNow) ?? null;
 
-  /* Following | Nearby: the server filed every item under
-     one, so this is a filter and never a second opinion. Headings only
-     where a tab holds more than one section. */
-  const shown = items.filter((item) => item.tab === tab);
+  /* Following | Nearby | My Flares. Which filter an item belongs under
+     is decided in one place for both platforms, version skew and all -
+     see `belongsToTab`. Matching `item.tab` here directly was the
+     stricter of the two clients: an item from a newer server, filed
+     under a tab this build has never heard of, vanished on the website
+     while the app still showed it. Headings only where a tab holds
+     more than one section. */
+  const shown = items.filter((item) => belongsToTab(item, tab));
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
 
   return (
@@ -201,6 +210,17 @@ export default async function FeedPage({
             search up top.
           </p>
         </Card>
+      ) : shown.length === 0 && tab === "mine" ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-text-primary">You have not posted yet</h2>
+          <p className="text-sm text-text-secondary">
+            Post a Flare for a card you are hunting and it shows up here, and in
+            Following with everyone else&rsquo;s.
+          </p>
+          <Link href="/flare" className={buttonStyles("secondary", "sm")}>
+            Post a Flare
+          </Link>
+        </Card>
       ) : shown.length === 0 && tab === "nearby" ? (
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Nothing on right now</h2>
@@ -230,10 +250,15 @@ export default async function FeedPage({
             {/* The heading, only where the section changes. The order was
                 always an argument about what is worth a tap; this is the
                 argument said out loud. */}
+            {/* A section we have no title for draws NOTHING - an empty
+                heading still takes a line box, which on the app read as
+                forty-three points of unexplained black above the first
+                card. Same forgiving rule the item kinds follow. */}
             {sectionsShown > 1 &&
+              sectionHeading(item.section) &&
               (index === 0 || shown[index - 1].section !== item.section) && (
-                <h2 className="mt-2 text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
-                  {SECTION_TITLES[item.section]}
+                <h2 className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+                  {sectionHeading(item.section)}
                 </h2>
               )}
             <Item item={item} />
