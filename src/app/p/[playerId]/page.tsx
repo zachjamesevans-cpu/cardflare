@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FollowButton } from "@/components/players/follow-button";
 import { PeopleList } from "@/components/players/people-list";
@@ -81,6 +81,18 @@ export default async function PublicProfilePage({
   const dressedArt = await wornArtFor(dressed);
   const shelfBg = backgroundClass(dressed);
   const imagesEnabled = cardImagesEnabled();
+
+  /* The shelf the zoom pages along: the founder's ask, "swipe
+     horizontally through showcase cards the same way Flare cards can
+     be swiped in the main feed". Each tile hands over the whole shelf
+     and its own place in it; the note rides with its card. */
+  const shelf: ZoomCard[] = profile.showcase.map((entry) => ({
+    imageUrl: entry.imageUrl,
+    exactName: entry.name,
+    cardNumber: entry.number,
+    note: entry.note,
+    direction: "showcase",
+  }));
 
   /* The viewer's side of the follow relationship. Null hides the
      button: operators without a player account, and your own page. */
@@ -195,12 +207,16 @@ export default async function PublicProfilePage({
                 >
                   <WornBackdrop rive={dressedArt} />
                   <Rail ariaLabel="Showcase">
-                    {profile.showcase.map((entry) => (
+                    {profile.showcase.map((entry, index) => (
                       <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
                         <CardImageZoom
                           imageUrl={entry.imageUrl}
                           exactName={entry.name}
                           cardNumber={entry.number}
+                          note={entry.note}
+                          direction="showcase"
+                          siblings={shelf}
+                          position={index}
                           enabled={imagesEnabled}
                           thumbClassName="w-full"
                           thumb={

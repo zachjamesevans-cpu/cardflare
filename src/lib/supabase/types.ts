@@ -572,6 +572,44 @@ export type FlareResponseInsert = Omit<
 };
 
 /**
+ * A like on a Flare post. The post is the posting action (`posted_batch`),
+ * so a deck of thirty cards has one heart, not thirty.
+ */
+export type FlarePostLikeRow = {
+  post_id: string;
+  player_id: string;
+  created_at: string;
+};
+
+export type FlarePostLikeInsert = Omit<FlarePostLikeRow, "created_at"> & {
+  created_at?: string;
+};
+
+/**
+ * One line under a Flare post: a comment, or an offer made from the
+ * Feed ("I have this"), which names the card it answers.
+ */
+export type FlarePostCommentRow = {
+  id: string;
+  created_at: string;
+  post_id: string;
+  player_id: string;
+  flare_id: string | null;
+  kind: "comment" | "offer";
+  body: string;
+};
+
+export type FlarePostCommentInsert = Omit<
+  FlarePostCommentRow,
+  "id" | "created_at" | "flare_id" | "kind"
+> & {
+  id?: string;
+  created_at?: string;
+  flare_id?: string | null;
+  kind?: "comment" | "offer";
+};
+
+/**
  * A confirmed in-person trade. A tally mark with names on it.
  *
  * The session, flare and printing references are nullable because history
@@ -1150,11 +1188,13 @@ export type PlayerShowcaseRow = {
   /** This card's own dressing, or null to wear the profile's default. */
   frame_slug: string | null;
   holo_slug: string | null;
+  /** The owner's caption, up to 140 characters, or null for none. */
+  note: string | null;
 };
 
 export type PlayerShowcaseInsert = Omit<
   PlayerShowcaseRow,
-  "id" | "created_at" | "printing_id" | "position" | "frame_slug" | "holo_slug"
+  "id" | "created_at" | "printing_id" | "position" | "frame_slug" | "holo_slug" | "note"
 > & {
   id?: string;
   created_at?: string;
@@ -1162,6 +1202,7 @@ export type PlayerShowcaseInsert = Omit<
   position?: number;
   frame_slug?: string | null;
   holo_slug?: string | null;
+  note?: string | null;
 };
 
 export type PlayerInviteRow = {
@@ -1362,7 +1403,8 @@ export type NotificationRow = {
     | "new-follower"
     | "room-flare"
     | "message-received"
-    | "nearby-match";
+    | "nearby-match"
+    | "post-comment";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */
@@ -1514,6 +1556,8 @@ export type Database = {
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       flares: Table<FlareRow, FlareInsert>;
       flare_responses: Table<FlareResponseRow, FlareResponseInsert>;
+      flare_post_likes: Table<FlarePostLikeRow, FlarePostLikeInsert>;
+      flare_post_comments: Table<FlarePostCommentRow, FlarePostCommentInsert>;
       trades: Table<TradeRow, TradeInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;

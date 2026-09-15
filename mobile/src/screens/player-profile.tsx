@@ -119,6 +119,20 @@ export function PlayerProfileScreen() {
     );
   }
 
+  /* The shelf the zoom pages along, with each card's note riding
+     along. Built from the same array the rail draws. */
+  const shelf: ZoomedCard[] = profile.showcase.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    number: entry.number,
+    imageUrl: entry.imageUrl,
+    frame: entry.frame,
+    holo: entry.holo,
+    effect: profile.effect,
+    border: profile.equips?.border ?? null,
+    note: entry.note ?? null,
+  }));
+
   return (
     <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
       {/* The profile block: cover, picture, name, badge, shelf. */}
@@ -197,19 +211,10 @@ export function PlayerProfileScreen() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                {profile.showcase.map((entry) => (
+                {profile.showcase.map((entry, index) => (
                   <Tap
                     key={entry.id}
-                    onPress={() =>
-                      setZoomed({
-                        name: entry.name,
-                        imageUrl: entry.imageUrl,
-                        frame: entry.frame,
-                        holo: entry.holo,
-                        effect: profile.effect,
-                        border: profile.equips?.border ?? null,
-                      })
-                    }
+                    onPress={() => setZoomed(shelf[index] ?? null)}
                   >
                     <CosmeticCard
                       imageUrl={entry.imageUrl}
@@ -227,7 +232,7 @@ export function PlayerProfileScreen() {
         </View>
       </Card>
 
-      <ShowcaseZoom card={zoomed} onClose={() => setZoomed(null)} />
+      <ShowcaseZoom card={zoomed} cards={shelf} onClose={() => setZoomed(null)} />
 
       <PeopleSheet
         which={people}

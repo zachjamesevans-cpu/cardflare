@@ -972,7 +972,12 @@ export interface ShowcaseCard {
   /** This card's own dressing, or null to wear the profile's default. */
   frame: string | null;
   holo: string | null;
+  /** The owner's caption, or null. Absent from an older server. */
+  note?: string | null;
 }
+
+/** A note's ceiling, the server's number. */
+export const SHOWCASE_NOTE_MAX = 140;
 
 /** Cosmetic slugs. Resolved server-side, so a slot is never null here. */
 export interface Equipped {
@@ -1142,6 +1147,14 @@ export const dressShowcase = (
     holo,
   });
 
+/** The caption under one showcase card. Empty clears it. */
+export const setShowcaseNote = (entryId: string, note: string) =>
+  call<{ ok: true }>("POST", "/api/v1/profile", {
+    action: "showcase-note",
+    entryId,
+    note: note.trim().length > 0 ? note.trim() : null,
+  });
+
 /** Apply to all: the pair becomes the default, every override clears. */
 export const dressAllShowcase = (frame: string | null, holo: string | null) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {
@@ -1188,6 +1201,8 @@ export interface PeekProfile {
     imageUrl: string | null;
     frame: string | null;
     holo: string | null;
+    /** The owner's caption, or null. Absent from an older server. */
+    note?: string | null;
   }[];
 }
 
@@ -1421,7 +1436,88 @@ export interface FeedCard {
   imageUrl: string | null;
   /** Null when the viewer holds none of it — a friend's hunt shows those. */
   match: "exact" | "other-printing" | null;
+  /** The Flare behind a hunt's card, so "I have this" can name it. */
+  flareId?: string;
+  /** OFFERED when a hand is up on it, FOUND when it traded. */
+  state?: CardState;
+  /** The viewer is one of the hands up. */
+  youOffered?: boolean;
 }
+
+export type CardState = "open" | "offered" | "found";
+
+/** One line under a Flare post. An offer line names the card it answers. */
+export interface PostComment {
+  id: string;
+  createdAt: string;
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  kind: "comment" | "offer";
+  body: string;
+  cardName: string | null;
+}
+
+/** A comment's ceiling, the server's number. */
+export const POST_COMMENT_MAX = 280;
+
+export interface PostCard {
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  flareId: string;
+  state: CardState;
+  youOffered: boolean;
+  match: "exact" | "other-printing" | null;
+}
+
+/** The whole post, for its own screen. Mirrors the server's PostDetail. */
+export interface PostDetail {
+  postId: string;
+  author: {
+    playerId: string | null;
+    displayName: string;
+    avatarUrl: string | null;
+    frame: string | null;
+    ring: string | null;
+  };
+  code: string | null;
+  storeName: string | null;
+  eventName: string | null;
+  deckLabel: string | null;
+  cards: PostCard[];
+  yours: boolean;
+  thread: PostComment[];
+  likes: number;
+  comments: number;
+  liked: boolean;
+}
+
+export const getPost = (postId: string) =>
+  call<{ post: PostDetail }>("GET", `/api/v1/posts/${encodeURIComponent(postId)}`);
+
+export const likePost = (postId: string, liked: boolean) =>
+  call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
+    action: liked ? "like" : "unlike",
+  });
+
+export const commentOnPost = (postId: string, body: string) =>
+  call<{ ok: true; comment: PostComment }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "comment", body },
+  );
+
+/** "I have this" on one card of a post, with a note for the thread. */
+export const offerFromPost = (postId: string, flareId: string, note: string) =>
+  call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
+    action: "offer",
+    flareId,
+    note,
+  });
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
 export type FeedSection =
@@ -1519,6 +1615,12 @@ export type FeedItem =
     }
   | {
       kind: "hunt";
+      /** The posting action: what a heart or a comment hangs off. */
+      postId: string;
+      likes: number;
+      comments: number;
+      /** The viewer's own heart. */
+      liked: boolean;
       code: string;
       storeName: string;
       eventName: string;
@@ -1533,6 +1635,8 @@ export type FeedItem =
       cards: FeedCard[];
       total: number;
       youCanAnswer: number;
+      /** The viewer's own post. */
+      yours: boolean;
     }
   /**
    * A store you have saved, with something to come.

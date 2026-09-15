@@ -13,7 +13,9 @@ import {
 import {
   dressAllShowcaseAction,
   dressShowcaseAction,
+  setShowcaseNoteAction,
 } from "@/lib/players/profile-actions";
+import { SHOWCASE_NOTE_MAX } from "@/lib/players/showcase-note";
 import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
 
 /**
@@ -59,12 +61,15 @@ export function ShowcaseEditor({
   effect,
   frames,
   holos,
+  note,
 }: {
   entryId: string;
   name: string;
   number: string;
   imageUrl: string | null;
   imagesEnabled: boolean;
+  /** The caption under the card, or null. Edited in the same room. */
+  note: string | null;
   /** What the card is wearing right now, resolved to concrete slugs. */
   frame: string | null;
   holo: string | null;
@@ -93,6 +98,10 @@ export function ShowcaseEditor({
   );
   const [allState, allAction] = useActionState<ShopState, FormData>(
     dressAllShowcaseAction,
+    SHOP_IDLE,
+  );
+  const [noteState, noteAction] = useActionState<ShopState, FormData>(
+    setShowcaseNoteAction,
     SHOP_IDLE,
   );
 
@@ -311,16 +320,70 @@ export function ShowcaseEditor({
             onPick={pick}
           />
 
+          {/* The note: how they got it, why it matters. The founder's
+              ask, kept lightweight - one field, one button, 140
+              characters, under the card wherever it is shown large. */}
+          <form
+            action={noteAction}
+            className="flex flex-col gap-2 border-t border-border pt-3"
+          >
+            <input type="hidden" name="entryId" value={entryId} />
+            <label
+              htmlFor={`note-${entryId}`}
+              className="text-sm font-semibold text-text-primary"
+            >
+              Note
+            </label>
+            <textarea
+              id={`note-${entryId}`}
+              name="note"
+              defaultValue={note ?? ""}
+              maxLength={SHOWCASE_NOTE_MAX}
+              rows={2}
+              placeholder="How you got it, or why it matters (optional)"
+              className="w-full resize-none rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
+            />
+            <SaveNote saved={noteState.status === "equipped"} />
+          </form>
+
           <form action={allAction} className="border-t border-border pt-3">
             <input type="hidden" name="frame" value={picked.frame ?? ""} />
             <input type="hidden" name="holo" value={picked.holo ?? ""} />
             <ApplyAll saved={allState.status === "equipped"} />
           </form>
 
-          <Status state={allState.status !== "idle" ? allState : state} />
+          <Status
+            state={
+              allState.status !== "idle"
+                ? allState
+                : noteState.status === "error"
+                  ? noteState
+                  : state
+            }
+          />
         </div>
       </dialog>
     </>
+  );
+}
+
+/** The note's own button, so useFormStatus reports on the note's form. */
+function SaveNote({ saved }: { saved: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-text-muted">
+        Shown under the card when somebody opens it.
+      </p>
+      <button
+        type="submit"
+        disabled={pending}
+        className="shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-border bg-elevated px-3 py-1.5 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong disabled:opacity-70"
+      >
+        {pending ? "Saving…" : saved ? "Saved!" : "Save note"}
+      </button>
+    </div>
   );
 }
 

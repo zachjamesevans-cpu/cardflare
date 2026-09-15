@@ -122,7 +122,8 @@ async function record(entry: {
     | "new-follower"
     | "room-flare"
     | "message-received"
-    | "nearby-match";
+    | "nearby-match"
+    | "post-comment";
   title: string;
   body: string | null;
   url: string;
@@ -941,6 +942,44 @@ export async function notifyMessageReceived(
     if (id) await deliverByPush(recipientId, title, preview, path);
   } catch (error) {
     console.error("Could not announce the message", error);
+  }
+}
+
+/**
+ * Somebody wrote under your Flare post.
+ *
+ * Once per commenter per post: the first line from a person buzzes,
+ * the rest of their thoughts wait in the thread. Offers made from the
+ * Feed do not come through here - the room's own "has your card"
+ * notice already covers that tap.
+ */
+export async function notifyPostComment(
+  postId: string,
+  authorId: string,
+  commenterId: string,
+  commenterName: string,
+  body: string,
+): Promise<void> {
+  if (!isSupabaseConfigured() || authorId === commenterId) return;
+
+  try {
+    const title = `${commenterName} commented on your Flare`;
+    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
+    const path = "/feed";
+
+    const id = await record({
+      playerId: authorId,
+      kind: "post-comment",
+      title,
+      body: preview,
+      url: path,
+      dedupeKey: `post-comment:${postId}:${commenterId}`,
+      actorId: commenterId,
+    });
+
+    if (id) await deliverByPush(authorId, title, preview, path);
+  } catch (error) {
+    console.error("Could not announce the comment", error);
   }
 }
 

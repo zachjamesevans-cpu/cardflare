@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
+import { SHOWCASE_NOTE_MAX } from "./showcase-note";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
@@ -48,7 +49,15 @@ export interface ShowcaseCard {
   /** This card's own dressing, or null to wear the profile's default. */
   frame: string | null;
   holo: string | null;
+  /**
+   * The owner's caption: how they got it, why it matters. Null for
+   * none. Shown under the card in the large view, on both platforms.
+   */
+  note: string | null;
 }
+
+/** A note's ceiling. A caption on a card, not a post. */
+export { SHOWCASE_NOTE_MAX } from "./showcase-note";
 
 export interface PublicProfile {
   playerId: string;
@@ -306,7 +315,7 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
 
   const { data, error } = await admin
     .from("player_showcase")
-    .select("id, card_id, printing_id, position, frame_slug, holo_slug")
+    .select("id, card_id, printing_id, position, frame_slug, holo_slug, note")
     .eq("player_id", playerId)
     .order("position")
     .limit(SHOWCASE_LIMIT);
@@ -357,8 +366,39 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
       position: row.position,
       frame: row.frame_slug,
       holo: row.holo_slug,
+      note: row.note ?? null,
     };
   });
+}
+
+/**
+ * The note on one showcase card.
+ *
+ * Trimmed, capped at SHOWCASE_NOTE_MAX, and stored as null when there is
+ * nothing left, so "no note" is one value however it was typed. Scoped
+ * to the owner in the WHERE clause like every other showcase write.
+ */
+export async function setShowcaseNote(
+  playerId: string,
+  entryId: string,
+  note: string | null,
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const trimmed = (note ?? "").trim().slice(0, SHOWCASE_NOTE_MAX);
+
+  const { error } = await getSupabaseAdmin()
+    .from("player_showcase")
+    .update({ note: trimmed.length > 0 ? trimmed : null })
+    .eq("id", entryId)
+    .eq("player_id", playerId);
+
+  if (error) {
+    console.error("Could not save the showcase note", error);
+    return false;
+  }
+
+  return true;
 }
 
 export type ShowcaseOutcome =

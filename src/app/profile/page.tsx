@@ -315,6 +315,7 @@ export default async function ProfilePage() {
                             effect={worn.effect}
                             frames={ownedFrames}
                             holos={ownedHolos}
+                            note={entry.note}
                           />
                         </WornCardShell>
                         <span className="truncate text-[11px] text-text-secondary">

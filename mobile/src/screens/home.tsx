@@ -27,12 +27,15 @@ import {
   type FeedEntry,
   getMe,
   joinRoom,
+  likePost,
+  offerFromPost,
   postFlare,
   rememberRoom,
   removeLocal,
   storedAccessToken,
   type Me,
 } from "../api";
+import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import {
   Body,
   Button,
@@ -155,11 +158,14 @@ function CardRail({
   cards,
   more = 0,
   width,
+  post,
 }: {
   cards: FeedCard[];
   /** Cards past the server's cap, which live on the board. */
   more?: number;
   width: number;
+  /** The post these cards belong to, when they can be answered. */
+  post?: PostRef;
 }) {
   /* The shelf the zoom pages along. Built from the same array the rail
      draws, so what you swipe through is exactly what you can see. */
@@ -168,6 +174,7 @@ function CardRail({
     name: card.cardName,
     cardNumber: card.cardNumber,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
+    have: haveFor(card, post),
   }));
 
   return (
@@ -188,6 +195,8 @@ function CardRail({
           name={card.cardName}
           cardNumber={card.cardNumber}
           youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+          state={card.state}
+          have={haveFor(card, post)}
           /*
            * The rest of the rail, so an opened card can be swiped along
            * it. The founder: "when there's a card u click on anywhere,
@@ -415,6 +424,20 @@ export function HomeScreen() {
       setRefreshing(false);
     }
   };
+
+  /**
+   * The post behind a hunt, with the one call "I have this" makes.
+   * After it lands the Feed reloads, so the card reads OFFERED and the
+   * count under it moves without a pull.
+   */
+  const postRef = (item: { postId: string; yours: boolean }): PostRef => ({
+    postId: item.postId,
+    yours: item.yours,
+    offer: async (flareId, note) => {
+      await offerFromPost(item.postId, flareId, note);
+      await load(() => true);
+    },
+  });
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
@@ -940,6 +963,8 @@ export function HomeScreen() {
                       ? { kind: item.cards[0].match, count: 0 }
                       : undefined
                   }
+                  state={item.cards[0].state}
+                  have={haveFor(item.cards[0], postRef(item))}
                 />
                 <View style={{ flexShrink: 1 }}>
                   <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
@@ -953,6 +978,13 @@ export function HomeScreen() {
                         : "You have another printing"}
                     </Text>
                   ) : null}
+                  {item.cards[0].state === "found" ? (
+                    <Text style={{ color: colors.accent, fontWeight: "600" }}>Found</Text>
+                  ) : item.cards[0].youOffered ? (
+                    <Muted>You said you have this</Muted>
+                  ) : item.cards[0].state === "offered" ? (
+                    <Muted>Somebody offered</Muted>
+                  ) : null}
                 </View>
               </View>
             ) : (
@@ -961,6 +993,7 @@ export function HomeScreen() {
                   cards={item.cards}
                   more={item.total - item.cards.length}
                   width={tileWidth(item.cards.length)}
+                  post={postRef(item)}
                 />
                 {item.youCanAnswer > 0 ? (
                   <Text style={{ color: colors.accent, fontWeight: "600" }}>
@@ -969,6 +1002,19 @@ export function HomeScreen() {
                 ) : null}
               </View>
             )}
+
+            {/* The heart, the thread, and "I have this" on any card
+                above: the founder's ask that a Flare post feel like a
+                post. The thread is its own screen here. */}
+            <PostSocialRow
+              likes={item.likes ?? 0}
+              liked={item.liked ?? false}
+              comments={item.comments ?? 0}
+              onLike={(liked) => likePost(item.postId, liked)}
+              onOpenThread={() =>
+                navigation.navigate("FlarePost", { postId: item.postId })
+              }
+            />
 
             {/* Every item ends in a place and a time. */}
             <Button

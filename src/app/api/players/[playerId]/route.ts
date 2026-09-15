@@ -124,6 +124,7 @@ export async function GET(
       imageUrl: entry.imageUrl,
       frame: entry.frame ?? worn.frame,
       holo: entry.holo ?? worn.holo,
+      note: entry.note,
     })),
   });
 }

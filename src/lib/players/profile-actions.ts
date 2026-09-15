@@ -22,6 +22,7 @@ import {
   setCover,
   setDisplayName,
   setHandle,
+  setShowcaseNote,
 } from "./profile";
 import { handleSchema } from "./handle";
 import {
@@ -385,6 +386,24 @@ export async function dressShowcaseAction(
 
   revalidateProfile();
   return { status: "equipped", name: "This card" };
+}
+
+/** The note under a showcase card, from the same editor. */
+export async function setShowcaseNoteAction(
+  _previous: ShopState,
+  formData: FormData,
+): Promise<ShopState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const entryId = text(formData, "entryId");
+  if (!entryId) return { status: "error", message: GENERIC_ERROR };
+
+  const done = await setShowcaseNote(playerId, entryId, text(formData, "note"));
+  if (!done) return { status: "error", message: GENERIC_ERROR };
+
+  revalidateProfile();
+  return { status: "equipped", name: "The note" };
 }
 
 /** The editor's Apply to all: default changed, overrides cleared. */

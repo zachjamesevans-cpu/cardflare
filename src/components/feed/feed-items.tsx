@@ -10,7 +10,12 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
-import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import {
+  CardImageZoom,
+  type ZoomCard,
+  type ZoomHave,
+} from "@/components/cards/card-image-zoom";
+import { PostSocial } from "@/components/feed/post-social";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
@@ -107,15 +112,35 @@ const TILE_CLASS = { lg: "w-40", md: "w-24", sm: "w-14" } as const;
  * survives past CARD_RAIL_CAP on the server, where it stops being "we
  * hid some" and becomes "the rest are on the board".
  */
+/**
+ * "I have this" for one card of a post, or null where it makes no sense:
+ * your own post, a card that already traded, an item that is not a post.
+ */
+function haveFor(
+  card: FeedCard,
+  post: { postId: string; yours: boolean } | undefined,
+): ZoomHave | null {
+  if (!post || post.yours || !card.flareId || card.state === "found") return null;
+  return {
+    postId: post.postId,
+    flareId: card.flareId,
+    state: card.state ?? "open",
+    youOffered: card.youOffered ?? false,
+  };
+}
+
 function CardRail({
   cards,
   more,
   size = "md",
+  post,
 }: {
   cards: FeedCard[];
   /** Cards past the server's cap, which live on the board. */
   more?: number;
   size?: "lg" | "md";
+  /** The post these cards belong to, when they can be answered. */
+  post?: { postId: string; yours: boolean };
 }) {
   /* The shelf the zoom pages along. Built from the same array the rail
      draws, so what you swipe through is exactly what you can see. */
@@ -124,6 +149,7 @@ function CardRail({
     exactName: card.cardName,
     cardNumber: card.cardNumber,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
+    have: haveFor(card, post),
   }));
 
   return (
@@ -138,6 +164,8 @@ function CardRail({
             size={size}
             siblings={shelf}
             position={index}
+            state={card.state}
+            have={haveFor(card, post)}
           />
         </div>
       ))}
@@ -170,6 +198,8 @@ function FeedTile({
   size = "sm",
   siblings,
   position,
+  state = "open",
+  have = null,
 }: {
   imageUrl: string | null;
   name: string;
@@ -178,6 +208,13 @@ function FeedTile({
   /** The rest of the rail this tile sits in, and where in it. */
   siblings?: ZoomCard[];
   position?: number;
+  /**
+   * OFFERED or FOUND, on a post's card. Only this tile dims - the
+   * founder: "do not gray out the whole Flare". The badge says which.
+   */
+  state?: "open" | "offered" | "found";
+  /** "I have this" in the large view, when the viewer can say so. */
+  have?: ZoomHave | null;
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -206,12 +243,33 @@ function FeedTile({
           : "border-border"
       }`}
     >
-      <span className="block aspect-[60/84] w-full">
+      <span
+        className={`block aspect-[60/84] w-full ${
+          state === "offered"
+            ? "opacity-50 grayscale"
+            : state === "found"
+              ? "opacity-70"
+              : ""
+        }`}
+      >
         {imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={imageUrl} alt="" className="size-full object-cover" />
         )}
       </span>
+      {state !== "open" && (
+        /* The one-word state, pinned to the foot of the card so the
+           art above it still reads as the card it is. */
+        <span
+          className={`pointer-events-none absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] font-bold tracking-wider uppercase ${
+            state === "found"
+              ? "bg-accent text-accent-contrast"
+              : "bg-surface/90 text-text-secondary"
+          }`}
+        >
+          {state}
+        </span>
+      )}
       {match && (
         <span className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-surface/90 p-0.5">
           {match === "exact" ? (
@@ -233,6 +291,7 @@ function FeedTile({
       /* The ring already says it across the row; the sentence is what
          the tap is for, same as the board and the app. */
       youHave={match ? { kind: match, count: 0 } : null}
+      have={have}
       siblings={siblings}
       position={position}
       thumb={art}
@@ -344,6 +403,8 @@ export function Item({ item }: { item: FeedItem }) {
               name={item.cards[0].cardName}
               cardNumber={item.cards[0].cardNumber}
               match={item.cards[0].match}
+              state={item.cards[0].state}
+              have={haveFor(item.cards[0], { postId: item.postId, yours: item.yours })}
             />
             <div className="flex min-w-0 flex-col gap-1">
               <p className="truncate font-semibold text-text-primary">
@@ -359,6 +420,13 @@ export function Item({ item }: { item: FeedItem }) {
                     : "You have another printing"}
                 </p>
               )}
+              {item.cards[0].state === "found" ? (
+                <p className="text-sm font-medium text-accent">Found</p>
+              ) : item.cards[0].youOffered ? (
+                <p className="text-sm text-text-secondary">You said you have this</p>
+              ) : item.cards[0].state === "offered" ? (
+                <p className="text-sm text-text-secondary">Somebody offered</p>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -367,6 +435,7 @@ export function Item({ item }: { item: FeedItem }) {
               cards={item.cards}
               more={item.total - item.cards.length}
               size={tileWidth(item.cards.length)}
+              post={{ postId: item.postId, yours: item.yours }}
             />
             {item.youCanAnswer > 0 && (
               /* The line that earns the tap. Absent when it would read
@@ -377,6 +446,15 @@ export function Item({ item }: { item: FeedItem }) {
             )}
           </div>
         )}
+
+        {/* The heart, the thread, and "I have this" on any card above:
+            the founder's ask that a Flare post feel like a post. */}
+        <PostSocial
+          postId={item.postId}
+          likes={item.likes}
+          liked={item.liked}
+          comments={item.comments}
+        />
 
         {/* Every item ends in a place and a time. */}
         <Link href={`/e/${item.code}`} className={buttonStyles("primary", "sm")}>
