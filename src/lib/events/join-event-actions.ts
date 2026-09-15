@@ -11,6 +11,7 @@ import {
   accountRoomIdentity,
   nameSessionAfterAccount,
 } from "@/lib/players/room-identity";
+import { awardAttendance } from "@/lib/players/embers";
 import { saveLocal } from "@/lib/players/locals";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -234,7 +235,12 @@ export async function joinEventAction(
 
   // A signed-in join is what makes a store a local — saved silently here,
   // never in the way: the join has already succeeded whatever this does.
-  if (accountPlayerId) await saveLocal(accountPlayerId, event.storeId);
+  if (accountPlayerId) {
+    /* Attendance pays before the save, so tonight's first join at a NEW
+       store saves it and pays nothing; the next night pays. */
+    void awardAttendance(accountPlayerId, event.storeId);
+    await saveLocal(accountPlayerId, event.storeId);
+  }
 
   if (freshToken) await setPlayerCookie(freshToken);
 

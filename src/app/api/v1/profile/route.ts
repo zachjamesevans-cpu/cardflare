@@ -15,6 +15,8 @@ import {
   setDisplayName,
   setHandle,
   setIdentity,
+  setShowcaseNote,
+  SHOWCASE_NOTE_MAX,
 } from "@/lib/players/profile";
 import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
 import { buyCosmetic } from "@/lib/players/cosmetics";
@@ -197,6 +199,16 @@ const actionSchema = z.discriminatedUnion("action", [
     frame: z.string().max(40).nullable(),
     holo: z.string().max(40).nullable(),
   }),
+  z.object({
+    action: z.literal("showcase-note"),
+    entryId: z.string().uuid(),
+    /* Trimmed and capped server-side too; the cap here only refuses
+       something no phone keyboard would send. */
+    note: z
+      .string()
+      .max(SHOWCASE_NOTE_MAX * 4)
+      .nullable(),
+  }),
 ]);
 
 export async function POST(request: Request): Promise<Response> {
@@ -308,6 +320,13 @@ export async function POST(request: Request): Promise<Response> {
 
   if (body.action === "showcase-dress-all") {
     const done = await dressAllShowcase(player.playerId, body.frame, body.holo);
+    return done
+      ? Response.json({ ok: true })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "showcase-note") {
+    const done = await setShowcaseNote(player.playerId, body.entryId, body.note);
     return done
       ? Response.json({ ok: true })
       : Response.json({ error: "unavailable" }, { status: 503 });

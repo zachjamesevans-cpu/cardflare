@@ -17,6 +17,7 @@ import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
 import type { Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
 
 /**
  * The Feed: the room's question asked from a sofa.
@@ -204,6 +205,19 @@ export interface FeedCard {
    * sample only ever carries matches, and still does.
    */
   match: MatchKind | null;
+  /**
+   * The Flare behind the card, on a hunt, so "I have this" can name it.
+   * Absent on the items that are not posts.
+   */
+  flareId?: string;
+  /**
+   * OFFERED when somebody has raised a hand on it, FOUND when it has
+   * traded. Only this card dims - the founder: "do not gray out the
+   * whole Flare. Only the specific card that has been answered."
+   */
+  state?: "open" | "offered" | "found";
+  /** The viewer is one of the hands up. */
+  youOffered?: boolean;
 }
 
 export interface BoardItem {
@@ -247,6 +261,15 @@ export interface BoardItem {
  */
 export interface HuntItem {
   kind: "hunt";
+  /**
+   * The posting action, which is what a heart or a comment hangs off:
+   * a deck of thirty cards is one post with one thread.
+   */
+  postId: string;
+  likes: number;
+  comments: number;
+  /** The viewer's own heart. */
+  liked: boolean;
   code: string;
   storeName: string;
   eventName: string;
@@ -1130,6 +1153,12 @@ async function boardWithHunts(
 
     items.push({
       kind: "hunt",
+      postId: key.split("::")[1] ?? ordered[0].flare.id,
+      /* Filled in by decorateHunts once every board is read: one query
+         for every post on the screen rather than one per store. */
+      likes: 0,
+      comments: 0,
+      liked: false,
       code,
       storeName: local.name,
       eventName,
@@ -1150,11 +1179,77 @@ async function boardWithHunts(
         cardNumber: flare.cardNumber,
         imageUrl: flare.imageUrl,
         match,
+        flareId: flare.id,
+        state: "open",
+        youOffered: false,
       })),
     });
   }
 
   return items;
+}
+
+/**
+ * The social half of every hunt on the screen, in three queries.
+ *
+ * Hearts and comment counts per post; which cards have a hand up, and
+ * whether one of the hands is the viewer's; and the cards in each post
+ * that already traded, which the room's open-only list never returns
+ * and which the founder wants kept and marked FOUND rather than gone.
+ */
+async function decorateHunts(items: FeedItem[], viewerId: string): Promise<void> {
+  const hunts = items.filter((item): item is HuntItem => item.kind === "hunt");
+  if (hunts.length === 0) return;
+
+  const postIds = hunts.map((hunt) => hunt.postId);
+  const flareIds = hunts.flatMap((hunt) =>
+    hunt.cards.flatMap((card) => (card.flareId ? [card.flareId] : [])),
+  );
+
+  const [social, sessions, found] = await Promise.all([
+    socialForPosts(postIds, viewerId),
+    sessionsForPlayers([viewerId]),
+    foundInPosts(postIds),
+  ]);
+  const [answers, facts] = await Promise.all([
+    answersFor(flareIds, new Set(sessions.keys())),
+    cardFacts(found.map((flare) => flare.cardId)),
+  ]);
+
+  for (const hunt of hunts) {
+    const counts = social.get(hunt.postId);
+    if (counts) {
+      hunt.likes = counts.likes;
+      hunt.comments = counts.comments;
+      hunt.liked = counts.liked;
+    }
+
+    for (const card of hunt.cards) {
+      const answer = card.flareId ? answers.get(card.flareId) : undefined;
+      if (answer?.offered) card.state = "offered";
+      if (answer?.youOffered) card.youOffered = true;
+    }
+
+    /* The traded ones, after the open ones: crossed off, not cut out. */
+    const shownCards = new Set(hunt.cards.map((card) => card.cardId));
+    for (const flare of found) {
+      if (flare.postId !== hunt.postId || shownCards.has(flare.cardId)) continue;
+      shownCards.add(flare.cardId);
+      const fact = facts.get(flare.cardId);
+      hunt.total += 1;
+      if (hunt.cards.length >= CARD_RAIL_CAP) continue;
+      hunt.cards.push({
+        cardId: flare.cardId,
+        cardName: fact?.cardName ?? "Unknown card",
+        cardNumber: fact?.cardNumber ?? "",
+        imageUrl: fact?.imageUrl ?? null,
+        match: null,
+        flareId: flare.id,
+        state: "found",
+        youOffered: false,
+      });
+    }
+  }
 }
 
 /**
@@ -1895,6 +1990,8 @@ export async function listFeed(
     ...pack,
     ...shop,
   ];
+
+  await decorateHunts(items, playerId);
 
   /*
    * Every item leaves here knowing where it goes and why it is here.

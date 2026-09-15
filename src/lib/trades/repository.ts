@@ -1,6 +1,6 @@
 import "server-only";
 
-import { awardTradeEmbers } from "@/lib/players/embers";
+import { awardTradeEmbers, reverseTradeEmbers } from "@/lib/players/embers";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { TradeRecord } from "./schema";
 
@@ -13,7 +13,8 @@ import type { TradeRecord } from "./schema";
 const UNIQUE_VIOLATION = "23505";
 
 export type ConfirmOutcome =
-  { ok: true } | { ok: false; reason: "not-found" | "no-offer" | "unavailable" };
+  | { ok: true; tradeId?: string }
+  | { ok: false; reason: "not-found" | "no-offer" | "unavailable" };
 
 /**
  * Records that a Flare's trade happened, and closes the Flare.
@@ -137,21 +138,93 @@ export async function confirmTrade(
   }
 
   /*
-   * The payout, last and unconditionally survivable.
+   * The payout waits for the second hand.
    *
-   * Only a confirmed trade earns Embers — the founder's rule — and this
-   * is the one place a trade becomes confirmed, so this is the one place
-   * that awards. It is keyed to the trade's id, so a retried confirm
-   * pays nothing the second time, and it throws nothing: the trade is
-   * the product and the Embers are the garnish, so a reward system
-   * having a bad day must never be why somebody at a counter cannot
-   * finish. Guests earn nothing, because there is no account to hold it.
+   * A named partner is asked "did you?" and the trade pays when they
+   * say yes (acknowledgeTrade), or the author alone after the window
+   * (payLateTrades). A trade with nobody named has nobody to ask and
+   * nothing to pay: it is settled here, at zero, so the sweep never
+   * revisits it. Keyed and survivable either way: the trade is the
+   * product and the Embers are the garnish.
    */
-  if (tradeId) {
-    await awardTradeEmbers(tradeId, requesterSessionId, partnerSessionId);
+  if (tradeId && !partnerSessionId) {
+    await awardTradeEmbers(tradeId, "acknowledged");
   }
 
+  return { ok: true, tradeId: tradeId ?? undefined };
+}
+
+/**
+ * The partner's tap: "yes, we traded". The second hand on the trade,
+ * and the moment it pays both sides. Scoped to the holder's own
+ * session so nobody can acknowledge a trade for somebody else.
+ */
+export async function acknowledgeTrade(
+  tradeId: string,
+  holderSessionId: string,
+): Promise<{ ok: true } | { ok: false; reason: "not-found" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("trades")
+    .update({ acknowledged_at: new Date().toISOString() })
+    .eq("id", tradeId)
+    .eq("holder_session_id", holderSessionId)
+    .is("acknowledged_at", null)
+    .is("disputed_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not acknowledge the trade", error);
+    return { ok: false, reason: "unavailable" };
+  }
+  if (!data) return { ok: false, reason: "not-found" };
+
+  await awardTradeEmbers(tradeId, "acknowledged");
   return { ok: true };
+}
+
+/**
+ * Trades whose window closed with no answer from the partner: the
+ * author is paid alone, at the unconfirmed rate. Run by the cron.
+ */
+export async function payLateTrades(windowHours: number): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("trades")
+    .select("id")
+    .is("paid_at", null)
+    .is("acknowledged_at", null)
+    .is("disputed_at", null)
+    .lt(
+      "confirmed_at",
+      new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString(),
+    )
+    .limit(500);
+
+  if (error) {
+    console.error("Could not list the late trades", error);
+    return 0;
+  }
+
+  for (const row of data ?? []) {
+    await awardTradeEmbers(row.id, "late");
+  }
+  return (data ?? []).length;
+}
+
+/**
+ * An admin, or a deletion, says this trade should not have paid: its
+ * Embers come back from both sides and it stops counting.
+ */
+export async function disputeTrade(
+  tradeId: string,
+  note: string,
+  disputedBy: string | null,
+): Promise<boolean> {
+  return reverseTradeEmbers(tradeId, note, disputedBy);
 }
 
 /**
@@ -172,7 +245,7 @@ export async function listMyTrades(
   const { data, error } = await admin
     .from("trades")
     .select(
-      "id, requester_session_id, holder_session_id, card_id, quantity, confirmed_at",
+      "id, flare_id, requester_session_id, holder_session_id, card_id, quantity, confirmed_at, acknowledged_at, paid_at, disputed_at",
     )
     .eq("event_id", eventId)
     .or(`requester_session_id.eq.${sessionId},holder_session_id.eq.${sessionId}`)
@@ -224,6 +297,15 @@ export async function listMyTrades(
 
   return rows.map((row) => {
     const youWere = row.requester_session_id === sessionId ? "requester" : "holder";
+    const status: TradeRecord["status"] = row.disputed_at
+      ? "disputed"
+      : !row.holder_session_id
+        ? "unnamed"
+        : row.acknowledged_at
+          ? "confirmed"
+          : row.paid_at
+            ? "late"
+            : "pending";
     const partnerId =
       youWere === "requester" ? row.holder_session_id : row.requester_session_id;
     const card = cardsById.get(row.card_id);
@@ -237,6 +319,10 @@ export async function listMyTrades(
       youWere,
       partnerName: partnerId ? (names.get(partnerId) ?? null) : null,
       confirmedAt: row.confirmed_at,
+      status,
+      awaitingYou: youWere === "holder" && status === "pending",
+      flareId: row.flare_id,
+      requesterSessionId: row.requester_session_id,
     };
   });
 }

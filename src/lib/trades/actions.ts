@@ -7,12 +7,15 @@ import { findParticipation } from "@/lib/events/participants";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { resolveCode } from "@/lib/events/rooms";
 import { text } from "@/lib/form-value";
-import { notifyTradeConfirmed } from "@/lib/notifications/notify";
+import {
+  notifyTradeAcknowledged,
+  notifyTradeConfirmed,
+} from "@/lib/notifications/notify";
 import { getPlayerSession } from "@/lib/players/session";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { clientKey } from "@/lib/request-context";
+import { LIMITS } from "@/lib/api/throttle";
 import { clearWantForFlare } from "@/lib/players/wants";
-import { confirmTrade } from "./repository";
+import { acknowledgeTrade, confirmTrade } from "./repository";
 
 /**
  * Confirming a trade. One action for both shapes: with a partner (tapped
@@ -26,9 +29,6 @@ import { confirmTrade } from "./repository";
  * offer server-side.
  */
 
-const CONFIRM_MAX = 30;
-const CONFIRM_WINDOW_MS = 5 * 60 * 1000;
-
 export async function confirmTradeAction(formData: FormData): Promise<void> {
   const code = normalizeJoinCode(text(formData, "code"));
   if (!isValidJoinCode(code)) return;
@@ -36,15 +36,17 @@ export async function confirmTradeAction(formData: FormData): Promise<void> {
   const flareId = text(formData, "flareId");
   if (!flareId) redirect(`/e/${code}`);
 
-  const rate = checkRateLimit(
-    `trade:${await clientKey()}`,
-    CONFIRM_MAX,
-    CONFIRM_WINDOW_MS,
-  );
-  if (!rate.allowed) redirect(`/e/${code}`);
-
   const session = await getPlayerSession();
   if (!session) redirect(`/e/${code}`);
+
+  /* Per room identity, not per network: a shop shares one wifi, and a
+     real night confirms a handful of trades, not dozens. */
+  const rate = checkRateLimit(
+    `trade-confirm:${session.id}`,
+    LIMITS.tradeConfirm.limit,
+    LIMITS.tradeConfirm.windowMs,
+  );
+  if (!rate.allowed) redirect(`/e/${code}`);
 
   // Resolved, never entered: confirming a trade is not a way into a room.
   const resolved = await resolveCode(code);
@@ -73,6 +75,41 @@ export async function confirmTradeAction(formData: FormData): Promise<void> {
     if (partner) {
       await notifyTradeConfirmed(flareId, partner, session.display_name);
     }
+  }
+
+  revalidatePath(`/e/${code}`);
+  redirect(`/e/${code}`);
+}
+
+/**
+ * The partner's "Yes, we traded". The second hand on a trade, and the
+ * tap that pays both sides. Re-establishes the session and the room the
+ * same way confirming does; `acknowledgeTrade` scopes the write to the
+ * holder's own session.
+ */
+export async function acknowledgeTradeAction(formData: FormData): Promise<void> {
+  const code = normalizeJoinCode(text(formData, "code"));
+  if (!isValidJoinCode(code)) return;
+
+  const tradeId = text(formData, "tradeId");
+  const flareId = text(formData, "flareId");
+  const requesterSessionId = text(formData, "requesterSessionId");
+  if (!tradeId) redirect(`/e/${code}`);
+
+  const session = await getPlayerSession();
+  if (!session) redirect(`/e/${code}`);
+
+  const resolved = await resolveCode(code);
+  if (resolved.outcome !== "room") redirect(`/e/${code}`);
+
+  const outcome = await acknowledgeTrade(tradeId, session.id);
+  if (outcome.ok && flareId && requesterSessionId) {
+    await notifyTradeAcknowledged(
+      flareId,
+      requesterSessionId,
+      session.display_name,
+      session.id,
+    );
   }
 
   revalidatePath(`/e/${code}`);

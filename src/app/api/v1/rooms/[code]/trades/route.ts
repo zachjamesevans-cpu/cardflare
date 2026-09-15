@@ -5,9 +5,13 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
-import { notifyTradeConfirmed } from "@/lib/notifications/notify";
+import {
+  notifyTradeAcknowledged,
+  notifyTradeConfirmed,
+} from "@/lib/notifications/notify";
+import { LIMITS, tooMany } from "@/lib/api/throttle";
 import { clearWantForFlare } from "@/lib/players/wants";
-import { confirmTrade, listMyTrades } from "@/lib/trades/repository";
+import { acknowledgeTrade, confirmTrade, listMyTrades } from "@/lib/trades/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +19,14 @@ const confirmSchema = z.object({
   flareId: z.guid(),
   /** Present when the trade closes an offer; absent for a walk-up trade. */
   partnerSessionId: z.guid().optional(),
+});
+
+/** The partner's "yes, we traded", the second hand on a trade. */
+const acknowledgeSchema = z.object({
+  action: z.literal("acknowledge"),
+  tradeId: z.guid(),
+  flareId: z.guid().optional(),
+  requesterSessionId: z.guid().optional(),
 });
 
 /**
@@ -71,7 +83,34 @@ export async function POST(
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
 
-  const parsed = confirmSchema.safeParse(await readJsonPayload(request));
+  const payload = await readJsonPayload(request);
+
+  const ack = acknowledgeSchema.safeParse(payload);
+  if (ack.success) {
+    const outcome = await acknowledgeTrade(ack.data.tradeId, session.id);
+    if (!outcome.ok) {
+      return Response.json({ error: outcome.reason }, { status: 409 });
+    }
+    if (ack.data.flareId && ack.data.requesterSessionId) {
+      await notifyTradeAcknowledged(
+        ack.data.flareId,
+        ack.data.requesterSessionId,
+        session.display_name,
+        session.id,
+      );
+    }
+    return Response.json({ ok: true });
+  }
+
+  /* Per room identity: a real night confirms a handful, not dozens. */
+  const limited = tooMany(
+    `trade-confirm:${session.id}`,
+    LIMITS.tradeConfirm.limit,
+    LIMITS.tradeConfirm.windowMs,
+  );
+  if (limited) return limited;
+
+  const parsed = confirmSchema.safeParse(payload);
   if (!parsed.success) return badRequest("flareId is required");
 
   const outcome = await confirmTrade(

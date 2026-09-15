@@ -148,6 +148,19 @@ export interface ZoomCard {
    * `ZoomCard.offer`, with the room's calls attached.
    */
   offer?: ZoomOffer | null;
+  /**
+   * "I have this", from a Flare post in the Feed. The founder: "tap a
+   * specific requested card and choose I have this", with a note. Null
+   * on your own post and on a card that already traded.
+   */
+  have?: ZoomHave | null;
+}
+
+export interface ZoomHave {
+  state: "open" | "offered" | "found";
+  /** The viewer already raised a hand on it. */
+  youOffered: boolean;
+  onOffer: (note: string) => Promise<void>;
 }
 
 export interface ZoomOffer {
@@ -268,6 +281,71 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
 }
 
 
+/**
+ * "I have this", inside the zoom, from the Feed.
+ *
+ * The same block the room's offer draws, with one field and one
+ * button: the note is what the thread will say ("I'll bring this to
+ * Mox tonight"), and confirming raises the hand on the Flare and posts
+ * the line in one go.
+ */
+function ZoomHaveForm({ have }: { have: ZoomHave }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (have.state === "found") {
+    return (
+      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+          <Text style={{ color: colors.accent, fontWeight: "600" }}>Found. </Text>
+          This one already traded.
+        </Text>
+      </Pressable>
+    );
+  }
+
+  if (have.youOffered) {
+    return (
+      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+          <Text style={{ color: colors.accent, fontWeight: "600" }}>
+            You said you have this.{" "}
+          </Text>
+          They can see your name in their room, so keep an eye out.
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable onPress={() => undefined} style={styles.zoomOffer}>
+      <Input
+        value={note}
+        onChangeText={setNote}
+        placeholder="Add a note, like where you'll be (optional)"
+        maxLength={280}
+        returnKeyType="done"
+      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+        <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
+          {have.state === "offered"
+            ? "Somebody already offered. You can too."
+            : "Posts in the thread and tells them."}
+        </Text>
+        <Button
+          label={busy ? "Sending…" : "I have this"}
+          busy={busy}
+          onPress={() => {
+            if (busy) return;
+            setBusy(true);
+            void have.onOffer(note.trim()).finally(() => setBusy(false));
+          }}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
 export function CardImage({
   imageUrl: ownImageUrl,
   width,
@@ -282,6 +360,8 @@ export function CardImage({
   terms: ownTerms = null,
   youHave: ownYouHave = null,
   offer: ownOffer = null,
+  have: ownHave = null,
+  state = "open",
   siblings,
   position = 0,
 }: {
@@ -289,6 +369,13 @@ export function CardImage({
   width: number;
   name: string;
   cardNumber: string;
+  /** "I have this" in the large view, when the viewer can say so. */
+  have?: ZoomHave | null;
+  /**
+   * OFFERED or FOUND, drawn on the thumbnail. Only this card dims - the
+   * founder: "do not gray out the whole Flare". The band says which.
+   */
+  state?: "open" | "offered" | "found";
   /** The printing, so the large view says which version is being shown. */
   caption?: string | null;
   /** The Flare's note, shown in the large view under the number. */
@@ -363,6 +450,7 @@ export function CardImage({
   const terms = shown ? (shown.terms ?? null) : ownTerms;
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
+  const have = shown ? (shown.have ?? null) : ownHave;
 
 
   const window = useWindowDimensions();
@@ -450,7 +538,38 @@ export function CardImage({
           setOpen(true);
         }}
       >
-        <RemoteImage uri={ownImageUrl} style={frame} />
+        <View style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.7 : 1 }}>
+          <RemoteImage uri={ownImageUrl} style={frame} />
+        </View>
+        {state !== "open" ? (
+          /* The one-word state, pinned to the foot of the card so the
+             art above it still reads as the card it is. */
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              paddingVertical: 2,
+              alignItems: "center",
+              backgroundColor: state === "found" ? colors.accent : "rgba(0,0,0,0.7)",
+              borderBottomLeftRadius: radius.control / 2,
+              borderBottomRightRadius: radius.control / 2,
+            }}
+          >
+            <Text
+              style={{
+                color: state === "found" ? colors.accentContrast : colors.textSecondary,
+                fontSize: 9,
+                fontWeight: "800",
+                letterSpacing: 1,
+              }}
+            >
+              {state.toUpperCase()}
+            </Text>
+          </View>
+        ) : null}
       </Tap>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>
@@ -597,6 +716,7 @@ export function CardImage({
                 {/* Keyed on the shelf position, so a half-typed note does
                     not ride along to the next card. */}
                 {offer ? <ZoomOfferForm key={shelf ? at : "own"} offer={offer} /> : null}
+                {have ? <ZoomHaveForm key={`have-${shelf ? at : "own"}`} have={have} /> : null}
               </Pressable>
               {/*
                 * The card, with its neighbours showing at the edges.

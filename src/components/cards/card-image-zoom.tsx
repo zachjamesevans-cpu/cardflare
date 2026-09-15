@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
+import { offerFromFeedAction } from "@/lib/feed/post-actions";
+import { POST_COMMENT_MAX, type CardState } from "@/lib/feed/post-schema";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 import { MAX_OFFER_MESSAGE, youHaveLabel, type MatchKind } from "@/lib/matching/schema";
 
@@ -63,6 +65,20 @@ export interface ZoomCard {
    * and the button.
    */
   offer?: ZoomOffer | null;
+  /**
+   * "I have this", from a Flare post in the Feed. The founder: "tap a
+   * specific requested card and choose I have this", with a note. Null
+   * on your own post and on a card that already traded.
+   */
+  have?: ZoomHave | null;
+}
+
+export interface ZoomHave {
+  postId: string;
+  flareId: string;
+  state: CardState;
+  /** The viewer already raised a hand on it. */
+  youOffered: boolean;
 }
 
 export interface ZoomOffer {
@@ -161,6 +177,74 @@ function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
   );
 }
 
+/**
+ * "I have this", inside the zoom, from the Feed.
+ *
+ * The same block the room's offer draws, with one field and one button:
+ * the note is what the thread will say ("I'll bring this to Mox
+ * tonight"), and confirming raises the hand on the Flare and posts the
+ * line in one go.
+ */
+function ZoomHaveBlock({ have }: { have: ZoomHave }) {
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
+
+  if (have.state === "found") {
+    return (
+      <div
+        onClick={stop}
+        className="rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
+      >
+        <span className="font-medium text-accent">Found.</span> This one already traded.
+      </div>
+    );
+  }
+
+  if (have.youOffered) {
+    return (
+      <div
+        onClick={stop}
+        className="rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
+      >
+        <span className="font-medium text-accent">You said you have this.</span> They
+        can see your name in their room, so keep an eye out.
+      </div>
+    );
+  }
+
+  return (
+    <form
+      action={offerFromFeedAction}
+      onClick={stop}
+      className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-2"
+    >
+      <input type="hidden" name="postId" value={have.postId} />
+      <input type="hidden" name="flareId" value={have.flareId} />
+      <input
+        type="text"
+        name="note"
+        maxLength={POST_COMMENT_MAX}
+        placeholder="Add a note, like where you'll be (optional)"
+        aria-label="A note with your offer"
+        className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-text-muted">
+          {have.state === "offered"
+            ? "Somebody already offered. You can too."
+            : "Posts in the thread and tells them."}
+        </p>
+        <SubmitButton
+          label="I have this"
+          pendingLabel="Sending…"
+          size="sm"
+          icon={PackageCheck}
+          className="shrink-0"
+        />
+      </div>
+    </form>
+  );
+}
+
 /** Long enough to read as a movement, short enough not to be in the way. */
 const OPEN_MS = 220;
 
@@ -213,6 +297,7 @@ export function CardImageZoom({
   pledges: ownPledges = [],
   youHave: ownYouHave = null,
   offer: ownOffer = null,
+  have: ownHave = null,
   siblings,
   position = 0,
   thumbClassName,
@@ -263,6 +348,8 @@ export function CardImageZoom({
   youHave?: { kind: MatchKind; count: number } | null;
   /** The offer form, for another player's want. See `ZoomCard.offer`. */
   offer?: ZoomOffer | null;
+  /** "I have this" from the Feed. See `ZoomCard.have`. */
+  have?: ZoomHave | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
   /**
@@ -335,6 +422,7 @@ export function CardImageZoom({
   const pledges = shown ? (shown.pledges ?? []) : ownPledges;
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
+  const have = shown ? (shown.have ?? null) : ownHave;
 
   /*
    * A swipe ends in a click, and a click anywhere on this dialog closes
@@ -804,6 +892,7 @@ export function CardImageZoom({
            * dialog closes it.
            */}
           {offer && <ZoomOfferBlock offer={offer} />}
+          {have && <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} />}
 
           {shelf && (
             <div className="flex items-center justify-between gap-3">

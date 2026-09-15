@@ -26,6 +26,7 @@ import {
   nameSessionAfterAccount,
 } from "@/lib/players/room-identity";
 import { saveLocal } from "@/lib/players/locals";
+import { awardAttendance } from "@/lib/players/embers";
 import { collectionAvailability } from "@/lib/players/collection";
 import {
   createPlayerSession,
@@ -327,7 +328,10 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
 
   // Same rule as the website's join: a signed-in join saves the store as
   // one of the player's locals, silently and idempotently.
-  if (accountPlayerId) await saveLocal(accountPlayerId, event.storeId);
+  if (accountPlayerId) {
+    void awardAttendance(accountPlayerId, event.storeId);
+    await saveLocal(accountPlayerId, event.storeId);
+  }
 
   return Response.json({
     joined: true,

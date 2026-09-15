@@ -33,9 +33,11 @@ vi.mock("@/lib/events/participants", () => ({
 vi.mock("@/lib/notifications/notify", () => ({
   notifyOfferReceived: vi.fn(),
   notifyTradeConfirmed: vi.fn(),
+  notifyTradeAcknowledged: vi.fn(),
 }));
 vi.mock("@/lib/trades/repository", () => ({
   confirmTrade: (...a: unknown[]) => confirmTrade(...a),
+  acknowledgeTrade: vi.fn(),
 }));
 
 const { confirmTradeAction } = await import("@/lib/trades/actions");
@@ -118,7 +120,8 @@ describe("confirmTradeAction", () => {
   });
 
   it("stops at the rate limit", async () => {
-    for (let i = 0; i < 30; i += 1) await confirm();
+    /* Ten an hour per room identity: a real night is a handful. */
+    for (let i = 0; i < 10; i += 1) await confirm();
     confirmTrade.mockClear();
 
     await confirm();

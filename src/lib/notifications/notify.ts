@@ -122,7 +122,8 @@ async function record(entry: {
     | "new-follower"
     | "room-flare"
     | "message-received"
-    | "nearby-match";
+    | "nearby-match"
+    | "post-comment";
   title: string;
   body: string | null;
   url: string;
@@ -857,8 +858,10 @@ export async function notifyTradeConfirmed(
     ]);
     if (!recipient) return;
 
-    const title = `Trade confirmed: ${context.cardName}`;
-    const body = `${confirmerName} marked your trade done. Good trade.`;
+    /* The second hand: the partner is asked, not told. Their tap in the
+       room is what pays both sides. */
+    const title = `${confirmerName} says you traded ${context.cardName}. Did you?`;
+    const body = "Tap Yes in the room and you both earn Embers.";
     const path = `/e/${context.code}`;
 
     const id = await record({
@@ -943,6 +946,44 @@ export async function notifyMessageReceived(
 }
 
 /**
+ * Somebody wrote under your Flare post.
+ *
+ * Once per commenter per post: the first line from a person buzzes,
+ * the rest of their thoughts wait in the thread. Offers made from the
+ * Feed do not come through here - the room's own "has your card"
+ * notice already covers that tap.
+ */
+export async function notifyPostComment(
+  postId: string,
+  authorId: string,
+  commenterId: string,
+  commenterName: string,
+  body: string,
+): Promise<void> {
+  if (!isSupabaseConfigured() || authorId === commenterId) return;
+
+  try {
+    const title = `${commenterName} commented on your Flare`;
+    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
+    const path = "/feed";
+
+    const id = await record({
+      playerId: authorId,
+      kind: "post-comment",
+      title,
+      body: preview,
+      url: path,
+      dedupeKey: `post-comment:${postId}:${commenterId}`,
+      actorId: commenterId,
+    });
+
+    if (id) await deliverByPush(authorId, title, preview, path);
+  } catch (error) {
+    console.error("Could not announce the comment", error);
+  }
+}
+
+/**
  * "Tyler is looking for your OP17 Shanks", to the HOLDER only.
  *
  * Nearby matching's one notice. The wanter hears nothing until the
@@ -982,5 +1023,47 @@ export async function notifyNearbyMatch(match: {
     if (id) await deliverByPush(match.holderId, title, body, path);
   } catch (error) {
     console.error("Could not notify the nearby match", error);
+  }
+}
+
+/**
+ * The partner said yes: the author hears the trade is confirmed. Both
+ * sides are paid by then, so this can say so.
+ */
+export async function notifyTradeAcknowledged(
+  flareId: string,
+  requesterSessionId: string,
+  partnerName: string,
+  partnerSessionId: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const context = await flareContext(flareId);
+    if (!context) return;
+
+    const [recipient, actorId] = await Promise.all([
+      notifiablePlayerForSession(requesterSessionId),
+      playerIdForSession(partnerSessionId),
+    ]);
+    if (!recipient) return;
+
+    const title = `Trade confirmed: ${context.cardName}`;
+    const body = `${partnerName} confirmed it. You both earned Embers.`;
+    const path = `/e/${context.code}`;
+
+    const id = await record({
+      playerId: recipient.playerId,
+      kind: "trade-confirmed",
+      title,
+      body,
+      url: path,
+      dedupeKey: `trade-ack:${flareId}:${requesterSessionId}`,
+      actorId,
+    });
+
+    if (id) await deliverByPush(recipient.playerId, title, body, path);
+  } catch (error) {
+    console.error("Could not notify the trade's author", error);
   }
 }

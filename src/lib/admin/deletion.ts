@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { disputeTrade } from "@/lib/trades/repository";
 import type { Database } from "@/lib/supabase/types";
 import type { DeletePreview, Collateral } from "@/lib/admin/deletion-schema";
 
@@ -287,6 +288,14 @@ export async function deletePlayer(playerId: string): Promise<{
 
   if (!player) return { ok: false, error: "That player no longer exists." };
 
+  /*
+   * A partner who vanishes days after trading is the throwaway-account
+   * pattern: sign up, join as the "partner", confirm, delete. Every
+   * paid trade this account was on in the last week is taken back from
+   * the OTHER side before the rows cascade away with the player.
+   */
+  await reverseRecentTrades(playerId, admin);
+
   const { error } = await admin.from("players").delete().eq("id", playerId);
   if (error) return { ok: false, error: error.message };
 
@@ -302,4 +311,41 @@ export async function deletePlayer(playerId: string): Promise<{
   }
 
   return { ok: true };
+}
+
+/** The window inside which a deleted partner's trades are reversed. */
+const REVERSAL_WINDOW_DAYS = 7;
+
+async function reverseRecentTrades(
+  playerId: string,
+  admin: ReturnType<typeof getSupabaseAdmin>,
+): Promise<void> {
+  try {
+    const { data: sessions } = await admin
+      .from("player_sessions")
+      .select("id")
+      .eq("player_id", playerId);
+    const ids = (sessions ?? []).map((row) => row.id);
+    if (ids.length === 0) return;
+
+    const list = ids.join(",");
+    const since = new Date(
+      Date.now() - REVERSAL_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const { data: trades } = await admin
+      .from("trades")
+      .select("id")
+      .or(`requester_session_id.in.(${list}),holder_session_id.in.(${list})`)
+      .not("paid_at", "is", null)
+      .is("disputed_at", null)
+      .gt("confirmed_at", since)
+      .limit(200);
+
+    for (const trade of trades ?? []) {
+      await disputeTrade(trade.id, "Partner account deleted within a week", null);
+    }
+  } catch (error) {
+    console.error("Could not reverse a deleted player's recent trades", error);
+  }
 }

@@ -29,6 +29,8 @@ import {
   removeFromShowcase,
   renameProfile,
   searchCards,
+  setShowcaseNote,
+  SHOWCASE_NOTE_MAX,
   signOut,
   storedAccessToken,
   uploadAvatar,
@@ -984,11 +986,16 @@ export function ProfileScreen() {
 
       <DressModal
         entry={dressing}
+        shelf={profile.showcase}
+        onSwitch={setDressing}
         border={profile.equips?.border ?? null}
         defaults={profile.equipped}
         frames={ownedFrames}
         holos={ownedHolos}
         onClose={() => setDressing(null)}
+        onNote={(entryId, note) =>
+          act(entryId, () => setShowcaseNote(entryId, note), "Note saved.")
+        }
         onDress={(entryId, frame, holo) =>
           void act(entryId, () => dressShowcase(entryId, frame, holo), "Saved.")
         }
@@ -1360,6 +1367,8 @@ function AddToShowcase({
  */
 function DressModal({
   entry,
+  shelf,
+  onSwitch,
   defaults,
   frames,
   holos,
@@ -1368,8 +1377,12 @@ function DressModal({
   onClose,
   onDress,
   onDressAll,
+  onNote,
 }: {
   entry: ShowcaseCard | null;
+  /** The whole shelf, so the room can step to the next card. */
+  shelf: ShowcaseCard[];
+  onSwitch: (entry: ShowcaseCard) => void;
   defaults: { frame: string | null; holo: string | null };
   frames: DressingOption[];
   holos: DressingOption[];
@@ -1380,11 +1393,24 @@ function DressModal({
   onDress: (entryId: string, frame: string | null, holo: string | null) => void;
   /** Resolves true when the write landed, so the button can say so. */
   onDressAll: (frame: string | null, holo: string | null) => Promise<boolean>;
+  /** The caption under the card. Resolves true when it saved. */
+  onNote: (entryId: string, note: string) => Promise<boolean>;
 }) {
   const [picked, setPicked] = useState<{ frame: string | null; holo: string | null }>({
     frame: null,
     holo: null,
   });
+  /* The note, as typed. Saved by its own button, not on every key. */
+  const [note, setNote] = useState("");
+  const [noteState, setNoteState] = useState<"idle" | "busy" | "saved" | "failed">(
+    "idle",
+  );
+
+  /* Where this card sits on the shelf, for the arrows and the swipe. */
+  const index = entry ? shelf.findIndex((card) => card.id === entry.id) : -1;
+  const previous = index > 0 ? shelf[index - 1] : null;
+  const next = index >= 0 && index < shelf.length - 1 ? shelf[index + 1] : null;
+  const touchFrom = useRef<number | null>(null);
   /* The Apply button narrates its own work: busy while saving, Saved!
      after, back to rest when the picks change. The founder's ask. */
   const [applyState, setApplyState] = useState<"idle" | "busy" | "saved" | "failed">(
@@ -1399,6 +1425,8 @@ function DressModal({
         holo: entry.holo ?? defaults.holo,
       });
       setApplyState("idle");
+      setNote(entry.note ?? "");
+      setNoteState("idle");
     }
   }, [entry, defaults.frame, defaults.holo]);
 
@@ -1435,7 +1463,34 @@ function DressModal({
             {entry.name}
           </Text>
 
-          <View style={{ alignItems: "center" }}>
+          {/* The card between its arrows. A swipe across it steps the
+              same way the arrows do - the founder's ask, the Feed's
+              gesture on the shelf - and the room re-opens on the
+              neighbour with its own picks and note. */}
+          <View
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+            onTouchStart={(event) => {
+              touchFrom.current = event.nativeEvent.pageX;
+            }}
+            onTouchEnd={(event) => {
+              const from = touchFrom.current;
+              touchFrom.current = null;
+              if (from === null) return;
+              const travelled = event.nativeEvent.pageX - from;
+              if (Math.abs(travelled) < 40) return;
+              const target = travelled < 0 ? next : previous;
+              if (target) onSwitch(target);
+            }}
+          >
+            <Tap
+              disabled={!previous}
+              onPress={() => previous && onSwitch(previous)}
+              accessibilityLabel="Previous card"
+              hitSlop={8}
+              style={{ padding: spacing(2), opacity: previous ? 1 : 0.25 }}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
+            </Tap>
             <CosmeticCard
               imageUrl={entry.imageUrl}
               width={150}
@@ -1444,7 +1499,21 @@ function DressModal({
               effect={effect}
               border={border}
             />
+            <Tap
+              disabled={!next}
+              onPress={() => next && onSwitch(next)}
+              accessibilityLabel="Next card"
+              hitSlop={8}
+              style={{ padding: spacing(2), opacity: next ? 1 : 0.25 }}
+            >
+              <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
+            </Tap>
           </View>
+          {shelf.length > 1 ? (
+            <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>
+              {`${index + 1} of ${shelf.length}`}
+            </Text>
+          ) : null}
 
           <DressingPicker
             imageUrl={entry.imageUrl}
@@ -1482,6 +1551,64 @@ function DressModal({
           <Muted>
             Every card on your shelf wears this border and holo, and new cards will too.
           </Muted>
+
+          {/* The note: how they got it, why it matters. One field, one
+              button, and it shows under the card wherever it is opened. */}
+          <View
+            style={{
+              gap: spacing(2),
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              paddingTop: spacing(3),
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}>
+              Note
+            </Text>
+            <Input
+              value={note}
+              onChangeText={(text) => {
+                setNote(text.slice(0, SHOWCASE_NOTE_MAX));
+                setNoteState("idle");
+              }}
+              placeholder="How you got it, or why it matters (optional)"
+              multiline
+              maxLength={SHOWCASE_NOTE_MAX}
+              style={{ minHeight: 64, textAlignVertical: "top" }}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing(2),
+              }}
+            >
+              <Text style={{ color: colors.textMuted, fontSize: 12, flexShrink: 1 }}>
+                Shown under the card when somebody opens it.
+              </Text>
+              <Button
+                label={
+                  noteState === "busy"
+                    ? "Saving…"
+                    : noteState === "saved"
+                      ? "Saved!"
+                      : noteState === "failed"
+                        ? "Did not save"
+                        : "Save note"
+                }
+                variant="secondary"
+                disabled={noteState === "busy"}
+                onPress={() => {
+                  setNoteState("busy");
+                  void onNote(entry.id, note).then((landed) =>
+                    setNoteState(landed ? "saved" : "failed"),
+                  );
+                }}
+              />
+            </View>
+          </View>
+
           <Button label="Done" onPress={onClose} />
         </Pressable>
       </Pressable>

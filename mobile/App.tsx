@@ -31,6 +31,7 @@ import {
 } from "react-native";
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
+import { FlarePostScreen } from "./src/screens/flare-post";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
@@ -123,6 +124,8 @@ export type StackParams = {
   PostFlare: { code: string };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
+  /** A Flare post's thread: likes, comments, "I have this" on a card. */
+  FlarePost: { postId: string };
   /** Finding somebody by name, from the Feed's own header. */
   FindPlayer: undefined;
   /**
@@ -684,6 +687,12 @@ export default function App() {
             component={PlayerProfileScreen}
             options={{ title: "Player", headerBackTitle: "Back" }}
           />
+          <Stack.Screen
+            name="FlarePost"
+            options={{ title: "Flare", headerBackTitle: "Back" }}
+          >
+            {({ route }) => <FlarePostScreen postId={route.params.postId} />}
+          </Stack.Screen>
           <Stack.Screen
             name="StoreProfile"
             options={{ title: "Store", headerBackTitle: "Back" }}

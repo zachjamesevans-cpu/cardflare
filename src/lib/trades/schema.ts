@@ -20,6 +20,18 @@ export interface TradeRecord {
   /** Null when the partner never tapped "offer", or their session expired. */
   partnerName: string | null;
   confirmedAt: string;
+  /**
+   * Where the Embers stand. "pending" is waiting on the partner's tap;
+   * "confirmed" has both hands on it; "unnamed" had nobody to ask;
+   * "late" paid the author alone after the window; "disputed" was
+   * taken back.
+   */
+  status: "pending" | "confirmed" | "unnamed" | "late" | "disputed";
+  /** True on the holder's side while their tap is what the trade is waiting for. */
+  awaitingYou: boolean;
+  /** The Flare and the author, carried so the partner's "yes" can tell the author. */
+  flareId: string | null;
+  requesterSessionId: string | null;
 }
 
 /**
