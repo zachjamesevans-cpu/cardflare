@@ -1496,6 +1496,43 @@ export interface PostDetail {
   liked: boolean;
 }
 
+/** One trade in your history, both sides. Mirrors the server's entry. */
+export interface TradeHistoryEntry {
+  id: string;
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  quantity: number;
+  /** The card came TO you. False: it left your binder. */
+  got: boolean;
+  partnerName: string | null;
+  storeName: string | null;
+  eventName: string | null;
+  confirmedAt: string;
+  status: "confirmed" | "pending" | "late" | "disputed" | "unnamed";
+  /** What this trade paid you, net of any reversal. */
+  embers: number;
+}
+
+export interface TradeHistoryTotals {
+  trades: number;
+  got: number;
+  gave: number;
+  embers: number;
+}
+
+export interface TradeHistory {
+  /** Not Pro: `trades` is empty and the totals still true. */
+  locked: boolean;
+  totals: TradeHistoryTotals;
+  trades: TradeHistoryEntry[];
+}
+
+/** Every trade you confirmed, newest first. Rows are Pro. */
+export const getTradeHistory = () =>
+  call<{ history: TradeHistory }>("GET", "/api/v1/trades/history");
+
 export const getPost = (postId: string) =>
   call<{ post: PostDetail }>("GET", `/api/v1/posts/${encodeURIComponent(postId)}`);
 

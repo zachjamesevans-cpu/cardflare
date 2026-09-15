@@ -32,6 +32,7 @@ import {
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { FlarePostScreen } from "./src/screens/flare-post";
+import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
@@ -126,6 +127,8 @@ export type StackParams = {
   PlayerProfile: { playerId: string };
   /** A Flare post's thread: likes, comments, "I have this" on a card. */
   FlarePost: { postId: string };
+  /** Every trade you confirmed, the website's /profile/trades. Pro. */
+  TradeHistory: undefined;
   /** Finding somebody by name, from the Feed's own header. */
   FindPlayer: undefined;
   /**
@@ -686,6 +689,11 @@ export default function App() {
             name="PlayerProfile"
             component={PlayerProfileScreen}
             options={{ title: "Player", headerBackTitle: "Back" }}
+          />
+          <Stack.Screen
+            name="TradeHistory"
+            component={TradeHistoryScreen}
+            options={{ title: "Trade history", headerBackTitle: "Profile" }}
           />
           <Stack.Screen
             name="FlarePost"
