@@ -387,9 +387,14 @@ export function Item({ item }: { item: FeedItem }) {
             avatarUrl={item.avatarUrl}
             frame={item.frame}
             ring={item.ring}
+            /* The event only when there IS one: a Flare posted with no
+               board has nowhere to name, and interpolating the absence
+               printed the word "null" after the deck. */
             detail={`${
               item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-            }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
+            }${item.deckLabel ? ` · ${item.deckLabel}` : ""}${
+              item.eventName ? ` · ${item.eventName}` : ""
+            }`}
           />
         </div>
 
@@ -456,10 +461,13 @@ export function Item({ item }: { item: FeedItem }) {
           comments={item.comments}
         />
 
-        {/* Every item ends in a place and a time. */}
-        <Link href={`/e/${item.code}`} className={buttonStyles("primary", "sm")}>
-          Go to {item.storeName}
-        </Link>
+        {/* Every item that HAS a place ends in one. A Flare posted to
+            your area has no room to walk into, so it ends at the post. */}
+        {item.code && item.storeName ? (
+          <Link href={`/e/${item.code}`} className={buttonStyles("primary", "sm")}>
+            Go to {item.storeName}
+          </Link>
+        ) : null}
       </Card>
     );
   }

@@ -49,6 +49,7 @@ import {
 import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { onFeedStale } from "../feed-refresh";
 import {
   CollapsingHeader,
   HEADER_CONTENT_HEIGHT,
@@ -409,6 +410,21 @@ export function HomeScreen() {
       };
     }, [load]),
   );
+
+  /*
+   * Reload the moment something worth showing happens, rather than
+   * waiting to be looked at.
+   *
+   * A tab screen stays mounted behind whichever tab is on top, so
+   * posting a Flare and then tapping Feed used to start the fetch AT
+   * the tap. The founder wanted the opposite: "when I post a flare, it
+   * immediately begins a refresh on the main feed so i can click feed
+   * instantly and itll already be there."
+   *
+   * Not a pull, so `refreshing` stays false and no spinner appears for
+   * something the viewer did not ask to watch.
+   */
+  useEffect(() => onFeedStale(() => void load(() => true)), [load]);
 
   /*
    * Pull to refresh, which the most-reopened screen in the app did not
@@ -939,9 +955,14 @@ export function HomeScreen() {
                 avatarUrl={item.avatarUrl}
                 frame={item.frame}
                 ring={item.ring}
+                /* The event only when there IS one: a Flare posted
+                   with no board has nowhere to name, and interpolating
+                   the absence printed the word "null" after the deck. */
                 detail={`${
                   item.total === 1 ? "is hunting" : `is hunting ${item.total} cards`
-                }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.eventName}`}
+                }${item.deckLabel ? ` · ${item.deckLabel}` : ""}${
+                  item.eventName ? ` · ${item.eventName}` : ""
+                }`}
                 onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
               />
             </View>
@@ -1016,11 +1037,15 @@ export function HomeScreen() {
               }
             />
 
-            {/* Every item ends in a place and a time. */}
-            <Button
-              label={`Go to ${item.storeName}`}
-              onPress={() => void enter(item.code)}
-            />
+            {/* Every item that HAS a place ends in one. A Flare posted
+                to your area has no room to walk into, so it ends at the
+                post. */}
+            {item.code && item.storeName ? (
+              <Button
+                label={`Go to ${item.storeName}`}
+                onPress={() => void enter(item.code as string)}
+              />
+            ) : null}
           </Card>
         ) : item.kind === "upcoming" ? (
           <Card key={`upcoming-${index}`}>
