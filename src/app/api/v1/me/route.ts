@@ -3,6 +3,7 @@ import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants, postedCardStores } from "@/lib/players/wants";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { postedLabel } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +59,15 @@ export async function GET(request: Request): Promise<Response> {
       note: want.note,
       deckLabel: want.deckLabel,
       imageUrl: want.imageUrl,
-      /* The store it is live at, or null for saved-but-not-posted. */
-      postedAt: posted.get(want.cardId) ?? null,
+      /*
+       * Where it is live. Both shapes on purpose: `postedAt` is the old
+       * one-line label, kept because the app ships on TestFlight's clock
+       * and a build that predates the tappable version must not lose the
+       * line entirely; `postedBoards` carries the room codes so a newer
+       * build can walk in.
+       */
+      postedAt: postedLabel(posted.get(want.cardId) ?? []),
+      postedBoards: posted.get(want.cardId) ?? [],
     })),
     collection: sync
       ? { cardsMatched: sync.cards_matched, syncedAt: sync.synced_at }

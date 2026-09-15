@@ -10,7 +10,7 @@ import {
   type ClaimFields,
   type PublicStore,
 } from "../api";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
 import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
 
@@ -64,7 +64,12 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
 
   if (failed) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Card>
           <Title>We could not open that store</Title>
           <Muted>It may not be listed any more. Try again in a moment.</Muted>
@@ -75,7 +80,12 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
 
   if (!store) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Card>
           <Muted>Loading…</Muted>
         </Card>
@@ -86,7 +96,11 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
     >
       <Card>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>

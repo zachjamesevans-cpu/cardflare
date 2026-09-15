@@ -5,7 +5,7 @@ import { describeError, signIn } from "../api";
 import { API_BASE, authConfigured } from "../config";
 import { registerForPush } from "../push";
 import { Body, Button, Card, ErrorLine, Input, Title } from "../ui";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 
 /**
  * Password sign-in against the same accounts as the website. Optional by
@@ -44,16 +44,26 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
   };
 
   return (
-    <View style={{ padding: spacing(4), gap: spacing(4) }}>
+    <View
+      style={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
       <Card>
         <Title>Sign in</Title>
         <Body>
-          The same account you use on cardflare.gg. No account? You can still scan
-          into any room as a guest; accounts are for keeping your wants and
-          collection with you.
+          The same account you use on cardflare.gg. No account? You can still scan into
+          any room as a guest; accounts are for keeping your wants and collection with
+          you.
         </Body>
 
-        <ErrorLine message={authConfigured() ? error : "Sign-in is not configured in this build."} />
+        <ErrorLine
+          message={
+            authConfigured() ? error : "Sign-in is not configured in this build."
+          }
+        />
 
         <Input
           value={email}

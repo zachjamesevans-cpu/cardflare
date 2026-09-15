@@ -510,12 +510,15 @@ export interface Me {
     imageUrl: string | null;
     /**
      * The store this card is live at, or null when it is only saved.
+     * Kept beside `postedBoards` for builds older than the tappable one.
      *
      * The list's two states, in one field. Optional because an app build
      * meets servers older than itself, and "not posted" is the safe read
      * of a server that has not started saying.
      */
     postedAt?: string | null;
+    /** Where it is up and how to walk in. Absent from an older server. */
+    postedBoards?: { name: string; code: string | null }[];
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {

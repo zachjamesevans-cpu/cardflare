@@ -30,7 +30,7 @@ import { haveLocationPermission, requestCoords, type Coords } from "../location"
 import { LOCAL_ENABLED } from "../local-enabled";
 import { markFeedStale } from "../feed-refresh";
 import { useTabBarInset } from "../glass";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import { gameShortName, type GameSlug } from "../games";
@@ -436,7 +436,8 @@ export function PostFlareScreen({
   return (
     <ScrollView
       contentContainerStyle={{
-        padding: spacing(4),
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
         gap: spacing(3),
         /* Clear of the floating tab bar - this screen IS the Flare tab. */
         paddingBottom: spacing(4) + tabInset,

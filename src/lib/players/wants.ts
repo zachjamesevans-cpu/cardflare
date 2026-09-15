@@ -321,8 +321,26 @@ async function accountBehind(sessionId: string | null): Promise<string | null> {
  * a player who has never joined a room - which is the common case and
  * costs nothing to answer.
  */
-export async function postedCardStores(playerId: string): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+/**
+ * Where a card is up, and how to get there.
+ *
+ * The founder: "make label tappable so it opens the rooms." A name on
+ * its own could only ever be read; a name with the room's code behind it
+ * can be walked into, which is the whole reason the label is worth
+ * drawing.
+ *
+ * `code` is null for an area Flare, which is posted to a postcode rather
+ * than to a board and so has no room to open.
+ */
+export interface PostedWhere {
+  name: string;
+  code: string | null;
+}
+
+export async function postedCardStores(
+  playerId: string,
+): Promise<Map<string, PostedWhere[]>> {
+  const out = new Map<string, PostedWhere[]>();
   if (!isSupabaseConfigured()) return out;
 
   const admin = getSupabaseAdmin();
@@ -390,10 +408,11 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
 
     const { data: events } = await admin
       .from("events")
-      .select("id, store_id")
+      .select("id, store_id, join_code")
       .in("id", [...live]);
 
     const storeOf = new Map((events ?? []).map((event) => [event.id, event.store_id]));
+    const codeOf = new Map((events ?? []).map((event) => [event.id, event.join_code]));
 
     const { data: stores } = await admin
       .from("stores")
@@ -409,28 +428,29 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
      * it counts them instead, which is true however many there are and
      * does not pretend to know which one you meant.
      */
-    const shopsFor = new Map<string, Set<string>>();
     for (const flare of boardFlares) {
       const storeId = flare.event_id ? storeOf.get(flare.event_id) : undefined;
       const name = storeId ? nameOf.get(storeId) : undefined;
       if (!name) continue;
 
-      const shops = shopsFor.get(flare.card_id) ?? new Set<string>();
-      shops.add(name);
-      shopsFor.set(flare.card_id, shops);
-    }
-
-    for (const [cardId, shops] of shopsFor) {
-      if (out.has(cardId)) continue;
-      const [only] = shops;
-      out.set(cardId, shops.size === 1 ? only : `${shops.size} stores`);
+      const where = out.get(flare.card_id) ?? [];
+      /* One entry per shop. The same card can be on two boards at the
+         same shop; that is one place to walk into, not two. */
+      if (!where.some((entry) => entry.name === name)) {
+        where.push({
+          name,
+          code: flare.event_id ? (codeOf.get(flare.event_id) ?? null) : null,
+        });
+      }
+      out.set(flare.card_id, where);
     }
   }
 
   /* A board wins the label when a card is on both: "live at Mox Valley
      Games tonight" is the more useful of the two sentences. */
   for (const flare of area.data ?? []) {
-    if (!out.has(flare.card_id)) out.set(flare.card_id, AREA_LABEL);
+    if (!out.has(flare.card_id))
+      out.set(flare.card_id, [{ name: AREA_LABEL, code: null }]);
   }
 
   return out;
@@ -444,3 +464,14 @@ export async function postedCardStores(playerId: string): Promise<Map<string, st
  * never posted to would be a lie.
  */
 export const AREA_LABEL = LOCAL_ENABLED ? "near you" : "in the Feed";
+
+/**
+ * The old one-line label, kept for app builds that predate the tappable
+ * one. "Mox Valley Games", or "2 stores" when a card is up at several -
+ * naming whichever came back first was a coin toss dressed as a fact.
+ */
+export function postedLabel(where: PostedWhere[]): string | null {
+  if (where.length === 0) return null;
+  if (where.length === 1) return where[0].name;
+  return `${where.length} stores`;
+}

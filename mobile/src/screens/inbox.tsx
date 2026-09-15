@@ -10,7 +10,7 @@ import { openRoom } from "../open-room";
 import { getNotifications, markRead, type InboxItem } from "../api";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Muted, Tap } from "../ui";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 
 /**
@@ -78,7 +78,8 @@ export function InboxScreen() {
   return (
     <ScrollView
       contentContainerStyle={{
-        padding: spacing(4),
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
         gap: spacing(4),
         /* Clear of the floating tab bar. */
         paddingBottom: spacing(4) + tabInset,
@@ -91,7 +92,13 @@ export function InboxScreen() {
 
       {items?.length === 0 && (
         <Card>
-          <View style={{ alignItems: "center", gap: spacing(3), paddingVertical: spacing(6) }}>
+          <View
+            style={{
+              alignItems: "center",
+              gap: spacing(3),
+              paddingVertical: spacing(6),
+            }}
+          >
             <Ionicons name="notifications-outline" size={24} color={colors.textMuted} />
             <Text
               style={{
@@ -101,8 +108,8 @@ export function InboxScreen() {
                 lineHeight: 21,
               }}
             >
-              Nothing yet. When somebody offers on one of your Flares, or a board
-              opens early at a store you save, it lands here.
+              Nothing yet. When somebody offers on one of your Flares, or a board opens
+              early at a store you save, it lands here.
             </Text>
             <Button
               label="Find a room"
@@ -198,12 +205,19 @@ export function InboxScreen() {
                     >
                       {rest}
                     </Text>
-                    <Text style={{ color: colors.textMuted }}> {ago(item.createdAt)}</Text>
+                    <Text style={{ color: colors.textMuted }}>
+                      {" "}
+                      {ago(item.createdAt)}
+                    </Text>
                   </Text>
                   {item.body ? (
                     <Text
                       numberOfLines={2}
-                      style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                        lineHeight: 18,
+                      }}
                     >
                       {item.body}
                     </Text>

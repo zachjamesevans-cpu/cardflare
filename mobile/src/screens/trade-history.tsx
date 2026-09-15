@@ -6,7 +6,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { getTradeHistory, type TradeHistory } from "../api";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import {
   LockedRows,
   monthOf,
@@ -47,7 +47,12 @@ export function TradeHistoryScreen() {
 
   if (failed) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Muted>Your trade history could not be loaded. Try again in a moment.</Muted>
       </ScrollView>
     );
@@ -55,7 +60,12 @@ export function TradeHistoryScreen() {
 
   if (!history) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Muted>Loading…</Muted>
       </ScrollView>
     );
@@ -71,7 +81,13 @@ export function TradeHistoryScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
       <View style={{ gap: spacing(1) }}>
         <Title>Trade history</Title>
         <Body>Only you can see this. Stores see totals, never who traded what.</Body>

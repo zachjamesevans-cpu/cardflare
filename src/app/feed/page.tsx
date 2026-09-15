@@ -66,7 +66,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <>
       <main
         id="main"
-        className="flex min-h-dvh flex-col items-center gap-4 px-4 pt-6 pb-16"
+        className="flex min-h-dvh flex-col items-center gap-4 px-2 pt-6 pb-16 sm:px-6"
       >
         {/* The wordmark, centred, and the one door out to other people
             on the right. Same place on both platforms. */}

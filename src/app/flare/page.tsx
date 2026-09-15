@@ -152,7 +152,7 @@ export default async function FlarePage() {
                   code={room?.code ?? ""}
                   wants={wants.map((want) => ({
                     ...want,
-                    postedAt: posted.get(want.cardId) ?? null,
+                    postedWhere: posted.get(want.cardId) ?? null,
                   }))}
                   imagesEnabled={images}
                 />

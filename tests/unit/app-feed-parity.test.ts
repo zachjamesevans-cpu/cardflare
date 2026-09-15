@@ -358,8 +358,14 @@ describe("the home screen's furniture", () => {
     /* The rendered heading, not the word: the file may well explain in a
        comment why the list is no longer here. */
     expect(settings).not.toContain("<Title>Your saved wants</Title>");
-    expect(row).toContain("want.postedAt");
-    expect(entries).toContain("want.postedAt");
+    /* Both platforms say where a saved card is live, and on both the
+       label is the way into that room - the founder: "make label
+       tappable so it opens the rooms." A flat, dead label on either side
+       is the regression this guards. */
+    expect(row).toContain("Live at ");
+    expect(entries).toContain("Live at ");
+    expect(row).toContain("onOpenRoom");
+    expect(entries).toContain("/e/${where.code}");
   });
 
   it("opens on the Feed, with no header about the viewer, on both", () => {

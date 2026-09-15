@@ -8,7 +8,7 @@ import { searchPlayersByName, type FoundPlayer } from "../api";
 import { formatHandle } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { Body, Input, Muted, Tap } from "../ui";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 
 /**
  * Finding somebody, from the screen you already have open.
@@ -55,14 +55,18 @@ export function FindPlayerScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(3),
+      }}
       keyboardShouldPersistTaps="handled"
     >
       {/* No heading: the navigation bar above already says "Find a
           player", and saying it twice is how a screen looks unfinished. */}
       <Body>
-        Search by name or @handle. Their profile is where the follow button
-        lives, and following each other makes you Trade partners.
+        Search by name or @handle. Their profile is where the follow button lives, and
+        following each other makes you Trade partners.
       </Body>
 
       <Input

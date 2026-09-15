@@ -83,6 +83,11 @@ describe("the one definition of a live room", () => {
      * dressed as a fact.
      */
     const wants = await readFile("src/lib/players/wants.ts", "utf8");
-    expect(wants).toContain("shops.size === 1 ? only : `${shops.size} stores`");
+    const label = wants.slice(wants.indexOf("export function postedLabel"));
+    /* One name only when there is one name; a count otherwise. Anchored
+       on both branches rather than on one spelling of the expression. */
+    expect(label).toContain("where.length === 1");
+    expect(label).toContain("where[0].name");
+    expect(label).toContain("`${where.length} stores`");
   });
 });

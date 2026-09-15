@@ -24,7 +24,7 @@ import {
 import { HandleField, NameField } from "./profile";
 import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { parseDeckList } from "../deck-list";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 
 /**
  * Settings: what the Account tab used to be, now behind the profile's cog.
@@ -199,7 +199,13 @@ export function SettingsScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
       {profile && (
         <Card>
           <Title>Your name</Title>
@@ -214,14 +220,10 @@ export function SettingsScreen() {
               same way the website groups them. */}
           <Title>How people find you</Title>
           <Body>
-            Your handle is yours alone. Letters, numbers and underscores, so it can
-            be said out loud and typed without guessing.
+            Your handle is yours alone. Letters, numbers and underscores, so it can be
+            said out loud and typed without guessing.
           </Body>
-          <HandleField
-            current={profile.handle}
-            busy={rehandling}
-            onSave={rehandle}
-          />
+          <HandleField current={profile.handle} busy={rehandling} onSave={rehandle} />
           {rehandled && <Muted>{rehandled}</Muted>}
         </Card>
       )}
@@ -256,8 +258,8 @@ export function SettingsScreen() {
       <Card>
         <Title>Design lab</Title>
         <Body>
-          Every shape a Feed post can take, drawn with made-up data. Nothing in
-          it reaches the server.
+          Every shape a Feed post can take, drawn with made-up data. Nothing in it
+          reaches the server.
         </Body>
         <Button
           label="Open the design lab"
@@ -269,8 +271,8 @@ export function SettingsScreen() {
       <Card>
         <Title>Paste a deck list</Title>
         <Body>
-          Every card in it becomes a want. Walk into any room and it offers to
-          post the lot in one go.
+          Every card in it becomes a want. Walk into any room and it offers to post the
+          lot in one go.
         </Body>
 
         <DeckListField />
@@ -323,8 +325,7 @@ function DeleteAccount({ handle }: { handle: string }) {
     <Card>
       <Title>Delete your account</Title>
       <Body>
-        Everything goes: profile, Flares, lists, showcase and unlocks. There is no
-        undo.
+        Everything goes: profile, Flares, lists, showcase and unlocks. There is no undo.
       </Body>
       {open ? (
         <>
@@ -369,7 +370,9 @@ function DeleteAccount({ handle }: { handle: string }) {
         </>
       ) : (
         <Tap accessibilityLabel="Delete your account" onPress={() => setOpen(true)}>
-          <Text style={{ color: colors.danger, fontSize: 14 }}>Delete your account</Text>
+          <Text style={{ color: colors.danger, fontSize: 14 }}>
+            Delete your account
+          </Text>
         </Tap>
       )}
     </Card>
@@ -448,8 +451,8 @@ function DeckListField() {
         maxLength={40}
       />
       <Muted>
-        One card per line. Counts in front or behind both work, with or without a
-        space, and anything after the number is ignored.
+        One card per line. Counts in front or behind both work, with or without a space,
+        and anything after the number is ignored.
       </Muted>
 
       {loading && <Muted>Loading your cards…</Muted>}

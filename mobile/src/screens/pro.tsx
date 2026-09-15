@@ -9,7 +9,7 @@ import { getProfile } from "../api";
 import { API_BASE } from "../config";
 import { PRO_PRICE_FALLBACK, buyPro, proPrice, restorePro, syncOwnedPro } from "../pro";
 import { AsyncButton, Card, Muted, Tap } from "../ui";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 
 /**
  * The Pro paywall — the one place the subscription is sold.
@@ -149,7 +149,11 @@ export function ProScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
     >
       <View style={{ gap: spacing(1) }}>
         <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
@@ -159,8 +163,8 @@ export function ProScreen() {
           Wear your collection.
         </Text>
         <Muted>
-          Free accounts change their profile picture. Pro wears everything: every
-          ring, aura, border and title you own, moving, on both your profiles.
+          Free accounts change their profile picture. Pro wears everything: every ring,
+          aura, border and title you own, moving, on both your profiles.
         </Muted>
       </View>
 

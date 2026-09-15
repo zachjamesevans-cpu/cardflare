@@ -52,3 +52,17 @@ export const avatarHues = [
 export const radius = { control: 10, card: 16, panel: 20 } as const;
 
 export const spacing = (n: number) => n * 4;
+
+/**
+ * How much air sits between content and the edge of the screen.
+ *
+ * The founder: "I think we can go a little bit closer to the edges of
+ * the screen with our UI. there's a good amount of dead space there. so
+ * just make everything as close to the sides of the os as possible."
+ *
+ * Eight rather than sixteen. Phones are narrow and a card's own padding
+ * already keeps its text off its border, so a second inset outside that
+ * was air between two kinds of air. Named once because forty-odd screens
+ * set it, and a number typed forty times is a number that drifts.
+ */
+export const gutter = spacing(2);
