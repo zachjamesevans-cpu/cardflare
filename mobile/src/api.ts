@@ -1668,6 +1668,18 @@ export type FeedItem =
       ring: string | null;
       /** The hunt's name, when they gave it one. */
       deckLabel: string | null;
+      /** When it went up. Absent from an older server. */
+      postedAt?: string;
+      /** How far away, or null when either side has no position. */
+      milesAway?: number | null;
+      storeId?: string | null;
+      /** What the poster will do for it: the Trade and Cash chips. */
+      acceptsTrade?: boolean;
+      acceptsCash?: boolean;
+      /** What they wrote with it. Collapsed entirely when absent. */
+      note?: string | null;
+      /** How many people have raised a hand on any card in it. */
+      offers?: number;
       /** Every card in one posting action, the viewer's first. */
       cards: FeedCard[];
       total: number;
@@ -1834,7 +1846,21 @@ export type FeedItem =
  * itself, and a feed with no sections is a plain list rather than a
  * broken one.
  */
-export type FeedEntry = FeedItem & { section?: FeedSection; reason?: string };
+export type FeedEntry = FeedItem & {
+  section?: FeedSection;
+  reason?: string;
+  /** Which of the three filters it belongs to. Absent from an older server. */
+  tab?: FeedTab;
+};
+
+/** The Feed's three filters. Decided by the server, same as the sections. */
+export type FeedTab = "following" | "nearby" | "mine";
+
+export const TAB_TITLES: Record<FeedTab, string> = {
+  following: "Following",
+  nearby: "Nearby",
+  mine: "My Flares",
+};
 
 /**
  * The Feed, optionally saying where the phone is.

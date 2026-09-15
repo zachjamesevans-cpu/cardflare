@@ -66,6 +66,8 @@ export async function socialForPosts(
 export interface CardAnswer {
   offered: boolean;
   youOffered: boolean;
+  /** Who raised a hand, by room identity, so a post can count them. */
+  responders: string[];
 }
 
 export async function answersFor(
@@ -87,8 +89,13 @@ export async function answersFor(
   }
 
   for (const row of data ?? []) {
-    const answer = out.get(row.flare_id) ?? { offered: false, youOffered: false };
+    const answer = out.get(row.flare_id) ?? {
+      offered: false,
+      youOffered: false,
+      responders: [],
+    };
     answer.offered = true;
+    answer.responders.push(row.responder_session_id);
     if (viewerSessionIds.has(row.responder_session_id)) answer.youOffered = true;
     out.set(row.flare_id, answer);
   }

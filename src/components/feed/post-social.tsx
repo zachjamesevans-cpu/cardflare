@@ -12,6 +12,7 @@ import {
   loadPostThreadAction,
   togglePostLikeAction,
 } from "@/lib/feed/post-actions";
+import { FlareMessage, type MessageTarget } from "@/components/feed/flare-message";
 import { POST_COMMENT_MAX, type PostComment } from "@/lib/feed/post-schema";
 
 /**
@@ -32,11 +33,17 @@ export function PostSocial({
   likes: initialLikes,
   liked: initialLiked,
   comments: initialComments,
+  offers = 0,
+  message = null,
 }: {
   postId: string;
   likes: number;
   liked: boolean;
   comments: number;
+  /** Hands raised on the post, beside the message action. */
+  offers?: number;
+  /** The third action: message the poster. Null on your own post. */
+  message?: MessageTarget | null;
 }) {
   const [liked, setLiked] = useState(initialLiked);
   const [likes, setLikes] = useState(initialLikes);
@@ -84,7 +91,7 @@ export function PostSocial({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
           onClick={toggleLike}
@@ -111,6 +118,7 @@ export function PostSocial({
           <MessageCircle className="size-5" aria-hidden="true" />
           <span className="tabular-nums">{count}</span>
         </button>
+        {message && <FlareMessage target={message} count={offers} />}
       </div>
 
       {open && (

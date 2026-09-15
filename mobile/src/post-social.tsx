@@ -46,15 +46,21 @@ export function PostSocialRow({
   likes: initialLikes,
   liked: initialLiked,
   comments,
+  offers,
   onLike,
   onOpenThread,
+  onMessage,
   threadOpen = false,
 }: {
   likes: number;
   liked: boolean;
   comments: number;
+  /** Hands raised on the post, beside the message action. */
+  offers?: number;
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
+  /** The third action: message the poster. Absent on your own post. */
+  onMessage?: () => void;
   /** On the post's own screen the bubble is a label, not a door. */
   threadOpen?: boolean;
 }) {
@@ -116,6 +122,21 @@ export function PostSocialRow({
           {comments}
         </Text>
       </Tap>
+      {onMessage ? (
+        <Tap
+          onPress={onMessage}
+          hitSlop={6}
+          accessibilityLabel="Message them"
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        >
+          <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
+          {offers !== undefined ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
+              {offers}
+            </Text>
+          ) : null}
+        </Tap>
+      ) : null}
     </View>
   );
 }

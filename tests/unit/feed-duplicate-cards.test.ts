@@ -126,7 +126,7 @@ describe("your own Flares reach your own feed", () => {
     expect(repo).toContain('yours: key.split("::")[0] === viewerId');
     expect(repo).toContain('return item.yours ? "yours" : "people"');
     expect(repo).toContain(
-      'return item.yours ? "You posted this" : "Because you follow them"',
+      'return item.yours ? "Your Flare" : "Because you follow them"',
     );
     expect(repo).toContain('yours: "Your flares"');
   });
@@ -188,11 +188,13 @@ describe("a Flare posted with no board still reaches your feed", () => {
      * printed the word "null" and offered a door to nowhere. A type
      * error would not have caught it - both were template strings.
      */
-    const items = await readFile("src/components/feed/feed-items.tsx", "utf8");
-    const app = await readFile("mobile/src/screens/home.tsx", "utf8");
+    /* The post is its own component on both platforms now. Its status
+       line never names the event, and the door to a room is guarded. */
+    const items = await readFile("src/components/feed/flare-feed-card.tsx", "utf8");
+    const app = await readFile("mobile/src/flare-feed-card.tsx", "utf8");
 
     for (const source of [items, app]) {
-      expect(source).toContain('item.eventName ? ` · ${item.eventName}` : ""');
+      expect(source).not.toMatch(/\$\{item\.eventName\}/);
       expect(source).toMatch(/item\.code && item\.storeName \?/);
     }
   });
