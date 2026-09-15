@@ -45,9 +45,20 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
   return (
     <nav
       aria-label="Player"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]"
+      /*
+       * A BUBBLE, not a floor. The founder, after looking at Instagram:
+       * "like the bubbles at the bottom instead of having it anchored."
+       * The bar sits in from both sides and floats clear of the bottom
+       * edge, so the page runs underneath it and visibly keeps going.
+       *
+       * `backdrop-blur` is the web's nearest thing to the app's Liquid
+       * Glass: the same job - let the page through - by the only means
+       * a browser has. The translucent surface underneath it is what
+       * keeps the labels readable where the blur is unsupported.
+       */
+      className="fixed inset-x-3 bottom-3.5 z-50 mx-auto max-w-2xl rounded-full border border-border bg-surface/80 shadow-[var(--shadow-panel)] backdrop-blur-xl"
     >
-      <ul className="mx-auto flex max-w-2xl items-stretch">
+      <ul className="flex items-stretch">
         {TABS.map((tab) => {
           /*
            * The room lives at /e/CODE once you are in one, so the Room

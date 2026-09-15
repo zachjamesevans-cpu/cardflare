@@ -35,11 +35,12 @@ export function FeedFilterTabs({
       {FEED_TABS.map((tab) => {
         const on = tab === value;
         return (
-          <View key={tab} style={{ flex: 1 }}>
           <Tap
+            key={tab}
             onPress={() => onChange(tab)}
             accessibilityLabel={`${TAB_TITLES[tab]}${on ? ", selected" : ""}`}
             style={{
+              flex: 1,
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
@@ -72,7 +73,6 @@ export function FeedFilterTabs({
               {TAB_TITLES[tab]}
             </Text>
           </Tap>
-          </View>
         );
       })}
     </View>
