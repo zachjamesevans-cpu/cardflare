@@ -3,14 +3,19 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Animated, {
+  interpolate,
+  runOnJS,
   runOnUI,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  ActivityIndicator,
   Image,
   Linking,
-  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -141,6 +146,68 @@ const STARTERS = {
  * tests/unit/app-feed-parity.test.ts: one product, one set of sizes.
  */
 
+/**
+ * How far past the top a thumb has to drag before releasing asks for a
+ * new feed. Far enough to be deliberate, short enough to reach.
+ */
+const PULL_TRIGGER = 80;
+
+/**
+ * The pull-to-refresh spinner, drawn rather than asked for.
+ *
+ * Grows and fades in with the drag, so the gesture has an answer while
+ * it is still happening, and turns into a real spinner once the load
+ * starts. Placed against the header rather than the content, because
+ * the content is the thing that moves.
+ */
+function PullSpinner({
+  pull,
+  refreshing,
+  top,
+}: {
+  pull: SharedValue<number>;
+  refreshing: boolean;
+  top: number;
+}) {
+  /* Worked out on the JS side: a worklet cannot call `spacing`, and
+     trying to takes the screen down with a red box rather than failing
+     quietly. */
+  const drop = spacing(2);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: refreshing ? 1 : interpolate(pull.value, [8, PULL_TRIGGER], [0, 1]),
+    transform: [
+      { scale: refreshing ? 1 : interpolate(pull.value, [8, PULL_TRIGGER], [0.6, 1]) },
+      /* Follows the thumb down a little, so it reads as attached to the
+         pull rather than pinned over it. */
+      {
+        translateY: refreshing
+          ? 0
+          : interpolate(pull.value, [0, PULL_TRIGGER], [0, drop]),
+      },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: "absolute",
+          top: top + spacing(2),
+          left: 0,
+          right: 0,
+          alignItems: "center",
+          zIndex: 5,
+        },
+        style,
+      ]}
+    >
+      <ActivityIndicator size="small" color={colors.accent} />
+    </Animated.View>
+  );
+}
+
 /** How long ago, in the shortest form that is still true. */
 function agoFrom(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -219,13 +286,53 @@ export function HomeScreen() {
   const tabInset = useTabBarInset();
   const header = useHeaderScroll();
 
-  const onScroll = useAnimatedScrollHandler((event) => {
-    onHeaderScroll(header, event.contentOffset.y);
+  /*
+   * How much of the top of the list the floating header covers. Named
+   * once because four things have to agree about it: the inset, the
+   * opening offset, the scrollbar, and the refresh spinner's perch.
+   */
+  const headerRoom = insets.top + HEADER_CONTENT_HEIGHT;
+
+  /*
+   * PULL TO REFRESH, DRAWN BY HAND.
+   *
+   * React Native's RefreshControl does not render in this app at all -
+   * not here and not on Room, which also asks for one. Pinning
+   * `refreshing` true produced no spinner AND no content displacement,
+   * at any `progressViewOffset`, on a plain ScrollView as well as this
+   * one. Measured on the simulator, not reasoned about.
+   *
+   * So the gesture is read off the scroll already being followed for
+   * the header: how far past the top the thumb has dragged, and what to
+   * do when it lets go.
+   */
+  const pull = useSharedValue(0);
+
+  const askForRefresh = useCallback(() => {
+    if (refreshingRef.current) return;
+    void refresh();
+  }, []);
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      onHeaderScroll(header, event.contentOffset.y);
+      /* Past the top is a negative offset, and the inset puts the top at
+         `-headerRoom` rather than at zero. */
+      pull.value = Math.max(0, -(event.contentOffset.y + headerRoom));
+    },
+    /* On release. The threshold is the distance the indicator takes to
+       become solid, so it commits exactly when it looks committed. */
+    onEndDrag: () => {
+      if (pull.value >= PULL_TRIGGER) runOnJS(askForRefresh)();
+    },
   });
 
   const settle = () => {
     runOnUI(settleHeader)(header);
   };
+  /* Read from a worklet's callback, where state would be a frame late
+     and could start a second load over the first. */
+  const refreshingRef = useRef(false);
   const feedRef = useRef<FeedEntry[]>([]);
   const meRef = useRef<Me | null>(null);
 
@@ -377,10 +484,12 @@ export function HomeScreen() {
    * what a feed is for.
    */
   const refresh = async () => {
+    refreshingRef.current = true;
     setRefreshing(true);
     try {
       await load(() => true);
     } finally {
+      refreshingRef.current = false;
       setRefreshing(false);
     }
   };
@@ -460,6 +569,14 @@ export function HomeScreen() {
 
   return (
     <>
+      {/*
+       * The spinner, floating under the header. Absolute and OUTSIDE the
+       * list, so it does not ride the content and cannot be clipped by
+       * it. It fades and grows with the pull, then spins while the load
+       * runs - the two states the platform control never gave us.
+       */}
+      <PullSpinner pull={pull} refreshing={refreshing} top={headerRoom} />
+
       <CollapsingHeader
         state={header}
         onSearch={() => navigation.navigate("FindPlayer")}
@@ -495,25 +612,28 @@ export function HomeScreen() {
         /* Every frame, because the header follows the thumb rather than
            waking up at intervals behind it. */
         scrollEventThrottle={16}
+        /*
+         * THE HEADER'S ROOM IS AN INSET, NOT PADDING.
+         *
+         * iOS measures the pull-to-refresh spinner against the scroll
+         * view's OWN top edge - above the content, not above the
+         * content's padding - and with padding that edge sat under the
+         * floating header. An inset moves the edge itself, so there is
+         * somewhere visible for the spinner to sit, and the first card
+         * still starts clear of the bar. The matching `contentOffset` is
+         * what stops the list opening already scrolled by the inset.
+         */
+        contentInset={{ top: headerRoom }}
+        contentOffset={{ x: 0, y: -headerRoom }}
+        scrollIndicatorInsets={{ top: headerRoom }}
+        automaticallyAdjustContentInsets={false}
         contentContainerStyle={{
           padding: spacing(4),
           gap: spacing(4),
-          /* The header floats over the list, so the first card starts
-             below it rather than under it. */
-          paddingTop: insets.top + HEADER_CONTENT_HEIGHT + spacing(4),
-          /* And the tab bar floats over the other end, so the last one
-             ends above it rather than under it. */
+          /* The tab bar floats over the other end, so the last card ends
+             above it rather than under it. */
           paddingBottom: spacing(4) + tabInset,
         }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void refresh()}
-            tintColor={colors.textMuted}
-            /* The spinner hangs below the bar, not behind it. */
-            progressViewOffset={insets.top + HEADER_CONTENT_HEIGHT}
-          />
-        }
       >
       {/*
        * NO IDENTITY HEADER. The Feed opens on the Feed.

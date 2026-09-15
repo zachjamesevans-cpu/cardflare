@@ -190,13 +190,26 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
       {/* The card, big, with its details beside it. A deck keeps its
           rail across the width and the details underneath. */}
       {single ? (
-        <div className="flex items-start gap-3.5">
+        /*
+         * Centred, not top-aligned, and a smaller card than it was.
+         *
+         * At "lg" the art stood far taller than the name, number and two
+         * chips beside it, and hanging those from the top put all of the
+         * slack in one block down the right of every post. The founder:
+         * "notice how the cards are so large and there's a lot of dead
+         * space? lessen card size a bit so it looks better."
+         *
+         * Same trade as the app's, which drops from 0.42 of the row to
+         * 0.34: still big enough to recognise a card at a glance, which
+         * is the whole job of the picture.
+         */
+        <div className="flex items-center gap-3.5">
           <FeedTile
             imageUrl={lead.imageUrl}
             name={lead.cardName}
             cardNumber={lead.cardNumber}
             match={lead.match}
-            size="lg"
+            size="md"
             state={lead.state}
             have={haveFor(lead, post)}
           />

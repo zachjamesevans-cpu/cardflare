@@ -228,10 +228,46 @@ describe("the home screen's furniture", () => {
     expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
-  it("lets the feed be asked for again", () => {
-    /* The most-reopened screen in the app had no pull to refresh, which
-       quietly teaches that reopening is pointless. */
-    expect(app).toContain("<RefreshControl");
+  it("lets the feed be asked for again, with a spinner that actually draws", () => {
+    /*
+     * The most-reopened screen in the app had no pull to refresh, which
+     * quietly teaches that reopening is pointless. It then had one that
+     * DID NOT WORK for longer, and this test is why nobody noticed: it
+     * asserted the string "<RefreshControl" was in the file.
+     *
+     * It was. React Native's RefreshControl does not render in this app
+     * at all - not here and not on Room, which asks for one too. Pinning
+     * `refreshing` true produced no spinner and did not even displace
+     * the content, at any offset, on a plain ScrollView as well as the
+     * animated one. Measured on the simulator.
+     *
+     * So the Feed draws its own, off the scroll it already follows for
+     * the header. Asserted on the MECHANISM now rather than a component
+     * name, because a name is exactly what fooled this file.
+     */
+    expect(app).not.toContain("<RefreshControl");
+    expect(app).toContain("function PullSpinner");
+    expect(app).toContain("const PULL_TRIGGER");
+    expect(app).toMatch(
+      /pull\.value = Math\.max\(0, -\(event\.contentOffset\.y \+ headerRoom\)\)/,
+    );
+    expect(app).toMatch(
+      /if \(pull\.value >= PULL_TRIGGER\) runOnJS\(askForRefresh\)\(\)/,
+    );
+  });
+
+  it("gives the header its room as an inset, so the spinner has somewhere to sit", () => {
+    /*
+     * The room used to be padding INSIDE the content, which is why even
+     * a working spinner would have been hidden: iOS draws it against the
+     * scroll view's own top edge, above the content rather than above
+     * the content's padding, and that edge sits under the floating
+     * header. An inset moves the edge itself.
+     */
+    expect(app).toContain("const headerRoom = insets.top + HEADER_CONTENT_HEIGHT;");
+    expect(app).toContain("contentInset={{ top: headerRoom }}");
+    expect(app).toContain("contentOffset={{ x: 0, y: -headerRoom }}");
+    expect(app).toContain("automaticallyAdjustContentInsets={false}");
   });
 
   it("hides the explainer once the screen has filled up", () => {
