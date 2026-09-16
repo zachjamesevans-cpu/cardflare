@@ -971,12 +971,31 @@ export const markRead = (ids: string[]) =>
  * than itself routinely and a profile with no hunts should draw a
  * profile, not a crash.
  */
+export interface HuntCard {
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  /** Traded: checked off by the trade that got it. */
+  found: boolean;
+  quantity: number;
+}
+
 export interface Hunt {
   name: string;
   looking: number;
   lookingCopies: number;
   found: number;
   lastPostedAt: string;
+  /**
+   * The cards themselves, still looking first.
+   *
+   * OPTIONAL on purpose. The app ships on TestFlight's clock and the
+   * server on Vercel's, so a phone carrying this meets a server that
+   * sends hunts with counts and nothing else. A folder that opens on
+   * nothing is honest; one that crashes on `undefined.map` is not.
+   */
+  cards?: HuntCard[];
 }
 
 export interface ShowcaseCard {

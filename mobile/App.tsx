@@ -96,13 +96,17 @@ export type TabParams = {
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
   Room: undefined;
-  Flare: undefined;
+  /* `hunt` names the group the composer opens into, so "Add cards" on a
+     profile folder lands here with the folder already chosen. */
+  Flare: { hunt?: string } | undefined;
   Inbox: undefined;
   Profile: undefined;
 };
 
 export type StackParams = {
-  Tabs: { screen?: keyof TabParams } | undefined;
+  Tabs:
+    | { screen?: keyof TabParams; params?: TabParams[keyof TabParams] }
+    | undefined;
   /** The live room as a stack screen, only while Local holds its tab
       slot. Open it through src/open-room.ts, never by name. */
   Room: undefined;

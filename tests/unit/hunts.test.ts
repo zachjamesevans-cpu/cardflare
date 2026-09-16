@@ -51,8 +51,17 @@ describe("what a hunt is made of", () => {
      */
     const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
 
-    expect(hunts).toContain('.select("deck_label, status, quantity, created_at")');
+    /* Read off `flares`, keyed on the deck label, and NOTHING is
+       written - no hunts table, no membership rows, no status of its
+       own to drift. Anchored on the shape rather than on one spelling
+       of the select, which now also carries the card id so the folder
+       has something to draw. */
+    expect(hunts).toContain('.from("flares")');
     expect(hunts).toContain('.not("deck_label", "is", null)');
+    expect(hunts).toMatch(/\.select\("deck_label, status, quantity, created_at/);
+    expect(hunts, "a hunt must not write anything").not.toMatch(
+      /\.(insert|upsert|update|delete)\(/,
+    );
   });
 
   it("checks a card off by the trade that got it, not by a tick box", async () => {
@@ -63,7 +72,13 @@ describe("what a hunt is made of", () => {
      * with the first.
      */
     const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
-    expect(hunts).toContain('if (row.status === "traded") hunt.found += 1;');
+    expect(hunts).toContain('const found = row.status === "traded";');
+    /* And the card carries that same fact, so a folder can dim the ones
+       already got without a second source of truth. */
+    expect(hunts).toContain("found,");
+    expect(hunts, "nothing may tick a card off by hand").not.toMatch(
+      /markFound|toggleFound|setFound\(/,
+    );
   });
 
   it("reads them once for the whole profile", async () => {
@@ -137,5 +152,98 @@ describe("both platforms draw the same panel", () => {
       const screen = await readFile(path, "utf8");
       expect(screen).toContain("profile.hunts ?? []");
     }
+  });
+});
+
+describe("a hunt is a folder, and it opens", () => {
+  /*
+   * The founder, looking at his own profile: "hunts doesn't really do
+   * anything rn... this should be a carousel of cards someone is
+   * looking for nested into a folder. go to my profile. there's
+   * nothing i can tap or add to."
+   *
+   * Three faults in one sentence - no cards, nothing tappable, nothing
+   * to add with - and all three are guarded here, because each one is
+   * the kind that typechecks perfectly while the panel sits dead.
+   */
+  it("carries the cards, not just the counts", async () => {
+    const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
+    expect(hunts).toContain("export interface HuntCard");
+    expect(hunts).toContain("cards: HuntCard[]");
+    /* Through the one helper that turns ids into something readable,
+       rather than a second copy of that query. */
+    expect(hunts).toContain("cardFacts(");
+  });
+
+  it("draws one tile per card, however many Flares carried it", async () => {
+    /*
+     * Posting the same card into a hunt twice is ordinary, and it used
+     * to mean two tiles sharing a React key - the exact duplicate-key
+     * fault the Feed had to be fixed for once already.
+     */
+    const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
+    expect(hunts).toContain("const byCard = new Map<string, HuntCard>()");
+  });
+
+  it("opens onto a carousel on both platforms", async () => {
+    /* The rails the rest of the product already uses, so a hunt's cards
+       zoom and swipe like every other card rather than being a new kind
+       of picture that does nothing. */
+    const app = await readFile("mobile/src/hunts-panel.tsx", "utf8");
+    const web = await readFile("src/components/players/hunts-panel.tsx", "utf8");
+    expect(app).toContain("<CardRail");
+    expect(web).toContain("<FeedTile");
+    /* And the found ones read as found, in the same vocabulary a traded
+       card wears on a Flare. */
+    for (const source of [app, web]) {
+      expect(source).toMatch(/card\.found \? "found" : "open"/);
+    }
+  });
+
+  it("gives every folder a lid and a way to add", async () => {
+    const app = await readFile("mobile/src/hunts-panel.tsx", "utf8");
+    const web = await readFile("src/components/players/hunts-panel.tsx", "utf8");
+
+    /* Tappable: the row toggles rather than just sitting there. */
+    expect(app).toContain("onPress={onToggle}");
+    expect(web).toContain("onClick={onToggle}");
+
+    /* And somewhere to press on your own profile - into the composer
+       with the group already named, so it adds to THIS hunt. */
+    expect(app).toContain('label="Add cards"');
+    expect(web).toContain("Add cards");
+    expect(web).toContain("/flare?hunt=$");
+    expect(app).toContain("onAdd");
+  });
+
+  it("opens the composer into the named group on both platforms", async () => {
+    /*
+     * "Add cards" that dropped you on an empty composer would be a
+     * button that looks like it worked. Both sides carry the name
+     * through to the field the composer already had.
+     */
+    const appForm = await readFile("mobile/src/screens/post-flare.tsx", "utf8");
+    const webForm = await readFile("src/components/lists/add-to-list-form.tsx", "utf8");
+    expect(appForm).toContain("initialDeck");
+    expect(webForm).toContain("initialDeck");
+    expect(appForm).toContain('useState(initialDeck ?? "")');
+    expect(webForm).toContain("useState(initialDeck)");
+
+    const page = await readFile("src/app/flare/page.tsx", "utf8");
+    expect(page).toContain("const { hunt } = await searchParams");
+  });
+
+  it("survives a server that has never heard of hunt cards", async () => {
+    /*
+     * Version skew. The app ships on TestFlight's clock and the server
+     * on Vercel's, so a phone carrying the folder meets a server still
+     * sending counts and nothing else. Optional, and read through a
+     * default - a folder that opens on nothing is honest, one that
+     * crashes on `undefined.map` is not.
+     */
+    const api = await readFile("mobile/src/api.ts", "utf8");
+    const panel = await readFile("mobile/src/hunts-panel.tsx", "utf8");
+    expect(api).toContain("cards?: HuntCard[]");
+    expect(panel).toContain("hunt.cards ?? []");
   });
 });

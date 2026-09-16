@@ -477,8 +477,11 @@ export function AddToListForm({
   playerGames = [],
   target = "room",
   footer,
+  initialDeck = "",
 }: {
   code: string;
+  /** The group to open into, from a profile folder's "Add cards". */
+  initialDeck?: string;
   kind: ListKind;
   imagesEnabled: boolean;
   /** The room's TCG, when the scan said which one. Scopes the search. */
@@ -533,7 +536,7 @@ export function AddToListForm({
    * per card (see the `key` below), so the draft lives out here and comes
    * back as the next card's default.
    */
-  const [deckDraft, setDeckDraft] = useState("");
+  const [deckDraft, setDeckDraft] = useState(initialDeck);
 
   /*
    * Reset on every posted card rather than kept like the deck name: which

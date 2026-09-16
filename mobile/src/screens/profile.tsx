@@ -755,7 +755,20 @@ export function ProfileScreen() {
 
         {/* Your hunts, above the shelf. What you are looking for is the
             live thing; the showcase is what you are done with. */}
-        <HuntsPanel hunts={profile.hunts ?? []} limit={profile.huntLimit} yours />
+        <HuntsPanel
+          hunts={profile.hunts ?? []}
+          limit={profile.huntLimit}
+          yours
+          /* Into the composer with the folder already named, so
+             "Add cards" adds to THIS hunt rather than starting a
+             fresh one that happens to share a name. */
+          onAdd={(name) =>
+            navigation.navigate("Tabs", {
+              screen: "Flare",
+              params: { hunt: name },
+            })
+          }
+        />
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cardFacts } from "@/lib/feed/repository";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { tierAllows } from "@/lib/tiers";
 
@@ -24,6 +25,17 @@ import { tierAllows } from "@/lib/tiers";
  * off by the trade that got it, which is the one moment we can be sure
  * actually happened, rather than by remembering to tick a box.
  */
+export interface HuntCard {
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  /** Traded: checked off by the trade that got it. */
+  found: boolean;
+  /** How many of it they are after. */
+  quantity: number;
+}
+
 export interface Hunt {
   /** The name they typed: "Sabo", "Red Luffy". */
   name: string;
@@ -34,6 +46,22 @@ export interface Hunt {
   found: number;
   /** The most recent post in the hunt, for ordering. */
   lastPostedAt: string;
+  /**
+   * THE CARDS THEMSELVES, still looking first.
+   *
+   * A hunt used to be a name and two numbers, and the founder went
+   * looking for the rest of it: "hunts doesn't really do anything rn...
+   * this should be a carousel of cards someone is looking for nested
+   * into a folder. go to my profile. there's nothing i can tap or add
+   * to."
+   *
+   * Right - two numbers is a receipt, not a folder. What somebody wants
+   * from a hunt is the same thing they want from a Flare: to see the
+   * cards. So the set travels with its counts, drawn by the same rail
+   * the Feed already uses, and the numbers become a summary of
+   * something visible rather than a substitute for it.
+   */
+  cards: HuntCard[];
 }
 
 /**
@@ -65,12 +93,16 @@ export function huntLimitFor(tier: string | null): number {
 export async function huntsFor(playerId: string): Promise<Hunt[]> {
   const { data } = await getSupabaseAdmin()
     .from("flares")
-    .select("deck_label, status, quantity, created_at")
+    .select("deck_label, status, quantity, created_at, card_id")
     .eq("player_id", playerId)
     .not("deck_label", "is", null)
     .order("created_at", { ascending: false });
 
   if (!data || data.length === 0) return [];
+
+  /* One lookup for every card in every hunt, rather than one per hunt.
+     A player with fifty folders is still two queries and a fold. */
+  const facts = await cardFacts(data.map((row) => row.card_id));
 
   const byName = new Map<string, Hunt>();
 
@@ -85,15 +117,54 @@ export async function huntsFor(playerId: string): Promise<Hunt[]> {
       found: 0,
       /* Rows arrive newest first, so the first one seen is the latest. */
       lastPostedAt: row.created_at,
+      cards: [],
     };
 
-    if (row.status === "traded") hunt.found += 1;
+    const found = row.status === "traded";
+    if (found) hunt.found += 1;
     else {
       hunt.looking += 1;
       hunt.lookingCopies += row.quantity ?? 1;
     }
 
+    /* A card with no facts is one the catalogue has since dropped. It
+       still counts - the flare happened - but there is nothing to draw,
+       and a tile with no name is worse than one fewer tile. */
+    const fact = facts.get(row.card_id);
+    if (fact) {
+      hunt.cards.push({
+        cardId: row.card_id,
+        cardName: fact.cardName,
+        cardNumber: fact.cardNumber,
+        imageUrl: fact.imageUrl,
+        found,
+        quantity: row.quantity ?? 1,
+      });
+    }
+
     byName.set(name, hunt);
+  }
+
+  for (const hunt of byName.values()) {
+    /*
+     * ONE TILE PER CARD, not per Flare. Posting the same card into a
+     * hunt twice is ordinary - a second copy wanted, or a repost - and
+     * it used to mean two tiles with the same React key, which is the
+     * exact duplicate-key fault the Feed had to be fixed for. A card
+     * still wanted beats the same card already found: the copy you can
+     * help with is the one worth drawing.
+     */
+    const byCard = new Map<string, HuntCard>();
+    for (const card of hunt.cards) {
+      const seen = byCard.get(card.cardId);
+      if (!seen) byCard.set(card.cardId, card);
+      else if (seen.found && !card.found) byCard.set(card.cardId, card);
+      else if (seen.found === card.found) seen.quantity += card.quantity;
+    }
+    /* Still looking first: the folder is about what is left, and a run
+       of found cards at the front buries the part somebody can help
+       with. */
+    hunt.cards = [...byCard.values()].sort((a, b) => Number(a.found) - Number(b.found));
   }
 
   return [...byName.values()];
