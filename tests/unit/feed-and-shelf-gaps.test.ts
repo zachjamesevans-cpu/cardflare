@@ -24,7 +24,7 @@ describe("your own Flares reach your own Feed, wherever you posted them", () => 
     expect(repo).toContain("const mine = await ownRoomFlares(viewerId);");
     /* Merged before grouping, or a batch posted in a room stops being
        one post and becomes one post per card. */
-    expect(repo).toContain("const all = [...(flares ?? []), ...mine];");
+    expect(repo).toContain("const all = [...(flares ?? []), ...mine]");
     expect(repo).toContain("for (const flare of all) {");
   });
 
@@ -38,6 +38,23 @@ describe("your own Flares reach your own Feed, wherever you posted them", () => 
        missing, recovered from the session that owns it. Grouping and
        "is this mine" both key on it. */
     expect(fn).toContain("player_id: viewerId");
+  });
+
+  it("merges the two reads by time, not by which query found them", async () => {
+    /*
+     * The second half of the same bug, and the one the founder hit
+     * after the first fix: "flares still not posting in the feed when
+     * there's multiple. try it for yourself."
+     *
+     * Two reads, each already sorted, simply concatenated - so every
+     * room Flare sorted BELOW every area one however recent it was. His
+     * four Bonney cards WERE in the Feed, sixth, under five posts from
+     * days earlier. From the top of the screen that is indistinguishable
+     * from a Feed that dropped the post.
+     */
+    const repo = await read("src/lib/feed/repository.ts");
+    expect(repo).toContain("const all = [...(flares ?? []), ...mine].sort(");
+    expect(repo).toContain("b.created_at.localeCompare(a.created_at)");
   });
 
   it("does not read the area Flares twice", async () => {

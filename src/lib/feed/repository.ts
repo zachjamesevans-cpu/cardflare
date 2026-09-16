@@ -1572,7 +1572,22 @@ async function areaHuntsFor(
    * so a batch posted in a room still becomes one post.
    */
   const mine = await ownRoomFlares(viewerId);
-  const all = [...(flares ?? []), ...mine];
+  /*
+   * MERGED BY TIME, not by which query found them.
+   *
+   * Two reads, each already sorted, concatenated - so every room Flare
+   * sorted BELOW every area one no matter when it was posted. The
+   * founder posted four Bonney cards and reported the Feed "still not
+   * posting": it was there, sixth, under five posts from days earlier.
+   * A feed out of order is a feed that looks broken, and from the top
+   * of the screen it looks exactly like a feed that dropped the post.
+   *
+   * Sorted before grouping, so the groups form newest-first and the
+   * map's insertion order carries that all the way out.
+   */
+  const all = [...(flares ?? []), ...mine].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  );
 
   if (all.length === 0) return [];
 
