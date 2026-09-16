@@ -1347,8 +1347,8 @@ async function boardWithHunts(
   const hunts = new Map<string, { flare: ListEntry; match: MatchKind | null }[]>();
 
   for (const flare of flares) {
-    if (flare.intent !== "want") continue;
-
+    /* Wants and offers alike: a board takes both, and the Feed draws
+       both, each the way the post says. */
     const author = playerBySession.get(flare.playerSessionId);
     if (!author || !followed.has(author)) continue;
 
@@ -1404,6 +1404,7 @@ async function boardWithHunts(
       avatarUrl: person.avatarUrl,
       frame: person.frame,
       ring: person.ring,
+      direction: ordered[0]?.flare.intent === "showcase" ? "showcase" : "want",
       deckLabel: ordered[0]?.flare.deckLabel ?? null,
       postedAt: ordered[0]?.flare.createdAt ?? new Date().toISOString(),
       /* Filled in by decorateHunts from the store's pin. */
@@ -1420,7 +1421,11 @@ async function boardWithHunts(
       /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
          trailing "+N more" are counting the same things the tiles are. */
       total: cards.length,
-      youCanAnswer: cards.filter(({ match }) => match).length,
+      /* Nobody answers an offer with a copy of their own. */
+      youCanAnswer:
+        ordered[0]?.flare.intent === "showcase"
+          ? 0
+          : cards.filter(({ match }) => match).length,
       cards: cards.slice(0, CARD_RAIL_CAP).map(({ flare, match }) => ({
         cardId: flare.cardId,
         cardName: flare.cardName,
@@ -1483,12 +1488,15 @@ async function areaHuntsFor(
   const { data: flares } = await getSupabaseAdmin()
     .from("flares")
     .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity",
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
     )
     /* One query for everybody rather than one per person followed. */
     .in("player_id", [...authors.keys()])
     .eq("status", "open")
-    .eq("intent", "want")
+    /* Both directions. An offering ("I have these") is a post like any
+       other; reading wants alone left every offer posted from the
+       composer nowhere at all. */
+    .in("intent", ["want", "showcase"])
     .is("event_id", null)
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
@@ -1551,6 +1559,7 @@ async function areaHuntsFor(
         avatarUrl: author.avatarUrl,
         frame: author.frame,
         ring: author.ring,
+        direction: group[0]?.intent === "showcase" ? "showcase" : "want",
         deckLabel: group[0]?.deck_label ?? null,
         postedAt: group[0]?.created_at ?? new Date().toISOString(),
         milesAway,
@@ -1563,7 +1572,10 @@ async function areaHuntsFor(
         remainingCopies: 0,
         completed: false,
         total: cards.length,
-        youCanAnswer: cards.filter((card) => card.match).length,
+        youCanAnswer:
+          group[0]?.intent === "showcase"
+            ? 0
+            : cards.filter((card) => card.match).length,
         cards: cards.slice(0, CARD_RAIL_CAP),
         yours: authorId === viewerId,
       },
@@ -2368,6 +2380,10 @@ export async function listFeed(
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
+  /* Your own room identity too. Without it a Flare you posted on a
+     board mapped to nobody, and your own post at your own shop was the
+     one post the Feed would not show you. */
+  if (sessionId) playerBySession.set(sessionId, playerId);
 
   /*
    * A store earns a place only when there is somewhere to go: a room open

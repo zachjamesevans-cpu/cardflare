@@ -94,7 +94,7 @@ describe("every row that draws cards goes through it", () => {
     const repo = await readFile("src/lib/feed/repository.ts", "utf8");
 
     expect(repo).toContain("total: cards.length");
-    expect(repo).toContain("youCanAnswer: cards.filter(({ match }) => match).length");
+    expect(repo).toContain(": cards.filter(({ match }) => match).length");
     expect(repo).not.toContain("total: group.length");
   });
 });
