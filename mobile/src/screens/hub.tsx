@@ -1,9 +1,10 @@
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 
-import type { StackParams } from "../../App";
+import type { StackParams, TabParams } from "../../App";
 import {
   dropWant,
   getMe,
@@ -40,6 +41,20 @@ import { HaveList, NearbyCard } from "../nearby";
  */
 export function HubScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  /*
+   * "Add cards" on a profile folder arrives here as a param. Read once
+   * and cleared, because a param that sticks would re-open the same
+   * group every time somebody came back to the tab for an unrelated
+   * card.
+   */
+  const route = useRoute<RouteProp<TabParams, "Flare">>();
+  const hunt = route.params?.hunt;
+  const [openInto, setOpenInto] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (hunt === undefined) return;
+    setOpenInto(hunt);
+    navigation.setParams({ hunt: undefined } as never);
+  }, [hunt, navigation]);
   const [target, setTarget] = useState<PostTarget | "scan" | null>(null);
 
   /*
@@ -160,6 +175,7 @@ export function HubScreen() {
   return (
     <PostFlareScreen
       target={target}
+      initialDeck={openInto}
       resetSignal={resetSignal}
       onPosted={() => void loadWants()}
       footer={

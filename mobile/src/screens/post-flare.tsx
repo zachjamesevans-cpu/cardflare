@@ -165,8 +165,11 @@ export function PostFlareScreen({
   resetSignal,
   onPosted,
   footer,
+  initialDeck,
 }: {
   target: PostTarget;
+  /** The group to open into, from a profile's "Add cards". */
+  initialDeck?: string;
   /** Bumped by the Flare tab on a re-tap while focused: "different card". */
   resetSignal?: number;
   /** A successful post or save landed; the hub refreshes its list. */
@@ -199,10 +202,22 @@ export function PostFlareScreen({
    * and posts fourteen cards; each one lands in the same folder on the
    * board. Clearing the field is the way out of the deck.
    */
-  const [deck, setDeck] = useState("");
+  const [deck, setDeck] = useState(initialDeck ?? "");
   /* Whether the group row is open. The NAME is what sticks; this is
      only whether the field is showing before one has been typed. */
-  const [grouping, setGrouping] = useState(false);
+  const [grouping, setGrouping] = useState(Boolean(initialDeck));
+  /*
+   * The tab is already mounted by the time "Add cards" is pressed, so
+   * the initial state above only fires the first time. Following the
+   * prop is what makes the SECOND folder's button open the second
+   * folder rather than the first one's name.
+   */
+  useEffect(() => {
+    if (!initialDeck) return;
+    setDeck(initialDeck);
+    setGrouping(true);
+  }, [initialDeck]);
+
   const [busy, setBusy] = useState(false);
   const [posted, setPosted] = useState(false);
   /*

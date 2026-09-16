@@ -42,7 +42,14 @@ export const dynamic = "force-dynamic";
  *   no account for a list to live on, so the hub is the payoff of
  *   signing in, never a gate.
  */
-export default async function FlarePage() {
+export default async function FlarePage({
+  searchParams,
+}: {
+  /* "Add cards" on a profile hunt arrives here, so the composer opens
+     into that folder rather than asking for the name a second time. */
+  searchParams: Promise<{ hunt?: string }>;
+}) {
+  const { hunt } = await searchParams;
   const [viewer, session] = await Promise.all([getViewer(), getPlayerSession()]);
 
   const playerId =
@@ -96,6 +103,7 @@ export default async function FlarePage() {
                 kind="flare"
                 imagesEnabled={images}
                 playerGames={games}
+                initialDeck={hunt ?? ""}
               />
             </>
           ) : playerId ? (
@@ -105,6 +113,7 @@ export default async function FlarePage() {
               imagesEnabled={images}
               playerGames={games}
               target="list"
+              initialDeck={hunt ?? ""}
             />
           ) : (
             <Card className="flex flex-col gap-3">

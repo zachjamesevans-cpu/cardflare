@@ -149,7 +149,7 @@ const SHOP_SAMPLE = 3;
 const NEARBY_RADIUS_MILES = 25;
 const NEARBY_SHOWN = 4;
 
-interface CardFacts {
+export interface CardFacts {
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
@@ -164,7 +164,7 @@ interface CardFacts {
  * person can read. One printing per card is enough: the feed shows the art,
  * not the edition.
  */
-async function cardFacts(cardIds: string[]): Promise<Map<string, CardFacts>> {
+export async function cardFacts(cardIds: string[]): Promise<Map<string, CardFacts>> {
   const facts = new Map<string, CardFacts>();
   const ids = [...new Set(cardIds)];
   if (ids.length === 0) return facts;
