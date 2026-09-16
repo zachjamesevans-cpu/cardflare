@@ -19,3 +19,5 @@ public/cosmetics/
 # one line. Prettier would expand it to 170k lines of no interest to any
 # reader, and nobody edits it by hand. See data/geo/README.md.
 data/geo/
+# A rendered page somebody saved at the root; not source.
+discover.html

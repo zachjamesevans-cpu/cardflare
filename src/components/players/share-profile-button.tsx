@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Share2 } from "lucide-react";
 
-import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 /**
@@ -54,18 +53,17 @@ export function ShareProfileButton({
     <button
       type="button"
       onClick={() => void share()}
-      className={cn(buttonStyles("secondary", "sm"), "flex-1", className)}
+      title={copied ? "Link copied" : "Share profile"}
+      aria-label={copied ? "Link copied" : "Share profile"}
+      className={cn(
+        "flex size-10 cursor-pointer items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary",
+        className,
+      )}
     >
       {copied ? (
-        <>
-          <Check className="size-4 text-accent" aria-hidden="true" />
-          Link copied
-        </>
+        <Check className="size-5 text-accent" aria-hidden="true" />
       ) : (
-        <>
-          <Share2 className="size-4" aria-hidden="true" />
-          Share profile
-        </>
+        <Share2 className="size-5" aria-hidden="true" />
       )}
     </button>
   );

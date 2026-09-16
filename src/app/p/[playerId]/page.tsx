@@ -123,6 +123,15 @@ export default async function PublicProfilePage({
             <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
+            {/* Share, top right over the cover: the same corner your own
+                profile keeps its icons in. */}
+            <div className="absolute top-3 right-3 z-10">
+              <ShareProfileButton
+                url={`${siteUrl()}/p/${profile.playerId}`}
+                title={`${profile.displayName} on cardflare`}
+              />
+            </div>
+
             {/* The same header the owner sees, with Follow where they
                 have Edit profile. Share is a link anybody can open. */}
             <div className="relative mt-16">
@@ -167,10 +176,6 @@ export default async function PublicProfilePage({
                         Follow
                       </Link>
                     ) : null}
-                    <ShareProfileButton
-                      url={`${siteUrl()}/p/${profile.playerId}`}
-                      title={`${profile.displayName} on cardflare`}
-                    />
                   </>
                 }
               />

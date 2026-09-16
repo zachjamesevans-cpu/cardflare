@@ -157,7 +157,14 @@ describe("the home screen's furniture", () => {
      */
     const route = read("src/app/api/v1/feed/route.ts");
 
-    expect(route).toContain("function absoluteAvatars");
+    /* Shared now, because the post screen's route forgot the rule and
+       the founder saw "A player" with no face. */
+    const shared = read("src/lib/api/absolute-avatars.ts");
+    expect(shared).toContain("function absoluteAvatars");
+    expect(route).toContain("absoluteAvatars");
+    expect(read("src/app/api/v1/posts/[postId]/route.ts")).toContain(
+      "absoluteAvatars(",
+    );
     expect(route).not.toContain('item.kind === "hunt" && item.avatarUrl');
   });
 

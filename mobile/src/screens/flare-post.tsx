@@ -155,6 +155,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           avatarUrl={post.author.avatarUrl}
           frame={post.author.frame}
           ring={post.author.ring}
+          aura={post.author.aura ?? null}
           detail={`${total === 1 ? "is hunting" : `is hunting ${total} cards`}${
             post.deckLabel ? ` · ${post.deckLabel}` : ""
           }${post.eventName ? ` · ${post.eventName}` : ""}`}

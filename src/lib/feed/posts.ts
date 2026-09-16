@@ -55,6 +55,7 @@ export interface PostDetail extends PostSocial {
     avatarUrl: string | null;
     frame: string | null;
     ring: string | null;
+    aura: string | null;
   };
   /** The room it was posted in, when it was. */
   code: string | null;
@@ -87,7 +88,7 @@ async function postContext(postId: string): Promise<PostContext | null> {
 
   const { data, error } = await admin
     .from("flares")
-    .select("id, card_id, status, event_id, player_session_id, deck_label")
+    .select("id, card_id, status, event_id, player_session_id, player_id, deck_label")
     .eq("posted_batch", postId)
     .order("created_at")
     .limit(60);
@@ -102,8 +103,12 @@ async function postContext(postId: string): Promise<PostContext | null> {
   if (!first) return null;
 
   const ownerSessionId = first.player_session_id;
-  let ownerPlayerId: string | null = null;
-  if (ownerSessionId) {
+  /* An area Flare names its account directly and has no room session;
+     a board Flare names the session. Read the account from whichever
+     the row carries, or the post's author is "A player" with no face -
+     which is what the founder saw. */
+  let ownerPlayerId: string | null = first.player_id ?? null;
+  if (!ownerPlayerId && ownerSessionId) {
     const { data: session } = await admin
       .from("player_sessions")
       .select("player_id")
@@ -169,6 +174,7 @@ async function facesFor(playerIds: string[]): Promise<
       avatarUrl: string | null;
       frame: string | null;
       ring: string | null;
+      aura: string | null;
     }
   >
 > {
@@ -179,6 +185,7 @@ async function facesFor(playerIds: string[]): Promise<
       avatarUrl: string | null;
       frame: string | null;
       ring: string | null;
+      aura: string | null;
     }
   >();
   const ids = [...new Set(playerIds)];
@@ -200,6 +207,7 @@ async function facesFor(playerIds: string[]): Promise<
       avatarUrl: avatarSrc(avatarPathFor(row)),
       frame: row.equipped_avatar_frame,
       ring: wear.get(row.id)?.ring ?? null,
+      aura: wear.get(row.id)?.aura ?? null,
     });
   }
   return out;
@@ -472,6 +480,7 @@ export async function postDetail(
       avatarUrl: author?.avatarUrl ?? null,
       frame: author?.frame ?? null,
       ring: author?.ring ?? null,
+      aura: author?.aura ?? null,
     },
     code: event.data?.join_code ?? null,
     storeName: store.data?.name ?? null,

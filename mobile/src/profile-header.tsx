@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Share, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Platform,
+  Share,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import type { ProfileStats } from "./api";
 import { API_BASE } from "./config";
@@ -54,7 +61,7 @@ export function ProfileHeader({
   actions: ReactNode;
 }) {
   return (
-    <View style={{ gap: spacing(3) }}>
+    <View style={{ gap: spacing(2.5) }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         {avatar}
         <View style={{ flex: 1, flexDirection: "row", gap: spacing(2) }}>
@@ -64,27 +71,48 @@ export function ProfileHeader({
         </View>
       </View>
 
-      <View style={{ gap: spacing(1.5), alignItems: "flex-start" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <WornName
-            name={name}
-            nameplate={equips.nameplate}
-            baseStyle={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}
-          />
-          <WornBadge badge={equips.badge} />
-        </View>
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>{formatHandle(handle)}</Text>
+      {/* The name row uses its whole width: name and badge on the left,
+          title and Embers on the right, the handle beneath. The founder,
+          on the old three stacked lines: "look at how much headspace
+          is to the right", and the name sat "off center". */}
+      <View style={{ gap: spacing(1), alignItems: "stretch" }}>
         <View
           style={{
             flexDirection: "row",
-            flexWrap: "wrap",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: spacing(2),
           }}
         >
-          <WornTitle title={equips.title} />
-          <EmberBadge earned={embersEarned} size="sm" />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(2),
+              flexShrink: 1,
+              minWidth: 0,
+            }}
+          >
+            <WornName
+              name={name}
+              nameplate={equips.nameplate}
+              baseStyle={{
+                color: colors.textPrimary,
+                fontSize: 17,
+                lineHeight: 22,
+                fontWeight: "800",
+              }}
+            />
+            <WornBadge badge={equips.badge} />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <WornTitle title={equips.title} />
+            <EmberBadge earned={embersEarned} size="sm" />
+          </View>
         </View>
+        <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 18 }}>
+          {formatHandle(handle)}
+        </Text>
       </View>
 
       <View style={{ flexDirection: "row", gap: spacing(2) }}>{actions}</View>
@@ -193,21 +221,42 @@ export function profileUrl(playerId: string): string {
   return `${API_BASE}/p/${encodeURIComponent(playerId)}`;
 }
 
-/** Share profile: the system sheet with the profile's address. */
-export function ShareProfileButton({ playerId, name }: { playerId: string; name: string }) {
+/**
+ * Share profile: the system sheet with the profile's address, behind
+ * one round icon rather than a full-width button - the founder: "the
+ * profile screen doesn't need a massive share profile thing."
+ *
+ * The address goes in ONCE. iOS reads `url` and `message` as two
+ * separate items, so sending the link in both showed the sheet as
+ * "2 Links" and pasted it twice; Android has no `url` and needs it in
+ * `message`. One field each, by platform.
+ */
+export function ShareProfileIcon({ playerId, name }: { playerId: string; name: string }) {
+  const url = profileUrl(playerId);
   return (
-    <HeaderButton
-      label="Share profile"
-      icon="share-outline"
+    <Tap
       onPress={() => {
-        void Share.share({
-          message: profileUrl(playerId),
-          url: profileUrl(playerId),
-          title: `${name} on cardflare`,
-        }).catch(() => {
+        void Share.share(
+          Platform.OS === "ios"
+            ? { url, title: `${name} on cardflare` }
+            : { message: url, title: `${name} on cardflare` },
+        ).catch(() => {
           /* The sheet was dismissed, or refused. Nothing more to offer. */
         });
       }}
-    />
+      accessibilityLabel="Share profile"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+    </Tap>
   );
 }
