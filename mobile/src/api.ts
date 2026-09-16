@@ -976,6 +976,14 @@ export interface HuntCard {
   requestId?: string;
   /** An open Flare posted for this card, or null when none is up. */
   flareId: string | null;
+  /**
+   * The post that Flare went up in, so a visitor's "I have this" can
+   * be sent through `offerItemsOnPost`. Null when nothing is posted.
+   * Optional because the server grows it in the same round as this
+   * screen and an older one never sends it; absent reads as "not
+   * posted yet", which offers nothing rather than something broken.
+   */
+  postId?: string | null;
   cardId: string;
   cardName: string;
   cardNumber: string;
@@ -1356,8 +1364,7 @@ export interface NearbySettings {
   postalCode: string | null;
 }
 
-export const getNearbySettings = () =>
-  call<NearbySettings>("GET", "/api/v1/me/nearby");
+export const getNearbySettings = () => call<NearbySettings>("GET", "/api/v1/me/nearby");
 
 export const setNearbyMatching = (enabled: boolean) =>
   call<NearbySettings>("PUT", "/api/v1/me/nearby", { enabled });
@@ -1603,7 +1610,8 @@ export interface HuntView extends Hunt {
   yours: boolean;
 }
 
-export const getHunts = () => call<{ hunts: Hunt[]; limit: number }>("GET", "/api/v1/hunts");
+export const getHunts = () =>
+  call<{ hunts: Hunt[]; limit: number }>("GET", "/api/v1/hunts");
 
 export const getHunt = (huntId: string) =>
   call<{ hunt: HuntView }>("GET", `/api/v1/hunts/${encodeURIComponent(huntId)}`);
@@ -1620,7 +1628,11 @@ export const createHunt = (input: {
 
 export const updateHunt = (
   huntId: string,
-  patch: { name?: string; description?: string | null; visibility?: "public" | "private" },
+  patch: {
+    name?: string;
+    description?: string | null;
+    visibility?: "public" | "private";
+  },
 ) =>
   call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
     action: "update",
@@ -2428,9 +2440,7 @@ export const postAreaFlare = (input: {
     posted?: number;
     error?: string;
     message?: string;
-  }>("POST", "/api/v1/local/flares",
-    input,
-  );
+  }>("POST", "/api/v1/local/flares", input);
 
 /** Taking your own area Flare down. */
 export const withdrawAreaFlare = (flareId: string) =>

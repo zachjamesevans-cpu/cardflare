@@ -1,26 +1,29 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Text, useWindowDimensions, View } from "react-native";
+import { Text, View } from "react-native";
 
 import type { FeedEntry } from "./api";
+import { cardsLabel } from "./flare-copy";
+import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
-import { FlareDeckPager } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
-import { PostSocialRow, haveFor, type PostRef } from "./post-social";
+import { PostSocialRow, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
-import { Button, CardImage, Tap, type ZoomCard } from "./ui";
+import { Button, Tap } from "./ui";
 
 /**
  * One Flare on the Feed, drawn as a post.
  *
- * The founder's redesign: the card is the headline, then its name, then
- * who is hunting it, then what they will do for it, then where and when,
- * then the counts. The old row gave its weight to grey space; this one
- * gives it to the card, which is what a trader is scanning for.
+ * The founder's redesign: who is hunting, then the card and what is
+ * asked of it, then what they wrote, then the counts. A post with
+ * several cards is the same row as a post with one, swiped: compact
+ * slides rather than a hero, because a Feed is scanned and a hero
+ * costs half a screen per post.
  *
  * Every piece of behaviour is the one the Feed already had: the tap on
  * the card opens the same zoom with "I have this" inside it, the heart
  * and the bubble are the post's own, and the paper plane opens the same
- * conversation Local opens.
+ * conversation Local opens. New here: "Offer cards" for several at
+ * once, "Update progress" on your own, and the hunt a post belongs to.
  */
 
 type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
@@ -44,29 +47,14 @@ export function awayLabel(miles: number): string {
  * What the person did, in the words the board uses.
  *
  * A Flare points one of two ways: wanted, or offered up. Everything in
- * the Feed used to be a want, so the line was a constant - the rows that
- * carry a direction arrived when the separate "recent" kind was folded
- * into this one, and a showcase post reading "is hunting" would have
- * been backwards.
+ * the Feed used to be a want, so the line was a constant, and a
+ * showcase post reading "is hunting" would have been backwards. It
+ * read "is letting go of" for a while; the founder's brief settled on
+ * "is offering", the same word the composer's control uses.
  */
-function statusLabel(item: Extract<FeedEntry, { kind: "hunt" }>): string {
-  const offering = item.direction === "showcase";
-  if (item.total === 1) return offering ? "is letting go of" : "is hunting";
-  return offering
-    ? `is letting go of ${item.total} cards`
-    : `is hunting ${item.total} cards`;
+export function statusLabel(item: Pick<Hunt, "direction">): string {
+  return item.direction === "showcase" ? "is offering" : "is hunting";
 }
-
-/**
- * Draw a Flare as one compact row rather than a tall card.
- *
- * "Give me some options on how to make it more clean looking" - this is
- * the one the founder picked: the art as a thumbnail beside its details,
- * the meta on a single line, and the counts up in the header instead of
- * below a rule. Set this to false and the tall card comes back exactly
- * as it was; nothing else needs touching.
- */
-const COMPACT_POSTS = true;
 
 /**
  * The crosshair and the words: CardFlare's status line.
@@ -76,7 +64,14 @@ const COMPACT_POSTS = true;
  * a Flare wherever one is drawn, so it is one component and nothing
  * else draws the pair.
  */
-export function FlareStatus({ label = "is hunting" }: { label?: string }) {
+export function FlareStatus({
+  label = "is hunting",
+  detail,
+}: {
+  label?: string;
+  /** "3 cards", in the quiet colour after the status. */
+  detail?: string | null;
+}) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
       <View
@@ -89,13 +84,24 @@ export function FlareStatus({ label = "is hunting" }: { label?: string }) {
       >
         <MaterialCommunityIcons name="crosshairs" size={17} color={colors.accent} />
       </View>
-      <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>{label}</Text>
+      <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
+        {label}
+      </Text>
+      {detail ? (
+        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{`· ${detail}`}</Text>
+      ) : null}
     </View>
   );
 }
 
 /** Want, Trade, Cash ok: the primary one filled, the rest outlined. */
-export function FlareTypeChip({ label, primary = false }: { label: string; primary?: boolean }) {
+export function FlareTypeChip({
+  label,
+  primary = false,
+}: {
+  label: string;
+  primary?: boolean;
+}) {
   return (
     <View
       style={{
@@ -120,6 +126,55 @@ export function FlareTypeChip({ label, primary = false }: { label: string; prima
   );
 }
 
+/**
+ * The buttons under a post's cards, decided by whose post it is and
+ * which way it points. Shared with the post's own screen so the two
+ * never offer different things.
+ */
+export function FlareActions({
+  yours,
+  direction,
+  completed,
+  onOffer,
+  onProgress,
+}: {
+  yours: boolean;
+  direction: "want" | "showcase";
+  completed: boolean;
+  onOffer?: () => void;
+  onProgress?: () => void;
+}) {
+  if (direction === "showcase") return null;
+  if (yours) {
+    return onProgress ? (
+      <Button
+        label={completed ? "All found · Update progress" : "Update progress"}
+        variant="secondary"
+        onPress={onProgress}
+      />
+    ) : null;
+  }
+  if (completed) {
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing(1.5),
+          paddingVertical: spacing(2),
+        }}
+      >
+        <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+        <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
+          All found
+        </Text>
+      </View>
+    );
+  }
+  return onOffer ? <Button label="Offer cards" onPress={onOffer} /> : null;
+}
+
 export function FlareFeedCard({
   item,
   post,
@@ -128,6 +183,10 @@ export function FlareFeedCard({
   onOpenThread,
   onMessage,
   onEnterRoom,
+  onOffer,
+  onViewAll,
+  onProgress,
+  onOpenHunt,
 }: {
   item: Hunt;
   post: PostRef;
@@ -137,120 +196,20 @@ export function FlareFeedCard({
   /** Absent on your own post: there is nobody to message. */
   onMessage?: () => void;
   onEnterRoom: (code: string) => void;
+  /** "Offer cards": the full list, in select mode. Never shown to the owner. */
+  onOffer?: () => void;
+  /** "View all 3": the full list, to read. */
+  onViewAll?: () => void;
+  /** "Update progress", on your own post. */
+  onProgress?: () => void;
+  /** "View hunt", when the post belongs to one. */
+  onOpenHunt?: (huntId: string) => void;
 }) {
-  const window = useWindowDimensions();
-  /*
-   * The card takes a real share of the row on any phone, and stops
-   * growing on a tablet so the details keep their column.
-   *
-   * SMALLER THAN IT WAS. At 0.42 of the row the art stood about 235pt
-   * tall while the name, number and two chips beside it needed barely
-   * ninety - so every post carried a column of black down its right
-   * hand side. The founder: "notice how the cards are so large and
-   * there's a lot of dead space? lessen card size a bit so it looks
-   * better."
-   *
-   * A third of the row is still big enough to read a card at a glance,
-   * which is what this picture is for, and it takes roughly fifty
-   * points of nothing out of every post in the feed.
-   */
-  /*
-   * A THUMBNAIL, not a hero.
-   *
-   * The founder, on the Following tab: "this mUST be more concise for
-   * the flares. it is HUGEEEEE. and way too big. look at how much dead
-   * space there is."
-   *
-   * Measured before changing anything: a post stood 295pt on an 874pt
-   * screen, so two filled it. The art was 176pt of that, and the name,
-   * number and two chips beside it needed about ninety - so a third of
-   * the art's height was empty on both sides of the details however they
-   * were aligned.
-   *
-   * At 72 the card is still recognisable - the art, the cost and the
-   * colour all read - and the row is as tall as the details rather than
-   * twice as tall. The whole post lands near 150pt, which is four to a
-   * screen instead of two.
-   */
-  const cardWidth = Math.round(
-    Math.min(COMPACT_POSTS ? 72 : 132, Math.max(COMPACT_POSTS ? 64 : 104, (window.width - spacing(16)) * (COMPACT_POSTS ? 0.19 : 0.34))),
-  );
-
+  const direction = item.direction ?? "want";
   const lead = item.cards[0];
   const single = item.total === 1 && lead;
-  const shelf: ZoomCard[] = item.cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    name: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
-  }));
-
-  const chips = (
-    <>
-      <FlareTypeChip label="Want" primary />
-      {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
-      {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
-    </>
-  );
-
-  const details = (
-    <View style={{ flex: 1, gap: spacing(2), minWidth: 0 }}>
-      {single ? (
-        <View style={{ gap: 2 }}>
-          <Text
-            numberOfLines={2}
-            style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}
-          >
-            {lead.cardName}
-          </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>{lead.cardNumber}</Text>
-        </View>
-      ) : (
-        <View style={{ gap: 2 }}>
-          <Text
-            numberOfLines={2}
-            style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}
-          >
-            {item.deckLabel ?? `${item.total} cards`}
-          </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-            {item.deckLabel ? `${item.total} cards` : "One hunt"}
-          </Text>
-        </View>
-      )}
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        {chips}
-      </View>
-
-      {single && lead.match ? (
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-          {lead.match === "exact" ? "You have this" : "You have another printing"}
-        </Text>
-      ) : null}
-      {single && lead.state === "found" ? (
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>Found</Text>
-      ) : single && lead.youOffered ? (
-        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>You said you have this</Text>
-      ) : single && lead.state === "offered" ? (
-        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Somebody offered</Text>
-      ) : null}
-      {!single && item.youCanAnswer > 0 ? (
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-          {`You can answer ${item.youCanAnswer} of ${item.total}`}
-        </Text>
-      ) : null}
-
-      {/* What they wrote with it, in the quiet colour. Nothing at all
-          when they wrote nothing: no empty row. */}
-      {item.note ? (
-        <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
-          {`“${item.note}”`}
-        </Text>
-      ) : null}
-    </View>
-  );
+  const shelf = shelfFor(item.cards, post);
+  const completed = item.completed ?? false;
 
   return (
     <View
@@ -259,8 +218,8 @@ export function FlareFeedCard({
         borderColor: colors.border,
         borderWidth: 1,
         borderRadius: radius.panel,
-        padding: spacing(COMPACT_POSTS ? 3 : 4),
-        gap: spacing(COMPACT_POSTS ? 2 : 3),
+        padding: spacing(3),
+        gap: spacing(2.5),
       }}
     >
       {/* The header: face, name, the status line; time and distance on
@@ -268,16 +227,13 @@ export function FlareFeedCard({
           a line between posts. */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}>
         {/*
-          * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
-          *
-          * Tap puts its `style` on an inner Animated.View rather than on
-          * the Pressable, so `flex: 1` there never reaches the thing
-          * being laid out: the Pressable sized itself to its content,
-          * the name column inside it collapsed to nothing, and the post
-          * drew a face, a crushed "YOUR FLARE" pill and no name at all.
-          * The same trap is written up in src/collapsing-header.tsx,
-          * where it swallowed the search icon.
-          */}
+         * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
+         *
+         * Tap puts its `style` on the Pressable it animates, but a
+         * `flex: 1` there once landed on an inner view and the name
+         * column collapsed to nothing. The same trap is written up in
+         * src/collapsing-header.tsx, where it swallowed the search icon.
+         */}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Tap
             onPress={() => onOpenProfile(item.playerId)}
@@ -288,58 +244,63 @@ export function FlareFeedCard({
               gap: spacing(2.5),
             }}
           >
-          <PlayerAvatar
-            displayName={item.displayName}
-            seed={item.playerId}
-            avatarUrl={item.avatarUrl}
-            frame={item.frame}
-            ring={item.ring}
-            size={COMPACT_POSTS ? 34 : 44}
-          />
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "800", flexShrink: 1 }}
+            <PlayerAvatar
+              displayName={item.displayName}
+              seed={item.playerId}
+              avatarUrl={item.avatarUrl}
+              frame={item.frame}
+              ring={item.ring}
+              size={34}
+            />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(1.5),
+                }}
               >
-                {item.displayName}
-              </Text>
-              {item.playerId === null ? <GuestChip /> : null}
-              {item.yours ? (
                 <Text
+                  numberOfLines={1}
                   style={{
-                    color: colors.textMuted,
-                    fontSize: 10,
-                    fontWeight: "700",
-                    letterSpacing: 0.6,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 999,
-                    paddingHorizontal: 6,
-                    paddingVertical: 1,
-                    overflow: "hidden",
+                    color: colors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: "800",
+                    flexShrink: 1,
                   }}
                 >
-                  YOUR FLARE
+                  {item.displayName}
                 </Text>
-              ) : null}
-            </View>
-              {/* Main's wrapper, which is what stopped the name column
-                  collapsing, and this branch's label, which is what
-                  stops a showcase post reading "is hunting". */}
-              <FlareStatus label={statusLabel(item)} />
+                {item.playerId === null ? <GuestChip /> : null}
+                {item.yours ? (
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 10,
+                      fontWeight: "700",
+                      letterSpacing: 0.6,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 999,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    YOUR FLARE
+                  </Text>
+                ) : null}
+              </View>
+              <FlareStatus
+                label={statusLabel(item)}
+                detail={item.total > 1 ? cardsLabel(item.total) : null}
+              />
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block. Two muted facts sitting on
-            top of each other made the header as tall as the avatar for
-            no reason; a middle dot costs nothing and reads the same. */}
+        {/* One line, not a stacked block: two muted facts with a dot. */}
         <View
-          style={
-            COMPACT_POSTS
-              ? { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }
-              : { alignItems: "flex-end", gap: 3, flexShrink: 0 }
-          }
+          style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}
         >
           {item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>
@@ -348,7 +309,7 @@ export function FlareFeedCard({
           ) : null}
           {typeof item.milesAway === "number" ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              {COMPACT_POSTS && item.postedAt ? (
+              {item.postedAt ? (
                 <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
               ) : (
                 <Ionicons name="location-outline" size={13} color={colors.textMuted} />
@@ -361,45 +322,73 @@ export function FlareFeedCard({
         </View>
       </View>
 
-      {/* The card, big, with its details beside it. A deck keeps its
-          rail across the width and the details underneath. */}
+      {/* Which way it points and what they will do for it. Post-level,
+          because they are true of every card in it. */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+        <FlareTypeChip label={direction === "showcase" ? "Offering" : "Want"} primary />
+        {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
+        {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
+      </View>
+
+      {/* The card and what is asked of it. Several cards are the same
+          row, swiped, with the next one peeking in. */}
       {single ? (
-        /* Centred, not top-aligned. The details are shorter than the
-           art whatever size it is, and hanging them from the top put
-           all of the slack in one block at the bottom - which is what
-           read as dead space. Split evenly it reads as breathing room. */
-        <View
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
-        >
-          <CardImage
-            imageUrl={lead.imageUrl}
-            width={cardWidth}
-            name={lead.cardName}
-            cardNumber={lead.cardNumber}
-            youHave={lead.match ? { kind: lead.match, count: 0 } : undefined}
-            state={lead.state}
-            have={haveFor(lead, post)}
-            siblings={shelf}
-            position={0}
-          />
-          {details}
-        </View>
+        <FlareCardSlide
+          card={lead}
+          direction={direction}
+          post={post}
+          siblings={shelf}
+          position={0}
+        />
       ) : (
-        <FlareDeckPager
+        <FlareCarousel
           cards={item.cards}
           total={item.total}
+          direction={direction}
           post={post}
-          chips={chips}
-          note={item.note ?? null}
+          remainingCopies={item.remainingCopies}
+          onViewAll={onViewAll}
         />
       )}
 
-      {/* A hairline, then the counts. Understated until touched. In
-          compact the rule goes and the counts sit under the details,
-          which saves the rule, a gap and a row of its own. */}
-      {COMPACT_POSTS ? null : (
-        <View style={{ height: 1, backgroundColor: colors.border }} />
-      )}
+      {/* What they wrote with it, once, in the quiet colour. Nothing at
+          all when they wrote nothing: no empty row. */}
+      {item.note ? (
+        <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
+          {item.note}
+        </Text>
+      ) : null}
+
+      {/* The hunt this post is part of, and the door to it. */}
+      {item.hunt ? (
+        <Tap
+          onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
+          accessibilityLabel={`View hunt ${item.hunt.name}`}
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        >
+          <Ionicons name="locate-outline" size={14} color={colors.accent} />
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
+          >
+            {item.hunt.name}
+          </Text>
+          {onOpenHunt ? (
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              · View hunt
+            </Text>
+          ) : null}
+        </Tap>
+      ) : null}
+
+      <FlareActions
+        yours={item.yours}
+        direction={direction}
+        completed={completed}
+        onOffer={onOffer}
+        onProgress={onProgress}
+      />
+
       <PostSocialRow
         likes={item.likes ?? 0}
         liked={item.liked ?? false}

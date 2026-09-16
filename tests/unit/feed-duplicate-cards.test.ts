@@ -259,7 +259,9 @@ describe("a Flare posted at a store is drawn as a post", () => {
     ]) {
       const source = await readFile(path, "utf8");
       expect(source).toContain("function statusLabel(");
-      expect(source).toContain("is letting go of");
+      /* "is offering" since the post grew its card-count chip; the older
+         "is letting go of" is still the app's wording until it catches up. */
+      expect(source).toMatch(/is offering|is letting go of/);
     }
   });
 });

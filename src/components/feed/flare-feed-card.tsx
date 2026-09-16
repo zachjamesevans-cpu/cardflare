@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { Crosshair } from "lucide-react";
+import { Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
-import { FlareDeckPager } from "@/components/feed/flare-deck-pager";
+import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
+import { cardCountLabel, FlareCarousel } from "@/components/feed/flare-carousel";
+import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -14,16 +16,14 @@ import type { HuntItem } from "@/lib/feed/repository";
 /**
  * One Flare on the Feed, drawn as a post.
  *
- * The founder's redesign: the card is the headline, then its name, then
- * who is hunting it, then what they will do for it, then where and when,
- * then the counts. The old row gave its weight to grey space; this one
- * gives it to the card, which is what a trader is scanning for.
- *
- * Every piece of behaviour is the one the Feed already had: the tap on
- * the card opens the same zoom with "I have this" inside it, the heart
- * and the bubble are the post's own, and the paper plane opens the same
- * conversation the Messages page opens. The app draws the same card
- * natively (mobile/src/flare-feed-card.tsx).
+ * A post is one person, one caption, one or many cards. The header
+ * says who and which way ("is hunting" or "is offering") and how many
+ * cards; the caption is theirs; a hunt the post belongs to is one line
+ * with a door to it. The cards are slides - the picture beside what
+ * matters about it - and the whole list is one press away with the
+ * boxes to say which you have. The heart and the thread belong to the
+ * post. The app draws the same card natively
+ * (mobile/src/flare-feed-card.tsx).
  */
 
 /** How long ago, in the shortest true form. */
@@ -42,20 +42,13 @@ export function awayLabel(miles: number): string {
 }
 
 /**
- * What the person did, in the words the board uses.
+ * What the person did, in two words.
  *
- * A Flare points one of two ways: wanted, or offered up. Everything in
- * the Feed used to be a want, so the line was a constant - the rows that
- * carry a direction arrived when the separate "recent" kind was folded
- * into this one, and a showcase post reading "is hunting" would have
- * been backwards.
+ * A Flare points one of two ways: wanted, or offered up. The count of
+ * cards is its own chip beside this, so the line itself stays short.
  */
 function statusLabel(item: HuntItem): string {
-  const offering = item.direction === "showcase";
-  if (item.total === 1) return offering ? "is letting go of" : "is hunting";
-  return offering
-    ? `is letting go of ${item.total} cards`
-    : `is hunting ${item.total} cards`;
+  return item.direction === "showcase" ? "is offering" : "is hunting";
 }
 
 /**
@@ -64,13 +57,23 @@ function statusLabel(item: HuntItem): string {
  * A targeting reticle in the accent with a faint glow behind it, then
  * "is hunting" in the same green. Meant to be the recognisable mark of
  * a Flare wherever one is drawn, so it is one component and nothing
- * else draws the pair.
+ * else draws the pair. An offer wears the same reticle without the
+ * glow: the mark is the same, the aim is not.
  */
-export function FlareStatus({ label = "is hunting" }: { label?: string }) {
+export function FlareStatus({
+  label = "is hunting",
+  glow = true,
+}: {
+  label?: string;
+  glow?: boolean;
+}) {
   return (
     <span className="flex items-center gap-1.5 text-sm font-semibold text-accent">
       <Crosshair
-        className="size-[17px] shrink-0 drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]"
+        className={cn(
+          "size-[17px] shrink-0",
+          glow && "drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]",
+        )}
         strokeWidth={1.75}
         aria-hidden="true"
       />
@@ -101,14 +104,25 @@ export function FlareTypeChip({
   );
 }
 
-export function FlareFeedCard({ item }: { item: HuntItem }) {
+export function FlareFeedCard({
+  item,
+  preview = false,
+}: {
+  item: HuntItem;
+  /**
+   * The composer's look before posting: the same card, with nothing
+   * on it that would write to a post that does not exist yet.
+   */
+  preview?: boolean;
+}) {
+  const direction = item.direction === "showcase" ? "showcase" : "want";
   const lead = item.cards[0];
   const single = item.total === 1 && lead;
-  const post = { postId: item.postId, yours: item.yours };
+  const post = { postId: item.postId, yours: item.yours || preview };
 
   const chips = (
     <>
-      <FlareTypeChip label="Want" primary />
+      <FlareTypeChip label={direction === "showcase" ? "Offering" : "Want"} primary />
       {item.acceptsTrade && <FlareTypeChip label="Trade" />}
       {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
     </>
@@ -119,62 +133,32 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
+    caption: card.printingLabel ?? null,
+    anyPrinting: !card.printingId,
+    direction,
+    lookingFor: card.quantity ?? null,
+    stillNeeds: direction === "want" ? (card.remaining ?? null) : null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
+    have: preview ? null : haveFor(card, post),
   }));
 
-  const details = (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      {single ? (
-        <div className="flex flex-col gap-0.5">
-          <p className="line-clamp-2 text-lg leading-tight font-extrabold text-text-primary">
-            {lead.cardName}
-          </p>
-          <p className="text-sm text-text-secondary">{lead.cardNumber}</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-0.5">
-          <p className="line-clamp-2 text-lg leading-tight font-extrabold text-text-primary">
-            {item.deckLabel ?? `${item.total} cards`}
-          </p>
-          <p className="text-sm text-text-secondary">
-            {item.deckLabel ? `${item.total} cards` : "One hunt"}
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-1.5">{chips}</div>
-
-      {single && lead.match && (
-        <p className="text-sm font-semibold text-accent">
-          {lead.match === "exact" ? "You have this" : "You have another printing"}
-        </p>
-      )}
-      {single && lead.state === "found" ? (
-        <p className="text-sm font-semibold text-accent">Found</p>
-      ) : single && lead.youOffered ? (
-        <p className="text-sm text-text-secondary">You said you have this</p>
-      ) : single && lead.state === "offered" ? (
-        <p className="text-sm text-text-secondary">Somebody offered</p>
-      ) : null}
-      {!single && item.youCanAnswer > 0 && (
-        <p className="text-sm font-semibold text-accent">
-          You can answer {item.youCanAnswer} of {item.total}
-        </p>
-      )}
-
-      {/* What they wrote with it, in the quiet colour. Nothing at all
-          when they wrote nothing: no empty row. */}
-      {item.note && (
-        <p className="text-sm leading-relaxed text-text-secondary">
-          &ldquo;{item.note}&rdquo;
-        </p>
-      )}
-    </div>
-  );
+  const tiles = item.cards.map((card, index) => (
+    <FeedTile
+      key={card.cardId}
+      imageUrl={card.imageUrl}
+      name={card.cardName}
+      cardNumber={card.cardNumber}
+      match={card.match}
+      size="pager"
+      state={card.state}
+      have={preview ? null : haveFor(card, post)}
+      siblings={shelf}
+      position={index}
+    />
+  ));
 
   return (
-    <article className="flex flex-col gap-2 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
+    <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
       {/* The header: face, name, the status line; time and distance on
           the right. "Your Flare" is a small label inside this row, never
           a line between posts. */}
@@ -197,18 +181,22 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
                 {item.displayName}
               </span>
               {!item.playerId && <GuestChip />}
-              {item.yours && (
+              {item.yours && !preview && (
                 <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
                   Your Flare
                 </span>
               )}
             </span>
-            <FlareStatus label={statusLabel(item)} />
+            <span className="flex flex-wrap items-center gap-1.5">
+              <FlareStatus label={statusLabel(item)} glow={direction === "want"} />
+              {item.total > 1 && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
+                  {item.total} cards
+                </span>
+              )}
+            </span>
           </span>
         </Link>
-        {/* One line, not a stacked block. Two muted facts on top of
-            each other made the header as tall as the avatar for no
-            reason; a middle dot costs nothing and reads the same. */}
         <div className="flex shrink-0 items-center gap-1 text-[13px] text-text-muted">
           <span>{agoFrom(item.postedAt)}</span>
           {typeof item.milesAway === "number" && (
@@ -220,70 +208,114 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
         </div>
       </div>
 
-      {/* The card, big, with its details beside it. A deck keeps its
-          rail across the width and the details underneath. */}
-      {single ? (
-        /*
-         * Centred, not top-aligned, and a smaller card than it was.
-         *
-         * At "lg" the art stood far taller than the name, number and two
-         * chips beside it, and hanging those from the top put all of the
-         * slack in one block down the right of every post. The founder:
-         * "notice how the cards are so large and there's a lot of dead
-         * space? lessen card size a bit so it looks better."
-         *
-         * Same trade as the app's, which drops from 0.42 of the row to
-         * 0.34: still big enough to recognise a card at a glance, which
-         * is the whole job of the picture.
-         */
-        <div className="flex items-center gap-3.5">
-          <FeedTile
-            imageUrl={lead.imageUrl}
-            name={lead.cardName}
-            cardNumber={lead.cardNumber}
-            match={lead.match}
-            /*
-             * A THUMBNAIL, not a hero. The founder, on the Following
-             * tab: "this mUST be more concise for the flares. it is
-             * HUGEEEEE." Measured on the phone first: a post stood 284pt
-             * on an 874pt screen, the art was most of it, and the
-             * details beside it needed a third of that - so the rest was
-             * empty however it was aligned. Small enough to keep the row
-             * as tall as its details, big enough to recognise the card.
-             */
-            size="sm"
-            state={lead.state}
-            have={haveFor(lead, post)}
-          />
-          {details}
-        </div>
-      ) : (
-        <FlareDeckPager
-          cards={item.cards}
-          total={item.total}
-          chips={chips}
-          note={item.note}
-          tiles={item.cards.map((card, index) => (
-            <FeedTile
-              key={card.cardId}
-              imageUrl={card.imageUrl}
-              name={card.cardName}
-              cardNumber={card.cardNumber}
-              match={card.match}
-              size="pager"
-              state={card.state}
-              have={haveFor(card, post)}
-              siblings={shelf}
-              position={index}
-            />
-          ))}
-        />
+      {/* What they wrote with it. Nothing at all when they wrote nothing. */}
+      {item.note && (
+        <p className="text-sm leading-relaxed text-text-secondary">
+          &ldquo;{item.note}&rdquo;
+        </p>
       )}
 
-      {/* A hairline, then the counts. Understated until touched. */}
-      {/* No rule. It cost a line, a gap above it and a gap below, to
-          separate two things that read as separate anyway. */}
-      <div>
+      {/* The hunt it belongs to, with a door: "Green Zoro · View hunt". */}
+      {item.hunt && (
+        <p className="flex items-center gap-1.5 text-sm">
+          <span className="truncate font-semibold text-text-primary">
+            {item.hunt.name}
+          </span>
+          <span className="text-text-muted" aria-hidden="true">
+            ·
+          </span>
+          {preview ? (
+            <span className="shrink-0 text-text-secondary">View hunt</span>
+          ) : (
+            <Link
+              href={`/hunts/${item.hunt.id}`}
+              className="shrink-0 font-semibold text-accent hover:underline"
+            >
+              View hunt
+            </Link>
+          )}
+        </p>
+      )}
+
+      {/* The cards: one beside its details, or slides. */}
+      {single ? (
+        <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5">
+          {tiles[0]}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <p className="line-clamp-2 text-base leading-tight font-extrabold text-text-primary">
+              {lead.cardName}
+            </p>
+            <p className="text-xs text-text-secondary">{lead.cardNumber}</p>
+            <p className="mt-0.5 text-sm font-semibold text-accent tabular-nums">
+              {cardCountLabel(lead, direction)}
+            </p>
+            <p className="truncate text-xs text-text-muted">
+              {lead.printingLabel ?? "Any printing"}
+            </p>
+            {lead.match && (
+              <p className="text-xs font-semibold text-accent">
+                {lead.match === "exact" ? "You have this" : "You have another printing"}
+              </p>
+            )}
+            {lead.youOffered ? (
+              <p className="text-xs text-text-secondary">You said you have this</p>
+            ) : lead.state === "offered" ? (
+              <p className="text-xs text-text-secondary">Somebody offered</p>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <FlareCarousel cards={item.cards} direction={direction} tiles={tiles} />
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {chips}
+        {!single && item.youCanAnswer > 0 && (
+          <span className="text-xs font-semibold text-accent">
+            You can answer {item.youCanAnswer} of {item.total}
+          </span>
+        )}
+      </div>
+
+      {/* The counts and the doors: the full list, and the one action
+          the post is for. The author updates; anyone else offers. */}
+      {preview ? (
+        <p className="text-sm font-semibold text-text-secondary tabular-nums">
+          {direction === "showcase"
+            ? `${item.cards.reduce((sum, card) => sum + (card.quantity ?? 1), 0)} copies available`
+            : `${item.remainingCopies} ${item.remainingCopies === 1 ? "copy" : "copies"} still needed`}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <FlareCardsSheet
+            postId={item.postId}
+            cards={item.cards}
+            total={item.total}
+            direction={direction}
+            yours={item.yours}
+            completed={item.completed}
+            remainingCopies={item.remainingCopies}
+          />
+          {item.yours &&
+            direction === "want" &&
+            item.cards.some((card) => card.flareId) && (
+              <div>
+                <FlareProgressSheet cards={item.cards} completed={item.completed} />
+              </div>
+            )}
+        </div>
+      )}
+
+      {preview ? (
+        <div className="flex items-center gap-4 text-sm font-medium text-text-secondary">
+          <span className="flex items-center gap-1.5">
+            <Heart className="size-5" aria-hidden="true" />0
+          </span>
+          <span className="flex items-center gap-1.5">
+            <MessageCircle className="size-5" aria-hidden="true" />0
+          </span>
+        </div>
+      ) : (
         <PostSocial
           postId={item.postId}
           likes={item.likes}
@@ -300,7 +332,7 @@ export function FlareFeedCard({ item }: { item: HuntItem }) {
                 }
           }
         />
-      </div>
+      )}
 
       {/* Every post that HAS a place ends in one. */}
       {item.code && item.storeName ? (

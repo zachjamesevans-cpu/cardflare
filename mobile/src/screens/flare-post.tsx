@@ -17,20 +17,16 @@ import {
   type PostDetail,
 } from "../api";
 import { FeedPerson } from "../feed-person";
+import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
+import { cardsLabel } from "../flare-copy";
+import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
+import { FlareActions, FlareTypeChip, statusLabel } from "../flare-feed-card";
+import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
 import { PlayerAvatar } from "../player-avatar";
-import { PostSocialRow, haveFor, type PostRef } from "../post-social";
+import { PostSocialRow, type PostRef } from "../post-social";
 import { colors, gutter, radius, spacing } from "../theme";
-import {
-  AsyncButton,
-  Button,
-  CardImage,
-  ErrorLine,
-  Input,
-  Muted,
-  Tap,
-  type ZoomCard,
-} from "../ui";
+import { AsyncButton, Button, ErrorLine, Input, Muted, Tap } from "../ui";
 
 /**
  * One Flare post, opened from its bubble in the Feed.
@@ -51,6 +47,12 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const [failed, setFailed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /* The cards in a sheet, to read or to offer on; and your own
+     progress. The same two sheets the Feed opens. */
+  const [cardsSheet, setCardsSheet] = useState<
+    (FlareSheetPost & { mode: "view" | "offer" }) | null
+  >(null);
+  const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -124,15 +126,18 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     },
   };
 
-  const shelf: ZoomCard[] = post.cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    name: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, ref),
-  }));
-
+  const shelf = shelfFor(post.cards, ref);
   const total = post.cards.length;
+  const direction = post.direction ?? "want";
+  const lead = post.cards[0];
+  const sheetPost: FlareSheetPost = {
+    postId: post.postId,
+    posterName: post.author.displayName,
+    direction,
+    yours: post.yours,
+    completed: post.completed ?? false,
+    cards: post.cards,
+  };
 
   return (
     <KeyboardAvoidingView
@@ -156,38 +161,74 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           frame={post.author.frame}
           ring={post.author.ring}
           aura={post.author.aura ?? null}
-          detail={`${total === 1 ? "is hunting" : `is hunting ${total} cards`}${
-            post.deckLabel ? ` · ${post.deckLabel}` : ""
-          }${post.eventName ? ` · ${post.eventName}` : ""}`}
+          detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
+            post.eventName ? ` · ${post.eventName}` : ""
+          }`}
           onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
         />
 
-        {/* The cards, tap one to open it big and say you have it. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: spacing(2),
-            alignItems: "center",
-            paddingVertical: spacing(0.5),
-          }}
-        >
-          {post.cards.map((card, index) => (
-            <CardImage
-              key={card.cardId}
-              imageUrl={card.imageUrl}
-              width={total <= 1 ? 160 : 96}
-              name={card.cardName}
-              cardNumber={card.cardNumber}
-              youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-              state={card.state}
-              have={haveFor(card, ref)}
-              siblings={shelf}
-              position={index}
-            />
-          ))}
-        </ScrollView>
-        {!post.yours ? <Muted>Tap a card to say you have it.</Muted> : null}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+          <FlareTypeChip
+            label={direction === "showcase" ? "Offering" : "Want"}
+            primary
+          />
+        </View>
+
+        {/* The cards, the way the Feed draws them: one row, or the
+            same row swiped. Tap one to open it big and say you have it. */}
+        {total === 1 && lead ? (
+          <FlareCardSlide
+            card={lead}
+            direction={direction}
+            post={ref}
+            siblings={shelf}
+            position={0}
+          />
+        ) : (
+          <FlareCarousel
+            cards={post.cards}
+            total={total}
+            direction={direction}
+            post={ref}
+            remainingCopies={post.remainingCopies}
+            onViewAll={() => setCardsSheet({ ...sheetPost, mode: "view" })}
+          />
+        )}
+
+        {post.caption ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
+            {post.caption}
+          </Text>
+        ) : null}
+
+        {post.hunt ? (
+          <Tap
+            onPress={() => navigation.navigate("Hunt", { huntId: post.hunt?.id ?? "" })}
+            accessibilityLabel={`View hunt ${post.hunt.name}`}
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
+            >
+              {post.hunt.name}
+            </Text>
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              · View hunt
+            </Text>
+          </Tap>
+        ) : null}
+
+        <FlareActions
+          yours={post.yours}
+          direction={direction}
+          completed={post.completed ?? false}
+          onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
+          onProgress={() => setProgressSheet(sheetPost)}
+        />
+        {!post.yours && direction === "want" && !post.completed ? (
+          <Muted>Tap a card to say you have it, or offer several at once.</Muted>
+        ) : null}
 
         <PostSocialRow
           likes={post.likes}
@@ -323,6 +364,17 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         </View>
         <ErrorLine message={error} />
       </View>
+
+      <FlareCardsSheet
+        open={cardsSheet}
+        onClose={() => setCardsSheet(null)}
+        onChanged={() => void load()}
+      />
+      <FlareProgressSheet
+        open={progressSheet}
+        onClose={() => setProgressSheet(null)}
+        onChanged={() => void load()}
+      />
     </KeyboardAvoidingView>
   );
 }

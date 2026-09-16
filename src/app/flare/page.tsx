@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { FlareComposer } from "@/components/flares/flare-composer";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,41 +13,62 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
+import { huntsFor } from "@/lib/players/hunts";
+import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getPlayerSession } from "@/lib/players/session";
 import { listWants, postedCardStores } from "@/lib/players/wants";
 import { listHaves } from "@/lib/lists/haves";
 import { nearbySettingsFor } from "@/lib/nearby/settings";
 import { HaveListCard } from "@/components/nearby/have-list-card";
-import { NearbyCard } from "@/components/nearby/nearby-card";
+import { NearbyRow } from "@/components/nearby/nearby-row";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { SITE } from "@/lib/site";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 export const metadata: Metadata = {
-  title: "Your Flares",
+  title: "New flare",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The app's centre tab, on the website — and, the founder's reframe,
- * the list the whole product orbits: search on top, the Flares you are
- * hunting underneath, and every place you scan into (a room, a store
- * counter, a card show) set up to answer that list. Where a new Flare
- * lands is still the same three-way answer:
+ * The app's centre tab, on the website: one composer for one Flare of
+ * one or many cards, the saved requests underneath it, and the Have
+ * list under those. Where a new Flare lands is the same three-way
+ * answer it always was:
  *
  * - in a room they have joined: onto that board;
- * - signed in with no room: onto their account list, waiting for the
- *   next room to offer to post it;
+ * - signed in with no room: to their area, and onto their account list;
  * - a guest with no room: pointed at the door, honestly. Guests have
  *   no account for a list to live on, so the hub is the payoff of
  *   signing in, never a gate.
  */
+
+/** The poster's face and name, for the preview that draws the post. */
+async function composerViewer(
+  playerId: string,
+  fallbackName: string,
+): Promise<{ id: string; displayName: string; avatarUrl: string | null }> {
+  if (!isSupabaseConfigured())
+    return { id: playerId, displayName: fallbackName, avatarUrl: null };
+  const { data } = await getSupabaseAdmin()
+    .from("players")
+    .select("display_name, avatar_url, avatar_animated, tier")
+    .eq("id", playerId)
+    .maybeSingle();
+  return {
+    id: playerId,
+    displayName: data?.display_name ?? fallbackName,
+    avatarUrl: data ? avatarSrc(avatarPathFor(data)) : null,
+  };
+}
+
 export default async function FlarePage({
   searchParams,
 }: {
   /* "Add cards" on a profile hunt arrives here, so the composer opens
-     into that folder rather than asking for the name a second time. */
+     with that hunt already chosen rather than asking a second time. */
   searchParams: Promise<{ hunt?: string }>;
 }) {
   const { hunt } = await searchParams;
@@ -62,14 +84,16 @@ export default async function FlarePage({
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
   const games = await viewerGames();
-  const [wants, posted, haves, nearby] = playerId
+  const [wants, posted, haves, nearby, hunts, poster] = playerId
     ? await Promise.all([
         listWants(playerId),
         postedCardStores(playerId),
         listHaves(playerId),
         nearbySettingsFor(playerId),
+        huntsFor(playerId, playerId),
+        composerViewer(playerId, viewer.kind === "player" ? viewer.playerName : "You"),
       ])
-    : [null, new Map<string, string>(), null, null];
+    : [null, new Map<string, string>(), null, null, [], null];
 
   return (
     <>
@@ -82,38 +106,23 @@ export default async function FlarePage({
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-5">
-          {/* The one switch for nearby matching, above the two lists it
-              governs. Signed-in only: matching needs an account on both
-              ends. */}
+          {/* The one switch for nearby matching, folded to a line above
+              the composer. Signed-in only: matching needs an account on
+              both ends. */}
           {nearby && (
-            <NearbyCard enabled={nearby.enabled} postalCode={nearby.postalCode} />
+            <NearbyRow enabled={nearby.enabled} postalCode={nearby.postalCode} />
           )}
 
-          {room ? (
-            <>
-              <Card className="flex flex-col gap-1">
-                <p className="text-sm text-text-muted">{room.event.storeName}</p>
-                <p className="font-semibold text-text-primary">
-                  Posting to {room.event.name}
-                </p>
-              </Card>
-
-              <AddToListForm
-                code={room.code}
-                kind="flare"
-                imagesEnabled={images}
-                playerGames={games}
-                initialDeck={hunt ?? ""}
-              />
-            </>
-          ) : playerId ? (
-            <AddToListForm
-              code=""
-              kind="flare"
+          {playerId && poster ? (
+            <FlareComposer
+              viewer={poster}
+              hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
               imagesEnabled={images}
               playerGames={games}
-              target="list"
-              initialDeck={hunt ?? ""}
+              room={
+                room ? { name: room.event.name, storeName: room.event.storeName } : null
+              }
+              initialHuntId={hunt ?? null}
             />
           ) : (
             <Card className="flex flex-col gap-3">
@@ -136,16 +145,15 @@ export default async function FlarePage({
           )}
 
           {/*
-           * The standing list, under the search that feeds it. Rendered
-           * for any signed-in player whatever the room situation: a
-           * Flare posted to a room saves here too, so the list below is
-           * live either way. Same rows as the room's re-post panel,
-           * verbs included.
+           * The standing list, under the composer that feeds it: the
+           * requests saved to the account, which every room, store and
+           * show they scan into helps answer. Named for what it is, so
+           * a draft above and a saved request below are never confused.
            */}
           {wants !== null && (
             <Card className="flex flex-col">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="font-semibold text-text-primary">Your Flares</h2>
+                <h2 className="font-semibold text-text-primary">Saved requests</h2>
                 <span className="text-sm text-text-muted tabular-nums">
                   {wants.length} {wants.length === 1 ? "card" : "cards"}
                 </span>
@@ -153,7 +161,7 @@ export default async function FlarePage({
 
               {wants.length === 0 ? (
                 <p className="pt-3 text-sm text-text-secondary">
-                  Post a Flare above and it stays here until you find the card. Every
+                  Post a Flare above and its cards stay here until you find them. Every
                   room, store and show you scan into helps answer this list.
                 </p>
               ) : (

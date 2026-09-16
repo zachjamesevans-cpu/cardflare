@@ -72,6 +72,10 @@ export const CACHE_TTL = {
   room: 5 * 60 * 1000,
   /* A shop's address and phone number. */
   store: 7 * 24 * 60 * 60 * 1000,
+  /* A Flare the composer has not posted yet: the cards, the caption,
+     the hunt. Somebody who picks three cards and gets a phone call
+     should find them still there. A week, then it is a stale idea. */
+  composer: 7 * 24 * 60 * 60 * 1000,
 } as const;
 
 export type CacheKind = keyof typeof CACHE_TTL;

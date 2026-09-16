@@ -10,7 +10,6 @@ import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { HANDLE_MAX, HANDLE_MIN, handleSeedFrom, handleWhileTyping } from "../handle";
 import {
-  tickHuntCard,
   addToShowcase,
   chooseUsername,
   describeError,
@@ -760,22 +759,20 @@ export function ProfileScreen() {
           hunts={profile.hunts ?? []}
           limit={profile.huntLimit}
           yours
-          /* Into the composer with the folder already named, so
+          /* Into the composer with the hunt already chosen, by id, so
              "Add cards" adds to THIS hunt rather than starting a
              fresh one that happens to share a name. */
-          onAdd={(name) =>
+          onAdd={(huntId) =>
             navigation.navigate("Tabs", {
               screen: "Flare",
-              params: { hunt: name },
+              params: { hunt: huntId },
             })
           }
-          /* The answer carries the whole list back, counts and all, so
-             the folder's "2 left" moves with the box rather than going
-             stale until the next load. */
-          onTick={async (flareId, found) => {
-            const { hunts } = await tickHuntCard(flareId, found);
-            setProfile((current) => (current ? { ...current, hunts } : current));
-          }}
+          /* Every write inside the panel paints first and then asks
+             for the truth, so the counts on the row move with the
+             stepper rather than going stale until the next open. */
+          onChanged={() => void load()}
+          onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
         />
 
         {/* The one showcase, editable in place: tap a card to dress

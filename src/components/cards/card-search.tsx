@@ -343,6 +343,7 @@ function Row({
   id,
   composerFor = null,
   composer = null,
+  mark = null,
 }: {
   card: CardResult;
   term: string;
@@ -356,6 +357,8 @@ function Row({
    */
   composerFor?: string | null;
   composer?: React.ReactNode;
+  /** A picker's mark on a result already taken: "1 · 2 copies". */
+  mark?: string | null;
 }) {
   /*
    * The headline is the base printing, not whichever set code sorted first —
@@ -435,8 +438,15 @@ function Row({
           /* Comfortably past 44px tall: a phone target at a busy counter. */
           className="flex min-w-0 flex-1 flex-col gap-1 self-stretch rounded-[var(--radius-control)] text-left"
         >
-          <p className="truncate font-semibold text-text-primary">
-            <Highlighted text={card.exactName} term={term} />
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-semibold text-text-primary">
+              <Highlighted text={card.exactName} term={term} />
+            </span>
+            {mark && (
+              <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
+                {mark}
+              </span>
+            )}
           </p>
 
           <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-xs text-text-muted">
@@ -547,6 +557,11 @@ export interface CardSearchProps {
    * the app's post screen already uses.
    */
   resetSignal?: number;
+  /**
+   * A picker's mark on results it already holds, so a search that picks
+   * several cards shows which are in and in what order. Null for none.
+   */
+  markFor?: (card: CardResult) => string | null;
 }
 
 /**
@@ -565,6 +580,7 @@ export function CardSearch({
   composer = null,
   composerKey = null,
   resetSignal = 0,
+  markFor,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -839,6 +855,7 @@ export function CardSearch({
                 onSelect={onSelect}
                 composerFor={mine ? (keyPrinting ?? "") : null}
                 composer={mine ? composer : null}
+                mark={markFor ? markFor(card) : null}
               />
             );
           })}

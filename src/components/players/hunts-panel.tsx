@@ -1,48 +1,34 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
-import Link from "next/link";
-import { Check, ChevronDown, Crosshair, Folder, FolderOpen } from "lucide-react";
+import { useState, useTransition } from "react";
+import { ChevronDown, Crosshair, Layers, Plus } from "lucide-react";
 
-import { FeedTile } from "@/components/feed/feed-tile";
-import { buttonStyles } from "@/components/ui/button";
-import type { ZoomCard } from "@/components/cards/card-image-zoom";
-import type { Hunt, HuntCard } from "@/lib/players/hunts";
-import { tickHuntCard } from "@/lib/players/hunt-actions";
+import { HuntDetail } from "@/components/players/hunt-detail";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { TextInput } from "@/components/ui/controls";
+import { cn } from "@/lib/cn";
+import { remainingLabel } from "@/lib/flares/draft-rules";
+import { createHuntAction } from "@/lib/players/hunt-actions";
+import type { Hunt } from "@/lib/players/hunts";
 
 /**
  * Somebody's hunts, on their profile.
  *
- * A HUNT IS A FOLDER, and it opens. The founder: "hunts doesn't really
- * do anything rn. look at it. think of the carousel we were using
- * previously. this should be a carousel of cards someone is looking for
- * nested into a folder. go to my profile. there's nothing i can tap or
- * add to."
+ * A hunt is a persistent named list: "Green Zoro", "Wishlist upgrades".
+ * Each row is closed by default and says the one thing worth reading
+ * shut - what is left - and opens onto the full list with its progress.
+ * Three rows at most, so a profile with a dozen hunts is still a
+ * profile; the rest are one press away, and every hunt has a page of
+ * its own at /hunts/<id> for sharing.
  *
- * Right on every count. It was a name and two numbers - a receipt for
- * cards you could not see, on a panel with nothing to press. The row is
- * a lid now: open it and the cards are underneath, drawn by the same
- * `FeedTile` the Feed's rails use, so they zoom and page exactly like
- * every other card on the site. Nothing new was invented to show them.
- *
- * The two numbers stay, because they are the thing worth reading at a
- * glance: what is left says whether you can help. They just summarise
- * something visible now instead of standing in for it.
- *
- * IT IS A CHECKLIST. The founder: "needs to be a simply way in hunts to
- * mark off if you've already found that card. think of it as a
- * checklist, others can help you check those things off, or you can
- * check them off yourself as you collect the cards."
- *
- * This panel used to say the opposite - nothing checked off by hand,
- * only a confirmed trade could do it - and that was wrong about the
- * world. Most cards arrive by pull, purchase or a friend, so a list only
- * a trade could tick was wrong about most of its own boxes.
- *
- * The two ways stay separate underneath: a trade writes `status`, a tick
- * writes `found_at`, and found is either. So ticking a box never invents
- * a trade that did not happen, and a trade never needs the box.
+ * The owner starts a hunt here, edits it here and ticks copies off
+ * here. A visitor picks the cards they have and offers them, on the
+ * posts those cards were flared in. Neither sees the other's controls.
  */
+
+/** How many rows the profile shows before "See all". */
+const SHOWN = 3;
+
 export function HuntsPanel({
   hunts,
   limit,
@@ -53,61 +39,116 @@ export function HuntsPanel({
   limit?: number;
   yours?: boolean;
 }) {
-  /*
-   * At most one open. A profile with five hunts open is five rails and
-   * a scroll, which is the wall of cards the folders exist to avoid.
-   * The first opens itself, so the panel is never a row of closed lids
-   * with nothing to look at.
-   */
-  const [open, setOpen] = useState<string | null>(hunts[0]?.name ?? null);
+  /* One open at a time: two open hunts are two lists and a scroll. The
+     first opens itself so the panel is never a row of closed lids. */
+  const [open, setOpen] = useState<string | null>(hunts[0]?.id ?? null);
+  const [showAll, setShowAll] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const atLimit = limit !== undefined && hunts.length >= limit;
+  const shown = showAll ? hunts : hunts.slice(0, SHOWN);
+  const hidden = hunts.length - shown.length;
 
   return (
     <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-2 font-semibold text-text-primary">
           <Crosshair className="size-4 text-accent" aria-hidden="true" />
           Hunts
         </p>
-        {limit ? (
-          <p className="text-xs text-text-muted tabular-nums">
-            {hunts.length} of {limit}
-          </p>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {limit ? (
+            <p className="text-xs text-text-muted tabular-nums">
+              {hunts.length} of {limit}
+            </p>
+          ) : null}
+          {yours && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={atLimit}
+              title={
+                atLimit ? "You are keeping the most hunts your plan allows." : undefined
+              }
+              onClick={() => setCreating((value) => !value)}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              New hunt
+            </Button>
+          )}
+        </div>
       </div>
+      {yours && atLimit && (
+        <p className="text-xs text-text-muted">
+          You are keeping {hunts.length} hunts, the limit on your plan. Finish one to
+          start another.
+        </p>
+      )}
+
+      {yours && creating && !atLimit && (
+        <NewHuntForm
+          onDone={(huntId) => {
+            setCreating(false);
+            if (huntId) setOpen(huntId);
+          }}
+        />
+      )}
 
       {hunts.length === 0 ? (
-        <>
-          <p className="text-sm text-text-secondary">
-            {yours
-              ? "Name a group when you post and every card you add joins it. The set shows up here, with what is left and what you have found."
-              : "No hunts yet."}
-          </p>
-          {/* Somewhere to press. An empty panel that only explains what
-              would happen is the thing the founder was looking at. */}
-          {yours ? (
-            <Link href="/flare" className={buttonStyles("secondary", "sm")}>
-              Start a hunt
-            </Link>
-          ) : null}
-        </>
+        <p className="text-sm text-text-secondary">
+          {yours
+            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole list follows you, with what is found and what is left."
+            : "No hunts yet."}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {hunts.map((hunt) => (
-            <HuntFolder
-              key={hunt.name}
+          {shown.map((hunt) => (
+            <HuntRow
+              key={hunt.id}
               hunt={hunt}
-              open={open === hunt.name}
-              onToggle={() => setOpen(open === hunt.name ? null : hunt.name)}
-              yours={yours}
+              open={open === hunt.id}
+              onToggle={() => setOpen(open === hunt.id ? null : hunt.id)}
+              yours={Boolean(yours)}
             />
           ))}
         </ul>
+      )}
+
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className={buttonStyles("ghost", "sm")}
+        >
+          See all {hunts.length} hunts
+        </button>
+      )}
+      {showAll && hunts.length > SHOWN && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className={buttonStyles("ghost", "sm")}
+        >
+          Show fewer
+        </button>
       )}
     </section>
   );
 }
 
-function HuntFolder({
+/**
+ * "5 copies left · 2 cards", or "All found". Copies and cards are two
+ * numbers and both are said, because a hunt for one card in four copies
+ * and a hunt for four cards are different amounts of help to give.
+ */
+export function lookingLabel(hunt: Hunt): string {
+  if (hunt.cards.length === 0) return "No cards yet";
+  return remainingLabel(hunt.cards);
+}
+
+/** One hunt, shut or open. Shut is a lid; open is the whole list. */
+function HuntRow({
   hunt,
   open,
   onToggle,
@@ -116,175 +157,119 @@ function HuntFolder({
   hunt: Hunt;
   open: boolean;
   onToggle: () => void;
-  yours?: boolean;
+  yours: boolean;
 }) {
-  const cards = hunt.cards ?? [];
-
-  /* The shelf the zoom pages along, so opening one card lets you swipe
-     the whole folder - the same shelf a Flare's deck hands its tiles. */
-  const shelf: ZoomCard[] = cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    exactName: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: null,
-    have: null,
-  }));
+  const previews = hunt.cards.slice(0, 3);
+  const finished = hunt.cards.length > 0 && hunt.lookingCopies === 0;
 
   return (
     <li
-      className={`overflow-hidden rounded-[var(--radius-control)] border bg-elevated ${
-        open ? "border-accent" : "border-border"
-      }`}
+      className={cn(
+        "rounded-[var(--radius-control)] border bg-elevated",
+        open ? "border-accent" : "border-border",
+      )}
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface/60"
+        className="flex w-full cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2.5 text-left transition-colors hover:bg-surface/60"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {open ? (
-            <FolderOpen className="size-4 shrink-0 text-accent" aria-hidden="true" />
-          ) : (
-            <Folder className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
-          )}
+        {previews.length > 0 ? (
+          <span className="flex shrink-0 -space-x-3" aria-hidden="true">
+            {previews.map((card) => (
+              <span
+                key={card.requestId}
+                className="block h-10 w-7 overflow-hidden rounded-[4px] border border-border bg-surface ring-1 ring-surface"
+              >
+                {card.imageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={card.imageUrl} alt="" className="size-full object-cover" />
+                )}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface">
+            <Layers className="size-4 text-text-muted" aria-hidden="true" />
+          </span>
+        )}
+        <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-semibold text-text-primary">{hunt.name}</span>
+          <span
+            className={cn(
+              "truncate text-xs tabular-nums",
+              finished ? "text-text-muted" : "text-accent",
+            )}
+          >
+            {lookingLabel(hunt)}
+          </span>
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums">
-          {hunt.looking > 0 ? (
-            <span className="text-accent">{lookingLabel(hunt)}</span>
-          ) : (
-            <span className="text-text-muted">All found</span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-text-muted transition-transform",
+            open && "rotate-180",
           )}
-          {hunt.found > 0 ? (
-            <span className="text-text-muted">· {hunt.found} found</span>
-          ) : null}
-          <ChevronDown
-            className={`size-3.5 text-text-muted transition-transform ${
-              open ? "rotate-180" : ""
-            }`}
-            aria-hidden="true"
-          />
-        </span>
+          aria-hidden="true"
+        />
       </button>
 
-      {open ? (
-        <div className="flex flex-col gap-3 px-3 pb-3">
-          {cards.length > 0 ? (
-            /* Scrolls inside itself: a long hunt must never make the
-               page scroll sideways. */
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-0.5">
-              {cards.map((card, index) => (
-                <div key={card.cardId} className="flex shrink-0 flex-col gap-1">
-                  <FeedTile
-                    imageUrl={card.imageUrl}
-                    name={card.cardName}
-                    cardNumber={card.cardNumber}
-                    match={null}
-                    size="pager"
-                    /* Found reads as found: the same dimming a traded
-                       card wears on a Flare, so one visual vocabulary
-                       covers both. */
-                    state={card.found ? "found" : "open"}
-                    siblings={shelf}
-                    position={index}
-                  />
-                  {yours ? <TickBox card={card} /> : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-text-muted">Nothing to show yet.</p>
-          )}
-          {yours ? (
-            <Link
-              /* Into the composer with the folder already named, so this
-                 adds to THIS hunt rather than starting a fresh one that
-                 happens to share a name. */
-              href={`/flare?hunt=${encodeURIComponent(hunt.name)}`}
-              className={buttonStyles("secondary", "sm")}
-            >
-              Add cards
-            </Link>
-          ) : null}
+      {open && (
+        <div className="border-t border-border px-3 pt-3 pb-3">
+          <HuntDetail hunt={hunt} yours={yours} />
         </div>
-      ) : null}
+      )}
     </li>
   );
 }
 
-/**
- * "3 left", or "3 left (5 copies)" when somebody wants more than one of
- * something. The copies only appear when they differ from the card
- * count, because "3 left (3 copies)" is the same fact twice.
- */
-export function lookingLabel(hunt: Hunt): string {
-  if (hunt.lookingCopies > hunt.looking) {
-    return `${hunt.looking} left · ${hunt.lookingCopies} copies`;
-  }
-  return `${hunt.looking} left`;
-}
-
-/**
- * One box, under one card.
- *
- * OPTIMISTIC, because the whole value of a checklist is that ticking
- * feels like nothing. Somebody standing at a counter with a binder open
- * is going to tap five of these in a row, and a spinner between each one
- * turns a checklist back into a form. The tick paints immediately and
- * the server confirms behind it; if the write fails the state snaps back
- * when the page revalidates and the error is said out loud rather than
- * swallowed.
- *
- * A card a real TRADE closed has no box: that fact belongs to the trade,
- * and a box implying you could untick it would be lying about what it
- * does.
- */
-function TickBox({ card }: { card: HuntCard }) {
-  const [pending, start] = useTransition();
-  const [found, setFound] = useOptimistic(card.found);
+/** A name, and the hunt exists. Everything else is edited once it does. */
+function NewHuntForm({ onDone }: { onDone: (huntId: string | null) => void }) {
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  if (card.tradedAway) {
-    return (
-      <span className="flex items-center justify-center gap-1 text-[10px] text-text-muted">
-        <Check className="size-3" aria-hidden="true" />
-        Traded
-      </span>
-    );
-  }
+  const [pending, start] = useTransition();
 
   return (
-    <>
-      <button
-        type="button"
-        disabled={pending}
-        aria-pressed={found}
-        aria-label={`${found ? "Unmark" : "Mark"} ${card.cardName} as found`}
-        onClick={() =>
-          start(async () => {
-            setFound(!found);
-            setError(null);
-            const result = card.flareId
-              ? await tickHuntCard(card.flareId, !found)
-              : { ok: false, error: "Nothing posted for this card yet." };
-            if (!result.ok) setError(result.error ?? "Could not update that card.");
-          })
-        }
-        className={`flex items-center justify-center gap-1 rounded-[6px] border px-1.5 py-1 text-[10px] font-bold transition-colors ${
-          found
-            ? "border-accent bg-accent text-accent-contrast"
-            : "border-border-strong text-text-secondary hover:border-accent hover:text-accent"
-        }`}
-      >
-        <Check className="size-3" aria-hidden="true" />
-        {found ? "Got it" : "Mark"}
-      </button>
-      {error ? (
-        <span role="alert" className="text-[10px] text-danger">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (pending || name.trim().length === 0) return;
+        setError(null);
+        start(async () => {
+          const result = await createHuntAction({ name });
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          onDone(result.huntId ?? null);
+        });
+      }}
+      className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3"
+    >
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-text-secondary">Hunt name</span>
+        <TextInput
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          maxLength={60}
+          placeholder="Green Zoro"
+          autoFocus
+          required
+        />
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-danger">
           {error}
-        </span>
-      ) : null}
-    </>
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={pending || name.trim().length === 0}>
+          {pending ? "Starting…" : "Start hunt"}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => onDone(null)}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }

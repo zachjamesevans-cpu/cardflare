@@ -90,7 +90,9 @@ export async function setFlareFoundAction(
     return {
       ok: false,
       error:
-        result.reason === "not-yours" ? "That card is not yours." : "Could not update that card.",
+        result.reason === "not-yours"
+          ? "That card is not yours."
+          : "Could not update that card.",
     };
   }
   repaint(playerId);
@@ -121,14 +123,19 @@ export async function createHuntAction(input: {
 
 export async function updateHuntAction(
   huntId: string,
-  patch: { name?: string; description?: string | null; visibility?: "public" | "private" },
+  patch: {
+    name?: string;
+    description?: string | null;
+    visibility?: "public" | "private";
+  },
 ): Promise<Outcome> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, error: SIGN_IN };
   const result = await updateHunt(playerId, huntId, patch);
   if (!result.ok) {
     if (result.reason === "name") return { ok: false, error: "Give the hunt a name." };
-    if (result.reason === "not-yours") return { ok: false, error: "That hunt is not yours." };
+    if (result.reason === "not-yours")
+      return { ok: false, error: "That hunt is not yours." };
     return { ok: false, error: "Could not update the hunt." };
   }
   repaint(playerId, huntId);
@@ -147,7 +154,10 @@ export async function addHuntCardsAction(
   if (!result.ok) {
     return {
       ok: false,
-      error: result.reason === "not-yours" ? "That hunt is not yours." : "Could not add those cards.",
+      error:
+        result.reason === "not-yours"
+          ? "That hunt is not yours."
+          : "Could not add those cards.",
     };
   }
   repaint(playerId, huntId);
