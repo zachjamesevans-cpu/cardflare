@@ -910,7 +910,32 @@ function RoomScreen({
           const held = (flare: RoomFlare) => Boolean(flare.match);
 
           const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
-          const orderedRail = inRailOrder(railFlares, held, isCovered);
+          /*
+           * ONE SHELF, BOTH DIRECTIONS - the wants in rail order, then
+           * the showcases in theirs.
+           *
+           * The founder: "when a flare is in the 'letting go' tab if im
+           * trying to offer something up, when i click it, it only shows
+           * the cards that are in cards im looking for. the letting go
+           * cards should be swipable in the carousel like normal, but
+           * should say im offering it up or letting it go once i swipe
+           * to it."
+           *
+           * The shelf was built from `wants` alone, so a showcase tile
+           * was never in it: `shelfAt` missed, the `?? 0` put the viewer
+           * at the FIRST WANTED CARD, and opening a card somebody was
+           * letting go showed a card they were hunting instead.
+           *
+           * They stay visibly separate - the two sections below are
+           * untouched - but the swipe runs through both, which is what
+           * the website has always done. The zoom reads `direction` off
+           * each card, so swiping onto a showcase says "Letting go of"
+           * on its own.
+           */
+          const orderedRail = [
+            ...inRailOrder(railFlares, held, isCovered),
+            ...inRailOrder(showcases, held, isCovered),
+          ];
 
           /*
            * The rail as one shelf, in the order it is drawn, so swiping
