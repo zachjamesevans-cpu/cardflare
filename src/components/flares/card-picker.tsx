@@ -17,6 +17,11 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * than a second row. The search stays as it was between taps, so
  * somebody adding three Zoros does not type "zoro" three times.
  */
+/** "1", or "1 · 2 copies" once there is more than one. */
+function markText(index: number, quantity: number): string {
+  return quantity > 1 ? `${index + 1} · ${quantity} copies` : `${index + 1}`;
+}
+
 export function CardPicker({
   imagesEnabled,
   playerGames,
@@ -88,13 +93,33 @@ export function CardPicker({
         playerGames={playerGames}
         autoFocus
         onSelect={onAdd}
+        /*
+         * THE NUMBER GOES WHERE THE TAP WENT.
+         *
+         * The founder: "it adds the number at the root of the card. for
+         * example, if there's 7 diff alt arts for bonney and i click the
+         * bottom one, the number appears to the right of the main one...
+         * you should't have to scroll up to see that."
+         *
+         * So the card row wears the badge only when the pick was the
+         * card itself - "any printing", which is what tapping the row
+         * means. A pick that named a version wears it on that version,
+         * down in the list where the finger already is.
+         */
         markFor={(card) => {
           const index = cards.findIndex((item) => item.card.id === card.id);
           if (index === -1) return null;
           const item = cards[index];
-          return item.quantity > 1
-            ? `${index + 1} · ${item.quantity} copies`
-            : `${index + 1}`;
+          if (item.printingId) return null;
+          return markText(index, item.quantity);
+        }}
+        markForPrintingFor={(card) => {
+          const index = cards.findIndex((item) => item.card.id === card.id);
+          if (index === -1) return undefined;
+          const item = cards[index];
+          if (!item.printingId) return undefined;
+          return (printing) =>
+            printing.id === item.printingId ? markText(index, item.quantity) : null;
         }}
       />
     </div>

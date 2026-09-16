@@ -254,6 +254,7 @@ function PrintingList({
   card,
   imagesEnabled,
   onPick,
+  markFor,
   composerFor = null,
   composer = null,
 }: {
@@ -269,6 +270,8 @@ function PrintingList({
    * made to pick the card, open a dropdown, and find the art a second time.
    */
   onPick?: (printing: CardPrinting) => void;
+  /** The badge for one version, when the caller is counting picks. */
+  markFor?: (printing: CardPrinting) => string | null;
 }) {
   return (
     <ul className="flex flex-col gap-1.5" aria-label="Versions">
@@ -323,6 +326,18 @@ function PrintingList({
                   {label}
                 </span>
               )}
+
+              {/*
+               * The badge belongs on the version that was tapped, not on
+               * the card above it. The founder: "it adds the number at
+               * the root of the card... you should't have to scroll up
+               * to see that."
+               */}
+              {markFor?.(printing) && (
+                <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
+                  {markFor(printing)}
+                </span>
+              )}
             </div>
 
             {/* Attached to this exact version, which is the point. */}
@@ -344,6 +359,7 @@ function Row({
   composerFor = null,
   composer = null,
   mark = null,
+  markForPrinting,
 }: {
   card: CardResult;
   term: string;
@@ -359,6 +375,8 @@ function Row({
   composer?: React.ReactNode;
   /** A picker's mark on a result already taken: "1 · 2 copies". */
   mark?: string | null;
+  /** The same, per version, so a tapped alt art wears its own number. */
+  markForPrinting?: (printing: CardPrinting) => string | null;
 }) {
   /*
    * The headline is the base printing, not whichever set code sorted first —
@@ -499,6 +517,7 @@ function Row({
                 card={card}
                 imagesEnabled={imagesEnabled}
                 onPick={onSelect && ((printing) => onSelect(card, printing))}
+                markFor={markForPrinting}
                 composerFor={composerFor}
                 composer={composer}
               />
@@ -562,6 +581,15 @@ export interface CardSearchProps {
    * several cards shows which are in and in what order. Null for none.
    */
   markFor?: (card: CardResult) => string | null;
+  /**
+   * The badge for one VERSION of a card, when the caller counts picks
+   * per printing. Returns the per-printing marker for that card, so a
+   * tapped alt art wears its own number rather than passing it up to
+   * the row above.
+   */
+  markForPrintingFor?: (
+    card: CardResult,
+  ) => ((printing: CardPrinting) => string | null) | undefined;
 }
 
 /**
@@ -581,6 +609,7 @@ export function CardSearch({
   composerKey = null,
   resetSignal = 0,
   markFor,
+  markForPrintingFor,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -856,6 +885,9 @@ export function CardSearch({
                 composerFor={mine ? (keyPrinting ?? "") : null}
                 composer={mine ? composer : null}
                 mark={markFor ? markFor(card) : null}
+                markForPrinting={
+                  markForPrintingFor ? markForPrintingFor(card) : undefined
+                }
               />
             );
           })}
