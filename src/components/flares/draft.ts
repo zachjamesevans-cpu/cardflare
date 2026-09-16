@@ -64,9 +64,19 @@ export function isEmptyDraft(draft: Draft): boolean {
 
 /**
  * The same CARD again is more copies of it, never a second row: card
- * identity and printing are two things, and the printing is changed
- * on the card's own editor. A tap that carried a printing sets it on a
- * card that had none.
+ * identity and printing are two things, and the printing is changed on
+ * the card's own editor.
+ *
+ * A TAP THAT CARRIES A PRINTING WINS. It used to set the printing only
+ * on a card that had none, so picking the card and then one of its alt
+ * arts quietly kept the first answer - the founder: "even though i
+ * select the alt art, it does the main version of it base rarity. that
+ * should not be the case."
+ *
+ * Right, and the old rule had it backwards: tapping a version in the
+ * list is the most specific thing anybody can say about which art they
+ * want, so it is the one answer that should never be discarded. Tapping
+ * the card itself still means "any printing", and still says so.
  */
 export function addCard(
   cards: DraftCard[],
@@ -82,7 +92,7 @@ export function addCard(
       ? {
           ...item,
           quantity: Math.min(MAX_COPIES, item.quantity + 1),
-          printingId: item.printingId ?? printing?.id ?? null,
+          printingId: printing ? printing.id : item.printingId,
         }
       : item,
   );

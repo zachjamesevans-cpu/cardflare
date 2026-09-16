@@ -41,7 +41,20 @@ export function HuntsPanel({
 }) {
   /* One open at a time: two open hunts are two lists and a scroll. The
      first opens itself so the panel is never a row of closed lids. */
-  const [open, setOpen] = useState<string | null>(hunts[0]?.id ?? null);
+  /*
+   * CLOSED UNTIL ASKED.
+   *
+   * The first folder used to open itself, on the argument that a panel
+   * of closed lids shows nothing. The founder, opening somebody else's
+   * profile: "it immediately unnests their top hunt holder. dont do
+   * that."
+   *
+   * Right - a profile is a thing you glance at, and the top hunt
+   * springing open makes one arbitrary folder the loudest thing on
+   * somebody's page. Closed is also the only state that reads the same
+   * whoever is looking.
+   */
+  const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [creating, setCreating] = useState(false);
 

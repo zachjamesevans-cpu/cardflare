@@ -94,7 +94,20 @@ export function HuntsPanel({
    * a scroll, which is the wall the rows exist to avoid. The first
    * opens itself so the panel is never a stack of closed lids.
    */
-  const [open, setOpen] = useState<string | null>(keyOf(hunts[0]));
+  /*
+   * CLOSED UNTIL ASKED.
+   *
+   * The first folder used to open itself, on the argument that a panel
+   * of closed lids shows nothing. The founder, opening somebody else's
+   * profile: "it immediately unnests their top hunt holder. dont do
+   * that."
+   *
+   * Right - a profile is a thing you glance at, and the top hunt
+   * springing open makes one arbitrary folder the loudest thing on
+   * somebody's page. Closed is also the only state that reads the same
+   * whoever is looking.
+   */
+  const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
