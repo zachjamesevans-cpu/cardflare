@@ -10,6 +10,8 @@ import {
 
 import { Logo } from "@/components/brand/logo";
 import { FlareFeedCard } from "@/components/feed/flare-feed-card";
+import { FlareFeedCardCompact } from "@/components/feed/flare-feed-card-compact";
+import type { FeedView } from "@/lib/feed/views";
 import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -113,7 +115,14 @@ const STARTERS = {
   },
 } as const;
 
-export function Item({ item }: { item: FeedItem }) {
+export function Item({
+  item,
+  view = "classic",
+}: {
+  item: FeedItem;
+  /** How the reader asked for the Feed to be drawn. */
+  view?: FeedView;
+}) {
   if (item.kind === "announcement") {
     return (
       <Card className="flex flex-col gap-3 p-4">
@@ -163,7 +172,11 @@ export function Item({ item }: { item: FeedItem }) {
   }
 
   if (item.kind === "hunt") {
-    return <FlareFeedCard item={item} />;
+    return view === "compact" ? (
+      <FlareFeedCardCompact item={item} />
+    ) : (
+      <FlareFeedCard item={item} />
+    );
   }
 
   if (item.kind === "traded") {

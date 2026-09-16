@@ -43,6 +43,8 @@ import {
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
 import { FlareFeedCard } from "../flare-feed-card";
+import { FlareFeedCardCompact } from "../flare-feed-card-compact";
+import { feedViewFrom } from "../feed-views";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { FeedFilterTabs } from "../feed-filter-tabs";
@@ -237,6 +239,10 @@ export function HomeScreen() {
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
+  /* How this player wants the Feed drawn. Anything this build does not
+     recognise reads as the original card - see feedViewFrom. */
+  const view = feedViewFrom(me?.player.feedView);
+
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
   const shown = feed.filter((item) => belongsToTab(item, tab));
@@ -1038,6 +1044,32 @@ export function HomeScreen() {
                 ))}
               </Card>
             ) : item.kind === "hunt" ? (
+              view === "compact" ? (
+                /* The founder's compact view: art and a needed-count,
+                   everything else a tap away. See flare-feed-card-compact. */
+                <FlareFeedCardCompact
+                  key={`hunt-${index}`}
+                  item={item}
+                  post={postRef(item)}
+                  onOpenProfile={(id) =>
+                    navigation.navigate("PlayerProfile", { playerId: id })
+                  }
+                  onLike={(liked) => likePost(item.postId, liked)}
+                  onOpenThread={() =>
+                    navigation.navigate("FlarePost", { postId: item.postId })
+                  }
+                  onMessage={
+                    item.yours || !item.cards[0]?.flareId
+                      ? undefined
+                      : () =>
+                          setMessaging({
+                            flareId: item.cards[0]?.flareId ?? "",
+                            cardName: item.cards[0]?.cardName ?? "your card",
+                            posterName: item.displayName,
+                          })
+                  }
+                />
+              ) : (
               <FlareFeedCard
                 key={`hunt-${index}`}
                 item={item}
@@ -1071,6 +1103,7 @@ export function HomeScreen() {
                 }
                 onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
               />
+              )
             ) : item.kind === "upcoming" ? (
               <Card key={`upcoming-${index}`}>
                 <Muted>

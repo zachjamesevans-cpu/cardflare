@@ -17,6 +17,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser, sessionForPlayer } from "@/lib/players/accounts";
 import { listFeed } from "@/lib/feed/repository";
+import { feedViewFor } from "@/lib/feed/view-settings";
 import { listLocals } from "@/lib/players/locals";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -172,6 +173,10 @@ export default async function FeedPage({
      under a tab this build has never heard of, vanished on the website
      while the app still showed it. Headings only where a tab holds
      more than one section. */
+  /* How this reader wants their Feed drawn. Read here rather than in
+     the card, so one query answers it for the whole page. */
+  const view = playerId ? await feedViewFor(playerId) : "classic";
+
   const shown = items.filter((item) => belongsToTab(item, tab));
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
 
@@ -261,7 +266,7 @@ export default async function FeedPage({
                   {sectionHeading(item.section)}
                 </h2>
               )}
-            <Item item={item} />
+            <Item item={item} view={view} />
             {/* Why this is on your screen. A feed that explains itself
                 stops feeling arbitrary even when it is thin. A post
                 carries its own label in its header instead - the

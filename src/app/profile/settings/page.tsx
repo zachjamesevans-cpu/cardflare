@@ -15,6 +15,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FeedViewPicker } from "@/components/feed/feed-view-picker";
+import { feedViewFor } from "@/lib/feed/view-settings";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { signOut } from "@/lib/auth/actions";
 import { areasForUser } from "@/lib/auth/areas";
@@ -159,6 +161,13 @@ export default async function ProfileSettingsPage() {
         </div>
       </div>
       <PostalAsk defaultValue={postalCode ?? ""} allowClear />
+    </Card>
+  );
+
+  /* How the Feed is drawn. Account-level, so it follows to the app. */
+  const feedViewCard = !playerId ? null : (
+    <Card key="feed-view">
+      <FeedViewPicker current={await feedViewFor(playerId)} />
     </Card>
   );
 
@@ -381,6 +390,7 @@ export default async function ProfileSettingsPage() {
   const cards = isPlayerHome
     ? [
         localsCard,
+        feedViewCard,
         wantsCard,
         collectionCard,
         locationCard,
@@ -394,6 +404,7 @@ export default async function ProfileSettingsPage() {
         emailCard,
         locationCard,
         localsCard,
+        feedViewCard,
         wantsCard,
         collectionCard,
         passwordCard,
