@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { PostedWhere } from "@/lib/players/wants";
+
 /**
  * The JSON API the native app talks to. The rules under test: a request
  * is somebody only when its bearer token verifies against the project
@@ -64,11 +66,15 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/players/accounts", () => ({
   playerForUser: (...a: unknown[]) => playerForUser(...a),
 }));
-vi.mock("@/lib/players/wants", () => ({
+vi.mock("@/lib/players/wants", async (importOriginal) => ({
+  /* `postedLabel` is pure and stays real: the route's snapshot should be
+     shaped by the same function the pages use, not by a copy of it that
+     can quietly disagree. Only the reads are stubbed. */
+  ...(await importOriginal<typeof import("@/lib/players/wants")>()),
   listWants: (...a: unknown[]) => listWants(...a),
   /* Which saved cards are live on a board. Nothing posted in these
      fixtures, so every want reads as saved-only. */
-  postedCardStores: () => Promise.resolve(new Map<string, string>()),
+  postedCardStores: () => Promise.resolve(new Map<string, PostedWhere[]>()),
 }));
 vi.mock("@/lib/players/collection", () => ({
   collectionSyncFor: (...a: unknown[]) => collectionSyncFor(...a),

@@ -8,12 +8,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
-import {
-  HANDLE_MAX,
-  HANDLE_MIN,
-  handleSeedFrom,
-  handleWhileTyping,
-} from "../handle";
+import { HANDLE_MAX, HANDLE_MIN, handleSeedFrom, handleWhileTyping } from "../handle";
 import {
   addToShowcase,
   chooseUsername,
@@ -62,7 +57,7 @@ import {
   Title,
 } from "../ui";
 import { useTabBarInset } from "../glass";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
@@ -409,7 +404,8 @@ export function ProfileScreen() {
     return (
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(4),
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
         }}
@@ -423,7 +419,8 @@ export function ProfileScreen() {
     return (
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(4),
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -463,7 +460,8 @@ export function ProfileScreen() {
     return (
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(4),
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -501,7 +499,8 @@ export function ProfileScreen() {
     return (
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(4),
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -535,13 +534,14 @@ export function ProfileScreen() {
 
   return (
     <ScrollView
-        contentContainerStyle={{
-          padding: spacing(4),
-          gap: spacing(4),
-          /* Clear of the floating tab bar. */
-          paddingBottom: spacing(4) + tabInset,
-        }}
-      >
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+        /* Clear of the floating tab bar. */
+        paddingBottom: spacing(4) + tabInset,
+      }}
+    >
       {/* Your own profile block, laid out exactly as View full profile
           shows anyone else - same cover, same picture, same numbers,
           same name and handle, same shelf, with Edit profile where
@@ -645,7 +645,10 @@ export function ProfileScreen() {
                   label={editing ? "Done" : "Edit profile"}
                   onPress={() => setEditing((open) => !open)}
                 />
-                <ShareProfileButton playerId={profile.playerId} name={profile.displayName} />
+                <ShareProfileButton
+                  playerId={profile.playerId}
+                  name={profile.displayName}
+                />
               </>
             }
           />
@@ -755,11 +758,7 @@ export function ProfileScreen() {
 
         {/* Your hunts, above the shelf. What you are looking for is the
             live thing; the showcase is what you are done with. */}
-        <HuntsPanel
-          hunts={profile.hunts ?? []}
-          limit={profile.huntLimit}
-          yours
-        />
+        <HuntsPanel hunts={profile.hunts ?? []} limit={profile.huntLimit} yours />
 
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The wand carries the
@@ -984,7 +983,9 @@ export function ProfileScreen() {
             />
           </View>
         ) : history.trades.length === 0 ? (
-          <Muted>Nothing traded yet. Confirm a trade in a room and it lands here.</Muted>
+          <Muted>
+            Nothing traded yet. Confirm a trade in a room and it lands here.
+          </Muted>
         ) : (
           <>
             <View>
@@ -1555,7 +1556,11 @@ function DressModal({
               gesture on the shelf - and the room re-opens on the
               neighbour with its own picks and note. */}
           <View
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
             onTouchStart={(event) => {
               touchFrom.current = event.nativeEvent.pageX;
             }}
@@ -1597,7 +1602,9 @@ function DressModal({
             </Tap>
           </View>
           {shelf.length > 1 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>
+            <Text
+              style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}
+            >
               {`${index + 1} of ${shelf.length}`}
             </Text>
           ) : null}
@@ -1649,7 +1656,9 @@ function DressModal({
               paddingTop: spacing(3),
             }}
           >
-            <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}
+            >
               Note
             </Text>
             <Input

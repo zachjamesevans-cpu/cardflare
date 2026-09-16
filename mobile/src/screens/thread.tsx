@@ -24,7 +24,7 @@ import {
 import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
 import { meetLine, suggestText } from "../meet";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Muted } from "../ui";
 
 /**
@@ -74,9 +74,7 @@ export function ThreadScreen() {
          slides in behind the composer unless it is followed down. */
       requestAnimationFrame(() => list.current?.scrollToEnd({ animated: true }));
     });
-    const hidden = Keyboard.addListener("keyboardWillHide", () =>
-      setKeyboardUp(false),
-    );
+    const hidden = Keyboard.addListener("keyboardWillHide", () => setKeyboardUp(false));
     return () => {
       shown.remove();
       hidden.remove();
@@ -151,7 +149,7 @@ export function ThreadScreen() {
       {cardName && (
         <View
           style={{
-            paddingHorizontal: spacing(4),
+            paddingHorizontal: gutter,
             paddingVertical: spacing(2),
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
@@ -164,7 +162,11 @@ export function ThreadScreen() {
       <FlatList
         ref={list}
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: spacing(4), gap: spacing(2) }}
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(2),
+        }}
         data={messages ?? []}
         keyExtractor={(message) => message.id}
         /* A conversation opens on its newest message, not its oldest.
@@ -242,10 +244,20 @@ export function ThreadScreen() {
                 }}
               >
                 <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                  }}
                 >
                   <Ionicons name="storefront-outline" size={16} color={colors.accent} />
-                  <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 13 }}>
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
                     Meet somewhere public
                   </Text>
                 </View>
@@ -277,7 +289,11 @@ export function ThreadScreen() {
             </View>
             <ErrorLine message={error} />
             <View style={{ alignSelf: "flex-start" }}>
-              <Button label="End conversation" variant="secondary" onPress={() => void end()} />
+              <Button
+                label="End conversation"
+                variant="secondary"
+                onPress={() => void end()}
+              />
             </View>
           </>
         )}

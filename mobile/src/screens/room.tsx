@@ -63,7 +63,7 @@ import { TournamentHelpModal } from "../tournament-help";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
 import { useTabBarInset } from "../glass";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { WantRow } from "../want-row";
 
 // The website's room ticker runs at twelve seconds now; the app keeps
@@ -91,7 +91,7 @@ export function RoomTab() {
 
   if (!code) {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
         {/*
          * Getting INTO a room happens here now, not on the Feed. The
          * founder: "move the qr code scanner/code entry to Room. No need
@@ -361,7 +361,7 @@ function RoomScreen({
 
   if (!state) {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
         <Card>
           {error ? <Title>No room on that code</Title> : null}
           <ErrorLine message={error} />
@@ -396,7 +396,13 @@ function RoomScreen({
   /* A sleeping counter code: joining is what opens the walk-in room. */
   if (state.state === "lobby") {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(4),
+        }}
+      >
         <Card>
           {state.store && <Muted>{state.store.name}</Muted>}
           <Title>Nothing on yet. Start the room</Title>
@@ -459,7 +465,13 @@ function RoomScreen({
 
   if (state.state !== "room") {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(4),
+        }}
+      >
         <Card>
           <Title>
             {state.state === "quiet"
@@ -510,7 +522,13 @@ function RoomScreen({
 
   if (!state.joined) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(4),
+        }}
+      >
         <Card>
           <Muted>{room.storeName}</Muted>
           <Title>{room.name}</Title>
@@ -902,7 +920,9 @@ function RoomScreen({
                     quantity: f.quantity,
                     own: (() => {
                       const own = f.offers.find((o) => o.responderSessionId === youId);
-                      return own ? { quantity: own.quantity, message: own.message } : null;
+                      return own
+                        ? { quantity: own.quantity, message: own.message }
+                        : null;
                     })(),
                     onOffer: (message, quantity) =>
                       act(() => offerOnFlare(code, f.id, message, quantity)),
@@ -1199,7 +1219,11 @@ function RoomScreen({
                       {". Did you?"}
                     </Text>
                     <View
-                      style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(3),
+                      }}
                     >
                       <Button
                         label="Yes, we traded"

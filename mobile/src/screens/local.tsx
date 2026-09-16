@@ -14,16 +14,11 @@ import {
   type LocalFlare,
   type LocalThread,
 } from "../api";
-import {
-  LOCAL_RADII,
-  MESSAGE_MAX_LENGTH,
-  agoLabel,
-  milesLabel,
-} from "../local-shared";
+import { LOCAL_RADII, MESSAGE_MAX_LENGTH, agoLabel, milesLabel } from "../local-shared";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { RemoteImage } from "../remote-image";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 import {
   AsyncButton,
@@ -90,43 +85,46 @@ export function LocalScreen({
    */
   const [at, setAt] = useState<Coords | null>(null);
 
-  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
-    const token = await storedAccessToken();
-    if (!isCurrent()) return;
-    if (!token) {
-      setSignedIn(false);
-      return;
-    }
-    setSignedIn(true);
+  const load = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      const token = await storedAccessToken();
+      if (!isCurrent()) return;
+      if (!token) {
+        setSignedIn(false);
+        return;
+      }
+      setSignedIn(true);
 
-    /* A permission we already hold is used quietly; the screen never
+      /* A permission we already hold is used quietly; the screen never
        pops the system dialog on its own — the ask card does that. */
-    let coords: Coords | null = null;
-    if (!threadsOnly && (await haveLocationPermission())) {
-      const outcome = await requestCoords();
-      if (outcome.status === "granted") coords = outcome.coords;
-    }
-    if (!isCurrent()) return;
-    setAt(coords);
+      let coords: Coords | null = null;
+      if (!threadsOnly && (await haveLocationPermission())) {
+        const outcome = await requestCoords();
+        if (outcome.status === "granted") coords = outcome.coords;
+      }
+      if (!isCurrent()) return;
+      setAt(coords);
 
-    try {
-      const [nextFeed, nextThreads] = await Promise.all([
-        threadsOnly ? null : getLocal(coords),
-        listLocalThreads(),
-      ]);
-      if (!isCurrent()) return;
-      setFeed(nextFeed);
-      setThreads(nextThreads.threads);
-      setFailure(null);
-    } catch {
-      if (!isCurrent()) return;
-      setFailure(
-        threadsOnly
-          ? "Messages could not load. Pull to try again."
-          : "Local could not load. Pull to try again.",
-      );
-    }
-  }, [threadsOnly]);
+      try {
+        const [nextFeed, nextThreads] = await Promise.all([
+          threadsOnly ? null : getLocal(coords),
+          listLocalThreads(),
+        ]);
+        if (!isCurrent()) return;
+        setFeed(nextFeed);
+        setThreads(nextThreads.threads);
+        setFailure(null);
+      } catch {
+        if (!isCurrent()) return;
+        setFailure(
+          threadsOnly
+            ? "Messages could not load. Pull to try again."
+            : "Local could not load. Pull to try again.",
+        );
+      }
+    },
+    [threadsOnly],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -149,7 +147,14 @@ export function LocalScreen({
 
   if (signedIn === false) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Card>
           <Title>{threadsOnly ? "Messages" : "Flares near you"}</Title>
           <Body>
@@ -165,13 +170,19 @@ export function LocalScreen({
 
   if (feed && feed.source === "none") {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Card>
           <Title>Flares near you</Title>
           <Body>
-            Local shows every Flare posted near you, and you can message the poster
-            when you have the card. It just needs to know roughly where you are,
-            once.
+            Local shows every Flare posted near you, and you can message the poster when
+            you have the card. It just needs to know roughly where you are, once.
           </Body>
           <NearbyLocationAsk onDone={() => void load()} intro={null} />
         </Card>
@@ -219,7 +230,8 @@ export function LocalScreen({
     <FlatList
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
-        padding: spacing(4),
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
         gap: spacing(3),
         /* Clear of the floating tab bar. */
         paddingBottom: spacing(4) + tabInset,
@@ -245,8 +257,7 @@ export function LocalScreen({
               <Card>
                 <Title>No conversations yet</Title>
                 <Body>
-                  When somebody answers one of your Flares, the conversation lands
-                  here.
+                  When somebody answers one of your Flares, the conversation lands here.
                 </Body>
               </Card>
             );
@@ -266,8 +277,8 @@ export function LocalScreen({
               <Card>
                 <Title>Nothing on the boards within {feed!.radius} miles</Title>
                 <Body>
-                  Post the card you are hunting and anyone nearby can answer.
-                  Flares posted at a store near you land here too.
+                  Post the card you are hunting and anyone nearby can answer. Flares
+                  posted at a store near you land here too.
                 </Body>
               </Card>
             );
@@ -415,9 +426,7 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
               numberOfLines={1}
               style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
             >
-              {thread.closed
-                ? "Conversation ended"
-                : (thread.lastMessagePreview ?? "")}
+              {thread.closed ? "Conversation ended" : (thread.lastMessagePreview ?? "")}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end", gap: spacing(1) }}>
@@ -501,8 +510,8 @@ function FlareGroup({
             >
               {lead.poster.name}
               {lead.isYours ? " (you)" : ""}
-              {lead.storeName ? ` · ${lead.storeName}` : ""} · {milesLabel(lead.miles)} ·{" "}
-              {agoLabel(lead.postedAt)}
+              {lead.storeName ? ` · ${lead.storeName}` : ""} · {milesLabel(lead.miles)}{" "}
+              · {agoLabel(lead.postedAt)}
             </Text>
           </View>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
@@ -602,8 +611,7 @@ function FlareRow({
           >
             {flare.poster.name}
             {flare.isYours ? " (you)" : ""}
-            {flare.storeName ? ` · ${flare.storeName}` : ""} ·{" "}
-            {milesLabel(flare.miles)}
+            {flare.storeName ? ` · ${flare.storeName}` : ""} · {milesLabel(flare.miles)}
           </Text>
           {flare.note ? (
             <Text

@@ -2,13 +2,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
@@ -26,7 +20,7 @@ import { FeedPerson } from "../feed-person";
 import { openRoom } from "../open-room";
 import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import {
   AsyncButton,
   Button,
@@ -93,7 +87,14 @@ export function FlarePostScreen({ postId }: { postId: string }) {
 
   if (failed) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Muted>This Flare could not be opened. It may have been taken down.</Muted>
       </View>
     );
@@ -101,7 +102,14 @@ export function FlarePostScreen({ postId }: { postId: string }) {
 
   if (!post) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(4) }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Muted>Loading…</Muted>
       </View>
     );
@@ -134,7 +142,11 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(3),
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <FeedPerson
@@ -174,9 +186,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             />
           ))}
         </ScrollView>
-        {!post.yours ? (
-          <Muted>Tap a card to say you have it.</Muted>
-        ) : null}
+        {!post.yours ? <Muted>Tap a card to say you have it.</Muted> : null}
 
         <PostSocialRow
           likes={post.likes}
@@ -202,7 +212,11 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             post.thread.map((comment) => (
               <View
                 key={comment.id}
-                style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(2.5) }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: spacing(2.5),
+                }}
               >
                 <Tap
                   onPress={() =>
@@ -227,7 +241,13 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                       gap: spacing(1.5),
                     }}
                   >
-                    <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}>
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontWeight: "700",
+                        fontSize: 14,
+                      }}
+                    >
                       {comment.displayName}
                     </Text>
                     {comment.kind === "offer" ? (
@@ -250,12 +270,17 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                             letterSpacing: 0.5,
                           }}
                         >
-                          {(comment.cardName ? `HAS ${comment.cardName}` : "HAS IT").toUpperCase()}
+                          {(comment.cardName
+                            ? `HAS ${comment.cardName}`
+                            : "HAS IT"
+                          ).toUpperCase()}
                         </Text>
                       </View>
                     ) : null}
                   </View>
-                  <Text style={{ color: colors.textPrimary, fontSize: 15 }}>{comment.body}</Text>
+                  <Text style={{ color: colors.textPrimary, fontSize: 15 }}>
+                    {comment.body}
+                  </Text>
                 </View>
               </View>
             ))

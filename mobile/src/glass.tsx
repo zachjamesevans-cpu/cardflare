@@ -116,6 +116,44 @@ export function GlassFill({
 }
 
 
+
+/**
+ * THE TAB BAR IS A BUBBLE, not a floor.
+ *
+ * The founder, after looking at Instagram: "like the bubbles at the
+ * bottom instead of having it anchored. make the tabs at bottom do
+ * that. liquid glass and match is as close as possible to instagram."
+ *
+ * Instagram's iOS 26 bar is a single translucent pill that sits in from
+ * both sides and floats clear of the bottom edge, so the feed runs
+ * underneath it and keeps going. The point is not the rounding - it is
+ * that the bar stops being the end of the screen. A bar welded to the
+ * bottom tells you the page stops there; one that floats tells you it
+ * does not.
+ *
+ * Named here because FOUR things have to agree about this shape: the
+ * bar's own box, the material drawn into it, the rounding, and how much
+ * room every list leaves so its last row is not stuck underneath. That
+ * last one is `useTabBarInset`, and it is the one that breaks silently.
+ */
+export const TAB_BAR = {
+  /** How far the pill sits in from each side. */
+  side: 16,
+  /**
+   * How far its underside floats above the BOTTOM OF THE SCREEN - not
+   * above the safe area. Sitting it on top of the home-indicator inset
+   * put it 44pt up and the founder called it straight away: "too high.
+   * lower it quite a bit!" Instagram's pill nearly rests on the bottom
+   * edge, with the indicator alongside it rather than below it.
+   */
+  lift: 14,
+  /** The pill itself, icons and labels included. */
+  height: 58,
+} as const;
+
+/** Fully rounded: a pill, not a rounded rectangle. */
+export const TAB_BAR_RADIUS = TAB_BAR.height / 2;
+
 /**
  * How much room the floating tab bar needs at the bottom of a list.
  *
@@ -136,5 +174,15 @@ export function GlassFill({
  * happen.
  */
 export function useTabBarInset(): number {
-  return useContext(BottomTabBarHeightContext) ?? 0;
+  const height = useContext(BottomTabBarHeightContext);
+  /* No tab bar on this screen - a pushed stack screen - so nothing to
+     clear. Zero, not a guess. */
+  if (!height) return 0;
+  /*
+   * The pill floats, so what a list has to clear is not the bar's own
+   * height: it is the height PLUS the air underneath it. React
+   * Navigation reports the box it laid out, and the lift sits below
+   * that box.
+   */
+  return height + TAB_BAR.lift;
 }

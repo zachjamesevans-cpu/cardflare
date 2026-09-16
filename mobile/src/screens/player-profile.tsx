@@ -19,7 +19,7 @@ import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-head
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap } from "../ui";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 
 /** The trade-room carousel's tile width; the profile shelf matches it. */
 const SHELF_TILE = 56;
@@ -104,7 +104,12 @@ export function PlayerProfileScreen() {
 
   if (failed) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Card>
           <Body>Could not load this profile right now. Try again in a moment.</Body>
         </Card>
@@ -114,7 +119,12 @@ export function PlayerProfileScreen() {
 
   if (!profile) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
         <Muted>Loading…</Muted>
       </ScrollView>
     );
@@ -135,7 +145,13 @@ export function PlayerProfileScreen() {
   }));
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
       {/* The profile block: cover, picture, name, badge, shelf. */}
       <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
         {/* The cover carries down behind the picture, the name and the
@@ -170,7 +186,11 @@ export function PlayerProfileScreen() {
             actions={
               <>
                 {profile.follow ? (
-                  <FollowButton playerId={profile.playerId} initial={profile.follow} fill />
+                  <FollowButton
+                    playerId={profile.playerId}
+                    initial={profile.follow}
+                    fill
+                  />
                 ) : guest ? (
                   <HeaderButton
                     label="Follow"
@@ -178,7 +198,10 @@ export function PlayerProfileScreen() {
                     onPress={() => navigation.navigate("CreateAccount")}
                   />
                 ) : null}
-                <ShareProfileButton playerId={profile.playerId} name={profile.displayName} />
+                <ShareProfileButton
+                  playerId={profile.playerId}
+                  name={profile.displayName}
+                />
               </>
             }
           />
@@ -218,10 +241,7 @@ export function PlayerProfileScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: "row", gap: spacing(2) }}>
                 {profile.showcase.map((entry, index) => (
-                  <Tap
-                    key={entry.id}
-                    onPress={() => setZoomed(shelf[index] ?? null)}
-                  >
+                  <Tap key={entry.id} onPress={() => setZoomed(shelf[index] ?? null)}>
                     <CosmeticCard
                       imageUrl={entry.imageUrl}
                       width={SHELF_TILE}
@@ -242,7 +262,9 @@ export function PlayerProfileScreen() {
 
       <PeopleSheet
         which={people}
-        people={lists ? (people === "followers" ? lists.followers : lists.following) : null}
+        people={
+          lists ? (people === "followers" ? lists.followers : lists.following) : null
+        }
         onClose={() => setPeople(null)}
         onOpen={(id) => {
           setPeople(null);

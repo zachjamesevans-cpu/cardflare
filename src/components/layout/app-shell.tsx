@@ -88,7 +88,7 @@ export function AppShell({
         </div>
       </header>
 
-      <main id="main" className="flex-1 px-5 py-10 sm:px-6">
+      <main id="main" className="flex-1 px-2 py-10 sm:px-6">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">

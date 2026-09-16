@@ -135,8 +135,13 @@ describe("the home screen's furniture", () => {
     expect(repo).toContain("function sectionFor(item: FeedItem): FeedSection");
     expect(repo).toContain("export const SECTION_TITLES");
 
-    expect(webPage).toContain("SECTION_TITLES[item.section]");
-    expect(app).toContain("SECTION_TITLES[item.section]");
+    /* Headings go through `sectionHeading`, which returns null for a
+       section that should not be drawn AND for one this build has no
+       title for. Reading the record straight into the markup is what
+       put an empty <Text> on the app, and an empty Text still takes a
+       line box - 43 points of black above the first card. */
+    expect(webPage).toContain("sectionHeading(item.section)");
+    expect(app).toContain("sectionHeading(item.section)");
     expect(webPage).toContain("{item.reason}");
     expect(app).toContain("{item.reason}");
   });
@@ -358,8 +363,14 @@ describe("the home screen's furniture", () => {
     /* The rendered heading, not the word: the file may well explain in a
        comment why the list is no longer here. */
     expect(settings).not.toContain("<Title>Your saved wants</Title>");
-    expect(row).toContain("want.postedAt");
-    expect(entries).toContain("want.postedAt");
+    /* Both platforms say where a saved card is live, and on both the
+       label is the way into that room - the founder: "make label
+       tappable so it opens the rooms." A flat, dead label on either side
+       is the regression this guards. */
+    expect(row).toContain("Live at ");
+    expect(entries).toContain("Live at ");
+    expect(row).toContain("onOpenRoom");
+    expect(entries).toContain("/e/${where.code}");
   });
 
   it("opens on the Feed, with no header about the viewer, on both", () => {
@@ -458,50 +469,95 @@ describe("posting a Flare wakes the Feed", () => {
   });
 });
 
-describe("the Feed has two filters, and your own Flares are in the main one", () => {
+describe("the Feed has three filters, and your own Flares are in the main one", () => {
   /*
-   * The founder: "its reundant to have a 'my flares' section when that
-   * is already listed elsewhere in the app imo. remove that tab. all of
-   * my flares should also go in the main feed when I post them."
+   * The founder cut My Flares as "a second door" and then asked for it
+   * back: "bring back the my flares tab so everything is equally split
+   * into 3 tabs at the top."
    *
-   * Right on both counts. Your standing list already has a tab of its
-   * own, so the third filter was a second door to it - and putting your
-   * posts behind that door meant posting something left the main feed
-   * looking unchanged.
+   * It came back as a VIEW, not a destination. Your posts are still
+   * filed under Following with everyone else's - the Instagram
+   * behaviour the founder asked for before it, and what the cut was
+   * really about - so the filter reads a post's own `yours` rather than
+   * its `tab`. Both halves are pinned, because losing either quietly
+   * undoes a round of work.
    */
   const repo = read("src/lib/feed/repository.ts");
+  const appApi = read("mobile/src/api.ts");
 
-  it("offers Following and Nearby, and nothing else", () => {
-    expect(repo).toContain('export type FeedTab = "following" | "nearby";');
-    /* The MAP ENTRY, not the words - the file explains at length why
-       the third tab went, and that explanation names it. */
-    expect(repo).not.toMatch(/mine: "My Flares"/);
+  it("offers Following, Nearby and My Flares, in that order", () => {
+    expect(repo).toContain('export type FeedTab = "following" | "nearby" | "mine";');
+    expect(repo).toContain('mine: "My Flares"');
 
-    /* Both clients read the same two, in the same order. */
+    /* Both clients draw the same three from the same list, not from two
+       copies that can be edited apart. */
     for (const source of [
       read("src/components/feed/feed-filter-tabs.tsx"),
       read("mobile/src/feed-filter-tabs.tsx"),
     ]) {
-      expect(source).toContain('FEED_TABS: FeedTab[] = ["following", "nearby"]');
-      expect(source).not.toMatch(/mine:/);
+      expect(source).toContain("FEED_TABS: FeedTab[] = FEED_TAB_VALUES");
+      expect(source).toContain("mine:");
+    }
+    for (const source of [repo, appApi]) {
+      expect(source).toContain(
+        'FEED_TAB_VALUES: FeedTab[] = ["following", "nearby", "mine"]',
+      );
     }
   });
 
-  it("files your own Flares into the main feed", () => {
+  it("files your own Flares into the main feed, not behind the new tab", () => {
     expect(repo).toContain('if (section === "yours") return "following";');
-    /* Still under their own heading, so they are not mistaken for
-       somebody you follow. */
-    expect(repo).toContain('yours: "Your flares"');
+    /* My Flares selects on the POST, so one item sits under two filters.
+       If this ever reads `item.tab === "mine"`, posting has stopped
+       changing the feed you are looking at. */
+    for (const source of [repo, appApi]) {
+      expect(source).toContain('if (tab === "mine") return item.yours === true;');
+    }
+  });
+
+  it("gives your own Flares no heading, since every one is badged", () => {
+    /* "See how under 'following' there's a big gap? close that gap."
+       The heading said what each post's own badge already said, and
+       what the tab now says a third time. */
+    for (const source of [repo, appApi]) {
+      expect(source).toContain('if (section === "yours") return null;');
+    }
+  });
+
+  it("knows every section the server can file an item under", () => {
+    /*
+     * THE BUG THIS ROUND FOUND. The app's FeedSection was missing
+     * "yours" while the server was already sending it, so the heading
+     * looked up an undefined title and drew an EMPTY Text - which still
+     * takes a line box. Forty-three points of black above the first
+     * card, with nothing in it to see or to blame.
+     *
+     * Read off the server's own record, so a section added there without
+     * one in the app fails here rather than on somebody's phone.
+     */
+    const titles = repo.slice(repo.indexOf("export const SECTION_TITLES"));
+    const declared = [
+      ...titles.slice(0, titles.indexOf("};")).matchAll(/(\w+): "/g),
+    ].map((m) => m[1]);
+
+    expect(declared.length).toBeGreaterThan(3);
+    for (const section of declared) {
+      expect(appApi, `the app is missing the "${section}" section`).toContain(
+        `${section}: "`,
+      );
+    }
   });
 
   it("shows an item whose tab it does not recognise, rather than hiding it", () => {
     /*
-     * Version skew, and the reason this one is worth a test. The app
-     * ships on TestFlight's clock and the server on Vercel's, so a build
-     * carrying this change meets a server still filing your Flares under
-     * "mine". Matching only the two known tabs would hide them entirely
-     * - the exact thing this round exists to fix.
+     * Version skew, and why this one is worth a test. The app ships on
+     * TestFlight's clock and the server on Vercel's, so an old build
+     * meets tabs newer than itself as a matter of routine. Matching only
+     * the known tabs is how a new server silently empties an old phone.
      */
-    expect(app).toContain("!FEED_TABS.includes(item.tab as FeedTab)");
+    for (const source of [repo, appApi]) {
+      expect(source).toContain("return !FEED_TAB_VALUES.includes(item.tab);");
+      expect(source).toContain("if (!item.tab) return true;");
+    }
   });
 });

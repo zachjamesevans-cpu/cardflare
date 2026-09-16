@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
+import type { PostedWhere } from "@/lib/players/wants";
 import { WantNudge, WantRemove } from "@/components/players/want-controls";
 
 /** One outstanding ask, as the room page resolves it. */
@@ -20,7 +23,8 @@ export interface OutstandingWant {
    * saved at home and a card on a board tonight are the same row and
    * completely different news.
    */
-  postedAt?: string | null;
+  /* Where it is up, and how to walk in. See lib/players/wants.ts. */
+  postedWhere?: PostedWhere[] | null;
 }
 
 /**
@@ -87,9 +91,26 @@ export function WantEntries({
                 </span>
                 {want.deckLabel && <span className="font-sans">{want.deckLabel}</span>}
                 <span
-                  className={`font-sans ${want.postedAt ? "font-semibold text-accent" : "text-text-muted"}`}
+                  className={`font-sans ${want.postedWhere?.length ? "font-semibold text-accent" : "text-text-muted"}`}
                 >
-                  {want.postedAt ? `Live at ${want.postedAt}` : "Saved"}
+                  {/* Tappable, one per shop. The founder: "make label
+                      tappable so it opens the rooms." A name that could
+                      only be read was the least useful half of it. */}
+                  {want.postedWhere?.length
+                    ? want.postedWhere.map((where) =>
+                        where.code ? (
+                          <Link
+                            key={where.name}
+                            href={`/e/${where.code}`}
+                            className="underline underline-offset-2 hover:text-accent-hover"
+                          >
+                            Live at {where.name}
+                          </Link>
+                        ) : (
+                          <span key={where.name}>Live {where.name}</span>
+                        ),
+                      )
+                    : "Saved"}
                 </span>
               </p>
 

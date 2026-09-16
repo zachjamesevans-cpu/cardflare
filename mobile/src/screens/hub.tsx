@@ -12,10 +12,12 @@ import {
   nudgeWant,
   storedAccessToken,
   type Me,
+  rememberRoom,
 } from "../api";
 import { PostFlareScreen, type PostTarget } from "./post-flare";
 import { Body, Button, Card, Muted, Title } from "../ui";
-import { spacing } from "../theme";
+import { gutter, spacing } from "../theme";
+import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
 import { HaveList, NearbyCard } from "../nearby";
 
@@ -132,7 +134,7 @@ export function HubScreen() {
 
   if (target === null) {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
         <Muted>One moment…</Muted>
       </View>
     );
@@ -140,13 +142,12 @@ export function HubScreen() {
 
   if (target === "scan") {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
         <Card>
           <Title>Post a Flare</Title>
           <Body>
-            A Flare goes up in a room. Scan the store&rsquo;s counter code first,
-            and this button becomes the fastest way to say what you&rsquo;re
-            hunting.
+            A Flare goes up in a room. Scan the store&rsquo;s counter code first, and
+            this button becomes the fastest way to say what you&rsquo;re hunting.
           </Body>
           <Button label="Scan a code" onPress={() => navigation.navigate("Scan")} />
         </Card>
@@ -164,42 +165,48 @@ export function HubScreen() {
       footer={
         wants !== null ? (
           <>
-          <NearbyCard />
-          <Card>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: spacing(2),
-              }}
-            >
-              <Title>Your Flares</Title>
-              <Muted>
-                {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
-              </Muted>
-            </View>
-
-            {wants.length === 0 ? (
-              <Body>
-                Post a Flare above and it stays here until you find the card.
-                Every room, store and show you scan into helps answer this
-                list.
-              </Body>
-            ) : (
-              <View>
-                {wants.map((want) => (
-                  <WantRow
-                    key={want.id}
-                    want={want}
-                    onNudge={(delta) => editWant(() => nudgeWant(want.id, delta))}
-                    onDrop={() => editWant(() => dropWant(want.id))}
-                  />
-                ))}
+            <NearbyCard />
+            <Card>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing(2),
+                }}
+              >
+                <Title>Your Flares</Title>
+                <Muted>
+                  {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
+                </Muted>
               </View>
-            )}
-          </Card>
-          <HaveList />
+
+              {wants.length === 0 ? (
+                <Body>
+                  Post a Flare above and it stays here until you find the card. Every
+                  room, store and show you scan into helps answer this list.
+                </Body>
+              ) : (
+                <View>
+                  {wants.map((want) => (
+                    <WantRow
+                      key={want.id}
+                      want={want}
+                      onNudge={(delta) => editWant(() => nudgeWant(want.id, delta))}
+                      onDrop={() => editWant(() => dropWant(want.id))}
+                      /* Remember the room, then open it - the same two
+                       steps the Feed's own buttons take. */
+                      onOpenRoom={(code) => {
+                        void rememberRoom(code.trim().toUpperCase()).then(() =>
+                          openRoom(navigation),
+                        );
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
+            </Card>
+            <HaveList />
           </>
         ) : undefined
       }

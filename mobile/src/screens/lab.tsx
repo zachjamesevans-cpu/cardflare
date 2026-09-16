@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import { FlareFeedCard } from "../flare-feed-card";
 import { useTabBarInset } from "../glass";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { Body, Card, Muted, Tap, Title } from "../ui";
 import type { FeedEntry } from "../api";
 
@@ -176,7 +176,8 @@ export function LabScreen() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
-        padding: spacing(4),
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
         gap: spacing(4),
         paddingBottom: spacing(4) + tabInset,
       }}
@@ -184,13 +185,13 @@ export function LabScreen() {
       <Card>
         <Title>Design lab</Title>
         <Body>
-          Every shape a Feed post can take, drawn by the real component with
-          made-up data. Nothing here touches the server: tapping a heart moves
-          nothing, and no Flare below exists.
+          Every shape a Feed post can take, drawn by the real component with made-up
+          data. Nothing here touches the server: tapping a heart moves nothing, and no
+          Flare below exists.
         </Body>
         <Muted>
-          Add a case in mobile/src/screens/lab.tsx rather than posting a real
-          Flare to see a new state.
+          Add a case in mobile/src/screens/lab.tsx rather than posting a real Flare to
+          see a new state.
         </Muted>
       </Card>
 
@@ -226,40 +227,38 @@ export function LabScreen() {
         })}
       </View>
 
-      {CASES.filter((_, index) => only === null || only === index).map(
-        (example) => (
-          <View key={example.title} style={{ gap: spacing(2) }}>
-            <View style={{ gap: 2 }}>
-              <Text
-                style={{
-                  color: colors.textPrimary,
-                  fontSize: 15,
-                  fontWeight: "800",
-                }}
-              >
-                {example.title}
-              </Text>
-              <Muted>{example.why}</Muted>
-            </View>
-
-            <FlareFeedCard
-              item={example.item as never}
-              post={{
-                postId: (example.item as { postId: string }).postId,
-                yours: false,
-                /* Inert, like everything else here. */
-                offer: async () => {},
+      {CASES.filter((_, index) => only === null || only === index).map((example) => (
+        <View key={example.title} style={{ gap: spacing(2) }}>
+          <View style={{ gap: 2 }}>
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontSize: 15,
+                fontWeight: "800",
               }}
-              onOpenProfile={() => {}}
-              /* Deliberately inert. The Lab is for looking; a screen that
-                 could post is a screen that could post by accident. */
-              onLike={async () => {}}
-              onOpenThread={() => {}}
-              onEnterRoom={() => {}}
-            />
+            >
+              {example.title}
+            </Text>
+            <Muted>{example.why}</Muted>
           </View>
-        ),
-      )}
+
+          <FlareFeedCard
+            item={example.item as never}
+            post={{
+              postId: (example.item as { postId: string }).postId,
+              yours: false,
+              /* Inert, like everything else here. */
+              offer: async () => {},
+            }}
+            onOpenProfile={() => {}}
+            /* Deliberately inert. The Lab is for looking; a screen that
+                 could post is a screen that could post by accident. */
+            onLike={async () => {}}
+            onOpenThread={() => {}}
+            onEnterRoom={() => {}}
+          />
+        </View>
+      ))}
     </ScrollView>
   );
 }

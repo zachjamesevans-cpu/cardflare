@@ -1,24 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
-import { TAB_TITLES, type FeedTab } from "./api";
+import { FEED_TAB_VALUES, TAB_TITLES, type FeedTab } from "./api";
 import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
 /**
- * Following | Nearby, under the wordmark.
+ * Following | Nearby | My Flares, under the wordmark.
  *
- * Two rounded segments. The one that is on wears the accent as a
- * border and a faint glow, the CardFlare green kept for the active
- * state; the others sit in muted grey. Same words and order as the
- * website's tabs, which read the same `tab` off every item.
+ * Three rounded segments, each an equal third of the row - the
+ * founder: "bring back the my flares tab so everything is equally
+ * split into 3 tabs at the top." The one that is on wears the accent
+ * as a border and a faint glow, the CardFlare green kept for the
+ * active state; the others sit in muted grey. Same words and order as
+ * the website's tabs, which read the same `tab` off every item.
  */
 const ICONS: Record<FeedTab, keyof typeof Ionicons.glyphMap> = {
   following: "people-outline",
   nearby: "location-outline",
+  mine: "flame-outline",
 };
 
-export const FEED_TABS: FeedTab[] = ["following", "nearby"];
+export const FEED_TABS: FeedTab[] = FEED_TAB_VALUES;
 
 export function FeedFilterTabs({
   value,

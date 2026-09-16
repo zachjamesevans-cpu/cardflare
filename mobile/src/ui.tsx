@@ -28,6 +28,27 @@ import { colors, radius, spacing } from "./theme";
 /** The handful of primitives every screen shares, in the site's skin. */
 
 /**
+ * A Pressable that is ALSO the animated view, rather than wrapping one.
+ *
+ * It used to be `<Pressable><Animated.View style={style}>`, and that
+ * cost three bugs before it was understood. The Pressable was the flex
+ * child; `style` went to the view INSIDE it. So `flex: 1` sized a view
+ * within a Pressable that had already shrunk to its content, `margin`
+ * pushed the content off its own background, and every one of those
+ * typechecked perfectly and looked wrong only to somebody who opened
+ * the app. The filter row spent a while at half the width of the
+ * screen for exactly this reason.
+ *
+ * Animating the Pressable itself means there is only ONE element, so
+ * there is no longer an inside for a style to land in by mistake.
+ * `tests/unit/app-tap.test.ts` fails if the wrapper comes back.
+ *
+ * A `transform` passed in is still overridden - the press scale owns
+ * that slot.
+ */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
  * Every touchable in the app, and how touching feels.
  *
  * A finger landing squeezes the control down a hair, instantly; letting
@@ -58,7 +79,7 @@ export function Tap({
   const scale = useRef(new Animated.Value(1)).current;
 
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={() => {
         if (!onPress) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -84,11 +105,10 @@ export function Tap({
           useNativeDriver: true,
         }).start();
       }}
+      style={[style, { transform: [{ scale }] }]}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>
-        {children}
-      </Animated.View>
-    </Pressable>
+      {children}
+    </AnimatedPressable>
   );
 }
 

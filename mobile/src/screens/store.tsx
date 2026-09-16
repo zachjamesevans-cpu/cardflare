@@ -1,12 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import {
   buyCosmetic,
@@ -24,7 +19,7 @@ import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
 import { FRAME_COLOR, RING_COLOR } from "../player-avatar";
 import { Body, Card, Muted, Tap, Title } from "../ui";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 
 /**
  * The Embers store, on its own screen — the website's /profile/store,
@@ -67,8 +62,17 @@ export function StoreScreen() {
 
   if (!profile || !wardrobe) {
     return (
-      <ScrollView contentContainerStyle={{ padding: spacing(4) }}>
-        {message ? <Muted>{message}</Muted> : <ActivityIndicator color={colors.accent} />}
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
+        {message ? (
+          <Muted>{message}</Muted>
+        ) : (
+          <ActivityIndicator color={colors.accent} />
+        )}
       </ScrollView>
     );
   }
@@ -88,7 +92,13 @@ export function StoreScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
       <View
         style={{
           flexDirection: "row",
@@ -97,7 +107,9 @@ export function StoreScreen() {
           gap: spacing(2),
         }}
       >
-        <Muted>Spend what you earned trading. Everything you buy is yours for good.</Muted>
+        <Muted>
+          Spend what you earned trading. Everything you buy is yours for good.
+        </Muted>
       </View>
 
       {/* The balance pill: deliberately NOT the EmberBadge. That badge
@@ -127,8 +139,8 @@ export function StoreScreen() {
       <Card>
         <Title>cardflare packs</Title>
         <Muted>
-          Sealed packs of cosmetics, opened like the real thing. Every new
-          account starts with one on the house.
+          Sealed packs of cosmetics, opened like the real thing. Every new account
+          starts with one on the house.
         </Muted>
         {packSeries.map((series) => (
           <PackShopSection
@@ -302,7 +314,11 @@ function Shelf({
                       padding: 2,
                     }}
                   >
-                    <Ionicons name="checkmark" size={10} color={colors.accentContrast} />
+                    <Ionicons
+                      name="checkmark"
+                      size={10}
+                      color={colors.accentContrast}
+                    />
                   </View>
                 )}
 
@@ -342,9 +358,7 @@ function Shelf({
                   {`Needs ${item.lockedUntil?.toLocaleString()} earned`}
                 </Text>
               ) : (
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
-                >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
                   <Ionicons
                     name="flame"
                     size={9}

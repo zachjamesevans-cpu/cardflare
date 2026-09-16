@@ -21,10 +21,14 @@ export function WantRow({
   want,
   onNudge,
   onDrop,
+  onOpenRoom,
 }: {
   want: Me["wants"][number];
   onNudge: (delta: number) => Promise<void>;
   onDrop: () => Promise<void>;
+  /** Walk into the room this card is up in. Absent where there is
+      nowhere to walk to, which makes the label plain text. */
+  onOpenRoom?: (code: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -92,25 +96,66 @@ export function WantRow({
            * home and a card live on a board tonight are the same row in
            * the database and completely different news.
            */}
-          {want.postedAt ? (
+          {/*
+           * TAPPABLE, one per shop. The founder: "make label tappable
+           * so it opens the rooms."
+           *
+           * A name that could only be read was the least useful half of
+           * the label - the point of knowing a card is up at a shop is
+           * being able to go there. `postedBoards` carries the room
+           * code; an older server sends only the line, which still
+           * draws, just without the tap.
+           */}
+          {want.postedBoards?.length ? (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: spacing(2),
+              }}
+            >
+              {want.postedBoards.map((where) =>
+                where.code && onOpenRoom ? (
+                  <Tap
+                    key={where.name}
+                    onPress={() => onOpenRoom(where.code as string)}
+                    accessibilityLabel={`Open the room at ${where.name}`}
+                  >
+                    <Text
+                      style={{
+                        color: colors.accent,
+                        fontSize: 12,
+                        fontWeight: "600",
+                        textDecorationLine: "underline",
+                      }}
+                    >
+                      {`Live at ${where.name}`}
+                    </Text>
+                  </Tap>
+                ) : (
+                  <Text
+                    key={where.name}
+                    style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}
+                  >
+                    {`Live ${where.name}`}
+                  </Text>
+                ),
+              )}
+            </View>
+          ) : want.postedAt ? (
             <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}>
               {`Live at ${want.postedAt}`}
             </Text>
           ) : (
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-              Saved
-            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Saved</Text>
           )}
 
-          <View
-            style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-          >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
             {/* Minus counts all the way down: at one it removes the
                 card outright, so the stepper is never a dead end. */}
             <Tap
-              onPress={() =>
-                void run(want.quantity <= 1 ? onDrop : () => onNudge(-1))
-              }
+              onPress={() => void run(want.quantity <= 1 ? onDrop : () => onNudge(-1))}
               disabled={busy}
               hitSlop={6}
               style={styles.stepButton}

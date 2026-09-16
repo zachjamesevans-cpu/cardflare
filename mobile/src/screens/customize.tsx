@@ -25,7 +25,7 @@ import {
   hasTitleArt,
 } from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
-import { colors, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 
 /**
  * Getting dressed, in one place — the same hub the website has at
@@ -318,7 +318,11 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
     >
       <View style={{ gap: spacing(1) }}>
         <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "700" }}>

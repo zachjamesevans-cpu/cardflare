@@ -36,7 +36,11 @@ export async function PlayerTabBar() {
 /**
  * The room the bar occupies, so a page's last control is never trapped
  * under it. Paired with the bar on every page that renders one.
+ *
+ * The bar floats now, so this has to cover its height AND the gap it
+ * leaves beneath itself - the app's `useTabBarInset` does the same sum
+ * for the same reason. Tuned to the pill, not to the old docked bar.
  */
 export function TabBarSpacer() {
-  return <div aria-hidden="true" className="h-20" />;
+  return <div aria-hidden="true" className="h-24" />;
 }

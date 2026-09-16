@@ -23,7 +23,6 @@ import {
   Image,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -58,7 +57,7 @@ import { Tap } from "./src/ui";
 import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
-import { GLASS_AVAILABLE, GlassFill } from "./src/glass";
+import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -335,12 +334,40 @@ function Tabs() {
          * hairline is still the only thing separating bar from page, so
          * it stays.
          */
-        tabBarBackground: () => <GlassFill />,
+        tabBarBackground: () => (
+          <GlassFill
+            style={{ borderRadius: TAB_BAR_RADIUS }}
+            /* Without the material, the pill still has to read as a
+               pill: a flat black shape on a black page is invisible, so
+               the fallback is the raised surface and keeps an edge. */
+            fallback={colors.elevated}
+          />
+        ),
         tabBarStyle: {
           position: "absolute",
+          /* The bubble. In from both sides, up off the bottom, and
+             rounded the whole way - see TAB_BAR.
+             `start`/`end` rather than `left`/`right`: React Navigation's
+             own base style pins the bar with `start: 0, end: 0`, and in
+             React Native the writing-direction props WIN over left and
+             right however late those are merged. Setting left/right here
+             looked perfectly correct and did nothing at all. */
+          start: TAB_BAR.side,
+          end: TAB_BAR.side,
+          bottom: TAB_BAR.lift,
+          height: TAB_BAR.height,
+          borderRadius: TAB_BAR_RADIUS,
+          /* The bar no longer reaches the bottom of the screen, so the
+             home-indicator padding React Navigation adds for a docked
+             bar would just push the icons off-centre inside the pill. */
+          paddingBottom: 0,
           backgroundColor: "transparent",
-          borderTopWidth: GLASS_AVAILABLE ? 0 : StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
+          /* A pill has no top edge to draw a hairline along; without
+             glass the fallback surface is what separates it instead. */
+          borderTopWidth: 0,
+          /* Clips the material to the pill on the fallback path, where
+             a plain View will not round its own children. */
+          overflow: "hidden",
           /* The bar draws its own material; a shadow under a glass
              surface is the one thing that makes it look pasted on. */
           elevation: 0,
