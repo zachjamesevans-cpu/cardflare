@@ -117,6 +117,27 @@ describe("feed views", () => {
     }
   });
 
+  it("says so when the save fails, rather than just snapping back", async () => {
+    /*
+     * The founder, before the migration had been run: "clicking compact
+     * clicks it back to classic immediately upon clicking."
+     *
+     * It was doing the right thing - the write failed, so the optimistic
+     * choice was put back - but in SILENCE, which reads as a setting
+     * that does not work rather than one that could not save. The
+     * website's picker already said so; the app did not.
+     */
+    const app = await read("mobile/src/screens/settings.tsx");
+    expect(app).toContain("setViewError(");
+    expect(app).toContain("<ErrorLine message={viewError} />");
+    /* And it reverts to what it was, not to whatever the closure held. */
+    expect(app).toContain("const previous = view;");
+    expect(app).toContain("setView(previous)");
+
+    const web = await read("src/components/feed/feed-view-picker.tsx");
+    expect(web).toContain("setError(");
+  });
+
   it("is switched from settings on both platforms", async () => {
     const appSettings = await read("mobile/src/screens/settings.tsx");
     const webSettings = await read("src/app/profile/settings/page.tsx");

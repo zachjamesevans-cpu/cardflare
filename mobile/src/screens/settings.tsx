@@ -24,7 +24,17 @@ import {
   type Profile,
 } from "../api";
 import { HandleField, NameField } from "./profile";
-import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  ErrorLine,
+  Input,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 import { parseDeckList } from "../deck-list";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
@@ -146,6 +156,16 @@ export function SettingsScreen() {
      Feed is actually drawing. */
   const [view, setView] = useState<FeedView>("classic");
   const [savingView, setSavingView] = useState(false);
+  /*
+   * A FAILED SAVE HAS TO SAY SO.
+   *
+   * The founder: "clicking compact clicks it back to classic
+   * immediately upon clicking." It was doing the right thing for the
+   * wrong-looking reason - the write failed, so the optimistic choice
+   * was put back - but it put it back in silence, which reads as a
+   * setting that does not work rather than one that could not save.
+   */
+  const [viewError, setViewError] = useState<string | null>(null);
   /*
    * Your name lives here rather than on the front of the profile.
    * The founder: "no need to have the name editor front and center on
@@ -287,13 +307,18 @@ export function SettingsScreen() {
                 accessibilityLabel={`${FEED_VIEW_TITLES[option]}${on ? ", selected" : ""}`}
                 onPress={() => {
                   if (on || savingView) return;
+                  const previous = view;
                   setView(option);
+                  setViewError(null);
                   setSavingView(true);
                   /* Optimistic: the Feed redraws at once and the write
                      follows. A failure puts the choice back rather than
                      leaving a setting that did not save. */
                   setFeedView(option)
-                    .catch(() => setView(view))
+                    .catch(() => {
+                      setView(previous);
+                      setViewError("Could not save that. Try again in a moment.");
+                    })
                     .finally(() => setSavingView(false));
                 }}
                 style={{
@@ -329,6 +354,7 @@ export function SettingsScreen() {
             );
           })}
         </View>
+        {viewError ? <ErrorLine message={viewError} /> : null}
       </Card>
 
       <Card>
