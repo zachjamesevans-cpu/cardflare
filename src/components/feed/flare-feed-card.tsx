@@ -3,13 +3,14 @@ import { Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
-import { cardCountLabel, FlareCarousel } from "@/components/feed/flare-carousel";
+import { FlareCarousel } from "@/components/feed/flare-carousel";
 import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { cardCountLabel } from "@/lib/feed/card-copy";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { HuntItem } from "@/lib/feed/repository";
 

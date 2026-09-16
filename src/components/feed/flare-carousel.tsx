@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { cardCountLabel } from "@/lib/feed/card-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
@@ -17,17 +18,6 @@ import type { FeedCard } from "@/lib/feed/repository";
  * over as children; this only tracks which one is in view. The app
  * draws the same slides natively.
  */
-
-/** "Need 2 more", "2 available", "Found": the one line under a name. */
-export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): string {
-  const quantity = card.quantity ?? 1;
-  if (direction === "showcase") {
-    return `${quantity} available`;
-  }
-  const remaining = card.remaining ?? quantity;
-  if (card.state === "found" || remaining === 0) return "Found";
-  return `Need ${remaining} more`;
-}
 
 export function FlareCarousel({
   cards,

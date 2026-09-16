@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 
-import { cardCountLabel } from "@/components/feed/flare-carousel";
 import {
   OfferReview,
   selectionSummary,
@@ -14,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { cn } from "@/lib/cn";
+import { cardCountLabel } from "@/lib/feed/card-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { FeedCard } from "@/lib/feed/repository";
 
