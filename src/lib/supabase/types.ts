@@ -505,6 +505,13 @@ export type FlareRow = {
   /** Groups a player's Flares under a named hunt ("RG Luffy"). Null = loose. */
   deck_label: string | null;
   /**
+   * Ticked by hand in a hunt: the owner has this card now. Null is the
+   * unticked box. Distinct from `status: "traded"`, which means a trade
+   * completed here and wrote a trades row - a card is found when either
+   * is true, and neither is derived from the other.
+   */
+  found_at: string | null;
+  /**
    * The posting action that created this Flare. Shared by every Flare
    * posted in one go, so a deck notifies once and reads as one Feed
    * item. Null for a lone post and for anything posted before batches.
@@ -523,6 +530,7 @@ export type FlareInsert = Omit<
   | "id"
   | "created_at"
   | "updated_at"
+  | "found_at"
   | "player_id"
   | "posted_postal_code"
   | "status"
@@ -543,6 +551,10 @@ export type FlareInsert = Omit<
   intent?: FlareIntent;
   accepts_trade?: boolean;
   accepts_cash?: boolean;
+  /* A new Flare is never already ticked off, and an existing one is
+     ticked and unticked by `markHuntCard` - so optional here rather
+     than omitted, or an update could not clear it back to null. */
+  found_at?: string | null;
 };
 
 /**

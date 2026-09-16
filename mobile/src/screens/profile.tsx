@@ -10,6 +10,7 @@ import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { HANDLE_MAX, HANDLE_MIN, handleSeedFrom, handleWhileTyping } from "../handle";
 import {
+  tickHuntCard,
   addToShowcase,
   chooseUsername,
   describeError,
@@ -768,6 +769,13 @@ export function ProfileScreen() {
               params: { hunt: name },
             })
           }
+          /* The answer carries the whole list back, counts and all, so
+             the folder's "2 left" moves with the box rather than going
+             stale until the next load. */
+          onTick={async (flareId, found) => {
+            const { hunts } = await tickHuntCard(flareId, found);
+            setProfile((current) => (current ? { ...current, hunts } : current));
+          }}
         />
 
         {/* The one showcase, editable in place: tap a card to dress

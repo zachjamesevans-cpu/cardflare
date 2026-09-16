@@ -42,43 +42,65 @@ describe("how many hunts a player may keep", () => {
 });
 
 describe("what a hunt is made of", () => {
-  it("stores nothing new: a hunt is the deck label Flares already carry", async () => {
-    /*
-     * The composer has asked for a group name since batches arrived
-     * ("Every card you post from here joins this group"), and the Feed
-     * already draws a deck as one post because of it. What was missing
-     * was anywhere to SEE the set, not a place to keep it.
-     */
+  it("keeps the folder itself derived: no hunts table, no membership rows", async () => {
     const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
-
-    /* Read off `flares`, keyed on the deck label, and NOTHING is
-       written - no hunts table, no membership rows, no status of its
-       own to drift. Anchored on the shape rather than on one spelling
-       of the select, which now also carries the card id so the folder
-       has something to draw. */
+    /*
+     * The composer has asked for a group name since batches arrived,
+     * and the Feed already draws a deck as one post because of it. What
+     * was missing was anywhere to SEE the set, not a place to keep it -
+     * so a hunt is still just the label, read off `flares`.
+     */
     expect(hunts).toContain('.from("flares")');
     expect(hunts).toContain('.not("deck_label", "is", null)');
-    expect(hunts).toMatch(/\.select\("deck_label, status, quantity, created_at/);
-    expect(hunts, "a hunt must not write anything").not.toMatch(
-      /\.(insert|upsert|update|delete)\(/,
+    expect(hunts, "a hunt must not be a table of its own").not.toMatch(
+      /from\("hunts"\)|from\("hunt_cards"\)/,
     );
   });
 
-  it("checks a card off by the trade that got it, not by a tick box", async () => {
-    /*
-     * Progress is the flare's own status - `open` is still looking,
-     * `traded` is found - so it cannot drift from what actually
-     * happened. A box to tick would be a second thing to keep in step
-     * with the first.
-     */
+  it("checks a card off by a trade OR by hand, and never confuses the two", async () => {
     const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
-    expect(hunts).toContain('const found = row.status === "traded";');
-    /* And the card carries that same fact, so a folder can dim the ones
-       already got without a second source of truth. */
-    expect(hunts).toContain("found,");
-    expect(hunts, "nothing may tick a card off by hand").not.toMatch(
-      /markFound|toggleFound|setFound\(/,
+    /*
+     * THIS RULE WAS REVERSED, deliberately. The panel was built on
+     * "nothing is checked off by hand", on the argument that a box is a
+     * second thing to keep in step with the trade. The founder asked
+     * for the box: "think of it as a checklist, others can help you
+     * check those things off, or you can check them off yourself as you
+     * collect the cards."
+     *
+     * He is right, and the old rule was wrong about the world: it
+     * assumed every card arrives through a trade here, when most arrive
+     * by pull, purchase or a friend. A checklist only a trade could
+     * tick was wrong about most of its own boxes.
+     *
+     * The two facts stay SEPARATE. A trade writes `status`, a tick
+     * writes `found_at`, and found is either - so neither is derived
+     * from the other and there is nothing to keep in step.
+     */
+    expect(hunts).toContain(
+      'const found = row.status === "traded" || row.found_at !== null;',
     );
+
+    /* And the tick must never invent a trade: a trades row means two
+       people actually dealt, and it shows up in somebody's history. */
+    const mark = hunts.slice(hunts.indexOf("export async function markHuntCard"));
+    expect(mark).toContain("found_at:");
+    expect(mark, "ticking a box must not write a trade").not.toMatch(
+      /from\("trades"\)|status: "traded"/,
+    );
+  });
+
+  it("lets only the owner tick their own list", async () => {
+    const hunts = await readFile("src/lib/players/hunts.ts", "utf8");
+    /*
+     * `flares` runs RLS on with ZERO policies, so every read and write
+     * goes through the service role. The ownership check in the code is
+     * not defence in depth - it is the entire defence.
+     */
+    const mark = hunts.slice(hunts.indexOf("export async function markHuntCard"));
+    expect(mark).toContain('.eq("player_id", playerId)');
+    expect(mark).toContain('reason: "not-yours"');
+    /* And a card a real trade closed is not untickable from here. */
+    expect(mark).toContain('reason: "traded"');
   });
 
   it("reads them once for the whole profile", async () => {
@@ -191,8 +213,17 @@ describe("a hunt is a folder, and it opens", () => {
        of picture that does nothing. */
     const app = await readFile("mobile/src/hunts-panel.tsx", "utf8");
     const web = await readFile("src/components/players/hunts-panel.tsx", "utf8");
-    expect(app).toContain("<CardRail");
+    /* A horizontal rail of the product's own card tiles, and the shelf
+       that lets an opened card swipe along the rest of the folder. The
+       app draws its rail inline rather than through `CardRail`, because
+       each card carries a tick box underneath - same tile, same zoom. */
+    expect(app).toContain("<ScrollView");
+    expect(app).toContain("horizontal");
+    expect(app).toContain("<CardImage");
     expect(web).toContain("<FeedTile");
+    for (const source of [app, web]) {
+      expect(source).toContain("siblings={shelf}");
+    }
     /* And the found ones read as found, in the same vocabulary a traded
        card wears on a Flare. */
     for (const source of [app, web]) {
@@ -245,5 +276,61 @@ describe("a hunt is a folder, and it opens", () => {
     const panel = await readFile("mobile/src/hunts-panel.tsx", "utf8");
     expect(api).toContain("cards?: HuntCard[]");
     expect(panel).toContain("hunt.cards ?? []");
+  });
+});
+
+describe("the checklist", () => {
+  /*
+   * The founder: "needs to be a simply way in hunts to mark off if
+   * you've already found that card. think of it as a checklist, others
+   * can help you check those things off, or you can check them off
+   * yourself as you collect the cards."
+   */
+  it("puts a box under every card on your own hunts, on both platforms", async () => {
+    const app = await readFile("mobile/src/hunts-panel.tsx", "utf8");
+    const web = await readFile("src/components/players/hunts-panel.tsx", "utf8");
+
+    for (const source of [app, web]) {
+      expect(source).toContain("function TickBox");
+      /* Yours only. Somebody else's list is a thing to read. */
+      expect(source).toMatch(/yours \? <TickBox|onTick \? <TickBox/);
+      /* And a card a trade closed says so instead of offering a box. */
+      expect(source).toContain("card.tradedAway");
+    }
+  });
+
+  it("ticks optimistically, and puts the box back when the write fails", async () => {
+    /*
+     * The whole value of a checklist is that ticking feels like
+     * nothing - somebody at a counter taps five in a row. A spinner
+     * between each turns it back into a form. But a tick that silently
+     * did not save is worse than a slow one, so a failure has to undo
+     * itself.
+     */
+    const app = await readFile("mobile/src/hunts-panel.tsx", "utf8");
+    expect(app).toContain("setFound(next)");
+    expect(app).toContain("catch(() => setFound(!next))");
+
+    const web = await readFile("src/components/players/hunts-panel.tsx", "utf8");
+    expect(web).toContain("useOptimistic");
+    expect(web).toContain("setError(");
+  });
+
+  it("reaches the server the same way from both platforms", async () => {
+    const route = await readFile("src/app/api/v1/hunts/route.ts", "utf8");
+    const action = await readFile("src/lib/players/hunt-actions.ts", "utf8");
+
+    /* Both go through the one function that owns the rule. */
+    for (const source of [route, action]) {
+      expect(source).toContain("markHuntCard(");
+    }
+    /* A Server Action is a public POST, so the viewer is resolved on the
+       server rather than trusted from the caller. */
+    expect(action).toContain("getViewer()");
+    expect(route).toContain("apiPlayer(request)");
+
+    /* The answer carries the whole list back: a tick moves the folder's
+       counts, and a client recomputing those will drift from them. */
+    expect(route).toContain("hunts: await huntsFor(player.playerId)");
   });
 });
