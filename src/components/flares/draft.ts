@@ -38,12 +38,19 @@ export interface Draft {
   acceptsCash: boolean;
 }
 
+/*
+ * A Flare is open to a trade, to cash, or to both, never to neither:
+ * the database refuses a row with both off (flares_accepts_something),
+ * and the first offering posted from this composer met exactly that.
+ * So a draft starts open to a trade, the way the app's does, and the
+ * loader below repairs a saved draft that has neither.
+ */
 export const EMPTY_DRAFT: Draft = {
   intent: "want",
   cards: [],
   caption: "",
   hunt: { kind: "none" },
-  acceptsTrade: false,
+  acceptsTrade: true,
   acceptsCash: false,
 };
 
@@ -91,10 +98,9 @@ export function chosenPrinting(item: DraftCard): CardPrinting | null {
   return pickBasePrinting(item.card.printings, item.card.exactName);
 }
 
-export function loadDraft(): Draft | null {
+/** A saved draft back into shape, or null for anything unreadable. */
+export function parseDraft(raw: string): Draft | null {
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Draft>;
     if (!parsed || !Array.isArray(parsed.cards)) return null;
     return {
@@ -105,9 +111,19 @@ export function loadDraft(): Draft | null {
       caption: typeof parsed.caption === "string" ? parsed.caption : "",
       hunt:
         parsed.hunt && typeof parsed.hunt === "object" ? parsed.hunt : { kind: "none" },
-      acceptsTrade: Boolean(parsed.acceptsTrade),
+      /* Open to something, always: see EMPTY_DRAFT. */
+      acceptsTrade: Boolean(parsed.acceptsTrade) || !parsed.acceptsCash,
       acceptsCash: Boolean(parsed.acceptsCash),
     };
+  } catch {
+    return null;
+  }
+}
+
+export function loadDraft(): Draft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    return raw ? parseDraft(raw) : null;
   } catch {
     return null;
   }

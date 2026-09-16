@@ -492,22 +492,33 @@ function ComposerBody({
               ["acceptsTrade", "Trade"],
               ["acceptsCash", "Cash ok"],
             ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={draft[key]}
-              onClick={() => patch({ [key]: !draft[key] })}
-              className={cn(
-                "cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors",
-                draft[key]
-                  ? "border-accent bg-accent text-accent-contrast"
-                  : "border-border-strong text-text-secondary hover:text-text-primary",
-              )}
-            >
-              {label}
-            </button>
-          ))}
+          ).map(([key, label]) => {
+            /* The last one on cannot be switched off: a Flare open to
+               nothing is not a Flare, and the database says so too. The
+               app's composer holds the same line. */
+            const last =
+              draft[key] &&
+              !draft[key === "acceptsTrade" ? "acceptsCash" : "acceptsTrade"];
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={draft[key]}
+                aria-disabled={last || undefined}
+                onClick={() => {
+                  if (!last) patch({ [key]: !draft[key] });
+                }}
+                className={cn(
+                  "cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors",
+                  draft[key]
+                    ? "border-accent bg-accent text-accent-contrast"
+                    : "border-border-strong text-text-secondary hover:text-text-primary",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
