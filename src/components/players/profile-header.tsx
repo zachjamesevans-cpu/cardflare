@@ -92,18 +92,23 @@ export function ProfileHeader({
         </div>
       </div>
 
-      <div className="flex flex-col items-start gap-1.5">
-        <WornNameRow
-          name={name}
-          worn={worn}
-          withTitle={false}
-          className="items-start text-base font-bold"
-        />
-        <p className="text-sm text-text-muted">{formatHandle(handle)}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <WornTitleChip worn={worn} />
-          <EmberBadge earned={embersEarned} size="sm" />
+      {/* The name row uses its whole width: name and badge on the left,
+          title and Embers on the right, the handle beneath. The app
+          draws the same row. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <WornNameRow
+            name={name}
+            worn={worn}
+            withTitle={false}
+            className="min-w-0 items-center text-[17px] leading-[22px] font-bold"
+          />
+          <div className="flex shrink-0 items-center gap-2">
+            <WornTitleChip worn={worn} />
+            <EmberBadge earned={embersEarned} size="sm" />
+          </div>
         </div>
+        <p className="text-sm leading-[18px] text-text-muted">{formatHandle(handle)}</p>
       </div>
 
       <div className="flex w-full items-center gap-2">{actions}</div>

@@ -162,8 +162,12 @@ export default async function ProfilePage() {
             <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
-            {/* The two wands, top right, over the cover. */}
+            {/* Share and the two wands, top right, over the cover. */}
             <div className="absolute top-3 right-3 z-10 flex gap-2">
+              <ShareProfileButton
+                url={`${siteUrl()}/p/${profile.playerId}`}
+                title={`${profile.displayName} on cardflare`}
+              />
               <Link
                 href="/profile/customize"
                 title="Customize"
@@ -227,10 +231,6 @@ export default async function ProfilePage() {
                     >
                       Edit profile
                     </Link>
-                    <ShareProfileButton
-                      url={`${siteUrl()}/p/${profile.playerId}`}
-                      title={`${profile.displayName} on cardflare`}
-                    />
                   </>
                 }
               />

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { absoluteAvatars } from "@/lib/api/absolute-avatars";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
@@ -59,7 +60,8 @@ export async function GET(
   const post = await postDetail(postId, player.playerId);
   if (!post) return Response.json({ error: "not-found" }, { status: 404 });
 
-  return Response.json({ post });
+  /* Faces and art made absolute for the phone, same as the Feed. */
+  return Response.json({ post: absoluteAvatars(post) });
 }
 
 export async function POST(
@@ -100,7 +102,7 @@ export async function POST(
       body.body,
     );
     return comment
-      ? Response.json({ ok: true, comment })
+      ? Response.json({ ok: true, comment: absoluteAvatars(comment) })
       : Response.json({ error: "unavailable" }, { status: 503 });
   }
 

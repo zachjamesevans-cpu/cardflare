@@ -15,7 +15,7 @@ import { CosmeticCard } from "../cosmetic-card";
 import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
-import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
+import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap } from "../ui";
@@ -159,6 +159,12 @@ export function PlayerProfileScreen() {
             profile shows: what you see is what they see. */}
         <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
 
+        {/* Share, top right over the cover: the same corner your own
+            profile keeps its icons in. */}
+        <View style={{ position: "absolute", top: spacing(3), right: spacing(3) }}>
+          <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+        </View>
+
         {/* The same header the owner sees, with Follow where they have
             Edit profile. Share is a link anybody can open. */}
         <View style={{ marginTop: HEADER_TOP }}>
@@ -198,10 +204,6 @@ export function PlayerProfileScreen() {
                     onPress={() => navigation.navigate("CreateAccount")}
                   />
                 ) : null}
-                <ShareProfileButton
-                  playerId={profile.playerId}
-                  name={profile.displayName}
-                />
               </>
             }
           />

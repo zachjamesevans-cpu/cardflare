@@ -42,7 +42,7 @@ import { CosmeticCard } from "../cosmetic-card";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
-import { HeaderButton, ProfileHeader, ShareProfileButton } from "../profile-header";
+import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { CoverBanner } from "../showcase-zoom";
 import { LockedRows, TradeHistoryRow, TradeHistoryWall } from "../trade-history";
 import {
@@ -567,6 +567,7 @@ export function ProfileScreen() {
             gap: spacing(2),
           }}
         >
+          <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
           <Tap
             onPress={() => navigation.navigate("Customize", { area: "profile" })}
             accessibilityLabel="Customize your profile"
@@ -644,10 +645,6 @@ export function ProfileScreen() {
                 <HeaderButton
                   label={editing ? "Done" : "Edit profile"}
                   onPress={() => setEditing((open) => !open)}
-                />
-                <ShareProfileButton
-                  playerId={profile.playerId}
-                  name={profile.displayName}
                 />
               </>
             }

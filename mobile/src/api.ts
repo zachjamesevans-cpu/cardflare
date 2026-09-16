@@ -1507,6 +1507,8 @@ export interface PostDetail {
     avatarUrl: string | null;
     frame: string | null;
     ring: string | null;
+    /** The avatar effect. Absent from an older server. */
+    aura?: string | null;
   };
   code: string | null;
   storeName: string | null;
