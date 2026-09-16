@@ -181,7 +181,6 @@ export function FeedTile({
         }`}
       >
         {imageUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
           /*
            * CONTAIN, NOT COVER. The box is the physical card's ratio
            * (2.5 x 3.5 = 0.714), but a scan carries a margin and comes
@@ -193,6 +192,7 @@ export function FeedTile({
            * squeezes it; the elevated ground behind takes up the
            * one-percent difference.
            */
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img src={imageUrl} alt="" className="size-full object-contain" />
         )}
       </span>

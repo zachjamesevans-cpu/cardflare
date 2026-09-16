@@ -126,6 +126,45 @@ describe("feed views", () => {
     expect(first.slice(0, 900)).toContain('contentFit="contain"');
   });
 
+  it("opens a profile with every hunt closed", async () => {
+    /*
+     * The founder, opening somebody else's profile: "it immediately
+     * unnests their top hunt holder. dont do that."
+     *
+     * The first folder used to open itself, on the argument that a
+     * panel of closed lids shows nothing. But a profile is a thing you
+     * glance at, and one arbitrary folder springing open makes it the
+     * loudest thing on somebody's page. Closed is also the only state
+     * that reads the same whoever is looking.
+     */
+    for (const path of [
+      "src/components/players/hunts-panel.tsx",
+      "mobile/src/hunts-panel.tsx",
+    ]) {
+      const source = await read(path);
+      expect(source).toContain("useState<string | null>(null)");
+      expect(source, `${path} still opens a hunt on arrival`).not.toMatch(
+        /useState<string \| null>\(\s*(keyOf\(hunts\[0\]\)|hunts\[0\])/,
+      );
+    }
+  });
+
+  it("puts the carousel arrows on the card, not in a row above it", async () => {
+    /*
+     * The founder: "the arrows to sift between the cards in a carousel
+     * should be at the right and left middle of the card, not at the
+     * very top. this will also allow you to eliminate dead space at the
+     * top and bottom as well."
+     */
+    const zoom = await read("src/components/cards/card-image-zoom.tsx");
+    expect(zoom).toContain("absolute top-1/2 left-2 -translate-y-1/2");
+    expect(zoom).toContain("absolute top-1/2 right-2 -translate-y-1/2");
+    /* And the row they came from is gone rather than emptied. */
+    expect(zoom).not.toContain(
+      '<div className="flex items-center justify-between gap-3">',
+    );
+  });
+
   it("keeps the extras contextual", async () => {
     /*
      * "focus on making things contexual - only popping up when needed."

@@ -894,38 +894,6 @@ export function CardImageZoom({
           {offer && <ZoomOfferBlock offer={offer} />}
           {have && <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} />}
 
-          {shelf && (
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                aria-label="Previous card"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  go(-1);
-                }}
-                className="rounded-[var(--radius-control)] border border-border p-1.5 text-text-secondary hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-              >
-                <ChevronLeft className="size-5" aria-hidden="true" />
-              </button>
-
-              <p aria-live="polite" className="text-xs text-text-muted tabular-nums">
-                {at + 1} of {shelf.length}
-              </p>
-
-              <button
-                type="button"
-                aria-label="Next card"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  go(1);
-                }}
-                className="rounded-[var(--radius-control)] border border-border p-1.5 text-text-secondary hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-              >
-                <ChevronRight className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-          )}
-
           {/*
            * Sized to the card's own proportions so nothing jumps when the
            * image arrives.
@@ -985,6 +953,60 @@ export function CardImageZoom({
               >
                 <Loader2 className="size-7 animate-spin text-white/70 drop-shadow" />
               </span>
+            )}
+
+            {/*
+             * ON THE CARD, halfway down each side.
+             *
+             * The founder: "the arrows to sift between the cards in a
+             * carousel should be at the right and left middle of the
+             * card, not at the very top. this will also allow you to
+             * eliminate dead space at the top and bottom as well."
+             *
+             * They used to be a row of their own above the picture,
+             * which cost a band of height on every zoom and put the
+             * control furthest from the thing it moves. Overlaid, they
+             * sit where a thumb or a cursor already is, and the row they
+             * came from is gone rather than emptied.
+             *
+             * `stopPropagation` because every other click on this dialog
+             * closes it.
+             */}
+            {shelf && shelf.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous card"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    go(-1);
+                  }}
+                  className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full border border-white/20 bg-black/55 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/75 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                >
+                  <ChevronLeft className="size-5" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Next card"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    go(1);
+                  }}
+                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full border border-white/20 bg-black/55 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/75 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                >
+                  <ChevronRight className="size-5" aria-hidden="true" />
+                </button>
+
+                {/* Where you are, on the card rather than above it. Still
+                    a live region: the swipe is silent otherwise. */}
+                <p
+                  aria-live="polite"
+                  className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] text-white/90 tabular-nums backdrop-blur-sm"
+                >
+                  {at + 1} of {shelf.length}
+                </p>
+              </>
             )}
           </div>
         </div>
