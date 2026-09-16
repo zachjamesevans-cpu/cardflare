@@ -3,7 +3,14 @@ import "server-only";
 
 import { showingAnnouncements } from "@/lib/announcements/repository";
 import { findEventByJoinCode } from "@/lib/events/repository";
-import { listRoomFlares, type ListEntry } from "@/lib/lists/repository";
+import {
+  listRoomFlares,
+  PRINTING_COLUMNS,
+  toPrinting,
+  type ListEntry,
+  type PrintingRow,
+} from "@/lib/lists/repository";
+import { printingLabel } from "@/lib/cards/schema";
 import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
@@ -218,6 +225,15 @@ export interface FeedCard {
   state?: "open" | "offered" | "found";
   /** The viewer is one of the hands up. */
   youOffered?: boolean;
+  /** The printing asked for, or null for any. */
+  printingId?: string | null;
+  /** "OP01 · SR · Alt art", or null for any printing. */
+  printingLabel?: string | null;
+  /** Copies asked for, and copies still wanted after what is in hand. */
+  quantity?: number;
+  remaining?: number;
+  /** The hunt request this card answers, when the post is in a hunt. */
+  huntRequestId?: string | null;
 }
 
 export interface BoardItem {
@@ -316,6 +332,12 @@ export interface HuntItem {
   note: string | null;
   /** How many people have raised a hand on any card in it. */
   offers: number;
+  /** The hunt the post belongs to, for the "Green Zoro · View hunt" line. */
+  hunt: { id: string; name: string } | null;
+  /** Copies still wanted across every card shown. */
+  remainingCopies: number;
+  /** Every copy is in hand: nothing left to offer on. */
+  completed: boolean;
   /** Every card in this batch, the ones the viewer holds first. */
   cards: FeedCard[];
   /** How many they posted, which can exceed what is shown. */
@@ -995,6 +1017,9 @@ function asPost(item: RecentItem): FeedItem {
     acceptsCash: item.acceptsCash ?? false,
     note: item.note ?? null,
     offers: 0,
+    hunt: null,
+    remainingCopies: 0,
+    completed: false,
     total: item.cards.length + item.more,
     youCanAnswer: item.cards.filter((card) => card.match).length,
     cards: item.cards,
@@ -1388,6 +1413,9 @@ async function boardWithHunts(
       acceptsCash: ordered.some(({ flare }) => flare.acceptsCash),
       note: ordered.find(({ flare }) => flare.note)?.flare.note ?? null,
       offers: 0,
+      hunt: null,
+      remainingCopies: 0,
+      completed: false,
       yours: key.split("::")[0] === viewerId,
       /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
          trailing "+N more" are counting the same things the tiles are. */
@@ -1402,6 +1430,10 @@ async function boardWithHunts(
         flareId: flare.id,
         state: "open",
         youOffered: false,
+        printingId: flare.printingId,
+        quantity: flare.quantity,
+        remaining: Math.max(0, flare.quantity - flare.foundQuantity),
+        huntRequestId: flare.huntRequestId,
       })),
     });
   }
@@ -1451,7 +1483,7 @@ async function areaHuntsFor(
   const { data: flares } = await getSupabaseAdmin()
     .from("flares")
     .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id",
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity",
     )
     /* One query for everybody rather than one per person followed. */
     .in("player_id", [...authors.keys()])
@@ -1496,6 +1528,10 @@ async function areaHuntsFor(
         flareId: flare.id,
         state: "open" as const,
         youOffered: false,
+        printingId: flare.printing_id,
+        quantity: flare.quantity,
+        remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
+        huntRequestId: flare.hunt_request_id ?? null,
       };
     });
 
@@ -1523,6 +1559,9 @@ async function areaHuntsFor(
         acceptsCash: group.some((flare) => flare.accepts_cash ?? false),
         note: group.find((flare) => flare.note)?.note ?? null,
         offers: 0,
+        hunt: null,
+        remainingCopies: 0,
+        completed: false,
         total: cards.length,
         youCanAnswer: cards.filter((card) => card.match).length,
         cards: cards.slice(0, CARD_RAIL_CAP),
@@ -1548,19 +1587,71 @@ async function decorateHunts(
   const storeIds = [
     ...new Set(hunts.flatMap((hunt) => (hunt.storeId ? [hunt.storeId] : []))),
   ];
+  const requestIds = [
+    ...new Set(
+      hunts.flatMap((hunt) =>
+        hunt.cards.flatMap((card) => (card.huntRequestId ? [card.huntRequestId] : [])),
+      ),
+    ),
+  ];
+  const printingIds = [
+    ...new Set(
+      hunts.flatMap((hunt) =>
+        hunt.cards.flatMap((card) => (card.printingId ? [card.printingId] : [])),
+      ),
+    ),
+  ];
+  const admin = getSupabaseAdmin();
 
-  const [social, sessions, found, pins] = await Promise.all([
-    socialForPosts(postIds, viewerId),
-    sessionsForPlayers([viewerId]),
-    foundInPosts(postIds),
-    origin && storeIds.length > 0
-      ? getSupabaseAdmin()
-          .from("stores")
-          .select("id, latitude, longitude")
-          .in("id", storeIds)
-          .then((result) => result.data ?? [])
-      : Promise.resolve([]),
-  ]);
+  const [social, sessions, found, pins, posts, requests, printings] = await Promise.all(
+    [
+      socialForPosts(postIds, viewerId),
+      sessionsForPlayers([viewerId]),
+      foundInPosts(postIds),
+      origin && storeIds.length > 0
+        ? admin
+            .from("stores")
+            .select("id, latitude, longitude")
+            .in("id", storeIds)
+            .then((result) => result.data ?? [])
+        : Promise.resolve([]),
+      /* The post behind the batch: its caption, its intent, its hunt. Older
+       batches have none and the flare's own words stand in. */
+      admin
+        .from("flare_posts")
+        .select("id, caption, intent, hunt_id")
+        .in("id", postIds)
+        .then((result) => result.data ?? []),
+      /* Progress for every card in a hunt: the one record, read once. */
+      requestIds.length > 0
+        ? admin
+            .from("hunt_requests")
+            .select("id, quantity_needed, quantity_found")
+            .in("id", requestIds)
+            .then((result) => result.data ?? [])
+        : Promise.resolve([]),
+      printingIds.length > 0
+        ? admin
+            .from("card_printings")
+            .select(PRINTING_COLUMNS)
+            .in("id", printingIds)
+            .then((result) => (result.data ?? []) as PrintingRow[])
+        : Promise.resolve([] as PrintingRow[]),
+    ],
+  );
+  const huntIds = [
+    ...new Set(posts.flatMap((post) => (post.hunt_id ? [post.hunt_id] : []))),
+  ];
+  const huntNames = new Map(
+    huntIds.length > 0
+      ? (
+          (await admin.from("hunts").select("id, name").in("id", huntIds)).data ?? []
+        ).map((hunt) => [hunt.id, hunt.name] as const)
+      : [],
+  );
+  const postById = new Map(posts.map((post) => [post.id, post]));
+  const requestById = new Map(requests.map((request) => [request.id, request]));
+  const printingById = new Map(printings.map((row) => [row.id, toPrinting(row)]));
   const [answers, facts] = await Promise.all([
     answersFor(flareIds, new Set(sessions.keys())),
     cardFacts(found.map((flare) => flare.cardId)),
@@ -1586,13 +1677,38 @@ async function decorateHunts(
       hunt.liked = counts.liked;
     }
 
-    /* Hands up across the whole post, each person once. */
+    const post = postById.get(hunt.postId);
+    if (post) {
+      hunt.direction = post.intent === "showcase" ? "showcase" : "want";
+      if (post.caption) hunt.note = post.caption;
+      const name = post.hunt_id ? huntNames.get(post.hunt_id) : undefined;
+      hunt.hunt = post.hunt_id && name ? { id: post.hunt_id, name } : null;
+    }
+
+    /* Hands up across the whole post, each person once; copies still
+       wanted per card, from the hunt request when there is one. */
     const hands = new Set<string>();
     for (const card of hunt.cards) {
       const answer = card.flareId ? answers.get(card.flareId) : undefined;
       if (answer?.offered) card.state = "offered";
       if (answer?.youOffered) card.youOffered = true;
       for (const responder of answer?.responders ?? []) hands.add(responder);
+
+      const request = card.huntRequestId
+        ? requestById.get(card.huntRequestId)
+        : undefined;
+      if (request) {
+        card.remaining = Math.max(
+          0,
+          Math.min(
+            card.quantity ?? 1,
+            request.quantity_needed - request.quantity_found,
+          ),
+        );
+      }
+      if (card.state === "found") card.remaining = 0;
+      const printing = card.printingId ? printingById.get(card.printingId) : undefined;
+      card.printingLabel = printing ? printingLabel(printing, card.cardName) : null;
     }
     hunt.offers = hands.size;
 
@@ -1616,8 +1732,16 @@ async function decorateHunts(
         flareId: flare.id,
         state: "found",
         youOffered: false,
+        remaining: 0,
       });
     }
+
+    hunt.remainingCopies = hunt.cards.reduce(
+      (sum, card) => sum + (card.remaining ?? 0),
+      0,
+    );
+    hunt.completed =
+      (hunt.direction ?? "want") === "want" && hunt.remainingCopies === 0;
   }
 }
 
@@ -1923,7 +2047,7 @@ async function recentItems(
   const { data: flares, error } = await admin
     .from("flares")
     .select(
-      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, accepts_trade, accepts_cash",
+      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, accepts_trade, accepts_cash, printing_id, quantity, hunt_request_id, found_quantity",
     )
     .eq("status", "open")
     .gte("created_at", since(RECENT_DAYS))
@@ -1997,6 +2121,13 @@ async function recentItems(
       cardId: flare.card_id,
       ...fact,
       match: matchFor({ cardId: flare.card_id, printingId: null }, held),
+      flareId: flare.id,
+      state: "open",
+      youOffered: false,
+      printingId: flare.printing_id,
+      quantity: flare.quantity,
+      remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
+      huntRequestId: flare.hunt_request_id ?? null,
     };
 
     const existing = groups.get(key);

@@ -324,7 +324,7 @@ function TickBox({
         const next = !found;
         setFound(next);
         setBusy(true);
-        onTick(card.flareId, next)
+        (card.flareId ? onTick(card.flareId, next) : Promise.reject(new Error("no flare")))
           .catch(() => setFound(!next))
           .finally(() => setBusy(false));
       }}

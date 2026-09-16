@@ -265,7 +265,9 @@ function TickBox({ card }: { card: HuntCard }) {
           start(async () => {
             setFound(!found);
             setError(null);
-            const result = await tickHuntCard(card.flareId, !found);
+            const result = card.flareId
+              ? await tickHuntCard(card.flareId, !found)
+              : { ok: false, error: "Nothing posted for this card yet." };
             if (!result.ok) setError(result.error ?? "Could not update that card.");
           })
         }

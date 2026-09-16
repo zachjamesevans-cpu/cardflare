@@ -972,13 +972,25 @@ export const markRead = (ids: string[]) =>
  * profile, not a crash.
  */
 export interface HuntCard {
-  /** The Flare this card is, so it can be ticked off. */
-  flareId: string;
+  /** The request row, which is what progress writes to. */
+  requestId?: string;
+  /** An open Flare posted for this card, or null when none is up. */
+  flareId: string | null;
   cardId: string;
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
-  /** Found, either way: a trade closed it, or the owner ticked it. */
+  /** Null is any printing. */
+  printingId?: string | null;
+  /** "OP01 · SR · Alt art", or null for any printing. */
+  printingLabel?: string | null;
+  /** Copies wanted, copies in hand, and the difference. */
+  needed?: number;
+  foundCopies?: number;
+  remaining?: number;
+  /** Copies that came through a trade closed here, never undoable. */
+  tradedCopies?: number;
+  /** Every copy is in hand. */
   found: boolean;
   /**
    * Found by a TRADE here, rather than by hand. Only a hand-ticked card
@@ -994,10 +1006,18 @@ export interface HuntCard {
 }
 
 export interface Hunt {
+  /** Absent from an older server, which folded hunts off the label. */
+  id?: string;
   name: string;
+  description?: string | null;
+  visibility?: "public" | "private";
   looking: number;
   lookingCopies: number;
   found: number;
+  /** Copies across the whole list, copies in hand, and the difference. */
+  neededCopies?: number;
+  foundCopies?: number;
+  remainingCopies?: number;
   lastPostedAt: string;
   /**
    * The cards themselves, still looking first.
@@ -1497,6 +1517,15 @@ export interface FeedCard {
   state?: CardState;
   /** The viewer is one of the hands up. */
   youOffered?: boolean;
+  /** The printing asked for, or null for any. */
+  printingId?: string | null;
+  /** "OP01 · SR · Alt art", or null for any printing. */
+  printingLabel?: string | null;
+  /** Copies asked for, and copies still wanted. */
+  quantity?: number;
+  remaining?: number;
+  /** The hunt request this card answers, when the post is in a hunt. */
+  huntRequestId?: string | null;
 }
 
 export type CardState = "open" | "offered" | "found";
@@ -1527,6 +1556,12 @@ export interface PostCard {
   state: CardState;
   youOffered: boolean;
   match: "exact" | "other-printing" | null;
+  printingId?: string | null;
+  printingLabel?: string | null;
+  /** Copies asked for, and copies still wanted. */
+  quantity?: number;
+  remaining?: number;
+  huntRequestId?: string | null;
 }
 
 /** The whole post, for its own screen. Mirrors the server's PostDetail. */
@@ -1545,6 +1580,13 @@ export interface PostDetail {
   storeName: string | null;
   eventName: string | null;
   deckLabel: string | null;
+  /** Which way the post points. Absent from an older server. */
+  direction?: "want" | "showcase";
+  caption?: string | null;
+  /** The hunt the post belongs to. */
+  hunt?: { id: string; name: string } | null;
+  remainingCopies?: number;
+  completed?: boolean;
   cards: PostCard[];
   yours: boolean;
   thread: PostComment[];
@@ -1552,6 +1594,99 @@ export interface PostDetail {
   comments: number;
   liked: boolean;
 }
+
+/** A hunt on its own screen: the list plus who owns it. */
+export interface HuntView extends Hunt {
+  id: string;
+  playerId: string;
+  ownerName: string;
+  yours: boolean;
+}
+
+export const getHunts = () => call<{ hunts: Hunt[]; limit: number }>("GET", "/api/v1/hunts");
+
+export const getHunt = (huntId: string) =>
+  call<{ hunt: HuntView }>("GET", `/api/v1/hunts/${encodeURIComponent(huntId)}`);
+
+export const createHunt = (input: {
+  name: string;
+  description?: string | null;
+  visibility?: "public" | "private";
+}) =>
+  call<{ ok: true; huntId: string; hunts: Hunt[] }>("POST", "/api/v1/hunts", {
+    action: "create",
+    ...input,
+  });
+
+export const updateHunt = (
+  huntId: string,
+  patch: { name?: string; description?: string | null; visibility?: "public" | "private" },
+) =>
+  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
+    action: "update",
+    huntId,
+    ...patch,
+  });
+
+export const addHuntCards = (
+  huntId: string,
+  items: { cardId: string; printingId?: string | null; quantity: number }[],
+) =>
+  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
+    action: "add-cards",
+    huntId,
+    items,
+  });
+
+/** Copies in hand for one request: "+1 found", the stepper, undo. */
+export const setRequestFound = (requestId: string, found: number) =>
+  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
+    action: "set-found",
+    requestId,
+    found,
+  });
+
+/** The same, addressed by a posted card from the Feed. */
+export const setFlareFound = (flareId: string, found: number) =>
+  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
+    action: "set-flare-found",
+    flareId,
+    found,
+  });
+
+/** One post of one or many cards, to a room by code or to the area. */
+export const publishFlare = (input: {
+  code?: string;
+  intent: "want" | "showcase";
+  caption?: string | null;
+  items: { cardId: string; printingId?: string | null; quantity: number }[];
+  hunt?: { id: string } | { name: string } | null;
+  acceptsTrade?: boolean;
+  acceptsCash?: boolean;
+  latitude?: number;
+  longitude?: number;
+}) =>
+  call<{
+    ok: boolean;
+    postId?: string;
+    posted?: number;
+    huntId?: string | null;
+    atCap?: boolean;
+    error?: string;
+    message?: string;
+  }>("POST", "/api/v1/flares/publish", input);
+
+/** "I have these": several cards from one post, each with how many. */
+export const offerItemsOnPost = (
+  postId: string,
+  items: { flareId: string; quantity: number }[],
+  message: string,
+) =>
+  call<{ ok: true; offered: number; refused: string[] }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "offer-items", items, message },
+  );
 
 /** One trade in your history, both sides. Mirrors the server's entry. */
 export interface TradeHistoryEntry {
@@ -1757,6 +1892,12 @@ export type FeedItem =
       note?: string | null;
       /** How many people have raised a hand on any card in it. */
       offers?: number;
+      /** The hunt the post belongs to, for "Green Zoro · View hunt". */
+      hunt?: { id: string; name: string } | null;
+      /** Copies still wanted across every card shown. */
+      remainingCopies?: number;
+      /** Every copy is in hand: nothing left to offer on. */
+      completed?: boolean;
       /** Every card in one posting action, the viewer's first. */
       cards: FeedCard[];
       total: number;

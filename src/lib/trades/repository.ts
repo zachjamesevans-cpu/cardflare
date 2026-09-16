@@ -1,6 +1,7 @@
 import "server-only";
 
 import { awardTradeEmbers, reverseTradeEmbers } from "@/lib/players/embers";
+import { recordTradeFound, reverseTradeFound } from "@/lib/players/hunts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { TradeRecord } from "./schema";
 
@@ -137,6 +138,10 @@ export async function confirmTrade(
     return { ok: false, reason: "unavailable" };
   }
 
+  /* The card is in hand now: its hunt request moves, or its own count
+     does. Once per trade, and a trade happens once per Flare. */
+  await recordTradeFound(flareId, flare.quantity);
+
   /*
    * The payout waits for the second hand.
    *
@@ -224,6 +229,12 @@ export async function disputeTrade(
   note: string,
   disputedBy: string | null,
 ): Promise<boolean> {
+  const { data: trade } = await getSupabaseAdmin()
+    .from("trades")
+    .select("flare_id, quantity")
+    .eq("id", tradeId)
+    .maybeSingle();
+  if (trade?.flare_id) await reverseTradeFound(trade.flare_id, trade.quantity);
   return reverseTradeEmbers(tradeId, note, disputedBy);
 }
 

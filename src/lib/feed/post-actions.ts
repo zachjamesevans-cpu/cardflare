@@ -12,6 +12,7 @@ import {
   likePost,
   listComments,
   offerFromFeed,
+  offerItems,
   unlikePost,
   type PostComment,
 } from "./posts";
@@ -131,4 +132,60 @@ export async function offerFromFeedAction(formData: FormData): Promise<void> {
   if (!outcome.ok) console.error(`Feed offer refused: ${outcome.reason}`);
 
   revalidatePath("/feed");
+}
+
+/**
+ * "I have these", from a post's full list: several cards, each with how
+ * many, in one offer with one optional message. Quantities are capped
+ * on the server at what is still wanted; a card answered meanwhile is
+ * named in `refused` so the sheet can say so.
+ */
+export async function offerItemsAction(
+  postId: string,
+  items: { flareId: string; quantity: number }[],
+  message: string,
+): Promise<
+  | { ok: true; offered: number; refused: string[] }
+  | { ok: false; message: string; refused: string[] }
+> {
+  const player = await viewerPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in first.", refused: [] };
+  if (!postId || items.length === 0) {
+    return { ok: false, message: "Pick a card first.", refused: [] };
+  }
+
+  if (
+    !checkRateLimit(
+      `offer-feed:${player.id}`,
+      LIMITS.offer.limit,
+      LIMITS.offer.windowMs,
+    ).allowed
+  ) {
+    return {
+      ok: false,
+      message: "That is a lot of offers. Give it a minute.",
+      refused: [],
+    };
+  }
+
+  const outcome = await offerItems(
+    postId,
+    player.id,
+    player.displayName,
+    items,
+    message,
+  );
+  revalidatePath("/feed");
+  if (!outcome.ok) {
+    const message =
+      outcome.reason === "own-flare"
+        ? "That one is yours."
+        : outcome.reason === "nothing-left"
+          ? "Those cards were all found already."
+          : outcome.reason === "at-cap"
+            ? "You have offers on the most cards this room allows."
+            : "Could not send the offer.";
+    return { ok: false, message, refused: outcome.refused ?? [] };
+  }
+  return { ok: true, offered: outcome.offered, refused: outcome.refused ?? [] };
 }
