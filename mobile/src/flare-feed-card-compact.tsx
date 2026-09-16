@@ -178,6 +178,11 @@ const COMPACT_TILE = 64;
  * of four found is a card somebody needs one of, and the number that
  * helps is the one you could answer today. A card fully found says so
  * with a tick instead: zero is not a quantity worth drawing.
+ *
+ * Half again as big as it started. The founder: "make the '1x'/quanity
+ * stuff like 50% bigger when soemone posts a quantity." At nine points
+ * it was a mark you noticed rather than a number you read, which is the
+ * wrong way round for the one fact this view keeps.
  */
 function NeedBadge({
   card,
@@ -193,23 +198,23 @@ function NeedBadge({
     <View
       style={{
         position: "absolute",
-        right: 2,
-        bottom: 2,
-        borderRadius: 5,
-        paddingHorizontal: 3,
-        paddingVertical: 1,
+        right: 3,
+        bottom: 3,
+        borderRadius: 6,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
         backgroundColor: done ? colors.surface : colors.accent,
         borderWidth: done ? 1 : 0,
         borderColor: colors.border,
       }}
     >
       {done ? (
-        <Ionicons name="checkmark" size={9} color={colors.textMuted} />
+        <Ionicons name="checkmark" size={13} color={colors.textMuted} />
       ) : (
         <Text
           style={{
             color: colors.canvas,
-            fontSize: 9,
+            fontSize: 13,
             fontWeight: "800",
           }}
         >

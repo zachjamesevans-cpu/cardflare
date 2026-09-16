@@ -122,6 +122,11 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
  * somebody needs one of, and the number that helps is the one you could
  * answer today. A card fully found wears a tick instead: zero is not a
  * quantity worth drawing.
+ *
+ * Half again as big as it started. The founder: "make the '1x'/quanity
+ * stuff like 50% bigger when soemone posts a quantity." At nine points
+ * it was a mark you noticed rather than a number you read, which is the
+ * wrong way round for the one fact this view keeps.
  */
 function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
   const wanted = card.remaining ?? card.quantity ?? 1;
@@ -131,9 +136,9 @@ function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
     return (
       <span
         aria-label="Found"
-        className="absolute right-0.5 bottom-0.5 flex items-center rounded-[5px] border border-border bg-surface px-1 py-px"
+        className="absolute right-1 bottom-1 flex items-center rounded-[6px] border border-border bg-surface px-1.5 py-0.5"
       >
-        <Check className="size-2.5 text-text-muted" aria-hidden="true" />
+        <Check className="size-3.5 text-text-muted" aria-hidden="true" />
       </span>
     );
   }
@@ -141,7 +146,7 @@ function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
   return (
     <span
       aria-label={`${wanted} still wanted`}
-      className="absolute right-0.5 bottom-0.5 rounded-[5px] bg-accent px-1 py-px text-[9px] leading-tight font-extrabold text-accent-contrast tabular-nums"
+      className="absolute right-1 bottom-1 rounded-[6px] bg-accent px-1.5 py-0.5 text-[13px] leading-none font-extrabold text-accent-contrast tabular-nums"
     >
       {wanted}x
     </span>
