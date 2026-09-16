@@ -110,6 +110,12 @@ revoke all on public.flare_posts from anon, authenticated;
 /* 3. What a flare gains                                                      */
 /* -------------------------------------------------------------------------- */
 
+/* `found_at` came from the hunt checklist migration (20261012090000).
+   The backfill below reads it, so it is added here too, harmlessly, in
+   case that migration was never run on this database. */
+alter table public.flares
+  add column if not exists found_at timestamptz;
+
 alter table public.flares
   add column if not exists hunt_request_id uuid references public.hunt_requests (id) on delete set null,
   add column if not exists found_quantity integer not null default 0 check (found_quantity >= 0);
