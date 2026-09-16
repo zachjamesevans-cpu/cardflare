@@ -1808,6 +1808,25 @@ async function decorateHunts(
       if (card.state === "found") card.remaining = 0;
       const printing = card.printingId ? printingById.get(card.printingId) : undefined;
       card.printingLabel = printing ? printingLabel(printing, card.cardName) : null;
+      /*
+       * AND ITS PICTURE, which is the whole point of naming a printing.
+       *
+       * The founder: "alts still aren't being shown in flare screen. it
+       * does say it's selecting it, but when it goes to flare screen, it
+       * just shows base rarity for all of them" - then the clue that
+       * found it: "it does show properly in the hunts screen when added
+       * to a hunt, but main menu feed doesn't show proper rarities."
+       *
+       * So the Flare knew which printing it meant all along. `cardFacts`
+       * resolves ONE image per card - whichever printing row came back
+       * first - and this loop read the chosen printing only to write its
+       * label. The post therefore said "Alternate Art" over the base
+       * art, which is worse than either alone.
+       *
+       * A printing with no art of its own keeps the card's, rather than
+       * dropping to an empty tile.
+       */
+      if (printing?.imageUrl) card.imageUrl = printing.imageUrl;
     }
     hunt.offers = hands.size;
 
