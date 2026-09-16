@@ -130,7 +130,14 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     return { ok: false, reason: "unavailable" };
   }
 
-  const accepts = { acceptsTrade: input.acceptsTrade, acceptsCash: input.acceptsCash };
+  /* Open to a trade, to cash, or to both, never to neither: the row's
+     check constraint (flares_accepts_something) refuses that, and a
+     client that sends nothing gets the same default a board post has
+     always had. */
+  const accepts = {
+    acceptsTrade: input.acceptsTrade || !input.acceptsCash,
+    acceptsCash: input.acceptsCash,
+  };
   let posted = 0;
   let atCap = false;
   let refused: PublishResult | null = null;
@@ -184,8 +191,8 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
           quantity: item.quantity,
           note: null,
           intent: input.intent,
-          acceptsTrade: input.acceptsTrade,
-          acceptsCash: input.acceptsCash,
+          acceptsTrade: accepts.acceptsTrade,
+          acceptsCash: accepts.acceptsCash,
         },
         input.at,
         { batchId: postId, deckLabel: huntName },
