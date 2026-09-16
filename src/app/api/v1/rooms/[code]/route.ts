@@ -124,7 +124,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   }
 
   const room = resolved.room;
-  const session = await apiSession(request);
+  const session = await apiSession(request, room.id);
   const participation = session ? await findParticipation(room.id, session.id) : null;
 
   if (session && participation) {
@@ -255,6 +255,16 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     return Response.json({ error: "not-open" }, { status: 409 });
   }
 
+  /*
+   * TOKEN ONLY, deliberately, and the one place that is right.
+   *
+   * Everywhere else a room route resolves a signed-in player's seat by
+   * account when the token misses. Here that would be wrong: this
+   * handler decides whether to MINT a token by asking whether the
+   * device already has an identity, and an account-resolved session
+   * would answer yes for a device holding nothing. The fresh install
+   * would be told "you are in" and handed no way to act.
+   */
   let session = await apiSession(request);
   let freshToken: string | null = null;
   let created = false;

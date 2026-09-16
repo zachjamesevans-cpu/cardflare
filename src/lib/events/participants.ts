@@ -3,6 +3,7 @@ import "server-only";
 import { roomIdentitiesFor } from "@/lib/players/profile";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import type { PlayerSessionRow } from "@/lib/supabase/types";
 
 /**
  * How recently a player must have loaded the room to count as "here now".
@@ -309,4 +310,67 @@ export async function countParticipants(
   }
 
   return counts;
+}
+
+/**
+ * The session an account is already in this room with, from any device.
+ *
+ * The founder: "if i join a room on my computer, it prompts me to join
+ * with my username. but really, if i open that same room in app, it
+ * should skip the whole join thing... if im in a room it should just be
+ * persistent across platforms."
+ *
+ * A room identity is a `player_sessions` row, and until now a client
+ * could only find one by holding its token: the browser had a cookie,
+ * the app had a stored token, and neither knew about the other's. So a
+ * signed-in player who joined on a laptop opened the app to a join
+ * screen for a room they were already standing in.
+ *
+ * The link has existed all along - joining while signed in stamps the
+ * account onto the session - so this is a lookup rather than a new
+ * fact. Two queries and no join: the account's live sessions, then the
+ * one of them this room has a seat for.
+ */
+export async function sessionInEventForPlayer(
+  playerId: string,
+  eventId: string,
+): Promise<PlayerSessionRow | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const admin = getSupabaseAdmin();
+
+  const { data: sessions, error: sessionError } = await admin
+    .from("player_sessions")
+    .select("*")
+    .eq("player_id", playerId)
+    .gt("expires_at", new Date().toISOString());
+
+  if (sessionError) {
+    console.error("Could not look up the account's sessions", sessionError);
+    return null;
+  }
+  if (!sessions || sessions.length === 0) return null;
+
+  const { data: seat, error: seatError } = await admin
+    .from("event_participants")
+    .select("player_session_id, last_seen_at")
+    .eq("event_id", eventId)
+    .in(
+      "player_session_id",
+      sessions.map((session) => session.id),
+    )
+    /* Newest seat wins. An account with two live sessions in one room is
+       a merge that has not happened yet; the one it was last seen on is
+       the one the person is actually using. */
+    .order("last_seen_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (seatError) {
+    console.error("Could not look up the account's seat", seatError);
+    return null;
+  }
+  if (!seat) return null;
+
+  return sessions.find((session) => session.id === seat.player_session_id) ?? null;
 }
