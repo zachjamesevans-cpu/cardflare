@@ -1,0 +1,98 @@
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+
+const read = (path: string) => readFile(path, "utf8");
+
+describe("your own Flares reach your own Feed, wherever you posted them", () => {
+  /*
+   * The founder: "when i post a flare, at least, a flare with multiple
+   * cards, it doesn't show in feed at all" - then, decisively: "i am in
+   * a room, if that helps. seems maybe if ur in a room it doesnt post
+   * to feed."
+   *
+   * Exactly that. A board Flare has an `event_id` AND no `player_id` -
+   * it is keyed to the room session - so it failed both filters on the
+   * area read. The "recent" list covers rooms but only for people you
+   * FOLLOW, and nobody follows themselves, so a Flare posted from a
+   * room was invisible to its own author. Nothing to do with the card
+   * count; a single one vanished just the same.
+   */
+  it("reads the author's own room Flares as well as their area ones", async () => {
+    const repo = await read("src/lib/feed/repository.ts");
+
+    expect(repo).toContain("async function ownRoomFlares(");
+    expect(repo).toContain("const mine = await ownRoomFlares(viewerId);");
+    /* Merged before grouping, or a batch posted in a room stops being
+       one post and becomes one post per card. */
+    expect(repo).toContain("const all = [...(flares ?? []), ...mine];");
+    expect(repo).toContain("for (const flare of all) {");
+  });
+
+  it("finds them by session, since a board Flare carries no player id", async () => {
+    const repo = await read("src/lib/feed/repository.ts");
+    const fn = repo.slice(repo.indexOf("async function ownRoomFlares("));
+
+    expect(fn).toContain('.from("player_sessions")');
+    expect(fn).toContain('.in("player_session_id", ids)');
+    /* Stamped with the account on the way out: the fact the row was
+       missing, recovered from the session that owns it. Grouping and
+       "is this mine" both key on it. */
+    expect(fn).toContain("player_id: viewerId");
+  });
+
+  it("does not read the area Flares twice", async () => {
+    /*
+     * The area query already returns everything with no event. Without
+     * this filter the same Flare arrives down both paths and every
+     * post outside a room is drawn twice.
+     */
+    const repo = await read("src/lib/feed/repository.ts");
+    const fn = repo.slice(repo.indexOf("async function ownRoomFlares("));
+    expect(fn).toContain('.not("event_id", "is", null)');
+  });
+});
+
+describe("one shelf, both directions", () => {
+  /*
+   * The founder: "when a flare is in the 'letting go' tab if im trying
+   * to offer something up, when i click it, it only shows the cards
+   * that are in cards im looking for. the letting go cards should be
+   * swipable in the carousel like normal, but should say im offering it
+   * up or letting it go once i swipe to it."
+   *
+   * The app built its zoom shelf from the WANTS alone, so a showcase
+   * tile was never in it - `shelfAt` missed, the `?? 0` fallback put
+   * the viewer at the first wanted card, and opening a card somebody
+   * was letting go showed one they were hunting.
+   */
+  it("puts showcases on the shelf on both platforms", async () => {
+    const app = await read("mobile/src/screens/room.tsx");
+    const web = await read("src/components/lists/list-entries.tsx");
+
+    expect(app).toContain("...inRailOrder(showcases, held, isCovered),");
+    expect(web).toContain(
+      "const shelfEntries = [...inTileOrder(wantEntries), ...inTileOrder(showcases)];",
+    );
+  });
+
+  it("keeps the two visibly separate in the rail", async () => {
+    /* One swipe, two sections. The founder asked for both: "they should
+       still be visibly separate in carousel, but when clicking on one,
+       it's same swiping carousel." */
+    const app = await read("mobile/src/screens/room.tsx");
+    expect(app).toContain("{showcases.map(tile)}");
+    expect(app).toMatch(/Letting go ·/);
+  });
+
+  it("says which way each card points once it is swiped to", async () => {
+    /* The shelf carries `direction` per card, and the zoom reads it -
+       so a showcase says so on its own rather than inheriting the
+       wording of whatever was tapped first. */
+    const app = await read("mobile/src/screens/room.tsx");
+    expect(app).toContain("direction: f.intent");
+
+    const ui = await read("mobile/src/ui.tsx");
+    expect(ui).toContain('direction === "showcase"');
+    expect(ui).toContain("Letting this go");
+  });
+});

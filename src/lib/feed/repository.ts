@@ -1476,6 +1476,53 @@ async function boardWithHunts(
  * Grouped by posting action, like a board's hunts, so a pasted deck is
  * one post with one thread rather than thirty rows.
  */
+/**
+ * The viewer's own Flares posted from inside a room.
+ *
+ * A board Flare is keyed to the room SESSION, not the account: its
+ * `player_id` is null, and the only thread back to a person is
+ * `player_session_id`. So this reads the account's sessions first and
+ * the Flares hanging off them second.
+ *
+ * The rows are stamped with the viewer's `player_id` on the way out.
+ * That is not a fudge - it is the fact the row was missing, recovered
+ * from the session that owns it - and the grouping downstream keys on
+ * it, as does "is this mine".
+ */
+async function ownRoomFlares(viewerId: string) {
+  const admin = getSupabaseAdmin();
+
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id")
+    .eq("player_id", viewerId);
+
+  const ids = (sessions ?? []).map((session) => session.id);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await admin
+    .from("flares")
+    .select(
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
+    )
+    .in("player_session_id", ids)
+    /* Room Flares only: the ones with no event are already in the read
+       this joins, and reading them twice would double every post. */
+    .not("event_id", "is", null)
+    .eq("status", "open")
+    .in("intent", ["want", "showcase"])
+    .gte("created_at", since(RECENT_DAYS))
+    .order("created_at", { ascending: false })
+    .limit(RECENT_READ);
+
+  if (error) {
+    console.error("Could not read your own room Flares", error);
+    return [];
+  }
+
+  return (data ?? []).map((flare) => ({ ...flare, player_id: viewerId }));
+}
+
 async function areaHuntsFor(
   authors: Map<string, FollowedPlayer>,
   viewerId: string,
@@ -1502,16 +1549,41 @@ async function areaHuntsFor(
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
 
-  if (!flares || flares.length === 0) return [];
+  /*
+   * YOUR OWN FLARES COUNT WHEREVER YOU POSTED THEM.
+   *
+   * The founder: "when i post a flare, at least, a flare with multiple
+   * cards, it doesn't show in feed at all... i am in a room, if that
+   * helps. seems maybe if ur in a room it doesnt post to feed."
+   *
+   * Exactly that, and for two reasons at once. The read above wants
+   * `event_id is null` and a `player_id` in the followed set; a Flare
+   * posted from inside a room has an event AND carries no player_id at
+   * all - it is keyed to the room session instead. So it failed both
+   * filters. Nothing else caught it either: the "recent" list covers
+   * rooms, but only for people you FOLLOW, and nobody follows
+   * themselves. Every Flare posted from a room was invisible to its own
+   * author - single or batched, which is why it read as a multi-card
+   * bug.
+   *
+   * Read separately rather than by widening the query above, because
+   * the two ask different questions: that one is "people I follow, out
+   * in the world", this one is "me, anywhere". Merged before grouping,
+   * so a batch posted in a room still becomes one post.
+   */
+  const mine = await ownRoomFlares(viewerId);
+  const all = [...(flares ?? []), ...mine];
 
-  const facts = await cardFacts(flares.map((flare) => flare.card_id));
+  if (all.length === 0) return [];
+
+  const facts = await cardFacts(all.map((flare) => flare.card_id));
 
   /* One group per posting act: the batch if it had one, else the Flare.
      Keyed by author as well, the way a board's hunts are. `postId` stays
      the batch alone, because that is what a heart and a thread hang
      off. */
-  const groups = new Map<string, typeof flares>();
-  for (const flare of flares) {
+  const groups = new Map<string, typeof all>();
+  for (const flare of all) {
     if (!flare.player_id) continue;
     const key = `${flare.player_id}::${flare.posted_batch ?? flare.id}`;
     groups.set(key, [...(groups.get(key) ?? []), flare]);
