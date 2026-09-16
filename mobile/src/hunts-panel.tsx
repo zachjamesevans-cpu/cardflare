@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 
-import type { FeedCard, Hunt } from "./api";
-import { CardRail } from "./card-rail";
+import type { FeedCard, Hunt, HuntCard } from "./api";
+import { CardImage } from "./ui";
 import { colors, radius, spacing } from "./theme";
 import { Body, Button, Card, Tap, Title } from "./ui";
+import type { ZoomCard } from "./ui";
 
 /**
  * Somebody's hunts, on their profile. The app's half of
@@ -25,6 +26,12 @@ import { Body, Button, Card, Tap, Title } from "./ui";
  * like every other card in the app. Nothing new was invented to show
  * them.
  *
+ * IT IS ALSO A CHECKLIST. The founder: "needs to be a simply way in
+ * hunts to mark off if you've already found that card... you can check
+ * them off yourself as you collect the cards." Most cards arrive by
+ * pull, purchase or a friend rather than a trade here, so a list only a
+ * trade could tick was wrong about most of its own boxes.
+ *
  * A hunt with nothing left is not hidden. Finishing one is the good
  * outcome, and a profile that quietly dropped them would only ever show
  * unfinished work.
@@ -34,12 +41,15 @@ export function HuntsPanel({
   limit,
   yours,
   onAdd,
+  onTick,
 }: {
   hunts: Hunt[];
   limit?: number;
   yours?: boolean;
   /** Post into this hunt - the composer, with the group already named. */
   onAdd?: (name: string) => void;
+  /** Tick a card off, or untick it. Absent on somebody else's profile. */
+  onTick?: (flareId: string, found: boolean) => Promise<void>;
 }) {
   /*
    * WHICH FOLDER IS OPEN, at most one.
@@ -98,6 +108,7 @@ export function HuntsPanel({
               open={open === hunt.name}
               onToggle={() => setOpen(open === hunt.name ? null : hunt.name)}
               onAdd={yours && onAdd ? () => onAdd(hunt.name) : undefined}
+              onTick={yours ? onTick : undefined}
             />
           ))}
         </View>
@@ -111,11 +122,13 @@ function HuntFolder({
   open,
   onToggle,
   onAdd,
+  onTick,
 }: {
   hunt: Hunt;
   open: boolean;
   onToggle: () => void;
   onAdd?: () => void;
+  onTick?: (flareId: string, found: boolean) => Promise<void>;
 }) {
   /*
    * An older server sends a hunt with no `cards` at all. The lid still
@@ -124,17 +137,14 @@ function HuntFolder({
    */
   const cards = hunt.cards ?? [];
 
-  /* The rail speaks FeedCard, which is what every other card in the app
-     is drawn from - so a hunt's cards zoom and swipe like the rest. */
-  const rail: FeedCard[] = cards.map((card) => ({
-    cardId: card.cardId,
-    cardName: card.cardName,
-    cardNumber: card.cardNumber,
+  /* The shelf the zoom pages along, so opening one card lets you swipe
+     the whole folder - the same shelf the Feed's rails hand their
+     tiles. */
+  const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
-    match: null,
-    /* Found reads as found: the same dimming a traded card wears on a
-       Flare, so one visual vocabulary covers both. */
-    state: card.found ? "found" : "open",
+    name: card.cardName,
+    cardNumber: card.cardNumber,
+    youHave: null,
   }));
 
   return (
@@ -216,8 +226,35 @@ function HuntFolder({
             paddingBottom: spacing(3),
           }}
         >
-          {rail.length > 0 ? (
-            <CardRail cards={rail} width={72} />
+          {cards.length > 0 ? (
+            /*
+             * The rail is drawn here rather than through `CardRail`,
+             * because each card carries a box of its own underneath.
+             * Same tile, same zoom, same shelf - the tick is the only
+             * thing the Feed's rail does not need.
+             */
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(0.5) }}
+            >
+              {cards.map((card, index) => (
+                <View key={card.cardId} style={{ gap: spacing(1) }}>
+                  <CardImage
+                    imageUrl={card.imageUrl}
+                    width={72}
+                    name={card.cardName}
+                    cardNumber={card.cardNumber}
+                    /* Found reads as found: the same dimming a traded
+                       card wears on a Flare. */
+                    state={card.found ? "found" : "open"}
+                    siblings={shelf}
+                    position={index}
+                  />
+                  {onTick ? <TickBox card={card} onTick={onTick} /> : null}
+                </View>
+              ))}
+            </ScrollView>
           ) : (
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>
               Nothing to show yet.
@@ -242,4 +279,81 @@ export function lookingLabel(hunt: Hunt): string {
     return `${hunt.looking} left · ${hunt.lookingCopies} copies`;
   }
   return `${hunt.looking} left`;
+}
+
+/**
+ * One box, under one card.
+ *
+ * OPTIMISTIC, because the whole value of a checklist is that ticking
+ * feels like nothing. Somebody standing at a counter with a binder open
+ * taps five of these in a row, and a spinner between each turns a
+ * checklist back into a form. The box paints immediately and the server
+ * confirms behind it; a failed write puts it back and says so rather
+ * than leaving a tick that was never saved.
+ *
+ * A card a real TRADE closed has no box: that fact belongs to the trade,
+ * and a box offering to untick it would be lying about what it does.
+ */
+function TickBox({
+  card,
+  onTick,
+}: {
+  card: HuntCard;
+  onTick: (flareId: string, found: boolean) => Promise<void>;
+}) {
+  const [found, setFound] = useState(card.found);
+  const [busy, setBusy] = useState(false);
+
+  /* The list can be replaced under us by the answer to somebody else's
+     tick, so the server's word wins whenever it changes. */
+  useEffect(() => setFound(card.found), [card.found]);
+
+  if (card.tradedAway) {
+    return (
+      <Text style={{ color: colors.textMuted, fontSize: 10, textAlign: "center" }}>
+        Traded
+      </Text>
+    );
+  }
+
+  return (
+    <Tap
+      disabled={busy}
+      accessibilityLabel={`${found ? "Unmark" : "Mark"} ${card.cardName} as found`}
+      onPress={() => {
+        const next = !found;
+        setFound(next);
+        setBusy(true);
+        onTick(card.flareId, next)
+          .catch(() => setFound(!next))
+          .finally(() => setBusy(false));
+      }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: found ? colors.accent : colors.border,
+        backgroundColor: found ? colors.accent : "transparent",
+        paddingVertical: 3,
+      }}
+    >
+      <Ionicons
+        name="checkmark"
+        size={11}
+        color={found ? colors.canvas : colors.textSecondary}
+      />
+      <Text
+        style={{
+          color: found ? colors.canvas : colors.textSecondary,
+          fontSize: 10,
+          fontWeight: "700",
+        }}
+      >
+        {found ? "Got it" : "Mark"}
+      </Text>
+    </Tap>
+  );
 }

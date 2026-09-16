@@ -972,12 +972,24 @@ export const markRead = (ids: string[]) =>
  * profile, not a crash.
  */
 export interface HuntCard {
+  /** The Flare this card is, so it can be ticked off. */
+  flareId: string;
   cardId: string;
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
-  /** Traded: checked off by the trade that got it. */
+  /** Found, either way: a trade closed it, or the owner ticked it. */
   found: boolean;
+  /**
+   * Found by a TRADE here, rather than by hand. Only a hand-ticked card
+   * offers a box - a trade is a thing that happened between two people,
+   * and a box offering to undo it would be lying about what it does.
+   *
+   * Optional for the same version-skew reason `cards` is: an older
+   * server sends neither, and a card with no flag reads as hand-ticked,
+   * which is the forgiving way round.
+   */
+  tradedAway?: boolean;
   quantity: number;
 }
 
@@ -1578,6 +1590,17 @@ export const getTradeHistory = () =>
 
 export const getPost = (postId: string) =>
   call<{ post: PostDetail }>("GET", `/api/v1/posts/${encodeURIComponent(postId)}`);
+
+/**
+ * Tick a card off a hunt, or untick it.
+ *
+ * The answer carries the whole hunts list back rather than an ack: a
+ * tick moves three numbers on the folder it is in, and a phone that
+ * recomputes those for itself is a phone that will eventually disagree
+ * with the profile it is sitting on.
+ */
+export const tickHuntCard = (flareId: string, found: boolean) =>
+  call<{ hunts: Hunt[] }>("POST", "/api/v1/hunts", { flareId, found });
 
 export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {

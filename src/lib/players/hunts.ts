@@ -26,12 +26,23 @@ import { tierAllows } from "@/lib/tiers";
  * actually happened, rather than by remembering to tick a box.
  */
 export interface HuntCard {
+  /** The Flare this card is, so it can be ticked off. */
+  flareId: string;
   cardId: string;
   cardName: string;
   cardNumber: string;
   imageUrl: string | null;
-  /** Traded: checked off by the trade that got it. */
+  /** Found, either way: a trade closed it, or the owner ticked it. */
   found: boolean;
+  /**
+   * Found by a TRADE here, rather than by hand.
+   *
+   * The two are drawn differently and only one of them is undoable: a
+   * trade is a thing that happened between two people and has a row of
+   * its own, so a box offering to untick it would be lying about what
+   * it does.
+   */
+  tradedAway: boolean;
   /** How many of it they are after. */
   quantity: number;
 }
@@ -91,12 +102,24 @@ export function huntLimitFor(tier: string | null): number {
  * never started.
  */
 export async function huntsFor(playerId: string): Promise<Hunt[]> {
-  const { data } = await getSupabaseAdmin()
+  const { data, error } = await getSupabaseAdmin()
     .from("flares")
-    .select("deck_label, status, quantity, created_at, card_id")
+    .select("id, deck_label, status, quantity, created_at, card_id, found_at")
     .eq("player_id", playerId)
     .not("deck_label", "is", null)
     .order("created_at", { ascending: false });
+
+  /*
+   * SAY SO RATHER THAN SHOW NOTHING. A failed read here used to fall
+   * through to "no hunts yet", which looks exactly like a player who
+   * has never made one - so the day `found_at` was added and the
+   * migration had not been run, every folder on the site would have
+   * quietly emptied with nothing anywhere saying why.
+   */
+  if (error) {
+    console.error("Could not read hunts", error);
+    return [];
+  }
 
   if (!data || data.length === 0) return [];
 
@@ -120,7 +143,13 @@ export async function huntsFor(playerId: string): Promise<Hunt[]> {
       cards: [],
     };
 
-    const found = row.status === "traded";
+    /*
+     * FOUND EITHER WAY. A trade here closed it, or the owner ticked the
+     * box because they got the card some other way - pulled it, bought
+     * it, a friend handed it over. Most cards arrive by the second
+     * route, which is why the box exists.
+     */
+    const found = row.status === "traded" || row.found_at !== null;
     if (found) hunt.found += 1;
     else {
       hunt.looking += 1;
@@ -133,6 +162,10 @@ export async function huntsFor(playerId: string): Promise<Hunt[]> {
     const fact = facts.get(row.card_id);
     if (fact) {
       hunt.cards.push({
+        /* The Flare behind the card, so the tick has something to
+           write to. A hunt card IS a Flare; there is no second row. */
+        flareId: row.id,
+        tradedAway: row.status === "traded",
         cardId: row.card_id,
         cardName: fact.cardName,
         cardNumber: fact.cardNumber,
@@ -201,4 +234,58 @@ export async function canStartHunt(
     kept: hunts.length,
     limit,
   };
+}
+
+/**
+ * Tick a card off in a hunt, or untick it.
+ *
+ * The founder: "needs to be a simply way in hunts to mark off if you've
+ * already found that card. think of it as a checklist... you can check
+ * them off yourself as you collect the cards."
+ *
+ * THE OWNER ONLY. `flares` runs RLS on with zero policies - every read
+ * and write in this app goes through the service role - so the `eq` on
+ * `player_id` is not a convenience, it is the whole of the access
+ * control. Without it any signed-in player could tick out somebody
+ * else's list.
+ *
+ * Unticking is deliberate and matters more than it looks: a checklist
+ * you cannot correct is one people stop trusting the moment they
+ * mis-tap. A card closed by a real TRADE is not untickable here though -
+ * that fact belongs to the trade, not to the box, and this must not be
+ * a way to quietly undo one.
+ */
+export async function markHuntCard(
+  playerId: string,
+  flareId: string,
+  found: boolean,
+): Promise<{ ok: boolean; reason?: "not-yours" | "traded" | "unavailable" }> {
+  const admin = getSupabaseAdmin();
+
+  const { data: flare } = await admin
+    .from("flares")
+    .select("id, player_id, status")
+    .eq("id", flareId)
+    .maybeSingle();
+
+  if (!flare || flare.player_id !== playerId) return { ok: false, reason: "not-yours" };
+  if (flare.status === "traded") return { ok: false, reason: "traded" };
+
+  const { error } = await admin
+    .from("flares")
+    .update({
+      found_at: found ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", flareId)
+    /* Again on the write: the read above could go stale between the two,
+       and this is the one that actually guards the row. */
+    .eq("player_id", playerId);
+
+  if (error) {
+    console.error("Could not tick the hunt card", error);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  return { ok: true };
 }

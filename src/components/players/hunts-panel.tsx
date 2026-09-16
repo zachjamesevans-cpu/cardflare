@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, Crosshair, Folder, FolderOpen } from "lucide-react";
+import { Check, ChevronDown, Crosshair, Folder, FolderOpen } from "lucide-react";
 
 import { FeedTile } from "@/components/feed/feed-tile";
 import { buttonStyles } from "@/components/ui/button";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
-import type { Hunt } from "@/lib/players/hunts";
+import type { Hunt, HuntCard } from "@/lib/players/hunts";
+import { tickHuntCard } from "@/lib/players/hunt-actions";
 
 /**
  * Somebody's hunts, on their profile.
@@ -28,10 +29,19 @@ import type { Hunt } from "@/lib/players/hunts";
  * glance: what is left says whether you can help. They just summarise
  * something visible now instead of standing in for it.
  *
- * NOTHING IS CHECKED OFF BY HAND. A card moves from looking to found
- * when the trade that got it is confirmed, which is the one moment we
- * can be sure actually happened. A tick box would be a second thing to
- * keep in step with the first.
+ * IT IS A CHECKLIST. The founder: "needs to be a simply way in hunts to
+ * mark off if you've already found that card. think of it as a
+ * checklist, others can help you check those things off, or you can
+ * check them off yourself as you collect the cards."
+ *
+ * This panel used to say the opposite - nothing checked off by hand,
+ * only a confirmed trade could do it - and that was wrong about the
+ * world. Most cards arrive by pull, purchase or a friend, so a list only
+ * a trade could tick was wrong about most of its own boxes.
+ *
+ * The two ways stay separate underneath: a trade writes `status`, a tick
+ * writes `found_at`, and found is either. So ticking a box never invents
+ * a trade that did not happen, and a trade never needs the box.
  */
 export function HuntsPanel({
   hunts,
@@ -165,20 +175,22 @@ function HuntFolder({
                page scroll sideways. */
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-0.5">
               {cards.map((card, index) => (
-                <FeedTile
-                  key={card.cardId}
-                  imageUrl={card.imageUrl}
-                  name={card.cardName}
-                  cardNumber={card.cardNumber}
-                  match={null}
-                  size="pager"
-                  /* Found reads as found: the same dimming a traded card
-                     wears on a Flare, so one visual vocabulary covers
-                     both. */
-                  state={card.found ? "found" : "open"}
-                  siblings={shelf}
-                  position={index}
-                />
+                <div key={card.cardId} className="flex shrink-0 flex-col gap-1">
+                  <FeedTile
+                    imageUrl={card.imageUrl}
+                    name={card.cardName}
+                    cardNumber={card.cardNumber}
+                    match={null}
+                    size="pager"
+                    /* Found reads as found: the same dimming a traded
+                       card wears on a Flare, so one visual vocabulary
+                       covers both. */
+                    state={card.found ? "found" : "open"}
+                    siblings={shelf}
+                    position={index}
+                  />
+                  {yours ? <TickBox card={card} /> : null}
+                </div>
               ))}
             </div>
           ) : (
@@ -211,4 +223,66 @@ export function lookingLabel(hunt: Hunt): string {
     return `${hunt.looking} left · ${hunt.lookingCopies} copies`;
   }
   return `${hunt.looking} left`;
+}
+
+/**
+ * One box, under one card.
+ *
+ * OPTIMISTIC, because the whole value of a checklist is that ticking
+ * feels like nothing. Somebody standing at a counter with a binder open
+ * is going to tap five of these in a row, and a spinner between each one
+ * turns a checklist back into a form. The tick paints immediately and
+ * the server confirms behind it; if the write fails the state snaps back
+ * when the page revalidates and the error is said out loud rather than
+ * swallowed.
+ *
+ * A card a real TRADE closed has no box: that fact belongs to the trade,
+ * and a box implying you could untick it would be lying about what it
+ * does.
+ */
+function TickBox({ card }: { card: HuntCard }) {
+  const [pending, start] = useTransition();
+  const [found, setFound] = useOptimistic(card.found);
+  const [error, setError] = useState<string | null>(null);
+
+  if (card.tradedAway) {
+    return (
+      <span className="flex items-center justify-center gap-1 text-[10px] text-text-muted">
+        <Check className="size-3" aria-hidden="true" />
+        Traded
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={pending}
+        aria-pressed={found}
+        aria-label={`${found ? "Unmark" : "Mark"} ${card.cardName} as found`}
+        onClick={() =>
+          start(async () => {
+            setFound(!found);
+            setError(null);
+            const result = await tickHuntCard(card.flareId, !found);
+            if (!result.ok) setError(result.error ?? "Could not update that card.");
+          })
+        }
+        className={`flex items-center justify-center gap-1 rounded-[6px] border px-1.5 py-1 text-[10px] font-bold transition-colors ${
+          found
+            ? "border-accent bg-accent text-accent-contrast"
+            : "border-border-strong text-text-secondary hover:border-accent hover:text-accent"
+        }`}
+      >
+        <Check className="size-3" aria-hidden="true" />
+        {found ? "Got it" : "Mark"}
+      </button>
+      {error ? (
+        <span role="alert" className="text-[10px] text-danger">
+          {error}
+        </span>
+      ) : null}
+    </>
+  );
 }
