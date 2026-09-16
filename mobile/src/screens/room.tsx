@@ -29,6 +29,7 @@ import {
   getMe,
   getRoom,
   joinRoom,
+  storedSessionToken,
   lastRoom,
   nudgeWant,
   offerOnFlare,
@@ -277,6 +278,28 @@ function RoomScreen({
       const fresh = await getRoom(code);
       setState(fresh);
       setError(null);
+
+      /*
+       * ALREADY IN, WITH NOTHING TO PROVE IT.
+       *
+       * The founder: "if i join a room on my computer... if i open that
+       * same room in app, it should skip the whole join thing... if im
+       * in a room it should just be persistent across platforms."
+       *
+       * The server now finds a signed-in player's seat by account, so
+       * the room answers `joined` on a phone that has never held a
+       * token for it. That is enough to draw the board - every room
+       * route resolves the same way - but it costs an account lookup on
+       * every poll. So the seat is adopted ONCE, through the join the
+       * tap used to make: it mints a token for the session already
+       * there rather than adding a second person to the board.
+       */
+      if (fresh.joined && !(await storedSessionToken())) {
+        /* Silent on purpose: nothing was asked for, so nothing is
+           reported. A failure just means the next poll tries again, and
+           the account lookup keeps the room working meanwhile. */
+        await joinRoom(code).catch(() => {});
+      }
 
       // The account's saved wants ride along so the room can offer to
       // re-post what is still outstanding — the whole point of signing in.

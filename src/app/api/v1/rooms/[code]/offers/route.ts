@@ -24,11 +24,11 @@ async function membership(request: Request, rawCode: string) {
   const code = normalizeJoinCode(decodeURIComponent(rawCode));
   if (!isValidJoinCode(code)) return null;
 
-  const session = await apiSession(request);
-  if (!session) return null;
-
   const resolved = await resolveCode(code);
   if (resolved.outcome !== "room") return null;
+
+  const session = await apiSession(request, resolved.room.id);
+  if (!session) return null;
 
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return null;

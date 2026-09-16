@@ -23,13 +23,13 @@ export async function POST(
     return Response.json({ error: "not-found" }, { status: 404 });
   }
 
-  const session = await apiSession(request);
-  if (!session) return unauthorized();
-
   const resolved = await resolveCode(code);
   if (resolved.outcome !== "room") {
     return Response.json({ error: "not-open" }, { status: 409 });
   }
+
+  const session = await apiSession(request, resolved.room.id);
+  if (!session) return unauthorized();
 
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
