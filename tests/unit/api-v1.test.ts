@@ -202,6 +202,9 @@ describe("GET /api/v1/me", () => {
       displayName: "Kaito",
       avatarUrl: null,
       embersBalance: 0,
+      /* How the Feed is drawn. Falls back to the original here, which
+         is also what an older account and a failed read both give. */
+      feedView: "classic",
     });
     expect(body.wants).toHaveLength(1);
     // The deck label rides the snapshot so the app can re-post the folder.

@@ -27,6 +27,8 @@ import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
 import { huntLimitFor } from "@/lib/players/hunts";
+import { feedViewFor, setFeedView } from "@/lib/feed/view-settings";
+import { feedViewFrom } from "@/lib/feed/views";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +111,9 @@ export async function GET(request: Request): Promise<Response> {
        */
       tier: profile.tier,
       pro: tierAllows(profile.tier, "cosmetics"),
+      /* How they want the Feed drawn. Sent with the profile because the
+         settings screen lives here and the Feed asks the same answer. */
+      feedView: await feedViewFor(player.playerId),
       equipped: worn,
       /*
        * The worn profile border and avatar effect, and the files
@@ -164,6 +169,10 @@ export async function GET(request: Request): Promise<Response> {
  */
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), displayName: z.string() }),
+  /* How the Feed is drawn. Narrowed again server-side by `setFeedView`,
+     so a client that sends a view nothing can draw stores the original
+     rather than an unreadable Feed. */
+  z.object({ action: z.literal("set-feed-view"), view: z.string().max(20) }),
   /* The handle is its own action for the same reason it is its own form
      on the website: only one of the two can come back "taken". */
   z.object({ action: z.literal("set-handle"), handle: z.string() }),
@@ -225,6 +234,12 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest("Unrecognised profile action");
 
   const body = parsed.data;
+
+  if (body.action === "set-feed-view") {
+    const result = await setFeedView(player.playerId, body.view);
+    if (!result.ok) return badRequest("Could not save that view.");
+    return Response.json({ ok: true, feedView: feedViewFrom(body.view) });
+  }
 
   if (body.action === "choose-username") {
     const name = displayNameSchema.safeParse({ displayName: body.displayName });

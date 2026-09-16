@@ -494,6 +494,15 @@ export interface Me {
      */
     avatarUrl?: string | null;
     embersBalance?: number;
+    /**
+     * How this player wants the Feed drawn.
+     *
+     * OPTIONAL, like the two above and for the same reason: a build can
+     * meet a server that predates views. `feedViewFrom` turns anything
+     * it does not recognise - including nothing at all - into the
+     * original card, which is the one answer always drawable.
+     */
+    feedView?: string;
   };
   wants: {
     id: string;
@@ -1748,6 +1757,13 @@ export const getPost = (postId: string) =>
  * recomputes those for itself is a phone that will eventually disagree
  * with the profile it is sitting on.
  */
+/** How this player wants the Feed drawn. Stored on the account. */
+export const setFeedView = (view: string) =>
+  call<{ ok: true; feedView: string }>("POST", "/api/v1/profile", {
+    action: "set-feed-view",
+    view,
+  });
+
 export const tickHuntCard = (flareId: string, found: boolean) =>
   call<{ hunts: Hunt[] }>("POST", "/api/v1/hunts", { flareId, found });
 

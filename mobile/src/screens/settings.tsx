@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -7,6 +8,7 @@ import type { StackParams } from "../../App";
 
 import { API_BASE } from "../config";
 import {
+  setFeedView,
   ApiError,
   deleteAccount,
   describeError,
@@ -24,7 +26,14 @@ import {
 import { HandleField, NameField } from "./profile";
 import { AsyncButton, Body, Button, Card, Input, Muted, Tap, Title } from "../ui";
 import { parseDeckList } from "../deck-list";
-import { colors, gutter, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
+import {
+  FEED_VIEWS,
+  FEED_VIEW_BLURBS,
+  FEED_VIEW_TITLES,
+  feedViewFrom,
+  type FeedView,
+} from "../feed-views";
 
 /**
  * Settings: what the Account tab used to be, now behind the profile's cog.
@@ -133,6 +142,10 @@ function ConnectionTest() {
 export function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
+  /* Seeded from the account on focus, so the radio matches what the
+     Feed is actually drawing. */
+  const [view, setView] = useState<FeedView>("classic");
+  const [savingView, setSavingView] = useState(false);
   /*
    * Your name lives here rather than on the front of the profile.
    * The founder: "no need to have the name editor front and center on
@@ -187,6 +200,7 @@ export function SettingsScreen() {
           if (live) {
             setMe(result);
             setProfile(mine?.profile ?? null);
+            setView(feedViewFrom(result.player.feedView));
           }
         } catch {
           if (live) setMe(null);
@@ -255,6 +269,68 @@ export function SettingsScreen() {
        * find. It ships in the binary on purpose: the person who needs it
        * is holding a TestFlight build, not a debug one.
        */}
+      {/*
+       * HOW THE FEED IS DRAWN. The founder: "lets develop a few 'views'
+       * for the feed, that can be changed under settings in the
+       * profile." On the account rather than the device, so picking
+       * Compact on a phone holds on the website too.
+       */}
+      <Card>
+        <Title>Feed view</Title>
+        <Body>Pick how a Flare is drawn in your Feed.</Body>
+        <View style={{ gap: spacing(2) }}>
+          {FEED_VIEWS.map((option) => {
+            const on = view === option;
+            return (
+              <Tap
+                key={option}
+                accessibilityLabel={`${FEED_VIEW_TITLES[option]}${on ? ", selected" : ""}`}
+                onPress={() => {
+                  if (on || savingView) return;
+                  setView(option);
+                  setSavingView(true);
+                  /* Optimistic: the Feed redraws at once and the write
+                     follows. A failure puts the choice back rather than
+                     leaving a setting that did not save. */
+                  setFeedView(option)
+                    .catch(() => setView(view))
+                    .finally(() => setSavingView(false));
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(2.5),
+                  borderRadius: radius.control,
+                  borderWidth: 1,
+                  borderColor: on ? colors.accent : colors.border,
+                  backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                <Ionicons
+                  name={on ? "radio-button-on" : "radio-button-off"}
+                  size={18}
+                  color={on ? colors.accent : colors.textMuted}
+                />
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text
+                    style={{
+                      color: on ? colors.accent : colors.textPrimary,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {FEED_VIEW_TITLES[option]}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {FEED_VIEW_BLURBS[option]}
+                  </Text>
+                </View>
+              </Tap>
+            );
+          })}
+        </View>
+      </Card>
+
       <Card>
         <Title>Design lab</Title>
         <Body>

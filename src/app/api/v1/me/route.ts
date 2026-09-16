@@ -1,4 +1,5 @@
 import { apiPlayer, unauthorized } from "@/lib/api/auth";
+import { feedViewFor } from "@/lib/feed/view-settings";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
 import { listWants, postedCardStores } from "@/lib/players/wants";
@@ -47,6 +48,17 @@ export async function GET(request: Request): Promise<Response> {
       handle: player.handle,
       avatarUrl: account.data?.avatar_url ?? null,
       embersBalance: account.data?.embers_balance ?? 0,
+      /*
+       * How they want the Feed drawn. Here as well as on the profile
+       * because the Feed asks this endpoint and nothing else.
+       *
+       * READ ON ITS OWN, deliberately. Folded into the select above it
+       * would take the whole of /me down on any deploy that landed
+       * before the migration - and /me is the endpoint the app opens
+       * with. `feedViewFor` logs and falls back to the original card,
+       * so a missing column costs a setting rather than a session.
+       */
+      feedView: await feedViewFor(player.playerId),
     },
     wants: wants.map((want) => ({
       id: want.id,

@@ -921,6 +921,8 @@ export type PlayerRow = {
   local_radius_miles: number;
   /** Nearby matching opt-in: Flares against cards nearby, both directions. */
   nearby_matching: boolean;
+  /** How this player wants the Feed drawn. See src/lib/feed/views.ts. */
+  feed_view: string;
 };
 
 /**
@@ -1004,6 +1006,7 @@ export type PlayerInsert = Omit<
   | "postal_code"
   | "local_radius_miles"
   | "nearby_matching"
+  | "feed_view"
 > & {
   id?: string;
   created_at?: string;
@@ -1020,6 +1023,8 @@ export type PlayerInsert = Omit<
   postal_code?: string | null;
   local_radius_miles?: number;
   nearby_matching?: boolean;
+  /* The default is 'classic'; the settings screen writes the rest. */
+  feed_view?: string;
   cosmetics_unlocked?: boolean;
   cosmetics_unlocked_draft?: boolean;
   onboarded_at?: string | null;
