@@ -559,7 +559,21 @@ export function CardImage({
         }}
       >
         <View style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.7 : 1 }}>
-          <RemoteImage uri={ownImageUrl} style={frame} />
+          <RemoteImage
+            uri={ownImageUrl}
+            style={frame}
+            /*
+             * CONTAIN, NOT COVER - the frame above is the physical
+             * card's ratio (63 x 88 = 0.716), but a scan carries a
+             * margin and arrives at 600x825 = 0.727. Cover filled the
+             * height and cut the sides off, taking the card's own
+             * border with them. The website had the identical fault in
+             * `feed-tile.tsx`, and the founder caught it there: "the
+             * images for the cards are quite pixelated and distorted...
+             * it is clearly rendering incorrectly."
+             */
+            contentFit="contain"
+          />
         </View>
         {state !== "open" ? (
           /* The one-word state, pinned to the foot of the card so the

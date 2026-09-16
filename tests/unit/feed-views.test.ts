@@ -99,6 +99,33 @@ describe("feed views", () => {
     expect(web).toContain("{wanted}x");
   });
 
+  it("shows the whole card rather than cropping its border off", async () => {
+    /*
+     * The founder, on the compact view: "the images for the cards are
+     * quite pixelated and distorted. i get that they're smaller, but it
+     * is cleraly rendering incorrectly."
+     *
+     * A tile is sized to the PHYSICAL card - 2.5 x 3.5, or 0.714 - but
+     * a scan carries a margin and arrives at 600x825, which is 0.727.
+     * Filling the box cut the sides off and took the card's own border
+     * with them, which reads as a squeezed picture. Containing shows
+     * the whole card and never squeezes it; the one percent of
+     * difference goes to the ground behind.
+     *
+     * Both platforms had it, and the app's tile is the same geometry.
+     */
+    const webTile = await read("src/components/feed/feed-tile.tsx");
+    expect(webTile).toContain('className="size-full object-contain"');
+    expect(webTile).not.toContain("object-cover");
+
+    const appUi = await read("mobile/src/ui.tsx");
+    /* The tile image, anchored on the frame it is drawn into rather
+       than on a line number. */
+    const tile = appUi.slice(appUi.indexOf("if (!ownImageUrl) return"));
+    const first = tile.slice(tile.indexOf("<RemoteImage"));
+    expect(first.slice(0, 900)).toContain('contentFit="contain"');
+  });
+
   it("keeps the extras contextual", async () => {
     /*
      * "focus on making things contexual - only popping up when needed."

@@ -182,7 +182,18 @@ export function FeedTile({
       >
         {imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="size-full object-cover" />
+          /*
+           * CONTAIN, NOT COVER. The box is the physical card's ratio
+           * (2.5 x 3.5 = 0.714), but a scan carries a margin and comes
+           * in at 600x825 = 0.727. Cover filled the height and cut the
+           * sides off - taking the card's own border with them, which
+           * is what the founder saw: "the images for the cards are
+           * quite pixelated and distorted... it is clearly rendering
+           * incorrectly." Contain shows the whole card and never
+           * squeezes it; the elevated ground behind takes up the
+           * one-percent difference.
+           */
+          <img src={imageUrl} alt="" className="size-full object-contain" />
         )}
       </span>
       {state !== "open" && (
