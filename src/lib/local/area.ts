@@ -137,7 +137,8 @@ export async function postAreaFlare(
       posted_postal_code: postalCode ?? null,
       /* The batch is what makes several cards read as one post, exactly
          as it does on a room's board. Null when a card goes up alone. */
-      posted_batch: group?.batchId ?? null,
+      /* A lone post is a batch of one: the column is NOT NULL. */
+      posted_batch: group?.batchId ?? randomUUID(),
       deck_label: group?.deckLabel ?? null,
       card_id: input.cardId,
       printing_id: input.printingId ?? null,

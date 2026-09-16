@@ -31,6 +31,7 @@ import {
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { FlarePostScreen } from "./src/screens/flare-post";
+import { HuntScreen } from "./src/screens/hunt";
 import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
@@ -39,7 +40,7 @@ import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
-import { PostFlareScreen } from "./src/screens/post-flare";
+import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
 import { RoomTab } from "./src/screens/room";
 import { ThreadScreen } from "./src/screens/thread";
@@ -96,17 +97,15 @@ export type TabParams = {
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
   Room: undefined;
-  /* `hunt` names the group the composer opens into, so "Add cards" on a
-     profile folder lands here with the folder already chosen. */
+  /* `hunt` is the id of the hunt the composer opens into, so "Add
+     cards" on a profile row lands here with the hunt already chosen. */
   Flare: { hunt?: string } | undefined;
   Inbox: undefined;
   Profile: undefined;
 };
 
 export type StackParams = {
-  Tabs:
-    | { screen?: keyof TabParams; params?: TabParams[keyof TabParams] }
-    | undefined;
+  Tabs: { screen?: keyof TabParams; params?: TabParams[keyof TabParams] } | undefined;
   /** The live room as a stack screen, only while Local holds its tab
       slot. Open it through src/open-room.ts, never by name. */
   Room: undefined;
@@ -134,6 +133,8 @@ export type StackParams = {
   PlayerProfile: { playerId: string };
   /** A Flare post's thread: likes, comments, "I have this" on a card. */
   FlarePost: { postId: string };
+  /** One hunt, whole: the website's /hunts/[huntId]. */
+  Hunt: { huntId: string };
   /** Every trade you confirmed, the website's /profile/trades. Pro. */
   TradeHistory: undefined;
   /** Finding somebody by name, from the Feed's own header. */
@@ -573,9 +574,8 @@ export default function App() {
 
   useEffect(() => {
     if (gate !== "open") return;
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      openNotificationLink,
-    );
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(openNotificationLink);
     return () => subscription.remove();
   }, [gate]);
 
@@ -695,9 +695,7 @@ export default function App() {
             name="Scan"
             options={{ title: "Scan", headerBackTitle: "Back" }}
           >
-            {({ navigation }) => (
-              <ScanScreen onCode={() => openRoom(navigation)} />
-            )}
+            {({ navigation }) => <ScanScreen onCode={() => openRoom(navigation)} />}
           </Stack.Screen>
           <Stack.Screen
             name="Lab"
@@ -742,6 +740,12 @@ export default function App() {
             {({ route }) => <FlarePostScreen postId={route.params.postId} />}
           </Stack.Screen>
           <Stack.Screen
+            name="Hunt"
+            options={{ title: "Hunt", headerBackTitle: "Back" }}
+          >
+            {({ route }) => <HuntScreen huntId={route.params.huntId} />}
+          </Stack.Screen>
+          <Stack.Screen
             name="StoreProfile"
             options={{ title: "Store", headerBackTitle: "Back" }}
           >
@@ -759,7 +763,7 @@ export default function App() {
             options={{ title: "Post a Flare", headerBackTitle: "Room" }}
           >
             {({ route }) => (
-              <PostFlareScreen target={{ kind: "room", code: route.params.code }} />
+              <FlareComposer target={{ kind: "room", code: route.params.code }} />
             )}
           </Stack.Screen>
         </Stack.Navigator>

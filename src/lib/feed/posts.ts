@@ -1,7 +1,15 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
+import { printingLabel } from "@/lib/cards/schema";
 import { binderSessionFor } from "@/lib/lists/haves";
-import { listBinder } from "@/lib/lists/repository";
+import {
+  listBinder,
+  PRINTING_COLUMNS,
+  toPrinting,
+  type PrintingRow,
+} from "@/lib/lists/repository";
 import { offerTrade } from "@/lib/matching/repository";
 import { heldByCard, MAX_OFFER_MESSAGE, matchFor } from "@/lib/matching/schema";
 import { notifyOfferReceived, notifyPostComment } from "@/lib/notifications/notify";
@@ -45,6 +53,14 @@ export interface PostCard {
   state: CardState;
   youOffered: boolean;
   match: "exact" | "other-printing" | null;
+  /** The printing asked for, or null for any. */
+  printingId: string | null;
+  printingLabel: string | null;
+  /** Copies asked for, and copies still wanted. */
+  quantity: number;
+  remaining: number;
+  /** The hunt request this card answers, when the post is in a hunt. */
+  huntRequestId: string | null;
 }
 
 export interface PostDetail extends PostSocial {
@@ -62,6 +78,15 @@ export interface PostDetail extends PostSocial {
   storeName: string | null;
   eventName: string | null;
   deckLabel: string | null;
+  /** Which way the post points. */
+  direction: "want" | "showcase";
+  /** What they wrote with it. */
+  caption: string | null;
+  /** The hunt the post belongs to. */
+  hunt: { id: string; name: string } | null;
+  /** Copies still wanted across the cards, and whether none are. */
+  remainingCopies: number;
+  completed: boolean;
   cards: PostCard[];
   /** The viewer's own post. Likes and comments still work; offers do not. */
   yours: boolean;
@@ -73,7 +98,18 @@ interface PostContext {
   ownerPlayerId: string | null;
   eventId: string | null;
   deckLabel: string | null;
-  flares: { id: string; cardId: string; status: string }[];
+  direction: "want" | "showcase";
+  caption: string | null;
+  huntId: string | null;
+  flares: {
+    id: string;
+    cardId: string;
+    status: string;
+    printingId: string | null;
+    quantity: number;
+    foundQuantity: number;
+    huntRequestId: string | null;
+  }[];
 }
 
 /**
@@ -88,7 +124,9 @@ async function postContext(postId: string): Promise<PostContext | null> {
 
   const { data, error } = await admin
     .from("flares")
-    .select("id, card_id, status, event_id, player_session_id, player_id, deck_label")
+    .select(
+      "id, card_id, status, event_id, player_session_id, player_id, deck_label, printing_id, quantity, found_quantity, hunt_request_id, note, intent",
+    )
     .eq("posted_batch", postId)
     .order("created_at")
     .limit(60);
@@ -117,15 +155,30 @@ async function postContext(postId: string): Promise<PostContext | null> {
     ownerPlayerId = session?.player_id ?? null;
   }
 
+  /* The post row, when the batch has one. Older batches have none, and
+     the first flare's words and way stand in. */
+  const { data: post } = await admin
+    .from("flare_posts")
+    .select("caption, intent, hunt_id")
+    .eq("id", postId)
+    .maybeSingle();
+
   return {
     ownerSessionId,
     ownerPlayerId,
     eventId: first.event_id,
     deckLabel: first.deck_label ?? null,
+    direction: (post?.intent ?? first.intent) === "showcase" ? "showcase" : "want",
+    caption: post?.caption ?? first.note ?? null,
+    huntId: post?.hunt_id ?? null,
     flares: rows.map((row) => ({
       id: row.id,
       cardId: row.card_id,
       status: row.status,
+      printingId: row.printing_id,
+      quantity: row.quantity,
+      foundQuantity: row.found_quantity ?? 0,
+      huntRequestId: row.hunt_request_id ?? null,
     })),
   };
 }
@@ -355,6 +408,9 @@ export async function offerFromFeed(
   if (!context || !flare || flare.status !== "open") {
     return { ok: false, reason: "not-found" };
   }
+  if ((await remainingByFlare(context)).get(flareId) === 0) {
+    return { ok: false, reason: "not-found" };
+  }
 
   const session = await binderSessionFor(playerId, displayName, true);
   if (!session) return { ok: false, reason: "unavailable" };
@@ -442,6 +498,10 @@ export async function postDetail(
         .eq("id", event.data.store_id)
         .maybeSingle()
     : { data: null };
+  const huntName = context.huntId
+    ? ((await admin.from("hunts").select("name").eq("id", context.huntId).maybeSingle())
+        .data?.name ?? null)
+    : null;
 
   const cardById = new Map((cards.data ?? []).map((row) => [row.id, row]));
   const artByCard = new Map<string, string | null>();
@@ -449,6 +509,22 @@ export async function postDetail(
     if (!artByCard.has(row.card_id)) artByCard.set(row.card_id, row.image_url);
   }
   const held = heldByCard(binder);
+  const remaining = await remainingByFlare(context);
+  const wantedPrintings = [
+    ...new Set(shown.flatMap((flare) => (flare.printingId ? [flare.printingId] : []))),
+  ];
+  const printingById = new Map(
+    wantedPrintings.length > 0
+      ? (
+          ((
+            await admin
+              .from("card_printings")
+              .select(PRINTING_COLUMNS)
+              .in("id", wantedPrintings)
+          ).data ?? []) as PrintingRow[]
+        ).map((row) => [row.id, toPrinting(row)] as const)
+      : [],
+  );
 
   const seen = new Set<string>();
   const postCards: PostCard[] = [];
@@ -457,17 +533,25 @@ export async function postDetail(
     seen.add(flare.cardId);
     const card = cardById.get(flare.cardId);
     const answer = answers.get(flare.id);
+    const printing = flare.printingId ? printingById.get(flare.printingId) : undefined;
+    const name = card?.exact_name ?? "Unknown card";
     postCards.push({
       cardId: flare.cardId,
-      cardName: card?.exact_name ?? "Unknown card",
+      cardName: name,
       cardNumber: card?.canonical_card_number ?? "",
-      imageUrl: artByCard.get(flare.cardId) ?? null,
+      imageUrl: printing?.imageUrl ?? artByCard.get(flare.cardId) ?? null,
       flareId: flare.id,
       state: flare.status === "traded" ? "found" : answer?.offered ? "offered" : "open",
       youOffered: answer?.youOffered ?? false,
       match: matchFor({ cardId: flare.cardId, printingId: null }, held),
+      printingId: flare.printingId,
+      printingLabel: printing ? printingLabel(printing, name) : null,
+      quantity: flare.quantity,
+      remaining: remaining.get(flare.id) ?? 0,
+      huntRequestId: flare.huntRequestId,
     });
   }
+  const remainingCopies = postCards.reduce((sum, card) => sum + card.remaining, 0);
 
   const author = context.ownerPlayerId ? faces.get(context.ownerPlayerId) : undefined;
   const counts = social.get(postId) ?? { likes: 0, comments: 0, liked: false };
@@ -486,11 +570,172 @@ export async function postDetail(
     storeName: store.data?.name ?? null,
     eventName: event.data?.name ?? null,
     deckLabel: context.deckLabel,
+    direction: context.direction,
+    caption: context.caption,
+    hunt: huntName ? { id: context.huntId as string, name: huntName } : null,
+    remainingCopies,
+    completed: context.direction === "want" && remainingCopies === 0,
     cards: postCards,
     yours: context.ownerPlayerId === viewerId,
     thread,
     ...counts,
   };
+}
+
+/**
+ * Copies still wanted of every card in a post, from the hunt request
+ * when the card is in one and from the flare's own count otherwise,
+ * never above what the flare itself asked for.
+ */
+async function remainingByFlare(context: PostContext): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const requestIds = context.flares.flatMap((flare) =>
+    flare.huntRequestId ? [flare.huntRequestId] : [],
+  );
+  const { data } =
+    requestIds.length > 0
+      ? await getSupabaseAdmin()
+          .from("hunt_requests")
+          .select("id, quantity_needed, quantity_found")
+          .in("id", requestIds)
+      : {
+          data: [] as { id: string; quantity_needed: number; quantity_found: number }[],
+        };
+  const requestById = new Map((data ?? []).map((row) => [row.id, row]));
+
+  for (const flare of context.flares) {
+    if (flare.status !== "open") {
+      out.set(flare.id, 0);
+      continue;
+    }
+    const request = flare.huntRequestId
+      ? requestById.get(flare.huntRequestId)
+      : undefined;
+    out.set(
+      flare.id,
+      request
+        ? Math.max(
+            0,
+            Math.min(flare.quantity, request.quantity_needed - request.quantity_found),
+          )
+        : Math.max(0, flare.quantity - flare.foundQuantity),
+    );
+  }
+  return out;
+}
+
+export type OfferItemsOutcome =
+  | { ok: true; offered: number }
+  | {
+      ok: false;
+      reason:
+        | "not-found"
+        | "own-flare"
+        | "at-cap"
+        | "unavailable"
+        | "nothing-left"
+        | "too-many";
+    };
+
+/**
+ * "I have these", from a post: one offer carrying several cards.
+ *
+ * Every line is the room's own offer row, under the account's one room
+ * identity, sharing an offer batch so the author reads it as one hand
+ * raised for three cards. Each quantity is capped at what is still
+ * wanted of that card AT THE MOMENT OF THE OFFER - a request answered
+ * while the offer was being written is refused for that line, and the
+ * caller hears which. Offering never counts as collecting: the copies
+ * stay wanted until the author says they have them.
+ */
+export async function offerItems(
+  postId: string,
+  playerId: string,
+  displayName: string,
+  items: { flareId: string; quantity: number }[],
+  message: string,
+): Promise<OfferItemsOutcome & { refused?: string[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  if (items.length === 0) return { ok: false, reason: "nothing-left" };
+
+  const context = await postContext(postId);
+  if (!context) return { ok: false, reason: "not-found" };
+  if (context.ownerPlayerId === playerId) return { ok: false, reason: "own-flare" };
+
+  const session = await binderSessionFor(playerId, displayName, true);
+  if (!session) return { ok: false, reason: "unavailable" };
+  if (session.id === context.ownerSessionId) return { ok: false, reason: "own-flare" };
+
+  const remaining = await remainingByFlare(context);
+  const note = cleanBody(message, MAX_OFFER_MESSAGE) || null;
+  const batch = randomUUID();
+  const admin = getSupabaseAdmin();
+
+  let offered = 0;
+  const refused: string[] = [];
+  for (const item of items) {
+    const flare = context.flares.find((row) => row.id === item.flareId);
+    const left = remaining.get(item.flareId) ?? 0;
+    if (!flare || flare.status !== "open" || left === 0) {
+      refused.push(item.flareId);
+      continue;
+    }
+    const quantity = Math.max(1, Math.min(left, Math.round(item.quantity)));
+    if (quantity > left) {
+      refused.push(item.flareId);
+      continue;
+    }
+
+    if (context.eventId) {
+      const outcome = await offerTrade(
+        item.flareId,
+        context.eventId,
+        session.id,
+        note,
+        quantity,
+        batch,
+      );
+      if (!outcome.ok) {
+        if (outcome.reason === "at-cap")
+          return { ok: false, reason: "at-cap", refused };
+        refused.push(item.flareId);
+        continue;
+      }
+    } else {
+      const { error } = await admin.from("flare_responses").upsert(
+        {
+          flare_id: item.flareId,
+          responder_session_id: session.id,
+          message: note,
+          quantity,
+          offer_batch: batch,
+        },
+        { onConflict: "flare_id,responder_session_id" },
+      );
+      if (error) {
+        console.error("Could not record the offer", error);
+        refused.push(item.flareId);
+        continue;
+      }
+    }
+    offered += 1;
+  }
+
+  if (offered === 0) return { ok: false, reason: "nothing-left", refused };
+
+  const first = items.find((item) => !refused.includes(item.flareId));
+  const names = context.flares.length;
+  await addComment(
+    postId,
+    playerId,
+    displayName,
+    message.trim() || (offered === 1 ? "I have this." : `I have ${offered} of these.`),
+    first ? { kind: "offer", flareId: first.flareId } : null,
+  );
+  if (first) await notifyOfferReceived(first.flareId, session.id, displayName, note);
+  void names;
+
+  return { ok: true, offered, refused };
 }
 
 /** Re-exported so the Feed's enrichment and the app route share one door. */

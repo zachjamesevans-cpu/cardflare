@@ -512,6 +512,14 @@ export type FlareRow = {
    */
   found_at: string | null;
   /**
+   * The hunt request this posted card answers, or null for a card
+   * posted outside any hunt. When set, the request holds the
+   * copies-found count and `found_quantity` here is ignored.
+   */
+  hunt_request_id: string | null;
+  /** Copies found of a card posted outside any hunt. */
+  found_quantity: number;
+  /**
    * The posting action that created this Flare. Shared by every Flare
    * posted in one go, so a deck notifies once and reads as one Feed
    * item. Null for a lone post and for anything posted before batches.
@@ -539,6 +547,8 @@ export type FlareInsert = Omit<
   | "intent"
   | "accepts_trade"
   | "accepts_cash"
+  | "hunt_request_id"
+  | "found_quantity"
 > & {
   id?: string;
   created_at?: string;
@@ -551,6 +561,8 @@ export type FlareInsert = Omit<
   intent?: FlareIntent;
   accepts_trade?: boolean;
   accepts_cash?: boolean;
+  hunt_request_id?: string | null;
+  found_quantity?: number;
   /* A new Flare is never already ticked off, and an existing one is
      ticked and unticked by `markHuntCard` - so optional here rather
      than omitted, or an update could not clear it back to null. */
@@ -572,15 +584,112 @@ export type FlareResponseRow = {
   message: string | null;
   /** How many copies they say they can bring. Defaults to one. */
   quantity: number;
+  /** Shared by every line of one offer made together. Null for a lone one. */
+  offer_batch: string | null;
 };
 
 export type FlareResponseInsert = Omit<
   FlareResponseRow,
-  "id" | "created_at" | "quantity"
+  "id" | "created_at" | "quantity" | "offer_batch"
 > & {
   id?: string;
   created_at?: string;
   quantity?: number;
+  offer_batch?: string | null;
+};
+
+/**
+ * A hunt: a persistent, named list of cards somebody is after.
+ *
+ * Its cards are `hunt_requests`, one per card per printing preference,
+ * each with the copies needed and the copies found. A posted Flare can
+ * point at a request, and then the request is the one record of
+ * progress for that card wherever it is drawn.
+ */
+export type HuntRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  player_id: string;
+  name: string;
+  description: string | null;
+  visibility: "public" | "private";
+};
+
+export type HuntInsert = Omit<
+  HuntRow,
+  "id" | "created_at" | "updated_at" | "description" | "visibility"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  description?: string | null;
+  visibility?: "public" | "private";
+};
+
+export type HuntRequestRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  hunt_id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity_needed: number;
+  quantity_found: number;
+  position: number;
+};
+
+export type HuntRequestInsert = Omit<
+  HuntRequestRow,
+  "id" | "created_at" | "updated_at" | "printing_id" | "quantity_found" | "position"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  printing_id?: string | null;
+  quantity_found?: number;
+  position?: number;
+};
+
+/**
+ * The post behind a batch of flares: who, which way, what they wrote,
+ * where it went up, and the hunt it belongs to. Keyed by the batch id
+ * every flare in it carries, so grouping is unchanged.
+ */
+export type FlarePostRow = {
+  id: string;
+  created_at: string;
+  player_id: string | null;
+  player_session_id: string | null;
+  intent: FlareIntent;
+  caption: string | null;
+  event_id: string | null;
+  posted_postal_code: string | null;
+  hunt_id: string | null;
+  published_at: string;
+};
+
+export type FlarePostInsert = Omit<
+  FlarePostRow,
+  | "created_at"
+  | "player_id"
+  | "player_session_id"
+  | "intent"
+  | "caption"
+  | "event_id"
+  | "posted_postal_code"
+  | "hunt_id"
+  | "published_at"
+> & {
+  created_at?: string;
+  player_id?: string | null;
+  player_session_id?: string | null;
+  intent?: FlareIntent;
+  caption?: string | null;
+  event_id?: string | null;
+  posted_postal_code?: string | null;
+  hunt_id?: string | null;
+  published_at?: string;
 };
 
 /**
@@ -1568,6 +1677,9 @@ export type Database = {
       event_participants: Table<EventParticipantRow, EventParticipantInsert>;
       flares: Table<FlareRow, FlareInsert>;
       flare_responses: Table<FlareResponseRow, FlareResponseInsert>;
+      flare_posts: Table<FlarePostRow, FlarePostInsert>;
+      hunts: Table<HuntRow, HuntInsert>;
+      hunt_requests: Table<HuntRequestRow, HuntRequestInsert>;
       flare_post_likes: Table<FlarePostLikeRow, FlarePostLikeInsert>;
       flare_post_comments: Table<FlarePostCommentRow, FlarePostCommentInsert>;
       trades: Table<TradeRow, TradeInsert>;

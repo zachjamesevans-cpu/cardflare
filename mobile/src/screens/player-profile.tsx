@@ -1,6 +1,6 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -78,6 +78,16 @@ export function PlayerProfileScreen() {
   /* Cards render together once their art is warm, not one by one. */
   const [shelfReady, setShelfReady] = useState(false);
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
+
+  /* Re-read after a write inside the page, an offer on a hunt say,
+     without the warm-up: the shelf is already drawn. */
+  const reload = useCallback(async () => {
+    try {
+      setProfile(await peekPlayer(playerId));
+    } catch {
+      /* What is on screen stays; the next open retries. */
+    }
+  }, [playerId]);
 
   useEffect(() => {
     let live = true;
@@ -212,7 +222,11 @@ export function PlayerProfileScreen() {
         {/* What they are looking for, before what they are showing off:
             somebody opening a profile is usually deciding whether they
             can help. Same order as the website. */}
-        <HuntsPanel hunts={profile.hunts ?? []} />
+        <HuntsPanel
+          hunts={profile.hunts ?? []}
+          onChanged={() => void reload()}
+          onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+        />
 
         {/* The showcase panel, same as the website: its own rounded
             rectangle inside the one connected profile block. */}

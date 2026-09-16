@@ -43,6 +43,8 @@ import {
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
 import { FlareFeedCard } from "../flare-feed-card";
+import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
+import { FlareProgressSheet } from "../flare-progress-sheet";
 import { FeedFilterTabs } from "../feed-filter-tabs";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
@@ -241,6 +243,12 @@ export function HomeScreen() {
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
+  /* The post whose cards are open in the sheet, to read or to offer on. */
+  const [cardsSheet, setCardsSheet] = useState<
+    (FlareSheetPost & { mode: "view" | "offer" }) | null
+  >(null);
+  /* Your own post, with its copies-found stepper open. */
+  const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
 
   /*
    * Refs beside the state, because `load` is a stable useCallback with
@@ -485,6 +493,16 @@ export function HomeScreen() {
       await offerFromPost(item.postId, flareId, note);
       await load(() => true);
     },
+  });
+
+  /** A Feed post, in the shape both sheets read. */
+  const sheetPost = (item: Extract<FeedEntry, { kind: "hunt" }>): FlareSheetPost => ({
+    postId: item.postId,
+    posterName: item.displayName,
+    direction: item.direction ?? "want",
+    yours: item.yours,
+    completed: item.completed ?? false,
+    cards: item.cards,
   });
 
   const enter = async (raw: string) => {
@@ -1042,6 +1060,16 @@ export function HomeScreen() {
                         })
                 }
                 onEnterRoom={(code) => void enter(code)}
+                onOffer={
+                  item.yours
+                    ? undefined
+                    : () => setCardsSheet({ ...sheetPost(item), mode: "offer" })
+                }
+                onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+                onProgress={
+                  item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
+                }
+                onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
               />
             ) : item.kind === "upcoming" ? (
               <Card key={`upcoming-${index}`}>
@@ -1540,6 +1568,16 @@ export function HomeScreen() {
             setMessaging(null);
             navigation.navigate("LocalThread", { threadId });
           }}
+        />
+        <FlareCardsSheet
+          open={cardsSheet}
+          onClose={() => setCardsSheet(null)}
+          onChanged={() => void load(() => true)}
+        />
+        <FlareProgressSheet
+          open={progressSheet}
+          onClose={() => setProgressSheet(null)}
+          onChanged={() => void load(() => true)}
         />
 
         {hydrated && feed.length < 3 && (

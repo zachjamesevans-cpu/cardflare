@@ -15,12 +15,13 @@ import {
   type Me,
   rememberRoom,
 } from "../api";
-import { PostFlareScreen, type PostTarget } from "./post-flare";
+import { FlareComposer } from "./flare-composer";
+import type { PostTarget } from "./post-flare";
 import { Body, Button, Card, Muted, Title } from "../ui";
 import { gutter, spacing } from "../theme";
 import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
-import { HaveList, NearbyCard } from "../nearby";
+import { HaveList } from "../nearby";
 
 /**
  * The centre tab — the mark itself, and behind it the list the whole
@@ -42,10 +43,10 @@ import { HaveList, NearbyCard } from "../nearby";
 export function HubScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   /*
-   * "Add cards" on a profile folder arrives here as a param. Read once
-   * and cleared, because a param that sticks would re-open the same
-   * group every time somebody came back to the tab for an unrelated
-   * card.
+   * "Add cards" on a profile hunt arrives here as a param: the hunt's
+   * id. Read once and cleared, because a param that sticks would
+   * re-open the same hunt every time somebody came back to the tab for
+   * an unrelated card.
    */
   const route = useRoute<RouteProp<TabParams, "Flare">>();
   const hunt = route.params?.hunt;
@@ -170,18 +171,19 @@ export function HubScreen() {
     );
   }
 
-  // No redirect after posting: the screen confirms in place and resets
-  // itself for the next card. The Room tab is one tap away.
+  // No redirect after posting: the screen confirms in place and offers
+  // the Feed. The composer is the one composer; the saved requests
+  // under it are what is published, so a draft and a post never look
+  // like the same thing.
   return (
-    <PostFlareScreen
+    <FlareComposer
       target={target}
-      initialDeck={openInto}
+      initialHuntId={openInto}
       resetSignal={resetSignal}
       onPosted={() => void loadWants()}
       footer={
         wants !== null ? (
           <>
-            <NearbyCard />
             <Card>
               <View
                 style={{
@@ -191,7 +193,7 @@ export function HubScreen() {
                   gap: spacing(2),
                 }}
               >
-                <Title>Your Flares</Title>
+                <Title>Saved requests</Title>
                 <Muted>
                   {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
                 </Muted>
@@ -199,7 +201,7 @@ export function HubScreen() {
 
               {wants.length === 0 ? (
                 <Body>
-                  Post a Flare above and it stays here until you find the card. Every
+                  Post a Flare above and its cards stay here until you find them. Every
                   room, store and show you scan into helps answer this list.
                 </Body>
               ) : (

@@ -8,6 +8,7 @@ import {
   addComment,
   likePost,
   offerFromFeed,
+  offerItems,
   POST_COMMENT_MAX,
   postDetail,
   unlikePost,
@@ -41,6 +42,18 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("offer"),
     flareId: z.guid(),
     note: z
+      .string()
+      .max(POST_COMMENT_MAX * 2)
+      .optional(),
+  }),
+  /* "I have these": several cards, each with how many, in one offer. */
+  z.object({
+    action: z.literal("offer-items"),
+    items: z
+      .array(z.object({ flareId: z.guid(), quantity: z.number().int().min(1).max(99) }))
+      .min(1)
+      .max(60),
+    message: z
       .string()
       .max(POST_COMMENT_MAX * 2)
       .optional(),
@@ -104,6 +117,33 @@ export async function POST(
     return comment
       ? Response.json({ ok: true, comment: absoluteAvatars(comment) })
       : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "offer-items") {
+    const limited = tooMany(
+      `offer-feed:${player.playerId}`,
+      LIMITS.offer.limit,
+      LIMITS.offer.windowMs,
+    );
+    if (limited) return limited;
+
+    const outcome = await offerItems(
+      postId,
+      player.playerId,
+      player.displayName,
+      body.items,
+      body.message ?? "",
+    );
+    return outcome.ok
+      ? Response.json({
+          ok: true,
+          offered: outcome.offered,
+          refused: outcome.refused ?? [],
+        })
+      : Response.json(
+          { error: outcome.reason, refused: outcome.refused ?? [] },
+          { status: 409 },
+        );
   }
 
   /* The room's own cap on hands raised, per account: the Feed has no

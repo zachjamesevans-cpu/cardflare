@@ -102,7 +102,11 @@ export interface OwnProfile extends PublicProfile {
 /** How many cards a profile shelf holds. Three across, three deep. */
 export const SHOWCASE_LIMIT = 9;
 
-async function loadProfile(playerId: string): Promise<OwnProfile | null> {
+async function loadProfile(
+  playerId: string,
+  /* Who is looking: the owner sees their private hunts, nobody else does. */
+  viewerId: string | null,
+): Promise<OwnProfile | null> {
   if (!isSupabaseConfigured()) return null;
 
   const admin = getSupabaseAdmin();
@@ -124,7 +128,7 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
     handle: player.handle,
     /* Read here so both the owner's profile and the public one carry
        them, rather than each caller remembering to ask. */
-    hunts: await huntsFor(playerId),
+    hunts: await huntsFor(playerId, viewerId),
     /*
      * Resolved to a src here rather than at every render point, and
      * VERIFIED against storage — see `verifiedAvatar`. This is the page
@@ -152,7 +156,7 @@ async function loadProfile(playerId: string): Promise<OwnProfile | null> {
 
 /** The signed-in player's own profile, balance included. */
 export async function ownProfile(playerId: string): Promise<OwnProfile | null> {
-  return loadProfile(playerId);
+  return loadProfile(playerId, playerId);
 }
 
 /**
@@ -221,7 +225,7 @@ async function verifiedAvatar(
  * put it in.
  */
 export async function publicProfile(playerId: string): Promise<PublicProfile | null> {
-  const full = await loadProfile(playerId);
+  const full = await loadProfile(playerId, null);
   if (!full) return null;
 
   /*

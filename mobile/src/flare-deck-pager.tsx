@@ -1,65 +1,191 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 
 import type { FeedCard } from "./api";
+import {
+  availableLabel,
+  cardsLabel,
+  copiesLabel,
+  needLabel,
+  printingLabel,
+} from "./flare-copy";
 import { haveFor, type PostRef } from "./post-social";
-import { RemoteImage } from "./remote-image";
 import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap, type ZoomCard } from "./ui";
 
 /**
- * A deck on the Feed: the founder's second concept render.
+ * A multi-card Flare on the Feed: compact slides, one card each.
  *
- * An inset panel holds a pager with the hero card centred and its
- * neighbours peeking either side, the active card's name and number
- * beside it, dots under the hero, a "1/4" pill in the corner, a swipe
- * hint, and a strip of thumbnails that jump the pager. Every card is
- * the same CardImage the rest of the Feed draws, so a tap still opens
- * the zoom with "I have this" inside it.
+ * The first pager was the founder's concept render, a hero card with
+ * its neighbours peeking and a strip of thumbnails under it. It stood
+ * taller than the post around it and said nothing about copies, which
+ * are the whole point now that a Flare can ask for two of something.
+ *
+ * So each slide is the single-card row: the art beside its name, the
+ * printing asked for and "Need 2 more", and the next slide peeks in
+ * from the right so the swipe is discoverable. Dots and a counter say
+ * where you are; a line underneath says what the whole post still
+ * needs, and "View all" opens the list.
+ *
+ * Every card is the same CardImage the rest of the Feed draws, so a
+ * tap still opens the zoom with "I have this" inside it.
  */
 
-const GAP = 10;
+const GAP = spacing(2);
+/** How much of the next slide shows, so a swipe is discoverable. */
+const PEEK = 28;
 
-export function FlareDeckPager({
+/** Copies wanted or on offer for one card, whichever field arrived. */
+export const copiesOf = (card: FeedCard): number => Math.max(1, card.quantity ?? 1);
+
+/** Copies still wanted for one card. */
+export const remainingOf = (card: FeedCard): number =>
+  Math.max(0, card.remaining ?? (card.state === "found" ? 0 : copiesOf(card)));
+
+/** Copies still wanted, or on offer, across every card shown. */
+export function remainingAcross(
+  cards: FeedCard[],
+  direction: "want" | "showcase",
+  given?: number,
+): number {
+  if (typeof given === "number") return given;
+  return cards.reduce(
+    (sum, card) =>
+      sum + (direction === "showcase" ? copiesOf(card) : remainingOf(card)),
+    0,
+  );
+}
+
+/** The shelf the zoom pages along, built from the cards it draws. */
+export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard[] {
+  return cards.map((card) => ({
+    imageUrl: card.imageUrl,
+    name: card.cardName,
+    cardNumber: card.cardNumber,
+    caption: card.printingLabel ?? null,
+    youHave: card.match ? { kind: card.match, count: 0 } : null,
+    have: haveFor(card, post),
+  }));
+}
+
+/**
+ * One card, as a row: the art, then what is asked. The single-card
+ * post and every slide of the carousel are this, so they cannot use
+ * different words for the same fact.
+ */
+export function FlareCardSlide({
+  card,
+  direction,
+  post,
+  siblings,
+  position,
+  width,
+  cardWidth = 72,
+}: {
+  card: FeedCard;
+  direction: "want" | "showcase";
+  post?: PostRef;
+  /** The shelf the zoom pages along: every card in the post. */
+  siblings: ZoomCard[];
+  position: number;
+  /** The slide's width, when it sits in the carousel. */
+  width?: number;
+  cardWidth?: number;
+}) {
+  const remaining = remainingOf(card);
+  const count =
+    direction === "showcase"
+      ? availableLabel(copiesOf(card))
+      : card.state === "found"
+        ? "Found"
+        : needLabel(remaining);
+
+  return (
+    <View
+      style={{
+        width,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(3),
+      }}
+    >
+      <CardImage
+        imageUrl={card.imageUrl}
+        width={cardWidth}
+        name={card.cardName}
+        cardNumber={card.cardNumber}
+        caption={card.printingLabel ?? null}
+        youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+        state={card.state}
+        have={haveFor(card, post)}
+        siblings={siblings}
+        position={position}
+      />
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <Text
+          numberOfLines={2}
+          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}
+        >
+          {card.cardName}
+        </Text>
+        <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 13 }}>
+          {`${card.cardNumber} · ${printingLabel(card.printingLabel)}`}
+        </Text>
+        <Text
+          style={{
+            color:
+              card.state === "found" || remaining === 0
+                ? colors.textMuted
+                : colors.accent,
+            fontSize: 13,
+            fontWeight: "700",
+          }}
+        >
+          {count}
+        </Text>
+        {card.match ? (
+          <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}>
+            {card.match === "exact" ? "You have this" : "You have another printing"}
+          </Text>
+        ) : null}
+        {card.youOffered ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+            You said you have this
+          </Text>
+        ) : card.state === "offered" ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+            Somebody offered
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export function FlareCarousel({
   cards,
   total,
+  direction,
   post,
-  chips,
-  note,
+  remainingCopies,
+  onViewAll,
 }: {
   cards: FeedCard[];
   /** How many they posted, which can exceed what is shown. */
   total: number;
-  post: PostRef;
-  /** Want / Trade / Cash ok, drawn beside the active card. */
-  chips: ReactNode;
-  note: string | null;
+  direction: "want" | "showcase";
+  post?: PostRef;
+  /** The server's count across the whole post, when it sent one. */
+  remainingCopies?: number;
+  /** "View all 3": the full list, in a sheet. */
+  onViewAll?: () => void;
 }) {
-  const window = useWindowDimensions();
   const [at, setAt] = useState(0);
-  const scroller = useRef<ScrollView>(null);
-
-  /* Screen gutters, the post's padding, and the panel's own. */
-  const panelWidth = window.width - spacing(8) - spacing(8) - spacing(6);
-  const pagerWidth = Math.round(panelWidth * 0.56);
-  const hero = Math.round(Math.min(150, Math.max(110, pagerWidth * 0.64)));
-  const page = hero + GAP;
-  const sidePad = Math.max(0, (pagerWidth - hero) / 2);
-
-  const shelf: ZoomCard[] = cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    name: card.cardName,
-    cardNumber: card.cardNumber,
-    youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
-  }));
-
-  const active = cards[at] ?? cards[0];
-  const jump = (index: number) => {
-    setAt(index);
-    scroller.current?.scrollTo({ x: index * page, animated: true });
-  };
+  const [width, setWidth] = useState(0);
+  const slide = Math.max(0, width - PEEK - GAP);
+  const page = slide + GAP;
+  const shelf = shelfFor(cards, post);
+  const remaining = remainingAcross(cards, direction, remainingCopies);
 
   return (
     <View
@@ -67,186 +193,100 @@ export function FlareDeckPager({
         borderRadius: radius.card,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: "rgba(0,0,0,0.35)",
+        backgroundColor: colors.elevated,
         padding: spacing(3),
-        gap: spacing(3),
+        gap: spacing(2.5),
       }}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width - spacing(6))}
     >
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(2) }}>
-        <View style={{ width: pagerWidth, gap: spacing(2) }}>
-          <ScrollView
-            ref={scroller}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={page}
-            snapToAlignment="start"
-            decelerationRate="fast"
-            disableIntervalMomentum
-            contentContainerStyle={{
-              paddingHorizontal: sidePad,
-              gap: GAP,
-              alignItems: "center",
-              paddingVertical: spacing(2),
-            }}
-            onMomentumScrollEnd={(event) => {
-              const landed = Math.round(event.nativeEvent.contentOffset.x / page);
-              if (landed >= 0 && landed < cards.length) setAt(landed);
-            }}
-          >
-            {cards.map((card, index) => (
-              <View
-                key={card.cardId}
-                style={{
-                  opacity: index === at ? 1 : 0.45,
-                  transform: [{ scale: index === at ? 1 : 0.92 }],
-                  shadowColor: colors.accent,
-                  shadowOpacity: index === at ? 0.5 : 0,
-                  shadowRadius: 10,
-                  shadowOffset: { width: 0, height: 0 },
-                }}
-              >
-                <CardImage
-                  imageUrl={card.imageUrl}
-                  width={hero}
-                  name={card.cardName}
-                  cardNumber={card.cardNumber}
-                  youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-                  state={card.state}
-                  have={haveFor(card, post)}
-                  siblings={shelf}
-                  position={index}
-                />
-              </View>
-            ))}
-          </ScrollView>
-          {/* One dot per card, the active one in the accent. */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: spacing(2),
-            }}
-          >
-            {cards.map((card, index) => (
-              <View
-                key={card.cardId}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: index === at ? colors.accent : colors.borderStrong,
-                }}
-              />
-            ))}
-          </View>
-        </View>
+      {width > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={page}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          contentContainerStyle={{ gap: GAP, paddingRight: PEEK + GAP }}
+          onMomentumScrollEnd={(event) => {
+            const landed = Math.round(event.nativeEvent.contentOffset.x / page);
+            if (landed >= 0 && landed < cards.length) setAt(landed);
+          }}
+        >
+          {cards.map((card, index) => (
+            <FlareCardSlide
+              key={card.cardId}
+              card={card}
+              direction={direction}
+              post={post}
+              siblings={shelf}
+              position={index}
+              width={slide}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
 
-        <View style={{ flex: 1, minWidth: 0, gap: spacing(2), paddingTop: spacing(1) }}>
-          {/* "1/4", the corner pill. */}
-          <View
-            style={{
-              alignSelf: "flex-end",
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.borderStrong,
-              backgroundColor: colors.surface,
-              paddingHorizontal: spacing(2.5),
-              paddingVertical: 3,
-            }}
-          >
-            <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: "700" }}>
-              {`${at + 1}/${cards.length}`}
-            </Text>
-          </View>
-          {active ? (
-            <View style={{ gap: 2 }}>
-              <Text
-                numberOfLines={2}
-                style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "800" }}
-              >
-                {active.cardName}
-              </Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                {active.cardNumber}
-              </Text>
-            </View>
-          ) : null}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-            {chips}
-          </View>
-          {active?.match ? (
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-              {active.match === "exact" ? "You have this" : "You have another printing"}
-            </Text>
-          ) : null}
-          {active?.state === "found" ? (
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-              Found
-            </Text>
-          ) : active?.youOffered ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              You said you have this
-            </Text>
-          ) : active?.state === "offered" ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              Somebody offered
-            </Text>
-          ) : null}
-          {note ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
-              {`“${note}”`}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={{ height: 1, backgroundColor: colors.border }} />
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "flex-end",
-          gap: spacing(1.5),
+          justifyContent: "space-between",
+          gap: spacing(2),
         }}
       >
-        <Ionicons name="swap-horizontal-outline" size={15} color={colors.textMuted} />
-        <Text style={{ color: colors.textMuted, fontSize: 12, fontStyle: "italic" }}>
-          {`Swipe to browse all ${total} cards`}
+        <View style={{ flexDirection: "row", gap: spacing(1.5), flexShrink: 1 }}>
+          {cards.map((card, index) => (
+            <View
+              key={card.cardId}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: index === at ? colors.accent : colors.borderStrong,
+              }}
+            />
+          ))}
+        </View>
+        <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600" }}>
+          {`${at + 1} / ${cards.length}`}
         </Text>
       </View>
 
-      {/* The strip: every card small, the active one lit. Tap to jump. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(2), paddingVertical: 2 }}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(2),
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          paddingTop: spacing(2.5),
+        }}
       >
-        {cards.map((card, index) => (
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+          {direction === "showcase"
+            ? `${copiesLabel(remaining)} available`
+            : remaining > 0
+              ? `${copiesLabel(remaining)} still needed`
+              : "All found"}
+        </Text>
+        {onViewAll ? (
           <Tap
-            key={card.cardId}
-            onPress={() => jump(index)}
-            accessibilityLabel={`Show ${card.cardName}`}
-            style={{
-              width: 60,
-              height: 84,
-              borderRadius: 8,
-              borderWidth: index === at ? 2 : 1,
-              borderColor: index === at ? colors.accent : colors.border,
-              backgroundColor: colors.elevated,
-              overflow: "hidden",
-              opacity: index === at ? 1 : 0.8,
-              shadowColor: colors.accent,
-              shadowOpacity: index === at ? 0.5 : 0,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 0 },
-            }}
+            onPress={onViewAll}
+            hitSlop={6}
+            accessibilityLabel={`View all ${total} cards`}
           >
-            {card.imageUrl ? (
-              <RemoteImage uri={card.imageUrl} style={{ width: "100%", height: "100%" }} />
-            ) : null}
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              {`View all ${total}`}
+            </Text>
           </Tap>
-        ))}
-      </ScrollView>
+        ) : (
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+            {cardsLabel(total)}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }

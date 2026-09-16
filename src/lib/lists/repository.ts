@@ -56,6 +56,10 @@ export interface ListEntry {
   acceptsCash: boolean;
   /** When it was posted, so the Feed can say "12m ago". */
   createdAt: string;
+  /** The hunt request this posted card answers, when it is in a hunt. */
+  huntRequestId: string | null;
+  /** Copies found of a card posted outside any hunt. */
+  foundQuantity: number;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -70,7 +74,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id";
+  "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id, hunt_request_id, found_quantity";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at, local_trade";
 
@@ -81,6 +85,8 @@ interface EntryRow {
   /** Flares only; binder selects never ask for either. */
   deck_label?: string | null;
   posted_batch?: string | null;
+  hunt_request_id?: string | null;
+  found_quantity?: number | null;
   intent?: FlareIntent;
   accepts_trade?: boolean;
   accepts_cash?: boolean;
@@ -107,10 +113,10 @@ const EMPTY_LOOKUPS: Lookups = {
   names: new Map(),
 };
 
-const PRINTING_COLUMNS =
+export const PRINTING_COLUMNS =
   "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url";
 
-type PrintingRow = {
+export type PrintingRow = {
   id: string;
   card_id: string;
   set_code: string | null;
@@ -123,7 +129,7 @@ type PrintingRow = {
   image_url: string | null;
 };
 
-function toPrinting(row: PrintingRow): CardPrinting {
+export function toPrinting(row: PrintingRow): CardPrinting {
   return {
     id: row.id,
     setCode: row.set_code,
@@ -252,6 +258,8 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     acceptsTrade: row.accepts_trade ?? true,
     acceptsCash: row.accepts_cash ?? false,
     createdAt: row.created_at,
+    huntRequestId: row.hunt_request_id ?? null,
+    foundQuantity: row.found_quantity ?? 0,
   };
 }
 
@@ -327,7 +335,9 @@ export async function addFlare(
         quantity: input.quantity,
         note: input.note,
         deck_label: input.deckLabel,
-        posted_batch: postedBatch,
+        /* A lone post is a batch of one: the column is NOT NULL, and a
+           null here is exactly what a single-card post used to send. */
+        posted_batch: postedBatch ?? randomUUID(),
         intent,
         accepts_trade: accepts.acceptsTrade,
         accepts_cash: accepts.acceptsCash,

@@ -42,6 +42,8 @@ export async function offerTrade(
   responderSessionId: string,
   message: string | null,
   quantity: number = 1,
+  /** Shared by every line of one offer made together from a post. */
+  offerBatch: string | null = null,
 ): Promise<OfferOutcome> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -76,6 +78,7 @@ export async function offerTrade(
       responder_session_id: responderSessionId,
       message,
       quantity,
+      offer_batch: offerBatch,
     },
     { onConflict: "flare_id,responder_session_id" },
   );

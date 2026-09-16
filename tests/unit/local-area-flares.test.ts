@@ -172,7 +172,12 @@ describe("posting a Flare to your area", () => {
   it("never carries a deck label or a batch, which belong to a board", async () => {
     await postAreaFlare("player-1", { cardId: "card-1" });
 
-    expect(inserted()).toMatchObject({ posted_batch: null, deck_label: null });
+    /* A lone post is a batch of ONE: the column is NOT NULL, so the row
+       carries its own fresh id rather than nothing. */
+    expect(inserted()).toMatchObject({ deck_label: null });
+    expect(typeof (inserted() as { posted_batch?: unknown }).posted_batch).toBe(
+      "string",
+    );
   });
 });
 
@@ -385,6 +390,11 @@ describe("posting several cards as one thing", () => {
   it("leaves a lone card ungrouped, so one card is not a folder", async () => {
     await postAreaFlare("player-1", { cardId: "card-1" });
 
-    expect(inserted()).toMatchObject({ posted_batch: null, deck_label: null });
+    /* A lone post is a batch of ONE: the column is NOT NULL, so the row
+       carries its own fresh id rather than nothing. */
+    expect(inserted()).toMatchObject({ deck_label: null });
+    expect(typeof (inserted() as { posted_batch?: unknown }).posted_batch).toBe(
+      "string",
+    );
   });
 });
