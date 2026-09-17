@@ -33,6 +33,10 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
+    /* Which version, said in the zoom: the compact tile has no room
+       for the words, so the tap is where "Alternate Art" is read. */
+    caption: card.printingLabel ?? null,
+    anyPrinting: !card.printingId,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveFor(card, post),
   }));

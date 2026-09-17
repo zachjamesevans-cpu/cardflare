@@ -1808,6 +1808,12 @@ async function decorateHunts(
       if (card.state === "found") card.remaining = 0;
       const printing = card.printingId ? printingById.get(card.printingId) : undefined;
       card.printingLabel = printing ? printingLabel(printing, card.cardName) : null;
+      /* The picture is the version they asked for. cardFacts hands every
+         card its first printing's art, which for an alternate art is
+         the wrong picture; the hunt page and the post already draw the
+         printing's own. The founder: "I am selecting the alt arts but
+         it still only shows the regular arts after flare is posted." */
+      if (printing?.imageUrl) card.imageUrl = printing.imageUrl;
     }
     hunt.offers = hands.size;
 
