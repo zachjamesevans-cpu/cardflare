@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
 import type { FeedEntry } from "./api";
-import { cardsLabel } from "./flare-copy";
+import { cardsLabel, doneLabel } from "./flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { PlayerAvatar } from "./player-avatar";
@@ -350,6 +350,17 @@ export function FlareFeedCard({
           onViewAll={onViewAll}
         />
       )}
+
+      {/* An offer with nothing left to give, said once. A want that is
+          done says "All found" in its actions row below. */}
+      {completed && item.direction === "showcase" ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+          <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
+            {doneLabel("showcase")}
+          </Text>
+        </View>
+      ) : null}
 
       {/* What they wrote with it, once, in the quiet colour. Nothing at
           all when they wrote nothing: no empty row. */}

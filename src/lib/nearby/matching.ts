@@ -154,7 +154,7 @@ export async function nearbyMatchesForHolder(
       .limit(500),
     admin
       .from("flares")
-      .select("id, player_id, card_id, printing_id")
+      .select("id, player_id, card_id, printing_id, quantity, found_quantity")
       .in("card_id", cardIds)
       .is("event_id", null)
       .eq("status", "open")
@@ -179,6 +179,8 @@ export async function nearbyMatchesForHolder(
   }
   for (const row of area ?? []) {
     if (!row.player_id || seen.has(`${row.player_id}:${row.card_id}`)) continue;
+    /* Found already: nobody needs telling they could have it. */
+    if ((row.found_quantity ?? 0) >= row.quantity) continue;
     seen.add(`${row.player_id}:${row.card_id}`);
     rows.push({
       ask: { kind: "flare", id: row.id },

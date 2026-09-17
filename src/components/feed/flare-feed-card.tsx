@@ -152,6 +152,7 @@ export function FlareFeedCard({
       match={card.match}
       size="pager"
       state={card.state}
+      direction={direction}
       have={preview ? null : haveFor(card, post)}
       siblings={shelf}
       position={index}

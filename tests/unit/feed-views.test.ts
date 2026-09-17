@@ -176,7 +176,7 @@ describe("feed views", () => {
 
     for (const source of [app, web]) {
       expect(source).toContain("item.acceptsCash");
-      expect(source).toContain("(terms || item.note)");
+      expect(source).toContain("(done || terms || item.note)");
       /* No always-on row of buttons: that is what made a post a screen. */
       expect(source).not.toContain("Update progress");
       expect(source).not.toContain("View all");

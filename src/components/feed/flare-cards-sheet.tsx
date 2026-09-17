@@ -80,12 +80,16 @@ export function FlareCardsSheet({
     direction === "showcase"
       ? cards.reduce((sum, card) => sum + (card.quantity ?? 1), 0)
       : remainingCopies;
-  const countLine =
-    direction === "showcase"
+  /* Done, said once for the whole post: every card above wears the
+     tick. The post stays, for the thread and for what it shows
+     somebody built. */
+  const countLine = completed
+    ? direction === "showcase"
+      ? "All gone"
+      : "All found"
+    : direction === "showcase"
       ? `${copies} ${copies === 1 ? "copy" : "copies"} available`
-      : completed
-        ? "All found"
-        : `${copies} ${copies === 1 ? "copy" : "copies"} still needed`;
+      : `${copies} ${copies === 1 ? "copy" : "copies"} still needed`;
 
   return (
     <>
@@ -93,10 +97,10 @@ export function FlareCardsSheet({
         <p
           className={cn(
             "text-sm font-semibold tabular-nums",
-            completed && direction === "want" ? "text-accent" : "text-text-secondary",
+            completed ? "text-accent" : "text-text-secondary",
           )}
         >
-          {completed && direction === "want" && (
+          {completed && (
             <Check className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
           )}
           {countLine}

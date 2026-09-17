@@ -30,6 +30,7 @@ import {
   type RepostState,
 } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
+import { syncCardQuantity } from "@/lib/players/found";
 import { listWants, removeWant, setWantQuantity } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
@@ -254,7 +255,13 @@ export async function nudgeWantQuantityAction(formData: FormData): Promise<void>
   const want = wants.find((entry) => entry.id === wantId);
   if (!want) return;
 
-  await setWantQuantity(wantId, playerId, want.quantity + Math.trunc(delta));
+  const quantity = await setWantQuantity(
+    wantId,
+    playerId,
+    want.quantity + Math.trunc(delta),
+  );
+  /* The post follows the number on the Flare screen. */
+  await syncCardQuantity(playerId, want.cardId, quantity, "want");
   revalidateWants(text(formData, "code"));
 }
 

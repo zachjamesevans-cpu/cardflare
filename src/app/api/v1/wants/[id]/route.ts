@@ -1,5 +1,6 @@
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
+import { syncCardQuantity } from "@/lib/players/found";
 import { listWants, removeWant, setWantQuantity } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ export async function POST(
     player.playerId,
     want.quantity + Math.trunc(delta),
   );
+  /* The post follows the number on the Flare screen. */
+  await syncCardQuantity(player.playerId, want.cardId, quantity, "want");
 
   return Response.json({ ok: true, quantity });
 }

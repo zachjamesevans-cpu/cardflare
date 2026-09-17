@@ -96,9 +96,17 @@ function Entry({
   /** Offer controls or the offers themselves, rendered under the card. */
   children?: React.ReactNode;
 }) {
+  /* Every copy found: greyed, ticked in words, and nothing left to
+     remove. The row stays so the board still shows what was wanted. */
+  const found = kind === "flare" && entry.foundQuantity >= entry.quantity;
+
   return (
     /* `relative` so Remove's pending veil covers the whole row. */
-    <li className="relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0">
+    <li
+      className={`relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0 ${
+        found ? "opacity-60 grayscale" : ""
+      }`}
+    >
       <div className="flex items-start gap-3">
         <CardImageZoom
           imageUrl={entry.imageUrl}
@@ -131,7 +139,12 @@ function Entry({
                 ×{entry.quantity}
               </span>
             )}
-            {removable && (
+            {found && (
+              <span className="shrink-0 text-xs font-bold tracking-wider text-accent uppercase">
+                Found
+              </span>
+            )}
+            {removable && !found && (
               <RemoveEntry
                 code={code}
                 kind={kind}
@@ -390,13 +403,15 @@ function CarouselEntry({
    */
   const visible = Math.max(remaining ?? entry.quantity, 1);
   const ghosts = Math.min(visible, 4) - 1;
+  /* Every copy found reads exactly like fully covered: taken care of. */
+  const found = kind === "flare" && entry.foundQuantity >= entry.quantity;
 
   return (
     <li
       className={`relative flex w-14 shrink-0 flex-col gap-1 ${
         /* Fully covered: dimmed AND drained of colour — "taken care
            of" should read from across the room. */
-        covered ? "opacity-60 grayscale" : ""
+        covered || found ? "opacity-60 grayscale" : ""
       }`}
       style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
@@ -550,7 +565,7 @@ function CarouselEntry({
             ownQuantity={ownQuantity}
           />
         )}
-        {removable && (
+        {removable && !found && (
           <RemoveEntry
             code={code}
             kind={kind}

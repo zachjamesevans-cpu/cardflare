@@ -28,6 +28,8 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
 export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
   const post = { postId: item.postId, yours: item.yours };
   const offering = item.direction === "showcase";
+  /* Done, said once: every tile below wears the tick. */
+  const done = item.completed ? (offering ? "All gone" : "All found") : null;
 
   const shelf: ZoomCard[] = item.cards.map((card) => ({
     imageUrl: card.imageUrl,
@@ -91,6 +93,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
               match={card.match}
               size="pager"
               state={card.state}
+              direction={offering ? "showcase" : "want"}
               have={haveFor(card, post)}
               siblings={shelf}
               position={index}
@@ -100,8 +103,9 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
         ))}
       </div>
 
-      {(terms || item.note) && (
+      {(done || terms || item.note) && (
         <p className="line-clamp-2 text-xs text-text-secondary">
+          {done && <span className="font-semibold text-accent">{done} · </span>}
           {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
         </p>
       )}
