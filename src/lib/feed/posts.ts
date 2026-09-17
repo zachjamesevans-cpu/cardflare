@@ -541,7 +541,12 @@ export async function postDetail(
       cardNumber: card?.canonical_card_number ?? "",
       imageUrl: printing?.imageUrl ?? artByCard.get(flare.cardId) ?? null,
       flareId: flare.id,
-      state: flare.status === "traded" ? "found" : answer?.offered ? "offered" : "open",
+      state:
+        flare.status === "traded" || (remaining.get(flare.id) ?? 1) === 0
+          ? "found"
+          : answer?.offered
+            ? "offered"
+            : "open",
       youOffered: answer?.youOffered ?? false,
       match: matchFor({ cardId: flare.cardId, printingId: null }, held),
       printingId: flare.printingId,

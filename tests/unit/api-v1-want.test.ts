@@ -30,6 +30,11 @@ vi.mock("@/lib/players/wants", () => ({
   removeWant: (...a: unknown[]) => removeWant(...a),
   setWantQuantity: (...a: unknown[]) => setWantQuantity(...a),
 }));
+/* The post following the number is the found rule's job, pinned in
+   found-everywhere.test.ts; here it only has to be reachable. */
+vi.mock("@/lib/players/found", () => ({
+  syncCardQuantity: async () => undefined,
+}));
 
 const route = await import("@/app/api/v1/wants/[id]/route");
 

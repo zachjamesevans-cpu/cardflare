@@ -1806,6 +1806,10 @@ async function decorateHunts(
         );
       }
       if (card.state === "found") card.remaining = 0;
+      /* Done is a count, not a status: every copy found, or on an
+         offer every copy gone, and the card goes grey with the tick on
+         every surface, whatever hands went up on it before. */
+      if ((card.remaining ?? 1) === 0) card.state = "found";
       const printing = card.printingId ? printingById.get(card.printingId) : undefined;
       card.printingLabel = printing ? printingLabel(printing, card.cardName) : null;
       /* The picture is the version they asked for. cardFacts hands every
@@ -1845,8 +1849,8 @@ async function decorateHunts(
       (sum, card) => sum + (card.remaining ?? 0),
       0,
     );
-    hunt.completed =
-      (hunt.direction ?? "want") === "want" && hunt.remainingCopies === 0;
+    /* Nothing left to find, or on an offer nothing left to give. */
+    hunt.completed = hunt.remainingCopies === 0;
   }
 }
 
@@ -1873,7 +1877,9 @@ async function wantedItems(
 
   const { data: flares, error } = await admin
     .from("flares")
-    .select("id, created_at, event_id, player_session_id, card_id, printing_id")
+    .select(
+      "id, created_at, event_id, player_session_id, card_id, printing_id, quantity, found_quantity",
+    )
     .eq("status", "open")
     .eq("intent", "want")
     .in("card_id", cardIds.slice(0, WANTED_CARDS_ASKED))
@@ -1894,7 +1900,9 @@ async function wantedItems(
     (flare): flare is typeof flare & { event_id: string; player_session_id: string } =>
       Boolean(flare.event_id) &&
       Boolean(flare.player_session_id) &&
-      flare.player_session_id !== ownSessionId,
+      flare.player_session_id !== ownSessionId &&
+      /* A card already found is not wanted from anybody. */
+      (flare.found_quantity ?? 0) < flare.quantity,
   );
   if (usable.length === 0) return [];
 

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, Text, View } from "react-native";
 
 import type { FeedEntry } from "./api";
+import { doneLabel } from "./flare-copy";
 import { agoFrom } from "./flare-feed-card";
 import { shelfFor } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
@@ -61,7 +62,13 @@ export function FlareFeedCardCompact({
 
   /* Cash is the only term that is not the default, so it is the only
      one worth a word. "Want · Trade" on every post said nothing. */
-  const terms = item.acceptsCash ? (item.acceptsTrade ? "Trade or cash" : "Cash") : null;
+  const terms = item.acceptsCash
+    ? item.acceptsTrade
+      ? "Trade or cash"
+      : "Cash"
+    : null;
+  /* Done, said once: every tile below wears the tick. */
+  const done = item.completed ? doneLabel(offering ? "showcase" : "want") : null;
 
   return (
     <View
@@ -146,8 +153,13 @@ export function FlareFeedCardCompact({
 
       {/* Contextual, all of it: a term that is not the default, a note
           somebody wrote, a place to go. Nothing draws an empty row. */}
-      {(terms || item.note) && (
+      {(done || terms || item.note) && (
         <Text numberOfLines={2} style={{ color: colors.textSecondary, fontSize: 12 }}>
+          {done ? (
+            <Text
+              style={{ color: colors.accent, fontWeight: "700" }}
+            >{`${done} · `}</Text>
+          ) : null}
           {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
         </Text>
       )}

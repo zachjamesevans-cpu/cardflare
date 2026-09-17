@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { markCardFound } from "@/lib/players/found";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { capFor, type Accepts, type AddEntryInput, type ListKind } from "./schema";
 import type { FlareIntent } from "@/lib/supabase/types";
@@ -454,20 +455,54 @@ export async function addToBinder(
  * someone else's Flare from a public board. Kept rather than deleted: a
  * cancelled Flare is history a store may want, and Milestone 8 will need it.
  */
+/** The account behind a room identity, or null for a guest. */
+async function accountBehind(playerSessionId: string): Promise<string | null> {
+  const { data } = await getSupabaseAdmin()
+    .from("player_sessions")
+    .select("player_id")
+    .eq("id", playerSessionId)
+    .maybeSingle();
+  return data?.player_id ?? null;
+}
+
 export async function cancelFlare(
   flareId: string,
   playerSessionId: string,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
+  const admin = getSupabaseAdmin();
 
-  const { error } = await getSupabaseAdmin()
+  /*
+   * Remove means found now, everywhere. The founder: "remove cards
+   * from flares and it's all global - updates everywhere as found."
+   * The row stays open with every copy found, so the post it belongs
+   * to keeps the card, greyed with the tick, and the thread under it.
+   * A guest's Flare has no account to carry it further, so it is
+   * marked on its own.
+   */
+  const { data: flare } = await admin
     .from("flares")
-    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .select("id, card_id, intent, quantity")
+    .eq("id", flareId)
+    .eq("player_session_id", playerSessionId)
+    .maybeSingle();
+  if (!flare) return false;
+
+  const owner = await accountBehind(playerSessionId);
+  if (owner) {
+    await markCardFound(owner, flare.card_id, flare.intent);
+    return true;
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from("flares")
+    .update({ found_quantity: flare.quantity, found_at: now, updated_at: now })
     .eq("id", flareId)
     .eq("player_session_id", playerSessionId);
 
   if (error) {
-    console.error("Could not cancel a Flare", error);
+    console.error("Could not mark a Flare found", error);
     return false;
   }
 
@@ -529,8 +564,16 @@ export async function removeFromBinder(
   playerSessionId: string,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
+  const admin = getSupabaseAdmin();
 
-  const { error } = await getSupabaseAdmin()
+  const { data: entry } = await admin
+    .from("player_cards")
+    .select("card_id")
+    .eq("id", entryId)
+    .eq("player_session_id", playerSessionId)
+    .maybeSingle();
+
+  const { error } = await admin
     .from("player_cards")
     .delete()
     .eq("id", entryId)
@@ -540,6 +583,11 @@ export async function removeFromBinder(
     console.error("Could not remove a card from the binder", error);
     return false;
   }
+
+  /* A card off the Have list is gone from every offer of it: the post
+     stays up and the card reads "Gone". Same rule as a found want. */
+  const owner = entry ? await accountBehind(playerSessionId) : null;
+  if (entry && owner) await markCardFound(owner, entry.card_id, "showcase");
 
   return true;
 }

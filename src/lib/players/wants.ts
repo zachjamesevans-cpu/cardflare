@@ -1,6 +1,7 @@
 import "server-only";
 
 import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
+import { markCardFound } from "@/lib/players/found";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { afterWantSaved } from "@/lib/nearby/matching";
@@ -150,16 +151,33 @@ export async function setWantQuantity(
   return clamped;
 }
 
+/**
+ * Removing a saved request means "I have it now": the request goes,
+ * and every Flare and hunt the card is on reads as found, greyed with
+ * the tick, the post itself left up. See src/lib/players/found.ts.
+ */
 export async function removeWant(id: string, playerId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
+  const admin = getSupabaseAdmin();
 
-  const { error } = await getSupabaseAdmin()
+  const { data: want } = await admin
+    .from("player_wants")
+    .select("card_id")
+    .eq("id", id)
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  const { error } = await admin
     .from("player_wants")
     .delete()
     .eq("id", id)
     .eq("player_id", playerId);
 
-  if (error) console.error("Could not remove the want", error);
+  if (error) {
+    console.error("Could not remove the want", error);
+    return;
+  }
+  if (want) await markCardFound(playerId, want.card_id, "want");
 }
 
 /** The player's saved wants, newest first, with card names resolved. */

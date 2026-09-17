@@ -15,6 +15,7 @@ import type { FeedCard } from "@/lib/feed/repository";
 export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): string {
   const quantity = card.quantity ?? 1;
   if (direction === "showcase") {
+    if (card.state === "found" || (card.remaining ?? quantity) === 0) return "Gone";
     return `${quantity} available`;
   }
   const remaining = card.remaining ?? quantity;

@@ -17,6 +17,7 @@ import {
   availableLabel,
   cardsLabel,
   copiesLabel,
+  GONE_LABEL,
   needLabel,
   printingLabel,
   selectionLabel,
@@ -295,7 +296,9 @@ export function FlareCardsSheet({
                             }}
                           >
                             {open.direction === "showcase"
-                              ? availableLabel(copiesOf(card))
+                              ? card.state === "found"
+                                ? GONE_LABEL
+                                : availableLabel(copiesOf(card))
                               : card.state === "found"
                                 ? "Found"
                                 : needLabel(remaining)}

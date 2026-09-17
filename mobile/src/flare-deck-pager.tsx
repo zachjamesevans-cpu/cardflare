@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { FeedCard } from "./api";
 import {
   availableLabel,
+  GONE_LABEL,
   cardsLabel,
   copiesLabel,
   needLabel,
@@ -95,7 +96,9 @@ export function FlareCardSlide({
   const remaining = remainingOf(card);
   const count =
     direction === "showcase"
-      ? availableLabel(copiesOf(card))
+      ? card.state === "found"
+        ? GONE_LABEL
+        : availableLabel(copiesOf(card))
       : card.state === "found"
         ? "Found"
         : needLabel(remaining);

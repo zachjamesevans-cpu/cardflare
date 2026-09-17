@@ -127,6 +127,7 @@ export function FeedTile({
   siblings,
   position,
   state = "open",
+  direction = "want",
   have = null,
 }: {
   imageUrl: string | null;
@@ -141,6 +142,8 @@ export function FeedTile({
    * founder: "do not gray out the whole Flare". The badge says which.
    */
   state?: "open" | "offered" | "found";
+  /** Which way the post points: a found card on an offer reads GONE. */
+  direction?: "want" | "showcase";
   /** "I have this" in the large view, when the viewer can say so. */
   have?: ZoomHave | null;
   /**
@@ -206,7 +209,7 @@ export function FeedTile({
               : "bg-surface/90 text-text-secondary"
           }`}
         >
-          {state}
+          {state === "found" && direction === "showcase" ? "gone" : state}
         </span>
       )}
       {match && (
