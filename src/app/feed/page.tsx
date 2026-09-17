@@ -251,7 +251,12 @@ export default async function FeedPage({
         </Card>
       ) : (
         shown.map((item, index) => (
-          <div key={`${item.kind}-${index}`} className="flex flex-col gap-3">
+          <div
+            /* A post keeps its identity when the list moves, so nothing
+               of one post's state lands on another's. */
+            key={item.kind === "hunt" ? `hunt-${item.postId}` : `${item.kind}-${index}`}
+            className="flex flex-col gap-3"
+          >
             {/* The heading, only where the section changes. The order was
                 always an argument about what is worth a tap; this is the
                 argument said out loud. */}

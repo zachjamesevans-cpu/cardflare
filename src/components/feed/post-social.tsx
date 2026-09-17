@@ -48,6 +48,16 @@ export function PostSocial({
   const [liked, setLiked] = useState(initialLiked);
   const [likes, setLikes] = useState(initialLikes);
   const [count, setCount] = useState(initialComments);
+
+  /* The server's word, remembered, so a change in it resets the heart:
+     a row that comes to hold a different post must not keep the heart
+     of the one it used to show. See the app's PostSocialRow. */
+  const [seen, setSeen] = useState({ liked: initialLiked, likes: initialLikes });
+  if (seen.liked !== initialLiked || seen.likes !== initialLikes) {
+    setSeen({ liked: initialLiked, likes: initialLikes });
+    setLiked(initialLiked);
+    setLikes(initialLikes);
+  }
   const [open, setOpen] = useState(false);
   const [thread, setThread] = useState<PostComment[] | null>(null);
   const [loading, startLoading] = useTransition();

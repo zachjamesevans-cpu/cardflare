@@ -1048,7 +1048,7 @@ export function HomeScreen() {
                 /* The founder's compact view: art and a needed-count,
                    everything else a tap away. See flare-feed-card-compact. */
                 <FlareFeedCardCompact
-                  key={`hunt-${index}`}
+                  key={`hunt-${item.postId}`}
                   item={item}
                   post={postRef(item)}
                   onOpenProfile={(id) =>
@@ -1070,39 +1070,39 @@ export function HomeScreen() {
                   }
                 />
               ) : (
-              <FlareFeedCard
-                key={`hunt-${index}`}
-                item={item}
-                post={postRef(item)}
-                onOpenProfile={(id) =>
-                  navigation.navigate("PlayerProfile", { playerId: id })
-                }
-                onLike={(liked) => likePost(item.postId, liked)}
-                onOpenThread={() =>
-                  navigation.navigate("FlarePost", { postId: item.postId })
-                }
-                onMessage={
-                  item.yours || !item.cards[0]?.flareId
-                    ? undefined
-                    : () =>
-                        setMessaging({
-                          flareId: item.cards[0]?.flareId ?? "",
-                          cardName: item.cards[0]?.cardName ?? "your card",
-                          posterName: item.displayName,
-                        })
-                }
-                onEnterRoom={(code) => void enter(code)}
-                onOffer={
-                  item.yours
-                    ? undefined
-                    : () => setCardsSheet({ ...sheetPost(item), mode: "offer" })
-                }
-                onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
-                onProgress={
-                  item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
-                }
-                onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
-              />
+                <FlareFeedCard
+                  key={`hunt-${item.postId}`}
+                  item={item}
+                  post={postRef(item)}
+                  onOpenProfile={(id) =>
+                    navigation.navigate("PlayerProfile", { playerId: id })
+                  }
+                  onLike={(liked) => likePost(item.postId, liked)}
+                  onOpenThread={() =>
+                    navigation.navigate("FlarePost", { postId: item.postId })
+                  }
+                  onMessage={
+                    item.yours || !item.cards[0]?.flareId
+                      ? undefined
+                      : () =>
+                          setMessaging({
+                            flareId: item.cards[0]?.flareId ?? "",
+                            cardName: item.cards[0]?.cardName ?? "your card",
+                            posterName: item.displayName,
+                          })
+                  }
+                  onEnterRoom={(code) => void enter(code)}
+                  onOffer={
+                    item.yours
+                      ? undefined
+                      : () => setCardsSheet({ ...sheetPost(item), mode: "offer" })
+                  }
+                  onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+                  onProgress={
+                    item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
+                  }
+                  onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+                />
               )
             ) : item.kind === "upcoming" ? (
               <Card key={`upcoming-${index}`}>
