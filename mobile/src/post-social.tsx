@@ -67,6 +67,21 @@ export function PostSocialRow({
   const [liked, setLiked] = useState(initialLiked);
   const [likes, setLikes] = useState(initialLikes);
 
+  /*
+   * The server's word, remembered, so a change in it resets the heart.
+   * Without this a row that came to hold a different post - the list
+   * moved when a new post landed on top - kept the heart of the post it
+   * used to show, and the founder read a like he never gave. A flip of
+   * his own leaves the server's word alone until the next read, so it
+   * survives; the next read then settles it.
+   */
+  const [seen, setSeen] = useState({ liked: initialLiked, likes: initialLikes });
+  if (seen.liked !== initialLiked || seen.likes !== initialLikes) {
+    setSeen({ liked: initialLiked, likes: initialLikes });
+    setLiked(initialLiked);
+    setLikes(initialLikes);
+  }
+
   const toggle = () => {
     const next = !liked;
     setLiked(next);
@@ -131,7 +146,9 @@ export function PostSocialRow({
         >
           <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
           {offers !== undefined ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
+            <Text
+              style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
+            >
               {offers}
             </Text>
           ) : null}
