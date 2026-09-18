@@ -190,6 +190,7 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
   const {
     Canvas,
     Circle,
+    ColorMatrix,
     Group,
     Image: SkiaImage,
     LinearGradient,
@@ -257,16 +258,40 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     /* cf-star-breathe: 6s ease, opacity 0.55 <-> 1. */
     const breathe = usePhase(3000, true, true);
 
-    const columnsStart = useDerivedValue(() => ({ x: -dx * drift.value, y: h * 0.08 - dy * drift.value }));
-    const columnsEnd = useDerivedValue(() => ({ x: w - dx * drift.value, y: h * 0.4 - dy * drift.value }));
+    const columnsStart = useDerivedValue(() => ({
+      x: -dx * drift.value,
+      y: h * 0.08 - dy * drift.value,
+    }));
+    const columnsEnd = useDerivedValue(() => ({
+      x: w - dx * drift.value,
+      y: h * 0.4 - dy * drift.value,
+    }));
 
-    const crossAStart = useDerivedValue(() => ({ x: dx * cross.value, y: dy * cross.value }));
-    const crossAEnd = useDerivedValue(() => ({ x: w + dx * cross.value, y: h + dy * cross.value }));
-    const crossBStart = useDerivedValue(() => ({ x: w + dx * cross.value, y: -dy * cross.value }));
-    const crossBEnd = useDerivedValue(() => ({ x: dx * cross.value, y: h - dy * cross.value }));
+    const crossAStart = useDerivedValue(() => ({
+      x: dx * cross.value,
+      y: dy * cross.value,
+    }));
+    const crossAEnd = useDerivedValue(() => ({
+      x: w + dx * cross.value,
+      y: h + dy * cross.value,
+    }));
+    const crossBStart = useDerivedValue(() => ({
+      x: w + dx * cross.value,
+      y: -dy * cross.value,
+    }));
+    const crossBEnd = useDerivedValue(() => ({
+      x: dx * cross.value,
+      y: h - dy * cross.value,
+    }));
 
-    const sweepStart = useDerivedValue(() => ({ x: -w * 1.4 + sweepPhase.value * 2.4 * w, y: h * 0.25 }));
-    const sweepEnd = useDerivedValue(() => ({ x: -w * 0.4 + sweepPhase.value * 2.4 * w, y: h * 0.75 }));
+    const sweepStart = useDerivedValue(() => ({
+      x: -w * 1.4 + sweepPhase.value * 2.4 * w,
+      y: h * 0.25,
+    }));
+    const sweepEnd = useDerivedValue(() => ({
+      x: -w * 0.4 + sweepPhase.value * 2.4 * w,
+      y: h * 0.75,
+    }));
 
     const starsOpacity = useDerivedValue(() => 0.55 + 0.45 * breathe.value);
 
@@ -281,7 +306,14 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
         style={{ position: "absolute", top: 0, left: 0, width, height }}
         pointerEvents="none"
       >
-        <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
+        <SkiaImage
+          image={image}
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          fit="cover"
+        />
 
         {/* The founder's balance note: dodge brightens, so the art
             under a foil starts a touch darker and the sum reads right.
@@ -445,8 +477,14 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     const { dx, dy } = axis(width, height);
     const phase = usePhase(spec?.duration ?? 6000);
 
-    const start = useDerivedValue(() => ({ x: -dx * phase.value, y: -dy * phase.value }));
-    const end = useDerivedValue(() => ({ x: width - dx * phase.value, y: height * 0.32 - dy * phase.value }));
+    const start = useDerivedValue(() => ({
+      x: -dx * phase.value,
+      y: -dy * phase.value,
+    }));
+    const end = useDerivedValue(() => ({
+      x: width - dx * phase.value,
+      y: height * 0.32 - dy * phase.value,
+    }));
 
     if (!spec) return null;
 
@@ -482,8 +520,14 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     const { dx, dy } = axis(size, size);
     const phase = usePhase(spec?.duration ?? 6000);
 
-    const start = useDerivedValue(() => ({ x: -dx * phase.value, y: -dy * phase.value }));
-    const end = useDerivedValue(() => ({ x: size - dx * phase.value, y: size * 0.32 - dy * phase.value }));
+    const start = useDerivedValue(() => ({
+      x: -dx * phase.value,
+      y: -dy * phase.value,
+    }));
+    const end = useDerivedValue(() => ({
+      x: size - dx * phase.value,
+      y: size * 0.32 - dy * phase.value,
+    }));
 
     if (!spec) return null;
 
@@ -492,7 +536,13 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
         style={{ position: "absolute", top: 0, left: 0, width: size, height: size }}
         pointerEvents="none"
       >
-        <Circle cx={size / 2} cy={size / 2} r={size / 2 - 1} style="stroke" strokeWidth={2}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={size / 2 - 1}
+          style="stroke"
+          strokeWidth={2}
+        >
           <LinearGradient
             start={start}
             end={end}
@@ -547,7 +597,49 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     );
   }
 
-  return { Foil, FrameRing, AvatarRing, OrbitRing };
+  /* Rec. 709 luma into every channel: full black and white. */
+  const GREY = [
+    0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722,
+    0, 0, 0, 0, 0, 1, 0,
+  ];
+
+  /**
+   * A card's art with the colour taken out.
+   *
+   * The founder, on a found card: "the card needs to go full black and
+   * white so it's more obvious." React Native has no grayscale filter,
+   * so the tile hands Skia the picture and a colour matrix, the same
+   * way the website hands CSS `grayscale`. Contain, like the tile it
+   * replaces, so the whole card still shows.
+   */
+  function Greyed({
+    imageUrl,
+    width,
+    height,
+  }: {
+    imageUrl: string;
+    width: number;
+    height: number;
+  }) {
+    const image = useImage(imageUrl);
+    if (!image) return null;
+    return (
+      <Canvas style={{ width, height }} pointerEvents="none">
+        <SkiaImage
+          image={image}
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          fit="contain"
+        >
+          <ColorMatrix matrix={GREY} />
+        </SkiaImage>
+      </Canvas>
+    );
+  }
+
+  return { Foil, FrameRing, AvatarRing, OrbitRing, Greyed };
 }
 
 export type FoilKit = ReturnType<typeof makeKit>;

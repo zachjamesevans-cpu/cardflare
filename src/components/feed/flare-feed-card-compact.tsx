@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Crosshair, PackageOpen } from "lucide-react";
+import { Crosshair, PackageOpen } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { PostSocial } from "@/components/feed/post-social";
@@ -140,16 +140,9 @@ function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
   const wanted = card.remaining ?? card.quantity ?? 1;
   const done = card.state === "found" || (!offering && wanted <= 0);
 
-  if (done) {
-    return (
-      <span
-        aria-label="Found"
-        className="absolute right-1 bottom-1 flex items-center rounded-[6px] border border-border bg-surface px-1.5 py-0.5"
-      >
-        <Check className="size-3.5 text-text-muted" aria-hidden="true" />
-      </span>
-    );
-  }
+  /* The tile's own foot says FOUND; a second tick on top of it was
+     the founder's "overlapping gray checkmark thing". */
+  if (done) return null;
 
   return (
     <span

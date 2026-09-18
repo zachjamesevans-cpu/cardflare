@@ -11,6 +11,7 @@ import {
   type PrintingRow,
 } from "@/lib/lists/repository";
 import { printingLabel } from "@/lib/cards/schema";
+import { foundLast } from "@/lib/feed/card-copy";
 import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
@@ -1844,6 +1845,9 @@ async function decorateHunts(
         remaining: 0,
       });
     }
+
+    /* The open cards first, the found ones at the far end. */
+    hunt.cards.sort(foundLast);
 
     hunt.remainingCopies = hunt.cards.reduce(
       (sum, card) => sum + (card.remaining ?? 0),

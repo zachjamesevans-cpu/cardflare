@@ -179,7 +179,9 @@ export function FeedTile({
           state === "offered"
             ? "opacity-50 grayscale"
             : state === "found"
-              ? "opacity-70"
+              ? /* Full black and white, the founder's call: "so it's
+                   more obvious". The foot says the word. */
+                "opacity-60 grayscale"
               : ""
         }`}
       >

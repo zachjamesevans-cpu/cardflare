@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { printingLabel } from "@/lib/cards/schema";
+import { foundLast } from "@/lib/feed/card-copy";
 import { binderSessionFor } from "@/lib/lists/haves";
 import {
   listBinder,
@@ -580,7 +581,7 @@ export async function postDetail(
     hunt: huntName ? { id: context.huntId as string, name: huntName } : null,
     remainingCopies,
     completed: context.direction === "want" && remainingCopies === 0,
-    cards: postCards,
+    cards: [...postCards].sort(foundLast),
     yours: context.ownerPlayerId === viewerId,
     thread,
     ...counts,
