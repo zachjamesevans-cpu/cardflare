@@ -20,6 +20,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { getFoilKit } from "./foil";
 import { RemoteImage } from "./remote-image";
 
 import { youHaveLabel } from "./held-label";
@@ -273,7 +274,9 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
               {count}
             </Text>
             <Tap
-              onPress={() => setCount((current) => Math.min(offer.quantity, current + 1))}
+              onPress={() =>
+                setCount((current) => Math.min(offer.quantity, current + 1))
+              }
               hitSlop={6}
               style={styles.zoomStep}
             >
@@ -299,7 +302,6 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
     </Pressable>
   );
 }
-
 
 /**
  * "I have this", inside the zoom, from the Feed.
@@ -472,9 +474,7 @@ export function CardImage({
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
 
-
   const window = useWindowDimensions();
-
 
   /*
    * The zoom's fade is driven by hand, not by the Modal. The built-in
@@ -515,6 +515,7 @@ export function CardImage({
   };
 
   if (!ownImageUrl) return <View style={frame} />;
+  const greyKit = state === "found" ? getFoilKit() : null;
 
   const large = Math.min(window.width - spacing(14), 380);
 
@@ -528,7 +529,6 @@ export function CardImage({
    * little enough that the one being read still dominates.
    */
   const hero = shelf ? large - 2 * (PEEK_WIDTH + PEEK_GAP) : large;
-
 
   /*
    * THE SHELF IS A PAGER, not a slideshow.
@@ -549,7 +549,6 @@ export function CardImage({
   const page = hero + PEEK_GAP;
   const sidePad = (large - hero) / 2;
 
-
   return (
     <>
       <Tap
@@ -558,22 +557,37 @@ export function CardImage({
           setOpen(true);
         }}
       >
-        <View style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.7 : 1 }}>
-          <RemoteImage
-            uri={ownImageUrl}
-            style={frame}
-            /*
-             * CONTAIN, NOT COVER - the frame above is the physical
-             * card's ratio (63 x 88 = 0.716), but a scan carries a
-             * margin and arrives at 600x825 = 0.727. Cover filled the
-             * height and cut the sides off, taking the card's own
-             * border with them. The website had the identical fault in
-             * `feed-tile.tsx`, and the founder caught it there: "the
-             * images for the cards are quite pixelated and distorted...
-             * it is clearly rendering incorrectly."
-             */
-            contentFit="contain"
-          />
+        <View
+          style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.6 : 1 }}
+        >
+          {/* Found: full black and white, drawn by Skia when it is in
+              this binary, dimmed colour when it is not. The band under
+              it says the word either way. */}
+          {greyKit ? (
+            <View style={frame}>
+              <greyKit.Greyed
+                imageUrl={ownImageUrl}
+                width={frame.width}
+                height={frame.height}
+              />
+            </View>
+          ) : (
+            <RemoteImage
+              uri={ownImageUrl}
+              style={frame}
+              /*
+               * CONTAIN, NOT COVER - the frame above is the physical
+               * card's ratio (63 x 88 = 0.716), but a scan carries a
+               * margin and arrives at 600x825 = 0.727. Cover filled the
+               * height and cut the sides off, taking the card's own
+               * border with them. The website had the identical fault in
+               * `feed-tile.tsx`, and the founder caught it there: "the
+               * images for the cards are quite pixelated and distorted...
+               * it is clearly rendering incorrectly."
+               */
+              contentFit="contain"
+            />
+          )}
         </View>
         {state !== "open" ? (
           /* The one-word state, pinned to the foot of the card so the
@@ -632,260 +646,272 @@ export function CardImage({
               behavior={Platform.OS === "ios" ? "position" : undefined}
               pointerEvents="box-none"
             >
-            <Animated.View
-              style={[
-                styles.zoomPanel,
-                {
-                  transform: [
-                    {
-                      scale: fade.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.97, 1],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Pressable style={{ alignSelf: "stretch" }} onPress={close}>
-                {/* Centred over the card they name. The founder: "center
+              <Animated.View
+                style={[
+                  styles.zoomPanel,
+                  {
+                    transform: [
+                      {
+                        scale: fade.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.97, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Pressable style={{ alignSelf: "stretch" }} onPress={close}>
+                  {/* Centred over the card they name. The founder: "center
                     the text. so, for example, fire first and op15-020
                     should be centered on that screen." Only these two -
                     a note runs to several lines and centred prose is
                     harder to read than the tidiness is worth. */}
-                <Text
-                  style={[styles.title, { textAlign: "center" }]}
-                  numberOfLines={1}
-                >
-                  {name}
-                </Text>
-                <Text style={[styles.muted, { textAlign: "center" }]}>
-                  {cardNumber}
-                  {caption ? ` · ${caption}` : ""}
-                </Text>
-                {/* Said in words here even though the tile draws it as a
+                  <Text
+                    style={[styles.title, { textAlign: "center" }]}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                  <Text style={[styles.muted, { textAlign: "center" }]}>
+                    {cardNumber}
+                    {caption ? ` · ${caption}` : ""}
+                  </Text>
+                  {/* Said in words here even though the tile draws it as a
                     stack, for anyone who cannot read the layers. Both
                     truths when hands are up: the ask, and the gap. */}
-                {lookingFor != null ? (
-                  <Text style={styles.zoomLooking}>
-                    {direction === "showcase"
-                      ? lookingFor === 1
-                        ? "Letting this go"
-                        : `Letting go of ${lookingFor}`
-                      : `Looking for ${lookingFor}${
-                          stillNeeds != null && stillNeeds !== lookingFor
-                            ? stillNeeds === 0
-                              ? " · all spoken for"
-                              : ` · still needs ${stillNeeds}`
-                            : ""
-                        }`}
-                  </Text>
-                ) : null}
-                {/* Who is bringing what - the founder's ask: tap the
+                  {lookingFor != null ? (
+                    <Text style={styles.zoomLooking}>
+                      {direction === "showcase"
+                        ? lookingFor === 1
+                          ? "Letting this go"
+                          : `Letting go of ${lookingFor}`
+                        : `Looking for ${lookingFor}${
+                            stillNeeds != null && stillNeeds !== lookingFor
+                              ? stillNeeds === 0
+                                ? " · all spoken for"
+                                : ` · still needs ${stillNeeds}`
+                              : ""
+                          }`}
+                    </Text>
+                  ) : null}
+                  {/* Who is bringing what - the founder's ask: tap the
                     card, see "Kaito is bringing 3". */}
-                {pledges.map((pledge, index) => (
-                  <Text
-                    key={index}
-                    style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
-                  >
-                    <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-                      {pledge.name}
-                    </Text>
-                    {` is bringing ${pledge.quantity}`}
-                  </Text>
-                ))}
-                {terms ? <Text style={styles.zoomLooking}>{terms}</Text> : null}
-                {/* Your own binder's answer, in the same green the ring on
-                    the tile is drawn in. Same three phrases as the web. */}
-                {youHave ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(1),
-                      marginTop: 2,
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={
-                        youHave.kind === "exact"
-                          ? "package-variant-closed-check"
-                          : "layers-outline"
-                      }
-                      size={15}
-                      color={colors.success}
-                    />
+                  {pledges.map((pledge, index) => (
                     <Text
-                      style={{ color: colors.success, fontSize: 13, fontWeight: "600" }}
-                    >
-                      {youHaveLabel(youHave.kind, youHave.count)}
-                    </Text>
-                  </View>
-                ) : null}
-                {/* The tile has no room for the note; the zoom is where
-                    it gets read. */}
-                {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
-
-                {/*
-                  * NOTHING BUT THE CARDS.
-                  *
-                  * There was a counter here reading "2 of 6" between two
-                  * chevrons. The counter went first - "i dont think the
-                  * '2 of 6' thing is necessary when viewing a full size
-                  * card... you should be able to see the card to the
-                  * left of it, and the right of, so it contextually
-                  * tells you that you can swipe" - and the chevrons
-                  * followed: "i still would like to be able to remove
-                  * the 'arrows' when looking at cards up top. no need to
-                  * have those. then remove the vertical space that is
-                  * dead space."
-                  *
-                  * Both were explaining a gesture that now explains
-                  * itself. The rail below tracks the finger and the
-                  * neighbours are visible at both edges, so a control
-                  * that did the same job in words was a row of chrome
-                  * between the title and the art.
-                  */}
-
-                {/* Keyed on the shelf position, so a half-typed note does
-                    not ride along to the next card. */}
-                {offer ? <ZoomOfferForm key={shelf ? at : "own"} offer={offer} /> : null}
-                {have ? <ZoomHaveForm key={`have-${shelf ? at : "own"}`} have={have} /> : null}
-              </Pressable>
-              {/*
-                * The card, with its neighbours showing at the edges.
-                *
-                * A sibling can be a card with no art of its own; the
-                * panel shows the empty frame rather than a broken box.
-                *
-                * Each neighbour is drawn at the SAME size as the hero
-                * inside a narrow window that clips it, so what peeks out
-                * is a real card edge at the right scale rather than a
-                * squashed thumbnail. The left one is pushed over so its
-                * RIGHT edge is the part that shows, which is the edge
-                * that would come into view if you pulled it across.
-                */}
-              {shelf ? (
-                /*
-                 * THE RAIL LIVES IN A BOX OF EXACTLY ONE CARD.
-                 *
-                 * A horizontal ScrollView does not take a height from
-                 * its own style here - it grew to 665pt inside a panel
-                 * that should have been 566, which stretched the panel
-                 * to the full height of the screen and pushed the title
-                 * up under the dynamic island. The founder: "it should
-                 * not take up the whole screen... it didn't have this
-                 * issue like 30 mins ago." Measured off the screenshot,
-                 * not guessed: the panel came back 831pt on an 874pt
-                 * screen.
-                 *
-                 * A parent with a fixed width and height is not
-                 * negotiable, and `flex: 1` inside it makes the rail
-                 * fill exactly that and no more.
-                 */
-                <View
-                  style={{
-                    width: large,
-                    height: Math.round((hero * 88) / 63),
-                  }}
-                >
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  /* Snap to a CARD, not to a screen: the viewport is
-                     wider than a card, because the neighbours live in
-                     the margins either side of it. */
-                  {...IMMEDIATE_TOUCHES}
-                  onScrollBeginDrag={() => {
-                    scrolled.current = true;
-                  }}
-                  /* Cleared a beat after the gesture settles, so the
-                     press that ends a swipe still sees it. */
-                  onScrollEndDrag={() => {
-                    setTimeout(() => {
-                      scrolled.current = false;
-                    }, 80);
-                  }}
-                  snapToInterval={page}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  disableIntervalMomentum
-                  contentOffset={{ x: position * page, y: 0 }}
-                  /*
-                   * BOTH dimensions, explicitly.
-                   *
-                   * A horizontal ScrollView with no height does not size
-                   * itself to its cards - it takes the room that is
-                   * going, which made the panel taller than its own
-                   * content and pushed the title up off the top of the
-                   * screen. The founder saw it as "it like clips into
-                   * the top now."
-                   */
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{
-                    paddingHorizontal: sidePad,
-                    gap: PEEK_GAP,
-                    alignItems: "center",
-                  }}
-                  /* The panel above follows the card you LANDED on, and
-                     only once you have landed - retitling it mid-drag
-                     reads as the text flickering. */
-                  onMomentumScrollEnd={(event) => {
-                    const landed = Math.round(
-                      event.nativeEvent.contentOffset.x / page,
-                    );
-                    if (landed >= 0 && landed < shelf.length) setAt(landed);
-                    scrolled.current = false;
-                  }}
-                >
-                  {shelf.map((card, index) => (
-                    /*
-                     * A tap on the card closes; a drag on it scrolls.
-                     * Both, from the same finger, because React Native
-                     * cancels a press the moment the ScrollView under it
-                     * claims the gesture - which is why the dismiss can
-                     * live INSIDE the rail without being the thing that
-                     * broke it when it was wrapped around the outside.
-                     */
-                    <Pressable
-                      key={`${card.cardNumber}-${index}`}
-                      onPress={() => {
-                        if (scrolled.current) return;
-                        close();
+                      key={index}
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                        marginTop: 2,
                       }}
                     >
-                      <RemoteImage
-                        uri={card.imageUrl}
-                        contentFit="contain"
-                        style={{
-                          width: hero,
-                          height: Math.round((hero * 88) / 63),
-                          borderRadius: radius.control,
-                          backgroundColor: colors.canvas,
-                        }}
-                      />
-                    </Pressable>
+                      <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                        {pledge.name}
+                      </Text>
+                      {` is bringing ${pledge.quantity}`}
+                    </Text>
                   ))}
-                </ScrollView>
-                </View>
-              ) : (
-                <Pressable onPress={close}>
-                  <RemoteImage
-                    uri={imageUrl}
-                    contentFit="contain"
-                    style={{
-                      width: hero,
-                      height: Math.round((hero * 88) / 63),
-                      borderRadius: radius.control,
-                      backgroundColor: colors.canvas,
-                    }}
-                  />
+                  {terms ? <Text style={styles.zoomLooking}>{terms}</Text> : null}
+                  {/* Your own binder's answer, in the same green the ring on
+                    the tile is drawn in. Same three phrases as the web. */}
+                  {youHave ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(1),
+                        marginTop: 2,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={
+                          youHave.kind === "exact"
+                            ? "package-variant-closed-check"
+                            : "layers-outline"
+                        }
+                        size={15}
+                        color={colors.success}
+                      />
+                      <Text
+                        style={{
+                          color: colors.success,
+                          fontSize: 13,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {youHaveLabel(youHave.kind, youHave.count)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {/* The tile has no room for the note; the zoom is where
+                    it gets read. */}
+                  {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
+
+                  {/*
+                   * NOTHING BUT THE CARDS.
+                   *
+                   * There was a counter here reading "2 of 6" between two
+                   * chevrons. The counter went first - "i dont think the
+                   * '2 of 6' thing is necessary when viewing a full size
+                   * card... you should be able to see the card to the
+                   * left of it, and the right of, so it contextually
+                   * tells you that you can swipe" - and the chevrons
+                   * followed: "i still would like to be able to remove
+                   * the 'arrows' when looking at cards up top. no need to
+                   * have those. then remove the vertical space that is
+                   * dead space."
+                   *
+                   * Both were explaining a gesture that now explains
+                   * itself. The rail below tracks the finger and the
+                   * neighbours are visible at both edges, so a control
+                   * that did the same job in words was a row of chrome
+                   * between the title and the art.
+                   */}
+
+                  {/* Keyed on the shelf position, so a half-typed note does
+                    not ride along to the next card. */}
+                  {offer ? (
+                    <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
+                  ) : null}
+                  {have ? (
+                    <ZoomHaveForm key={`have-${shelf ? at : "own"}`} have={have} />
+                  ) : null}
                 </Pressable>
-              )}
-              <Tap onPress={close} hitSlop={8}>
-                <Text style={styles.muted}>Tap anywhere to close</Text>
-              </Tap>
-            </Animated.View>
+                {/*
+                 * The card, with its neighbours showing at the edges.
+                 *
+                 * A sibling can be a card with no art of its own; the
+                 * panel shows the empty frame rather than a broken box.
+                 *
+                 * Each neighbour is drawn at the SAME size as the hero
+                 * inside a narrow window that clips it, so what peeks out
+                 * is a real card edge at the right scale rather than a
+                 * squashed thumbnail. The left one is pushed over so its
+                 * RIGHT edge is the part that shows, which is the edge
+                 * that would come into view if you pulled it across.
+                 */}
+                {shelf ? (
+                  /*
+                   * THE RAIL LIVES IN A BOX OF EXACTLY ONE CARD.
+                   *
+                   * A horizontal ScrollView does not take a height from
+                   * its own style here - it grew to 665pt inside a panel
+                   * that should have been 566, which stretched the panel
+                   * to the full height of the screen and pushed the title
+                   * up under the dynamic island. The founder: "it should
+                   * not take up the whole screen... it didn't have this
+                   * issue like 30 mins ago." Measured off the screenshot,
+                   * not guessed: the panel came back 831pt on an 874pt
+                   * screen.
+                   *
+                   * A parent with a fixed width and height is not
+                   * negotiable, and `flex: 1` inside it makes the rail
+                   * fill exactly that and no more.
+                   */
+                  <View
+                    style={{
+                      width: large,
+                      height: Math.round((hero * 88) / 63),
+                    }}
+                  >
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      /* Snap to a CARD, not to a screen: the viewport is
+                     wider than a card, because the neighbours live in
+                     the margins either side of it. */
+                      {...IMMEDIATE_TOUCHES}
+                      onScrollBeginDrag={() => {
+                        scrolled.current = true;
+                      }}
+                      /* Cleared a beat after the gesture settles, so the
+                     press that ends a swipe still sees it. */
+                      onScrollEndDrag={() => {
+                        setTimeout(() => {
+                          scrolled.current = false;
+                        }, 80);
+                      }}
+                      snapToInterval={page}
+                      snapToAlignment="start"
+                      decelerationRate="fast"
+                      disableIntervalMomentum
+                      contentOffset={{ x: position * page, y: 0 }}
+                      /*
+                       * BOTH dimensions, explicitly.
+                       *
+                       * A horizontal ScrollView with no height does not size
+                       * itself to its cards - it takes the room that is
+                       * going, which made the panel taller than its own
+                       * content and pushed the title up off the top of the
+                       * screen. The founder saw it as "it like clips into
+                       * the top now."
+                       */
+                      style={{ flex: 1 }}
+                      contentContainerStyle={{
+                        paddingHorizontal: sidePad,
+                        gap: PEEK_GAP,
+                        alignItems: "center",
+                      }}
+                      /* The panel above follows the card you LANDED on, and
+                     only once you have landed - retitling it mid-drag
+                     reads as the text flickering. */
+                      onMomentumScrollEnd={(event) => {
+                        const landed = Math.round(
+                          event.nativeEvent.contentOffset.x / page,
+                        );
+                        if (landed >= 0 && landed < shelf.length) setAt(landed);
+                        scrolled.current = false;
+                      }}
+                    >
+                      {shelf.map((card, index) => (
+                        /*
+                         * A tap on the card closes; a drag on it scrolls.
+                         * Both, from the same finger, because React Native
+                         * cancels a press the moment the ScrollView under it
+                         * claims the gesture - which is why the dismiss can
+                         * live INSIDE the rail without being the thing that
+                         * broke it when it was wrapped around the outside.
+                         */
+                        <Pressable
+                          key={`${card.cardNumber}-${index}`}
+                          onPress={() => {
+                            if (scrolled.current) return;
+                            close();
+                          }}
+                        >
+                          <RemoteImage
+                            uri={card.imageUrl}
+                            contentFit="contain"
+                            style={{
+                              width: hero,
+                              height: Math.round((hero * 88) / 63),
+                              borderRadius: radius.control,
+                              backgroundColor: colors.canvas,
+                            }}
+                          />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <Pressable onPress={close}>
+                    <RemoteImage
+                      uri={imageUrl}
+                      contentFit="contain"
+                      style={{
+                        width: hero,
+                        height: Math.round((hero * 88) / 63),
+                        borderRadius: radius.control,
+                        backgroundColor: colors.canvas,
+                      }}
+                    />
+                  </Pressable>
+                )}
+                <Tap onPress={close} hitSlop={8}>
+                  <Text style={styles.muted}>Tap anywhere to close</Text>
+                </Tap>
+              </Animated.View>
             </KeyboardAvoidingView>
           </View>
         </Animated.View>

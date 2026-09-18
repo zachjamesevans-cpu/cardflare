@@ -12,6 +12,15 @@ import type { FeedCard } from "@/lib/feed/repository";
  * tests/unit/client-boundary.test.ts keeps the next helper out of the
  * same trap.
  */
+/**
+ * Found cards last. The founder: "if a card is found, it gets moved to
+ * the far right so the most pertinent flares are always front and
+ * center." A stable sort, so the open cards keep the order they were
+ * posted in.
+ */
+export const foundLast = <T extends { state?: string }>(a: T, b: T): number =>
+  Number(a.state === "found") - Number(b.state === "found");
+
 export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): string {
   const quantity = card.quantity ?? 1;
   if (direction === "showcase") {

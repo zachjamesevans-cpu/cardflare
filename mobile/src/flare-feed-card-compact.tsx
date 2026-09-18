@@ -206,6 +206,10 @@ function NeedBadge({
   const wanted = card.remaining ?? card.quantity ?? 1;
   const done = card.state === "found" || (!offering && wanted <= 0);
 
+  /* The tile's own foot says FOUND; a second tick on top of it was
+     the founder's "overlapping gray checkmark thing". */
+  if (done) return null;
+
   return (
     <View
       style={{
@@ -215,24 +219,18 @@ function NeedBadge({
         borderRadius: 6,
         paddingHorizontal: 5,
         paddingVertical: 2,
-        backgroundColor: done ? colors.surface : colors.accent,
-        borderWidth: done ? 1 : 0,
-        borderColor: colors.border,
+        backgroundColor: colors.accent,
       }}
     >
-      {done ? (
-        <Ionicons name="checkmark" size={13} color={colors.textMuted} />
-      ) : (
-        <Text
-          style={{
-            color: colors.canvas,
-            fontSize: 13,
-            fontWeight: "800",
-          }}
-        >
-          {`${wanted}x`}
-        </Text>
-      )}
+      <Text
+        style={{
+          color: colors.canvas,
+          fontSize: 13,
+          fontWeight: "800",
+        }}
+      >
+        {`${wanted}x`}
+      </Text>
     </View>
   );
 }

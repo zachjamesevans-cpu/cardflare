@@ -116,6 +116,35 @@ describe("found, everywhere", () => {
     expect(read("mobile/src/flare-feed-card.tsx")).toContain('doneLabel("showcase")');
   });
 
+  it("a found card goes to the far right, on the Feed and on the post page", () => {
+    /* "if a card is found, it gets moved to the far right so the most
+       pertinent flares are always front and center." Decided on the
+       server, so both platforms and both views agree. */
+    expect(read("src/lib/feed/card-copy.ts")).toContain("export const foundLast");
+    expect(read("src/lib/feed/repository.ts")).toContain("hunt.cards.sort(foundLast);");
+    expect(read("src/lib/feed/posts.ts")).toContain("[...postCards].sort(foundLast)");
+  });
+
+  it("a found card is black and white with one word on it, no second tick", () => {
+    /* "there's no need to also have this overlapping gray checkmark
+       thing... the card needs to go full black and white." */
+    expect(read("src/components/feed/feed-tile.tsx")).toContain(
+      '"opacity-60 grayscale"',
+    );
+    expect(read("src/components/feed/flare-feed-card-compact.tsx")).toContain(
+      "if (done) return null;",
+    );
+    expect(read("mobile/src/flare-feed-card-compact.tsx")).toContain(
+      "if (done) return null;",
+    );
+    const foil = read("mobile/src/foil.tsx");
+    expect(foil).toContain("function Greyed(");
+    expect(foil).toContain("<ColorMatrix matrix={GREY} />");
+    expect(read("mobile/src/ui.tsx")).toContain(
+      'state === "found" ? getFoilKit() : null',
+    );
+  });
+
   it("a found card on a board greys out and loses its Remove", () => {
     const rows = read("src/components/lists/list-entries.tsx");
     expect(
