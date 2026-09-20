@@ -1,8 +1,12 @@
 import { FoundPanel } from "@/components/marketing/found-panel";
 import { HeroCtas } from "@/components/marketing/places";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
-export const HERO_SUB =
-  "One Want List finds cards nearby, at your LGS, and at card shows.";
+/* With Local off the page sells what is on: the room at a store event,
+   the players who follow you, and the show. See `PLACES`. */
+export const HERO_SUB = LOCAL_ENABLED
+  ? "One Flare finds cards nearby, at your LGS, and at card shows."
+  : "One Flare reaches the room, the players who follow you, your LGS and the show.";
 
 /**
  * The hero: the line, one sentence, two buttons, and the product.

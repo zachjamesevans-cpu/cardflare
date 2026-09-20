@@ -1,5 +1,3 @@
-import type { CreateEventValues } from "@/lib/events/schema";
-
 /**
  * The setup wizard's steps, in the order a new store walks them.
  *
@@ -32,18 +30,3 @@ export function nextSetupStep(step: SetupStep): SetupStep | null {
 export function setupHref(storeId: string, step: SetupStep): string {
   return `/store/setup?as=${storeId}&step=${step}`;
 }
-
-/** The first event night, as the wizard's form reports it back. */
-export type SetupEventState =
-  | { status: "idle" }
-  | { status: "error"; message: string; values: CreateEventValues }
-  | {
-      status: "done";
-      eventId: string;
-      name: string;
-      joinCode: string | null;
-      startsAt: string;
-      endsAt: string | null;
-    };
-
-export const SETUP_EVENT_IDLE: SetupEventState = { status: "idle" };

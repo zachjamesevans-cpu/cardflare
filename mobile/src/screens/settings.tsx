@@ -331,24 +331,29 @@ export function SettingsScreen() {
         </View>
       </Card>
 
-      <Card>
-        <Title>Design lab</Title>
-        <Body>
-          Every shape a Feed post can take, drawn with made-up data. Nothing in it
-          reaches the server.
-        </Body>
-        <Button
-          label="Open the design lab"
-          variant="secondary"
-          onPress={() => navigation.navigate("Lab")}
-        />
-      </Card>
+      {/* Tooling, for a development build only. A player's settings
+          page is not the place for a design lab or a connection probe;
+          both stay in the binary for the person holding a dev client. */}
+      {__DEV__ && (
+        <Card>
+          <Title>Design lab</Title>
+          <Body>
+            Every shape a Feed post can take, drawn with made-up data. Nothing in it
+            reaches the server.
+          </Body>
+          <Button
+            label="Open the design lab"
+            variant="secondary"
+            onPress={() => navigation.navigate("Lab")}
+          />
+        </Card>
+      )}
 
       <Card>
         <Title>Paste a deck list</Title>
         <Body>
-          Every card in it becomes a want. Walk into any room and it offers to post the
-          lot in one go.
+          Every card in it becomes a saved request. Walk into any room and it offers to
+          post the lot in one go.
         </Body>
 
         <DeckListField />
@@ -374,7 +379,7 @@ export function SettingsScreen() {
         </Body>
       </Card>
 
-      <ConnectionTest />
+      {__DEV__ && <ConnectionTest />}
 
       {profile && <DeleteAccount handle={profile.handle} />}
     </ScrollView>

@@ -44,7 +44,7 @@ export default async function TradeHistoryPage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
-  if (await needsSetup(playerId)) redirect("/welcome/username");
+  if (await needsSetup(playerId)) redirect("/welcome");
 
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");

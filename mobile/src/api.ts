@@ -1364,36 +1364,8 @@ export const getPlayerPeople = (playerId: string) =>
   );
 
 /* ------------------------------------------------------------------ */
-/* The Have list and nearby matching                                   */
+/* Nearby matching                                                     */
 /* ------------------------------------------------------------------ */
-
-/** One card on the Have list: the room's binder row, with the switch. */
-export interface HaveEntry {
-  id: string;
-  cardId: string;
-  cardName: string;
-  cardNumber: string;
-  printingId: string | null;
-  printingLabel: string | null;
-  imageUrl: string | null;
-  quantity: number;
-  note: string | null;
-  /** The owner will trade this one with people nearby. */
-  localTrade: boolean;
-}
-
-/** The account's Have list, no room needed. Private to its owner. */
-export const getHaves = () => call<{ haves: HaveEntry[] }>("GET", "/api/v1/haves");
-
-export const addHave = (cardId: string, printingId: string | null, quantity = 1) =>
-  call<{ ok: true }>("POST", "/api/v1/haves", { cardId, printingId, quantity });
-
-export const removeHave = (entryId: string) =>
-  call<{ ok: boolean }>("DELETE", "/api/v1/haves", { entryId });
-
-/** Trade locally on or off, for one card. */
-export const setHaveLocalTrade = (entryId: string, localTrade: boolean) =>
-  call<{ ok: true }>("PUT", "/api/v1/haves", { entryId, localTrade });
 
 export interface NearbySettings {
   enabled: boolean;
@@ -2431,6 +2403,14 @@ export interface PublicStore {
   }[];
   /** Whether the signed-in account follows it; absent for a guest or an older server. */
   following?: boolean;
+  /** A room open right now, or the next night on the calendar. Absent from an older server. */
+  board?: {
+    liveNow: boolean;
+    joinCode: string;
+    nextEventAt: string | null;
+    nextEventName: string | null;
+    timeZone: string | null;
+  } | null;
   attribution: string | null;
 }
 
@@ -2458,14 +2438,8 @@ export const claimStore = (storeId: string, fields: ClaimFields) =>
     fields,
   );
 
-/** The roles the picker offers, matching the website's. */
-export const CLAIM_ROLES = [
-  "Owner",
-  "Manager",
-  "Staff",
-  "Event organiser",
-  "Other",
-] as const;
+/** The roles the picker offers: the website's claim-schema.ts, verbatim. */
+export const CLAIM_ROLES = ["Owner", "Organizer"] as const;
 
 /* -------------------------------------------------------------------------- */
 /* Local: Flares near you, and the conversations they start                   */

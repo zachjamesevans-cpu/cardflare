@@ -53,7 +53,9 @@ export default async function HuntPage({
         id="main"
         className="flex min-h-dvh flex-col items-center gap-5 px-4 pt-6 pb-16 sm:px-6 sm:pt-10"
       >
-        <Link href="/" aria-label={`${SITE.name} home`}>
+        {/* The Feed, not the marketing home: whoever opens a hunt is
+            already inside the product. */}
+        <Link href="/feed" aria-label={`${SITE.name} Feed`}>
           <Logo size={36} priority />
         </Link>
 

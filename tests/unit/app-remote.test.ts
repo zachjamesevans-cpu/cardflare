@@ -145,11 +145,15 @@ describe("the timer remote in the app", () => {
       'navigation.navigate("StoreProfile", { storeId: store.storeId })',
     );
     expect(entry).toContain("if (stores.length === 0) return null;");
+    /* Inside the one ProfileHeader, under the handle, so both screens
+       get it from one place and neither can forget it. */
+    const header = mobile("src/profile-header.tsx");
+    expect(header).toContain('import { OrganizerChips } from "./remote-entry";');
+    expect(header).toContain("<OrganizerChips stores={organizerAt} />");
     for (const source of [own, theirs]) {
-      expect(source).toContain('import { OrganizerChips } from "../remote-entry";');
-      /* Right after the header block that carries the name and handle. */
+      expect(source).not.toContain("OrganizerChips");
       expect(source).toMatch(
-        /<ProfileHeader[\s\S]*?\/>\s*\{\/\*[^*]*\*\/\}\s*<OrganizerChips profile=\{profile\} \/>/,
+        /<ProfileHeader[\s\S]*?organizerAt=\{profile\.organizerAt\}[\s\S]*?\/>/,
       );
     }
   });

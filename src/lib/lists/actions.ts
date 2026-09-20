@@ -3,45 +3,23 @@
 import { revalidatePath } from "next/cache";
 
 import { resolveCode } from "@/lib/events/rooms";
-import { roomPhase, type PublicEvent } from "@/lib/events/schema";
-import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
-import { hasFeature } from "@/lib/billing/features";
-import { tierForPlayer } from "@/lib/billing/repository";
-import { announceShowcase } from "./showcase";
-import { keepShowcaseAsHave } from "@/lib/nearby/showcase";
 import { findParticipation } from "@/lib/events/participants";
 import { text } from "@/lib/form-value";
 import { getPlayerSession } from "@/lib/players/session";
-import { saveWant } from "@/lib/players/wants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
-import {
-  addFlare,
-  addToBinder,
-  cancelFlare,
-  confirmBinder,
-  confirmBinderEntry,
-  removeFromBinder,
-} from "./repository";
-import {
-  acceptsSchema,
-  addEntrySchema,
-  atCapMessage,
-  kindSchema,
-  type ListState,
-} from "./schema";
-import { afterResponse } from "@/lib/after-response";
+import { cancelFlare, removeFromBinder } from "./repository";
+import { kindSchema } from "./schema";
 
 /**
- * Posting a Flare, and keeping the binder.
+ * Taking a card off a board or out of the binder.
  *
- * Every one of these is a public POST endpoint, so each re-establishes the
- * whole chain itself: a valid player session, an event that exists, and that
- * this player is actually in that room. None of it is inferred from the page
- * that rendered the form.
+ * Posting goes through the composer (src/lib/flares/publish-actions.ts);
+ * this is the one form left on a room page. It is a public POST
+ * endpoint, so it re-establishes the whole chain itself: a valid player
+ * session, an event that exists, and that this player is actually in
+ * that room. None of it is inferred from the page that rendered the form.
  */
-
-const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
 /**
  * Generous, because a player emptying a binder into the app is using the
@@ -69,8 +47,6 @@ async function overRate(): Promise<boolean> {
 async function requirePlayerInRoom(code: string): Promise<{
   eventId: string;
   playerSessionId: string;
-  playerId: string | null;
-  room: PublicEvent;
 } | null> {
   const session = await getPlayerSession();
   if (!session) return null;
@@ -90,178 +66,6 @@ async function requirePlayerInRoom(code: string): Promise<{
   return {
     eventId: resolved.room.id,
     playerSessionId: session.id,
-    playerId: session.player_id,
-    room: resolved.room,
-  };
-}
-
-export async function addToListAction(
-  _previous: ListState,
-  formData: FormData,
-): Promise<ListState> {
-  const kind = kindSchema.safeParse(text(formData, "kind"));
-  if (!kind.success) return { status: "error", message: GENERIC_ERROR };
-
-  const code = text(formData, "code");
-
-  if (await overRate()) {
-    return {
-      status: "error",
-      message: "Too many changes from this network. Please wait a moment.",
-    };
-  }
-
-  /*
-   * A binder is not scoped to a room, but adding to it still requires being in
-   * one. There is no other surface for it, and it keeps a stolen session from
-   * being usable without also being somewhere.
-   */
-  const room = await requirePlayerInRoom(code);
-  if (!room) {
-    return {
-      status: "error",
-      message: "You are not in this room any more. Reload and rejoin.",
-    };
-  }
-
-  const parsed = addEntrySchema.safeParse({
-    cardId: text(formData, "cardId"),
-    printingId: text(formData, "printingId"),
-    quantity: text(formData, "quantity") || 1,
-    note: text(formData, "note"),
-    deckLabel: text(formData, "deckLabel"),
-  });
-
-  if (!parsed.success) {
-    return {
-      status: "error",
-      message: parsed.error.issues[0]?.message ?? "Please check the details.",
-    };
-  }
-
-  /*
-   * What the poster will take. Unticked checkboxes send nothing at all,
-   * which is why this parses separately with its own defaults rather
-   * than riding inside `addEntrySchema` — and why the schema, not this
-   * caller, is where "neither" is turned back into a trade.
-   */
-  const accepts = acceptsSchema.parse({
-    acceptsTrade: text(formData, "acceptsTrade"),
-    acceptsCash: text(formData, "acceptsCash"),
-  });
-
-  /*
-   * A showcase is a Flare pointed the other way: same board, same row,
-   * opposite direction. The intent rides in the form because the two
-   * are posted from the same control.
-   */
-  const showcase = text(formData, "intent") === "showcase";
-
-  /*
-   * The gate, written now and open now. `hasFeature` answers from one
-   * table (src/lib/billing/features.ts), so making showcases a Pro
-   * feature later is a single word there — not a hunt through actions.
-   * While the feature is free this costs no query at all.
-   */
-  if (showcase && !hasFeature("showcase", null)) {
-    const tier = room.playerId ? await tierForPlayer(room.playerId) : null;
-    if (!hasFeature("showcase", tier)) {
-      return {
-        status: "error",
-        message: "Showcasing a card is a cardflare Pro feature.",
-      };
-    }
-  }
-
-  const result =
-    kind.data === "flare"
-      ? await addFlare(
-          room.eventId,
-          room.playerSessionId,
-          parsed.data,
-          showcase ? "showcase" : "want",
-          accepts,
-        )
-      : await addToBinder(room.playerSessionId, parsed.data);
-
-  /*
-   * The quiet half of accounts: a signed-in player's Flare is also saved
-   * as a want, so it follows them to the next store. Best-effort — the
-   * Flare already posted, and a bookkeeping miss must not undo that.
-   */
-  if (result.ok && kind.data === "flare" && !showcase && room.playerId) {
-    await saveWant(room.playerId, parsed.data);
-  }
-
-  // The first Flares on an early board wake the store's regulars. Fire
-  // and forget: the dedupe makes repeats free, and the post already won.
-  if (
-    result.ok &&
-    kind.data === "flare" &&
-    !showcase &&
-    roomPhase(room.room) === "early"
-  ) {
-    void notifyEarlyBoardFlares(room.eventId);
-  }
-
-  /*
-   * The payoff: a card offered up finds the people already asking for
-   * it, and tells them. Fire and forget — the showcase is already on
-   * the board, and the dedupe makes a repeat post free.
-   */
-  if (result.ok && kind.data === "flare" && showcase) {
-    void announceShowcase(
-      room,
-      parsed.data,
-      (await getPlayerSession())?.display_name ?? "A player",
-    );
-    /* And onto the Have list, marked for nearby matching: a showcase
-       is "I have this" said out loud. See nearby/showcase.ts. */
-    void keepShowcaseAsHave(
-      { playerSessionId: room.playerSessionId, playerId: room.playerId },
-      {
-        cardId: parsed.data.cardId,
-        printingId: parsed.data.printingId ?? null,
-        quantity: parsed.data.quantity,
-        note: parsed.data.note ?? null,
-      },
-    );
-  }
-
-  /*
-   * Everyone standing in this room hears about a card going up. The
-   * board already shows it; nobody at a counter is watching a board.
-   */
-  if (result.ok && kind.data === "flare") {
-    /* After the response, not beside it, so the fan-out is not frozen
-       with the function the moment it answers. See afterResponse. */
-    const posterName = (await getPlayerSession())?.display_name ?? "A player";
-    afterResponse(() =>
-      notifyRoomFlare(
-        room.eventId,
-        room.playerSessionId,
-        posterName,
-        [parsed.data.cardId],
-        showcase ? "showcase" : "want",
-      ),
-    );
-  }
-
-  if (!result.ok) {
-    return {
-      status: "error",
-      message: result.reason === "at-cap" ? atCapMessage(kind.data) : GENERIC_ERROR,
-    };
-  }
-
-  revalidatePath(`/e/${code}`);
-
-  return {
-    status: "added",
-    kind: kind.data,
-    // Echoed back from the form purely so the confirmation can name the card.
-    // Never trusted for anything: the card itself was resolved by id above.
-    cardName: text(formData, "cardName").slice(0, 200),
   };
 }
 
@@ -285,44 +89,6 @@ export async function removeListEntryAction(formData: FormData): Promise<void> {
   } else {
     await removeFromBinder(entryId, room.playerSessionId);
   }
-
-  revalidatePath(`/e/${code}`);
-}
-
-/**
- * "Still carrying these?" — yes.
- *
- * The one tap that makes a portable binder safe to match against. Without it a
- * list that follows a player between events quietly rots, and a wrong match
- * costs more trust than a missing one.
- */
-/**
- * "Still have it" on the after-trade prompt: re-confirms one entry, which is
- * what hides the prompt — no new state, just a fresher `confirmed_at`.
- */
-export async function confirmBinderEntryAction(formData: FormData): Promise<void> {
-  const code = text(formData, "code");
-  const entryId = text(formData, "entryId");
-
-  if (!entryId || (await overRate())) return;
-
-  const room = await requirePlayerInRoom(code);
-  if (!room) return;
-
-  await confirmBinderEntry(entryId, room.playerSessionId);
-
-  revalidatePath(`/e/${code}`);
-}
-
-export async function confirmBinderAction(formData: FormData): Promise<void> {
-  const code = text(formData, "code");
-
-  if (await overRate()) return;
-
-  const room = await requirePlayerInRoom(code);
-  if (!room) return;
-
-  await confirmBinder(room.playerSessionId);
 
   revalidatePath(`/e/${code}`);
 }

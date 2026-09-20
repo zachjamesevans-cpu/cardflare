@@ -3,6 +3,7 @@ import { hasLocal } from "@/lib/players/locals";
 import { siteUrl } from "@/lib/site";
 import { openNow } from "@/lib/stores/hours";
 import { publicStore } from "@/lib/stores/public-profile";
+import { storeBoard } from "@/lib/players/locals";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export async function GET(
   if (!store) return Response.json({ error: "not-found" }, { status: 404 });
 
   const account = await apiPlayer(request);
-  const following = account ? await hasLocal(account.playerId, store.storeId) : false;
+  const [following, board] = await Promise.all([
+    account ? hasLocal(account.playerId, store.storeId) : Promise.resolve(false),
+    storeBoard(store.storeId),
+  ]);
 
   const origin = siteUrl();
   const absolute = (path: string | null) =>
@@ -50,6 +54,17 @@ export async function GET(
       coverUrl: absolute(store.coverUrl),
       openNow: store.hours ? openNow(store.hours, new Date(), store.timeZone) : null,
       following,
+      /* The same line the website draws under the header: a room open
+         right now, or the next night on the calendar. */
+      board: board
+        ? {
+            liveNow: board.liveNow,
+            joinCode: board.joinCode,
+            nextEventAt: board.nextEventAt,
+            nextEventName: board.nextEventName,
+            timeZone: board.timeZone,
+          }
+        : null,
     },
   });
 }

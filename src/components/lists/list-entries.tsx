@@ -1,4 +1,3 @@
-import { TradeLocallySwitch } from "@/components/nearby/trade-locally-switch";
 import Image from "next/image";
 import {
   ArrowLeftRight,
@@ -6,7 +5,6 @@ import {
   Banknote,
   Flame,
   Folder,
-  Hand,
   Layers,
   PackageCheck,
   Search,
@@ -47,7 +45,7 @@ import {
 import type { MatchKind, Offer } from "@/lib/matching/schema";
 
 /**
- * Flare boards and Have lists.
+ * Flare boards.
  *
  * Server components: nothing here is interactive except removing, which is a
  * plain form posting to a Server Action, so a list of forty cards ships no
@@ -154,13 +152,6 @@ function Entry({
               />
             )}
           </div>
-
-          {/* Nearby matching's per-card switch, on the binder only. */}
-          {kind === "have" && (
-            <div className="mt-1 flex items-center gap-2">
-              <TradeLocallySwitch entryId={entry.id} on={entry.localTrade} />
-            </div>
-          )}
 
           <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
             <span>{entry.cardNumber}</span>
@@ -1149,42 +1140,5 @@ export function FlareBoard({
         </Card>
       )}
     </ul>
-  );
-}
-
-/** One player's own binder. Never shown to anybody else. */
-export function HaveList({
-  entries,
-  code,
-  imagesEnabled,
-}: {
-  entries: ListEntry[];
-  code: string;
-  imagesEnabled: boolean;
-}) {
-  if (entries.length === 0) {
-    return (
-      <Empty icon={Hand}>
-        Add what you brought with you. Only you can see this list, it follows you to
-        every event, and it flags Flares here that you can answer.
-      </Empty>
-    );
-  }
-
-  return (
-    <Card className="p-4">
-      <ul className="flex flex-col">
-        {entries.map((entry) => (
-          <Entry
-            key={entry.id}
-            entry={entry}
-            code={code}
-            kind="have"
-            imagesEnabled={imagesEnabled}
-            removable
-          />
-        ))}
-      </ul>
-    </Card>
   );
 }

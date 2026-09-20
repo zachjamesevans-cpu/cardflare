@@ -98,7 +98,7 @@ describe("one shelf, both directions", () => {
        it's same swiping carousel." */
     const app = await read("mobile/src/screens/room.tsx");
     expect(app).toContain("{showcases.map(tile)}");
-    expect(app).toMatch(/Letting go ·/);
+    expect(app).toMatch(/Offering ·/);
   });
 
   it("says which way each card points once it is swiped to", async () => {
@@ -110,7 +110,7 @@ describe("one shelf, both directions", () => {
 
     const ui = await read("mobile/src/ui.tsx");
     expect(ui).toContain('direction === "showcase"');
-    expect(ui).toContain("Letting this go");
+    expect(ui).toContain("Offering this");
   });
 });
 

@@ -42,10 +42,11 @@ export const dynamic = "force-dynamic";
  * same block the console's wizard previews, so what the owner saw
  * while setting it up is what a player sees here.
  *
- * FOLLOWING is the same row as "Your locals" - joining a room signed in
- * has always written it - with a button on the page for the player who
- * found the shop before they walked in. A guest sees a sign-in link
- * that comes back here, because a Follow that cannot work is a lie.
+ * FOLLOWING is the same row the Room tab lists under "Following" -
+ * joining a room signed in has always written it - with a button on
+ * the page for the player who found the shop before they walked in. A
+ * guest's Follow is the same button as a door: it starts sign-up and
+ * comes back here, because a Follow that cannot work is a lie.
  */
 export default async function StoreProfilePage({
   params,
@@ -128,20 +129,22 @@ export default async function StoreProfilePage({
           </ul>
         )}
 
-        {/* Follow, for a signed-in player; the way to become one, for anyone else. */}
+        {/* Follow, for a signed-in player; the same word as a door to an
+            account for anyone else, the way a player's page does it. */}
         <div className="flex flex-wrap items-center gap-3">
           {playerId ? (
             <FollowStoreButton storeId={store.storeId} initial={following} />
           ) : (
             <Link
-              href={`/login?next=${encodeURIComponent(`/s/${store.storeId}`)}`}
-              className={buttonStyles("secondary", "md")}
+              href={`/signup?next=${encodeURIComponent(`/s/${store.storeId}`)}`}
+              className={buttonStyles("primary", "sm")}
             >
-              Sign in to follow
+              Follow
             </Link>
           )}
           <p className="text-xs text-text-muted">
-            Following puts this store&rsquo;s nights in your Feed and your locals.
+            Following puts this store&rsquo;s nights in your Feed and on your Following
+            list.
           </p>
         </div>
 

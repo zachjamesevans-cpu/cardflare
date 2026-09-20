@@ -189,16 +189,18 @@ describe("the home screen's furniture", () => {
     }
   });
 
-  it("keeps Verified and Ultra as two separate marks", () => {
+  it("draws Verified on a nearby row and never Ultra", () => {
     /*
      * Verified is trust - "cardflare has confirmed this profile is
      * controlled by the listed business" - and it is never for sale.
-     * Ultra is the product tier. A row may show one, both or neither,
-     * and no client may infer one from the other.
+     * Ultra is the product tier, and a Feed row is not where a shop's
+     * plan is anybody's business: the store page's eyebrow is the one
+     * place it is said. The server still sends both, separately, so
+     * neither client can infer one from the other.
      */
     for (const source of [items, app]) {
       expect(source).toContain("store.verified");
-      expect(source).toContain("store.ultra");
+      expect(source).not.toContain("store.ultra");
     }
 
     const repo = read("src/lib/feed/repository.ts");
@@ -371,6 +373,14 @@ describe("the home screen's furniture", () => {
     /* The rendered heading, not the word: the file may well explain in a
        comment why the list is no longer here. */
     expect(settings).not.toContain("<Title>Your saved wants</Title>");
+    /* The website's settings page is the same housekeeping-only page:
+       no wants list (the Flare tab's "Saved requests" is the one list)
+       and no followed-store list (the Room tab's "Following" is). */
+    const webSettings = read("src/app/profile/settings/page.tsx");
+    expect(webSettings).not.toContain("Your saved wants");
+    expect(webSettings).not.toContain("Your locals");
+    /* The paste box stays, under the title the app's card carries. */
+    expect(webSettings).toContain("Paste a deck list");
     /* Both platforms say where a saved card is live, and on both the
        label is the way into that room - the founder: "make label
        tappable so it opens the rooms." A flat, dead label on either side
@@ -450,7 +460,7 @@ describe("posting a Flare wakes the Feed", () => {
    * usually already in hand.
    */
   const refresh = read("mobile/src/feed-refresh.ts");
-  const composer = read("mobile/src/screens/post-flare.tsx");
+  const composer = read("mobile/src/screens/flare-composer.tsx");
 
   it("has one place that says the Feed is out of date", () => {
     expect(refresh).toContain("export function onFeedStale");

@@ -25,7 +25,7 @@ async function fillValidForm(page: Page, email: string) {
 
   await page.getByLabel("First name").fill("Zach");
   await page.getByLabel("Email address").fill(email);
-  await page.getByLabel(/which best describes you/i).selectOption("store");
+  await page.getByLabel(/which best describes you/i).selectOption("vendor");
   await page.getByRole("checkbox").check();
 
   await settleFillWindow(page);
@@ -38,10 +38,10 @@ test.describe("invite request form", () => {
     for (const label of [
       "First name",
       "Email address",
-      "Primary card game",
+      "Games you sell",
       "City",
       "State or region",
-      "Local game store",
+      "Business name",
     ]) {
       await expect(page.getByLabel(label, { exact: false })).toBeVisible();
     }
@@ -77,7 +77,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await expect(page.getByRole("checkbox")).not.toBeChecked();
 
     await settleFillWindow(page);
@@ -92,7 +92,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
 
@@ -108,10 +108,10 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("creator");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await page.getByLabel("City").fill("Austin");
     await page.getByLabel("State or region").fill("TX");
-    await page.getByLabel("Local game store").fill("Grand Line Games");
+    await page.getByLabel("Business name").fill("Grand Line Games");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
 
@@ -121,8 +121,8 @@ test.describe("invite request form", () => {
     await expect(page.getByLabel("First name")).toHaveValue("Zach");
     await expect(page.getByLabel("City")).toHaveValue("Austin");
     await expect(page.getByLabel("State or region")).toHaveValue("TX");
-    await expect(page.getByLabel("Local game store")).toHaveValue("Grand Line Games");
-    await expect(page.getByLabel(/which best describes you/i)).toHaveValue("creator");
+    await expect(page.getByLabel("Business name")).toHaveValue("Grand Line Games");
+    await expect(page.getByLabel(/which best describes you/i)).toHaveValue("vendor");
 
     // Consent is a deliberate act; it must never be re-ticked on the user's behalf.
     await expect(page.getByRole("checkbox")).not.toBeChecked();
@@ -133,7 +133,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
     await page.getByRole("button", { name: /request an invite/i }).click();

@@ -124,12 +124,7 @@ describe("proxy matcher", () => {
    * nobody's benefit.
    */
   it("covers every signed-in area", () => {
-    for (const path of [
-      "/store/:path*",
-      "/admin/:path*",
-      "/account/:path*",
-      "/profile/:path*",
-    ]) {
+    for (const path of ["/store/:path*", "/admin/:path*", "/profile/:path*"]) {
       expect(config.matcher).toContain(path);
     }
   });
@@ -148,10 +143,15 @@ describe("proxy matcher", () => {
     expect(config.matcher).toContain("/welcome/:path*");
   });
 
-  it("leaves the public pages alone", () => {
+  /*
+   * `/account` is on this list too: both pages under it are permanent
+   * redirects into `/profile`, which IS matched, so a refresh there would
+   * be a round trip spent on a page with no session behind it.
+   */
+  it("leaves the public pages and the bare redirects alone", () => {
     const matchers = config.matcher.join(" ");
 
-    for (const path of ["/e/", "/join", "/play", "/cards"]) {
+    for (const path of ["/e/", "/join", "/play", "/account", "/room"]) {
       expect(matchers).not.toContain(path);
     }
   });

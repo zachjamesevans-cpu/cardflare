@@ -617,56 +617,6 @@ export async function setLocalTrade(
   return true;
 }
 
-/**
- * Says one binder entry is still there.
- *
- * The trade-time counterpart of `confirmBinder`: after a trade in which this
- * player was the holder, the room asks about exactly that card, and "still
- * have it" must not silently vouch for the rest of the binder too.
- */
-export async function confirmBinderEntry(
-  entryId: string,
-  playerSessionId: string,
-): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-
-  const { error } = await getSupabaseAdmin()
-    .from("player_cards")
-    .update({ confirmed_at: new Date().toISOString() })
-    .eq("id", entryId)
-    .eq("player_session_id", playerSessionId);
-
-  if (error) {
-    console.error("Could not confirm a binder entry", error);
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Says the whole binder is still accurate.
- *
- * One tap on arriving at an event. Turns "he has it" into "he said he had it
- * an hour ago", which is the difference between a portable binder being useful
- * and being a source of wasted walks across a room.
- */
-export async function confirmBinder(playerSessionId: string): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-
-  const { error } = await getSupabaseAdmin()
-    .from("player_cards")
-    .update({ confirmed_at: new Date().toISOString() })
-    .eq("player_session_id", playerSessionId);
-
-  if (error) {
-    console.error("Could not confirm the binder", error);
-    return false;
-  }
-
-  return true;
-}
-
 /** The player's binder. Follows them between events and stores. */
 export async function listBinder(playerSessionId: string): Promise<ListEntry[]> {
   if (!isSupabaseConfigured()) return [];

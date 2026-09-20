@@ -73,10 +73,26 @@ async function authorizeStore(storeId: string) {
   return null;
 }
 
-export async function createEventAction(
-  _previous: CreateEventState,
+/**
+ * What the in-place door reports back: the form's usual state, or the
+ * night it made. A type only, so this "use server" module still
+ * exports nothing but async functions.
+ */
+export type CreateEventResult =
+  CreateEventState | { status: "created"; eventId: string; name: string };
+
+/**
+ * Everything both doors share: the schema, the store check, the zone
+ * rule and the insert. Reports the state to show or the row it made,
+ * and leaves what happens next (a redirect, or a card under the form)
+ * to the caller.
+ */
+async function createEventFrom(
   formData: FormData,
-): Promise<CreateEventState> {
+): Promise<
+  | { ok: false; state: CreateEventState }
+  | { ok: true; event: { id: string; name: string } }
+> {
   const values = valuesFrom(formData);
   const parsed = createEventSchema.safeParse({
     storeId: text(formData, "storeId"),
@@ -90,19 +106,25 @@ export async function createEventAction(
       if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
     }
 
-    return failure("Please fix the highlighted fields.", fieldErrors, values);
+    return {
+      ok: false,
+      state: failure("Please fix the highlighted fields.", fieldErrors, values),
+    };
   }
 
   const actor = await authorizeStore(parsed.data.storeId);
   if (!actor) {
     // Same message whether the store does not exist or is someone else's, so
     // this cannot be used to discover which store ids are real.
-    return failure("You cannot create an event for that store.", {}, values);
+    return {
+      ok: false,
+      state: failure("You cannot create an event for that store.", {}, values),
+    };
   }
 
   if (!isSupabaseConfigured()) {
     console.error("Event creation rejected: Supabase is not configured.");
-    return failure(GENERIC_ERROR, {}, values);
+    return { ok: false, state: failure(GENERIC_ERROR, {}, values) };
   }
 
   /*
@@ -116,7 +138,7 @@ export async function createEventAction(
   const store = await findStoreById(parsed.data.storeId);
   if (!store) {
     console.error("Event creation rejected: the store could not be loaded.");
-    return failure(GENERIC_ERROR, {}, values);
+    return { ok: false, state: failure(GENERIC_ERROR, {}, values) };
   }
 
   const window = eventWindowIn(
@@ -126,16 +148,18 @@ export async function createEventAction(
   );
 
   if (!window.ok) {
-    return failure(
-      "Please fix the highlighted fields.",
-      { [window.problem.field]: window.problem.message },
-      values,
-    );
+    return {
+      ok: false,
+      state: failure(
+        "Please fix the highlighted fields.",
+        { [window.problem.field]: window.problem.message },
+        values,
+      ),
+    };
   }
 
-  let event;
   try {
-    event = await createEvent(
+    const event = await createEvent(
       {
         storeId: parsed.data.storeId,
         name: parsed.data.name,
@@ -145,14 +169,44 @@ export async function createEventAction(
       },
       actor.userId,
     );
+    return { ok: true, event: { id: event.id, name: parsed.data.name } };
   } catch (error) {
     console.error("Could not create the event", error);
-    return failure(GENERIC_ERROR, {}, values);
+    return { ok: false, state: failure(GENERIC_ERROR, {}, values) };
   }
+}
+
+/** The Events tab's door: the new night's page is where you land. */
+export async function createEventAction(
+  _previous: CreateEventState,
+  formData: FormData,
+): Promise<CreateEventState> {
+  const made = await createEventFrom(formData);
+  if (!made.ok) return made.state;
 
   revalidatePath("/store");
   revalidatePath("/admin");
-  redirect(`/store/events/${event.id}`);
+  redirect(`/store/events/${made.event.id}`);
+}
+
+/**
+ * The same door without the redirect, for a form that has somewhere
+ * else to be afterwards: the setup wizard has two steps left after
+ * the first night, so it shows the night under the form instead of
+ * going to it. The wizard is repainted along with the console.
+ */
+export async function createEventInPlaceAction(
+  _previous: CreateEventResult,
+  formData: FormData,
+): Promise<CreateEventResult> {
+  const made = await createEventFrom(formData);
+  if (!made.ok) return made.state;
+
+  revalidatePath("/store");
+  revalidatePath("/store/events");
+  revalidatePath("/store/setup");
+  revalidatePath("/admin");
+  return { status: "created", eventId: made.event.id, name: made.event.name };
 }
 
 /**

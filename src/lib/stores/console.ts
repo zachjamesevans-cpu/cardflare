@@ -21,9 +21,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * Two kinds of person stand here. An OWNER (a store account, or an
  * admin) runs everything. An ORGANIZER is a player the owner named:
  * they stay a player everywhere else on the site, and here they get
- * FlareCast and the events for the stores that named them, with the
- * owner-only tabs (singles, settings, organizers) locked on the server
- * as well as hidden.
+ * FlareCast, the events, the posts and the case for the stores that
+ * named them, with the owner-only pages (singles, organizers, settings
+ * and the setup wizard) locked on the server as well as hidden.
  */
 export interface ConsoleStore {
   id: string;
@@ -62,11 +62,30 @@ export interface StoreConsole {
 }
 
 /**
- * The tabs an organizer never opens. Locked here, in the loader every
- * tab goes through, so hiding a link is never the only thing between
- * an organizer and the billing page.
+ * The pages an organizer never opens. Locked here, in the loader every
+ * page goes through, so hiding a link is never the only thing between
+ * an organizer and the billing page. Three are tabs; the setup wizard
+ * has no tab and is the owner's for the same reasons the tabs are (it
+ * names the shop, hands out organizers and stamps the store as set up).
  */
-const OWNER_ONLY_PATHS = ["/store/singles", "/store/settings", "/store/organizers"];
+const OWNER_ONLY_PATHS = [
+  "/store/singles",
+  "/store/settings",
+  "/store/organizers",
+  "/store/setup",
+];
+
+/**
+ * Whether a console href is one of the owner's pages. The query string
+ * and the hash are ignored, so `consoleHref` output and a `#page`
+ * anchor answer the same as the bare path.
+ */
+export function isOwnerOnlyPath(href: string): boolean {
+  const path = href.split(/[?#]/, 1)[0];
+  return OWNER_ONLY_PATHS.some(
+    (locked) => path === locked || path.startsWith(`${locked}/`),
+  );
+}
 
 /** The stores this viewer may run from the console, by id. */
 export function consoleStoreIds(viewer: Viewer): string[] {
@@ -132,13 +151,9 @@ export async function loadStoreConsole(
   if (!store && viewer.kind === "admin") redirect("/admin");
   if (!store && viewer.kind === "player") redirect("/profile");
 
-  /* The server-side lock on the owner-only tabs. An organizer who types
+  /* The server-side lock on the owner-only pages. An organizer who types
      the URL lands on the overview, exactly as if the tab were not there. */
-  if (
-    store &&
-    store.role !== "owner" &&
-    OWNER_ONLY_PATHS.some((locked) => path === locked || path.startsWith(`${locked}/`))
-  ) {
+  if (store && store.role !== "owner" && isOwnerOnlyPath(path)) {
     redirect(`/store?as=${store.id}`);
   }
 

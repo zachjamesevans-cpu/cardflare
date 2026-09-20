@@ -6,15 +6,16 @@ import { Card } from "@/components/ui/card";
 import { SITE } from "@/lib/site";
 
 /**
- * The first thing a new store sees.
+ * The welcome, and the checklist that follows it.
  *
  * The founder, after his own trial: "first thing I see is a button
  * that says start your 14 day free trial" and "a big welcome to
- * cardflare ultra so they feel welcomed." So: a welcome with the
- * tier's name on it, the trial's end date when there is one, and the
- * things to do first, each ticked as it is done and each a link
- * to the tab where it happens. It shows until all four are ticked,
- * then quietly leaves.
+ * cardflare ultra so they feel welcomed." So: `WelcomeHero` opens the
+ * setup wizard at /store/setup with the tier's name on it and the
+ * trial's end date when there is one. `SetupChecklist` is the console
+ * home's list of what is still to do once the wizard is finished or
+ * skipped: each step ticked as it is done and each a link to the tab
+ * where it happens, and the card leaves when nothing is left.
  */
 export interface SetupStep {
   key: string;
@@ -45,8 +46,9 @@ export function WelcomeHero({
         Welcome to {SITE.name} <UltraMark />
       </h2>
       <p className="max-w-2xl text-text-secondary">
-        {storeName} is on. Your counter code is ready to print, and the steps below put
-        the rest of Ultra to work tonight.
+        {storeName} is on. Your counter code is ready to print, and the next four steps
+        put the rest of Ultra to work: your page, your screens, your first night and
+        your team.
         {trialUntil &&
           ` Your free trial runs until ${trialUntil}; nothing is charged before then.`}
       </p>

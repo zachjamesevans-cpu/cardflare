@@ -1,11 +1,17 @@
 import { z } from "zod";
 
+/**
+ * Who can ask for an invite: the people Max is set up for.
+ *
+ * Max is by invitation, so a card show vendor, or the organizer who
+ * runs the show, asks here and a person answers. Nobody else needs to:
+ * a player's account is free at /signup, and Ultra for a game store is
+ * self-serve at /ultra with a trial button. The database enum still
+ * carries the older values, so rows from the beta read as they were.
+ */
 export const USER_TYPES = [
-  { value: "player", label: "Player" },
-  { value: "store", label: "Local game store" },
   { value: "vendor", label: "Card show vendor" },
-  { value: "tournament_organizer", label: "Tournament organizer" },
-  { value: "creator", label: "Content creator or community organizer" },
+  { value: "tournament_organizer", label: "Show or tournament organizer" },
   { value: "other", label: "Other" },
 ] as const;
 

@@ -117,7 +117,12 @@ describe("the console for an organizer", () => {
       console.indexOf("];", console.indexOf("const OWNER_ONLY_PATHS")),
     );
 
-    for (const path of ["/store/singles", "/store/settings", "/store/organizers"]) {
+    for (const path of [
+      "/store/singles",
+      "/store/settings",
+      "/store/organizers",
+      "/store/setup",
+    ]) {
       expect(locked).toContain(`"${path}"`);
     }
     expect(console).toContain('store.role !== "owner"');
@@ -125,6 +130,34 @@ describe("the console for an organizer", () => {
     /* The organizers page carries its own copy of the lock. */
     const page = read("src/app/store/organizers/page.tsx");
     expect(page).toContain('if (store.role !== "owner") redirect(');
+  });
+
+  it("gives the case to an organizer and the singles upload to the owner", () => {
+    const page = read("src/app/store/case/page.tsx");
+    expect(page).toContain('store.role === "owner"');
+    expect(page).toContain("The owner uploads singles from the Singles tab.");
+    /* The one link to Singles is the owner's branch. */
+    const owners = page.slice(
+      page.indexOf('store.role === "owner"'),
+      page.indexOf("The owner uploads singles"),
+    );
+    expect(owners).toContain("/store/singles");
+  });
+
+  it("says what an organizer is in one sentence, from one string", () => {
+    const list = read("src/components/stores/organizer-list.tsx");
+    expect(list).toContain(
+      'export const ORGANIZER_DESCRIPTION =\n  "Organizers get FlareCast, the timers and the remote, plus events, posts and the case. They cannot see billing, singles or settings."',
+    );
+    for (const file of [
+      "src/app/store/organizers/page.tsx",
+      "src/app/store/setup/page.tsx",
+    ]) {
+      const source = read(file);
+      expect(source).toContain("ORGANIZER_DESCRIPTION");
+      expect(source).not.toContain("Organizers get FlareCast");
+      expect(source).toContain("<OrganizerList");
+    }
   });
 });
 

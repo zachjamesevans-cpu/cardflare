@@ -17,7 +17,7 @@ import { confirmTradeAction } from "@/lib/trades/actions";
  */
 
 /**
- * What anyone can do on somebody else's Flare: pledge to answer it.
+ * What anyone can do on somebody else's Flare: offer to answer it.
  *
  * No longer gated on a binder match — the founder's call. Somebody who
  * knows their box at home has the card should be able to say "I got you"
@@ -34,9 +34,9 @@ export function OfferPanel({
   flareId: string;
   /** The viewer's own standing offer on this Flare, when they have one. */
   ownOffer?: Offer;
-  /** Early board: the offer is a pledge to bring the card, so say so. */
+  /** Early board: the offer is a promise to bring the card, so say so. */
   early?: boolean;
-  /** How many the Flare asks for; above one, the pledge asks "how many". */
+  /** How many the Flare asks for; above one, the offer asks "how many". */
   flareQuantity?: number;
 }) {
   if (ownOffer) {
@@ -131,7 +131,7 @@ export function OfferPanel({
  * Visible to everyone, not just the requester — the founder's example is
  * Damian wanting 2x Brook with Chunc bringing one. The next Brook holder
  * should read "still needs 1 more" and know their copy matters, and once
- * everything is pledged, nobody wastes a trip.
+ * everything is offered, nobody wastes a trip.
  */
 export function PledgeSummary({ offers, asked }: { offers: Offer[]; asked: number }) {
   if (offers.length === 0) return null;

@@ -84,6 +84,8 @@ describe("the mark beside a store's name", () => {
     expect(web).toContain('from "@/components/stores/verified-mark"');
     expect(webNearby).toContain("{store.verified && <VerifiedMark");
     expect(webNearby).not.toContain("BadgeCheck");
+    /* Verified only: the Ultra pill that sat beside it is gone. */
+    expect(webNearby).not.toMatch(/store\.ultra/);
 
     const app = read("mobile/src/screens/home.tsx");
     const appNearby = nearbyBlock(app);

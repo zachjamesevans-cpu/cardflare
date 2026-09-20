@@ -1,22 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  ExternalLink,
-  Printer,
-  Smartphone,
-  Store as StoreIcon,
-  Users,
-} from "lucide-react";
+import { ExternalLink, Smartphone, Store as StoreIcon, Users } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
 import { AppShell } from "@/components/layout/app-shell";
-import { PlayerAvatar } from "@/components/players/player-avatar";
+import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { WelcomeHero } from "@/components/stores/onboarding";
+import {
+  ORGANIZER_DESCRIPTION,
+  OrganizerList,
+} from "@/components/stores/organizer-list";
 import { AddOrganizer } from "@/components/stores/organizers";
 import { SetupEventForm } from "@/components/stores/setup-event-form";
 import {
-  AddScreenForm,
   ScreenRow,
   StepDots,
   StepFrame,
@@ -33,13 +30,15 @@ import { listDisplays } from "@/lib/event-hub/repository";
 import { defaultEventWindow, formatEventWindow } from "@/lib/events/format";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
-import { formatHandle } from "@/lib/players/handle";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { siteUrl } from "@/lib/site";
 import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
 import { markStoreOnboarded, storePageFor } from "@/lib/stores/page";
-import { finishStoreSetupAction } from "@/lib/stores/setup-actions";
+import {
+  addSetupScreenAction,
+  finishStoreSetupAction,
+} from "@/lib/stores/setup-actions";
 import { qrSvgFor } from "@/lib/stores/setup-qr";
 import { isSetupStep, setupHref, type SetupStep } from "@/lib/stores/setup-schema";
 import { listStaff } from "@/lib/stores/staff";
@@ -64,8 +63,10 @@ export const dynamic = "force-dynamic";
  * refresh. The store's rows are the only state there is.
  *
  * OWNER-ONLY. The page names the shop, hands out organizers and stamps
- * the store as set up. An organizer who lands here goes to the console
- * they do have.
+ * the store as set up. `/store/setup` is on `loadStoreConsole`'s
+ * owner-only list, so an organizer who lands here is sent to the
+ * console they do have before this page runs, and every action the
+ * steps post asks for the owner again.
  *
  * Back from Stripe, this is where the browser lands, so the checkout
  * session is reconciled here the way the console home does it: ask
@@ -80,7 +81,6 @@ export default async function StoreSetupPage({
     step?: string;
     checkout?: string;
     session_id?: string;
-    welcome?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -89,7 +89,6 @@ export default async function StoreSetupPage({
     "/store/setup",
   );
   if (!store || store.kind === "vendor") redirect("/store");
-  if (store.role !== "owner") redirect(`/store?as=${store.id}`);
 
   const justStarted = params.checkout === "success";
   if (justStarted && params.session_id) {
@@ -116,21 +115,14 @@ export default async function StoreSetupPage({
         )}
         {step === "page" && <PageStep storeId={store.id} tier={store.tier} />}
         {step === "screens" && <ScreensStep storeId={store.id} />}
-        {step === "event" && (
-          <EventStep
-            storeId={store.id}
-            storeName={store.name}
-            joinCode={store.join_code}
-            walkInEnabled={store.walk_in_enabled}
-            timeZone={timeZone}
-          />
-        )}
+        {step === "event" && <EventStep storeId={store.id} timeZone={timeZone} />}
         {step === "team" && <TeamStep storeId={store.id} />}
         {step === "done" && (
           <DoneStep
             storeId={store.id}
             storeName={store.name}
             joinCode={store.join_code}
+            walkInEnabled={store.walk_in_enabled}
           />
         )}
       </div>
@@ -282,7 +274,7 @@ async function ScreensStep({ storeId }: { storeId: string }) {
       storeId={storeId}
       step="screens"
       title={STEP_TITLES.screens}
-      lede="A screen is a TV in your shop running FlareCast. It shows your counter code so players scan in, the round clocks for tonight's event, and what the room is hunting. Name one per TV."
+      lede="A screen is a TV in your shop running FlareCast. It shows your counter code so players scan in, the round clocks for tonight's event, and what the room is looking for. Name one per TV. Each screen has its own private link: open it on the TV's browser, press Enter Fullscreen once, and leave it. Nobody has to sign in on the television."
     >
       {screens.length > 0 && (
         <ul className="flex flex-col gap-3">
@@ -298,13 +290,11 @@ async function ScreensStep({ storeId }: { storeId: string }) {
         </ul>
       )}
 
-      <AddScreenForm storeId={storeId} first={screens.length === 0} />
-
-      <p className="max-w-2xl text-sm text-text-muted">
-        Each screen has its own private link. Scan the code from the TV&rsquo;s browser
-        or type the address, press Enter Fullscreen once, and leave it. Nobody has to
-        sign in on the television.
-      </p>
+      <AddScreenForm
+        storeId={storeId}
+        first={screens.length === 0}
+        action={addSetupScreenAction}
+      />
     </StepFrame>
   );
 }
@@ -313,23 +303,8 @@ async function ScreensStep({ storeId }: { storeId: string }) {
 /* 4. Your first event night                                             */
 /* -------------------------------------------------------------------- */
 
-async function EventStep({
-  storeId,
-  storeName,
-  joinCode,
-  walkInEnabled,
-  timeZone,
-}: {
-  storeId: string;
-  storeName: string;
-  joinCode: string | null;
-  walkInEnabled: boolean;
-  timeZone: string;
-}) {
-  const [events, counterQr] = await Promise.all([
-    listEventsForStore(storeId),
-    joinCode ? joinQrSvg(joinCode) : Promise.resolve(null),
-  ]);
+async function EventStep({ storeId, timeZone }: { storeId: string; timeZone: string }) {
+  const events = await listEventsForStore(storeId);
   const upcoming = events.filter((event) => event.status !== "closed").slice(0, 3);
   const window = defaultEventWindow(timeZone);
 
@@ -361,6 +336,8 @@ async function EventStep({
         </Card>
       )}
 
+      {/* The counter code is the next step's: it is what a finished
+          store prints, whether or not a night was created here. */}
       <Card>
         <SetupEventForm
           storeId={storeId}
@@ -369,32 +346,6 @@ async function EventStep({
           another={events.length > 0}
         />
       </Card>
-
-      {events.length > 0 && counterQr && joinCode && (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-xl font-bold text-text-primary">Your counter code</h3>
-            <ButtonLink
-              href={`/poster/${joinCode}`}
-              target="_blank"
-              rel="noopener"
-              variant="secondary"
-              size="sm"
-            >
-              <Printer className="size-4" aria-hidden="true" />
-              Print the counter sign
-            </ButtonLink>
-          </div>
-          <CounterCode
-            storeId={storeId}
-            storeName={storeName}
-            joinCode={joinCode}
-            url={joinUrl(joinCode)}
-            qrSvg={counterQr}
-            walkInEnabled={walkInEnabled}
-          />
-        </div>
-      )}
     </StepFrame>
   );
 }
@@ -415,7 +366,7 @@ async function TeamStep({ storeId }: { storeId: string }) {
       storeId={storeId}
       step="team"
       title={STEP_TITLES.team}
-      lede="An organizer runs your nights from their phone: FlareCast, the timers and the remote. They never see billing, singles or settings. Running it alone for now is fine."
+      lede={`${ORGANIZER_DESCRIPTION} Running it alone for now is fine.`}
     >
       <Card className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
@@ -428,31 +379,7 @@ async function TeamStep({ storeId }: { storeId: string }) {
         </div>
 
         {organizers.length > 0 && (
-          <ul className="flex flex-col">
-            {organizers.map((member) => (
-              <li
-                key={member.userId}
-                className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0"
-              >
-                <PlayerAvatar
-                  displayName={member.displayName}
-                  seed={member.playerId ?? member.userId}
-                  avatarUrl={member.avatarUrl}
-                  size="sm"
-                />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-semibold text-text-primary">
-                    {member.displayName}
-                  </span>
-                  {member.handle && (
-                    <span className="truncate text-xs text-text-muted">
-                      {formatHandle(member.handle)}
-                    </span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <OrganizerList storeId={storeId} members={organizers} />
         )}
 
         <AddOrganizer storeId={storeId} memberPlayerIds={memberPlayerIds} />
@@ -474,10 +401,12 @@ async function DoneStep({
   storeId,
   storeName,
   joinCode,
+  walkInEnabled,
 }: {
   storeId: string;
   storeName: string;
   joinCode: string | null;
+  walkInEnabled: boolean;
 }) {
   /* Reaching the end IS finishing: the console stops asking. */
   await markStoreOnboarded(storeId);
@@ -490,23 +419,17 @@ async function DoneStep({
       title={`${storeName} is on`}
       lede="One code on the counter opens whichever room is running. Everything else is a tab in your console."
     >
+      {/* The same sheet the console home prints, not a second drawing
+          of the code. */}
       {counterQr && joinCode && (
-        <Card className="flex flex-col items-center gap-4 text-center">
-          <div
-            className="w-full max-w-60 rounded-lg bg-white p-3"
-            dangerouslySetInnerHTML={{ __html: counterQr }}
-          />
-          <p className="font-mono text-4xl font-bold tracking-[0.18em] text-text-primary">
-            {joinCode}
-          </p>
-          <p className="text-sm text-text-secondary">
-            Your counter code. It never changes.
-          </p>
-          <ButtonLink href={`/poster/${joinCode}`} target="_blank" rel="noopener">
-            <Printer className="size-4" aria-hidden="true" />
-            Print the counter sign
-          </ButtonLink>
-        </Card>
+        <CounterCode
+          storeId={storeId}
+          storeName={storeName}
+          joinCode={joinCode}
+          url={joinUrl(joinCode)}
+          qrSvg={counterQr}
+          walkInEnabled={walkInEnabled}
+        />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">

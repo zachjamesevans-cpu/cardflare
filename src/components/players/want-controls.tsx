@@ -10,7 +10,7 @@ import {
 } from "@/lib/players/account-actions";
 
 /**
- * The hunting panel's verbs, with every tap acknowledged.
+ * The Looking-for panel's verbs, with every tap acknowledged.
  *
  * The founder's report: tapping minus or Remove "stalls for a second",
  * because these shipped as plain forms with no pending state while the

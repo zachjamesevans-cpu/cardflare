@@ -26,7 +26,17 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-/** Chrome for the signed-in areas. Deliberately plainer than the landing page. */
+/**
+ * Chrome for the signed-in areas. Deliberately plainer than the landing page.
+ *
+ * Two kinds of page wear it. A console (Store, Admin) has no other
+ * chrome, so the header carries the account: the address as the way
+ * into settings, and Sign out. A player page (area "Profile") sits on
+ * the tab bar, its settings cog is on the profile itself and Sign out
+ * lives in settings, so the header shows none of that: only the logo,
+ * back to the Feed, and the area switcher for an account that is more
+ * than one thing.
+ */
 export function AppShell({
   area,
   email,
@@ -36,6 +46,8 @@ export function AppShell({
   currentArea,
   children,
 }: AppShellProps) {
+  const playerArea = area === "Profile";
+
   return (
     <>
       <header className="border-b border-border bg-surface">
@@ -43,7 +55,10 @@ export function AppShell({
           {/* shrink-0: the wordmark never gives way — the switcher beside
               the email is the flexible one. */}
           <div className="flex shrink-0 items-center gap-3">
-            <Link href="/" aria-label={`${SITE.name} home`}>
+            <Link
+              href={playerArea ? "/feed" : "/"}
+              aria-label={playerArea ? `${SITE.name} feed` : `${SITE.name} home`}
+            >
               <Logo size={30} priority />
             </Link>
             <span
@@ -60,12 +75,17 @@ export function AppShell({
               <AreaSwitcher areas={areas} current={currentArea} />
             )}
             {/*
-             * The address doubles as the way into the account settings. It was
-             * already the only thing on the page identifying who you are, and
-             * a separate nav item for one page would be more chrome than the
-             * signed-in areas need.
+             * On a console the address doubles as the way into the account
+             * settings. It was already the only thing on the page identifying
+             * who you are, and a separate nav item for one page would be more
+             * chrome than the signed-in areas need. A player page has its own
+             * doors to both, so it draws neither.
              */}
-            {email ? (
+            {!email ? (
+              <ButtonLink href="/login" variant="secondary" size="sm">
+                Sign in
+              </ButtonLink>
+            ) : playerArea ? null : (
               <>
                 <Link
                   href="/profile/settings"
@@ -79,10 +99,6 @@ export function AppShell({
                   </Button>
                 </form>
               </>
-            ) : (
-              <ButtonLink href="/login" variant="secondary" size="sm">
-                Sign in
-              </ButtonLink>
             )}
           </div>
         </div>

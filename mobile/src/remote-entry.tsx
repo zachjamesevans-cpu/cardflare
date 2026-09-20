@@ -84,12 +84,11 @@ export function RemoteEntry() {
  * older server, or nobody) draws nothing.
  */
 export function OrganizerChips({
-  profile,
+  stores,
 }: {
-  profile: { playerId: string; organizerAt?: { storeId: string; name: string }[] };
+  stores: { storeId: string; name: string }[];
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const stores = profile.organizerAt ?? [];
   if (stores.length === 0) return null;
 
   return (

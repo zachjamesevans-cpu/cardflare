@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ShoppingBag, Wand2 } from "lucide-react";
+import { ArrowLeft, Wand2 } from "lucide-react";
 
 import { CustomizeHub } from "@/components/players/customize-hub";
 import { getViewer } from "@/lib/auth/session";
@@ -32,9 +32,10 @@ const AREA_COPY = {
 
 /**
  * Getting dressed lives HERE now, not in the store. The store sells;
- * this wears. Split into two menus behind two wands - the founder's
- * call: "have a magic wand that edits profile stuff... a separate one
- * for showcase so the menu isn't too crowded." Unreleased cosmetics
+ * this wears. Split into two menus, profile and showcase, so neither
+ * is a wall - the founder's call: "a separate one for showcase so the
+ * menu isn't too crowded." One wand on the profile opens this page and
+ * the header link here swaps menus. Unreleased cosmetics
  * appear only for an account whose admin grant reaches them, and wear
  * exactly like live ones so they can be judged on a real profile.
  */
@@ -86,22 +87,15 @@ export default async function CustomizePage({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/profile/customize?area=${copy.other.area}`}
-            className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
-          >
-            <Wand2 className="size-4" aria-hidden="true" />
-            {copy.other.label}
-          </Link>
-          <Link
-            href="/profile/store"
-            className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
-          >
-            <ShoppingBag className="size-4" aria-hidden="true" />
-            Embers store
-          </Link>
-        </div>
+        {/* The other menu, and only that. The Embers store's door is on
+            the profile; a second one here made this page a shop front. */}
+        <Link
+          href={`/profile/customize?area=${copy.other.area}`}
+          className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
+        >
+          <Wand2 className="size-4" aria-hidden="true" />
+          {copy.other.label}
+        </Link>
       </div>
 
       <CustomizeHub sections={shown} />

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { EventStatsCard } from "@/components/events/event-stats";
@@ -9,14 +9,14 @@ import { RoomRoster } from "@/components/events/room-roster";
 import { WalkInSession } from "@/components/events/walk-in-session";
 import { AppShell } from "@/components/layout/app-shell";
 import { FlareBoard } from "@/components/lists/list-entries";
+import { StoreTabs } from "@/components/stores/store-tabs";
 import { Badge, Card } from "@/components/ui/card";
-import { getViewer } from "@/lib/auth/session";
-import { consoleStoreIds } from "@/lib/stores/console";
+import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { formatEventWindow } from "@/lib/events/format";
 import { listParticipants } from "@/lib/events/participants";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
-import { findEventById, findStoreById } from "@/lib/events/repository";
+import { findEventById } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
@@ -30,16 +30,23 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * One event, for whoever runs the store.
+ *
+ * Who may stand here is decided by `loadStoreConsole`, exactly as on
+ * every other console tab; the event then has to belong to one of the
+ * stores that loader returned, or the page does not exist.
+ */
 export default async function EventPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ as?: string }>;
 }) {
   const { id } = await params;
-
-  const viewer = await getViewer();
-
-  if (viewer.kind === "anonymous") redirect(`/login?next=/store/events/${id}`);
+  const { as } = await searchParams;
+  const { viewer, stores, areas } = await loadStoreConsole(as, `/store/events/${id}`);
 
   // Close whatever ran out first, so this page's status badge and room
   // snapshot describe now rather than the last scan.
@@ -50,17 +57,15 @@ export default async function EventPage({
   /*
    * A missing event and someone else's event produce the same 404.
    * Distinguishing them would let any signed-in store confirm which event ids
-   * exist by walking them.
+   * exist by walking them. Owners, admins, and the organizers this store
+   * named all arrive through `loadStoreConsole`, so "someone else's" is
+   * simply an event whose store is not in that list.
    */
-  if (!event) notFound();
+  const store = event ? stores.find((entry) => entry.id === event.store_id) : null;
 
-  const store = await findStoreById(event.store_id);
-  const timeZone = store?.timezone ?? "UTC";
+  if (!event || !store) notFound();
 
-  /* Owners, admins, and the organizers this store named. */
-  const canView = consoleStoreIds(viewer).includes(event.store_id);
-
-  if (!canView) notFound();
+  const timeZone = store.timezone ?? "UTC";
 
   /*
    * A walk-in room has no code and no sheet: it is reached through the store's
@@ -121,7 +126,11 @@ export default async function EventPage({
       email={viewer.user.email ?? ""}
       title={event.name}
       description={formatEventWindow(event.starts_at, event.ends_at, timeZone)}
+      areas={areas}
+      currentArea={`/store?as=${store.id}`}
     >
+      <StoreTabs storeId={store.id} />
+
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
           {STATUS_LABELS[event.status]}
@@ -132,7 +141,7 @@ export default async function EventPage({
           </Badge>
         )}
         <Link
-          href={viewer.kind === "admin" ? "/admin" : "/store"}
+          href={consoleHref("/store/events", store.id)}
           className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
         >
           Back to all events
@@ -174,7 +183,7 @@ export default async function EventPage({
               openToTrades={openPlayers}
               identities={boardIdentities}
               counterHas={counterHas}
-              counterName={store?.name}
+              counterName={store.name}
             />
           ) : (
             <p className="text-sm text-text-muted">No Flares in this room yet.</p>

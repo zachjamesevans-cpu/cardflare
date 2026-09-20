@@ -7,11 +7,11 @@ import { Check, Handshake, Loader2, Minus, Plus, X } from "lucide-react";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 
 /**
- * The carousel tile's pledge control: a small handshake button, the
+ * The carousel tile's offer control: a small handshake button, the
  * founder's pick over a text link — at tile size an icon reads faster
  * than words, and the handshake is already the offer's mark elsewhere.
  *
- * Fresh pledge, one copy asked: the tap is the pledge. Anything with a
+ * Fresh offer, one copy asked: the tap is the offer. Anything with a
  * count to choose opens the stepper — and the stepper is an overlay
  * panel ON the card art, not an inline expansion. The founder's
  * screenshots showed why: expanding in the flow shoved neighbouring
@@ -20,7 +20,7 @@ import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
  * the button underneath never moves, and tapping the button again
  * closes the panel.
  *
- * A standing pledge keeps the button, filled in — committing should not
+ * A standing offer keeps the button, filled in — committing should not
  * take the control away. Reopening starts at your promised count, and
  * stepping to zero turns the check into a withdraw. While anything is
  * in flight the tile greys out under a spinner, because a silent button
@@ -91,9 +91,9 @@ export function QuickPledge({
   early?: boolean;
   /** How many the Flare asks for; above one, the tap asks "how many". */
   flareQuantity?: number;
-  /** The viewer's pledge is already standing: filled button, editable. */
+  /** The viewer's offer is already standing: filled button, editable. */
   offered?: boolean;
-  /** How many the standing pledge promised, the stepper's start. */
+  /** How many the standing offer promised, the stepper's start. */
   ownQuantity?: number;
 }) {
   const [picking, setPicking] = useState(false);
@@ -101,7 +101,7 @@ export function QuickPledge({
 
   const label = early ? "I got you" : "I got it";
 
-  /* A fresh pledge on a one-of needs no conversation: the tap is it. */
+  /* A fresh offer on a one-of needs no conversation: the tap is it. */
   if (!offered && flareQuantity <= 1) {
     return (
       <form action={offerTradeAction}>
@@ -113,7 +113,7 @@ export function QuickPledge({
     );
   }
 
-  /* Zero is a real answer once a pledge stands: the check withdraws it. */
+  /* Zero is a real answer once an offer stands: the check withdraws it. */
   const floor = offered ? 0 : 1;
   const withdrawing = offered && count === 0;
 
@@ -166,7 +166,7 @@ export function QuickPledge({
             <button
               type="submit"
               aria-label={
-                withdrawing ? "Take the pledge back" : `${label}, bringing ${count}`
+                withdrawing ? "Take the offer back" : `${label}, bringing ${count}`
               }
               className={`flex h-5 w-11 items-center justify-center rounded-[4px] text-[10px] font-semibold ${
                 withdrawing
@@ -183,8 +183,8 @@ export function QuickPledge({
       <button
         type="button"
         onClick={() => setPicking((open) => !open)}
-        aria-label={offered ? "Change your pledge" : label}
-        title={offered ? "Change your pledge" : label}
+        aria-label={offered ? "Change your offer" : label}
+        title={offered ? "Change your offer" : label}
         className="w-full"
       >
         <HandshakeFace offered={offered} />

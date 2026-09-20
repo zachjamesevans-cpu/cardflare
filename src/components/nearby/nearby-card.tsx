@@ -58,12 +58,20 @@ export function NearbyCard({
         <Toggle on={enabled} pending={pending} onClick={flip} label="Nearby matching" />
       </div>
 
-      {enabled && !postalCode && (
+      {/* The ZIP field is here whenever the switch is on, filled with
+          what is saved: "Change" on the folded row has to lead
+          somewhere, and a card that only asked when there was nothing
+          to change would be a dead end for the one thing it promised.
+          Clearing the field is allowed on purpose, since an emptied
+          ZIP is how a player takes their location back. */}
+      {enabled && (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
           <p className="text-sm text-text-secondary">
-            Nearby needs to know roughly where you are. Just the ZIP.
+            {postalCode
+              ? "Matching around this ZIP. Change it here."
+              : "Nearby needs to know roughly where you are. Just the ZIP."}
           </p>
-          <PostalAsk submitLabel="Save" />
+          <PostalAsk defaultValue={postalCode ?? ""} allowClear submitLabel="Save" />
         </div>
       )}
 

@@ -13,6 +13,7 @@ import type { ProfileStats } from "./api";
 import { API_BASE } from "./config";
 import { EmberBadge } from "./ember-badge";
 import { formatHandle } from "./handle";
+import { OrganizerChips } from "./remote-entry";
 import { Tap } from "./ui";
 import { colors, radius, spacing } from "./theme";
 import { WornBadge, WornName, WornTitle } from "./worn-name";
@@ -41,6 +42,7 @@ export function ProfileHeader({
   equips,
   embersEarned,
   stats,
+  organizerAt = [],
   onFollowers,
   onFollowing,
   actions,
@@ -54,6 +56,8 @@ export function ProfileHeader({
   embersEarned: number;
   /** Absent from an older server: the row shows dashes rather than lying. */
   stats: ProfileStats | undefined;
+  /** The stores that named them an organizer: the TO chips under the handle. */
+  organizerAt?: { storeId: string; name: string }[];
   /** Where the followers and following numbers go, on a profile that lists them. */
   onFollowers?: () => void;
   onFollowing?: () => void;
@@ -65,7 +69,10 @@ export function ProfileHeader({
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         {avatar}
         <View style={{ flex: 1, flexDirection: "row", gap: spacing(2) }}>
-          <Stat value={stats?.flares} label={stats?.flares === 1 ? "Flare" : "Flares"} />
+          <Stat
+            value={stats?.flares}
+            label={stats?.flares === 1 ? "Flare" : "Flares"}
+          />
           <Stat value={stats?.followers} label="followers" onPress={onFollowers} />
           <Stat value={stats?.following} label="following" onPress={onFollowing} />
         </View>
@@ -113,6 +120,9 @@ export function ProfileHeader({
         <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 18 }}>
           {formatHandle(handle)}
         </Text>
+        {/* The TO badge, part of the header so both profile screens get
+            it from one place, the website's ProfileHeader's shape. */}
+        <OrganizerChips stores={organizerAt} />
       </View>
 
       <View style={{ flexDirection: "row", gap: spacing(2) }}>{actions}</View>
@@ -231,7 +241,13 @@ export function profileUrl(playerId: string): string {
  * "2 Links" and pasted it twice; Android has no `url` and needs it in
  * `message`. One field each, by platform.
  */
-export function ShareProfileIcon({ playerId, name }: { playerId: string; name: string }) {
+export function ShareProfileIcon({
+  playerId,
+  name,
+}: {
+  playerId: string;
+  name: string;
+}) {
   const url = profileUrl(playerId);
   return (
     <Tap

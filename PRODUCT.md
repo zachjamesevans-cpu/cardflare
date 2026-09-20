@@ -26,8 +26,8 @@ explicit approval, not an implementation detail.
 - A nationwide marketplace
 - A shipping platform
 - A card-pricing application
-- Tournament-management software. The Event Hub runs timers and shows the
-  room what is on; pairings, standings, registration, decklists, brackets and
+- Tournament-management software. FlareCast runs timers and shows the room
+  what is on; pairings, standings, registration, decklists, brackets and
   result reporting belong to whatever the store already uses.
 
 ## Core product language
@@ -111,10 +111,12 @@ a place and a time: _bring it Friday_, not _post it to me_.
 
 ### What it is not
 
-- **Not a photo feed.** No free-form captions, no uploaded photographs, no
-  comments, in this milestone. Posts are card-shaped: a card from the
-  catalogue and, at most, a short note. That is nearly moderation-free, and
-  CardFlare does not have a moderation system and has never claimed one.
+- **Not a photo feed.** No free-form captions and no uploaded photographs
+  from players. A player's item is card-shaped: a card from the catalogue
+  and, at most, a short note. That is nearly moderation-free, and CardFlare
+  does not have a moderation system and has never claimed one. A store's post
+  is the exception that earns it: a store can write to its followers, with a
+  picture, and followers can heart it and talk under it in a thread.
 - **Not somewhere you post.** In this milestone the Feed reports what players
   did — joined, hunted, added, traded — rather than offering a compose box.
   Almost every item is derived, which is also how a pilot with six players has
@@ -166,9 +168,9 @@ place. So the Feed may carry them. The guards that keep this from becoming a
 shop: they sit BELOW everything derived, they are capped at one item each, and
 they are never the reason a room goes unmentioned.
 
-What has not changed: no compose box, no photographs, no comments, no prices on
-cards, and no item that could be satisfied by post. A quiet Feed is allowed to
-be short. It is not allowed to be empty.
+What has not changed: no compose box for players, no prices on cards, and no
+item that could be satisfied by post. A quiet Feed is allowed to be short. It
+is not allowed to be empty.
 
 ### The measure
 
@@ -176,9 +178,9 @@ Not daily actives. **Trades and wants that trace back to a Feed item.** A Feed
 that does not produce trades is a cost with good engagement numbers, which is
 the most expensive kind of mistake available here.
 
-## The Event Hub
+## FlareCast
 
-The screen a store puts on its television at the start of locals and leaves
+The screen a store puts on its TV at the start of an event night and leaves
 running. What it replaces is a YouTube countdown and a whiteboard, so the
 measure is not "does it keep time" but "does a shop employee reach for it
 instead", and the target is under two minutes from opening the console to a
@@ -186,7 +188,7 @@ timer on the wall.
 
 ### What it is
 
-One always-on display per television: tournament timers for up to four
+One always-on screen per TV: tournament timers for up to four
 simultaneous events, each with its own game, round, structure and clock; the
 end-of-round procedure for whichever game reached zero, over that tournament's
 panel and no other; the room's current Flares rotating beside them; the
@@ -243,16 +245,17 @@ care of itself.
 | -------------------- | -------------------------------------------------------------------- |
 | Player               | Complete a deck before the next round without searching every binder |
 | Local game store     | A better event experience and a reason for players to come back      |
-| Tournament organiser | Smoother trading at larger events                                    |
+| Tournament organizer | Smoother trading at larger events                                    |
 | Content creator      | A community hook around local play                                   |
 
 ## Current status
 
 **Live at https://cardflare.gg, with the whole core loop working.** Event rooms,
-accounts, card search, Flares, matching, pledges and confirmed trades are all
+accounts, card search, Flares, matching, offers and confirmed trades are all
 built, on the website and in the Expo app. So are the things that grew out of
-them: Embers and cosmetics, the profile and showcase, follows and locals, the
-Feed, and a console for stores, players, packs and card sets.
+them: Embers and cosmetics, the profile and showcase, following players and
+stores, the Feed, store pages with posts and the case, and a console for
+stores, players, packs and card sets.
 
 Sign-up is open. Anyone can create an account from the website or the app; the
 invite-only pilot ended when the TestFlight link became the invitation. A guest
@@ -260,9 +263,6 @@ still needs no account at all to scan in and trade, and that stays the front
 door.
 
 See [ROADMAP.md](./ROADMAP.md) for what is next.
-
-The landing page must not imply the product has launched. Copy says CardFlare
-"is currently being built and preparing for its first local-store pilots".
 
 ## Product principles
 

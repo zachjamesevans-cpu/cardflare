@@ -35,30 +35,23 @@ export default async function StoreSettingsPage({
   );
   if (!store || store.kind === "vendor") return null;
 
-  /*
-   * The page is the owner's to write. An organizer reaches the console
-   * for the timers and the hub, not to rename the shop, so the card is
-   * gated on the role the membership carries rather than on being here.
-   */
-  const owner = store.role === "owner";
-
-  const [plan, page] = await Promise.all([
-    storePlan(store.id),
-    owner ? storePageFor(store.id) : Promise.resolve(null),
-  ]);
+  /* Owner-only: `loadStoreConsole` has already turned an organizer
+     away from this path, so everyone who gets here may write the page
+     and see the plan. */
+  const [plan, page] = await Promise.all([storePlan(store.id), storePageFor(store.id)]);
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
       title="Settings"
-      description="Your page, where you are, when your boards open, and your plan."
+      description="Your page, your time zone, when your boards open, and your plan."
       areas={areas}
       currentArea={currentArea}
     >
       <StoreTabs storeId={store.id} />
 
-      {owner && page && (
+      {page && (
         <section className="flex flex-col gap-5" aria-labelledby="page-heading">
           <h2 id="page-heading" className="text-xl font-bold text-text-primary">
             Your store page
@@ -107,7 +100,7 @@ export default async function StoreSettingsPage({
 
       <section className="flex flex-col gap-5" aria-labelledby="timezone-heading">
         <h2 id="timezone-heading" className="text-xl font-bold text-text-primary">
-          Where you are
+          Your time zone
         </h2>
         <TimeZonePicker storeId={store.id} timeZone={store.timezone ?? "UTC"} />
       </section>

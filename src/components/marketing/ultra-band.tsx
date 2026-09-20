@@ -20,7 +20,6 @@ import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 export function UltraBand() {
   return (
     <Section
-      id="for-stores"
       labelledBy="ultra-band-title"
       padding="py-10 md:py-16"
       className="relative overflow-hidden border-t-2 border-accent/60 bg-surface"
@@ -49,7 +48,7 @@ export function UltraBand() {
       <div className="relative mt-6 md:mt-8">
         <TvFrame
           scene="focus"
-          label="FlareCast on the wall during round 3: the clock, what the room is hunting, and the code to scan in."
+          label="FlareCast on the wall during round 3: the clock, what the room is looking for, and the code to scan in."
         />
       </div>
 

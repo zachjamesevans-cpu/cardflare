@@ -25,6 +25,7 @@ function markText(index: number, quantity: number): string {
 export function CardPicker({
   imagesEnabled,
   playerGames,
+  game = null,
   cards,
   onAdd,
   onRemove,
@@ -32,6 +33,8 @@ export function CardPicker({
 }: {
   imagesEnabled: boolean;
   playerGames: readonly string[];
+  /** The room's game from a tournament QR, which narrows the search. */
+  game?: string | null;
   cards: DraftCard[];
   onAdd: (card: CardResult, printing?: CardPrinting) => void;
   onRemove: (cardId: string) => void;
@@ -91,6 +94,7 @@ export function CardPicker({
       <CardSearch
         imagesEnabled={imagesEnabled}
         playerGames={playerGames}
+        game={game}
         autoFocus
         onSelect={onAdd}
         /*

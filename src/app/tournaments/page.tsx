@@ -26,12 +26,28 @@ export const metadata: Metadata = {
     "What a tournament night at your local shop actually looks like, game by game.",
 };
 
-export default function TournamentsPage() {
+/**
+ * Where Back goes. A room links here with `?from=/e/CODE`, and Back
+ * returns to that board; anything else, or nothing, goes to the Feed.
+ * Only a room path is honoured, so the parameter cannot send anybody
+ * off the site.
+ */
+function backHref(from: string | undefined): string {
+  return from && /^\/e\/[A-Za-z0-9]+$/.test(from) ? from : "/feed";
+}
+
+export default async function TournamentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const { from } = await searchParams;
+
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
       <div className="flex flex-col gap-2">
         <Link
-          href="/feed"
+          href={backHref(from)}
           className="flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary"
         >
           <ArrowLeft className="size-4" aria-hidden /> Back

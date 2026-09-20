@@ -7,6 +7,13 @@ import {
   SAMPLE_CARD,
 } from "@/components/marketing/places";
 import { cn } from "@/lib/cn";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
+
+/* The picture in words, for a screen reader. It has to say what the
+   rows say, and the first row follows the Local switch. */
+const PANEL_LABEL = LOCAL_ENABLED
+  ? "A Flare for Monkey D. Luffy with three matches: Alex has it 2.1 miles away, the local store may have it, and vendor 81 at booth 174 has a PSA 9."
+  : "A Flare for Monkey D. Luffy with three matches: Alex has it in the Friday night room, the local store may have it, and vendor 81 at booth 174 has a PSA 9.";
 
 /**
  * The product, on the first screen: one wanted card, and where it is.
@@ -15,7 +22,7 @@ import { cn } from "@/lib/cn";
  * where it is" should be obvious before the first scroll, and the
  * visual should "feel like an actual cardflare product result, not a
  * generic marketing diagram." So this is drawn as the app draws a
- * Flare: the want at the top with its card, then the three matches
+ * Flare: the card at the top, then the three matches
  * underneath in the colour of their place, each with the thing you do
  * next. It sits beside the headline on desktop and directly under the
  * buttons on a phone, and there is no second copy of it on the page.
@@ -24,19 +31,19 @@ export function FoundPanel({ className }: { className?: string }) {
   return (
     <div
       role="img"
-      aria-label="A Want List entry for Monkey D. Luffy with three matches: Alex has it 2.1 miles away, the local store may have it, and vendor 81 at booth 174 has a PSA 9."
+      aria-label={PANEL_LABEL}
       className={cn(
         "overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface shadow-[var(--shadow-panel)]",
         className,
       )}
     >
-      {/* The want. */}
+      {/* The Flare. */}
       <div className="flex items-center gap-3 border-b border-border bg-elevated/60 px-4 py-3">
         <CardTile size="sm" className="w-9" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.16em] text-text-muted uppercase">
             <Radio className="size-3 text-accent" aria-hidden="true" />
-            Want List
+            Flare
           </p>
           <p className="truncate text-sm font-bold text-text-primary sm:text-base">
             {SAMPLE_CARD.name}{" "}

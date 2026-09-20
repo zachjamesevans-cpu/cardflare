@@ -5,8 +5,13 @@ import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { JoinCodeForm } from "@/components/events/join-code-form";
+import { FollowingCard } from "@/components/players/following-card";
+import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
+import { listLocals } from "@/lib/players/locals";
 import { getPlayerSession } from "@/lib/players/session";
+import { listWants } from "@/lib/players/wants";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -29,12 +34,29 @@ export const dynamic = "force-dynamic";
  * the feed." The code form is on this page rather than a link away,
  * because the whole of this screen when you are not in a room is the
  * question "which room?".
+ *
+ * The stores a player follows answer the same question from the other
+ * side, so they live under the form: one tap onto a store's page, and
+ * "I'll be there" when its next board is already open. This is the
+ * list's one home; settings no longer carries a copy.
  */
 export default async function RoomPage() {
-  const session = await getPlayerSession();
+  const [viewer, session] = await Promise.all([getViewer(), getPlayerSession()]);
   const room = session ? await currentRoomForSession(session.id) : null;
 
   if (room) redirect(`/e/${room.code}`);
+
+  /* Guests see the form alone: following needs an account to hang the
+     list on. */
+  const playerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const [locals, wants] = playerId
+    ? await Promise.all([listLocals(playerId), listWants(playerId)])
+    : [[], []];
 
   return (
     <>
@@ -42,7 +64,7 @@ export default async function RoomPage() {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12"
       >
-        <Link href="/" aria-label={`${SITE.name} home`}>
+        <Link href="/feed" aria-label={`${SITE.name} feed`}>
           <Logo size={40} priority />
         </Link>
 
@@ -60,6 +82,8 @@ export default async function RoomPage() {
           </div>
 
           <JoinCodeForm />
+
+          <FollowingCard locals={locals} wantCount={wants.length} />
         </div>
 
         <TabBarSpacer />

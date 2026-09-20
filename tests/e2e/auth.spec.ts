@@ -82,7 +82,7 @@ test.describe("protected areas", () => {
     for (const path of [
       "/admin",
       "/store",
-      "/account",
+      "/profile",
       "/login",
       "/welcome",
       "/auth/",

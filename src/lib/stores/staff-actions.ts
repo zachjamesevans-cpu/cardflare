@@ -20,6 +20,8 @@ import { addOrganizer, removeOrganizer } from "./staff";
  */
 
 const ORGANIZERS = "/store/organizers";
+/* The wizard's team step lists the same people. */
+const SETUP = "/store/setup";
 
 /** Thirty membership changes in ten minutes is a busy night's worth. */
 const LIMIT = 30;
@@ -52,6 +54,7 @@ export async function addOrganizerAction(formData: FormData): Promise<void> {
   await addOrganizer(storeId, playerId);
 
   revalidatePath(ORGANIZERS);
+  revalidatePath(SETUP);
 }
 
 export async function removeOrganizerAction(formData: FormData): Promise<void> {
@@ -68,4 +71,5 @@ export async function removeOrganizerAction(formData: FormData): Promise<void> {
   await removeOrganizer(storeId, userId);
 
   revalidatePath(ORGANIZERS);
+  revalidatePath(SETUP);
 }

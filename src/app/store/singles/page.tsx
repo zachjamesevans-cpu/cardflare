@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/** The Singles tab: the case, matched to the room. */
+/** The Singles tab: your singles, matched to the room. */
 export default async function StoreSinglesPage({
   searchParams,
 }: {

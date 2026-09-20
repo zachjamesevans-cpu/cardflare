@@ -60,11 +60,13 @@ const AREA_COPY = {
     title: "Customize profile",
     blurb:
       "Everything worn on you: your border, name style, title, badge and page effect. Changes land the moment you tap them.",
+    other: { area: "showcase", label: "Showcase cosmetics" },
   },
   showcase: {
     title: "Customize showcase",
     blurb:
       "Everything worn on your cards: borders, foils, motion and the shelf behind them. Changes land the moment you tap them.",
+    other: { area: "profile", label: "Profile cosmetics" },
   },
 } as const;
 
@@ -330,6 +332,33 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         </Text>
         <Muted>{AREA_COPY[area].blurb}</Muted>
       </View>
+
+      {/* The other menu, and only that. The Embers store's door is on
+          the profile; a second one here would make this screen a shop
+          front. Same link the website's page carries. */}
+      <Tap
+        onPress={() =>
+          navigation.navigate("Customize", { area: AREA_COPY[area].other.area })
+        }
+        accessibilityLabel={AREA_COPY[area].other.label}
+        style={{
+          alignSelf: "flex-start",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing(2),
+          borderRadius: radius.control,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          paddingHorizontal: spacing(4),
+          paddingVertical: spacing(2),
+        }}
+      >
+        <Ionicons name="color-wand" size={16} color={colors.textPrimary} />
+        <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "600" }}>
+          {AREA_COPY[area].other.label}
+        </Text>
+      </Tap>
 
       {/* Honest before anything is tapped: browsing is free, wearing is
           Pro. The website shows the same banner; here it can actually

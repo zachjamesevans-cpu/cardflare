@@ -86,7 +86,7 @@ export function InboxScreen() {
       }}
     >
       {/* No heading here: the navigation bar above already says
-          "Notifications", and printing it twice on one screen reads as a
+          "Inbox", and printing it twice on one screen reads as a
           mistake. The website has one because it has no nav bar. */}
       {items === null && <Muted>Loading…</Muted>}
 
@@ -109,7 +109,7 @@ export function InboxScreen() {
               }}
             >
               Nothing yet. When somebody offers on one of your Flares, or a board opens
-              early at a store you save, it lands here.
+              early at a store you follow, it lands here.
             </Text>
             <Button
               label="Find a room"

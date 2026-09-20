@@ -16,7 +16,6 @@ import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { OrganizerChips } from "../remote-entry";
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap } from "../ui";
@@ -198,6 +197,7 @@ export function PlayerProfileScreen() {
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}
+            organizerAt={profile.organizerAt}
             onFollowers={() => openPeople("followers")}
             onFollowing={() => openPeople("following")}
             actions={
@@ -218,18 +218,12 @@ export function PlayerProfileScreen() {
               </>
             }
           />
-          {/* The TO badge: the stores that named them an organizer. */}
-          <OrganizerChips profile={profile} />
         </View>
 
         {/* What they are looking for, before what they are showing off:
             somebody opening a profile is usually deciding whether they
             can help. Same order as the website. */}
-        <HuntsPanel
-          hunts={profile.hunts ?? []}
-          onChanged={() => void reload()}
-          onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
-        />
+        <HuntsPanel hunts={profile.hunts ?? []} onChanged={() => void reload()} />
 
         {/* The showcase panel, same as the website: its own rounded
             rectangle inside the one connected profile block. */}

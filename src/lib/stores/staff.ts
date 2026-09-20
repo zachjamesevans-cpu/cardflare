@@ -11,8 +11,9 @@ import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
  * account: billing, singles, settings, everything. A "staff" row is an
  * ORGANIZER (the "TO" badge, tournament organizer): a player the owner
  * named, who may run FlareCast, the timers and the remote from their
- * phone and nothing about money, membership or the case. The word
- * "staff" never reaches a screen; every surface says Organizer.
+ * phone, plus the events, the posts and the case, and nothing about
+ * money, singles, settings or membership. The word "staff" never
+ * reaches a screen; every surface says Organizer.
  *
  * Everything here goes through the service role after the Server
  * Action has established who is asking, the same pattern every other

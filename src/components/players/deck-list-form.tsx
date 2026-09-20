@@ -41,7 +41,7 @@ import type { DeckPreviewEntry } from "@/lib/players/deck-list-preview";
  * column of card faces is checkable at a glance.
  *
  * What lands here are WANTS, not Flares. A deck is written at home and
- * posted at a counter, often days apart; the room's "still hunting
+ * posted at a counter, often days apart; the room's "still looking for
  * these?" panel posts the lot as one batch when the player walks in,
  * which is what makes it one notification and one Feed item.
  */

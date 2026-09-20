@@ -502,7 +502,7 @@ form, so `/e/k3m-9pz` and a hand-typed `K3M 9PZ` resolve identically.
 
 **Two code spaces, separated by length.** Six characters is one event; seven is
 a store's permanent Counter Code. Both arrive through `/e/CODE` and the same
-box on `/join`, and a player never has to know which they hold — but the
+box on the Room tab (`/room`), and a player never has to know which they hold — but the
 application must never confuse them. Different lengths make that impossible
 rather than unlikely: one shared length plus two unique indexes would leave a
 birthday collision _between_ the tables, and its failure would be silent, a

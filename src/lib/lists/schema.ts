@@ -158,44 +158,6 @@ export type ListState =
 
 export const LIST_IDLE: ListState = { status: "idle" };
 
-export function atCapMessage(kind: ListKind): string {
-  return kind === "flare"
-    ? `You can have ${MAX_FLARES} Flares open at once. Cancel one to post another.`
-    : `Your Have list is capped at ${MAX_HAVES} cards.`;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Freshness                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Whether a binder needs confirming before it can be trusted in this room.
- *
- * The rule is "have you confirmed since this event started", not "is it older
- * than N hours". An event is the natural unit: you arrive, you say what you
- * are still carrying, and you are not asked again for the rest of the night
- * however many times you reload the page.
- *
- * Without this a portable binder quietly rots. Being told "Zach has this",
- * walking over, and finding he traded it last week costs more trust than never
- * being matched at all — one bad match does more damage than ten missed ones.
- */
-export function needsConfirming(
-  confirmedAt: (string | Date)[],
-  eventStartedAt: string | Date,
-): boolean {
-  if (confirmedAt.length === 0) return false;
-
-  const start = new Date(eventStartedAt).getTime();
-  if (Number.isNaN(start)) return false;
-
-  return confirmedAt.some((at) => {
-    const when = new Date(at).getTime();
-    // An unreadable timestamp is not evidence of freshness.
-    return Number.isNaN(when) || when < start;
-  });
-}
-
 /* -------------------------------------------------------------------------- */
 /* Grouping the board                                                         */
 /* -------------------------------------------------------------------------- */

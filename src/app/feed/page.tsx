@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
-import { Logo } from "@/components/brand/logo";
+import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { FeedSearch } from "@/components/feed/feed-search";
 import { Item } from "@/components/feed/feed-items";
@@ -67,29 +66,14 @@ export const dynamic = "force-dynamic";
  * name, face and balance. The Feed page no longer asks for either.
  */
 
+/* The chrome is TabPageShell, shared with a player's page: the wordmark
+   centred with the Feed behind it, the search on the right, the tab
+   bar below. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <main
-        id="main"
-        className="flex min-h-dvh flex-col items-center gap-4 px-2 pt-6 pb-16 sm:px-6"
-      >
-        {/* The wordmark, centred, and the one door out to other people
-            on the right. Same place on both platforms. */}
-        <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
-          <h1 className="sr-only">Feed</h1>
-          <span aria-hidden="true" className="size-9 shrink-0" />
-          <span className="flex flex-1 justify-center">
-            <Logo size={30} priority />
-          </span>
-          <FeedSearch />
-        </div>
-
-        <div className="flex w-full max-w-2xl flex-col gap-3">{children}</div>
-        <TabBarSpacer />
-      </main>
-      <PlayerTabBar />
-    </>
+    <TabPageShell title="Feed" trailing={<FeedSearch />}>
+      {children}
+    </TabPageShell>
   );
 }
 
@@ -137,17 +121,24 @@ export default async function FeedPage({
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Start trading</h2>
           <p className="text-sm text-text-secondary">
-            Create a free account and the cards you hunt reach your friends and every
-            room you walk into. At a store right now? The code at the counter gets you
-            into tonight&rsquo;s room, no account needed.
+            Create a free account and the cards you are looking for reach your friends
+            and every room you walk into. At a store right now? The code at the counter
+            gets you into tonight&rsquo;s room, no account needed.
           </p>
-          {/* Both doors, in the order the copy offers them. Room holds
+          {/* The doors, in the order the copy offers them: the account,
+              the way in for somebody who has one, and Room, which holds
               the scanner for the person already standing in a shop. */}
           <div className="flex flex-wrap gap-2">
-            <Link href="/signup" className={buttonStyles("primary", "sm")}>
-              Join free
+            <Link href="/signup?next=%2Ffeed" className={buttonStyles("primary", "sm")}>
+              Create free account
             </Link>
-            <Link href="/room" className={buttonStyles("secondary", "sm")}>
+            <Link
+              href="/login?next=%2Ffeed"
+              className={buttonStyles("secondary", "sm")}
+            >
+              Sign in
+            </Link>
+            <Link href="/room" className={buttonStyles("ghost", "sm")}>
               Go to Room
             </Link>
           </div>
@@ -219,34 +210,25 @@ export default async function FeedPage({
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">You have not posted yet</h2>
           <p className="text-sm text-text-secondary">
-            Post a Flare for a card you are hunting and it shows up here, and in
+            Post a Flare for a card you are looking for and it shows up here, and in
             Following with everyone else&rsquo;s.
           </p>
           <Link href="/flare" className={buttonStyles("secondary", "sm")}>
             Post a Flare
           </Link>
         </Card>
-      ) : shown.length === 0 && tab === "nearby" ? (
+      ) : shown.length === 0 ? (
+        /* The tab is one of three and the other two are answered above,
+           so this is Nearby's empty state and nobody else's. */
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Nothing on right now</h2>
           <p className="text-sm text-text-secondary">
-            Post a Flare for a card you are hunting, or follow a friend, and it shows up
-            here. At a store? The code at the counter gets you into tonight&rsquo;s
-            room.
+            Post a Flare for a card you are looking for, or follow a friend, and it
+            shows up here. At a store? The code at the counter gets you into
+            tonight&rsquo;s room.
           </p>
           <Link href="/room" className={buttonStyles("secondary", "sm")}>
             Go to Room
-          </Link>
-        </Card>
-      ) : shown.length === 0 ? (
-        <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-text-primary">No Flares of yours yet</h2>
-          <p className="text-sm text-text-secondary">
-            Post one for the card you are hunting and it shows up here, with every hand
-            that goes up on it.
-          </p>
-          <Link href="/flare" className={buttonStyles("secondary", "sm")}>
-            Post a Flare
           </Link>
         </Card>
       ) : (
@@ -275,8 +257,9 @@ export default async function FeedPage({
             {/* Why this is on your screen. A feed that explains itself
                 stops feeling arbitrary even when it is thin. A post
                 carries its own label in its header instead - the
-                founder: no separate text between cards. */}
-            {item.kind !== "hunt" && (
+                founder: no separate text between cards - and a store's
+                post is a post, so it goes without one too. */}
+            {item.kind !== "hunt" && item.kind !== "storePost" && (
               <p className="-mt-1 text-xs text-text-muted">{item.reason}</p>
             )}
           </div>
@@ -295,8 +278,8 @@ export default async function FeedPage({
         <Card className="flex flex-col gap-2">
           <h2 className="font-semibold text-text-primary">How it works</h2>
           <p className="text-sm text-text-secondary">
-            Post a Flare for the card you&rsquo;re hunting. When a friend or somebody in
-            your room has it, they raise a hand and you trade in person.
+            Post a Flare for the card you&rsquo;re looking for. When a friend or
+            somebody in your room has it, they raise a hand and you trade in person.
           </p>
         </Card>
       )}

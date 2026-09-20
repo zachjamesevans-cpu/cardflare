@@ -48,24 +48,24 @@ export function awayLabel(miles: number): string {
  *
  * A Flare points one of two ways: wanted, or offered up. Everything in
  * the Feed used to be a want, so the line was a constant, and a
- * showcase post reading "is hunting" would have been backwards. It
- * read "is letting go of" for a while; the founder's brief settled on
- * "is offering", the same word the composer's control uses.
+ * showcase post reading "is looking for" would have been backwards.
+ * "Looking for" and "Offering" are the two directions everywhere, the
+ * same words the composer's control uses.
  */
 export function statusLabel(item: Pick<Hunt, "direction">): string {
-  return item.direction === "showcase" ? "is offering" : "is hunting";
+  return item.direction === "showcase" ? "is offering" : "is looking for";
 }
 
 /**
  * The crosshair and the words: CardFlare's status line.
  *
  * A targeting reticle in the accent with a faint glow behind it, then
- * "is hunting" in the same green. Meant to be the recognisable mark of
+ * "is looking for" in the same green. Meant to be the recognisable mark of
  * a Flare wherever one is drawn, so it is one component and nothing
  * else draws the pair.
  */
 export function FlareStatus({
-  label = "is hunting",
+  label = "is looking for",
   detail,
 }: {
   label?: string;
@@ -325,7 +325,10 @@ export function FlareFeedCard({
       {/* Which way it points and what they will do for it. Post-level,
           because they are true of every card in it. */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        <FlareTypeChip label={direction === "showcase" ? "Offering" : "Want"} primary />
+        <FlareTypeChip
+          label={direction === "showcase" ? "Offering" : "Looking for"}
+          primary
+        />
         {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
         {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
       </View>

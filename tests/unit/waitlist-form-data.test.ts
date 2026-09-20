@@ -14,7 +14,7 @@ function formData(overrides: Record<string, string> = {}, omit: string[] = []) {
   const fields: Record<string, string> = {
     firstName: "Zach",
     email: "zach@example.com",
-    userType: "player",
+    userType: "vendor",
     marketingConsent: "on",
     [RENDERED_AT_FIELD]: String(NOW - 60_000),
     ...overrides,
@@ -33,7 +33,7 @@ describe("parseWaitlistFormData", () => {
 
     expect(result.kind).toBe("valid");
     expect(result).toMatchObject({
-      data: { firstName: "Zach", email: "zach@example.com", userType: "player" },
+      data: { firstName: "Zach", email: "zach@example.com", userType: "vendor" },
     });
   });
 

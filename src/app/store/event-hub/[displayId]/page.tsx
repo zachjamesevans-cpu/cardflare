@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft, MonitorUp, Tv } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -12,9 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/controls";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { buttonStyles } from "@/components/ui/button";
-import { areasForUser } from "@/lib/auth/areas";
-import { getViewer } from "@/lib/auth/session";
-import { consoleStoreIds } from "@/lib/stores/console";
+import { loadStoreConsole } from "@/lib/stores/console";
 import { moveTimerToScreenAction } from "@/lib/event-hub/actions";
 import { displayPayload } from "@/lib/event-hub/display-payload";
 import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
@@ -30,15 +28,20 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * One television, managed.
+ * One screen, managed.
  *
  * The overview answers "what is on my screens"; this page is everything
  * about ONE of them — the live controls, what is assigned to it, where
  * to open it, and its settings. The raw URL sits behind a disclosure
  * because the founder's brief was exact: "the long raw URL should NOT
  * dominate the interface. Copy Link is enough." And the button that
- * opens the television sits at the very top, beside the way back: the
- * founder, a round later, "it should be higher at the top".
+ * opens the screen on the TV sits at the very top, beside the way back:
+ * the founder, a round later, "it should be higher at the top".
+ *
+ * Who may stand here is decided by `loadStoreConsole`, exactly as on
+ * every other console tab. The screen then has to belong to one of the
+ * stores that loader returned, or the page does not exist: same
+ * non-oracle shape every store page uses.
  */
 export default async function ManageScreenPage({
   params,
@@ -47,38 +50,26 @@ export default async function ManageScreenPage({
   params: Promise<{ displayId: string }>;
   searchParams: Promise<{ as?: string }>;
 }) {
-  const viewer = await getViewer();
-
-  if (viewer.kind === "anonymous") redirect("/login?next=/store/event-hub");
-  /* An organizer is a player viewer carrying the stores that named
-     them; a player nobody named has no console to see. */
-  if (viewer.kind === "player" && viewer.organizerStoreIds.length === 0) {
-    redirect("/profile");
-  }
-  if (viewer.kind === "admin" && viewer.storeIds.length === 0) redirect("/admin");
-  if (viewer.kind === "unaffiliated") redirect("/store");
-
-  const storeIds = consoleStoreIds(viewer);
-
   const { displayId } = await params;
-  const display = await findDisplay(displayId);
-
-  /* The id names a screen this account actually owns, or the page does
-     not exist. Same non-oracle shape every store page uses. */
-  if (!display || !storeIds.includes(display.storeId)) notFound();
-
   const { as } = await searchParams;
-  const storeId = as && storeIds.includes(as) ? as : display.storeId;
+  const { viewer, stores, areas } = await loadStoreConsole(
+    as,
+    `/store/event-hub/${displayId}`,
+  );
 
-  const [payload, displays, areas] = await Promise.all([
+  const display = await findDisplay(displayId);
+  const store = display ? stores.find((entry) => entry.id === display.storeId) : null;
+
+  if (!display || !store) notFound();
+
+  const [payload, displays] = await Promise.all([
     displayPayload(display),
-    listDisplays(display.storeId),
-    areasForUser(viewer.user.id, viewer.kind === "admin"),
+    listDisplays(store.id),
   ]);
 
   const otherScreens = displays.filter((entry) => entry.id !== display.id);
   const displayUrl = `${siteUrl()}/display/${display.token}`;
-  const backHref = `/store/event-hub?as=${storeId}`;
+  const backHref = `/store/event-hub?as=${store.id}`;
 
   return (
     <AppShell
@@ -87,7 +78,7 @@ export default async function ManageScreenPage({
       title={display.name}
       description="Everything on this screen: the live controls, its tournaments and its display link."
       areas={areas}
-      currentArea={`/store?as=${storeId}`}
+      currentArea={`/store?as=${store.id}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
@@ -99,9 +90,10 @@ export default async function ManageScreenPage({
         </Link>
 
         {/* The two things done most on this page, before anything
-            scrolls: open the television, and copy its link for one. */}
+            scrolls: open the screen on the TV, and copy its display
+            link for one. */}
         <div className="flex flex-wrap items-center gap-2">
-          <CopyLink url={displayUrl} />
+          <CopyLink url={displayUrl} label="Copy display link" />
           <a
             href={`/display/${display.token}`}
             target="_blank"
@@ -109,7 +101,7 @@ export default async function ManageScreenPage({
             className={buttonStyles("primary", "sm")}
           >
             <Tv className="size-4" aria-hidden="true" />
-            Open TV display
+            Open on the TV
           </a>
         </div>
       </div>
@@ -126,8 +118,8 @@ export default async function ManageScreenPage({
             </span>
           </div>
 
-          {/* Live from here down: the same polled payload the television
-              reads, so a second staff phone's pause shows up here too. */}
+          {/* Live from here down: the same polled payload the TV reads,
+              so a second staff phone's pause shows up here too. */}
           <ControlPanel initial={payload} token={display.token} />
 
           {/* Reassigning without recreating: the clock never notices. */}
@@ -174,7 +166,7 @@ export default async function ManageScreenPage({
         <Card className="flex flex-col gap-1">
           <p className="font-semibold text-text-primary">Nothing on this screen yet</p>
           <p className="text-sm text-text-secondary">
-            Add a tournament below and this television lights up with its timer, the
+            Add a tournament below and this screen lights up with its timer, the
             room&rsquo;s Flares and your counter code.
           </p>
         </Card>
@@ -193,15 +185,16 @@ export default async function ManageScreenPage({
 
       <section className="flex flex-col gap-4" aria-labelledby="display-heading">
         <h2 id="display-heading" className="text-xl font-bold text-text-primary">
-          The television
+          Display link
         </h2>
 
+        {/* How to get it on the TV (fullscreen, no sign-in) is said once,
+            on the hub's About paragraph, and not again here. */}
         <Card className="flex flex-col gap-3">
           <p className="text-sm text-text-secondary">
-            Open TV display, at the top of this page, opens this screen in a new tab. Do
-            that on whatever drives the television and press Enter Fullscreen once. It
-            asks nobody to sign in. Copy link puts the same address on the clipboard for
-            a browser you cannot type into.
+            Open on the TV, at the top of this page, opens this screen in a new tab. Do
+            that on whatever drives the TV. Copy display link puts the same link on the
+            clipboard for a browser you cannot type into.
           </p>
           <details>
             <summary className="cursor-pointer text-xs font-semibold text-text-secondary select-none">

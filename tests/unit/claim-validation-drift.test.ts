@@ -40,14 +40,14 @@ const CASES = [
   {
     claimantName: "Zach",
     claimantEmail: "not-an-email",
-    claimantRole: "Staff",
+    claimantRole: "Organizer",
     businessEmail: "",
     notes: "",
   },
   {
     claimantName: "Zach",
     claimantEmail: "zach@example",
-    claimantRole: "Staff",
+    claimantRole: "Organizer",
     businessEmail: "",
     notes: "",
   },
@@ -61,7 +61,7 @@ const CASES = [
   {
     claimantName: "Zach",
     claimantEmail: "weird+tag@sub.domain.co",
-    claimantRole: "Other",
+    claimantRole: "Organizer",
     businessEmail: "",
     notes: "",
   },

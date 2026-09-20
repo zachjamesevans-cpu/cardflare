@@ -438,16 +438,17 @@ function Tabs() {
         <Tab.Screen name="Room" component={RoomTab} options={{ title: "Room" }} />
       )}
       {/* The tab keeps the product's name; the header says what the
-          hub holds now: your standing list, not just the post form. */}
+          tab is for, the same words as the website's page heading. */}
       <Tab.Screen
         name="Flare"
         component={HubScreen}
-        options={{ title: "Your Flares", tabBarLabel: "Flare" }}
+        options={{ title: "Post a Flare", tabBarLabel: "Flare" }}
       />
+      {/* The tab and its page agree: Inbox, on both platforms. */}
       <Tab.Screen
         name="Inbox"
         component={InboxScreen}
-        options={{ title: "Notifications", tabBarLabel: "Inbox" }}
+        options={{ title: "Inbox", tabBarLabel: "Inbox" }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

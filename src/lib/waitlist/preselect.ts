@@ -1,7 +1,7 @@
 import type { UserType } from "./schema";
 
 /**
- * Anchors that jump to the invite-request form and preselect a type.
+ * The anchor that jumps to the invite-request form and preselects a type.
  *
  * Ordinary links, so scrolling works with JavaScript disabled; the form reads
  * the fragment on mount and applies the preselection as an enhancement.
@@ -12,13 +12,12 @@ import type { UserType } from "./schema";
  */
 export const INVITE_PATH = "/invite";
 export const INVITE_SECTION_ID = "request-invite";
-export const STORE_PILOT_ANCHOR_ID = "invite-store";
-export const STORE_PILOT_ANCHOR = `${INVITE_PATH}#${STORE_PILOT_ANCHOR_ID}`;
 export const VENDOR_PILOT_ANCHOR_ID = "invite-vendor";
 export const VENDOR_PILOT_ANCHOR = `${INVITE_PATH}#${VENDOR_PILOT_ANCHOR_ID}`;
 
+/* Only vendors are sent here with a preselection: Max is by invitation,
+   Ultra is self-serve at /ultra, so there is no store anchor. */
 const ANCHOR_USER_TYPES: Record<string, UserType> = {
-  [STORE_PILOT_ANCHOR_ID]: "store",
   [VENDOR_PILOT_ANCHOR_ID]: "vendor",
 };
 

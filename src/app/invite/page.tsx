@@ -8,17 +8,17 @@ import { siteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Request an invite",
   description:
-    "Ultra for game stores and Max for show vendors are set up personally. Tell us who you are and we will be in touch.",
+    "Max for card show vendors is set up personally. Tell us who you are and which shows you work, and we will be in touch.",
   alternates: { canonical: `${siteUrl()}/invite` },
 };
 
 /**
- * Where a store or vendor asks to be set up.
+ * Where a card show vendor asks to be set up on Max.
  *
  * This form lived at the foot of the homepage until the homepage was
- * shortened to a final call to action. The Max page still sends
- * vendors here, and the fragment on the link preselects their type
- * exactly as it did on the homepage.
+ * shortened to a final call to action. The Max page sends vendors here,
+ * and the fragment on the link preselects their type exactly as it did
+ * on the homepage. Stores do not come here: Ultra is self-serve.
  */
 export default function InvitePage() {
   return (

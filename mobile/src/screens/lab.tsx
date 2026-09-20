@@ -99,7 +99,7 @@ const CASES: { title: string; why: string; item: FeedEntry }[] = [
   },
   {
     title: "A showcase",
-    why: "Points the other way. Read 'is hunting' until direction existed.",
+    why: "Points the other way. Read 'is looking for' until direction existed.",
     item: sample({ direction: "showcase", postId: "p3" }),
   },
   {

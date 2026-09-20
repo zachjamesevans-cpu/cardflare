@@ -194,7 +194,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
               <FlareTypeChip
-                label={direction === "showcase" ? "Offering" : "Want"}
+                label={direction === "showcase" ? "Offering" : "Looking for"}
                 primary
               />
             </View>

@@ -18,7 +18,7 @@ import type { HuntItem } from "@/lib/feed/repository";
  * One Flare on the Feed, drawn as a post.
  *
  * A post is one person, one caption, one or many cards. The header
- * says who and which way ("is hunting" or "is offering") and how many
+ * says who and which way ("is looking for" or "is offering") and how many
  * cards; the caption is theirs; a hunt the post belongs to is one line
  * with a door to it. The cards are slides - the picture beside what
  * matters about it - and the whole list is one press away with the
@@ -49,20 +49,20 @@ export function awayLabel(miles: number): string {
  * cards is its own chip beside this, so the line itself stays short.
  */
 function statusLabel(item: HuntItem): string {
-  return item.direction === "showcase" ? "is offering" : "is hunting";
+  return item.direction === "showcase" ? "is offering" : "is looking for";
 }
 
 /**
  * The crosshair and the words: CardFlare's status line.
  *
  * A targeting reticle in the accent with a faint glow behind it, then
- * "is hunting" in the same green. Meant to be the recognisable mark of
+ * "is looking for" in the same green. Meant to be the recognisable mark of
  * a Flare wherever one is drawn, so it is one component and nothing
  * else draws the pair. An offer wears the same reticle without the
  * glow: the mark is the same, the aim is not.
  */
 export function FlareStatus({
-  label = "is hunting",
+  label = "is looking for",
   glow = true,
 }: {
   label?: string;
@@ -83,7 +83,7 @@ export function FlareStatus({
   );
 }
 
-/** Want, Trade, Cash ok: the primary one filled, the rest outlined. */
+/** Looking for, Trade, Cash ok: the primary one filled, the rest outlined. */
 export function FlareTypeChip({
   label,
   primary = false,
@@ -123,7 +123,10 @@ export function FlareFeedCard({
 
   const chips = (
     <>
-      <FlareTypeChip label={direction === "showcase" ? "Offering" : "Want"} primary />
+      <FlareTypeChip
+        label={direction === "showcase" ? "Offering" : "Looking for"}
+        primary
+      />
       {item.acceptsTrade && <FlareTypeChip label="Trade" />}
       {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
     </>
