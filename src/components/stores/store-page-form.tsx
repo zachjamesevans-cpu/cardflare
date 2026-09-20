@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { GamesFields, HoursFields } from "@/components/stores/hours-form";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextInput, Textarea } from "@/components/ui/controls";
 import { Field, fieldIds } from "@/components/ui/field";
@@ -21,7 +22,8 @@ import {
 /**
  * The store's own page, editable.
  *
- * One form, every public field, one Save. A client component only
+ * One form, every public field, one Save: the lines of text, then the
+ * hours and the games, which post with the rest. A client component only
  * because `useActionState` is how the server's validation message gets
  * back to the person who typed the thing it rejected; the caps on the
  * inputs are a convenience and the schema is the rule.
@@ -126,6 +128,10 @@ export function StorePageForm({ page }: { page: StorePageFields }) {
           />
         </Field>
       </div>
+
+      <HoursFields hours={page.hours} />
+
+      <GamesFields games={page.games} />
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label="Save your page" pendingLabel="Saving…" variant="primary" />

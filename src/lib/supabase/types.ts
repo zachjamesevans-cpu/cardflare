@@ -193,6 +193,13 @@ export type StoreUpdate = Partial<Omit<StoreInsert, "verified_at" | "verified_by
   verified_at?: string | null;
   verified_by?: string | null;
   tier?: StoreTier;
+  /* The page's own columns, defaulted on insert and so left out of
+     StoreInsert; an update may set any of them. */
+  description?: string | null;
+  logo_image?: string | null;
+  cover_image?: string | null;
+  hours?: StoreHoursJson | null;
+  onboarding_completed_at?: string | null;
 };
 
 export type StoreMemberRow = {

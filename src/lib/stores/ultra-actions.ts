@@ -124,14 +124,18 @@ async function sendToCheckout(
 ): Promise<never> {
   const origin = siteUrl();
   const console = `/store?as=${storeId}`;
+  /* Back from a successful checkout the browser lands in the setup
+     wizard, not on the console: the welcome, the page, the screens.
+     The wizard reconciles the session the way the console did. */
+  const setup = `/store/setup?as=${storeId}`;
 
-  if (!stripePriceId("ultra")) redirect(`${console}&welcome=1`);
+  if (!stripePriceId("ultra")) redirect(`${setup}&welcome=1`);
 
   const session = await createCheckoutSession({
     tier: "ultra",
     storeId,
     customerEmail: email,
-    successUrl: `${origin}${console}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    successUrl: `${origin}${setup}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${origin}${console}&checkout=cancelled`,
     trialDays: ULTRA_TRIAL_DAYS,
   });

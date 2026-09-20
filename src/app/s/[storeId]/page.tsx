@@ -1,21 +1,17 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  BadgeCheck,
-  CalendarClock,
-  Globe,
-  MapPin,
-  Phone,
-  Store as StoreIcon,
-} from "lucide-react";
+import { CalendarClock, Clock, Globe, MapPin, Phone } from "lucide-react";
 
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
-import { Card } from "@/components/ui/card";
+import { StorePageHeader } from "@/components/stores/store-page-header";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { gameShortName } from "@/lib/players/games-catalog";
 import { hasLocal, storeBoard } from "@/lib/players/locals";
+import { hoursLines, openNow } from "@/lib/stores/hours";
 import { publicStore } from "@/lib/stores/public-profile";
 
 export const metadata: Metadata = {
@@ -38,8 +34,11 @@ export const dynamic = "force-dynamic";
  * licence to reproduce. A generic mark, the address, and an honest label
  * saying nobody at the shop has claimed this yet.
  *
- * Verified and Ultra are drawn as two separate marks because they mean
- * two different things, and the help text says which is which.
+ * A CLAIMED store's page is the player's profile shape without the
+ * cosmetics: banner, logo, name, the games it runs, its hours with
+ * whether it is open right now. The header is `StorePageHeader`, the
+ * same block the console's wizard previews, so what the owner saw
+ * while setting it up is what a player sees here.
  *
  * FOLLOWING is the same row as "Your locals" - joining a room signed in
  * has always written it - with a button on the page for the player who
@@ -86,49 +85,40 @@ export default async function StoreProfilePage({
         }).format(new Date(board.nextEventAt))}`
       : null;
 
+  const lines = store.hours ? hoursLines(store.hours) : [];
+  const open = store.hours ? openNow(store.hours, new Date(), store.timeZone) : null;
+
   return (
     <main
       id="main"
       className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 px-4 pt-6 pb-16"
     >
-      <Card className="flex flex-col gap-4 p-5">
-        <div className="flex items-start gap-4">
-          {/* The placeholder, deliberately. A shop's own logo is theirs. */}
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated">
-            <StoreIcon className="size-6 text-text-muted" aria-hidden="true" />
-          </span>
+      <StorePageHeader
+        name={store.name}
+        verified={store.verified}
+        ultra={store.ultra}
+        unclaimed={store.unclaimed}
+        city={store.city}
+        region={store.region}
+        logoUrl={store.logoUrl}
+        coverUrl={store.coverUrl}
+      >
+        {store.description && (
+          <p className="text-sm text-text-secondary">{store.description}</p>
+        )}
 
-          <div className="min-w-0 flex-1">
-            <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold text-text-primary">
-              {store.name}
-              {store.verified && (
-                <BadgeCheck
-                  className="size-5 text-accent"
-                  aria-label="cardflare Verified"
-                />
-              )}
-              {store.ultra && (
-                <span className="rounded-full border border-border-strong px-2 py-0.5 text-[10px] font-semibold tracking-wider text-text-secondary uppercase">
-                  Ultra
-                </span>
-              )}
-            </h1>
-
-            {store.description && (
-              <p className="mt-1 text-sm text-text-secondary">{store.description}</p>
-            )}
-
-            {store.verified ? (
-              <p className="mt-1 text-xs text-text-muted">
-                cardflare Verified means cardflare has confirmed that this profile is
-                controlled by the listed business. It is not an endorsement or guarantee
-                of the business.
-              </p>
-            ) : (
-              <p className="mt-1 text-xs text-text-muted">Unclaimed listing</p>
-            )}
-          </div>
-        </div>
+        {store.games.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5" aria-label="Games">
+            {store.games.map((game) => (
+              <li
+                key={game}
+                className="rounded-full border border-border bg-elevated px-2.5 py-0.5 text-xs font-medium text-text-secondary"
+              >
+                {gameShortName(game)}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* Follow, for a signed-in player; the way to become one, for anyone else. */}
         <div className="flex flex-wrap items-center gap-3">
@@ -166,6 +156,26 @@ export default async function StoreProfilePage({
               )}
             </p>
           )}
+
+          {lines.length > 0 && (
+            <div className="flex items-start gap-2">
+              <Clock className="mt-0.5 size-4 shrink-0 text-text-muted" aria-hidden />
+              <div className="flex flex-col gap-0.5">
+                <p className={open ? "font-semibold text-success" : "font-semibold"}>
+                  {open ? "Open now" : "Closed now"}
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  {lines.map((line) => (
+                    <Fragment key={line.days}>
+                      <dt className="text-text-primary">{line.days}</dt>
+                      <dd>{line.hours}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </div>
+            </div>
+          )}
+
           {store.address && (
             <p className="flex items-start gap-2">
               <MapPin className="mt-0.5 size-4 shrink-0 text-text-muted" aria-hidden />
@@ -210,7 +220,7 @@ export default async function StoreProfilePage({
             </Link>
           </div>
         )}
-      </Card>
+      </StorePageHeader>
 
       {/* Attribution travels with the record. Overture Places is a mix of
           licences, so the line comes from the source row rather than from

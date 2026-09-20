@@ -6,6 +6,8 @@ import { EarlyBoardPicker } from "@/components/events/early-board-picker";
 import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { AppShell } from "@/components/layout/app-shell";
 import { BillingCard, billingNotice } from "@/components/stores/billing-card";
+import { StoreBannerForm } from "@/components/stores/store-banner-form";
+import { StoreLogoForm } from "@/components/stores/store-logo-form";
 import { StorePageForm } from "@/components/stores/store-page-form";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { Card } from "@/components/ui/card";
@@ -81,7 +83,24 @@ export default async function StoreSettingsPage({
                 <ExternalLink className="size-4" aria-hidden="true" />
               </Link>
             </div>
-            <StorePageForm page={page} />
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
+              <p className="font-semibold text-text-primary">Pictures</p>
+              <StoreLogoForm storeId={store.id} hasLogo={page.logoPath !== null} />
+              <StoreBannerForm storeId={store.id} hasBanner={page.coverPath !== null} />
+            </div>
+            <div className="border-t border-border pt-4">
+              <StorePageForm page={page} />
+            </div>
+            <p className="text-xs text-text-muted">
+              Want the guided version? Open the{" "}
+              <Link
+                href={`/store/setup?as=${store.id}`}
+                className="text-accent underline-offset-4 hover:underline"
+              >
+                setup wizard
+              </Link>{" "}
+              any time.
+            </p>
           </Card>
         </section>
       )}

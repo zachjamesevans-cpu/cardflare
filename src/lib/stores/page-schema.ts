@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { isGameSlug, type GameSlug } from "@/lib/players/games-catalog";
+import { parseHours, type StoreHours } from "@/lib/stores/hours";
+
 /**
  * What a store may say about itself on its public page.
  *
@@ -35,6 +38,30 @@ export function collapseWhitespace(raw: string): string {
 export function normaliseStorePostalCode(raw: string): string | null {
   const digits = raw.trim().slice(0, 5);
   return /^\d{5}$/.test(digits) ? digits : null;
+}
+
+/**
+ * The hours as the form posts them: seven groups of `hours.<day>.closed`,
+ * `hours.<day>.open` and `hours.<day>.close`, Sunday first. Assembled
+ * here, in the plain module, so the action stays a thin door and the
+ * assembly is testable with a fake reader. A day whose box is ticked
+ * is closed whatever its times say; a form that carries no hours at
+ * all (an older form, or a test) reads as "not set".
+ */
+export function readHoursFields(
+  read: (name: string) => string,
+  has: (name: string) => boolean,
+): unknown {
+  if (!has("hours.0.open") && !has("hours.0.closed")) return undefined;
+  const days: unknown[] = [];
+  for (let day = 0; day < 7; day += 1) {
+    if (read(`hours.${day}.closed`) === "on") {
+      days.push(null);
+    } else {
+      days.push({ open: read(`hours.${day}.open`), close: read(`hours.${day}.close`) });
+    }
+  }
+  return days;
 }
 
 /** An optional line: blank becomes null, anything else is trimmed and capped. */
@@ -108,6 +135,53 @@ export const storePageSchema = z.object({
         ),
     )
     .transform((value) => (value === "" ? null : value)),
+  /*
+   * Seven days or nothing. Absent means "leave the hours alone" is NOT
+   * a thing here - the form always posts all seven - so absent reads
+   * as not set, and anything present has to pass `parseHours`, which
+   * is the one rule the page and the app read hours by. A day that is
+   * open has to close after it opens; a sign that says "9 pm to 11 am"
+   * is a typo, not a night shift.
+   */
+  hours: z
+    .unknown()
+    .optional()
+    .transform((value, ctx): StoreHours | null => {
+      if (value === undefined || value === null) return null;
+      const parsed = parseHours(value);
+      if (!parsed) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter each day's opening and closing time, or mark it closed.",
+        });
+        return z.NEVER;
+      }
+      const backwards = parsed.find((day) => day && day.close <= day.open);
+      if (backwards) {
+        ctx.addIssue({
+          code: "custom",
+          message: "A day has to close after it opens.",
+        });
+        return z.NEVER;
+      }
+      return parsed;
+    }),
+  /* Only slugs from the one game list, each once, in the list's order. */
+  games: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .transform((value, ctx): GameSlug[] => {
+      const games: GameSlug[] = [];
+      for (const slug of value) {
+        if (!isGameSlug(slug)) {
+          ctx.addIssue({ code: "custom", message: "Pick games from the list." });
+          return z.NEVER;
+        }
+        if (!games.includes(slug)) games.push(slug);
+      }
+      return games;
+    }),
 });
 
 export type StorePageInput = z.input<typeof storePageSchema>;
@@ -116,6 +190,9 @@ export type StorePage = z.output<typeof storePageSchema>;
 /** The page as the console reads it back: the fields, plus whose they are. */
 export interface StorePageFields extends StorePage {
   storeId: string;
+  /** Object paths of the pictures, or null; `avatarSrc` turns them into URLs. */
+  logoPath: string | null;
+  coverPath: string | null;
 }
 
 /**

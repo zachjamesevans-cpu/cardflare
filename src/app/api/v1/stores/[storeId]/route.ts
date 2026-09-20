@@ -1,5 +1,7 @@
 import { apiPlayer } from "@/lib/api/auth";
 import { hasLocal } from "@/lib/players/locals";
+import { siteUrl } from "@/lib/site";
+import { openNow } from "@/lib/stores/hours";
 import { publicStore } from "@/lib/stores/public-profile";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,12 @@ export const dynamic = "force-dynamic";
  * would defeat the point. A draft still 404s. A bearer token, when one
  * is sent, adds `following` so the app's Follow button can draw its
  * first word without a second call.
+ *
+ * The pictures go out ABSOLUTE. A relative `/api/avatars/...` means
+ * nothing to a phone with no origin to resolve it against - the Feed
+ * learned that one face at a time. And `openNow` is decided here, in
+ * the store's zone, so the phone never has to know what a time zone
+ * is to print the word.
  */
 export async function GET(
   request: Request,
@@ -31,5 +39,17 @@ export async function GET(
   const account = await apiPlayer(request);
   const following = account ? await hasLocal(account.playerId, store.storeId) : false;
 
-  return Response.json({ store: { ...store, following } });
+  const origin = siteUrl();
+  const absolute = (path: string | null) =>
+    path && path.startsWith("/") ? `${origin}${path}` : path;
+
+  return Response.json({
+    store: {
+      ...store,
+      logoUrl: absolute(store.logoUrl),
+      coverUrl: absolute(store.coverUrl),
+      openNow: store.hours ? openNow(store.hours, new Date(), store.timeZone) : null,
+      following,
+    },
+  });
 }

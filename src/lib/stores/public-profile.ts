@@ -1,6 +1,10 @@
 import "server-only";
 
+import type { GameSlug } from "@/lib/players/games-catalog";
+import { avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { parseHours, type StoreHours } from "@/lib/stores/hours";
+import { storeGamesFrom } from "@/lib/stores/page";
 
 /**
  * A store as a player may see it.
@@ -17,6 +21,8 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 export interface PublicStore {
   storeId: string;
   name: string;
+  city: string | null;
+  region: string | null;
   address: string | null;
   phone: string | null;
   website: string | null;
@@ -31,6 +37,19 @@ export interface PublicStore {
   description: string | null;
   /** The line the source licence requires, when the record came from one. */
   attribution: string | null;
+  /**
+   * The store's own pictures, as `/api/avatars/...` paths the website
+   * draws directly; the app's route makes them absolute. Only a
+   * claimed store can have uploaded one, so an unclaimed listing has
+   * none by construction, the same way it has no description.
+   */
+  logoUrl: string | null;
+  coverUrl: string | null;
+  /** Seven days, Sunday first, or null while the shop has not said. */
+  hours: StoreHours | null;
+  games: GameSlug[];
+  /** The zone the hours are read in, so "open now" is the shop's now. */
+  timeZone: string;
 }
 
 export async function publicStore(storeId: string): Promise<PublicStore | null> {
@@ -41,7 +60,7 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
   const { data, error } = await admin
     .from("stores")
     .select(
-      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description",
+      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description, logo_image, cover_image, hours, timezone",
     )
     .eq("id", storeId)
     .maybeSingle();
@@ -49,11 +68,10 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
   if (error || !data) return null;
   if (data.listing_state !== "published") return null;
 
-  const { data: source } = await admin
-    .from("store_sources")
-    .select("attribution")
-    .eq("store_id", storeId)
-    .limit(1);
+  const [{ data: source }, { data: gameRows }] = await Promise.all([
+    admin.from("store_sources").select("attribution").eq("store_id", storeId).limit(1),
+    admin.from("store_games").select("game").eq("store_id", storeId),
+  ]);
 
   const address =
     [data.address_line, data.city, data.region, data.postal_code]
@@ -63,6 +81,8 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
   return {
     storeId: data.id,
     name: data.name,
+    city: data.city,
+    region: data.region,
     address,
     phone: data.phone,
     website: data.website,
@@ -71,5 +91,10 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     unclaimed: data.claim_status === "unclaimed",
     description: data.description,
     attribution: source?.[0]?.attribution ?? null,
+    logoUrl: avatarSrc(data.logo_image),
+    coverUrl: avatarSrc(data.cover_image),
+    hours: parseHours(data.hours),
+    games: storeGamesFrom(gameRows ?? []),
+    timeZone: data.timezone ?? "UTC",
   };
 }
