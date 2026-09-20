@@ -80,6 +80,8 @@ export type StoreRow = {
   /** Trust. Admin-only, never for sale, never inferred from `tier`. */
   verified_at: string | null;
   verified_by: string | null;
+  /** What the store says about itself on its public page. 280 max. */
+  description: string | null;
 };
 
 /** Columns with database defaults are optional on insert. */
@@ -87,6 +89,7 @@ export type StoreInsert = Omit<
   StoreRow,
   | "id"
   | "created_at"
+  | "description"
   | "status"
   | "is_pilot"
   | "walk_in_enabled"
@@ -1459,6 +1462,9 @@ export type EventHubTimerRow = {
   intermission_extended_ms: number;
   /** Set while the organizer has pressed HOLD. */
   auto_held_at: string | null;
+  /** Who last pressed a control, for the other organizer's screen. */
+  controlled_by: string | null;
+  controlled_at: string | null;
   /** When time was called by hand — can beat the clock. */
   time_called_at: string | null;
 };

@@ -544,6 +544,12 @@ export interface Me {
     nextEventCode: string | null;
     earlyOpen: boolean;
   }[];
+  /**
+   * The stores this account may RUN, for the timer remote: owners and
+   * organizers (the TO badge) alike. Optional so a build against an
+   * older server reads it as nobody, which locks nothing.
+   */
+  staff?: { storeId: string; name: string; code: string; role: "owner" | "staff" }[];
 }
 
 export const getMe = () => call<Me>("GET", "/api/v1/me");
@@ -1098,6 +1104,8 @@ export interface Profile {
   handle: string;
   avatarUrl: string | null;
   embersEarned: number;
+  /** The stores that named this player an organizer: the TO badge. */
+  organizerAt?: { storeId: string; name: string }[];
   /**
    * The membership tier, and the one question the app actually asks of
    * it. Optional so a build against an older server keeps working —
@@ -2535,3 +2543,10 @@ export const closeLocalThread = (threadId: string) =>
     "DELETE",
     `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
   );
+
+/**
+ * The same request the rest of this file makes, for a module that
+ * lives beside it (the remote's calls in remote-api.ts) rather than
+ * inside it.
+ */
+export const apiCall = call;
