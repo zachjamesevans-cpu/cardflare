@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/site";
+import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
 
 /**
  * The notification backbone: record first, deliver second.
@@ -123,7 +124,8 @@ async function record(entry: {
     | "room-flare"
     | "message-received"
     | "nearby-match"
-    | "post-comment";
+    | "post-comment"
+    | "store-post";
   title: string;
   body: string | null;
   url: string;
@@ -1065,5 +1067,93 @@ export async function notifyTradeAcknowledged(
     if (id) await deliverByPush(recipient.playerId, title, body, path);
   } catch (error) {
     console.error("Could not notify the trade's author", error);
+  }
+}
+
+/**
+ * A store you follow posted an update.
+ *
+ * The founder: "a store announcing 'OP-12 prerelease Saturday, 20
+ * seats' as a Flare-shaped post to its followers. This is the thing
+ * that makes following worth it." So a follow earns a push: the
+ * store's name in the title, the post's own title as the body, and
+ * the store's page one tap away.
+ *
+ * Sent to every follower (a `player_locals` row) except the store's
+ * own staff, who wrote it. Push and inbox only, no email - a shop that
+ * posts on Tuesday and Thursday would train an inbox to ignore it.
+ * And capped: after the second post of a day the rest post quietly,
+ * so a store cannot buzz its followers ten times before lunch.
+ *
+ * Recorded under the board-open kind, the one notice that is already
+ * "from the store, with nobody behind it" - the inbox leads it with
+ * the storefront. The kinds are a check constraint in the database,
+ * and this round ships no migration; a kind of its own is a one-line
+ * migration when the founder wants the inbox to tell the two apart.
+ */
+export async function notifyStorePost(
+  storeId: string,
+  postId: string,
+  postTitle: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [{ data: store }, { count: today }, { data: locals }, { data: staff }] =
+      await Promise.all([
+        admin.from("stores").select("name").eq("id", storeId).maybeSingle(),
+        admin
+          .from("store_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", storeId)
+          .gte("published_at", dayAgo),
+        admin.from("player_locals").select("player_id").eq("store_id", storeId),
+        admin.from("store_members").select("user_id").eq("store_id", storeId),
+      ]);
+
+    if (!store) return;
+    /* This post is already counted: the third of the day posts quietly. */
+    if ((today ?? 0) > STORE_POST_NOTICES_PER_DAY) return;
+
+    const followers = new Set((locals ?? []).map((row) => row.player_id));
+    if (followers.size === 0) return;
+
+    const staffUsers = (staff ?? []).map((row) => row.user_id);
+    if (staffUsers.length > 0) {
+      const { data: staffPlayers } = await admin
+        .from("players")
+        .select("id")
+        .in("user_id", staffUsers);
+      for (const row of staffPlayers ?? []) followers.delete(row.id);
+    }
+    if (followers.size === 0) return;
+
+    const title = `${store.name} posted an update`;
+    const body = postTitle.length > 120 ? `${postTitle.slice(0, 119)}…` : postTitle;
+    const path = `/s/${storeId}`;
+
+    const everyone = [...followers];
+    for (let at = 0; at < everyone.length; at += 10) {
+      await Promise.all(
+        everyone.slice(at, at + 10).map(async (playerId) => {
+          const id = await record({
+            playerId,
+            kind: "store-post",
+            title,
+            body,
+            url: path,
+            dedupeKey: `store-post:${postId}:${playerId}`,
+            actorId: null,
+          });
+
+          if (id) await deliverByPush(playerId, title, body, path);
+        }),
+      );
+    }
+  } catch (error) {
+    console.error("Could not tell the followers about the store post", error);
   }
 }

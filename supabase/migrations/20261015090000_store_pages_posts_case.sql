@@ -75,3 +75,27 @@ alter table public.store_case_picks enable row level security;
 revoke all on public.store_case_picks from anon, authenticated;
 
 commit;
+
+-- A store's post is its own kind of notice, not a board opening
+-- wearing a borrowed name. Same list as before, plus 'store-post'.
+begin;
+
+alter table public.notifications
+  drop constraint if exists notifications_kind_check;
+
+alter table public.notifications
+  add constraint notifications_kind_check
+    check (kind in (
+      'offer-received',
+      'trade-confirmed',
+      'early-board',
+      'board-open',
+      'new-follower',
+      'room-flare',
+      'message-received',
+      'nearby-match',
+      'post-comment',
+      'store-post'
+    ));
+
+commit;

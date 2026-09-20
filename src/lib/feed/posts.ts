@@ -92,6 +92,23 @@ export interface PostDetail extends PostSocial {
   /** The viewer's own post. Likes and comments still work; offers do not. */
   yours: boolean;
   thread: PostComment[];
+  /**
+   * A STORE's post rather than a player's: the shop that wrote it and
+   * what it said. Null on every Flare. The app's post screen draws the
+   * store's header from this and the same thread under it.
+   */
+  store: StorePostHeader | null;
+}
+
+export interface StorePostHeader {
+  storeId: string;
+  name: string;
+  logoUrl: string | null;
+  verified: boolean;
+  title: string;
+  body: string | null;
+  imageUrl: string | null;
+  postedAt: string;
 }
 
 interface PostContext {
@@ -111,6 +128,55 @@ interface PostContext {
     foundQuantity: number;
     huntRequestId: string | null;
   }[];
+  /** Set when the id names a store's post; see storePostContext. */
+  store: StorePostHeader | null;
+}
+
+/**
+ * A store post behind an id, or null.
+ *
+ * Likes and comments key on a bare post id on purpose, so a store's
+ * post takes the same heart and thread a Flare does. It has no Flares,
+ * no owner session and no player to notify - the store wrote it - so
+ * the context is the empty shape with the store's header attached.
+ */
+async function storePostContext(postId: string): Promise<PostContext | null> {
+  const admin = getSupabaseAdmin();
+  const { data: post } = await admin
+    .from("store_posts")
+    .select("id, store_id, title, body, image, event_id, published_at")
+    .eq("id", postId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (!post) return null;
+
+  const { data: store } = await admin
+    .from("stores")
+    .select("id, name, logo_image, verified_at")
+    .eq("id", post.store_id)
+    .maybeSingle();
+  if (!store) return null;
+
+  return {
+    ownerSessionId: null,
+    ownerPlayerId: null,
+    eventId: post.event_id,
+    deckLabel: null,
+    direction: "showcase",
+    caption: null,
+    huntId: null,
+    flares: [],
+    store: {
+      storeId: store.id,
+      name: store.name,
+      logoUrl: avatarSrc(store.logo_image),
+      verified: store.verified_at !== null,
+      title: post.title,
+      body: post.body,
+      imageUrl: avatarSrc(post.image),
+      postedAt: post.published_at,
+    },
+  };
 }
 
 /**
@@ -139,7 +205,8 @@ async function postContext(postId: string): Promise<PostContext | null> {
 
   const rows = data ?? [];
   const first = rows[0];
-  if (!first) return null;
+  /* No Flares under this id: it may be a store's post. */
+  if (!first) return storePostContext(postId);
 
   const ownerSessionId = first.player_session_id;
   /* An area Flare names its account directly and has no room session;
@@ -172,6 +239,7 @@ async function postContext(postId: string): Promise<PostContext | null> {
     direction: (post?.intent ?? first.intent) === "showcase" ? "showcase" : "want",
     caption: post?.caption ?? first.note ?? null,
     huntId: post?.hunt_id ?? null,
+    store: null,
     flares: rows.map((row) => ({
       id: row.id,
       cardId: row.card_id,
@@ -584,6 +652,7 @@ export async function postDetail(
     cards: [...postCards].sort(foundLast),
     yours: context.ownerPlayerId === viewerId,
     thread,
+    store: context.store,
     ...counts,
   };
 }

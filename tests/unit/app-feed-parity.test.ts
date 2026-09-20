@@ -37,6 +37,7 @@ const KINDS = [
   "nearbyMatch",
   "nearbyStores",
   "announcement",
+  "storePost",
   "board",
   "hunt",
   "upcoming",

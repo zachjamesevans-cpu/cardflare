@@ -10,6 +10,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { FlareFeedCard } from "@/components/feed/flare-feed-card";
 import { FlareFeedCardCompact } from "@/components/feed/flare-feed-card-compact";
+import { StorePostCard } from "@/components/feed/store-post-card";
 import type { FeedView } from "@/lib/feed/views";
 import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
@@ -169,6 +170,12 @@ export function Item({
         </Link>
       </Card>
     );
+  }
+
+  /* A store you follow, saying something. One card in both views: the
+     compact view is about card art, and this post has none. */
+  if (item.kind === "storePost") {
+    return <StorePostCard item={item} />;
   }
 
   if (item.kind === "hunt") {

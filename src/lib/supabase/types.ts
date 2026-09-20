@@ -120,6 +120,11 @@ export type StorePostInsert = Omit<
   published_at?: string;
 };
 
+/** What a store may change about a post after it exists: taking it down. */
+export type StorePostUpdate = Partial<
+  Pick<StorePostRow, "title" | "body" | "image" | "event_id" | "archived_at">
+>;
+
 export type StoreCasePickRow = { store_id: string; position: number; card_id: string };
 
 /** Columns with database defaults are optional on insert. */
@@ -1587,7 +1592,8 @@ export type NotificationRow = {
     | "room-flare"
     | "message-received"
     | "nearby-match"
-    | "post-comment";
+    | "post-comment"
+    | "store-post";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */
@@ -1777,7 +1783,7 @@ export type Database = {
       event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;
       event_hub_timers: Table<EventHubTimerRow, EventHubTimerInsert>;
       store_games: Table<StoreGameRow, StoreGameRow>;
-      store_posts: Table<StorePostRow, StorePostInsert>;
+      store_posts: Table<StorePostRow, StorePostInsert, StorePostUpdate>;
       store_case_picks: Table<StoreCasePickRow, StoreCasePickRow>;
       event_hub_timer_log: Table<EventHubTimerLogRow, EventHubTimerLogInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
