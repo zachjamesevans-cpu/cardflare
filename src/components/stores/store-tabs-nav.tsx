@@ -21,9 +21,10 @@ import { cn } from "@/lib/cn";
  * The founder: "a lot of the things should be moved to tabs so it's
  * not just one big scrolling window. FlareCast for example should be a
  * tab at the top." Each place is a page of its own: what to do
- * tonight, the television, the events, the case, the people who run
- * the nights, and the settings a store touches once. `?as=` rides
- * every link so the area switcher's choice survives a tab change.
+ * tonight, the television, the events, the posts, the case, your
+ * singles, the people who run the nights, and the settings a store
+ * touches once. `?as=` rides every link so the area switcher's choice
+ * survives a tab change.
  *
  * Which tabs appear is decided by the server half (`store-tabs.tsx`)
  * from the viewer's role; this component only draws the list it is

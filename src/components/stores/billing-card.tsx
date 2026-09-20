@@ -12,35 +12,29 @@ import {
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 
 /**
- * The plan, on the console, in a sentence with a date in it.
+ * The plan, on Settings, in a sentence with a date in it.
  *
  * One card that always says where the store stands and offers the one
  * thing to do about it: start the trial, or open Stripe's page to
  * change the card or cancel. Never a second copy of the pitch; that is
- * what /ultra is for.
+ * what /ultra is for. Stripe's cancel and failure doors, and the
+ * billing portal, all come back here so the notice lands beside the
+ * card it is about. A successful checkout lands in the setup wizard.
  */
 export function BillingCard({
   storeId,
   plan,
   sellable,
   notice,
-  justStarted = false,
 }: {
   storeId: string;
   plan: StorePlan;
   sellable: boolean;
   /** What the query string said on arrival, already turned into words. */
   notice: string | null;
-  /** Back from checkout this very page load. */
-  justStarted?: boolean;
 }) {
-  const line =
-    justStarted && plan.state === "none"
-      ? "Stripe is confirming your trial. Refresh in a moment."
-      : planLine(plan);
-  /* Never a start button to somebody who just started: even if Stripe's
-     word has not landed yet, the offer would read as "it did not work". */
-  const canStart = !justStarted && (plan.state === "none" || plan.state === "ended");
+  const line = planLine(plan);
+  const canStart = plan.state === "none" || plan.state === "ended";
   const canManage = "canManage" in plan && plan.canManage;
 
   return (
@@ -124,10 +118,7 @@ function planLine(plan: StorePlan): string {
 }
 
 /** The one sentence the query string earns, or nothing. */
-export function billingNotice(params: {
-  checkout?: string;
-  welcome?: string;
-}): string | null {
+export function billingNotice(params: { checkout?: string }): string | null {
   if (params.checkout === "success") {
     return "Welcome to Ultra. Your free trial has started.";
   }
@@ -137,6 +128,5 @@ export function billingNotice(params: {
   if (params.checkout === "failed") {
     return "Stripe could not be reached. Try again in a moment.";
   }
-  if (params.welcome === "1") return "Your store is ready.";
   return null;
 }

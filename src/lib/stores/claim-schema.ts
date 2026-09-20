@@ -45,14 +45,13 @@ export const CLAIM_IDLE: ClaimState = {
   errors: {},
 };
 
-/** Roles the picker offers. "Other" is why `claimant_role` is free text. */
-export const CLAIM_ROLES = [
-  "Owner",
-  "Manager",
-  "Staff",
-  "Event organiser",
-  "Other",
-] as const;
+/**
+ * Roles the picker offers: the two the console has. An owner runs the
+ * store; an organizer runs its nights. `claimant_role` stays free text
+ * in the row, so an older app build's picker, or a value typed by
+ * hand, is stored as sent and read by the admin as sent.
+ */
+export const CLAIM_ROLES = ["Owner", "Organizer"] as const;
 
 const NOTES_LIMIT = 500;
 

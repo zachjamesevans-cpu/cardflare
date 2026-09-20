@@ -56,7 +56,7 @@ export default async function StoreCasePage({
 
         {stocked ? (
           <CasePicker storeId={store.id} initial={picks} />
-        ) : (
+        ) : store.role === "owner" ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-text-secondary">
               Nothing to pick from yet. Upload your singles first and your case fills
@@ -69,6 +69,12 @@ export default async function StoreCasePage({
               Upload your singles
             </Link>
           </div>
+        ) : (
+          /* The Singles tab is the owner's, so an organizer gets the
+             fact and no link to a page that would turn them away. */
+          <p className="text-sm text-text-secondary">
+            Nothing to pick from yet. The owner uploads singles from the Singles tab.
+          </p>
         )}
       </Card>
     </AppShell>

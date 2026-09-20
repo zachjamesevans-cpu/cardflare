@@ -1,28 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, MonitorPlay, Sparkles, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, MonitorPlay, Sparkles } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
 import { AppShell } from "@/components/layout/app-shell";
-import { BillingCard, billingNotice } from "@/components/stores/billing-card";
 import { SetupChecklist, type SetupStep } from "@/components/stores/onboarding";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { VendorConsole } from "@/components/stores/vendor-console";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { reconcileCheckoutSession } from "@/lib/billing/reconcile";
 import { listDisplays } from "@/lib/event-hub/repository";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
 import { singlesSyncFor } from "@/lib/singles/repository";
-import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
+import { consoleHref, isOwnerOnlyPath, loadStoreConsole } from "@/lib/stores/console";
 import {
   storeOnboardingCompletedAt,
   storePageFor,
   storePageIsSetUp,
 } from "@/lib/stores/page";
-import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
 export const metadata: Metadata = {
   title: "Your store",
@@ -31,29 +28,31 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** The checklist steps the wizard already walks, by key. */
+const WIZARD_STEPS = new Set(["page", "flarecast", "event"]);
+
 /**
  * The console's front page: what to do, and the code to print.
  *
  * It used to be every section of the console on one long scroll. The
  * founder: "kind of just a massive fart of a bunch of screens." Now
- * the front page is the things to do first, the counter code, and the
- * plan; the television, the events, the case and the settings each
- * have a tab. A store that has done all four things sees the code and
- * the plan and nothing nagging.
+ * the front page is the things still to do, the counter code, and a
+ * card each for FlareCast and the events; the television, the events,
+ * the case, the singles, the organizers, the settings and the plan
+ * each have a tab. A store that has done everything sees the code and
+ * the two cards and nothing nagging.
  *
- * The welcome moved to the setup wizard at /store/setup, which is
- * where checkout lands now. An owner who has not finished or skipped
- * it sees one card at the top offering it, and nothing else about it.
+ * The welcome is the setup wizard at /store/setup, which is where
+ * checkout lands. Until the owner finishes or skips it, the front page
+ * offers the wizard and nothing else about setting up: one card, not
+ * a card and a checklist saying the same things. After that, the
+ * checklist shows what the wizard did not cover, plus anything from
+ * the wizard that is still undone.
  */
 export default async function StorePage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    as?: string;
-    checkout?: string;
-    welcome?: string;
-    session_id?: string;
-  }>;
+  searchParams: Promise<{ as?: string }>;
 }) {
   const params = await searchParams;
   const console = await loadStoreConsole(params.as, "/store");
@@ -78,36 +77,23 @@ export default async function StorePage({
     );
   }
 
-  /*
-   * Back from Stripe: ask Stripe what just happened rather than wait
-   * for its webhook, which can land after this page has rendered. The
-   * session id is checked against this store before anything is
-   * written, so a pasted id entitles nobody.
-   */
-  const justStarted = params.checkout === "success";
-  if (justStarted && params.session_id) {
-    await reconcileCheckoutSession(params.session_id, { storeId: store.id });
-  }
-
   await sweepStaleRooms();
 
   /*
-   * The page and the organizers are the owner's. An organizer landing
-   * here runs the timers and the hub; the card that hands those out,
-   * and the form that names the shop, are not offered to them.
+   * The wizard is the owner's. An organizer landing here runs the
+   * timers and FlareCast; the wizard, and every step whose page is
+   * owner-only, are not offered to them.
    */
   const owner = store.role === "owner";
 
-  const [events, displays, sync, plan, counterQr, page, onboardedAt] =
-    await Promise.all([
-      listEventsForStore(store.id),
-      listDisplays(store.id),
-      singlesSyncFor(store.id),
-      storePlan(store.id),
-      store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
-      storePageFor(store.id),
-      owner ? storeOnboardingCompletedAt(store.id) : Promise.resolve(null),
-    ]);
+  const [events, displays, sync, counterQr, page, onboardedAt] = await Promise.all([
+    listEventsForStore(store.id),
+    listDisplays(store.id),
+    singlesSyncFor(store.id),
+    store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
+    storePageFor(store.id),
+    owner ? storeOnboardingCompletedAt(store.id) : Promise.resolve(null),
+  ]);
 
   const steps: SetupStep[] = [
     /*
@@ -129,7 +115,7 @@ export default async function StorePage({
       key: "flarecast",
       title: "Put FlareCast on your TV",
       detail:
-        "Add a screen, open its link on the television and press Enter Fullscreen once. Timers, the room's wants and your code, all night.",
+        "Add a screen, open its link on the television and press Enter Fullscreen once. Timers, what the room is looking for and your code, all night.",
       done: displays.length > 0,
       href: consoleHref("/store/event-hub", store.id),
       action: "Add a screen",
@@ -164,8 +150,22 @@ export default async function StorePage({
   ];
   const upcoming = events.filter((event) => event.status !== "closed").slice(0, 3);
 
-  /* The first four steps are everybody's; the page is the owner's. */
-  const visibleSteps = owner ? steps : steps.filter((step) => step.key !== "page");
+  /*
+   * Until the owner finishes or skips the wizard, the wizard is the
+   * only thing about setting up on this page. After that, the steps
+   * the wizard walked (the page, the screens, the first night) are
+   * listed only while still undone; the rest are listed until done,
+   * ticked as they go. An organizer never sees a step whose page
+   * would turn them away.
+   */
+  const offerWizard = owner && onboardedAt === null;
+  const visibleSteps = offerWizard
+    ? []
+    : steps.filter(
+        (step) =>
+          !(WIZARD_STEPS.has(step.key) && step.done) &&
+          (owner || !isOwnerOnlyPath(step.href)),
+      );
   const settingUp = visibleSteps.some((step) => !step.done);
 
   return (
@@ -180,7 +180,7 @@ export default async function StorePage({
       <StoreTabs storeId={store.id} />
 
       {/* The wizard, until the owner has finished or skipped it. */}
-      {owner && onboardedAt === null && (
+      {offerWizard && (
         <Card className="flex flex-wrap items-center gap-4 border-accent">
           <Sparkles className="size-6 shrink-0 text-accent" aria-hidden="true" />
           <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
@@ -273,46 +273,7 @@ export default async function StorePage({
             </ButtonLink>
           </div>
         </Card>
-
-        {owner && (
-          <Card className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Users className="size-5 text-accent" aria-hidden="true" />
-              <h2 className="font-semibold text-text-primary">Organizers</h2>
-            </div>
-            <p className="text-sm text-text-secondary">
-              Hand the timers to a regular. They get the event hub and the remote,
-              nothing else.
-            </p>
-            <div>
-              <ButtonLink
-                href={consoleHref("/store/organizers", store.id)}
-                variant="secondary"
-                size="sm"
-              >
-                Manage organizers
-              </ButtonLink>
-            </div>
-          </Card>
-        )}
       </section>
-
-      {/* Money is the owner's. An organizer runs the room, never the
-          plan, and the actions behind this card refuse them too. */}
-      {owner && (
-        <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
-          <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
-            Your plan
-          </h2>
-          <BillingCard
-            storeId={store.id}
-            plan={plan}
-            sellable={ultraIsSellable()}
-            notice={billingNotice(params)}
-            justStarted={justStarted}
-          />
-        </section>
-      )}
     </AppShell>
   );
 }

@@ -51,8 +51,12 @@ vi.mock("@/lib/events/rooms", () => ({
   settleClosedOccurrences: vi.fn(),
 }));
 
-const { createEventAction, setEventStatusAction, setStoreTimeZoneAction } =
-  await import("@/lib/events/actions");
+const {
+  createEventAction,
+  createEventInPlaceAction,
+  setEventStatusAction,
+  setStoreTimeZoneAction,
+} = await import("@/lib/events/actions");
 const { CREATE_EVENT_IDLE } = await import("@/lib/events/schema");
 
 function formData(overrides: Record<string, string> = {}) {
@@ -208,6 +212,57 @@ describe("createEventAction", () => {
 
     expect(result.status).toBe("error");
     expect(result.status === "error" && result.message).not.toMatch(/duplicate key/i);
+  });
+});
+
+/*
+ * The same door without the redirect: the setup wizard has two steps
+ * left after the first night, so it needs the night reported back.
+ */
+describe("createEventInPlaceAction", () => {
+  const createInPlace = (data: FormData) =>
+    createEventInPlaceAction(CREATE_EVENT_IDLE, data);
+
+  it("creates the event and reports it back instead of leaving", async () => {
+    const result = await createInPlace(formData());
+
+    expect(result).toEqual({
+      status: "created",
+      eventId: "event-1",
+      name: "Friday Night One Piece",
+    });
+    expect(createEvent).toHaveBeenCalledOnce();
+  });
+
+  it("stores the instant the store's clock names, like the redirecting door", async () => {
+    await createInPlace(formData());
+
+    const [record] = createEvent.mock.calls[0] as [{ startsAt: Date }];
+    /* 18:00 in Chicago on 2026-08-14 (CDT, UTC-5) is 23:00Z. */
+    expect(record.startsAt.toISOString()).toBe("2026-08-14T23:00:00.000Z");
+  });
+
+  it("refuses another store's id with the same words, and never redirects", async () => {
+    const result = await createInPlace(formData({ storeId: STORE_B }));
+
+    expect(result.status).toBe("error");
+    expect(result.status === "error" && result.message).toBe(
+      "You cannot create an event for that store.",
+    );
+    expect(createEvent).not.toHaveBeenCalled();
+  });
+
+  it("reports field errors on the field, the way the Events tab does", async () => {
+    const result = await createInPlace(
+      formData({ startsAt: "2026-08-14T22:00", endsAt: "2026-08-14T18:00" }),
+    );
+
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.fieldErrors.endsAt).toBeTruthy();
+      expect(result.values.name).toBe("Friday Night One Piece");
+    }
+    expect(createEvent).not.toHaveBeenCalled();
   });
 });
 

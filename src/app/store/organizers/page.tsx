@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { PlayerAvatar } from "@/components/players/player-avatar";
+import {
+  ORGANIZER_DESCRIPTION,
+  OrganizerList,
+} from "@/components/stores/organizer-list";
 import { AddOrganizer } from "@/components/stores/organizers";
 import { StoreTabs } from "@/components/stores/store-tabs";
-import { Button } from "@/components/ui/button";
-import { Badge, Card } from "@/components/ui/card";
-import { formatHandle } from "@/lib/players/handle";
+import { Card } from "@/components/ui/card";
 import { loadStoreConsole } from "@/lib/stores/console";
 import { listStaff } from "@/lib/stores/staff";
-import { removeOrganizerAction } from "@/lib/stores/staff-actions";
 
 export const metadata: Metadata = {
   title: "Organizers",
@@ -60,57 +60,13 @@ export default async function StoreOrganizersPage({
         <div className="flex flex-col gap-2">
           <h2 className="text-xl font-bold text-text-primary">Organizers</h2>
           <p className="text-sm leading-relaxed text-text-secondary">
-            An organizer can run FlareCast, the timers and the remote from their phone.
-            They cannot see billing, singles or settings, and they cannot add or remove
-            other organizers. They keep their player profile, with a small TO badge that
-            says they run tournaments here.
+            {ORGANIZER_DESCRIPTION} They cannot add or remove other organizers. They
+            keep their player profile, with a small TO badge that says they run
+            tournaments here.
           </p>
         </div>
 
-        <ul className="flex flex-col">
-          {staff.map((member) => (
-            <li
-              key={member.userId}
-              className="flex items-center gap-3 border-t border-border py-3 first:border-t-0"
-            >
-              <PlayerAvatar
-                displayName={member.displayName}
-                seed={member.playerId ?? member.userId}
-                avatarUrl={member.avatarUrl}
-                size="sm"
-              />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate font-semibold text-text-primary">
-                    {member.displayName}
-                  </span>
-                  {member.role === "owner" ? (
-                    <Badge tone="neutral">Owner</Badge>
-                  ) : (
-                    <Badge>
-                      <span className="font-bold tracking-wide">TO</span>
-                      Organizer
-                    </Badge>
-                  )}
-                </span>
-                {member.handle && (
-                  <span className="truncate text-xs text-text-muted">
-                    {formatHandle(member.handle)}
-                  </span>
-                )}
-              </span>
-              {member.role === "staff" && (
-                <form action={removeOrganizerAction}>
-                  <input type="hidden" name="storeId" value={store.id} />
-                  <input type="hidden" name="userId" value={member.userId} />
-                  <Button type="submit" size="sm" variant="ghost">
-                    Remove
-                  </Button>
-                </form>
-              )}
-            </li>
-          ))}
-        </ul>
+        <OrganizerList storeId={store.id} members={staff} />
       </Card>
 
       <Card className="flex flex-col gap-4">

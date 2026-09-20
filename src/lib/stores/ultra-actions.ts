@@ -123,24 +123,25 @@ async function sendToCheckout(
   email: string | undefined,
 ): Promise<never> {
   const origin = siteUrl();
-  const console = `/store?as=${storeId}`;
   /* Back from a successful checkout the browser lands in the setup
-     wizard, not on the console: the welcome, the page, the screens.
-     The wizard reconciles the session the way the console did. */
+     wizard: the welcome, the page, the screens. The wizard reconciles
+     the session. A closed or failed checkout lands on Settings, beside
+     the plan card that says what happened and offers the button again. */
   const setup = `/store/setup?as=${storeId}`;
+  const settings = `/store/settings?as=${storeId}`;
 
-  if (!stripePriceId("ultra")) redirect(`${setup}&welcome=1`);
+  if (!stripePriceId("ultra")) redirect(setup);
 
   const session = await createCheckoutSession({
     tier: "ultra",
     storeId,
     customerEmail: email,
     successUrl: `${origin}${setup}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${origin}${console}&checkout=cancelled`,
+    cancelUrl: `${origin}${settings}&checkout=cancelled`,
     trialDays: ULTRA_TRIAL_DAYS,
   });
 
-  if (!session.ok) redirect(`${console}&checkout=failed`);
+  if (!session.ok) redirect(`${settings}&checkout=failed`);
   redirect(session.data.url);
 }
 
@@ -151,8 +152,9 @@ export async function manageBillingAction(formData: FormData): Promise<void> {
 
   if (!ownsStore(viewer, storeId)) redirect("/login?next=/store");
 
+  /* Back to the plan card, which is on Settings. */
   const subscription = await subscriptionForStore(storeId);
-  const back = `${siteUrl()}/store?as=${storeId}`;
+  const back = `${siteUrl()}/store/settings?as=${storeId}`;
   if (!subscription?.stripe_customer_id) redirect(back);
 
   const portal = await createBillingPortalSession(

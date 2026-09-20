@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, MonitorPlay, Plus } from "lucide-react";
+import { ArrowRight, MonitorPlay } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { TextInput } from "@/components/ui/controls";
-import { SubmitButton } from "@/components/ui/submit-button";
 import { buttonStyles } from "@/components/ui/button";
-import { addSetupScreenAction } from "@/lib/stores/setup-actions";
 import {
   nextSetupStep,
   SETUP_STEPS,
@@ -111,7 +108,10 @@ export const STEP_TITLES: Record<SetupStep, string> = {
   done: "Done",
 };
 
-/** One television, with the link that goes on it. */
+/**
+ * One television, with the link that goes on it. What to do with the
+ * link is said once, in the step's lede, not under every row.
+ */
 export function ScreenRow({
   name,
   url,
@@ -136,9 +136,6 @@ export function ScreenRow({
           <MonitorPlay className="size-4 text-accent" aria-hidden="true" />
           {name}
         </p>
-        <p className="text-xs text-text-muted">
-          Open this on the TV&rsquo;s browser and press Enter Fullscreen once.
-        </p>
         <p className="font-mono text-xs break-all text-text-secondary">{url}</p>
         <Link
           href={manageHref}
@@ -147,33 +144,6 @@ export function ScreenRow({
           Manage this screen
         </Link>
       </div>
-    </Card>
-  );
-}
-
-/** Naming a television is one field. */
-export function AddScreenForm({ storeId, first }: { storeId: string; first: boolean }) {
-  return (
-    <Card className="flex flex-col gap-3 border-dashed">
-      <form action={addSetupScreenAction} className="flex flex-col gap-3">
-        <input type="hidden" name="storeId" value={storeId} />
-        <label
-          htmlFor="setup-screen-name"
-          className="flex items-center gap-2 font-semibold text-text-primary"
-        >
-          <Plus className="size-4 text-accent" aria-hidden="true" />
-          {first ? "Name your first screen" : "Add another screen"}
-        </label>
-        <TextInput
-          id="setup-screen-name"
-          name="name"
-          maxLength={40}
-          placeholder={first ? "Main TV" : "Back TV"}
-        />
-        <div>
-          <SubmitButton label="Add the screen" pendingLabel="Adding…" size="sm" />
-        </div>
-      </form>
     </Card>
   );
 }
