@@ -16,6 +16,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RemoteImage } from "../remote-image";
+import { RemoteEntry } from "../remote-entry";
+import { FollowStoreButton } from "../follow-store-button";
 
 import type { StackParams } from "../../App";
 import {
@@ -553,7 +555,20 @@ function RoomScreen({
         }}
       >
         <Card>
-          <Muted>{room.storeName}</Muted>
+          {room.storeId ? (
+            <Tap
+              onPress={() =>
+                navigation.navigate("StoreProfile", { storeId: room.storeId! })
+              }
+              hitSlop={6}
+            >
+              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+                {room.storeName}
+              </Text>
+            </Tap>
+          ) : (
+            <Muted>{room.storeName}</Muted>
+          )}
           <Title>{room.name}</Title>
           {room.status !== "open" && !room.early ? (
             <Body>This room is not open right now.</Body>
@@ -683,8 +698,47 @@ function RoomScreen({
           />
         }
       >
+        {/* The organizer's door to the timer remote; nothing for anyone else. */}
+        <RemoteEntry />
+
         <Card>
-          <Muted>{room.storeName}</Muted>
+          {/* The store is linked from the room, with Follow beside it.
+              The founder: "if a player is in a room for that store, the
+              store is linked in there for them to quickly follow that
+              store's page and stay updated." The chip is for a
+              signed-in account only, the website's rule: a guest has
+              the account pitch just below instead. */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: spacing(2),
+            }}
+          >
+            {room.storeId ? (
+              <Tap
+                onPress={() =>
+                  navigation.navigate("StoreProfile", { storeId: room.storeId! })
+                }
+                hitSlop={6}
+              >
+                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+                  {room.storeName}
+                </Text>
+              </Tap>
+            ) : (
+              <Muted>{room.storeName}</Muted>
+            )}
+            {room.storeId && state.account && state.following !== undefined ? (
+              <FollowStoreButton
+                key={`${room.storeId}:${state.following}`}
+                storeId={room.storeId}
+                initial={state.following}
+                size="chip"
+              />
+            ) : null}
+          </View>
           <Title>{room.name}</Title>
           {/* The room's pulse on the door card, the founder's reorder:
               the two numbers a glance wants first. "You're in as" is

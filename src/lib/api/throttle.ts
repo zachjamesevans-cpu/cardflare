@@ -53,4 +53,6 @@ export const LIMITS = {
   avatarChunk: { limit: 2000, windowMs: 10 * MINUTE },
   /** Apple purchase syncs, per account. */
   billing: { limit: 10, windowMs: 60 * MINUTE },
+  /** Presses on the timer remote, per account: two a second is a jittery thumb. */
+  remoteControl: { limit: 120, windowMs: MINUTE },
 } as const;

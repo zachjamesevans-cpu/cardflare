@@ -64,6 +64,11 @@ async function authorizeStore(storeId: string) {
   if (viewer.kind === "store" && viewer.storeIds.includes(storeId)) {
     return { userId: viewer.user.id };
   }
+  /* An organizer runs the nights, and a night is an event: the
+     stores that named them are on the player viewer. */
+  if (viewer.kind === "player" && viewer.organizerStoreIds.includes(storeId)) {
+    return { userId: viewer.user.id };
+  }
 
   return null;
 }

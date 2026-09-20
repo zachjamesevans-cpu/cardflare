@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarDays, MonitorPlay } from "lucide-react";
+import { CalendarDays, MonitorPlay, Users } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
 import { AppShell } from "@/components/layout/app-shell";
@@ -20,6 +20,7 @@ import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
 import { singlesSyncFor } from "@/lib/singles/repository";
 import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
+import { storePageFor, storePageIsSetUp } from "@/lib/stores/page";
 import { planDate, storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
 export const metadata: Metadata = {
@@ -85,15 +86,38 @@ export default async function StorePage({
 
   await sweepStaleRooms();
 
-  const [events, displays, sync, plan, counterQr] = await Promise.all([
+  const [events, displays, sync, plan, counterQr, page] = await Promise.all([
     listEventsForStore(store.id),
     listDisplays(store.id),
     singlesSyncFor(store.id),
     storePlan(store.id),
     store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
+    storePageFor(store.id),
   ]);
 
+  /*
+   * The page and the organizers are the owner's. An organizer landing
+   * here runs the timers and the hub; the card that hands those out,
+   * and the form that names the shop, are not offered to them.
+   */
+  const owner = store.role === "owner";
+
   const steps: SetupStep[] = [
+    /*
+     * First, because it is what a player sees. The founder: "make a way
+     * and flow for stores to setup their store account once they're
+     * subscribed to ultra so players can follow the store." Ticked once
+     * the page says something a player could act on.
+     */
+    {
+      key: "page",
+      title: "Set up your store page",
+      detail:
+        "Your address, hours and a line about the shop, so players can find and follow you",
+      done: storePageIsSetUp(page),
+      href: `${consoleHref("/store/settings", store.id)}#page`,
+      action: "Set up your page",
+    },
     {
       key: "flarecast",
       title: "Put FlareCast on your TV",
@@ -131,11 +155,13 @@ export default async function StorePage({
       action: "Open settings",
     },
   ];
-  const settingUp = steps.some((step) => !step.done);
-
   const trialUntil = plan.state === "trialing" ? planDate(plan.until) : null;
 
   const upcoming = events.filter((event) => event.status !== "closed").slice(0, 3);
+
+  /* The first four steps are everybody's; the page is the owner's. */
+  const visibleSteps = owner ? steps : steps.filter((step) => step.key !== "page");
+  const settingUp = visibleSteps.some((step) => !step.done);
 
   return (
     <AppShell
@@ -156,7 +182,7 @@ export default async function StorePage({
         />
       )}
 
-      {settingUp && <SetupChecklist steps={steps} />}
+      {settingUp && <SetupChecklist steps={visibleSteps} />}
 
       {counterQr && store.join_code && (
         <section className="flex flex-col gap-5" aria-labelledby="counter-code-heading">
@@ -229,20 +255,46 @@ export default async function StorePage({
             </ButtonLink>
           </div>
         </Card>
+
+        {owner && (
+          <Card className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <Users className="size-5 text-accent" aria-hidden="true" />
+              <h2 className="font-semibold text-text-primary">Organizers</h2>
+            </div>
+            <p className="text-sm text-text-secondary">
+              Hand the timers to a regular. They get the event hub and the remote,
+              nothing else.
+            </p>
+            <div>
+              <ButtonLink
+                href={consoleHref("/store/organizers", store.id)}
+                variant="secondary"
+                size="sm"
+              >
+                Manage organizers
+              </ButtonLink>
+            </div>
+          </Card>
+        )}
       </section>
 
-      <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
-        <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
-          Your plan
-        </h2>
-        <BillingCard
-          storeId={store.id}
-          plan={plan}
-          sellable={ultraIsSellable()}
-          notice={billingNotice(params)}
-          justStarted={justStarted}
-        />
-      </section>
+      {/* Money is the owner's. An organizer runs the room, never the
+          plan, and the actions behind this card refuse them too. */}
+      {owner && (
+        <section className="flex flex-col gap-5" aria-labelledby="plan-heading">
+          <h2 id="plan-heading" className="text-xl font-bold text-text-primary">
+            Your plan
+          </h2>
+          <BillingCard
+            storeId={store.id}
+            plan={plan}
+            sellable={ultraIsSellable()}
+            notice={billingNotice(params)}
+            justStarted={justStarted}
+          />
+        </section>
+      )}
     </AppShell>
   );
 }

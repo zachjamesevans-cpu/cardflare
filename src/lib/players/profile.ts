@@ -1,6 +1,7 @@
 import "server-only";
 
 import { huntsFor, type Hunt } from "@/lib/players/hunts";
+import { organizerStoresFor, type OrganizerStore } from "@/lib/stores/staff";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
@@ -91,6 +92,12 @@ export interface PublicProfile {
    * pieces arrives twice.
    */
   hunts: Hunt[];
+  /**
+   * The stores that named them an organizer: the "TO" chip under the
+   * name, one per store, linking to the store's page. Empty for nearly
+   * everybody. Public because the badge is the point of it.
+   */
+  organizerAt: OrganizerStore[];
   joinedAt: string;
 }
 
@@ -150,6 +157,7 @@ async function loadProfile(
       effect: player.equipped_effect,
     },
     showcase: await listShowcase(playerId),
+    organizerAt: await organizerStoresFor(playerId),
     joinedAt: player.created_at,
   };
 }

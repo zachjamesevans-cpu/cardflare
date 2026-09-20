@@ -12,7 +12,7 @@ import { SITE } from "@/lib/site";
  * that says start your 14 day free trial" and "a big welcome to
  * cardflare ultra so they feel welcomed." So: a welcome with the
  * tier's name on it, the trial's end date when there is one, and the
- * four things to do first, each ticked as it is done and each a link
+ * things to do first, each ticked as it is done and each a link
  * to the tab where it happens. It shows until all four are ticked,
  * then quietly leaves.
  */
@@ -45,8 +45,8 @@ export function WelcomeHero({
         Welcome to {SITE.name} <UltraMark />
       </h2>
       <p className="max-w-2xl text-text-secondary">
-        {storeName} is on. Your counter code is ready to print, and the four steps below
-        put the rest of Ultra to work tonight.
+        {storeName} is on. Your counter code is ready to print, and the steps below put
+        the rest of Ultra to work tonight.
         {trialUntil &&
           ` Your free trial runs until ${trialUntil}; nothing is charged before then.`}
       </p>

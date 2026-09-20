@@ -557,6 +557,14 @@ export const getMe = () => call<Me>("GET", "/api/v1/me");
 export const removeLocal = (storeId: string) =>
   call<{ ok: true }>("DELETE", "/api/v1/locals", { storeId });
 
+/**
+ * Following a store on purpose - the website's `followStoreAction`.
+ * Same row as a local saved by joining a room; `removeLocal` is the
+ * unfollow.
+ */
+export const followStore = (storeId: string) =>
+  call<{ ok: true; following: boolean }>("POST", "/api/v1/locals", { storeId });
+
 export interface RoomFlare {
   id: string;
   playerSessionId: string;
@@ -615,6 +623,8 @@ export interface RoomState {
     name: string;
     status: string;
     storeName: string;
+    /** The store's page, linked from the room. Absent from an older server. */
+    storeId?: string;
     kind: string;
     startsAt: string | null;
     endsAt: string | null;
@@ -622,6 +632,12 @@ export interface RoomState {
     early: boolean;
   };
   you?: { sessionId: string; displayName: string };
+  /**
+   * Whether the signed-in account follows this room's store, for the
+   * Follow chip beside the store's name. False for a guest; absent from
+   * an older server, which draws no chip.
+   */
+  following?: boolean;
   /**
    * The store's live tournament clocks, as instants the phone ticks on
    * its own — see `room-timer-wire.ts`. Present once joined.
@@ -1273,6 +1289,8 @@ export interface PeekProfile {
   /** The unique one, so a popup can say who this actually is. */
   handle: string;
   avatarUrl: string | null;
+  /** The stores that named this player an organizer: the TO badge. */
+  organizerAt?: { storeId: string; name: string }[];
   /** Their cover banner, blurred behind the popup header. */
   coverUrl: string | null;
   /** The viewer's side of the relationship; null hides the button. */
@@ -2341,6 +2359,10 @@ export interface PublicStore {
   verified: boolean;
   ultra: boolean;
   unclaimed: boolean;
+  /** What the store says about itself. Absent from an older server. */
+  description?: string | null;
+  /** Whether the signed-in account follows it; absent for a guest or an older server. */
+  following?: boolean;
   attribution: string | null;
 }
 

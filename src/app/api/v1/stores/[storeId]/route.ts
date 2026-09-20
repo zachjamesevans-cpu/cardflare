@@ -1,3 +1,5 @@
+import { apiPlayer } from "@/lib/api/auth";
+import { hasLocal } from "@/lib/players/locals";
 import { publicStore } from "@/lib/stores/public-profile";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +13,14 @@ export const dynamic = "force-dynamic";
  * coordinates, no contact email, no provenance beyond the attribution
  * line the licence requires.
  *
- * No auth. An unclaimed listing exists so players can find a shop that
- * has never heard of cardflare, and a page behind a sign-in would defeat
- * the point. A draft still 404s.
+ * No auth REQUIRED. An unclaimed listing exists so players can find a
+ * shop that has never heard of cardflare, and a page behind a sign-in
+ * would defeat the point. A draft still 404s. A bearer token, when one
+ * is sent, adds `following` so the app's Follow button can draw its
+ * first word without a second call.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ storeId: string }> },
 ): Promise<Response> {
   const { storeId } = await params;
@@ -24,5 +28,8 @@ export async function GET(
 
   if (!store) return Response.json({ error: "not-found" }, { status: 404 });
 
-  return Response.json({ store });
+  const account = await apiPlayer(request);
+  const following = account ? await hasLocal(account.playerId, store.storeId) : false;
+
+  return Response.json({ store: { ...store, following } });
 }

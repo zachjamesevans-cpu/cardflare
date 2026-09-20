@@ -76,6 +76,8 @@ function toTimer(row: EventHubTimerRow): HubTimer {
     intermissionExtendedMs: Number(row.intermission_extended_ms ?? 0),
     autoHeldAt: row.auto_held_at ?? null,
     timeCalledAt: row.time_called_at ?? null,
+    controlledBy: row.controlled_by ?? null,
+    controlledAt: row.controlled_at ?? null,
     updatedAt: row.updated_at,
   };
 }
@@ -328,6 +330,8 @@ function toRowPatch(patch: TimerPatch): Partial<EventHubTimerRow> {
       : {}),
     ...(patch.autoHeldAt !== undefined ? { auto_held_at: patch.autoHeldAt } : {}),
     ...(patch.timeCalledAt !== undefined ? { time_called_at: patch.timeCalledAt } : {}),
+    ...(patch.controlledBy !== undefined ? { controlled_by: patch.controlledBy } : {}),
+    ...(patch.controlledAt !== undefined ? { controlled_at: patch.controlledAt } : {}),
     updated_at: new Date().toISOString(),
   };
 }

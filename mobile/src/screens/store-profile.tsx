@@ -1,15 +1,19 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Linking, ScrollView, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+import type { StackParams } from "../../App";
 import {
   claimStore,
   getStore,
+  storedAccessToken,
   CLAIM_ROLES,
   type ClaimFields,
   type PublicStore,
 } from "../api";
+import { FollowStoreButton } from "../follow-store-button";
 import { colors, gutter, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
 import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
@@ -31,18 +35,32 @@ import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from 
  * Not a browser hand-off. The founder, on being thrown into Safari by a
  * tab that should have been native: a link out of the app is a link out
  * of the app.
+ *
+ * FOLLOWING is the same row as the locals list - joining a room signed
+ * in has always written it - with a button here for the player who
+ * found the shop before they walked in. A guest sees "Sign in to
+ * follow", the website's words, because a Follow that cannot work is a
+ * lie.
  */
 export function StoreProfileScreen({ storeId }: { storeId: string }) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [store, setStore] = useState<PublicStore | null>(null);
   const [failed, setFailed] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  /* Null until the token has been looked for, so neither word is drawn
+     on a guess. */
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   const load = useCallback(
     async (alive: () => boolean) => {
       try {
-        const fresh = await getStore(storeId);
+        const [fresh, token] = await Promise.all([
+          getStore(storeId),
+          storedAccessToken(),
+        ]);
         if (alive()) {
           setStore(fresh.store);
+          setSignedIn(Boolean(token));
           setFailed(false);
         }
       } catch {
@@ -121,7 +139,29 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
           ) : null}
         </View>
 
+        {store.description ? <Body>{store.description}</Body> : null}
         {store.unclaimed ? <Muted>Unclaimed listing</Muted> : null}
+
+        {/* Follow, for a signed-in account; the way to become one, for
+            anyone else. Keyed on the server's answer so a follow made in
+            a room shows here without a restart. */}
+        {signedIn === null ? null : signedIn && store.following !== undefined ? (
+          <FollowStoreButton
+            key={`${store.storeId}:${store.following}`}
+            storeId={store.storeId}
+            initial={store.following}
+          />
+        ) : (
+          <Button
+            label="Sign in to follow"
+            variant="secondary"
+            onPress={() => navigation.navigate("SignIn")}
+          />
+        )}
+        <Muted>
+          Following puts this store&rsquo;s nights in your Feed and your locals.
+        </Muted>
+
         {store.address ? <Body>{store.address}</Body> : null}
 
         {store.phone ? (

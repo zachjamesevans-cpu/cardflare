@@ -89,7 +89,10 @@ vi.mock("@/lib/players/accounts", () => ({
   linkSessionToPlayer: (...a: unknown[]) => linkSessionToPlayer(...a),
   sessionForPlayer: (...a: unknown[]) => sessionForPlayer(...a),
 }));
-vi.mock("@/lib/players/locals", () => ({ saveLocal: vi.fn() }));
+vi.mock("@/lib/players/locals", () => ({
+  saveLocal: vi.fn(),
+  hasLocal: vi.fn().mockResolvedValue(false),
+}));
 vi.mock("@/lib/players/collection", () => ({
   collectionAvailability: vi.fn().mockResolvedValue(new Map()),
 }));
