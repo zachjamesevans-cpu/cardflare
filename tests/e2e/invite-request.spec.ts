@@ -25,7 +25,7 @@ async function fillValidForm(page: Page, email: string) {
 
   await page.getByLabel("First name").fill("Zach");
   await page.getByLabel("Email address").fill(email);
-  await page.getByLabel(/which best describes you/i).selectOption("store");
+  await page.getByLabel(/which best describes you/i).selectOption("vendor");
   await page.getByRole("checkbox").check();
 
   await settleFillWindow(page);
@@ -77,7 +77,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await expect(page.getByRole("checkbox")).not.toBeChecked();
 
     await settleFillWindow(page);
@@ -92,7 +92,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
 
@@ -133,7 +133,7 @@ test.describe("invite request form", () => {
 
     await page.getByLabel("First name").fill("Zach");
     await page.getByLabel("Email address").fill("not-an-email");
-    await page.getByLabel(/which best describes you/i).selectOption("store");
+    await page.getByLabel(/which best describes you/i).selectOption("vendor");
     await page.getByRole("checkbox").check();
     await settleFillWindow(page);
     await page.getByRole("button", { name: /request an invite/i }).click();
