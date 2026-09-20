@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   Home,
+  Gem,
   Megaphone,
   MonitorPlay,
   PackageSearch,
@@ -31,13 +32,21 @@ import { cn } from "@/lib/cn";
  * an organizer out of billing.
  */
 export type StoreTabId =
-  "overview" | "event-hub" | "events" | "posts" | "singles" | "organizers" | "settings";
+  | "overview"
+  | "event-hub"
+  | "events"
+  | "posts"
+  | "case"
+  | "singles"
+  | "organizers"
+  | "settings";
 
 const TABS = {
   overview: { href: "/store", label: "Overview", icon: Home },
   "event-hub": { href: "/store/event-hub", label: "FlareCast", icon: MonitorPlay },
   events: { href: "/store/events", label: "Events", icon: CalendarDays },
   posts: { href: "/store/posts", label: "Posts", icon: Megaphone },
+  case: { href: "/store/case", label: "Case", icon: Gem },
   singles: { href: "/store/singles", label: "Singles", icon: PackageSearch },
   organizers: { href: "/store/organizers", label: "Organizers", icon: Users },
   settings: { href: "/store/settings", label: "Settings", icon: Settings },

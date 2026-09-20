@@ -5,11 +5,7 @@ import { earlyBoardOpensAt, roomPhase, type RoomPhase } from "@/lib/events/schem
 import { socialForPosts, type PostSocial } from "@/lib/feed/post-queries";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import type {
-  StorePostInsert,
-  StorePostRow,
-  StorePostUpdate,
-} from "@/lib/supabase/types";
+import type { StorePostRow, StorePostUpdate } from "@/lib/supabase/types";
 import { putStoreImage } from "./store-images";
 
 /**

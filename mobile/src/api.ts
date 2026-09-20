@@ -2422,6 +2422,13 @@ export interface PublicStore {
   timeZone?: string;
   /** Decided by the server in the store's own zone; null without hours. */
   openNow?: boolean | null;
+  /** Up to six cards from the store's singles, chosen by hand. */
+  casePicks?: {
+    cardId: string;
+    cardName: string;
+    cardNumber: string;
+    imageUrl: string | null;
+  }[];
   /** Whether the signed-in account follows it; absent for a guest or an older server. */
   following?: boolean;
   attribution: string | null;

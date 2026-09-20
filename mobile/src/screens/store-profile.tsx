@@ -20,7 +20,17 @@ import { CoverBanner } from "../showcase-zoom";
 import { hoursLines } from "../store-hours";
 import { colors, gutter, radius, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
-import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  CardImage,
+  ErrorLine,
+  Input,
+  Muted,
+  Title,
+} from "../ui";
 import { VerifiedMark } from "../verified-mark";
 
 /** The header's banner: a strip the logo overlaps, the website's short cover. */
@@ -62,6 +72,12 @@ const LOGO = 64;
 export function StoreProfileScreen({ storeId }: { storeId: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [store, setStore] = useState<PublicStore | null>(null);
+  /* The case as one shelf, so the zoom swipes along it. */
+  const caseShelf = (store?.casePicks ?? []).map((pick) => ({
+    imageUrl: pick.imageUrl,
+    name: pick.cardName,
+    cardNumber: pick.cardNumber,
+  }));
   const [failed, setFailed] = useState(false);
   const [claiming, setClaiming] = useState(false);
   /* Null until the token has been looked for, so neither word is drawn
@@ -285,6 +301,33 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
                 </Text>
               </View>
             ))}
+          </View>
+        ) : null}
+
+        {store.casePicks && store.casePicks.length > 0 ? (
+          <View style={{ gap: spacing(1.5) }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 14 }}
+            >
+              In the case this week
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(2) }}
+            >
+              {store.casePicks.map((pick, index) => (
+                <CardImage
+                  key={pick.cardId}
+                  imageUrl={pick.imageUrl}
+                  width={64}
+                  name={pick.cardName}
+                  cardNumber={pick.cardNumber}
+                  siblings={caseShelf}
+                  position={index}
+                />
+              ))}
+            </ScrollView>
           </View>
         ) : null}
 

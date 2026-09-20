@@ -3,6 +3,8 @@ import "server-only";
 import type { GameSlug } from "@/lib/players/games-catalog";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { caseFor } from "@/lib/stores/case";
+import type { CasePick } from "@/lib/stores/case-schema";
 import { parseHours, type StoreHours } from "@/lib/stores/hours";
 import { storeGamesFrom } from "@/lib/stores/page";
 
@@ -50,6 +52,8 @@ export interface PublicStore {
   games: GameSlug[];
   /** The zone the hours are read in, so "open now" is the shop's now. */
   timeZone: string;
+  /** Up to six cards from the synced singles, chosen by hand. */
+  casePicks: CasePick[];
 }
 
 export async function publicStore(storeId: string): Promise<PublicStore | null> {
@@ -96,5 +100,6 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     hours: parseHours(data.hours),
     games: storeGamesFrom(gameRows ?? []),
     timeZone: data.timezone ?? "UTC",
+    casePicks: await caseFor(storeId),
   };
 }

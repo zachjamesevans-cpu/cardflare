@@ -4,11 +4,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, Clock, Globe, MapPin, Phone } from "lucide-react";
 
+import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { StorePageHeader } from "@/components/stores/store-page-header";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { cardImagesEnabled } from "@/lib/cards/images";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { hasLocal, storeBoard } from "@/lib/players/locals";
 import { hoursLines, openNow } from "@/lib/stores/hours";
@@ -86,6 +88,12 @@ export default async function StoreProfilePage({
       : null;
 
   const lines = store.hours ? hoursLines(store.hours) : [];
+  /* The case as one shelf, so the zoom swipes along it. */
+  const shelf: ZoomCard[] = store.casePicks.map((pick) => ({
+    imageUrl: pick.imageUrl,
+    exactName: pick.cardName,
+    cardNumber: pick.cardNumber,
+  }));
   const open = store.hours ? openNow(store.hours, new Date(), store.timeZone) : null;
 
   return (
@@ -173,6 +181,26 @@ export default async function StoreProfilePage({
                   ))}
                 </dl>
               </div>
+            </div>
+          )}
+
+          {store.casePicks.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold text-text-primary">In the case this week</p>
+              <ul className="flex gap-2 overflow-x-auto pb-1">
+                {store.casePicks.map((pick, index) => (
+                  <li key={pick.cardId} className="w-16 shrink-0">
+                    <CardImageZoom
+                      imageUrl={pick.imageUrl}
+                      exactName={pick.cardName}
+                      cardNumber={pick.cardNumber}
+                      enabled={cardImagesEnabled()}
+                      siblings={shelf}
+                      position={index}
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

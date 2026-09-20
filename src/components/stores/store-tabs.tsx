@@ -20,6 +20,7 @@ const OWNER_TABS: StoreTabId[] = [
   "event-hub",
   "events",
   "posts",
+  "case",
   "singles",
   "organizers",
   "settings",
@@ -27,7 +28,13 @@ const OWNER_TABS: StoreTabId[] = [
 
 /* Posts are theirs too: "OP-12 prerelease Saturday, 20 seats" is the
    organizer's news as much as the owner's. */
-const ORGANIZER_TABS: StoreTabId[] = ["overview", "event-hub", "events", "posts"];
+const ORGANIZER_TABS: StoreTabId[] = [
+  "overview",
+  "event-hub",
+  "events",
+  "posts",
+  "case",
+];
 
 export async function StoreTabs({ storeId }: { storeId: string }) {
   const viewer = await getViewer();
