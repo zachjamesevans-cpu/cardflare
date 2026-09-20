@@ -82,7 +82,45 @@ export type StoreRow = {
   verified_by: string | null;
   /** What the store says about itself on its public page. 280 max. */
   description: string | null;
+  /** Object paths in the avatars bucket; see src/lib/stores/store-image.ts. */
+  logo_image: string | null;
+  cover_image: string | null;
+  /** Seven entries, Sunday first; see src/lib/stores/hours.ts. */
+  hours: StoreHoursJson | null;
+  /** When the owner finished or skipped the setup wizard. */
+  onboarding_completed_at: string | null;
 };
+
+/** One day's opening, or null for closed. Times are "HH:MM", 24-hour. */
+export type StoreHoursJson = ({ open: string; close: string } | null)[];
+
+export type StoreGameRow = { store_id: string; game: string };
+
+export type StorePostRow = {
+  id: string;
+  created_at: string;
+  store_id: string;
+  author_user_id: string | null;
+  title: string;
+  body: string | null;
+  image: string | null;
+  event_id: string | null;
+  published_at: string;
+  archived_at: string | null;
+};
+
+export type StorePostInsert = Omit<
+  StorePostRow,
+  "id" | "created_at" | "published_at" | "archived_at" | "body" | "image" | "event_id"
+> & {
+  id?: string;
+  body?: string | null;
+  image?: string | null;
+  event_id?: string | null;
+  published_at?: string;
+};
+
+export type StoreCasePickRow = { store_id: string; position: number; card_id: string };
 
 /** Columns with database defaults are optional on insert. */
 export type StoreInsert = Omit<
@@ -90,6 +128,10 @@ export type StoreInsert = Omit<
   | "id"
   | "created_at"
   | "description"
+  | "logo_image"
+  | "cover_image"
+  | "hours"
+  | "onboarding_completed_at"
   | "status"
   | "is_pilot"
   | "walk_in_enabled"
@@ -1727,6 +1769,9 @@ export type Database = {
       announcements: Table<AnnouncementRow, AnnouncementInsert>;
       event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;
       event_hub_timers: Table<EventHubTimerRow, EventHubTimerInsert>;
+      store_games: Table<StoreGameRow, StoreGameRow>;
+      store_posts: Table<StorePostRow, StorePostInsert>;
+      store_case_picks: Table<StoreCasePickRow, StoreCasePickRow>;
       event_hub_timer_log: Table<EventHubTimerLogRow, EventHubTimerLogInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
