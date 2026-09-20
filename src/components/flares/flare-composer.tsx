@@ -61,6 +61,8 @@ export function FlareComposer(props: {
   hunts: { id: string; name: string }[];
   imagesEnabled: boolean;
   playerGames: readonly string[];
+  /** The room's game from a tournament QR, which narrows the search. */
+  game?: string | null;
   /** The room the poster is standing in, when they are. */
   room: ComposerRoom | null;
   /** "Add cards" on a hunt arrives with the hunt already chosen. */
@@ -92,6 +94,7 @@ function ComposerBody({
   hunts,
   imagesEnabled,
   playerGames,
+  game = null,
   room,
   initialHuntId,
 }: {
@@ -99,6 +102,7 @@ function ComposerBody({
   hunts: { id: string; name: string }[];
   imagesEnabled: boolean;
   playerGames: readonly string[];
+  game?: string | null;
   room: ComposerRoom | null;
   initialHuntId: string | null;
 }) {
@@ -249,6 +253,7 @@ function ComposerBody({
         <CardPicker
           imagesEnabled={imagesEnabled}
           playerGames={playerGames}
+          game={game}
           cards={draft.cards}
           onAdd={(card, printing) =>
             patch({ cards: addCard(draft.cards, card, printing) })

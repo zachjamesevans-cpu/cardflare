@@ -69,7 +69,7 @@ export function binderPrompts(
      * A missing or unreadable confirmation must read as stale, and it does by
      * arithmetic rather than by a branch: NaN fails every comparison, so
      * `confirmedAt >= tradeTime` — the only thing that suppresses a prompt —
-     * can never be true for it. Same stance as `needsConfirming`.
+     * can never be true for it. Same stance the list schema takes.
      */
     const confirmedAt = entry.confirmedAt
       ? new Date(entry.confirmedAt).getTime()

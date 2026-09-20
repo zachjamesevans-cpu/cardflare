@@ -3,13 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getPlayerSession = vi.fn();
 const findEventByJoinCode = vi.fn();
 const findParticipation = vi.fn();
-const addFlare = vi.fn();
-const addToBinder = vi.fn();
 const cancelFlare = vi.fn();
 const removeFromBinder = vi.fn();
-const confirmBinder = vi.fn();
 
-const CARD = "11111111-1111-1111-1111-111111111111";
 const SESSION = { id: "33333333-3333-3333-3333-333333333333", display_name: "Zach" };
 const EVENT = { id: "44444444-4444-4444-4444-444444444444", name: "Friday" };
 
@@ -31,16 +27,11 @@ vi.mock("@/lib/events/participants", () => ({
   findParticipation: (...a: unknown[]) => findParticipation(...a),
 }));
 vi.mock("@/lib/lists/repository", () => ({
-  addFlare: (...a: unknown[]) => addFlare(...a),
-  addToBinder: (...a: unknown[]) => addToBinder(...a),
   cancelFlare: (...a: unknown[]) => cancelFlare(...a),
   removeFromBinder: (...a: unknown[]) => removeFromBinder(...a),
-  confirmBinder: (...a: unknown[]) => confirmBinder(...a),
 }));
 
-const { addToListAction, removeListEntryAction, confirmBinderAction } =
-  await import("@/lib/lists/actions");
-const { LIST_IDLE } = await import("@/lib/lists/schema");
+const { removeListEntryAction } = await import("@/lib/lists/actions");
 const { resetRateLimits } = await import("@/lib/rate-limit");
 
 function formData(fields: Record<string, string>) {
@@ -49,204 +40,19 @@ function formData(fields: Record<string, string>) {
   return data;
 }
 
-const add = (fields: Record<string, string> = {}) =>
-  addToListAction(
-    LIST_IDLE,
-    formData({ code: "K3M9PZ", kind: "flare", cardId: CARD, ...fields }),
-  );
-
 beforeEach(() => {
   resetRateLimits();
   getPlayerSession.mockReset().mockResolvedValue(SESSION);
   findEventByJoinCode.mockReset().mockResolvedValue(EVENT);
   findParticipation.mockReset().mockResolvedValue({ joinedAt: "", lastSeenAt: "" });
-  addFlare.mockReset().mockResolvedValue({ ok: true });
-  addToBinder.mockReset().mockResolvedValue({ ok: true });
   cancelFlare.mockReset().mockResolvedValue(true);
   removeFromBinder.mockReset().mockResolvedValue(true);
-  confirmBinder.mockReset().mockResolvedValue(true);
 });
 
 /*
- * A Server Action is a public POST endpoint. Rendering the form inside a room
- * a player has joined proves nothing about who is calling this.
+ * A Server Action is a public POST endpoint. Rendering the button inside a
+ * room a player has joined proves nothing about who is calling this.
  */
-describe("posting to a list requires being in the room", () => {
-  it("refuses someone with no player session", async () => {
-    getPlayerSession.mockResolvedValue(null);
-
-    expect((await add()).status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  it("refuses a code that resolves to no event", async () => {
-    findEventByJoinCode.mockResolvedValue(null);
-
-    expect((await add()).status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  /* The one that matters: a real session, a real room, but not a member. */
-  it("refuses a player who has not joined this room", async () => {
-    findParticipation.mockResolvedValue(null);
-
-    expect((await add()).status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  it("writes against the session's own id, never one from the form", async () => {
-    await add({ playerSessionId: "99999999-9999-9999-9999-999999999999" });
-
-    expect(addFlare).toHaveBeenCalledWith(
-      EVENT.id,
-      SESSION.id,
-      expect.anything(),
-      "want",
-      expect.anything(),
-    );
-  });
-});
-
-describe("showcases", () => {
-  it("posts a Flare as a want unless the form says otherwise", async () => {
-    await add();
-
-    expect(addFlare.mock.calls[0]![3]).toBe("want");
-  });
-
-  it("posts a showcase when the form asks for one", async () => {
-    await add({ intent: "showcase" });
-
-    expect(addFlare.mock.calls[0]![3]).toBe("showcase");
-  });
-
-  /* Anything other than the exact word is a want: a showcase is an
-     opt-in statement, never something a stray value turns on. */
-  it("treats an unrecognised intent as a want", async () => {
-    await add({ intent: "selling" });
-
-    expect(addFlare.mock.calls[0]![3]).toBe("want");
-  });
-});
-
-/**
- * Trade, cash, or either.
- *
- * A Server Action is a public POST endpoint, so the rule that a Flare
- * must be answerable by something cannot live in the form. These pin it
- * where it is actually enforced.
- */
-describe("what the poster will take", () => {
-  const accepts = () => addFlare.mock.calls[0]![4];
-
-  it("defaults to a trade when the form says nothing", async () => {
-    await add();
-
-    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: false });
-  });
-
-  it("takes cash only when that is all that was ticked", async () => {
-    await add({ acceptsCash: "on" });
-
-    expect(accepts()).toEqual({ acceptsTrade: false, acceptsCash: true });
-  });
-
-  it("takes both when both were ticked", async () => {
-    await add({ acceptsTrade: "on", acceptsCash: "on" });
-
-    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: true });
-  });
-
-  /*
-   * The case the database refuses outright. A hand-rolled POST can send
-   * it, and a Flare nobody can answer is worse than a wrong default, so
-   * it falls back to what the board has always meant.
-   */
-  it("falls back to a trade rather than posting a Flare nobody can answer", async () => {
-    await add({ acceptsTrade: "", acceptsCash: "" });
-
-    expect(accepts()).toEqual({ acceptsTrade: true, acceptsCash: false });
-  });
-
-  it("carries the terms on a showcase too", async () => {
-    await add({ intent: "showcase", acceptsCash: "on" });
-
-    expect(addFlare.mock.calls[0]![3]).toBe("showcase");
-    expect(accepts()).toEqual({ acceptsTrade: false, acceptsCash: true });
-  });
-});
-
-describe("addToListAction", () => {
-  it("posts a Flare for any printing by default", async () => {
-    const state = await add();
-
-    expect(state.status).toBe("added");
-    expect(addFlare.mock.calls[0]![2]).toMatchObject({
-      cardId: CARD,
-      printingId: null,
-      quantity: 1,
-    });
-  });
-
-  /*
-   * The binder is not scoped to a room, so it must not be written against one.
-   * Passing an event id here is what would silently make it per-event again.
-   */
-  it("adds to the binder without an event, so it follows the player", async () => {
-    await add({ kind: "have" });
-
-    expect(addToBinder).toHaveBeenCalledWith(SESSION.id, expect.anything());
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  it("refuses a kind it does not recognise", async () => {
-    expect((await add({ kind: "need" })).status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  it("refuses a card id that is not one", async () => {
-    expect((await add({ cardId: "OP01-024" })).status).toBe("error");
-    expect(addFlare).not.toHaveBeenCalled();
-  });
-
-  /* The cap has to be explained, or a silent failure looks like a bug. */
-  it("says which cap was hit", async () => {
-    addFlare.mockResolvedValue({ ok: false, reason: "at-cap" });
-
-    const state = await add();
-
-    expect(state.status).toBe("error");
-    expect(state.status === "error" && state.message).toMatch(/flares/i);
-  });
-
-  it("does not leak internals when the write fails", async () => {
-    addFlare.mockResolvedValue({ ok: false, reason: "unavailable" });
-
-    const state = await add();
-
-    expect(state.status === "error" && state.message).not.toMatch(
-      /supabase|postgres|event_cards/i,
-    );
-  });
-
-  /*
-   * The name is echoed back only so the confirmation can say what was added.
-   * The card itself is resolved by id, so a forged name changes nothing.
-   */
-  it("never uses the card name the client sent for anything but the message", async () => {
-    const state = await add({ cardName: "Totally Different Card" });
-
-    expect(state.status === "added" && state.cardName).toBe("Totally Different Card");
-    expect(addFlare.mock.calls[0]![2]).toMatchObject({ cardId: CARD });
-  });
-
-  it("stops a flood from one network", async () => {
-    for (let i = 0; i < 120; i += 1) await add();
-
-    expect((await add()).status).toBe("error");
-  });
-});
-
 describe("removeListEntryAction", () => {
   const remove = (kind: string) =>
     removeListEntryAction(formData({ code: "K3M9PZ", kind, entryId: "entry-1" }));
@@ -280,20 +86,27 @@ describe("removeListEntryAction", () => {
     expect(cancelFlare).not.toHaveBeenCalled();
     expect(removeFromBinder).not.toHaveBeenCalled();
   });
-});
 
-describe("confirmBinderAction", () => {
-  it("refreshes the caller's own binder", async () => {
-    await confirmBinderAction(formData({ code: "K3M9PZ" }));
+  it("does nothing for someone with no player session", async () => {
+    getPlayerSession.mockResolvedValue(null);
 
-    expect(confirmBinder).toHaveBeenCalledWith(SESSION.id);
+    await remove("flare");
+
+    expect(cancelFlare).not.toHaveBeenCalled();
   });
 
-  it("does nothing for someone who is not in the room", async () => {
-    findParticipation.mockResolvedValue(null);
+  it("does nothing for a code that resolves to no event", async () => {
+    findEventByJoinCode.mockResolvedValue(null);
 
-    await confirmBinderAction(formData({ code: "K3M9PZ" }));
+    await remove("flare");
 
-    expect(confirmBinder).not.toHaveBeenCalled();
+    expect(cancelFlare).not.toHaveBeenCalled();
+  });
+
+  it("ignores a kind it does not recognise", async () => {
+    await remove("need");
+
+    expect(cancelFlare).not.toHaveBeenCalled();
+    expect(removeFromBinder).not.toHaveBeenCalled();
   });
 });

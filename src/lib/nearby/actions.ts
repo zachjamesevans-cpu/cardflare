@@ -4,13 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
 import { binderSessionFor } from "@/lib/lists/haves";
-import { removeFromBinder, setLocalTrade } from "@/lib/lists/repository";
+import { removeFromBinder } from "@/lib/lists/repository";
 import { openWantThread, openFlareThread } from "@/lib/local/threads";
 import { LIMITS } from "@/lib/api/throttle";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { playerForUser } from "@/lib/players/accounts";
 
-import { afterHolderChanged } from "./matching";
 import { setNearbyMatching } from "./settings";
 import { haveThisMessage, messageOpener } from "./shared";
 
@@ -44,23 +43,6 @@ export async function setNearbyMatchingAction(
 
   const saved = await setNearbyMatching(player.id, on);
   if (!saved) return { ok: false, message: GENERIC };
-  touched();
-  return { ok: true };
-}
-
-export async function setLocalTradeAction(
-  entryId: string,
-  on: boolean,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const player = await viewerPlayer();
-  if (!player) return { ok: false, message: SIGN_IN };
-
-  const session = await binderSessionFor(player.id, player.name, false);
-  if (!session) return { ok: false, message: GENERIC };
-
-  const saved = await setLocalTrade(entryId, session.id, on);
-  if (!saved) return { ok: false, message: GENERIC };
-  if (on) void afterHolderChanged(player.id);
   touched();
   return { ok: true };
 }

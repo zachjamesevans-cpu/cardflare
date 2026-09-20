@@ -98,12 +98,11 @@ export function StoreQuiet({
     <>
       <Card className="flex flex-col gap-2">
         <p className="text-sm font-medium text-accent">{storeName}</p>
-        <h1 className="text-xl font-bold text-text-primary">
-          No trading room right now
-        </h1>
+        <h1 className="text-xl font-bold text-text-primary">Not open yet</h1>
+        {/* The same two sentences a scheduled room shows before doors, so
+            "not open" reads one way however the code was met. */}
         <p className="text-text-secondary">
-          This store opens a room for its events. Ask at the counter when the next one
-          is, and scan this code again then.
+          The store has not opened this room yet. Scan the code again when it starts.
         </p>
       </Card>
 

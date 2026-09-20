@@ -5,7 +5,7 @@ import { CalendarClock, MapPin } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { EventLobby } from "@/components/events/event-lobby";
-import { AddToListForm } from "@/components/lists/add-to-list-form";
+import { FlareComposer } from "@/components/flares/flare-composer";
 import { AccountPitch } from "@/components/players/account-pitch";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { FlareBoard } from "@/components/lists/list-entries";
@@ -36,6 +36,7 @@ import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
+import { huntsFor } from "@/lib/players/hunts";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { collectionAvailability } from "@/lib/players/collection";
@@ -86,7 +87,7 @@ function Shell({
           "flex min-h-dvh flex-col items-center justify-start gap-3 px-5 pt-5 pb-16 sm:gap-5 sm:pt-10",
         )}
       >
-        <Link href="/" aria-label={`${SITE.name} home`}>
+        <Link href="/feed" aria-label={`${SITE.name} feed`}>
           <Logo size={40} priority />
         </Link>
         <div
@@ -147,13 +148,17 @@ export default async function JoinByCodePage({
 
   /*
    * The scan's game, when the code came off a tournament's own screen.
-   * `?g=one-piece` narrows this room's card search to that TCG — the
-   * counter code stays universal, and the per-tournament QR is where
-   * the scope comes from. Validated against the five real profiles, so
-   * a crafted URL degrades to no filter rather than an empty search.
+   * `?g=one-piece` puts that TCG first for this room's card search, so
+   * it is the game the composer opens on: the counter code stays
+   * universal, and the per-tournament QR is where the scope comes from.
+   * Validated against the five real profiles, so a crafted URL degrades
+   * to the player's own games rather than an empty search.
    */
   const scannedGame = gameProfile(params_.g ?? "")?.id ?? null;
-  const games = await viewerGames();
+  const playerGames = await viewerGames();
+  const games = scannedGame
+    ? [scannedGame, ...playerGames.filter((game) => game !== scannedGame)]
+    : playerGames;
 
   const normalized = normalizeJoinCode(decodeURIComponent(code));
 
@@ -380,6 +385,26 @@ export default async function JoinByCodePage({
   const savedWants = inRoom && accountPlayerId ? await listWants(accountPlayerId) : [];
 
   /*
+   * The composer is the Flare tab's, given the same things: the hunts a
+   * post can join, and the poster's own face and name for the preview.
+   * The face comes off the participant list already in hand, so posting
+   * from a room costs no query the Flare tab does not also make.
+   */
+  const hunts =
+    inRoom && accountPlayerId ? await huntsFor(accountPlayerId, accountPlayerId) : [];
+  const me = participants.find(
+    (participant) => participant.playerSessionId === session?.id,
+  );
+  const poster =
+    accountPlayerId && session
+      ? {
+          id: accountPlayerId,
+          displayName: me?.displayName ?? session.display_name,
+          avatarUrl: me?.avatarUrl ?? null,
+        }
+      : null;
+
+  /*
    * The store is linked from the room, with Follow beside it. The
    * founder: "if a player is in a room for that store, the store is
    * linked in there for them to quickly follow that store's page and
@@ -524,7 +549,6 @@ export default async function JoinByCodePage({
                 storeId={event.storeId}
                 initial={followingStore}
                 code={code}
-                size="sm"
               />
             )}
           </div>
@@ -620,12 +644,18 @@ export default async function JoinByCodePage({
       {phase === "pending" || phase === "finished" ? (
         <Card className="flex flex-col gap-2">
           <h2 className="font-semibold text-text-primary">
-            {phase === "pending" ? "Not open yet" : "This event has finished"}
+            {phase === "pending" ? "Not open yet" : "This room has closed"}
           </h2>
+          {/* The same two sentences the store's quiet code shows, so a
+              room that is not open yet reads one way wherever it is met.
+              Closed: the Follow button is in the header above, so the
+              prompt points at it only when there is one to press. */}
           <p className="text-text-secondary">
             {phase === "pending"
-              ? "The store hasn't opened this room yet. Try again closer to the start."
-              : "Thanks for coming. Ask the store about their next event."}
+              ? "The store has not opened this room yet. Scan the code again when it starts."
+              : accountPlayerId && !followingStore
+                ? `This room has closed. Follow ${event.storeName} above to hear about the next one.`
+                : "This room has closed. Thanks for coming."}
           </p>
         </Card>
       ) : inRoom && session ? (
@@ -656,18 +686,29 @@ export default async function JoinByCodePage({
 
           <section className="flex flex-col gap-4" aria-label="Wanted in this room">
             {/*
-             * Both ways onto the board share one card: the form for a
-             * named hunt, and (as the card's footer row) the open-to-any-
-             * trade switch for everyone who cannot name one.
+             * The Flare tab's composer, posting onto this board: one post
+             * of one or many cards, the same on the website and in the
+             * app. It needs an account, so a guest keeps the pitch above
+             * and the open-to-any-trade row below, which is theirs too.
              */}
-            <AddToListForm
-              code={normalized}
-              kind="flare"
-              imagesEnabled={images}
-              game={scannedGame}
-              playerGames={games}
-              footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
-            />
+            {poster && (
+              <FlareComposer
+                viewer={poster}
+                hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
+                imagesEnabled={images}
+                playerGames={games}
+                game={scannedGame}
+                room={{ name: event.name, storeName: event.storeName }}
+                initialHuntId={null}
+              />
+            )}
+
+            {/* The other way onto the board, for everyone who cannot name
+                a card. The row draws its own divider for the foot of a
+                card; on its own it needs none. */}
+            <Card className="[&>div]:border-t-0 [&>div]:pt-0">
+              <OpenToTradesToggle code={normalized} open={youAreOpen} />
+            </Card>
 
             <FlareBoard
               entries={flares}
