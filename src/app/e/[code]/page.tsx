@@ -12,6 +12,7 @@ import { FlareBoard } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import { RoomComposerDoor } from "@/components/events/room-composer-door";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { RoomTimers } from "@/components/event-hub/room-timers";
 import { ShowSearch } from "@/components/shows/show-search";
@@ -686,29 +687,31 @@ export default async function JoinByCodePage({
 
           <section className="flex flex-col gap-4" aria-label="Wanted in this room">
             {/*
-             * The Flare tab's composer, posting onto this board: one post
-             * of one or many cards, the same on the website and in the
-             * app. It needs an account, so a guest keeps the pitch above
-             * and the open-to-any-trade row below, which is theirs too.
+             * The Flare tab's composer, behind one door: a room page is
+             * for seeing the room, so the composer opens in place when
+             * asked and folds away again. It needs an account, so a
+             * guest keeps the pitch above and only the open-to-any-trade
+             * row here, which is theirs too.
              */}
-            {poster && (
-              <FlareComposer
-                viewer={poster}
-                hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
-                imagesEnabled={images}
-                playerGames={games}
-                game={scannedGame}
-                room={{ name: event.name, storeName: event.storeName }}
-                initialHuntId={null}
-              />
-            )}
-
-            {/* The other way onto the board, for everyone who cannot name
-                a card. The row draws its own divider for the foot of a
-                card; on its own it needs none. */}
-            <Card className="[&>div]:border-t-0 [&>div]:pt-0">
-              <OpenToTradesToggle code={normalized} open={youAreOpen} />
-            </Card>
+            <RoomComposerDoor
+              eventName={event.name}
+              storeName={event.storeName}
+              composer={
+                poster ? (
+                  <FlareComposer
+                    viewer={poster}
+                    hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
+                    imagesEnabled={images}
+                    playerGames={games}
+                    game={scannedGame}
+                    room={{ name: event.name, storeName: event.storeName }}
+                    initialHuntId={null}
+                    footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
+                  />
+                ) : null
+              }
+              trades={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
+            />
 
             <FlareBoard
               entries={flares}

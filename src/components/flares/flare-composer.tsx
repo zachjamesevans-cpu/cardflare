@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Plus, Star, Trash2 } from "lucide-react";
 
@@ -67,6 +73,8 @@ export function FlareComposer(props: {
   room: ComposerRoom | null;
   /** "Add cards" on a hunt arrives with the hunt already chosen. */
   initialHuntId: string | null;
+  /** A row at the foot of the compose step: the room's open-to-trades switch. */
+  footer?: ReactNode;
 }) {
   /*
    * The draft is read from storage, which the server does not have, so
@@ -81,7 +89,7 @@ export function FlareComposer(props: {
   if (!mounted) {
     return (
       <Card className="flex flex-col gap-2 p-4 sm:p-6">
-        <h1 className="text-xl font-bold text-text-primary">New flare</h1>
+        <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
         <p className="text-sm text-text-muted">Loading your draft…</p>
       </Card>
     );
@@ -97,6 +105,7 @@ function ComposerBody({
   game = null,
   room,
   initialHuntId,
+  footer,
 }: {
   viewer: ComposerViewer;
   hunts: { id: string; name: string }[];
@@ -105,6 +114,7 @@ function ComposerBody({
   game?: string | null;
   room: ComposerRoom | null;
   initialHuntId: string | null;
+  footer?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Draft>(() => {
     const saved = loadDraft() ?? EMPTY_DRAFT;
@@ -289,7 +299,7 @@ function ComposerBody({
   return (
     <Card className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-text-primary">New flare</h1>
+        <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
         <p className="text-sm text-text-muted">
           {room
             ? `Posting to ${room.name} at ${room.storeName}.`
@@ -561,6 +571,8 @@ function ComposerBody({
           </Button>
         )}
       </div>
+
+      {footer}
     </Card>
   );
 }
