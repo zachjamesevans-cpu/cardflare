@@ -11,7 +11,13 @@ import { Button } from "@/components/ui/button";
  * The feedback matters more than the copy: without "Copied" the button
  * gives no sign anything happened, and people press it four times.
  */
-export function CopyLink({ url }: { url: string }) {
+export function CopyLink({
+  url,
+  label = "Copy link",
+}: {
+  url: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -43,7 +49,7 @@ export function CopyLink({ url }: { url: string }) {
       ) : (
         <>
           <Copy className="size-4" aria-hidden="true" />
-          Copy link
+          {label}
         </>
       )}
     </Button>

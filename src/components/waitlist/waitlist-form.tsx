@@ -208,10 +208,10 @@ export function WaitlistForm() {
           <option value="" disabled>
             Select an option
           </option>
-          {/* No "Player" here: a player's account is free and self-serve
-              at /signup, and offering it as an invite to request would
-              send people the long way round to a button. */}
-          {USER_TYPES.filter((type) => type.value !== "player").map((type) => (
+          {/* Vendors and the people who run shows. A player's account is
+              free at /signup and a store's trial is a button at /ultra,
+              so neither is an invite to request. */}
+          {USER_TYPES.map((type) => (
             <option key={type.value} value={type.value}>
               {type.label}
             </option>
@@ -225,16 +225,16 @@ export function WaitlistForm() {
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field name="primaryGame" label="Primary card game" optional>
+          <Field name="primaryGame" label="Games you sell" optional>
             <TextInput
               {...fieldIds("primaryGame")}
               name="primaryGame"
               defaultValue={values.primaryGame}
-              placeholder="One Piece Card Game"
+              placeholder="One Piece, Pokemon"
             />
           </Field>
 
-          <Field name="storeName" label="Local game store" optional>
+          <Field name="storeName" label="Business name" optional>
             <TextInput
               {...fieldIds("storeName")}
               name="storeName"

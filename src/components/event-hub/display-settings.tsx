@@ -9,7 +9,7 @@ import type { LayoutChoice } from "@/lib/event-hub/layout";
 import { ANNOUNCEMENT_MAX, NIGHT_TITLE_MAX } from "@/lib/event-hub/schema";
 
 /**
- * What the display says when nothing is running, and how it divides
+ * What the screen says when nothing is running, and how it divides
  * itself when things are.
  *
  * Three small forms rather than one, because they are used at different
@@ -58,7 +58,7 @@ export function DisplaySettings({
             placeholder="Round 3 pairings are posted."
           />
           <p className="text-xs text-text-muted">
-            One line, across the bottom of the television. Clear the box to remove it.
+            One line, across the bottom of the screen. Clear the box to remove it.
           </p>
         </div>
 
@@ -83,9 +83,7 @@ export function DisplaySettings({
               defaultValue={name}
               placeholder="Main TV"
             />
-            <p className="text-xs text-text-muted">
-              What the screens list calls this television.
-            </p>
+            <p className="text-xs text-text-muted">The name in your screens list.</p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -125,7 +123,7 @@ export function DisplaySettings({
         </div>
 
         <fieldset className="flex flex-col gap-3">
-          <legend className="sr-only">What the display shows</legend>
+          <legend className="sr-only">What the screen shows</legend>
 
           {/*
            * Each box is preceded by a hidden "off" of the same name.
@@ -158,19 +156,19 @@ export function DisplaySettings({
             name="soundEnabled"
             value="on"
             defaultChecked={soundEnabled}
-            label="Sound alerts at 10, 5 and 1 minute, and on time. Browsers block audio until somebody touches the display once."
+            label="Sound alerts at 10, 5 and 1 minute, and on time. Browsers block audio until somebody clicks once in the TV's browser."
           />
         </fieldset>
 
-        <SubmitButton label="Save display settings" pendingLabel="Saving…" size="sm" />
+        <SubmitButton label="Save screen settings" pendingLabel="Saving…" size="sm" />
       </form>
 
       <form action={rotateDisplayTokenAction} className="flex flex-col gap-2">
         <input type="hidden" name="displayId" value={displayId} />
         <p className="text-xs text-text-muted">
           {/* Said plainly, because the consequence is immediate. */}
-          Issuing a new link stops the old one working straight away. Do this if a
-          television leaves the building or the link gets out.
+          Issuing a new display link stops the old one working straight away. Do this if
+          a TV leaves the building or the link gets out.
         </p>
         <SubmitButton
           label="Issue a new display link"

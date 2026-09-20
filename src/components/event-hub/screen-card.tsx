@@ -24,7 +24,7 @@ import { readRoomTimer, type RoomTimerReading } from "@/lib/event-hub/room-timer
 import type { ScreenCardRow } from "@/lib/event-hub/room-timers";
 
 /**
- * One physical television, as a card on the FlareCast overview.
+ * One physical TV, as a card on the FlareCast overview.
  *
  * The founder's brief, almost verbatim: "I should be able to open
  * FlareCast and immediately understand: these are my physical screens.
@@ -172,7 +172,7 @@ export function ScreenCard({
   name: string;
   rows: ScreenCardRow[];
   manageHref: string;
-  /** The television's own page, opened in a new tab. */
+  /** The screen's own page, opened in a new tab. */
   displayHref: string;
   /** Where to add a tournament; null once the screen is full. */
   addHref: string | null;
@@ -209,7 +209,7 @@ export function ScreenCard({
       </div>
 
       {/* The two buttons a night uses, at the top where a thumb lands.
-          The television opens in its own tab so this page stays put. */}
+          The TV opens in its own tab so this page stays put. */}
       <div className="flex flex-wrap items-center gap-2">
         <a
           href={displayHref}
@@ -218,7 +218,7 @@ export function ScreenCard({
           className={buttonStyles("primary", "sm")}
         >
           <Tv className="size-4" aria-hidden="true" />
-          Open TV display
+          Open on the TV
         </a>
         <Link href={manageHref} className={buttonStyles("secondary", "sm")}>
           Manage
@@ -228,7 +228,7 @@ export function ScreenCard({
 
       {rows.length === 0 ? (
         <p className="text-sm text-text-muted">
-          Nothing on this screen yet. Add a tournament and the television lights up.
+          Nothing on this screen yet. Add a tournament and the screen lights up.
         </p>
       ) : (
         <div className="flex flex-col gap-2">

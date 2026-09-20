@@ -11,7 +11,7 @@ function validInput(overrides: Record<string, unknown> = {}) {
   return {
     firstName: "Zach",
     email: "zach@example.com",
-    userType: "player",
+    userType: "vendor",
     marketingConsent: true,
     ...overrides,
   };
@@ -43,7 +43,7 @@ describe("waitlistSubmissionSchema", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.email).toBe("zach@example.com");
-    expect(result.data?.userType).toBe("player");
+    expect(result.data?.userType).toBe("vendor");
   });
 
   it("normalizes the email as part of parsing", () => {
@@ -97,7 +97,14 @@ describe("waitlistSubmissionSchema", () => {
   it.each([
     ["unknown value", "hacker"],
     ["empty", ""],
-    ["wrong case", "Player"],
+    ["wrong case", "Vendor"],
+    /* Retired with the invite form going vendor-only: a player's account
+       is free at /signup and a store's Ultra trial is self-serve, so
+       neither is an invite to request any more. The database enum still
+       carries them for the rows the beta collected. */
+    ["a player, who signs up instead", "player"],
+    ["a store, which starts its trial instead", "store"],
+    ["a creator, no longer offered", "creator"],
   ])("rejects an invalid user type (%s)", (_label, userType) => {
     const result = waitlistSubmissionSchema.safeParse(validInput({ userType }));
 

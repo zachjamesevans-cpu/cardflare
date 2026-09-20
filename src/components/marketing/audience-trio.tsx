@@ -5,11 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 
 /**
- * Players, stores, vendors: one headline and a sentence or two each.
+ * Players and vendors: one headline and a sentence or two each.
  *
  * The founder: "Shorten the Players, Stores, and Vendors sections
- * heavily. Do not use long bullet lists." The ids keep the nav's
- * For Players and For Vendors links landing somewhere.
+ * heavily. Do not use long bullet lists." Stores are not a card here:
+ * the Ultra band above and the pricing tile below both send them to
+ * /ultra already, and a third door to the same page is noise. The ids
+ * keep the nav's For Players and For Vendors links landing somewhere.
  */
 const AUDIENCES = [
   {
@@ -20,15 +22,6 @@ const AUDIENCES = [
     href: "/signup",
     cta: "Create free account",
     analytics: "player_signup_cta_clicked",
-  },
-  {
-    id: "for-stores-card",
-    eyebrow: "Stores",
-    title: "Every night, on the TV.",
-    text: "Timers, Flares and your inventory on the TV. One code on the counter.",
-    href: "/ultra",
-    cta: "See Ultra",
-    analytics: undefined,
   },
   {
     id: "for-vendors",
@@ -47,7 +40,7 @@ export function AudienceTrio() {
       <h2 id="audience-title" className="sr-only">
         Who cardflare is for
       </h2>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {AUDIENCES.map((a) => (
           <Card
             key={a.id}

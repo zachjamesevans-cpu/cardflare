@@ -1,10 +1,17 @@
 import { Handshake, Radio, Search } from "lucide-react";
 
 import { Section } from "@/components/ui/section";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 const STEPS = [
-  { icon: Radio, title: "Send a Flare", text: "Post the card you need." },
-  { icon: Search, title: "cardflare looks", text: "Nearby, your LGS, the show." },
+  { icon: Radio, title: "Post a Flare", text: "The card you need, in one tap." },
+  {
+    icon: Search,
+    title: "cardflare looks",
+    text: LOCAL_ENABLED
+      ? "Nearby, your LGS, the show."
+      : "The room, your followers, your LGS, the show.",
+  },
   { icon: Handshake, title: "Make the trade", text: "In person. Earn Embers." },
 ] as const;
 

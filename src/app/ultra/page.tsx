@@ -56,8 +56,8 @@ export const dynamic = "force-dynamic";
 const SALES = [
   {
     icon: PackageSearch,
-    title: "Your case, matched to every want",
-    body: "Upload your TCGplayer inventory export. When a player in your room posts a Flare for a card you stock, their Flare says your counter may have it. The single sells to the exact person hunting it, the night they are in the building.",
+    title: "Your singles, matched to every Flare",
+    body: "Upload your TCGplayer inventory export. When a player in your room posts a Flare for a card you stock, their Flare says your counter may have it. The single sells to the exact person looking for it, the night they are in the building.",
   },
   {
     icon: Repeat,
@@ -67,7 +67,7 @@ const SALES = [
   {
     icon: BellRing,
     title: "A reason to walk in on a Tuesday",
-    body: "Your early board opens before the event and everybody who saved your store gets a push. Wants go up from the couch and get answered at the counter.",
+    body: "Your early board opens before the event and everybody who follows your store gets a push. Flares go up from the couch and get answered at the counter.",
   },
 ] as const;
 
@@ -97,31 +97,36 @@ const FLARECAST = [
   },
   {
     icon: MonitorPlay,
-    title: "Wants on the screen",
-    body: "The room's Flares rotate on the display, so a player who has the card knows before they leave their table.",
+    title: "Flares on the screen",
+    body: "The room's Flares rotate on the screen, so a player who has the card knows before they leave their table.",
   },
   {
     icon: TrendingUp,
     title: "Trades stay in your store",
-    body: "Matches happen at your tables and the singles come from your case. The store is the venue and the answer.",
+    body: "Matches happen at your tables and the cards come from your singles. The store is the venue and the answer.",
   },
 ] as const;
 
+/* Every line names something on the console the moment the trial
+   starts. Nothing here is a roadmap. */
 const INCLUDED = [
   "One printed counter code; players scan in with no account setup at the door",
   "A room for every event night, and walk-in rooms between them",
-  "FlareCast: timers, the room's wants and your code on the television",
+  "FlareCast: timers, the room's Flares and your code on the TV",
   "Auto Mode with the round-ready voice on the organizer's computer",
   "Every game's real overtime rules on the wall, with a beginner mode",
-  "TCGplayer inventory matching against every Flare in your room",
+  "Your singles, from a TCGplayer export, matched against every Flare in your room",
   "Early boards that open before the event, with a push to your regulars",
-  `Your store in the ${SITE.name} directory with the Ultra badge`,
+  "Your store page, with a Follow button for every player who finds it",
+  "Posts to your followers, each landing in their Feed with a thread under it",
+  "The case: six cards from your singles, on a shelf on your store page",
+  "The Verified mark on your store page",
 ];
 
 const FAQ = [
   {
     q: "Do I need new hardware?",
-    a: "No. Any television with a browser, or the laptop you already run pairings on, plugged into the TV. The organizer's controls run on a phone.",
+    a: "No. Any TV with a browser, or the laptop you already run pairings on, plugged into the TV. The organizer's controls run on a phone.",
   },
   {
     q: "What do players need?",
@@ -193,9 +198,8 @@ export default async function ForStoresPage() {
               {SITE.name} <UltraMark />
             </h1>
             <p className="max-w-2xl text-lg leading-relaxed text-pretty text-text-secondary sm:text-xl">
-              The counter, the tournament and the trades, run from one screen. Sell the
-              singles in your case to the players in your room, and let the tournament
-              run itself.
+              The counter, the tournament and the trades, run from one screen. Sell your
+              singles to the players in your room, and let the tournament run itself.
             </p>
             <p className="text-text-primary">
               <span className="text-3xl font-bold">{ULTRA_PRICE_LABEL}</span>
@@ -211,7 +215,7 @@ export default async function ForStoresPage() {
               </ButtonLink>
             </div>
           </div>
-          {/* The product itself, running: the television a store leaves on
+          {/* The product itself, running: the TV a store leaves on
               all night, on a sample night. It counts in real time. */}
           <div className="mx-auto mt-12 w-full max-w-5xl">
             <FlareCastPreview />
@@ -223,7 +227,7 @@ export default async function ForStoresPage() {
             id="sales-title"
             eyebrow="More sales"
             title="Sell to the players already in your store"
-            description="Every event night is a room full of people hunting specific cards. Ultra puts your case in front of the exact person looking for it."
+            description="Every event night is a room full of people looking for specific cards. Ultra puts your singles in front of the exact person who wants one."
           />
           <FeatureGrid items={SALES} />
           <div className="mx-auto mt-8 w-full max-w-3xl">
@@ -243,8 +247,8 @@ export default async function ForStoresPage() {
           </div>
           <FeatureGrid items={AUTO} />
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-text-muted">
-            Any television with a browser, or a laptop plugged into one. Nothing to
-            install, nothing for players to download at the door.
+            Any TV with a browser, or a laptop plugged into one. Nothing to install,
+            nothing for players to download at the door.
           </p>
         </Section>
 
@@ -253,7 +257,7 @@ export default async function ForStoresPage() {
             id="flarecast-title"
             eyebrow="FlareCast"
             title="The whole room, on your TV"
-            description="Put it on at the start of the night and leave it running. Your counter code, the tournament clocks and what the room is hunting, all on one screen."
+            description="Put it on at the start of the night and leave it running. Your counter code, the tournament clocks and what the room is looking for, all on one screen."
           />
           <FeatureGrid items={FLARECAST} />
         </Section>

@@ -13,7 +13,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 const SUBMISSION: WaitlistSubmission = {
   firstName: "Zach",
   email: "zach@example.com",
-  userType: "store",
+  userType: "vendor",
   primaryGame: "One Piece Card Game",
   city: "Austin",
   region: "TX",
@@ -36,7 +36,7 @@ describe("insertWaitlistSignup", () => {
     expect(insert).toHaveBeenCalledWith({
       first_name: "Zach",
       email: "zach@example.com",
-      user_type: "store",
+      user_type: "vendor",
       primary_game: "One Piece Card Game",
       city: "Austin",
       region: "TX",

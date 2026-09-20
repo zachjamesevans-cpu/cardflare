@@ -1,7 +1,8 @@
-import { MapPin, Sparkles, Store, Tent, type LucideIcon } from "lucide-react";
+import { MapPin, Sparkles, Store, Tent, Users, type LucideIcon } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 /**
  * The three places a card turns up, and the pieces every homepage
@@ -13,14 +14,20 @@ import { cn } from "@/lib/cn";
  * instantly understand: oh, cardflare tells me where the card is."
  * So one card, three answers, said the same way everywhere on the
  * page: in the hero, in the strip under it, on the phone.
+ *
+ * The first answer follows the Local switch. With Local on, a Flare
+ * reaches players nearby by distance; with it off (the founder's call,
+ * see `LOCAL_ENABLED`) the page must not sell that, so the first
+ * answer is what is actually on: the room at a store event, and the
+ * players who follow you seeing the Flare in their Feed.
  */
 
 export type Place = "nearby" | "lgs" | "show";
 
 export interface PlaceFacts {
-  /** The small capitals: NEARBY, AT YOUR LGS, AT THE SHOW. */
+  /** The small capitals: IN THE ROOM, AT YOUR LGS, AT THE SHOW. */
   eyebrow: string;
-  /** The answer: "Someone nearby has it". */
+  /** The answer: "Alex has it". */
   line: string;
   /** The sample detail under it. Illustrative, never live data. */
   detail: string;
@@ -32,14 +39,23 @@ export interface PlaceFacts {
 }
 
 export const PLACES: Record<Place, PlaceFacts> = {
-  nearby: {
-    eyebrow: "Nearby",
-    line: "Alex has it",
-    detail: "2.1 mi · 2 available",
-    action: "Raise a hand",
-    icon: MapPin,
-    tone: "text-accent",
-  },
+  nearby: LOCAL_ENABLED
+    ? {
+        eyebrow: "Nearby",
+        line: "Alex has it",
+        detail: "2.1 mi · 2 available",
+        action: "Raise a hand",
+        icon: MapPin,
+        tone: "text-accent",
+      }
+    : {
+        eyebrow: "In the room",
+        line: "Alex has it",
+        detail: "Friday night room · Table 4 · 3 followers saw it",
+        action: "Walk over",
+        icon: Users,
+        tone: "text-accent",
+      },
   lgs: {
     eyebrow: "At your LGS",
     line: "Local store may have it",
@@ -48,10 +64,12 @@ export const PLACES: Record<Place, PlaceFacts> = {
     icon: Store,
     tone: "text-frost",
   },
+  /* PRODUCT.md: never a price. The grade is the reason to cross a hall;
+     the number on the sticker is booth talk. */
   show: {
     eyebrow: "At the show",
     line: "Vendor 81 · Booth 174",
-    detail: "PSA 9 · $38",
+    detail: "PSA 9 · Hall B",
     action: "Go to booth",
     icon: Tent,
     tone: "text-gold",
@@ -144,8 +162,8 @@ export function PlaceChip({
 
 /**
  * The two doors in, used by the hero and again at the foot of the page.
- * Players get an account now; stores and vendors get the Ultra pitch,
- * which links on to Max for show vendors.
+ * Players get an account now; stores get the Ultra pitch. Vendors have
+ * their own page at /max, reached from the nav and the Vendors card.
  */
 export function HeroCtas({
   className,
@@ -176,7 +194,7 @@ export function HeroCtas({
         size="lg"
         className="w-full sm:w-auto"
       >
-        For stores &amp; vendors
+        For stores
       </ButtonLink>
     </div>
   );

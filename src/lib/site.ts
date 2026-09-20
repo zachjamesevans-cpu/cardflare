@@ -7,7 +7,7 @@ export const SITE = {
   /** The page title's second half, after "cardflare | ". */
   title: "Find Trading Cards Near You",
   description:
-    "Find the card. Make the trade. cardflare searches nearby collectors, local game stores and card show vendors for the cards you need, then puts you in the same room.",
+    "Find the card. Make the trade. Post a Flare for the card you need and the room at your game store, the players who follow you and the vendors at the show see it.",
   contactEmail: "hello@cardflare.gg",
   /**
    * Where the contact form delivers.
@@ -50,7 +50,6 @@ export const ANCHORS = {
   howItWorks: "/#how-it-works",
   forPlayers: "/#for-players",
   forVendors: "/#for-vendors",
-  forStores: "/#for-stores",
   pricing: "/#pricing",
   invite: "/invite",
 } as const;

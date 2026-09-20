@@ -42,7 +42,7 @@ function formData(overrides: Record<string, string> = {}, omit: string[] = []) {
   const fields: Record<string, string> = {
     firstName: "Zach",
     email: "Zach@Example.com",
-    userType: "player",
+    userType: "vendor",
     marketingConsent: "on",
     [RENDERED_AT_FIELD]: String(Date.now() - 60_000),
     ...overrides,
@@ -137,7 +137,7 @@ describe("submitWaitlist", () => {
         email: "not-an-email",
         firstName: "Zach",
         city: "Austin",
-        userType: "store",
+        userType: "vendor",
       }),
     );
 
@@ -147,7 +147,7 @@ describe("submitWaitlist", () => {
         firstName: "Zach",
         email: "not-an-email",
         city: "Austin",
-        userType: "store",
+        userType: "vendor",
       },
     });
   });

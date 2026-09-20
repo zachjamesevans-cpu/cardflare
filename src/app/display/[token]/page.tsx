@@ -28,7 +28,7 @@ export async function generateMetadata({
      certainly not something a search engine should be handing out. */
   const robots = { index: false, follow: false, nocache: true };
 
-  if (!display) return { title: "Event Hub", robots };
+  if (!display) return { title: "FlareCast", robots };
 
   const timers = await listTimers(display.id);
   const games = [...new Set(timers.map((timer) => timer.game))];
@@ -79,9 +79,9 @@ export default async function DisplayPage({
 }
 
 /**
- * The same screen for a wrong token, a retired one and a deleted
- * display. There is nothing to learn here by guessing, and a shop
- * staring at a television needs a next step rather than a status code.
+ * The same page for a wrong token, a retired one and a deleted screen.
+ * There is nothing to learn here by guessing, and a shop staring at a
+ * TV needs a next step rather than a status code.
  */
 function NotConnected() {
   return (
@@ -91,10 +91,10 @@ function NotConnected() {
     >
       <Logo size={56} />
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-text-primary">Display not connected</h1>
+        <h1 className="text-3xl font-bold text-text-primary">Screen not connected</h1>
         <p className="max-w-md text-text-secondary">
-          This link is no longer live. Open the Event Hub in your store console and use
-          the current display link.
+          This display link is no longer live. Open the screen&rsquo;s page in FlareCast
+          in your store console and use its current display link.
         </p>
       </div>
     </main>

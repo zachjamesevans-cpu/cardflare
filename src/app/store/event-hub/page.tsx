@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ScreenCard } from "@/components/event-hub/screen-card";
 import { StoreTabs } from "@/components/stores/store-tabs";
-import { Card } from "@/components/ui/card";
-import { SubmitButton } from "@/components/ui/submit-button";
-import { TextInput } from "@/components/ui/controls";
-import { areasForUser } from "@/lib/auth/areas";
-import { getViewer } from "@/lib/auth/session";
-import { consoleStoreIds } from "@/lib/stores/console";
+import { loadStoreConsole } from "@/lib/stores/console";
 import { createDisplayAction } from "@/lib/event-hub/actions";
+import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { RULES_DISCLAIMER } from "@/lib/event-hub/game-profiles";
 import { MAX_TIMERS } from "@/lib/event-hub/layout";
 import { listDisplays } from "@/lib/event-hub/repository";
@@ -25,51 +19,41 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * FlareCast's front page: the store's physical screens, as cards.
+ * FlareCast's front page: the store's screens, as cards.
  *
  * The founder's brief, after running real nights on the old page: each
- * display repeated a full block of link instructions, URL, controls and
+ * screen repeated a full block of link instructions, URL, controls and
  * settings, and two screens made "an extremely long repetitive mobile
  * page". So this page now answers exactly one question — WHAT IS ON MY
  * SCREENS — and everything about one screen lives on that screen's own
  * manage page, one tap away. No URLs here, no instructions, and the
  * general explanation appears once at the bottom instead of under
- * every television.
+ * every screen.
  *
  * A round later, with several tournaments running at once, the
  * founder asked for the opposite lean on the cards themselves: the
- * colour code of each tournament, more of the controls, and Open TV
- * display reachable from here. The card carries that; the page still
- * carries nothing twice.
+ * colour code of each tournament, more of the controls, and the TV
+ * reachable from here. The card carries that; the page still carries
+ * nothing twice.
+ *
+ * Who may stand here, and which store `?as=` points at, is decided by
+ * `loadStoreConsole`, the same loader every other console tab goes
+ * through, so this tab cannot drift on authorisation.
  */
 export default async function FlareCastPage({
   searchParams,
 }: {
   searchParams: Promise<{ as?: string }>;
 }) {
-  const viewer = await getViewer();
-
-  if (viewer.kind === "anonymous") redirect("/login?next=/store/event-hub");
-  /* An organizer is a player viewer carrying the stores that named
-     them; a player nobody named has no console to see. */
-  if (viewer.kind === "player" && viewer.organizerStoreIds.length === 0) {
-    redirect("/profile");
-  }
-  if (viewer.kind === "admin" && viewer.storeIds.length === 0) redirect("/admin");
-  if (viewer.kind === "unaffiliated") redirect("/store");
-
-  /* Same `?as=` switcher the store dashboard uses, and the same rule:
-     anything not in this account's own list falls back to the first. */
   const { as } = await searchParams;
-  const storeIds = consoleStoreIds(viewer);
-  const storeId = as && storeIds.includes(as) ? as : storeIds[0];
+  const { viewer, store, areas, currentArea } = await loadStoreConsole(
+    as,
+    "/store/event-hub",
+  );
+  if (!store || store.kind === "vendor") return null;
 
-  if (!storeId) redirect("/store");
-
-  const [displays, areas] = await Promise.all([
-    listDisplays(storeId),
-    areasForUser(viewer.user.id, viewer.kind === "admin"),
-  ]);
+  const storeId = store.id;
+  const displays = await listDisplays(storeId);
 
   const screens = await Promise.all(
     displays.map(async (display) => ({
@@ -89,9 +73,9 @@ export default async function FlareCastPage({
       area="Store"
       email={viewer.user.email ?? ""}
       title="FlareCast"
-      description="Your screens: tournament timers, the room's Flares and your counter code, on every television."
+      description="Your screens: tournament timers, the room's Flares and your counter code, on every TV."
       areas={areas}
-      currentArea={`/store?as=${storeId}`}
+      currentArea={currentArea}
     >
       <StoreTabs storeId={storeId} />
 
@@ -112,9 +96,9 @@ export default async function FlareCastPage({
 
         {screens.length === 0 && (
           <p className="max-w-2xl text-sm text-text-secondary">
-            A screen is one physical television or projector. Add your first one below,
-            open its link on that TV, and it runs all night: timers, the room&rsquo;s
-            Flares and your counter code.
+            A screen is one TV or projector. Add your first one below, open its display
+            link on that TV, and it runs all night: timers, the room&rsquo;s Flares and
+            your counter code.
           </p>
         )}
 
@@ -134,27 +118,13 @@ export default async function FlareCastPage({
             />
           ))}
 
-          {/* Adding a television is one field. The link and token are
-              generated on create; they live on the manage page. */}
-          <Card className="flex flex-col justify-center gap-3 border-dashed">
-            <form action={createDisplayAction} className="flex flex-col gap-3">
-              <input type="hidden" name="storeId" value={storeId} />
-              <label
-                htmlFor="new-screen-name"
-                className="flex items-center gap-2 font-semibold text-text-primary"
-              >
-                <Plus className="size-4 text-accent" aria-hidden="true" />
-                Add a screen
-              </label>
-              <TextInput
-                id="new-screen-name"
-                name="name"
-                maxLength={40}
-                placeholder={screens.length === 0 ? "Main TV" : "Back TV"}
-              />
-              <SubmitButton label="Create" pendingLabel="Creating…" size="sm" />
-            </form>
-          </Card>
+          {/* Adding a screen is one field. The display link and token
+              are generated on create; they live on the manage page. */}
+          <AddScreenForm
+            storeId={storeId}
+            first={screens.length === 0}
+            action={createDisplayAction}
+          />
         </div>
       </section>
 
@@ -167,8 +137,8 @@ export default async function FlareCastPage({
         </h2>
         <div className="max-w-2xl space-y-2 text-sm text-text-secondary">
           <p>
-            Each screen has its own private link. Open it in the browser on whatever
-            drives that television, press Enter Fullscreen once, and leave it. It needs
+            Each screen has its own private display link. Open it in the browser on
+            whatever drives that TV, press Enter Fullscreen once, and leave it. It needs
             nobody to sign in and keeps counting through wifi hiccups. The link lives on
             each screen&rsquo;s manage page.
           </p>
