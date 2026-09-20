@@ -25,6 +25,7 @@ import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
 import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
+import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Muted, Tap } from "../ui";
 
@@ -154,52 +155,80 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <FeedPerson
-          playerId={post.author.playerId}
-          displayName={post.author.displayName}
-          avatarUrl={post.author.avatarUrl}
-          frame={post.author.frame}
-          ring={post.author.ring}
-          aura={post.author.aura ?? null}
-          detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
-            post.eventName ? ` · ${post.eventName}` : ""
-          }`}
-          onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
-        />
-
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-          <FlareTypeChip
-            label={direction === "showcase" ? "Offering" : "Want"}
-            primary
-          />
-        </View>
-
-        {/* The cards, the way the Feed draws them: one row, or the
-            same row swiped. Tap one to open it big and say you have it. */}
-        {total === 1 && lead ? (
-          <FlareCardSlide
-            card={lead}
-            direction={direction}
-            post={ref}
-            siblings={shelf}
-            position={0}
-          />
+        {post.store ? (
+          /* A STORE's post: the shop's header and what it said, then the
+             same heart and thread every post has. No cards, no offers -
+             the store wrote it, and there is nothing to have. */
+          <>
+            <StorePostHeader
+              name={post.store.name}
+              logoUrl={post.store.logoUrl}
+              verified={post.store.verified}
+              postedAt={post.store.postedAt}
+              onOpenStore={() =>
+                navigation.navigate("StoreProfile", {
+                  storeId: post.store?.storeId ?? "",
+                })
+              }
+            />
+            <StorePostBody
+              title={post.store.title}
+              body={post.store.body}
+              imageUrl={post.store.imageUrl}
+            />
+          </>
         ) : (
-          <FlareCarousel
-            cards={post.cards}
-            total={total}
-            direction={direction}
-            post={ref}
-            remainingCopies={post.remainingCopies}
-            onViewAll={() => setCardsSheet({ ...sheetPost, mode: "view" })}
-          />
-        )}
+          <>
+            <FeedPerson
+              playerId={post.author.playerId}
+              displayName={post.author.displayName}
+              avatarUrl={post.author.avatarUrl}
+              frame={post.author.frame}
+              ring={post.author.ring}
+              aura={post.author.aura ?? null}
+              detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
+                post.eventName ? ` · ${post.eventName}` : ""
+              }`}
+              onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+            />
 
-        {post.caption ? (
-          <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
-            {post.caption}
-          </Text>
-        ) : null}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+              <FlareTypeChip
+                label={direction === "showcase" ? "Offering" : "Want"}
+                primary
+              />
+            </View>
+
+            {/* The cards, the way the Feed draws them: one row, or the
+                same row swiped. Tap one to open it big and say you have it. */}
+            {total === 1 && lead ? (
+              <FlareCardSlide
+                card={lead}
+                direction={direction}
+                post={ref}
+                siblings={shelf}
+                position={0}
+              />
+            ) : (
+              <FlareCarousel
+                cards={post.cards}
+                total={total}
+                direction={direction}
+                post={ref}
+                remainingCopies={post.remainingCopies}
+                onViewAll={() => setCardsSheet({ ...sheetPost, mode: "view" })}
+              />
+            )}
+
+            {post.caption ? (
+              <Text
+                style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}
+              >
+                {post.caption}
+              </Text>
+            ) : null}
+          </>
+        )}
 
         {post.hunt ? (
           <Tap
@@ -219,16 +248,20 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           </Tap>
         ) : null}
 
-        <FlareActions
-          yours={post.yours}
-          direction={direction}
-          completed={post.completed ?? false}
-          onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
-          onProgress={() => setProgressSheet(sheetPost)}
-        />
-        {!post.yours && direction === "want" && !post.completed ? (
-          <Muted>Tap a card to say you have it, or offer several at once.</Muted>
-        ) : null}
+        {post.store ? null : (
+          <>
+            <FlareActions
+              yours={post.yours}
+              direction={direction}
+              completed={post.completed ?? false}
+              onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
+              onProgress={() => setProgressSheet(sheetPost)}
+            />
+            {!post.yours && direction === "want" && !post.completed ? (
+              <Muted>Tap a card to say you have it, or offer several at once.</Muted>
+            ) : null}
+          </>
+        )}
 
         <PostSocialRow
           likes={post.likes}
@@ -329,7 +362,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           )}
         </View>
 
-        {post.code && post.storeName ? (
+        {!post.store && post.code && post.storeName ? (
           <Button
             label={`Go to ${post.storeName}`}
             onPress={() => {

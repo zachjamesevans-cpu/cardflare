@@ -660,7 +660,7 @@ export type AvatarOutcome =
  */
 type SharpFactory = (typeof import("sharp"))["default"];
 
-async function loadSharp(): Promise<SharpFactory> {
+export async function loadSharp(): Promise<SharpFactory> {
   try {
     return (await import("sharp")).default;
   } catch (cause) {
@@ -980,7 +980,7 @@ export async function setAnimatedAvatar(
  * and left a correctly-sized object no browser could decode - and an
  * animation written any other way would reproduce the same bug.
  */
-async function putAvatarObject(
+export async function putAvatarObject(
   path: string,
   bytes: Buffer,
   contentType: string,

@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import { CalendarDays, MonitorPlay, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarDays, MonitorPlay, Sparkles, Users } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
 import { AppShell } from "@/components/layout/app-shell";
 import { BillingCard, billingNotice } from "@/components/stores/billing-card";
-import {
-  SetupChecklist,
-  WelcomeHero,
-  type SetupStep,
-} from "@/components/stores/onboarding";
+import { SetupChecklist, type SetupStep } from "@/components/stores/onboarding";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { VendorConsole } from "@/components/stores/vendor-console";
 import { ButtonLink } from "@/components/ui/button";
@@ -20,8 +17,12 @@ import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
 import { singlesSyncFor } from "@/lib/singles/repository";
 import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
-import { storePageFor, storePageIsSetUp } from "@/lib/stores/page";
-import { planDate, storePlan, ultraIsSellable } from "@/lib/stores/ultra";
+import {
+  storeOnboardingCompletedAt,
+  storePageFor,
+  storePageIsSetUp,
+} from "@/lib/stores/page";
+import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
 export const metadata: Metadata = {
   title: "Your store",
@@ -35,10 +36,14 @@ export const dynamic = "force-dynamic";
  *
  * It used to be every section of the console on one long scroll. The
  * founder: "kind of just a massive fart of a bunch of screens." Now
- * the front page is the welcome, the four things to do first, the
- * counter code, and the plan; the television, the events, the case
- * and the settings each have a tab. A store that has done all four
- * things sees the code and the plan and nothing nagging.
+ * the front page is the things to do first, the counter code, and the
+ * plan; the television, the events, the case and the settings each
+ * have a tab. A store that has done all four things sees the code and
+ * the plan and nothing nagging.
+ *
+ * The welcome moved to the setup wizard at /store/setup, which is
+ * where checkout lands now. An owner who has not finished or skipped
+ * it sees one card at the top offering it, and nothing else about it.
  */
 export default async function StorePage({
   searchParams,
@@ -86,21 +91,23 @@ export default async function StorePage({
 
   await sweepStaleRooms();
 
-  const [events, displays, sync, plan, counterQr, page] = await Promise.all([
-    listEventsForStore(store.id),
-    listDisplays(store.id),
-    singlesSyncFor(store.id),
-    storePlan(store.id),
-    store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
-    storePageFor(store.id),
-  ]);
-
   /*
    * The page and the organizers are the owner's. An organizer landing
    * here runs the timers and the hub; the card that hands those out,
    * and the form that names the shop, are not offered to them.
    */
   const owner = store.role === "owner";
+
+  const [events, displays, sync, plan, counterQr, page, onboardedAt] =
+    await Promise.all([
+      listEventsForStore(store.id),
+      listDisplays(store.id),
+      singlesSyncFor(store.id),
+      storePlan(store.id),
+      store.join_code ? joinQrSvg(store.join_code) : Promise.resolve(null),
+      storePageFor(store.id),
+      owner ? storeOnboardingCompletedAt(store.id) : Promise.resolve(null),
+    ]);
 
   const steps: SetupStep[] = [
     /*
@@ -113,7 +120,7 @@ export default async function StorePage({
       key: "page",
       title: "Set up your store page",
       detail:
-        "Your address, hours and a line about the shop, so players can find and follow you",
+        "Your logo, banner, hours and a line about the shop, so players can find and follow you",
       done: storePageIsSetUp(page),
       href: `${consoleHref("/store/settings", store.id)}#page`,
       action: "Set up your page",
@@ -155,8 +162,6 @@ export default async function StorePage({
       action: "Open settings",
     },
   ];
-  const trialUntil = plan.state === "trialing" ? planDate(plan.until) : null;
-
   const upcoming = events.filter((event) => event.status !== "closed").slice(0, 3);
 
   /* The first four steps are everybody's; the page is the owner's. */
@@ -174,12 +179,25 @@ export default async function StorePage({
     >
       <StoreTabs storeId={store.id} />
 
-      {(justStarted || params.welcome === "1" || settingUp) && (
-        <WelcomeHero
-          storeName={store.name}
-          trialUntil={trialUntil}
-          fresh={justStarted || params.welcome === "1"}
-        />
+      {/* The wizard, until the owner has finished or skipped it. */}
+      {owner && onboardedAt === null && (
+        <Card className="flex flex-wrap items-center gap-4 border-accent">
+          <Sparkles className="size-6 shrink-0 text-accent" aria-hidden="true" />
+          <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
+            <p className="font-semibold text-text-primary">Finish setting up</p>
+            <p className="text-sm text-text-secondary">
+              Your store page, your screens, your first night and your team. Five
+              minutes, and every step can wait.
+            </p>
+          </div>
+          <Link
+            href={consoleHref("/store/setup", store.id)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-accent underline-offset-4 hover:underline"
+          >
+            Open the setup
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </Card>
       )}
 
       {settingUp && <SetupChecklist steps={visibleSteps} />}

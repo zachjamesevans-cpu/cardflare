@@ -14,9 +14,30 @@ import {
   type PublicStore,
 } from "../api";
 import { FollowStoreButton } from "../follow-store-button";
-import { colors, gutter, spacing } from "../theme";
+import { gameShortName } from "../games";
+import { RemoteImage } from "../remote-image";
+import { CoverBanner } from "../showcase-zoom";
+import { hoursLines } from "../store-hours";
+import { colors, gutter, radius, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
-import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from "../ui";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  CardImage,
+  ErrorLine,
+  Input,
+  Muted,
+  Title,
+} from "../ui";
+import { VerifiedMark } from "../verified-mark";
+
+/** The header's banner: a strip the logo overlaps, the website's short cover. */
+const COVER_HEIGHT = 144;
+/** How far the header sits down the card, so the logo straddles the cover's edge. */
+const HEADER_TOP = 88;
+const LOGO = 64;
 
 /**
  * A store, as a player sees it — claimed or not.
@@ -32,6 +53,12 @@ import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from 
  * reproduce. A mark, an address, and an honest label saying nobody at
  * the shop has claimed it yet.
  *
+ * A CLAIMED store's page is the player profile's shape without the
+ * cosmetics, the website's `StorePageHeader` drawn in React Native:
+ * the banner as a strip, the logo overlapping its edge, the name with
+ * the Verified mark, the Ultra line, the games, the hours with whether
+ * it is open right now. No frames, no rings: a business page.
+ *
  * Not a browser hand-off. The founder, on being thrown into Safari by a
  * tab that should have been native: a link out of the app is a link out
  * of the app.
@@ -45,6 +72,12 @@ import { AsyncButton, Body, Button, Card, ErrorLine, Input, Muted, Title } from 
 export function StoreProfileScreen({ storeId }: { storeId: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [store, setStore] = useState<PublicStore | null>(null);
+  /* The case as one shelf, so the zoom swipes along it. */
+  const caseShelf = (store?.casePicks ?? []).map((pick) => ({
+    imageUrl: pick.imageUrl,
+    name: pick.cardName,
+    cardNumber: pick.cardNumber,
+  }));
   const [failed, setFailed] = useState(false);
   const [claiming, setClaiming] = useState(false);
   /* Null until the token has been looked for, so neither word is drawn
@@ -120,27 +153,112 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         gap: spacing(4),
       }}
     >
-      <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <MaterialCommunityIcons
-            name="storefront-outline"
-            size={22}
-            color={colors.textMuted}
-          />
-          <Title>{store.name}</Title>
-          {/* Two marks, never one inferred from the other: Verified is
-              trust, Ultra is a product tier. */}
+      <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
+        {/* The banner carries down behind the logo and the name, then
+            fades into the card: the player cover's short strip. */}
+        <CoverBanner coverUrl={store.coverUrl ?? null} height={COVER_HEIGHT} fade />
+
+        <View style={{ marginTop: HEADER_TOP, gap: spacing(1) }}>
+          {/* The logo, a rounded square with the card's own colour as its
+              border, straddling the banner's bottom edge. The
+              placeholder stands in for a logo the store has not
+              uploaded; an unclaimed listing never has one. */}
+          <View
+            style={{
+              width: LOGO,
+              height: LOGO,
+              borderRadius: radius.card,
+              borderWidth: 4,
+              borderColor: colors.surface,
+              backgroundColor: colors.elevated,
+              overflow: "hidden",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {store.logoUrl ? (
+              <RemoteImage
+                uri={store.logoUrl}
+                style={{ width: "100%", height: "100%" }}
+              />
+            ) : (
+              <MaterialCommunityIcons
+                name="storefront-outline"
+                size={28}
+                color={colors.textMuted}
+              />
+            )}
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: spacing(2),
+              marginTop: spacing(2),
+            }}
+          >
+            <Title>{store.name}</Title>
+            {/* Two marks, never one inferred from the other: Verified is
+                trust, Ultra is a product tier. */}
+            {store.verified ? <VerifiedMark size={20} /> : null}
+          </View>
+
+          {store.ultra ? (
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 11,
+                fontWeight: "600",
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+              }}
+            >
+              cardflare <Text style={{ color: colors.accent }}>Ultra</Text> store
+            </Text>
+          ) : null}
+
+          {store.city || store.region ? (
+            <Body>{[store.city, store.region].filter(Boolean).join(", ")}</Body>
+          ) : null}
+
           {store.verified ? (
-            <MaterialCommunityIcons
-              name="check-decagram"
-              size={16}
-              color={colors.accent}
-            />
+            <Muted>
+              cardflare Verified means cardflare has confirmed that this profile is
+              controlled by the listed business. It is not an endorsement or guarantee
+              of the business.
+            </Muted>
+          ) : store.unclaimed ? (
+            <Muted>Unclaimed listing</Muted>
           ) : null}
         </View>
 
         {store.description ? <Body>{store.description}</Body> : null}
-        {store.unclaimed ? <Muted>Unclaimed listing</Muted> : null}
+
+        {store.games && store.games.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+            {store.games.map((game) => (
+              <Text
+                key={game}
+                style={{
+                  color: colors.textSecondary,
+                  backgroundColor: colors.elevated,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 999,
+                  paddingHorizontal: spacing(2.5),
+                  paddingVertical: spacing(0.5),
+                  fontSize: 12,
+                  fontWeight: "600",
+                  overflow: "hidden",
+                }}
+              >
+                {gameShortName(game)}
+              </Text>
+            ))}
+          </View>
+        ) : null}
 
         {/* Follow, for a signed-in account; the way to become one, for
             anyone else. Keyed on the server's answer so a follow made in
@@ -161,6 +279,57 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         <Muted>
           Following puts this store&rsquo;s nights in your Feed and your locals.
         </Muted>
+
+        {store.hours ? (
+          <View style={{ gap: spacing(0.5) }}>
+            <Text
+              style={{
+                color: store.openNow ? colors.success : colors.textSecondary,
+                fontWeight: "600",
+                fontSize: 14,
+              }}
+            >
+              {store.openNow ? "Open now" : "Closed now"}
+            </Text>
+            {hoursLines(store.hours).map((line) => (
+              <View key={line.days} style={{ flexDirection: "row", gap: spacing(3) }}>
+                <Text style={{ color: colors.textPrimary, fontSize: 14, minWidth: 92 }}>
+                  {line.days}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                  {line.hours}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {store.casePicks && store.casePicks.length > 0 ? (
+          <View style={{ gap: spacing(1.5) }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 14 }}
+            >
+              In the case this week
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(2) }}
+            >
+              {store.casePicks.map((pick, index) => (
+                <CardImage
+                  key={pick.cardId}
+                  imageUrl={pick.imageUrl}
+                  width={64}
+                  name={pick.cardName}
+                  cardNumber={pick.cardNumber}
+                  siblings={caseShelf}
+                  position={index}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {store.address ? <Body>{store.address}</Body> : null}
 

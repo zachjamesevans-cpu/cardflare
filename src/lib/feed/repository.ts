@@ -23,6 +23,7 @@ import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosme
 import { listWants } from "@/lib/players/wants";
 import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
+import { storePostsForFollowers } from "@/lib/stores/posts";
 import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
@@ -708,8 +709,54 @@ export interface NearbyMatchItem {
   matches: NearbyMatch[];
 }
 
+/**
+ * A store you follow, saying something.
+ *
+ * The founder: "a store announcing 'OP-12 prerelease Saturday, 20
+ * seats' as a Flare-shaped post to its followers. This is the thing
+ * that makes following worth it." The one authored item beside the
+ * cardflare notice, and unlike that one it hangs off a follow: a
+ * `player_locals` row, which joining a room while signed in writes and
+ * the Follow button writes. Drawn as the post a Flare is - logo for
+ * the face, "posted an update" where a Flare says "is hunting", the
+ * same heart and thread - and when it is about an event night, "I'll
+ * be there" is the same RSVP the upcoming item has always had.
+ */
+export interface StorePostItem {
+  kind: "storePost";
+  postId: string;
+  storeId: string;
+  storeName: string;
+  /** The store's logo, or null: the card draws a storefront instead. */
+  logoUrl: string | null;
+  verified: boolean;
+  title: string;
+  body: string | null;
+  /** A wide picture, 16:9, or null for words alone. */
+  imageUrl: string | null;
+  postedAt: string;
+  /** The event night it is about, or null for plain news. */
+  event: {
+    code: string;
+    name: string;
+    startsAt: string;
+    /** When the board starts taking Flares, for "Opens Friday" while it is not. */
+    opensAt: string;
+    timeZone: string;
+    playersIn: number;
+    /** Whether "I'll be there" works right now: the board is early or live. */
+    open: boolean;
+  } | null;
+  likes: number;
+  comments: number;
+  liked: boolean;
+  /** The viewer already has a seat at the event. */
+  going: boolean;
+}
+
 export type FeedItem =
   | AnnouncementItem
+  | StorePostItem
   | NearbyMatchItem
   | WantedItem
   | BoardItem
@@ -792,6 +839,12 @@ function sectionFor(item: FeedItem): FeedSection {
     case "hunt":
       /* Your own post is not news about somebody else. */
       return item.yours ? "yours" : "people";
+    /* A shop you follow, under the same heading as the people you
+       follow: it is the same relationship, and the founder's whole
+       point was that following a store should read like following a
+       person. */
+    case "storePost":
+      return "people";
     case "recent":
     case "added":
     case "traded":
@@ -834,6 +887,8 @@ function reasonFor(item: FeedItem): string {
       return item.yours ? "Your Flare" : "Because you follow them";
     case "added":
       return "Because you follow them";
+    case "storePost":
+      return `Because you follow ${item.storeName}`;
     case "recent":
       return `Posted at ${item.storeName}`;
     case "traded":
@@ -949,7 +1004,12 @@ export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
      somebody you follow. */
   if (section === "yours") return "following";
   if (item.kind === "start" && item.topic === "deck") return "following";
-  if (section === "people" || section === "store" || item.kind === "announcement") {
+  if (
+    section === "people" ||
+    section === "store" ||
+    item.kind === "announcement" ||
+    item.kind === "storePost"
+  ) {
     return "following";
   }
   return "nearby";
@@ -2432,6 +2492,78 @@ async function shopItem(playerId: string, balance: number): Promise<ShopItem[]> 
  * Without it there is no binder to match against and the feed is still worth
  * showing: a board opening on Friday is news whether or not you can answer it.
  */
+/**
+ * Followed Flares and store posts in one order, newest first.
+ *
+ * Stable for equal dates, so two posts from the same second keep the
+ * order their builders gave them.
+ */
+function byPostedAt<T extends { postedAt: string }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index, at: Date.parse(item.postedAt) || 0 }))
+    .sort((a, b) => b.at - a.at || a.index - b.index)
+    .map((entry) => entry.item);
+}
+
+/**
+ * What the shops this player follows have said this week.
+ *
+ * `going` is read here rather than in the store module because it is
+ * a fact about the viewer's seat, which the Feed already knows how to
+ * ask: the account's room sessions, and which events have one of them.
+ */
+async function storePostItems(
+  playerId: string,
+  sessionId: string | null,
+): Promise<StorePostItem[]> {
+  const posts = await storePostsForFollowers(playerId, since(RECENT_DAYS));
+  if (posts.length === 0) return [];
+
+  const eventIds = [
+    ...new Set(posts.flatMap((post) => (post.event ? [post.event.id] : []))),
+  ];
+  const sessionIds = new Set((await sessionsForPlayers([playerId])).keys());
+  if (sessionId) sessionIds.add(sessionId);
+
+  const seated = new Set<string>();
+  if (eventIds.length > 0 && sessionIds.size > 0) {
+    const { data } = await getSupabaseAdmin()
+      .from("event_participants")
+      .select("event_id")
+      .in("event_id", eventIds)
+      .in("player_session_id", [...sessionIds]);
+    for (const row of data ?? []) seated.add(row.event_id);
+  }
+
+  return posts.map((post) => ({
+    kind: "storePost",
+    postId: post.postId,
+    storeId: post.storeId,
+    storeName: post.storeName,
+    logoUrl: post.logoUrl,
+    verified: post.verified,
+    title: post.title,
+    body: post.body,
+    imageUrl: post.imageUrl,
+    postedAt: post.postedAt,
+    event: post.event
+      ? {
+          code: post.event.code,
+          name: post.event.name,
+          startsAt: post.event.startsAt,
+          opensAt: post.event.opensAt,
+          timeZone: post.event.timeZone,
+          playersIn: post.event.playersIn,
+          open: post.event.phase === "early" || post.event.phase === "live",
+        }
+      : null,
+    likes: post.likes,
+    comments: post.comments,
+    liked: post.liked,
+    going: post.event ? seated.has(post.event.id) : false,
+  }));
+}
+
 export async function listFeed(
   playerId: string,
   sessionId: string | null,
@@ -2552,7 +2684,7 @@ export async function listFeed(
      twice under two different headings. */
   const shown = new Set([...live, ...elsewhere].map((local) => local.storeId));
 
-  const [traded, added, suggested, recent, pack, shop, nearbyStores] =
+  const [traded, added, suggested, recent, pack, shop, nearbyStores, storePosts] =
     await Promise.all([
       tradedItems(locals.map((local) => local.storeId)),
       addedItems(followed, playerBySession, wanted),
@@ -2561,6 +2693,7 @@ export async function listFeed(
       packItem(balance),
       shopItem(playerId, balance),
       nearbyStoreItems(playerId, locals, device),
+      storePostItems(playerId, sessionId),
     ]);
 
   /* The lead item, and the one that needs nothing from anybody else
@@ -2612,11 +2745,24 @@ export async function listFeed(
      */
     ...areaHunts.filter((item) => item.yours),
     ...boards.filter((item) => item.kind === "hunt" && item.yours),
-    ...boards.filter((item) => item.kind === "hunt" && !item.yours),
-    /* Somebody you follow, posting from anywhere rather than onto a
-       board at a shop you happen to share. Without this, following a
-       player showed you almost nothing. */
-    ...areaHunts.filter((item) => !item.yours),
+    /*
+     * Everyone you follow, people and shops alike, newest first.
+     *
+     * A store's post is dated the way a Flare is, so it takes its place
+     * among the followed Flares by that date rather than in a block of
+     * its own: the shop that posted an hour ago sits above the Flare
+     * from yesterday, and under the one from ten minutes ago. Board
+     * hunts, area hunts and store posts are one list here. Your own
+     * posts stay hoisted above, as they always were.
+     */
+    ...byPostedAt<HuntItem | StorePostItem>([
+      ...boards.filter((item): item is HuntItem => item.kind === "hunt" && !item.yours),
+      /* Somebody you follow, posting from anywhere rather than onto a
+         board at a shop you happen to share. Without this, following a
+         player showed you almost nothing. */
+      ...areaHunts.filter((item) => !item.yours),
+      ...storePosts,
+    ]),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,

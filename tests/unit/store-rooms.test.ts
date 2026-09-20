@@ -94,6 +94,7 @@ const room = (over: Partial<PublicEvent> = {}): PublicEvent => ({
   storeName: "Grand Line Games",
   storeCity: "Austin",
   storeRegion: "TX",
+  storeVerified: false,
   storeTimeZone: "America/Chicago",
   repeatWeekly: false,
   earlyBoardHours: 48,

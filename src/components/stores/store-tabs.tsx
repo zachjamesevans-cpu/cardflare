@@ -9,8 +9,8 @@ import { StoreTabsNav, type StoreTabId } from "./store-tabs-nav";
  * session rather than from a prop a page might forget to pass: every
  * console page renders `<StoreTabs storeId={...} />` and gets the right
  * tabs for that person at that store. An OWNER sees all six. An
- * ORGANIZER (role "staff", the TO badge) sees the overview, FlareCast
- * and the events, because those are what they run; singles, the
+ * ORGANIZER (role "staff", the TO badge) sees the overview, FlareCast,
+ * the events and the posts, because those are what they run; singles, the
  * organizers list and settings are the owner's, and `loadStoreConsole`
  * turns an organizer away from those pages on the server regardless
  * of what is drawn here.
@@ -19,12 +19,22 @@ const OWNER_TABS: StoreTabId[] = [
   "overview",
   "event-hub",
   "events",
+  "posts",
+  "case",
   "singles",
   "organizers",
   "settings",
 ];
 
-const ORGANIZER_TABS: StoreTabId[] = ["overview", "event-hub", "events"];
+/* Posts are theirs too: "OP-12 prerelease Saturday, 20 seats" is the
+   organizer's news as much as the owner's. */
+const ORGANIZER_TABS: StoreTabId[] = [
+  "overview",
+  "event-hub",
+  "events",
+  "posts",
+  "case",
+];
 
 export async function StoreTabs({ storeId }: { storeId: string }) {
   const viewer = await getViewer();

@@ -44,5 +44,7 @@ export function splitTitle(
  * a store is the store; anything else that lost its person is a bell.
  */
 export function kindIcon(kind: string): "store" | "bell" {
-  return kind === "board-open" || kind === "early-board" ? "store" : "bell";
+  return kind === "board-open" || kind === "early-board" || kind === "store-post"
+    ? "store"
+    : "bell";
 }

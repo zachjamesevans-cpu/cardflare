@@ -625,6 +625,8 @@ export interface RoomState {
     storeName: string;
     /** The store's page, linked from the room. Absent from an older server. */
     storeId?: string;
+    /** cardflare Verified, drawn beside the name. Absent from an older server. */
+    verified?: boolean;
     kind: string;
     startsAt: string | null;
     endsAt: string | null;
@@ -1635,6 +1637,20 @@ export interface PostDetail {
   likes: number;
   comments: number;
   liked: boolean;
+  /**
+   * A STORE's post rather than a player's, with the shop's header.
+   * Null on every Flare; absent from an older server.
+   */
+  store?: {
+    storeId: string;
+    name: string;
+    logoUrl: string | null;
+    verified: boolean;
+    title: string;
+    body: string | null;
+    imageUrl: string | null;
+    postedAt: string;
+  } | null;
 }
 
 /** A hunt on its own screen: the list plus who owns it. */
@@ -2029,6 +2045,38 @@ export type FeedItem =
    * holder answers.
    */
   | { kind: "nearbyMatch"; matches: NearbyMatch[] }
+  /**
+   * A store you follow, saying something: the founder's "OP-12
+   * prerelease Saturday, 20 seats". Drawn as the post a Flare is, with
+   * the logo for a face and "I'll be there" when it is about a night.
+   */
+  | {
+      kind: "storePost";
+      postId: string;
+      storeId: string;
+      storeName: string;
+      logoUrl: string | null;
+      verified: boolean;
+      title: string;
+      body: string | null;
+      imageUrl: string | null;
+      postedAt: string;
+      event: {
+        code: string;
+        name: string;
+        startsAt: string;
+        opensAt: string;
+        timeZone: string;
+        playersIn: number;
+        /** "I'll be there" works right now: the board is early or live. */
+        open: boolean;
+      } | null;
+      likes: number;
+      comments: number;
+      liked: boolean;
+      /** The viewer already has a seat at the event. */
+      going: boolean;
+    }
   | {
       kind: "wanted";
       total: number;
@@ -2353,6 +2401,9 @@ export const savePostalCode = (postalCode: string) =>
 export interface PublicStore {
   storeId: string;
   name: string;
+  /** Where it is, for the line under the name. Absent from an older server. */
+  city?: string | null;
+  region?: string | null;
   address: string | null;
   phone: string | null;
   website: string | null;
@@ -2361,6 +2412,23 @@ export interface PublicStore {
   unclaimed: boolean;
   /** What the store says about itself. Absent from an older server. */
   description?: string | null;
+  /** The store's own pictures, absolute. Absent from an older server. */
+  logoUrl?: string | null;
+  coverUrl?: string | null;
+  /** Seven days, Sunday first, {open, close} or null; see store-hours.ts. */
+  hours?: ({ open: string; close: string } | null)[] | null;
+  /** Slugs from the one game list. Absent from an older server. */
+  games?: string[];
+  timeZone?: string;
+  /** Decided by the server in the store's own zone; null without hours. */
+  openNow?: boolean | null;
+  /** Up to six cards from the store's singles, chosen by hand. */
+  casePicks?: {
+    cardId: string;
+    cardName: string;
+    cardNumber: string;
+    imageUrl: string | null;
+  }[];
   /** Whether the signed-in account follows it; absent for a guest or an older server. */
   following?: boolean;
   attribution: string | null;

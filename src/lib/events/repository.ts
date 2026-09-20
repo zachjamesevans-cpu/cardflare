@@ -267,7 +267,7 @@ export async function findEventById(id: string): Promise<EventRow | null> {
  * column a later migration adds.
  */
 export const PUBLIC_ROOM_COLUMNS =
-  "id, name, kind, status, starts_at, ends_at, store_id, repeat_weekly, stores(name, city, region, timezone, early_board_hours)";
+  "id, name, kind, status, starts_at, ends_at, store_id, repeat_weekly, stores(name, city, region, timezone, early_board_hours, verified_at)";
 
 type PublicRoomRow = {
   id: string;
@@ -284,6 +284,7 @@ type PublicRoomRow = {
     region: string | null;
     timezone: string;
     early_board_hours: number;
+    verified_at: string | null;
   } | null;
 };
 
@@ -299,6 +300,9 @@ export function toPublicEvent(row: PublicRoomRow): PublicEvent {
     storeName: row.stores?.name ?? "A cardflare store",
     storeCity: row.stores?.city ?? null,
     storeRegion: row.stores?.region ?? null,
+    // Trust is a timestamp on the store, never a tier. A missing embed
+    // is unverified: the mark must never appear on a guess.
+    storeVerified: (row.stores?.verified_at ?? null) !== null,
     // UTC is the column default, so it is also the right fallback when the
     // embed comes back empty: it is what the store had before it said.
     storeTimeZone: row.stores?.timezone ?? "UTC",

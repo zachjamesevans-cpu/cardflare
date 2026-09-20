@@ -26,7 +26,10 @@ export function absoluteAvatars<T>(value: T): T {
     const out: Record<string, unknown> = {};
     for (const [key, inner] of Object.entries(node as Record<string, unknown>)) {
       out[key] =
-        (key === "avatarUrl" || key === "imageUrl" || key === "url") &&
+        (key === "avatarUrl" ||
+          key === "imageUrl" ||
+          key === "logoUrl" ||
+          key === "url") &&
         typeof inner === "string" &&
         inner.startsWith("/")
           ? `${base}${inner}`

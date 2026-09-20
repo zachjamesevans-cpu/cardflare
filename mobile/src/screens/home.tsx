@@ -50,6 +50,7 @@ import { FlareProgressSheet } from "../flare-progress-sheet";
 import { FeedFilterTabs } from "../feed-filter-tabs";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
+import { StorePostCard } from "../store-post-card";
 import { Body, Button, Card, CardImage, Muted, Tap, Title, type ZoomCard } from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
@@ -65,6 +66,7 @@ import {
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
+import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
 import { colors, gutter, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
@@ -557,6 +559,28 @@ export function HomeScreen() {
     }
   };
 
+  /*
+   * "I'll be there" from a store's post: the same RSVP as above, keyed
+   * on the night's own code rather than on a saved local, because the
+   * post names the board it is about. The card keeps its own busy
+   * state, so this only has to do the joining.
+   */
+  const rsvpToCode = async (code: string) => {
+    if (!me) return;
+    await joinRoom(code, me.player.displayName);
+    for (const want of me.wants) {
+      await postFlare(code, {
+        cardId: want.cardId,
+        printingId: want.printingId,
+        quantity: want.quantity,
+        note: want.note ?? undefined,
+        deckLabel: want.deckLabel,
+      }).catch(() => {});
+    }
+    await rememberRoom(code);
+    openRoom(navigation);
+  };
+
   const nextLine = (local: Me["locals"][number]) => {
     if (local.liveNow) return "A room is open right now";
     if (local.nextEventAt) {
@@ -863,6 +887,21 @@ export function HomeScreen() {
                   </Muted>
                 ) : null}
               </Card>
+            ) : item.kind === "storePost" ? (
+              /* A store you follow, saying something. The website's card,
+                 drawn natively; see store-post-card. */
+              <StorePostCard
+                key={`store-post-${item.postId}`}
+                item={item}
+                onOpenStore={(storeId) =>
+                  navigation.navigate("StoreProfile", { storeId })
+                }
+                onLike={(liked) => likePost(item.postId, liked)}
+                onOpenThread={() =>
+                  navigation.navigate("FlarePost", { postId: item.postId })
+                }
+                onRsvp={rsvpToCode}
+              />
             ) : item.kind === "announcement" ? (
               <Card key={`announcement-${index}`}>
                 <View
@@ -1246,13 +1285,7 @@ export function HomeScreen() {
                             </Text>
                             {/* Two marks, never one inferred from the other:
                           Verified is trust, Ultra is a product tier. */}
-                            {store.verified ? (
-                              <MaterialCommunityIcons
-                                name="check-decagram"
-                                size={14}
-                                color={colors.accent}
-                              />
-                            ) : null}
+                            {store.verified ? <VerifiedMark size={14} /> : null}
                             {store.ultra ? (
                               <Text
                                 style={{

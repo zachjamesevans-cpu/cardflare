@@ -37,6 +37,7 @@ import { accountIdentity } from "@/lib/players/account-identity";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
+import { VerifiedMark } from "@/components/stores/verified-mark";
 import { collectionAvailability } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
@@ -511,9 +512,12 @@ export default async function JoinByCodePage({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
               href={`/s/${event.storeId}`}
-              className="text-sm font-medium text-accent underline-offset-4 hover:underline"
+              className="inline-flex items-center gap-1 text-sm font-medium text-accent underline-offset-4 hover:underline"
             >
               {event.storeName}
+              {/* Verified is the badge everybody sees beside a store's
+                  name. Ultra is a tier and is never drawn here. */}
+              {event.storeVerified && <VerifiedMark className="size-4" />}
             </Link>
             {accountPlayerId && (
               <FollowStoreButton

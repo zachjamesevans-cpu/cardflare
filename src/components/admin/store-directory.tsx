@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Flame, SearchX } from "lucide-react";
 
+import { VerifyButton } from "@/components/admin/store-listing-controls";
+import { VerifiedMark } from "@/components/stores/verified-mark";
 import { Badge, Card } from "@/components/ui/card";
 import { Select, TextInput } from "@/components/ui/controls";
 import {
@@ -158,9 +160,12 @@ function DirectoryRow({ store }: { store: DirectoryStore }) {
       <div className="flex min-w-0 flex-col gap-1">
         <Link
           href={`/admin/stores/${store.id}`}
-          className="font-semibold text-text-primary underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1.5 font-semibold text-text-primary underline-offset-4 hover:underline"
         >
           {store.name}
+          {/* The same glyph players see, so the admin list looks the
+              way the product does. Ultra stays a word: it is a tier. */}
+          {store.verified && <VerifiedMark className="size-4" />}
         </Link>
         <p className="truncate text-sm text-text-muted">
           {/* An unclaimed listing has no contact address yet, and saying
@@ -175,8 +180,10 @@ function DirectoryRow({ store }: { store: DirectoryStore }) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{KIND_LABEL[store.kind] ?? store.kind}</Badge>
         {store.claimStatus === "unclaimed" && <Badge tone="neutral">Unclaimed</Badge>}
-        {store.verified && <Badge>Verified</Badge>}
         {store.ultra && <Badge tone="neutral">Ultra</Badge>}
+        {/* An Ultra store that is not yet Verified is the row most
+            likely to need a click, so the click is right here. */}
+        {store.ultra && !store.verified && <VerifyButton storeId={store.id} />}
         {store.liveRoomName && (
           <Badge>
             <span className="size-1.5 rounded-full bg-accent" />

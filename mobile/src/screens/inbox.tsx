@@ -276,5 +276,7 @@ function splitTitle(
 
 /** The icon a row with nobody behind it leads with. */
 function kindIcon(kind: string): "store" | "bell" {
-  return kind === "board-open" || kind === "early-board" ? "store" : "bell";
+  return kind === "board-open" || kind === "early-board" || kind === "store-post"
+    ? "store"
+    : "bell";
 }
