@@ -12,12 +12,10 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/admin",
         "/store",
-        "/account",
         "/profile",
         "/login",
         "/welcome",
         "/auth/",
-        "/play",
         "/join",
         "/e/",
         "/p/",

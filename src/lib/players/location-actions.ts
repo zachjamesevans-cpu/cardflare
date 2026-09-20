@@ -50,6 +50,7 @@ export async function savePostalCodeAction(
      section above it still asks the question. */
   revalidatePath("/feed");
   revalidatePath("/local");
+  revalidatePath("/flare");
   revalidatePath("/profile/settings");
 
   return {

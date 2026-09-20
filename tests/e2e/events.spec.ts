@@ -35,7 +35,7 @@ test.describe("event routes are protected", () => {
 
 test.describe("joining by typed code", () => {
   test("offers a code field and nothing that needs an account", async ({ page }) => {
-    await page.goto("/join");
+    await page.goto("/room");
 
     await expect(page.getByLabel("Event code")).toBeVisible();
     await expect(page.locator('input[type="password"]')).toHaveCount(0);
@@ -43,7 +43,7 @@ test.describe("joining by typed code", () => {
   });
 
   test("is marked noindex", async ({ page }) => {
-    await page.goto("/join");
+    await page.goto("/room");
 
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",
@@ -52,7 +52,7 @@ test.describe("joining by typed code", () => {
   });
 
   test("reports a malformed code without needing a database", async ({ page }) => {
-    await page.goto("/join");
+    await page.goto("/room");
     await page.getByLabel("Event code").fill("!!!!!!");
     await page.getByRole("button", { name: /find event/i }).click();
 
@@ -80,7 +80,7 @@ test.describe("joining by typed code", () => {
     const messages: string[] = [];
 
     for (const code of ["!!!!!!", "K3M9PZ"]) {
-      await page.goto("/join");
+      await page.goto("/room");
       await page.getByLabel("Event code").fill(code);
       await page.getByRole("button", { name: /find event/i }).click();
 
@@ -93,7 +93,7 @@ test.describe("joining by typed code", () => {
   });
 
   test("keeps what was typed so it can be corrected", async ({ page }) => {
-    await page.goto("/join");
+    await page.goto("/room");
 
     await page.getByLabel("Event code").fill("K3M9PZ");
     await page.getByRole("button", { name: /find event/i }).click();
@@ -160,7 +160,7 @@ test.describe("joining by typed code", () => {
   });
 
   test("the typed-code box accepts a store code", async ({ page }) => {
-    await page.goto("/join");
+    await page.goto("/room");
     await page.getByLabel("Event code").fill("K3M9PZQ");
     await page.getByRole("button", { name: /find event/i }).click();
 

@@ -203,18 +203,16 @@ export async function removeLocalAction(formData: FormData): Promise<void> {
   if (!playerId) return;
 
   await removeLocal(playerId, storeId);
-  revalidatePath("/profile/settings");
+  revalidatePath("/room");
 }
 
 /**
  * Repaints wherever the want list is on screen.
  *
- * The profile's settings page and the Flare tab always — the Flare tab
- * is the list's home now — and the room too when the form came from the
+ * The Flare tab always, the list's one home, and the room too when the form came from the
  * re-post panel, which edits the list in place.
  */
 function revalidateWants(code: string): void {
-  revalidatePath("/profile/settings");
   revalidatePath("/flare");
   if (code) {
     revalidatePath(`/e/${code}`);

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
-import { AddToListForm } from "@/components/lists/add-to-list-form";
 import { FlareComposer } from "@/components/flares/flare-composer";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { ButtonLink } from "@/components/ui/button";
@@ -17,16 +16,14 @@ import { huntsFor } from "@/lib/players/hunts";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getPlayerSession } from "@/lib/players/session";
 import { listWants, postedCardStores } from "@/lib/players/wants";
-import { listHaves } from "@/lib/lists/haves";
 import { nearbySettingsFor } from "@/lib/nearby/settings";
-import { HaveListCard } from "@/components/nearby/have-list-card";
 import { NearbyRow } from "@/components/nearby/nearby-row";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { SITE } from "@/lib/site";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 export const metadata: Metadata = {
-  title: "New flare",
+  title: "Post a Flare",
   robots: { index: false, follow: false },
 };
 
@@ -34,15 +31,18 @@ export const dynamic = "force-dynamic";
 
 /**
  * The app's centre tab, on the website: one composer for one Flare of
- * one or many cards, the saved requests underneath it, and the Have
- * list under those. Where a new Flare lands is the same three-way
- * answer it always was:
+ * one or many cards, and the saved requests underneath it. Where a new
+ * Flare lands is the same three-way answer it always was:
  *
  * - in a room they have joined: onto that board;
  * - signed in with no room: to their area, and onto their account list;
  * - a guest with no room: pointed at the door, honestly. Guests have
  *   no account for a list to live on, so the hub is the payoff of
  *   signing in, never a gate.
+ *
+ * The Have list used to sit under the saved requests. It is gone from
+ * here: the cards you would trade belong to the case, and this tab is
+ * for asking.
  */
 
 /** The poster's face and name, for the preview that draws the post. */
@@ -84,16 +84,18 @@ export default async function FlarePage({
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
   const games = await viewerGames();
-  const [wants, posted, haves, nearby, hunts, poster] = playerId
+  const [wants, posted, nearby, hunts, poster] = playerId
     ? await Promise.all([
         listWants(playerId),
         postedCardStores(playerId),
-        listHaves(playerId),
-        nearbySettingsFor(playerId),
+        /* Nearby matching is part of Local. With Local off there is no
+           feed for a match to land on, so the switch is not asked for
+           either: a setting nothing reads is a lie in a form field. */
+        LOCAL_ENABLED ? nearbySettingsFor(playerId) : null,
         huntsFor(playerId, playerId),
         composerViewer(playerId, viewer.kind === "player" ? viewer.playerName : "You"),
       ])
-    : [null, new Map<string, string>(), null, null, [], null];
+    : [null, new Map<string, string>(), null, [], null];
 
   return (
     <>
@@ -101,15 +103,16 @@ export default async function FlarePage({
         id="main"
         className="flex min-h-dvh flex-col items-center gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12"
       >
-        <Link href="/" aria-label={`${SITE.name} home`}>
+        <Link href="/feed" aria-label={`${SITE.name} feed`}>
           <Logo size={40} priority />
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-5">
           {/* The one switch for nearby matching, folded to a line above
-              the composer. Signed-in only: matching needs an account on
-              both ends. */}
-          {nearby && (
+              the composer. Signed-in only, and only while Local is on:
+              matching needs an account on both ends and a feed to show
+              the match in. */}
+          {LOCAL_ENABLED && nearby && (
             <NearbyRow enabled={nearby.enabled} postalCode={nearby.postalCode} />
           )}
 
@@ -128,8 +131,8 @@ export default async function FlarePage({
             <Card className="flex flex-col gap-3">
               <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
               <p className="text-text-secondary">
-                A Flare says what card you are hunting, and the people who can help see
-                it: the room at a store event
+                A Flare says what card you are looking for, and the people who can help
+                see it: the room at a store event
                 {LOCAL_ENABLED ? ", players near that store on Local," : ""} and
                 everyone who follows you. Create a free account to start posting, or
                 scan the code at a store&rsquo;s counter to post into tonight&rsquo;s
@@ -137,7 +140,7 @@ export default async function FlarePage({
               </p>
               <div className="flex flex-wrap gap-2">
                 <ButtonLink href="/signup">Create your free account</ButtonLink>
-                <ButtonLink href="/join" variant="secondary">
+                <ButtonLink href="/room" variant="secondary">
                   Enter a code
                 </ButtonLink>
               </div>
@@ -175,21 +178,6 @@ export default async function FlarePage({
                 />
               )}
             </Card>
-          )}
-
-          {/* The Have list, with no room: the cards you would trade, and
-              the switch that lets people nearby find one. */}
-          {haves !== null && playerId && (
-            <>
-              <AddToListForm
-                code=""
-                kind="have"
-                imagesEnabled={images}
-                playerGames={games}
-                target="list"
-              />
-              <HaveListCard entries={haves} imagesEnabled={images} />
-            </>
           )}
         </div>
 
