@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { getViewer } from "@/lib/auth/session";
+import { getViewer, type Viewer } from "@/lib/auth/session";
 import { subscriptionForStore } from "@/lib/billing/repository";
 import {
   createBillingPortalSession,
@@ -22,6 +22,20 @@ import {
 } from "./ultra-schema";
 
 const GENERIC = "Something went wrong. Please try again in a moment.";
+
+/**
+ * Money is the OWNER's. An admin may act for any store; a store account
+ * only for a store it holds role "owner" at. An organizer (role
+ * "staff") is never here, whatever the form said: they run the timers,
+ * not the card on file.
+ */
+function ownsStore(
+  viewer: Viewer,
+  storeId: string,
+): viewer is Extract<Viewer, { kind: "store" | "admin" }> {
+  if (viewer.kind === "admin") return viewer.storeIds.includes(storeId);
+  return viewer.kind === "store" && viewer.storeRoles[storeId] === "owner";
+}
 
 /**
  * The trial button on /ultra.
@@ -92,19 +106,14 @@ export async function startStoreTrialAction(
 
 /**
  * The same checkout for a store that already exists: a pilot store an
- * admin invited, or one whose owner closed the Stripe tab. Only a
- * member of the store may start it.
+ * admin invited, or one whose owner closed the Stripe tab. Only the
+ * OWNER of the store may start it.
  */
 export async function startUltraCheckoutAction(formData: FormData): Promise<void> {
   const storeId = text(formData, "storeId");
   const viewer = await getViewer();
 
-  if (
-    (viewer.kind !== "store" && viewer.kind !== "admin") ||
-    !viewer.storeIds.includes(storeId)
-  ) {
-    redirect("/login?next=/store");
-  }
+  if (!ownsStore(viewer, storeId)) redirect("/login?next=/store");
 
   await sendToCheckout(storeId, viewer.user.email ?? undefined);
 }
@@ -136,12 +145,7 @@ export async function manageBillingAction(formData: FormData): Promise<void> {
   const storeId = text(formData, "storeId");
   const viewer = await getViewer();
 
-  if (
-    (viewer.kind !== "store" && viewer.kind !== "admin") ||
-    !viewer.storeIds.includes(storeId)
-  ) {
-    redirect("/login?next=/store");
-  }
+  if (!ownsStore(viewer, storeId)) redirect("/login?next=/store");
 
   const subscription = await subscriptionForStore(storeId);
   const back = `${siteUrl()}/store?as=${storeId}`;

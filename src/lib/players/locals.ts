@@ -66,6 +66,29 @@ export async function saveLocal(playerId: string, storeId: string): Promise<void
   if (error) console.error("Could not save the local store", error);
 }
 
+/**
+ * Whether this player already follows this store.
+ *
+ * For the Follow button's first paint: a store page and a room both
+ * need to know which word to draw before anyone taps.
+ */
+export async function hasLocal(playerId: string, storeId: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_locals")
+    .select("store_id")
+    .eq("player_id", playerId)
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not check the player's locals", error);
+    return false;
+  }
+  return data !== null;
+}
+
 export async function removeLocal(playerId: string, storeId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
@@ -172,6 +195,17 @@ async function boardsForStores(
       },
     ];
   });
+}
+
+/**
+ * One store's pulse - live now, next event - for its own page, where a
+ * player deciding whether to follow wants to see something is on.
+ */
+export async function storeBoard(storeId: string): Promise<LocalStore | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const [board] = await boardsForStores([storeId], new Map());
+  return board ?? null;
 }
 
 export async function listLocals(playerId: string): Promise<LocalStore[]> {

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { EmberBadge } from "@/components/players/ember-badge";
 import { PeopleDialog } from "@/components/players/people-dialog";
@@ -36,6 +37,7 @@ export function ProfileHeader({
   embersEarned,
   stats,
   people,
+  organizerAt = [],
   actions,
 }: {
   /** The picture, already dressed; the own profile passes its editable one. */
@@ -47,6 +49,11 @@ export function ProfileHeader({
   stats: ProfileStats;
   /** The lists behind the followers and following tiles, on a profile that opens them. */
   people?: { followers: ReactNode; following: ReactNode };
+  /**
+   * The stores that named them an organizer: a "TO" chip per store
+   * under the handle, linking to the store's page. Empty for most.
+   */
+  organizerAt?: { storeId: string; name: string }[];
   /** The button row: edit and share, or follow and share. */
   actions: ReactNode;
 }) {
@@ -109,6 +116,26 @@ export function ProfileHeader({
           </div>
         </div>
         <p className="text-sm leading-[18px] text-text-muted">{formatHandle(handle)}</p>
+        {organizerAt.length > 0 && (
+          <ul
+            className="flex flex-wrap items-center gap-1.5 pt-1"
+            aria-label="Organizes at"
+          >
+            {organizerAt.map((store) => (
+              <li key={store.storeId}>
+                <Link
+                  href={`/s/${store.storeId}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent hover:border-accent/60"
+                  title={`Tournament organizer at ${store.name}`}
+                >
+                  <span className="font-bold tracking-wide">TO</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="truncate">{store.name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="flex w-full items-center gap-2">{actions}</div>

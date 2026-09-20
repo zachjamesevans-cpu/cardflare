@@ -105,6 +105,13 @@ export interface HubTimer {
   autoHeldAt: string | null;
   /** When time was called by hand — can be earlier than the clock. */
   timeCalledAt: string | null;
+  /**
+   * Who last pressed a control, and when: a name for the other
+   * organizer's screen, never an authorisation. Null until somebody
+   * has. Stamped by `control.ts` on every write it makes.
+   */
+  controlledBy: string | null;
+  controlledAt: string | null;
   updatedAt: string;
 }
 
@@ -129,6 +136,8 @@ export type TimerPatch = Partial<
     | "intermissionExtendedMs"
     | "autoHeldAt"
     | "timeCalledAt"
+    | "controlledBy"
+    | "controlledAt"
   >
 >;
 

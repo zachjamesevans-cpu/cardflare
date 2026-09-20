@@ -209,6 +209,7 @@ export default async function ProfilePage() {
                 worn={dressed}
                 embersEarned={profile.embersEarned}
                 stats={stats}
+                organizerAt={profile.organizerAt}
                 people={{
                   followers: (
                     <PeopleList

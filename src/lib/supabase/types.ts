@@ -118,6 +118,8 @@ export type StoreInsert = Omit<
   longitude?: number | null;
   phone?: string | null;
   website?: string | null;
+  /** The store's own line about itself, written from its console. */
+  description?: string | null;
   claim_status?: StoreClaimStatus;
   tier?: StoreTier;
   listing_state?: StoreListingState;

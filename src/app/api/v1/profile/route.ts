@@ -111,6 +111,8 @@ export async function GET(request: Request): Promise<Response> {
        */
       tier: profile.tier,
       pro: tierAllows(profile.tier, "cosmetics"),
+      /* The stores that named them an organizer: the TO chip. */
+      organizerAt: profile.organizerAt,
       /* How they want the Feed drawn. Sent with the profile because the
          settings screen lives here and the Feed asks the same answer. */
       feedView: await feedViewFor(player.playerId),

@@ -23,6 +23,12 @@ export interface PublicStore {
   verified: boolean;
   ultra: boolean;
   unclaimed: boolean;
+  /**
+   * What the store says about itself, or null. Only a claimed store can
+   * have written one - the console's page form is behind ownership - so
+   * an unclaimed listing stays factual by construction.
+   */
+  description: string | null;
   /** The line the source licence requires, when the record came from one. */
   attribution: string | null;
 }
@@ -35,7 +41,7 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
   const { data, error } = await admin
     .from("stores")
     .select(
-      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state",
+      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description",
     )
     .eq("id", storeId)
     .maybeSingle();
@@ -63,6 +69,7 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     verified: data.verified_at !== null,
     ultra: data.tier === "ultra",
     unclaimed: data.claim_status === "unclaimed",
+    description: data.description,
     attribution: source?.[0]?.attribution ?? null,
   };
 }

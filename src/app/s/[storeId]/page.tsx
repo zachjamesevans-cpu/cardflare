@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BadgeCheck, Globe, MapPin, Phone, Store as StoreIcon } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarClock,
+  Globe,
+  MapPin,
+  Phone,
+  Store as StoreIcon,
+} from "lucide-react";
 
+import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
+import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
+import { hasLocal, storeBoard } from "@/lib/players/locals";
 import { publicStore } from "@/lib/stores/public-profile";
 
 export const metadata: Metadata = {
@@ -29,6 +40,11 @@ export const dynamic = "force-dynamic";
  *
  * Verified and Ultra are drawn as two separate marks because they mean
  * two different things, and the help text says which is which.
+ *
+ * FOLLOWING is the same row as "Your locals" - joining a room signed in
+ * has always written it - with a button on the page for the player who
+ * found the shop before they walked in. A guest sees a sign-in link
+ * that comes back here, because a Follow that cannot work is a lie.
  */
 export default async function StoreProfilePage({
   params,
@@ -39,6 +55,36 @@ export default async function StoreProfilePage({
   const store = await publicStore(storeId);
 
   if (!store) notFound();
+
+  /*
+   * The optional account, never required. The same rule as the room
+   * page: a player viewer carries its id, and an admin or owner who
+   * also holds a player row follows as that player.
+   */
+  const viewer = await getViewer();
+  const playerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+
+  const [following, board] = await Promise.all([
+    playerId ? hasLocal(playerId, store.storeId) : Promise.resolve(false),
+    storeBoard(store.storeId),
+  ]);
+
+  const nextEvent =
+    board?.nextEventAt && board.nextEventName
+      ? `${board.nextEventName} · ${new Intl.DateTimeFormat("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: board.timeZone,
+        }).format(new Date(board.nextEventAt))}`
+      : null;
 
   return (
     <main
@@ -68,6 +114,10 @@ export default async function StoreProfilePage({
               )}
             </h1>
 
+            {store.description && (
+              <p className="mt-1 text-sm text-text-secondary">{store.description}</p>
+            )}
+
             {store.verified ? (
               <p className="mt-1 text-xs text-text-muted">
                 cardflare Verified means cardflare has confirmed that this profile is
@@ -80,7 +130,42 @@ export default async function StoreProfilePage({
           </div>
         </div>
 
+        {/* Follow, for a signed-in player; the way to become one, for anyone else. */}
+        <div className="flex flex-wrap items-center gap-3">
+          {playerId ? (
+            <FollowStoreButton storeId={store.storeId} initial={following} />
+          ) : (
+            <Link
+              href={`/login?next=${encodeURIComponent(`/s/${store.storeId}`)}`}
+              className={buttonStyles("secondary", "md")}
+            >
+              Sign in to follow
+            </Link>
+          )}
+          <p className="text-xs text-text-muted">
+            Following puts this store&rsquo;s nights in your Feed and your locals.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-2 text-sm text-text-secondary">
+          {(board?.liveNow || nextEvent) && (
+            <p className="flex items-start gap-2">
+              <CalendarClock
+                className="mt-0.5 size-4 shrink-0 text-accent"
+                aria-hidden
+              />
+              {board?.liveNow ? (
+                <Link
+                  href={`/e/${board.joinCode}`}
+                  className="text-text-primary underline-offset-4 hover:underline"
+                >
+                  A room is open right now
+                </Link>
+              ) : (
+                <span>Next: {nextEvent}</span>
+              )}
+            </p>
+          )}
           {store.address && (
             <p className="flex items-start gap-2">
               <MapPin className="mt-0.5 size-4 shrink-0 text-text-muted" aria-hidden />

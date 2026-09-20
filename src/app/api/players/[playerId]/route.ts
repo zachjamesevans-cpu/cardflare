@@ -93,6 +93,9 @@ export async function GET(
       ? `${siteUrl()}${profile.coverUrl}`
       : profile.coverUrl,
     embersEarned: profile.embersEarned,
+    /* The stores that named them an organizer: the TO chip under the
+       name, the same list the website draws. */
+    organizerAt: profile.organizerAt,
     /* The ring around the picture: the avatar slot, since the split. */
     frame: worn.avatarFrame,
     /* The catalogue ring, worn over the frame when both are set. */

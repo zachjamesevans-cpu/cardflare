@@ -196,7 +196,7 @@ export default async function ProfileSettingsPage() {
           <div className="flex flex-col gap-1">
             <p className="font-semibold text-text-primary">Your locals</p>
             <p className="text-sm text-text-secondary">
-              Saved automatically when you join a room signed in. Tap one to see
+              Stores you follow. Joining a room follows the store too. Tap one to see
               what&rsquo;s happening there, no QR code needed.
             </p>
           </div>

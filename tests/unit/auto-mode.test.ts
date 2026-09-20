@@ -60,6 +60,8 @@ function autoTimer(overrides: Partial<HubTimer> = {}): HubTimer {
     intermissionExtendedMs: 0,
     autoHeldAt: null,
     timeCalledAt: null,
+    controlledBy: null,
+    controlledAt: null,
     updatedAt: new Date(T0).toISOString(),
     ...overrides,
   };

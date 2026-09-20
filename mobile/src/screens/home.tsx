@@ -1444,10 +1444,11 @@ export function HomeScreen() {
               on it is an "upcoming" item further up now, so this exists
               for the two things that item cannot do: say you will be
               there, and stop following a shop you no longer go to. */}
-            <Title>Stores you&rsquo;ve saved</Title>
+            <Title>Your locals</Title>
             <Muted>
-              Tap one to walk in, no QR needed. &ldquo;I&rsquo;ll be there&rdquo; posts
-              your wants to the board before you arrive.
+              Stores you follow. Joining a room follows the store too. Tap one to walk
+              in, no QR needed. &ldquo;I&rsquo;ll be there&rdquo; posts your wants to
+              the board before you arrive.
             </Muted>
             {/* Divided rows, RSVP inside its own row - the web's list,
               exactly. The button carries the count so the tap never

@@ -25,7 +25,7 @@ import {
   accountRoomIdentity,
   nameSessionAfterAccount,
 } from "@/lib/players/room-identity";
-import { saveLocal } from "@/lib/players/locals";
+import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { awardAttendance } from "@/lib/players/embers";
 import { collectionAvailability } from "@/lib/players/collection";
 import {
@@ -135,17 +135,29 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   // the app say so instead of pretending the event is live.
   const phase = roomPhase(room, Date.now());
 
+  /*
+   * Whether the account already follows this store, for the Follow chip
+   * beside the store's name. False for a guest, who has no chip: the
+   * website shows its button to signed-in players only, and so does the
+   * app. Read on the not-joined answer too, because the join screen
+   * carries the store's name as well.
+   */
+  const following = account ? await hasLocal(account.playerId, room.storeId) : false;
+
   const base = {
     state: "room" as const,
     room: {
       name: room.name,
       status: room.status,
+      /* Links the room to the store's page, the founder's ask. */
+      storeId: room.storeId,
       storeName: room.storeName,
       kind: room.kind,
       startsAt: room.startsAt,
       endsAt: room.endsAt,
       early: phase === "early",
     },
+    following,
   };
 
   if (!session || !participation || (phase !== "live" && phase !== "early")) {

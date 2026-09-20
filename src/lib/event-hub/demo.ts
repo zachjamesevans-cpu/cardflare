@@ -55,6 +55,8 @@ function baseTimer(now: number): HubTimer {
     intermissionExtendedMs: 0,
     autoHeldAt: null,
     timeCalledAt: null,
+    controlledBy: null,
+    controlledAt: null,
     updatedAt: iso(now),
   };
 }

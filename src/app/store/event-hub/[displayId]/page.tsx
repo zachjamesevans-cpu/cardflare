@@ -14,6 +14,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { buttonStyles } from "@/components/ui/button";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
+import { consoleStoreIds } from "@/lib/stores/console";
 import { moveTimerToScreenAction } from "@/lib/event-hub/actions";
 import { displayPayload } from "@/lib/event-hub/display-payload";
 import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
@@ -49,12 +50,15 @@ export default async function ManageScreenPage({
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect("/login?next=/store/event-hub");
-  if (viewer.kind === "player") redirect("/profile");
+  /* An organizer is a player viewer carrying the stores that named
+     them; a player nobody named has no console to see. */
+  if (viewer.kind === "player" && viewer.organizerStoreIds.length === 0) {
+    redirect("/profile");
+  }
   if (viewer.kind === "admin" && viewer.storeIds.length === 0) redirect("/admin");
   if (viewer.kind === "unaffiliated") redirect("/store");
 
-  const storeIds =
-    viewer.kind === "store" || viewer.kind === "admin" ? viewer.storeIds : [];
+  const storeIds = consoleStoreIds(viewer);
 
   const { displayId } = await params;
   const display = await findDisplay(displayId);

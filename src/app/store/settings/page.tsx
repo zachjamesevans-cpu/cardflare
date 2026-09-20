@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ExternalLink, Store as StoreIcon } from "lucide-react";
 
 import { EarlyBoardPicker } from "@/components/events/early-board-picker";
 import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { AppShell } from "@/components/layout/app-shell";
 import { BillingCard, billingNotice } from "@/components/stores/billing-card";
+import { StorePageForm } from "@/components/stores/store-page-form";
 import { StoreTabs } from "@/components/stores/store-tabs";
+import { Card } from "@/components/ui/card";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { storePageFor } from "@/lib/stores/page";
 import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
 export const metadata: Metadata = {
@@ -28,18 +33,58 @@ export default async function StoreSettingsPage({
   );
   if (!store || store.kind === "vendor") return null;
 
-  const plan = await storePlan(store.id);
+  /*
+   * The page is the owner's to write. An organizer reaches the console
+   * for the timers and the hub, not to rename the shop, so the card is
+   * gated on the role the membership carries rather than on being here.
+   */
+  const owner = store.role === "owner";
+
+  const [plan, page] = await Promise.all([
+    storePlan(store.id),
+    owner ? storePageFor(store.id) : Promise.resolve(null),
+  ]);
 
   return (
     <AppShell
       area="Store"
       email={viewer.user.email ?? ""}
       title="Settings"
-      description="Where you are, when your boards open, and your plan."
+      description="Your page, where you are, when your boards open, and your plan."
       areas={areas}
       currentArea={currentArea}
     >
       <StoreTabs storeId={store.id} />
+
+      {owner && page && (
+        <section className="flex flex-col gap-5" aria-labelledby="page-heading">
+          <h2 id="page-heading" className="text-xl font-bold text-text-primary">
+            Your store page
+          </h2>
+          <Card id="page" className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <StoreIcon
+                className="mt-0.5 size-5 shrink-0 text-accent"
+                aria-hidden="true"
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <p className="font-semibold text-text-primary">What players see</p>
+                <p className="text-sm text-text-secondary">
+                  This is what players see when they follow you.
+                </p>
+              </div>
+              <Link
+                href={`/s/${store.id}`}
+                className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-accent underline-offset-4 hover:underline"
+              >
+                View your page
+                <ExternalLink className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
+            <StorePageForm page={page} />
+          </Card>
+        </section>
+      )}
 
       <section className="flex flex-col gap-5" aria-labelledby="timezone-heading">
         <h2 id="timezone-heading" className="text-xl font-bold text-text-primary">

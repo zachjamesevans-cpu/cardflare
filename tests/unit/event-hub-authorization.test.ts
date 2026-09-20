@@ -220,16 +220,49 @@ describe("a player, and nobody at all", () => {
     expect(patchTimer).not.toHaveBeenCalled();
   });
 
-  it("refuses a player account", async () => {
+  it("refuses a player account nobody named", async () => {
     getViewer.mockResolvedValue({
       kind: "player",
       user: { id: "user-3" },
       playerId: "p1",
+      playerName: "Zach",
+      organizerStoreIds: [],
     });
 
     await timerControlAction(form({ timerId: "timer-1", op: "start" }));
 
     expect(patchTimer).not.toHaveBeenCalled();
+  });
+
+  it("refuses an organizer of a different store", async () => {
+    getViewer.mockResolvedValue({
+      kind: "player",
+      user: { id: "user-3" },
+      playerId: "p1",
+      playerName: "Zach",
+      organizerStoreIds: ["store-2"],
+    });
+
+    await timerControlAction(form({ timerId: "timer-1", op: "start" }));
+
+    expect(patchTimer).not.toHaveBeenCalled();
+  });
+
+  it("admits an organizer of this store, and stamps their name", async () => {
+    getViewer.mockResolvedValue({
+      kind: "player",
+      user: { id: "user-3" },
+      playerId: "p1",
+      playerName: "Zach",
+      organizerStoreIds: ["store-1"],
+    });
+
+    await timerControlAction(form({ timerId: "timer-1", op: "start" }));
+
+    expect(patchTimer).toHaveBeenCalledWith(
+      "timer-1",
+      expect.objectContaining({ status: "running", controlledBy: "Zach" }),
+    );
   });
 
   it("refuses a timer that does not exist", async () => {

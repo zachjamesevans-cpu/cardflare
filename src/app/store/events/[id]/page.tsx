@@ -11,6 +11,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { FlareBoard } from "@/components/lists/list-entries";
 import { Badge, Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
+import { consoleStoreIds } from "@/lib/stores/console";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { formatEventWindow } from "@/lib/events/format";
 import { listParticipants } from "@/lib/events/participants";
@@ -56,9 +57,8 @@ export default async function EventPage({
   const store = await findStoreById(event.store_id);
   const timeZone = store?.timezone ?? "UTC";
 
-  const canView =
-    viewer.kind === "admin" ||
-    (viewer.kind === "store" && viewer.storeIds.includes(event.store_id));
+  /* Owners, admins, and the organizers this store named. */
+  const canView = consoleStoreIds(viewer).includes(event.store_id);
 
   if (!canView) notFound();
 

@@ -35,7 +35,8 @@ import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
-import { saveLocal } from "@/lib/players/locals";
+import { hasLocal, saveLocal } from "@/lib/players/locals";
+import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { collectionAvailability } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
@@ -377,6 +378,17 @@ export default async function JoinByCodePage({
 
   const savedWants = inRoom && accountPlayerId ? await listWants(accountPlayerId) : [];
 
+  /*
+   * The store is linked from the room, with Follow beside it. The
+   * founder: "if a player is in a room for that store, the store is
+   * linked in there for them to quickly follow that store's page and
+   * stay updated." Read after the join above has had its chance to
+   * write the row, so the button's first word is the truth.
+   */
+  const followingStore = accountPlayerId
+    ? await hasLocal(accountPlayerId, event.storeId)
+    : false;
+
   /* Outstanding = saved but not already an open Flare of theirs here. */
   const postedAsks = new Set(
     flares
@@ -496,7 +508,22 @@ export default async function JoinByCodePage({
     <Shell wide={inRoom}>
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-accent">{event.storeName}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Link
+              href={`/s/${event.storeId}`}
+              className="text-sm font-medium text-accent underline-offset-4 hover:underline"
+            >
+              {event.storeName}
+            </Link>
+            {accountPlayerId && (
+              <FollowStoreButton
+                storeId={event.storeId}
+                initial={followingStore}
+                code={code}
+                size="sm"
+              />
+            )}
+          </div>
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">
             {event.name}
           </h1>
