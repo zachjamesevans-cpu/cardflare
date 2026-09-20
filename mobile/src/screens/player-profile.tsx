@@ -16,6 +16,7 @@ import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { OrganizerChips } from "../remote-entry";
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Muted, Tap } from "../ui";
@@ -217,6 +218,8 @@ export function PlayerProfileScreen() {
               </>
             }
           />
+          {/* The TO badge: the stores that named them an organizer. */}
+          <OrganizerChips profile={profile} />
         </View>
 
         {/* What they are looking for, before what they are showing off:

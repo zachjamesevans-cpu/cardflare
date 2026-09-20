@@ -43,6 +43,7 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { OrganizerChips } from "../remote-entry";
 import { CoverBanner } from "../showcase-zoom";
 import { LockedRows, TradeHistoryRow, TradeHistoryWall } from "../trade-history";
 import {
@@ -649,6 +650,8 @@ export function ProfileScreen() {
               </>
             }
           />
+          {/* The TO badge: the stores that named them an organizer. */}
+          <OrganizerChips profile={profile} />
         </View>
 
         {/*

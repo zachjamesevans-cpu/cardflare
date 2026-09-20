@@ -32,6 +32,7 @@ import {
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { FlarePostScreen } from "./src/screens/flare-post";
 import { HuntScreen } from "./src/screens/hunt";
+import { RemoteScreen } from "./src/screens/remote";
 import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { ProfileScreen } from "./src/screens/profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
@@ -146,6 +147,13 @@ export type StackParams = {
    * into Safari, and it is also where an owner claims their listing.
    */
   StoreProfile: { storeId: string };
+  /**
+   * The timer remote: a store's round clocks, run from a pocket. With
+   * a storeId it opens on that store; without, it asks which counter
+   * when the account runs more than one. Reached from the Timer remote
+   * card at the top of a joined room, drawn only for staff.
+   */
+  Remote: { storeId?: string } | undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParams>();
@@ -162,6 +170,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Customize: "Profile",
   Pro: "Back",
   PlayerProfile: "Back",
+  Remote: "Room",
   FindPlayer: "Feed",
   PostFlare: "Room",
   Room: "Back",
@@ -750,6 +759,12 @@ export default function App() {
             options={{ title: "Store", headerBackTitle: "Back" }}
           >
             {({ route }) => <StoreProfileScreen storeId={route.params.storeId} />}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Remote"
+            options={{ title: "Timer remote", headerBackTitle: "Room" }}
+          >
+            {({ route }) => <RemoteScreen storeId={route.params?.storeId} />}
           </Stack.Screen>
           <Stack.Screen
             name="FindPlayer"
