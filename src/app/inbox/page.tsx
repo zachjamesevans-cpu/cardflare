@@ -15,7 +15,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Notifications",
+  title: "Inbox",
   robots: { index: false, follow: false },
 };
 
@@ -51,13 +51,15 @@ export default async function InboxPage() {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-5 px-5 pt-6 pb-16 sm:gap-8 sm:pt-12"
       >
-        <Link href="/" aria-label={`${SITE.name} home`}>
+        {/* A tab-bar page: the logo goes back to the Feed, not the
+            marketing home. */}
+        <Link href="/feed" aria-label={`${SITE.name} feed`}>
           <Logo size={40} priority />
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-xl font-bold text-text-primary">Notifications</h1>
+            <h1 className="text-xl font-bold text-text-primary">Inbox</h1>
             {unread > 0 && (
               <form action={markInboxReadAction}>
                 <Button type="submit" variant="ghost" size="sm">
@@ -78,7 +80,7 @@ export default async function InboxPage() {
               <Bell className="size-6 text-text-muted" aria-hidden="true" />
               <p className="max-w-sm text-text-secondary">
                 Nothing yet. When somebody offers on one of your Flares, or a board
-                opens early at a store you save, it lands here.
+                opens early at a store you follow, it lands here.
               </p>
               <ButtonLink href="/room" variant="secondary">
                 Find a room

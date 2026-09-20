@@ -3,12 +3,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft,
-  Flame,
+  ClipboardList,
   KeyRound,
   Library,
   Mail,
   MapPin,
-  Store,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -21,17 +20,10 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { signOut } from "@/lib/auth/actions";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
-import {
-  removeLocalAction,
-  removeWantAction,
-  rsvpAction,
-} from "@/lib/players/account-actions";
 import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
-import { listLocals } from "@/lib/players/locals";
 import { postalCodeForPlayer } from "@/lib/players/location";
 import { PostalAsk } from "@/components/feed/postal-ask";
-import { listWants } from "@/lib/players/wants";
 import { DisplayNameForm } from "@/components/players/display-name-form";
 import { DeckListForm } from "@/components/players/deck-list-form";
 import { HandleForm } from "@/components/players/handle-form";
@@ -54,9 +46,14 @@ export const dynamic = "force-dynamic";
  * will exist in the profile page, maybe as a settings cog... so just
  * moving it basically". Nothing here changed but where it lives.
  *
+ * Housekeeping only. The lists that used to live here have one home
+ * each now: saved wants are the Flare tab's "Saved requests", and the
+ * stores you follow are the Room tab's "Following". What is left is
+ * what is about the account itself.
+ *
  * Two audiences still, ordered by who is looking. For a player their
- * wants and collection lead and sign-in housekeeping follows; for an
- * operator email and password come first. The email address is fixed
+ * collection and deck paste lead and sign-in housekeeping follows; for
+ * an operator email and password come first. The email address is fixed
  * either way: it is what the invitation was addressed to and what
  * `claimPendingInvite` matches on, so letting it be edited here would
  * quietly detach an account from what it was invited to.
@@ -77,11 +74,9 @@ export default async function ProfileSettingsPage() {
     viewer.kind === "player"
       ? viewer.playerId
       : ((await playerForUser(viewer.user.id))?.id ?? null);
-  const wants = playerId ? await listWants(playerId) : null;
   const profile = playerId ? await ownProfile(playerId) : null;
   const displayName = profile?.displayName ?? "";
   const handle = profile?.handle ?? "";
-  const locals = playerId ? await listLocals(playerId) : [];
   const postalCode = playerId ? await postalCodeForPlayer(playerId) : null;
 
   const sync = playerId ? await collectionSyncFor(playerId) : null;
@@ -146,21 +141,23 @@ export default async function ProfileSettingsPage() {
    * A ZIP rather than a stored coordinate is the whole design: the
    * device position the app can ask for is never written down, so this
    * five-digit field is the entirety of what cardflare keeps about
-   * where somebody is. Emptying it is how you take it back.
+   * where somebody is. Emptying it is how you take it back. The card
+   * is named for what it holds, not for what it finds: the stores it
+   * finds are on the Room tab, and this is the setting behind them.
    */
   const locationCard = !playerId ? null : (
     <Card key="location" className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
         <MapPin className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
         <div className="flex flex-col gap-1">
-          <p className="font-semibold text-text-primary">Stores near you</p>
+          <p className="font-semibold text-text-primary">Your ZIP code</p>
           <p className="text-sm text-text-secondary">
-            Your ZIP code, used to list game stores and Flares within a few miles. It is
-            never shown to anyone and never used for anything else.
+            Used only to match you with players and stores nearby. It is never shown to
+            anyone.
           </p>
         </div>
       </div>
-      <PostalAsk defaultValue={postalCode ?? ""} allowClear />
+      <PostalAsk defaultValue={postalCode ?? ""} allowClear submitLabel="Save" />
     </Card>
   );
 
@@ -188,147 +185,39 @@ export default async function ProfileSettingsPage() {
     </Card>
   );
 
-  const localsCard =
-    playerId && locals.length > 0 ? (
-      <Card key="locals" className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <Store className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div className="flex flex-col gap-1">
-            <p className="font-semibold text-text-primary">Your locals</p>
-            <p className="text-sm text-text-secondary">
-              Stores you follow. Joining a room follows the store too. Tap one to see
-              what&rsquo;s happening there, no QR code needed.
-            </p>
-          </div>
-        </div>
-
-        <ul className="flex flex-col">
-          {locals.map((local) => {
-            const where = [local.city, local.region].filter(Boolean).join(", ");
-            return (
-              <li
-                key={local.storeId}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-              >
-                <div className="flex min-w-0 flex-1 basis-48 flex-col">
-                  <Link
-                    href={`/e/${local.joinCode}`}
-                    className="truncate font-semibold text-text-primary underline-offset-4 hover:underline"
-                  >
-                    {local.name}
-                  </Link>
-                  <span className="text-xs text-text-muted">
-                    {local.liveNow
-                      ? "A room is open right now"
-                      : local.nextEventAt
-                        ? `Next: ${local.nextEventName} · ${new Intl.DateTimeFormat(
-                            "en-US",
-                            { weekday: "short", month: "short", day: "numeric" },
-                          ).format(new Date(local.nextEventAt))}`
-                        : (where ?? "")}
-                  </span>
-                </div>
-                {local.earlyOpen && local.nextEventCode && (
-                  <form action={rsvpAction}>
-                    <input type="hidden" name="code" value={local.nextEventCode} />
-                    {/* The button says everything the tap does: an RSVP
-                        posts the whole list, and a silent broadcast is
-                        not a thing this product does. */}
-                    <Button type="submit" variant="secondary" size="sm">
-                      {wants && wants.length > 0
-                        ? `I'll be there. Post my ${wants.length} ${
-                            wants.length === 1 ? "Flare" : "Flares"
-                          }`
-                        : "I'll be there"}
-                    </Button>
-                  </form>
-                )}
-                <form action={removeLocalAction}>
-                  <input type="hidden" name="storeId" value={local.storeId} />
-                  <Button type="submit" variant="ghost" size="sm">
-                    Remove
-                  </Button>
-                </form>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-    ) : null;
-
-  const wantsCard =
-    wants !== null ? (
-      <Card key="wants" className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <Flame className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div className="flex flex-col gap-1">
-            <p className="font-semibold text-text-primary">Your saved wants</p>
-            <p className="text-sm text-text-secondary">
-              Saved automatically when you post a Flare while signed in, cleared when a
-              trade finds the card. Walk into any cardflare room and it offers to post
-              these again.
-            </p>
-          </div>
-        </div>
-
-        {/*
-         * The fast way in, above the list rather than below it. A player
-         * arriving here before a release has nothing to scroll past and
-         * a deck to paste; a player with fifty wants already knows where
-         * their list is.
-         */}
-        <details className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-text-primary">
-            Paste a deck list
-          </summary>
-          <div className="pt-4">
-            <DeckListForm />
-          </div>
-        </details>
-
-        {wants.length === 0 ? (
-          <p className="text-sm text-text-muted">
-            Nothing yet. Paste a deck above, or post a Flare at your next event and it
-            will be waiting here.
+  /*
+   * The paste box, as its own card. The wants it produces are not
+   * listed here: "the 'saved wants' section in the settings is kinda
+   * redundant, since it's just the flare section, just elsewhere", so
+   * the Flare tab's "Saved requests" is the one list and this card
+   * only feeds it. The app carries a card under exactly this title.
+   */
+  const deckListCard = !playerId ? null : (
+    <Card key="deck-list" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <ClipboardList
+          className="mt-0.5 size-5 shrink-0 text-accent"
+          aria-hidden="true"
+        />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Paste a deck list</p>
+          <p className="text-sm text-text-secondary">
+            Every card in it becomes a saved request. Walk into any room and it offers
+            to post the lot in one go.
           </p>
-        ) : (
-          <ul className="flex flex-col">
-            {wants.map((want) => (
-              <li
-                key={want.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
-              >
-                <div className="flex min-w-0 flex-1 basis-48 flex-col">
-                  <span className="truncate font-semibold text-text-primary">
-                    {want.cardName}
-                    {want.quantity > 1 && (
-                      <span className="font-normal text-text-muted tabular-nums">
-                        {" "}
-                        ×{want.quantity}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-mono text-xs text-text-muted">
-                    {want.cardNumber}
-                    <span className="font-sans">
-                      {" "}
-                      · {want.printingLabel ?? "Any printing"}
-                      {want.deckLabel && <> · {want.deckLabel}</>}
-                    </span>
-                  </span>
-                </div>
-                <form action={removeWantAction}>
-                  <input type="hidden" name="wantId" value={want.id} />
-                  <Button type="submit" variant="ghost" size="sm">
-                    Remove
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    ) : null;
+        </div>
+      </div>
+
+      <DeckListForm />
+
+      <Link
+        href="/flare"
+        className="w-fit text-sm font-semibold text-accent underline-offset-4 hover:underline"
+      >
+        Your saved requests live on the Flare tab
+      </Link>
+    </Card>
+  );
 
   const collectionCard = playerId ? (
     <Card key="collection" className="flex flex-col gap-4">
@@ -389,9 +278,8 @@ export default async function ProfileSettingsPage() {
   /* A player's own things lead; sign-in housekeeping follows. */
   const cards = isPlayerHome
     ? [
-        localsCard,
         feedViewCard,
-        wantsCard,
+        deckListCard,
         collectionCard,
         locationCard,
         nameCard,
@@ -403,9 +291,8 @@ export default async function ProfileSettingsPage() {
         nameCard,
         emailCard,
         locationCard,
-        localsCard,
         feedViewCard,
-        wantsCard,
+        deckListCard,
         collectionCard,
         passwordCard,
         deleteCard,
@@ -419,7 +306,7 @@ export default async function ProfileSettingsPage() {
         title="Settings"
         description={
           isPlayerHome
-            ? "Your wants, your collection, and how you sign in."
+            ? "Your collection, your ZIP code, and how you sign in."
             : "How you sign in to cardflare."
         }
         areas={areas}

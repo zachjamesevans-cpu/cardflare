@@ -92,7 +92,7 @@ export default async function ProfilePage() {
    * through — a wizard nobody can fall out of is one nobody has to
    * remember to come back to.
    */
-  if (await needsSetup(playerId)) redirect("/welcome/username");
+  if (await needsSetup(playerId)) redirect("/welcome");
 
   const profile = await ownProfile(playerId);
   if (!profile) redirect("/profile/settings");
@@ -162,7 +162,10 @@ export default async function ProfilePage() {
             <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
-            {/* Share and the two wands, top right, over the cover. */}
+            {/* Share, the one wand and the cog, top right, over the
+                cover. One wand: Customize opens on profile cosmetics
+                and switches to showcase cosmetics from its own header,
+                so a second wand on the shelf was the same door twice. */}
             <div className="absolute top-3 right-3 z-10 flex gap-2">
               <ShareProfileButton
                 url={`${siteUrl()}/p/${profile.playerId}`}
@@ -277,17 +280,6 @@ export default async function ProfilePage() {
                     </p>
                   </details>
                 </div>
-                {/* The showcase's own wand: card borders, foils, motion
-                    and the shelf background, in a menu of their own so
-                    neither wand opens a wall. */}
-                <Link
-                  href="/profile/customize?area=showcase"
-                  title="Customize showcase"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-                >
-                  <Wand2 className="size-5" aria-hidden="true" />
-                  <span className="sr-only">Customize your showcase</span>
-                </Link>
               </div>
 
               {profile.showcase.length === 0 ? (
@@ -380,31 +372,20 @@ export default async function ProfilePage() {
               <EmberBadge earned={profile.embersEarned} size="md" />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
-                <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-                  Earned, all time
-                </p>
-                <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
-                  {profile.embersEarned.toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Public. This is the number on your badge, and it never goes down.
-                </p>
-              </div>
-
-              <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
-                <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-                  Left to spend
-                </p>
-                <p className="mt-1 flex items-center gap-1.5 text-2xl font-bold text-accent tabular-nums">
-                  <Flame className="size-5" aria-hidden="true" />
-                  {profile.embersBalance.toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Private. Nobody else sees this, only you.
-                </p>
-              </div>
+            {/* One number here, the public one. The balance is on the
+                store door below and nowhere else on this page, so the
+                two are never read side by side and mistaken for each
+                other. */}
+            <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
+              <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
+                Earned, all time
+              </p>
+              <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
+                {profile.embersEarned.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Public. This is the number on your badge, and it never goes down.
+              </p>
             </div>
           </Card>
 

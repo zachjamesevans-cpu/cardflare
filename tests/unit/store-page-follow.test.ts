@@ -183,10 +183,4 @@ describe("following a store", () => {
     expect(read("mobile/src/screens/room.tsx")).toContain('navigate("StoreProfile"');
     expect(read("mobile/src/api.ts")).toContain("export const followStore");
   });
-
-  it("says the same thing about locals on both platforms", () => {
-    const line = "Stores you follow. Joining a room follows the store too.";
-    expect(read("src/app/profile/settings/page.tsx")).toContain(line);
-    expect(read("mobile/src/screens/home.tsx").replace(/\s+/g, " ")).toContain(line);
-  });
 });

@@ -20,14 +20,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Step two: a picture, and it is genuinely optional.
+ * A picture, and it is genuinely optional.
  *
  * The account was already marked set up when the name was chosen, so
  * nobody who skips this is left permanently owing a step. The generated
  * initials are a real avatar rather than a placeholder — that is why
  * `avatar.ts` still exists — so "later" costs nothing.
  *
- * Reached after the username step, and also reachable on its own by
+ * Reached after the account is created on /welcome, and also reachable on its own by
  * somebody who closed the tab: it does not check `needsSetup`, because
  * by the time anyone gets here setup is already recorded as done.
  */
@@ -57,7 +57,7 @@ export default async function SetupPicturePage() {
             Add a picture
           </h1>
           <p className="text-text-secondary">
-            Step 2 of 3, and you can skip it. Your initials work fine.
+            You can skip this. Your initials work fine.
           </p>
         </div>
 

@@ -156,7 +156,7 @@ export async function GET(request: Request): Promise<Response> {
     },
     wardrobe,
     /* An account that never chose a username finishes that first - the
-       same wizard the website runs at /welcome/username. */
+       same screen the website runs at /welcome. */
     needsSetup: await needsSetup(player.playerId),
   });
 }

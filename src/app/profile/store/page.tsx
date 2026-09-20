@@ -47,7 +47,7 @@ export default async function EmberStorePage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
-  if (await needsSetup(playerId)) redirect("/welcome/username");
+  if (await needsSetup(playerId)) redirect("/welcome");
 
   const profile = await ownProfile(playerId);
   const sealed = await listSealedPacks(playerId);

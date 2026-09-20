@@ -19,7 +19,8 @@ export interface OutstandingWant {
    *
    * The list's two states. "The 'saved wants' section in the settings is
    * kinda redundant, since it's just the flare section, jsut elsewhere" -
-   * so there is one list now, and this is what makes one enough: a card
+   * so there is one list now, the Flare tab's "Saved requests", and
+   * settings has no list at all. This is what makes one enough: a card
    * saved at home and a card on a board tonight are the same row and
    * completely different news.
    */
