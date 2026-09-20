@@ -2735,39 +2735,29 @@ export async function listFeed(
       linkHref: notice.linkHref,
     })),
     /*
-     * YOUR OWN FLARES FIRST, and together.
+     * EVERYTHING YOU FOLLOW, NEWEST FIRST, your own posts among them.
      *
-     * Both clients draw a heading only when the section CHANGES, so an
-     * own post sitting between two followed ones would read "Your
-     * flares / People you follow / Your flares". Hoisting them keeps
-     * one heading over one block - and puts what you just posted where
-     * Instagram puts it, at the top, so posting visibly did something.
-     */
-    ...areaHunts.filter((item) => item.yours),
-    ...boards.filter((item) => item.kind === "hunt" && item.yours),
-    /*
-     * Everyone you follow, people and shops alike, newest first.
-     *
-     * A store's post is dated the way a Flare is, so it takes its place
-     * among the followed Flares by that date rather than in a block of
-     * its own: the shop that posted an hour ago sits above the Flare
-     * from yesterday, and under the one from ten minutes ago. Board
-     * hunts, area hunts and store posts are one list here. Your own
-     * posts stay hoisted above, as they always were.
+     * One list by date: your Flares, the people you follow, the shops
+     * you follow. The founder, on finding the followed posts filed under
+     * a "People you follow" heading beneath a block of his own: "why
+     * have the followed people be all the way down there? Makes zero
+     * sense. Following tab needs to be sorted in chronological order,
+     * with most recent." So the shop that posted an hour ago sits above
+     * the Flare from yesterday and under the one from ten minutes ago,
+     * whoever posted it. Neither client draws a heading on this tab.
      */
     ...byPostedAt<HuntItem | StorePostItem>([
-      ...boards.filter((item): item is HuntItem => item.kind === "hunt" && !item.yours),
-      /* Somebody you follow, posting from anywhere rather than onto a
-         board at a shop you happen to share. Without this, following a
-         player showed you almost nothing. */
-      ...areaHunts.filter((item) => !item.yours),
+      ...boards.filter((item): item is HuntItem => item.kind === "hunt"),
+      ...areaHunts,
       ...storePosts,
+      ...recent.map(asPost).filter((item): item is HuntItem => item.kind === "hunt"),
     ]),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
     ...boards.filter((item) => item.kind === "board" && !item.yours),
-    ...recent.map(asPost),
+    /* Guest posts that could not become a post stay as the older row. */
+    ...recent.map(asPost).filter((item) => item.kind !== "hunt"),
     ...added,
     ...traded,
     ...suggested,

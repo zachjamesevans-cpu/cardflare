@@ -131,18 +131,18 @@ describe("your own Flares reach your own feed", () => {
     expect(repo).toContain('yours: "Your flares"');
   });
 
-  it("keeps your posts together at the top", async () => {
+  it("files your posts in the same time order as everyone else's", async () => {
     /*
-     * Both clients draw a heading only when the section CHANGES, so an
-     * own post between two followed ones would read "Your flares /
-     * People you follow / Your flares".
+     * The founder: "Following tab needs to be sorted in chronological
+     * order, with most recent." No hoisted block of your own, and no
+     * heading on that tab on either client.
      */
     const repo = await readFile("src/lib/feed/repository.ts", "utf8");
 
-    const own = repo.indexOf('item.kind === "hunt" && item.yours');
-    const others = repo.indexOf('item.kind === "hunt" && !item.yours');
-    expect(own).toBeGreaterThan(-1);
-    expect(others).toBeGreaterThan(own);
+    expect(repo).toContain(
+      'boards.filter((item): item is HuntItem => item.kind === "hunt")',
+    );
+    expect(repo).not.toContain('item.kind === "hunt" && item.yours)');
   });
 });
 
