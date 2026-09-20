@@ -4,6 +4,11 @@ import "server-only";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
+import type { StoreRole } from "@/lib/supabase/types";
+
+/** Which role this account holds at each store it belongs to. */
+export type StoreRoles = Record<string, StoreRole>;
+
 import { claimPendingPlayerInvite, playerForUser } from "@/lib/players/accounts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -15,10 +20,21 @@ export type Viewer =
    * themselves to a test store or vendor, and the area switcher lets one
    * signed-in account move between the consoles without re-authenticating.
    */
-  | { kind: "admin"; user: User; storeIds: string[] }
-  | { kind: "store"; user: User; storeIds: string[] }
-  /** A signed-in player: someone whose wants follow them between stores. */
-  | { kind: "player"; user: User; playerId: string; playerName: string }
+  | { kind: "admin"; user: User; storeIds: string[]; storeRoles: StoreRoles }
+  | { kind: "store"; user: User; storeIds: string[]; storeRoles: StoreRoles }
+  /**
+   * A signed-in player: someone whose wants follow them between stores.
+   * `organizerStoreIds` are the stores that named them an organizer:
+   * the event hub and the timers there are theirs to run, nothing
+   * about money or membership is.
+   */
+  | {
+      kind: "player";
+      user: User;
+      playerId: string;
+      playerName: string;
+      organizerStoreIds: string[];
+    }
   | { kind: "unaffiliated"; user: User };
 
 /**
@@ -60,28 +76,42 @@ export const getViewer = cache(async function getViewer(): Promise<Viewer> {
     { data: memberships, error: memberError },
   ] = await Promise.all([
     admin.from("admin_users").select("user_id").eq("user_id", user.id).maybeSingle(),
-    admin.from("store_members").select("store_id").eq("user_id", user.id),
+    admin.from("store_members").select("store_id, role").eq("user_id", user.id),
   ]);
 
   if (adminError) console.error("Could not read the admin list", adminError);
   if (memberError) console.error("Could not read store memberships", memberError);
 
   const storeIds = (memberships ?? []).map((m) => m.store_id);
+  const storeRoles: StoreRoles = Object.fromEntries(
+    (memberships ?? []).map((m) => [m.store_id, m.role] as const),
+  );
 
-  if (adminRow) return { kind: "admin", user, storeIds };
+  if (adminRow) return { kind: "admin", user, storeIds, storeRoles };
 
-  if (storeIds.length > 0) {
-    return { kind: "store", user, storeIds };
-  }
+  /*
+   * An OWNER is a store account. An ORGANIZER is a player first: a
+   * regular who was handed the timers at their shop, whose Feed and
+   * Flares must go on working exactly as before. So the store kind is
+   * for owners (and for the rare staff login with no player behind
+   * it), and an organizer with a player row stays a player who also
+   * carries the stores they may run.
+   */
+  const ownsAStore = (memberships ?? []).some((m) => m.role === "owner");
+  const player = ownsAStore ? null : await playerForUser(user.id);
 
-  const player = await playerForUser(user.id);
   if (player) {
     return {
       kind: "player",
       user,
       playerId: player.id,
       playerName: player.display_name,
+      organizerStoreIds: storeIds,
     };
+  }
+
+  if (storeIds.length > 0) {
+    return { kind: "store", user, storeIds, storeRoles };
   }
 
   return { kind: "unaffiliated", user };

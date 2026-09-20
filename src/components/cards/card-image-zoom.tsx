@@ -777,6 +777,11 @@ export function CardImageZoom({
         }}
         onTouchStart={(event) => {
           touchFrom.current = event.touches[0]?.clientX ?? null;
+          /* A new finger is new intent. The founder, swiping then
+             tapping: "i want to close out of it immediately, but i
+             cant until the swipe animation is done." The flag a swipe
+             left behind was eating that tap. */
+          swiped.current = false;
         }}
         onTouchEnd={(event) => {
           const from = touchFrom.current;
@@ -788,7 +793,13 @@ export function CardImageZoom({
              still a tap, near enough that a flick counts. */
           if (Math.abs(travelled) < 40) return;
 
+          /* Swallow only the click THIS gesture might leave, which lands
+             within the same frame or two; a tap a moment later, while
+             the rail is still sliding, closes at once. */
           swiped.current = true;
+          window.setTimeout(() => {
+            swiped.current = false;
+          }, 120);
           go(travelled < 0 ? 1 : -1);
         }}
         className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] cursor-zoom-out overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]"

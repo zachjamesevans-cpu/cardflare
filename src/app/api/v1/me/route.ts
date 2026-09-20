@@ -1,4 +1,4 @@
-import { apiPlayer, unauthorized } from "@/lib/api/auth";
+import { apiPlayer, apiStaffStores, unauthorized } from "@/lib/api/auth";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
@@ -7,6 +7,28 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { postedLabel } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
+
+/** The stores an account runs, named, for the remote's picker. */
+async function staffedStores(
+  userId: string,
+): Promise<{ storeId: string; name: string; code: string; role: "owner" | "staff" }[]> {
+  const memberships = await apiStaffStores(userId);
+  if (memberships.length === 0) return [];
+  const { data } = await getSupabaseAdmin()
+    .from("stores")
+    .select("id, name, join_code")
+    .in(
+      "id",
+      memberships.map((m) => m.storeId),
+    );
+  const byId = new Map((data ?? []).map((row) => [row.id, row]));
+  return memberships.flatMap((m) => {
+    const store = byId.get(m.storeId);
+    return store
+      ? [{ storeId: m.storeId, name: store.name, code: store.join_code, role: m.role }]
+      : [];
+  });
+}
 
 /**
  * The signed-in player's account snapshot: who they are, what they are
@@ -96,5 +118,8 @@ export async function GET(request: Request): Promise<Response> {
       nextEventCode: local.nextEventCode,
       earlyOpen: local.earlyOpen,
     })),
+    /* The stores this account may RUN, for the remote: owners and
+       organizers alike. Empty for nearly everybody. */
+    staff: await staffedStores(player.userId),
   });
 }

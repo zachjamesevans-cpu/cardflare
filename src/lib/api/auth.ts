@@ -4,6 +4,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { sessionInEventForPlayer } from "@/lib/events/participants";
 import { findPlayerSession, touchPlayerSession } from "@/lib/players/repository";
 import { hashSessionToken } from "@/lib/players/session";
+import type { StoreRole } from "@/lib/supabase/types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -131,4 +132,38 @@ export function unauthorized(): Response {
 
 export function badRequest(message: string): Response {
   return Response.json({ error: message }, { status: 400 });
+}
+
+/** A store this account belongs to, and as what. */
+export interface ApiStaffStore {
+  storeId: string;
+  role: StoreRole;
+}
+
+/**
+ * The stores an account may run from the app: every membership, with
+ * its role. An owner runs everything; an organizer (role "staff", the
+ * TO badge) runs the event hub and the timers. Empty for a player who
+ * staffs nowhere, which is nearly everybody.
+ */
+export async function apiStaffStores(userId: string): Promise<ApiStaffStore[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("store_members")
+    .select("store_id, role")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("Could not read the account's store memberships", error);
+    return [];
+  }
+  return (data ?? []).map((row) => ({ storeId: row.store_id, role: row.role }));
+}
+
+/** The role this account holds at one store, or null for none. */
+export async function apiStoreRole(
+  userId: string,
+  storeId: string,
+): Promise<StoreRole | null> {
+  const stores = await apiStaffStores(userId);
+  return stores.find((store) => store.storeId === storeId)?.role ?? null;
 }

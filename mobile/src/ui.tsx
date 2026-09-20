@@ -456,6 +456,18 @@ export function CardImage({
    * still false was a tap and nothing else.
    */
   const scrolled = useRef(false);
+  /*
+   * Is the rail still sliding to its snap point?
+   *
+   * The founder: "when swiping between cards, i want to close out of
+   * it immediately, but i cant until the swipe animation is done." A
+   * finger that lands mid-slide stops the rail, and React Native
+   * hands that touch to the rail rather than to the card's press, so
+   * the tap went nowhere. The rail watches its own touches while it
+   * settles: one that does not move is a tap, and a tap closes.
+   */
+  const settling = useRef(false);
+  const settleTouch = useRef<{ x: number; y: number } | null>(null);
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
 
   /* Everything below reads these, so the panel draws whichever card the
@@ -824,13 +836,33 @@ export function CardImage({
                       {...IMMEDIATE_TOUCHES}
                       onScrollBeginDrag={() => {
                         scrolled.current = true;
+                        settling.current = false;
                       }}
                       /* Cleared a beat after the gesture settles, so the
                      press that ends a swipe still sees it. */
                       onScrollEndDrag={() => {
+                        settling.current = true;
                         setTimeout(() => {
                           scrolled.current = false;
                         }, 80);
+                      }}
+                      onTouchStart={(event) => {
+                        settleTouch.current = settling.current
+                          ? {
+                              x: event.nativeEvent.pageX,
+                              y: event.nativeEvent.pageY,
+                            }
+                          : null;
+                      }}
+                      onTouchEnd={(event) => {
+                        const from = settleTouch.current;
+                        settleTouch.current = null;
+                        if (!from) return;
+                        const moved =
+                          Math.abs(event.nativeEvent.pageX - from.x) +
+                          Math.abs(event.nativeEvent.pageY - from.y);
+                        /* A still finger mid-slide is a tap: close now. */
+                        if (moved < 12) close();
                       }}
                       snapToInterval={page}
                       snapToAlignment="start"
@@ -862,6 +894,7 @@ export function CardImage({
                         );
                         if (landed >= 0 && landed < shelf.length) setAt(landed);
                         scrolled.current = false;
+                        settling.current = false;
                       }}
                     >
                       {shelf.map((card, index) => (
