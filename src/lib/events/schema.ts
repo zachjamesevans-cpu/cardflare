@@ -125,6 +125,11 @@ export interface PublicEvent {
   storeName: string;
   storeCity: string | null;
   storeRegion: string | null;
+  /**
+   * cardflare Verified: admin-set trust, never inferred from the tier.
+   * Drawn beside the store's name wherever a room shows it.
+   */
+  storeVerified: boolean;
   /** The store's zone. Event times mean nothing without it. */
   storeTimeZone: string;
   /** When true, closing this occurrence creates the next one, +7 days. */

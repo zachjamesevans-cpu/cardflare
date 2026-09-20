@@ -65,6 +65,7 @@ import {
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
+import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
 import { colors, gutter, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
@@ -1246,13 +1247,7 @@ export function HomeScreen() {
                             </Text>
                             {/* Two marks, never one inferred from the other:
                           Verified is trust, Ultra is a product tier. */}
-                            {store.verified ? (
-                              <MaterialCommunityIcons
-                                name="check-decagram"
-                                size={14}
-                                color={colors.accent}
-                              />
-                            ) : null}
+                            {store.verified ? <VerifiedMark size={14} /> : null}
                             {store.ultra ? (
                               <Text
                                 style={{

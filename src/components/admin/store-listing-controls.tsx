@@ -46,6 +46,32 @@ function Outcome({ state }: { state: ListingState }) {
   );
 }
 
+/**
+ * One click to mark a store cardflare Verified, for the directory row.
+ *
+ * The same action the full control below posts, so a verification from
+ * the list and one from the store's own page write the same columns.
+ * Only offered where the row has already earned it: an Ultra store that
+ * is not yet verified. Removing verification stays on the store's page,
+ * where the admin can see what they are undoing.
+ */
+export function VerifyButton({ storeId }: { storeId: string }) {
+  const [trust, trustAction] = useActionState(setVerifiedAction, LISTING_IDLE);
+
+  if (trust.status === "done") {
+    return <Outcome state={trust} />;
+  }
+
+  return (
+    <form action={trustAction} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="storeId" value={storeId} />
+      <input type="hidden" name="verified" value="true" />
+      <Pending label="Verify" busy="Verifying…" />
+      <Outcome state={trust} />
+    </form>
+  );
+}
+
 export function StoreListingControls({
   storeId,
   published,

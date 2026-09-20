@@ -625,6 +625,8 @@ export interface RoomState {
     storeName: string;
     /** The store's page, linked from the room. Absent from an older server. */
     storeId?: string;
+    /** cardflare Verified, drawn beside the name. Absent from an older server. */
+    verified?: boolean;
     kind: string;
     startsAt: string | null;
     endsAt: string | null;

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RemoteImage } from "../remote-image";
 import { RemoteEntry } from "../remote-entry";
 import { FollowStoreButton } from "../follow-store-button";
+import { VerifiedMark } from "../verified-mark";
 
 import type { StackParams } from "../../App";
 import {
@@ -561,10 +562,14 @@ function RoomScreen({
                 navigation.navigate("StoreProfile", { storeId: room.storeId! })
               }
               hitSlop={6}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
             >
               <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
                 {room.storeName}
               </Text>
+              {/* Verified is the badge everybody sees beside a store's
+                  name. Ultra is a tier and is never drawn here. */}
+              {room.verified ? <VerifiedMark size={14} /> : null}
             </Tap>
           ) : (
             <Muted>{room.storeName}</Muted>
@@ -722,10 +727,12 @@ function RoomScreen({
                   navigation.navigate("StoreProfile", { storeId: room.storeId! })
                 }
                 hitSlop={6}
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
               >
                 <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
                   {room.storeName}
                 </Text>
+                {room.verified ? <VerifiedMark size={14} /> : null}
               </Tap>
             ) : (
               <Muted>{room.storeName}</Muted>

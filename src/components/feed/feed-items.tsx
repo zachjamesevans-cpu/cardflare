@@ -5,7 +5,6 @@ import {
   MapPin,
   PackageCheck,
   Sparkles,
-  BadgeCheck,
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -15,6 +14,7 @@ import type { FeedView } from "@/lib/feed/views";
 import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { VerifiedMark } from "@/components/stores/verified-mark";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
@@ -543,12 +543,7 @@ export function Item({
                 {store.name}
                 {/* Verified is trust and Ultra is a product tier: two
                     marks, never one inferred from the other. */}
-                {store.verified && (
-                  <BadgeCheck
-                    className="size-4 shrink-0 text-accent"
-                    aria-label="cardflare Verified"
-                  />
-                )}
+                {store.verified && <VerifiedMark className="size-4" />}
                 {store.ultra && (
                   <span className="shrink-0 rounded-full border border-border-strong px-1.5 text-[10px] font-medium tracking-wide text-text-secondary uppercase">
                     Ultra

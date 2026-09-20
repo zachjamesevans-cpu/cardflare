@@ -152,6 +152,8 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       /* Links the room to the store's page, the founder's ask. */
       storeId: room.storeId,
       storeName: room.storeName,
+      /* cardflare Verified, drawn beside the store's name in the app. */
+      verified: room.storeVerified,
       kind: room.kind,
       startsAt: room.startsAt,
       endsAt: room.endsAt,
