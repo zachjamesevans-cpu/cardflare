@@ -189,16 +189,18 @@ describe("the home screen's furniture", () => {
     }
   });
 
-  it("keeps Verified and Ultra as two separate marks", () => {
+  it("draws Verified on a nearby row and never Ultra", () => {
     /*
      * Verified is trust - "cardflare has confirmed this profile is
      * controlled by the listed business" - and it is never for sale.
-     * Ultra is the product tier. A row may show one, both or neither,
-     * and no client may infer one from the other.
+     * Ultra is the product tier, and a Feed row is not where a shop's
+     * plan is anybody's business: the store page's eyebrow is the one
+     * place it is said. The server still sends both, separately, so
+     * neither client can infer one from the other.
      */
     for (const source of [items, app]) {
       expect(source).toContain("store.verified");
-      expect(source).toContain("store.ultra");
+      expect(source).not.toContain("store.ultra");
     }
 
     const repo = read("src/lib/feed/repository.ts");

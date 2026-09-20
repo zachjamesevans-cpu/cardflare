@@ -194,11 +194,68 @@ describe("the wizard", () => {
     expect(read("src/components/stores/setup-wizard.tsx")).toContain("Skip for now");
   });
 
-  it("is the owner's, and organizers are sent to the console", () => {
+  it("is the owner's, locked in the loader like the owner-only tabs", () => {
+    const console = read("src/lib/stores/console.ts");
+    expect(console).toMatch(/OWNER_ONLY_PATHS = \[[^\]]*"\/store\/setup"/);
+    /* One lock, not a second copy that could drift from it. */
+    expect(read("src/app/store/setup/page.tsx")).not.toContain(
+      'store.role !== "owner"',
+    );
+    /* The actions the steps post ask for the owner again. */
+    expect(read("src/lib/stores/setup-actions.ts")).toContain(
+      'viewer.storeRoles[storeId] === "owner"',
+    );
+  });
+
+  it("makes the first night through the Events tab's own action, in place", () => {
+    const form = read("src/components/stores/setup-event-form.tsx");
+    expect(form).toContain("createEventInPlaceAction");
+    expect(form).not.toContain("createSetupEventAction");
+    expect(read("src/lib/stores/setup-actions.ts")).not.toContain(
+      "createSetupEventAction",
+    );
+
+    const actions = read("src/lib/events/actions.ts");
+    expect(actions).toContain("export async function createEventInPlaceAction");
+    /* Both doors share one body; only the redirecting one leaves. */
+    expect(actions.match(/await createEventFrom\(formData\)/g)).toHaveLength(2);
+    expect(actions).toMatch(
+      /createEventInPlaceAction[\s\S]*?return \{ status: "created"/,
+    );
+  });
+
+  it("names a screen with the one form FlareCast can adopt", () => {
+    const form = read("src/components/stores/add-screen-form.tsx");
+    expect(form).toContain("action: (formData: FormData) => Promise<void>");
     const page = read("src/app/store/setup/page.tsx");
     expect(page).toContain(
-      'if (store.role !== "owner") redirect(`/store?as=${store.id}`)',
+      'import { AddScreenForm } from "@/components/stores/add-screen-form"',
     );
+    expect(page).toContain("action={addSetupScreenAction}");
+    expect(read("src/components/stores/setup-wizard.tsx")).not.toContain(
+      "AddScreenForm",
+    );
+  });
+
+  it("says how to put a screen on the TV once, in the lede", () => {
+    const page = read("src/app/store/setup/page.tsx");
+    expect(page.match(/Enter Fullscreen/g)).toHaveLength(1);
+    expect(read("src/components/stores/setup-wizard.tsx")).not.toContain(
+      "Enter Fullscreen",
+    );
+  });
+
+  it("prints the counter code on Done with the console's own sheet", () => {
+    const page = read("src/app/store/setup/page.tsx");
+    const done = page.slice(page.indexOf("async function DoneStep"));
+    expect(done).toContain("<CounterCode");
+    expect(done).not.toContain("dangerouslySetInnerHTML");
+    /* The event step no longer draws it: it is one step away. */
+    const event = page.slice(
+      page.indexOf("async function EventStep"),
+      page.indexOf("async function TeamStep"),
+    );
+    expect(event).not.toContain("<CounterCode");
   });
 
   it("stamps onboarding_completed_at from Later and from Done", () => {
@@ -224,22 +281,66 @@ describe("the wizard", () => {
     );
   });
 
-  it("is where checkout lands", () => {
+  it("is where checkout lands; a closed or failed checkout lands on Settings", () => {
     const actions = read("src/lib/stores/ultra-actions.ts");
     expect(actions).toContain("const setup = `/store/setup?as=${storeId}`");
     expect(actions).toContain(
       "successUrl: `${origin}${setup}&checkout=success&session_id={CHECKOUT_SESSION_ID}`",
     );
+    expect(actions).toContain("cancelUrl: `${origin}${settings}&checkout=cancelled`");
+    expect(actions).toContain("redirect(`${settings}&checkout=failed`)");
+    expect(actions).toContain(
+      "const back = `${siteUrl()}/store/settings?as=${storeId}`",
+    );
     expect(read("src/app/store/setup/page.tsx")).toContain(
       "await reconcileCheckoutSession(params.session_id, { storeId: store.id })",
     );
+    /* The console home neither reconciles nor shows the plan; Settings does. */
+    const home = read("src/app/store/page.tsx");
+    expect(home).not.toContain("reconcileCheckoutSession");
+    expect(home).not.toContain("BillingCard");
+    expect(read("src/app/store/settings/page.tsx")).toContain("<BillingCard");
   });
 
-  it("is offered from the console home until it is finished", () => {
+  it("has no welcome flag: the wizard is the welcome", () => {
+    for (const file of [
+      "src/lib/stores/ultra-actions.ts",
+      "src/app/store/setup/page.tsx",
+      "src/app/store/page.tsx",
+      "src/components/stores/billing-card.tsx",
+    ]) {
+      expect(read(file), file).not.toContain("welcome=1");
+      expect(read(file), file).not.toContain("welcome?:");
+    }
+    expect(read("src/components/stores/billing-card.tsx")).not.toContain(
+      "Your store is ready.",
+    );
+  });
+
+  it("is offered from the console home until it is finished, alone", () => {
     const home = read("src/app/store/page.tsx");
     expect(home).toContain("Finish setting up");
-    expect(home).toContain("onboardedAt === null");
+    expect(home).toContain("const offerWizard = owner && onboardedAt === null");
     expect(home).not.toContain("WelcomeHero");
+    /* While the wizard is offered the checklist is not drawn as well. */
+    expect(home).toContain("const visibleSteps = offerWizard\n    ? []");
+    /* Afterwards, the steps the wizard walked show only while undone,
+       and an organizer never sees a step whose page turns them away. */
+    expect(home).toContain(
+      'const WIZARD_STEPS = new Set(["page", "flarecast", "event"])',
+    );
+    expect(home).toContain("!(WIZARD_STEPS.has(step.key) && step.done)");
+    expect(home).toContain("(owner || !isOwnerOnlyPath(step.href))");
+  });
+
+  it("lists organizers with the same rows on the tab and in the wizard", () => {
+    for (const file of [
+      "src/app/store/organizers/page.tsx",
+      "src/app/store/setup/page.tsx",
+    ]) {
+      expect(read(file)).toContain("<OrganizerList");
+      expect(read(file)).not.toContain("<PlayerAvatar");
+    }
   });
 });
 
@@ -262,7 +363,7 @@ describe("the public store page", () => {
   it("says the same words on both platforms", () => {
     const web = read("src/app/s/[storeId]/page.tsx");
     const app = read("mobile/src/screens/store-profile.tsx");
-    for (const words of ["Open now", "Closed now", "Sign in to follow"]) {
+    for (const words of ["Open now", "Closed now"]) {
       expect(web).toContain(words);
       expect(app).toContain(words);
     }

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
-import { AppShell } from "@/components/layout/app-shell";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FollowButton } from "@/components/players/follow-button";
@@ -11,7 +10,7 @@ import { PeopleList } from "@/components/players/people-list";
 import { ProfileHeader } from "@/components/players/profile-header";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { TabPageShell } from "@/components/players/tab-page-shell";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
@@ -34,10 +33,23 @@ import { cn } from "@/lib/cn";
 import { ProfileCover } from "@/components/players/profile-cover";
 import { HuntsPanel } from "@/components/players/hunts-panel";
 
-export const metadata: Metadata = {
-  title: "Player",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ playerId: string }>;
+}): Promise<Metadata> {
+  const { playerId } = await params;
+  const profile = await publicProfile(playerId);
+  const robots = { index: false, follow: false };
+
+  if (!profile) return { title: "Player", robots };
+
+  return {
+    title: profile.displayName,
+    description: `${profile.displayName} on cardflare`,
+    robots,
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -110,162 +122,152 @@ export default async function PublicProfilePage({
     listFollowing(playerId),
   ]);
 
+  /* The Feed's chrome, not the console's: the wordmark with the Feed
+     behind it and the tab bar below. The name is drawn once, by
+     ProfileHeader, the same block the owner's page draws. */
   return (
-    <>
-      <AppShell
-        area="Profile"
-        email={viewer.kind === "anonymous" ? "" : (viewer.user.email ?? "")}
-        title={profile.displayName}
-        description="What this player has traded for, and what they are showing off."
-      >
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Card className="relative flex flex-col gap-4 overflow-hidden">
-            <ProfileCover coverUrl={profile.coverUrl} short />
-            <WornSceneLayer worn={dressed} rive={dressedArt} />
+    <TabPageShell title={profile.displayName}>
+      <Card className="relative flex flex-col gap-4 overflow-hidden">
+        <ProfileCover coverUrl={profile.coverUrl} short />
+        <WornSceneLayer worn={dressed} rive={dressedArt} />
 
-            {/* Share, top right over the cover: the same corner your own
+        {/* Share, top right over the cover: the same corner your own
                 profile keeps its icons in. */}
-            <div className="absolute top-3 right-3 z-10">
-              <ShareProfileButton
-                url={`${siteUrl()}/p/${profile.playerId}`}
-                title={`${profile.displayName} on cardflare`}
-              />
-            </div>
+        <div className="absolute top-3 right-3 z-10">
+          <ShareProfileButton
+            url={`${siteUrl()}/p/${profile.playerId}`}
+            title={`${profile.displayName} on cardflare`}
+          />
+        </div>
 
-            {/* The same header the owner sees, with Follow where they
+        {/* The same header the owner sees, with Follow where they
                 have Edit profile. Share is a link anybody can open. */}
-            <div className="relative mt-16">
-              <ProfileHeader
-                avatar={
-                  <PlayerAvatar
-                    displayName={profile.displayName}
-                    seed={profile.playerId}
-                    avatarUrl={profile.avatarUrl}
-                    frame={worn.avatarFrame}
-                    ring={dressed.ring}
-                    aura={dressed.aura}
-                    ringArt={dressedArt.ring}
-                    auraArt={dressedArt.aura}
-                    className="size-20 text-2xl sm:size-24"
-                  />
-                }
-                name={profile.displayName}
-                handle={profile.handle}
-                worn={dressed}
-                embersEarned={profile.embersEarned}
-                stats={stats}
-                organizerAt={profile.organizerAt}
-                /* Their lists open too, as Instagram's do. The Trade
-                   partners mark is theirs, not the viewer's. */
-                people={{
-                  followers: <PeopleList people={followers} empty="Nobody yet." />,
-                  following: <PeopleList people={following} empty="Nobody yet." />,
-                }}
-                actions={
-                  <>
-                    {follow ? (
-                      <FollowButton
-                        playerId={playerId}
-                        initial={follow}
-                        className="flex-1 justify-center"
-                      />
-                    ) : viewer.kind === "anonymous" ? (
-                      <Link
-                        href={`/signup?next=${encodeURIComponent(`/p/${playerId}`)}`}
-                        className={cn(buttonStyles("primary", "sm"), "flex-1")}
-                      >
-                        Follow
-                      </Link>
-                    ) : null}
-                  </>
-                }
+        <div className="relative mt-16">
+          <ProfileHeader
+            avatar={
+              <PlayerAvatar
+                displayName={profile.displayName}
+                seed={profile.playerId}
+                avatarUrl={profile.avatarUrl}
+                frame={worn.avatarFrame}
+                ring={dressed.ring}
+                aura={dressed.aura}
+                ringArt={dressedArt.ring}
+                auraArt={dressedArt.aura}
+                className="size-20 text-2xl sm:size-24"
               />
-            </div>
+            }
+            name={profile.displayName}
+            handle={profile.handle}
+            worn={dressed}
+            embersEarned={profile.embersEarned}
+            stats={stats}
+            organizerAt={profile.organizerAt}
+            /* Their lists open too, as Instagram's do. The Trade
+                   partners mark is theirs, not the viewer's. */
+            people={{
+              followers: <PeopleList people={followers} empty="Nobody yet." />,
+              following: <PeopleList people={following} empty="Nobody yet." />,
+            }}
+            actions={
+              <>
+                {follow ? (
+                  <FollowButton
+                    playerId={playerId}
+                    initial={follow}
+                    className="flex-1 justify-center"
+                  />
+                ) : viewer.kind === "anonymous" ? (
+                  <Link
+                    href={`/signup?next=${encodeURIComponent(`/p/${playerId}`)}`}
+                    className={cn(buttonStyles("primary", "sm"), "flex-1")}
+                  >
+                    Follow
+                  </Link>
+                ) : null}
+              </>
+            }
+          />
+        </div>
 
-            {/* What they are looking for, before what they are showing
+        {/* What they are looking for, before what they are showing
                 off: somebody opening a profile is usually deciding
                 whether they can help. */}
-            <HuntsPanel hunts={profile.hunts} />
+        <HuntsPanel hunts={profile.hunts} />
 
-            {/* The showcase panel, pixel-identical to the own-profile
+        {/* The showcase panel, pixel-identical to the own-profile
                 page's - the founder's spec: viewing somebody must show
                 the same block their owner sees. */}
-            <div className="relative flex w-full flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4 text-left">
-              <div className="flex items-start gap-3">
-                <Sparkles
-                  className="mt-0.5 size-5 shrink-0 text-accent"
-                  aria-hidden="true"
-                />
-                <div className="flex flex-col gap-1">
-                  <p className="font-semibold text-text-primary">Showcase</p>
-                  <p className="text-sm text-text-secondary">
-                    Cards this player is proud of. Not a trade list, so there is nothing
-                    to pledge on here.
-                  </p>
-                </div>
-              </div>
-
-              {profile.showcase.length === 0 ? (
-                <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
-              ) : (
-                /* The board's carousel: same Rail, same card width. */
-                <div
-                  className={cn(
-                    "relative",
-                    (shelfBg || dressedArt.background) &&
-                      "overflow-hidden rounded-[var(--radius-control)] p-2",
-                    shelfBg,
-                  )}
-                >
-                  <WornBackdrop rive={dressedArt} />
-                  <Rail ariaLabel="Showcase">
-                    {profile.showcase.map((entry, index) => (
-                      <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                        <CardImageZoom
-                          imageUrl={entry.imageUrl}
-                          exactName={entry.name}
-                          cardNumber={entry.number}
-                          note={entry.note}
-                          direction="showcase"
-                          siblings={shelf}
-                          position={index}
-                          enabled={imagesEnabled}
-                          thumbClassName="w-full"
-                          thumb={
-                            <WornCardShell
-                              worn={dressed}
-                              rive={dressedArt}
-                              className="w-full"
-                            >
-                              <CosmeticCard
-                                imageUrl={entry.imageUrl}
-                                name={entry.name}
-                                number={entry.number}
-                                imagesEnabled={imagesEnabled}
-                                frame={entry.frame ?? worn.frame}
-                                holo={entry.holo ?? worn.holo}
-                                effect={worn.effect}
-                                className="w-full"
-                              />
-                            </WornCardShell>
-                          }
-                        />
-                        <span className="truncate text-[11px] text-text-secondary">
-                          {entry.name}
-                        </span>
-                      </li>
-                    ))}
-                  </Rail>
-                </div>
-              )}
+        <div className="relative flex w-full flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4 text-left">
+          <div className="flex items-start gap-3">
+            <Sparkles
+              className="mt-0.5 size-5 shrink-0 text-accent"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">Showcase</p>
+              <p className="text-sm text-text-secondary">
+                Cards this player is proud of. Not a trade list, so there is nothing to
+                offer on here.
+              </p>
             </div>
-          </Card>
+          </div>
 
-          <TabBarSpacer />
+          {profile.showcase.length === 0 ? (
+            <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
+          ) : (
+            /* The board's carousel: same Rail, same card width. */
+            <div
+              className={cn(
+                "relative",
+                (shelfBg || dressedArt.background) &&
+                  "overflow-hidden rounded-[var(--radius-control)] p-2",
+                shelfBg,
+              )}
+            >
+              <WornBackdrop rive={dressedArt} />
+              <Rail ariaLabel="Showcase">
+                {profile.showcase.map((entry, index) => (
+                  <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
+                    <CardImageZoom
+                      imageUrl={entry.imageUrl}
+                      exactName={entry.name}
+                      cardNumber={entry.number}
+                      note={entry.note}
+                      direction="showcase"
+                      siblings={shelf}
+                      position={index}
+                      enabled={imagesEnabled}
+                      thumbClassName="w-full"
+                      thumb={
+                        <WornCardShell
+                          worn={dressed}
+                          rive={dressedArt}
+                          className="w-full"
+                        >
+                          <CosmeticCard
+                            imageUrl={entry.imageUrl}
+                            name={entry.name}
+                            number={entry.number}
+                            imagesEnabled={imagesEnabled}
+                            frame={entry.frame ?? worn.frame}
+                            holo={entry.holo ?? worn.holo}
+                            effect={worn.effect}
+                            className="w-full"
+                          />
+                        </WornCardShell>
+                      }
+                    />
+                    <span className="truncate text-[11px] text-text-secondary">
+                      {entry.name}
+                    </span>
+                  </li>
+                ))}
+              </Rail>
+            </div>
+          )}
         </div>
-      </AppShell>
-
-      <PlayerTabBar />
-    </>
+      </Card>
+    </TabPageShell>
   );
 }

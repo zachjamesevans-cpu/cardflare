@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronDown, Crosshair, Layers, Plus } from "lucide-react";
+import { ChevronDown, Layers, ListChecks, Plus } from "lucide-react";
 
 import { HuntDetail } from "@/components/players/hunt-detail";
 import { Button, buttonStyles } from "@/components/ui/button";
@@ -66,7 +66,9 @@ export function HuntsPanel({
     <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-2 font-semibold text-text-primary">
-          <Crosshair className="size-4 text-accent" aria-hidden="true" />
+          {/* A list with ticks, not the crosshair: the reticle is the
+              Flare status mark and means one thing. */}
+          <ListChecks className="size-4 text-accent" aria-hidden="true" />
           Hunts
         </p>
         <div className="flex items-center gap-2">

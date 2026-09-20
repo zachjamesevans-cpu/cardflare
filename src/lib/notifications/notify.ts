@@ -547,8 +547,8 @@ export async function notifyBoardOpen(eventId: string): Promise<void> {
 
       const body =
         (count ?? 0) > 0
-          ? `You are hunting ${count} ${count === 1 ? "card" : "cards"}. RSVP and ${count === 1 ? "it goes" : "they go"} up for ${day}.`
-          : `Post what you are hunting and see who is coming ${day}.`;
+          ? `You are looking for ${count} ${count === 1 ? "card" : "cards"}. RSVP and ${count === 1 ? "it goes" : "they go"} up for ${day}.`
+          : `Post what you are looking for and see who is coming ${day}.`;
 
       const id = await record({
         playerId: saver.player_id,
@@ -587,7 +587,7 @@ export const TEST_NOTICES = {
   },
   "board-open": {
     title: "The board is open: Friday Locals at Card Cavern",
-    body: "You are hunting 5 cards. RSVP and they go up for Friday.",
+    body: "You are looking for 5 cards. RSVP and they go up for Friday.",
   },
   "early-board": {
     title: "The Friday Locals board is open at Card Cavern",
@@ -598,7 +598,7 @@ export const TEST_NOTICES = {
     body: "Follow back and you are Trade partners.",
   },
   "room-flare": {
-    title: "CHUNC is hunting Umbreon VMAX",
+    title: "CHUNC is looking for Umbreon VMAX",
     body: "It just went up in your room. Check your binder.",
   },
 } as const;
@@ -782,7 +782,7 @@ export async function notifyRoomFlare(
     if (recipients.size === 0) return;
 
     /*
-     * One card is named; a batch is counted. "Zach is hunting 24 cards"
+     * One card is named; a batch is counted. "Zach is looking for 24 cards"
      * is the whole news — naming one of twenty-four would suggest the
      * others matter less, and listing them will not fit in a push.
      */
@@ -790,8 +790,8 @@ export async function notifyRoomFlare(
 
     const title =
       intent === "showcase"
-        ? `${posterName} is letting go of ${subject}`
-        : `${posterName} is hunting ${subject}`;
+        ? `${posterName} is offering ${subject}`
+        : `${posterName} is looking for ${subject}`;
     const body =
       intent === "showcase"
         ? count === 1

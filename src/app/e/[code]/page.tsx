@@ -603,7 +603,7 @@ export default async function JoinByCodePage({
             trading, where the question does not arise. */}
         {event.kind !== "walk_in" && (
           <Link
-            href="/tournaments"
+            href={`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`}
             className="w-fit text-sm font-medium text-accent hover:text-accent-hover"
           >
             New to tournaments? Here&rsquo;s how a night works &rarr;

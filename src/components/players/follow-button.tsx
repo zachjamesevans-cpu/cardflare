@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, UserCheck, UserPlus, Users } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { followButtonClass } from "@/components/players/follow-styles";
 
 /** The viewer's side of the relationship, as the API serves it. */
 export interface FollowStateJson {
@@ -69,13 +69,7 @@ export function FollowButton({
       type="button"
       onClick={() => void toggle()}
       disabled={busy}
-      className={cn(
-        "flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-1.5 text-sm font-semibold transition-colors",
-        state.following
-          ? "border-border bg-elevated text-text-secondary hover:border-border-strong"
-          : "border-accent/40 bg-accent/10 text-accent hover:border-accent",
-        className,
-      )}
+      className={followButtonClass(state.following, className)}
     >
       {busy ? (
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />

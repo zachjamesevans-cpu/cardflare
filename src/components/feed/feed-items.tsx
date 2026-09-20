@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
-import { FlareFeedCard } from "@/components/feed/flare-feed-card";
+import { agoFrom, FlareFeedCard } from "@/components/feed/flare-feed-card";
 import { FlareFeedCardCompact } from "@/components/feed/flare-feed-card-compact";
 import { StorePostCard } from "@/components/feed/store-post-card";
 import type { FeedView } from "@/lib/feed/views";
@@ -16,6 +16,7 @@ import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { VerifiedMark } from "@/components/stores/verified-mark";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
 import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
@@ -46,23 +47,6 @@ function doorsAt(startsAt: string | null, timeZone: string): string {
     minute: "2-digit",
     timeZone,
   }).format(new Date(startsAt))}`;
-}
-
-/**
- * How long ago, in the shortest true form.
- *
- * A Flare from this afternoon and one from Tuesday are different news, and
- * a full date on every row is noise. Days are the coarsest unit that
- * matters here because the item stops being shown after a week.
- */
-function agoFrom(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
-
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.round(hours / 24)}d ago`;
 }
 
 /**
@@ -99,7 +83,7 @@ const STARTERS = {
     icon: MapPin,
     variant: "primary",
     headline: "Where do you play?",
-    body: "Join your store's room once and it saves itself here, with its next board and who is hunting what. The code is on the counter.",
+    body: "Join your store's room once and it saves itself here, with its next board and who is looking for what. The code is on the counter.",
     label: "Enter a store code",
     href: "/room",
   },
@@ -109,7 +93,7 @@ const STARTERS = {
        and therefore none, and a store is the answer that makes every
        other item on this screen possible. */
     variant: "secondary",
-    headline: "What are you hunting?",
+    headline: "What are you looking for?",
     body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
     label: "Paste a deck list",
     href: "/profile/settings",
@@ -269,7 +253,7 @@ export function Item({
         <div className="flex flex-col gap-0.5">
           <p className="font-semibold text-text-primary">Worth following</p>
           <p className="text-xs text-text-muted">
-            Their binders answer what you&rsquo;re hunting.
+            Their binders answer what you&rsquo;re looking for.
           </p>
         </div>
 
@@ -307,6 +291,11 @@ export function Item({
   }
 
   if (item.kind === "nearbyMatch") {
+    /* The "I have this" door is Local's, and Local is off: see
+       src/lib/local/enabled.ts. The kind stays known so a server that
+       still sends it is not mistaken for one this build cannot read. */
+    if (!LOCAL_ENABLED) return null;
+
     return (
       <Card className="flex flex-col gap-3 border-accent/40 bg-gradient-to-b from-accent/5 to-transparent p-4">
         <div className="flex flex-col gap-0.5">
@@ -478,7 +467,7 @@ export function Item({
             aura={item.aura}
             /* The direction in words, never a texture: PRODUCT.md is
                explicit that foil means rare, not available. */
-            detail={`${item.direction === "showcase" ? "Letting go of" : "Hunting"}${
+            detail={`${item.direction === "showcase" ? "Offering" : "Looking for"}${
               item.deckLabel ? ` · ${item.deckLabel}` : ""
             } · ${item.storeName}`}
           />
@@ -548,14 +537,10 @@ export function Item({
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-text-primary">
                 {store.name}
-                {/* Verified is trust and Ultra is a product tier: two
-                    marks, never one inferred from the other. */}
+                {/* Verified only. Ultra is a product tier, not trust,
+                    and a row is not where a shop's plan is anybody's
+                    business: the store page's eyebrow says it. */}
                 {store.verified && <VerifiedMark className="size-4" />}
-                {store.ultra && (
-                  <span className="shrink-0 rounded-full border border-border-strong px-1.5 text-[10px] font-medium tracking-wide text-text-secondary uppercase">
-                    Ultra
-                  </span>
-                )}
               </p>
               <p className="truncate text-xs text-text-muted">
                 {store.miles} mi

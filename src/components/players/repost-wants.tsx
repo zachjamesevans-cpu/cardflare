@@ -23,7 +23,7 @@ function SubmitButton({ count }: { count: number }) {
 }
 
 /**
- * "Still hunting these?" — the payoff of an account, folded shut.
+ * "Still looking for these?": the payoff of an account, folded shut.
  *
  * Closed, this tile is EXACTLY the roster's silhouette: icon, question,
  * count, chevron, one line, nothing else. The founder's screenshot of
@@ -64,8 +64,8 @@ export function RepostWants({
         <CheckCircle2 className="size-5 shrink-0 text-accent" aria-hidden="true" />
         <p className="text-sm text-text-secondary">
           {state.count === 0
-            ? "Everything you are hunting is already on the board."
-            : `${state.count} ${state.count === 1 ? "Flare" : "Flares"} posted. The room can see what you are hunting.`}
+            ? "Everything you are looking for is already on the board."
+            : `${state.count} ${state.count === 1 ? "Flare" : "Flares"} posted. The room can see what you are looking for.`}
         </p>
       </Card>
     );
@@ -81,7 +81,7 @@ export function RepostWants({
       >
         <h2 className="flex min-w-0 items-center gap-2 font-semibold text-text-primary">
           <History className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
-          <span className="truncate">Still hunting these?</span>
+          <span className="truncate">Still looking for these?</span>
         </h2>
         <span className="flex shrink-0 items-center gap-2">
           <span className="text-sm text-text-muted tabular-nums">

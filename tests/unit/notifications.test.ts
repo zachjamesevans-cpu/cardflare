@@ -336,7 +336,7 @@ describe("notifyBoardOpen", () => {
       url: "/e/K3M9PZ",
       dedupe_key: "board-open:e1:p9",
     });
-    expect(String(inserted.body)).toContain("hunting 5 cards");
+    expect(String(inserted.body)).toContain("looking for 5 cards");
     // The doorbell never emails: midnight is phone territory.
     expect(sendEmail).not.toHaveBeenCalled();
   });
@@ -368,7 +368,7 @@ describe("notifyBoardOpen", () => {
     await notifyBoardOpen("e1");
 
     const inserted = calls.notifications.insert?.[0]?.[0] as Record<string, unknown>;
-    expect(String(inserted.body)).toContain("Post what you are hunting");
+    expect(String(inserted.body)).toContain("Post what you are looking for");
   });
 
   it("does nothing for an event with no join code", async () => {

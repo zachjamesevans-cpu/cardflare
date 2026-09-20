@@ -17,7 +17,7 @@ import type { StorePostItem } from "@/lib/feed/repository";
  * that makes following worth it." So it takes the Flare card's shape
  * exactly: the logo where the face goes, the store's name with its
  * Verified mark, "posted an update" in the accent where a Flare says
- * "is hunting", the time on the right. Then the picture when there is
+ * "is looking for", the time on the right. Then the picture when there is
  * one, the title, the words, and when the post is about an event
  * night, "I'll be there" with how many already are. The heart and the
  * thread are the same ones every post has. The app draws the same

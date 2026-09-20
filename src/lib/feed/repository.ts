@@ -877,9 +877,9 @@ function reasonFor(item: FeedItem): string {
     case "announcement":
       return "From cardflare";
     case "board":
-      return item.yours ? "At a store you saved" : "A room open right now";
+      return item.yours ? "At a store you follow" : "A room open right now";
     case "upcoming":
-      return "At a store you saved";
+      return "At a store you follow";
     case "hunt":
       /* Drawn as a small label inside the post's header, never as a
          line between cards - the founder: "do not interrupt the feed

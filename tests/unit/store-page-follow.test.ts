@@ -125,16 +125,21 @@ describe("the setup flow", () => {
       expect(steps.indexOf(`key: "${key}"`)).toBeGreaterThan(first);
     }
     expect(page).toContain("Set up your store page");
-    expect(page).toContain("/store/organizers");
+    /* The Organizers tab is reached from the tab bar, not a third card. */
+    expect(page).not.toContain("/store/organizers");
   });
 
   it("only lets an owner write the page", () => {
     const action = read("src/lib/stores/page-actions.ts");
     expect(action).toMatch(/storeRoles\[storeId\] === "owner"/);
     expect(action).toContain('viewer.kind === "admin"');
-    /* The card itself is owner-only too. */
+    /* The card lives on Settings, which the loader locks to owners, so
+       the page carries no role check of its own. */
     const settings = read("src/app/store/settings/page.tsx");
-    expect(settings).toContain('store.role === "owner"');
+    expect(settings).not.toContain('store.role === "owner"');
+    expect(read("src/lib/stores/console.ts")).toMatch(
+      /OWNER_ONLY_PATHS = \[[^\]]*"\/store\/settings"/,
+    );
     expect(settings).toContain('id="page"');
     expect(settings).toContain("This is what players see when they follow you");
     expect(settings).toContain("View your page");
@@ -174,8 +179,17 @@ describe("following a store", () => {
       expect(source).toContain('"Following"');
       expect(source).toContain('"Follow"');
     }
-    expect(read("src/app/s/[storeId]/page.tsx")).toContain("Sign in to follow");
-    expect(read("mobile/src/screens/store-profile.tsx")).toContain("Sign in to follow");
+    /* A guest's door is the same word as the button, and it starts
+       sign-up with the store page as the way back: the founder's one
+       look for Follow, whoever is being followed. */
+    const page = read("src/app/s/[storeId]/page.tsx");
+    expect(page).toContain(
+      "href={`/signup?next=${encodeURIComponent(`/s/${store.storeId}`)}`}",
+    );
+    expect(page).not.toContain("Sign in to follow");
+    expect(read("mobile/src/screens/store-profile.tsx")).not.toContain(
+      "Sign in to follow",
+    );
 
     /* Both app screens draw the button: the store's page and the room. */
     expect(read("mobile/src/screens/store-profile.tsx")).toContain("FollowStoreButton");
