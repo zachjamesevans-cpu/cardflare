@@ -61,7 +61,7 @@ describe("Tap is the pressable it animates", () => {
     for (const [path, needle] of [
       ["mobile/src/feed-filter-tabs.tsx", "flex: 1"],
       ["mobile/src/profile-header.tsx", "flex: 1"],
-      ["mobile/src/screens/post-flare.tsx", "flex: 1"],
+      ["mobile/src/flare-bits.tsx", "flex: 1"],
     ] as const) {
       const source = read(path);
       /* Some files hold several Taps; one of them has to be asking to

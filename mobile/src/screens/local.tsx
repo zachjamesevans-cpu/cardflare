@@ -277,7 +277,7 @@ export function LocalScreen({
               <Card>
                 <Title>Nothing on the boards within {feed!.radius} miles</Title>
                 <Body>
-                  Post the card you are hunting and anyone nearby can answer. Flares
+                  Post the card you are looking for and anyone nearby can answer. Flares
                   posted at a store near you land here too.
                 </Body>
               </Card>
@@ -622,7 +622,7 @@ function FlareRow({
             </Text>
           ) : null}
           <Muted>
-            {flare.intent === "showcase" ? "Trading away" : "Hunting"} · {accepts} ·{" "}
+            {flare.intent === "showcase" ? "Offering" : "Looking for"} · {accepts} ·{" "}
             {agoLabel(flare.postedAt)}
           </Muted>
         </View>

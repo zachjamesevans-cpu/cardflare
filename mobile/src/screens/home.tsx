@@ -37,7 +37,6 @@ import {
   offerFromPost,
   postFlare,
   rememberRoom,
-  removeLocal,
   storedAccessToken,
   type Me,
 } from "../api";
@@ -78,8 +77,8 @@ import { useTabBarInset } from "../glass";
  * screen, and the founder cut it: "move the qr code scanner/code entry
  * to Room. No need to have that in the feed." Room is the tab you are
  * already opening when you are standing at a counter, and this one is
- * for reading. A signed-in player still gets their locals here — the
- * stores they actually go to, saved automatically on every join.
+ * for reading. The stores a player follows are listed on the Room tab,
+ * the one place that list lives; here a live one is a banner.
  */
 /**
  * When the doors open, in the store's own clock — the website's `doorsAt`.
@@ -110,13 +109,13 @@ const STARTERS = {
   store: {
     icon: "map-marker-outline",
     headline: "Where do you play?",
-    body: "Join your store's room once and it saves itself here, with its next board and who is hunting what. The code is on the counter.",
+    body: "Join your store's room once and you follow the store, with its next board and who is looking for what. The code is on the counter.",
     label: "Enter a store code",
   },
   deck: {
     icon: "clipboard-list-outline",
-    headline: "What are you hunting?",
-    body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
+    headline: "What are you looking for?",
+    body: "Paste a deck list and every card in it becomes a saved request. Walk into any room and it offers to post the lot in one go.",
     label: "Paste a deck list",
   },
 } as const;
@@ -235,9 +234,7 @@ export function HomeScreen() {
   /* What is on at the places you go, and who needs what you have. The
      website's Feed, from the same server answer. */
   const [feed, setFeed] = useState<FeedEntry[]>([]);
-  const [rsvping, setRsvping] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const locals = me?.locals ?? [];
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
@@ -532,38 +529,12 @@ export function HomeScreen() {
   };
 
   /*
-   * "I'll be there", the app's way: join the early board under the
-   * account's own name and post every saved want. Duplicates already on
-   * the board are skipped by the server, so this is safe to repeat.
-   */
-  const rsvp = async (local: Me["locals"][number]) => {
-    if (!me || !local.nextEventCode || rsvping) return;
-    setRsvping(local.storeId);
-    try {
-      await joinRoom(local.nextEventCode, me.player.displayName);
-      for (const want of me.wants) {
-        await postFlare(local.nextEventCode, {
-          cardId: want.cardId,
-          printingId: want.printingId,
-          quantity: want.quantity,
-          note: want.note ?? undefined,
-          deckLabel: want.deckLabel,
-        }).catch(() => {});
-      }
-      await rememberRoom(local.nextEventCode);
-      openRoom(navigation);
-    } catch {
-      // The Room tab shows the truthful state; nothing to add here.
-    } finally {
-      setRsvping(null);
-    }
-  };
-
-  /*
-   * "I'll be there" from a store's post: the same RSVP as above, keyed
-   * on the night's own code rather than on a saved local, because the
-   * post names the board it is about. The card keeps its own busy
-   * state, so this only has to do the joining.
+   * "I'll be there" from a store's post: join the early board under the
+   * account's own name and post every saved request, keyed on the
+   * night's own code because the post names the board it is about.
+   * Duplicates already on the board are skipped by the server, so this
+   * is safe to repeat. The card keeps its own busy state, so this only
+   * has to do the joining.
    */
   const rsvpToCode = async (code: string) => {
     if (!me) return;
@@ -579,19 +550,6 @@ export function HomeScreen() {
     }
     await rememberRoom(code);
     openRoom(navigation);
-  };
-
-  const nextLine = (local: Me["locals"][number]) => {
-    if (local.liveNow) return "A room is open right now";
-    if (local.nextEventAt) {
-      const day = new Date(local.nextEventAt).toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      return `Next: ${local.nextEventName} · ${day}`;
-    }
-    return "Tap to see what's happening";
   };
 
   return (
@@ -1050,7 +1008,7 @@ export function HomeScreen() {
             ) : item.kind === "suggest" ? (
               <Card key={`suggest-${index}`}>
                 <Title>Worth following</Title>
-                <Muted>Their binders answer what you&rsquo;re hunting.</Muted>
+                <Muted>Their binders answer what you&rsquo;re looking for.</Muted>
                 {item.players.map((person) => (
                   <Tap
                     key={person.playerId}
@@ -1189,7 +1147,7 @@ export function HomeScreen() {
                     aura={item.aura}
                     size={36}
                     detail={`${
-                      item.direction === "showcase" ? "Letting go of" : "Hunting"
+                      item.direction === "showcase" ? "Offering" : "Looking for"
                     }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.storeName}`}
                     onOpen={(id) =>
                       navigation.navigate("PlayerProfile", { playerId: id })
@@ -1283,26 +1241,10 @@ export function HomeScreen() {
                             >
                               {store.name}
                             </Text>
-                            {/* Two marks, never one inferred from the other:
-                          Verified is trust, Ultra is a product tier. */}
+                            {/* Verified is the mark everybody sees beside a
+                                store's name. Ultra is a tier and is never
+                                drawn here: the store's own page says it. */}
                             {store.verified ? <VerifiedMark size={14} /> : null}
-                            {store.ultra ? (
-                              <Text
-                                style={{
-                                  color: colors.textSecondary,
-                                  fontSize: 9,
-                                  fontWeight: "700",
-                                  letterSpacing: 0.8,
-                                  borderWidth: 1,
-                                  borderColor: colors.border,
-                                  borderRadius: 999,
-                                  paddingHorizontal: 5,
-                                  paddingVertical: 1,
-                                }}
-                              >
-                                ULTRA
-                              </Text>
-                            ) : null}
                           </View>
                           <Text
                             numberOfLines={1}
@@ -1471,99 +1413,6 @@ export function HomeScreen() {
           );
         })}
 
-        {locals.length > 0 && (
-          <Card>
-            {/* The MANAGING list, not the news. A saved store with a night
-              on it is an "upcoming" item further up now, so this exists
-              for the two things that item cannot do: say you will be
-              there, and stop following a shop you no longer go to. */}
-            <Title>Your locals</Title>
-            <Muted>
-              Stores you follow. Joining a room follows the store too. Tap one to walk
-              in, no QR needed. &ldquo;I&rsquo;ll be there&rdquo; posts your wants to
-              the board before you arrive.
-            </Muted>
-            {/* Divided rows, RSVP inside its own row - the web's list,
-              exactly. The button carries the count so the tap never
-              posts more than it said. */}
-            <View>
-              {locals.map((local, index) => (
-                <View
-                  key={local.storeId}
-                  style={{
-                    gap: spacing(2),
-                    paddingVertical: spacing(3),
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: colors.border,
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(2),
-                    }}
-                  >
-                    <Tap
-                      onPress={() => void enter(local.code)}
-                      style={{ flex: 1, gap: 2 }}
-                    >
-                      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                        {local.name}
-                      </Text>
-                      <Text
-                        style={{
-                          color: local.liveNow ? colors.accent : colors.textMuted,
-                          fontSize: 12,
-                        }}
-                      >
-                        {nextLine(local)}
-                      </Text>
-                    </Tap>
-                    <Tap
-                      onPress={() => {
-                        setMe((current) =>
-                          current
-                            ? {
-                                ...current,
-                                locals: current.locals.filter(
-                                  (entry) => entry.storeId !== local.storeId,
-                                ),
-                              }
-                            : current,
-                        );
-                        void removeLocal(local.storeId).catch(() => {});
-                      }}
-                      hitSlop={8}
-                    >
-                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                        Remove
-                      </Text>
-                    </Tap>
-                  </View>
-
-                  {local.earlyOpen && local.nextEventCode && (
-                    <Button
-                      label={
-                        rsvping === local.storeId
-                          ? "Joining the board…"
-                          : me && me.wants.length > 0
-                            ? `I'll be there. Post my ${me.wants.length} ${
-                                me.wants.length === 1 ? "Flare" : "Flares"
-                              }`
-                            : "I'll be there"
-                      }
-                      variant="secondary"
-                      onPress={() => void rsvp(local)}
-                      busy={rsvping === local.storeId}
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
-          </Card>
-        )}
-
         {/*
          * The explainer, for a screen that has not filled up yet.
          *
@@ -1601,7 +1450,7 @@ export function HomeScreen() {
           <Card>
             <Title>You have not posted yet</Title>
             <Body>
-              Post a Flare for a card you are hunting and it shows up here, and in
+              Post a Flare for a card you are looking for and it shows up here, and in
               Following with everyone else&rsquo;s.
             </Body>
             <Button
@@ -1616,9 +1465,9 @@ export function HomeScreen() {
           <Card>
             <Title>Nothing on right now</Title>
             <Body>
-              Post a Flare for a card you are hunting, or follow a friend, and it shows
-              up here. At a store? The code at the counter gets you into tonight&rsquo;s
-              room.
+              Post a Flare for a card you are looking for, or follow a friend, and it
+              shows up here. At a store? The code at the counter gets you into
+              tonight&rsquo;s room.
             </Body>
             <Button
               label="Go to Room"
@@ -1651,8 +1500,8 @@ export function HomeScreen() {
           <Card>
             <Title>How it works</Title>
             <Body>
-              Post a Flare for the card you&rsquo;re hunting. When a friend or somebody
-              in your room has it, they raise a hand and you trade in person.
+              Post a Flare for the card you&rsquo;re looking for. When a friend or
+              somebody in your room has it, they raise a hand and you trade in person.
             </Body>
           </Card>
         )}

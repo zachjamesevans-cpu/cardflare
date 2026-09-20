@@ -21,7 +21,18 @@ import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../hand
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { SignInScreen } from "./sign-in";
-import { AsyncButton, Body, Button, Card, ErrorLine, HandleInput, Input, Muted, Tap, Title } from "../ui";
+import {
+  AsyncButton,
+  Body,
+  Button,
+  Card,
+  ErrorLine,
+  HandleInput,
+  Input,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 import { colors, radius, spacing } from "../theme";
 
 /**
@@ -115,15 +126,16 @@ export function WelcomeScreen({
       )}
       {step === "account" && (
         <StepShell
-          step={1}
           title="Create your account"
-          onBack={initialStep === "account" && onCancel ? onCancel : () => setStep("splash")}
+          onBack={
+            initialStep === "account" && onCancel ? onCancel : () => setStep("splash")
+          }
         >
           <AccountStep onDone={() => setStep("games")} />
         </StepShell>
       )}
       {step === "games" && (
-        <StepShell step={2} title="Which games do you play?">
+        <StepShell title="Which games do you play?">
           <GamesStep onDone={done} />
         </StepShell>
       )}
@@ -262,13 +274,13 @@ function Splash({
   );
 }
 
+/* No "Step N of 2" line: the website's welcome dropped its step
+   counter, and the title says where you are. */
 function StepShell({
-  step,
   title,
   onBack,
   children,
 }: {
-  step: number;
   title: string;
   /**
    * The way back out, when there is one. Step 1 has it: tapping "Create
@@ -306,7 +318,6 @@ function StepShell({
             <Text style={{ color: colors.accent, fontWeight: "600" }}>‹ Back</Text>
           </Tap>
         ) : null}
-        <Muted>Step {step} of 2</Muted>
         <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: "800" }}>
           {title}
         </Text>
@@ -488,8 +499,8 @@ function GamesStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        Last step. When your stores run event nights on cardflare, this is how we
-        know which ones are yours. Pick any number.
+        When the stores you follow run event nights on cardflare, this is how we know
+        which ones are yours. Pick any number.
       </Body>
 
       <View style={{ gap: spacing(2) }}>

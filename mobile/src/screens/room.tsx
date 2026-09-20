@@ -40,6 +40,7 @@ import {
   withdrawOffer,
   rememberRoom,
   removeFlare,
+  removeLocal,
   setOpenToTrades,
   storedAccessToken,
   type Me,
@@ -86,16 +87,117 @@ export function RoomTab() {
   /* What is being typed, for the player whose camera will not focus. */
   const [typed, setTyped] = useState("");
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const tabInset = useTabBarInset();
+  /*
+   * The account, for the stores it follows. Null while signed out or
+   * until the read lands, and the card below simply does not draw:
+   * a guest has nothing to follow with.
+   */
+  const [me, setMe] = useState<Me | null>(null);
+  const [rsvping, setRsvping] = useState<string | null>(null);
+  const [unfollowing, setUnfollowing] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      void lastRoom().then(setCode);
+      let live = true;
+      void lastRoom().then((value) => {
+        if (live) setCode(value);
+      });
+      void (async () => {
+        if (!(await storedAccessToken())) {
+          if (live) setMe(null);
+          return;
+        }
+        try {
+          const result = await getMe();
+          if (live) setMe(result);
+        } catch {
+          /* Keep whatever was on screen; the next focus retries. */
+        }
+      })();
+      return () => {
+        live = false;
+      };
     }, []),
   );
 
+  /*
+   * "I'll be there", the app's way: join the early board under the
+   * account's own name and post every saved request. Duplicates already
+   * on the board are skipped by the server, so this is safe to repeat.
+   */
+  const rsvp = async (local: Me["locals"][number]) => {
+    if (!me || !local.nextEventCode || rsvping) return;
+    setRsvping(local.storeId);
+    try {
+      await joinRoom(local.nextEventCode, me.player.displayName);
+      for (const want of me.wants) {
+        await postFlare(local.nextEventCode, {
+          cardId: want.cardId,
+          printingId: want.printingId,
+          quantity: want.quantity,
+          note: want.note ?? undefined,
+          deckLabel: want.deckLabel,
+        }).catch(() => {});
+      }
+      await rememberRoom(local.nextEventCode);
+      setCode(local.nextEventCode);
+    } catch {
+      // The room shows the truthful state; nothing to add here.
+    } finally {
+      setRsvping(null);
+    }
+  };
+
+  /* Unfollow: the row goes at once, and the server is told after. */
+  const unfollow = async (storeId: string) => {
+    if (unfollowing) return;
+    setUnfollowing(storeId);
+    try {
+      await removeLocal(storeId);
+      setMe((current) =>
+        current
+          ? {
+              ...current,
+              locals: current.locals.filter((entry) => entry.storeId !== storeId),
+            }
+          : current,
+      );
+    } catch {
+      /* Still followed; the row stays, honestly. */
+    } finally {
+      setUnfollowing(null);
+    }
+  };
+
+  /* The row's second line: the website's, word for word. */
+  const nextLine = (local: Me["locals"][number]) => {
+    if (local.liveNow) return "A room is open right now";
+    if (local.nextEventAt) {
+      const day = new Date(local.nextEventAt).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      return `Next: ${local.nextEventName} · ${day}`;
+    }
+    return [local.city, local.region].filter(Boolean).join(", ");
+  };
+
   if (!code) {
+    const locals = me?.locals ?? [];
+    const wantCount = me?.wants.length ?? 0;
+
     return (
-      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(4),
+          paddingBottom: spacing(4) + tabInset,
+        }}
+      >
         {/*
          * Getting INTO a room happens here now, not on the Feed. The
          * founder: "move the qr code scanner/code entry to Room. No need
@@ -111,7 +213,7 @@ export function RoomTab() {
             cardflare reopens the room where you left it.
           </Body>
 
-          <Button label="Scan a QR code" onPress={() => navigation.navigate("Scan")} />
+          <Button label="Scan a code" onPress={() => navigation.navigate("Scan")} />
 
           <View style={{ flexDirection: "row", gap: spacing(2) }}>
             <View style={{ flex: 1 }}>
@@ -137,7 +239,90 @@ export function RoomTab() {
             />
           </View>
         </Card>
-      </View>
+
+        {/*
+         * The stores you follow, in the one place that list lives: the
+         * website's /room card, row for row. A row opens the store's
+         * page; "I'll be there" walks onto a board that is open early,
+         * Flares and all; Unfollow is the way off the list.
+         */}
+        {locals.length > 0 && (
+          <Card>
+            <Title>Following</Title>
+            <Muted>Stores you follow. Joining a room follows the store too.</Muted>
+            <View>
+              {locals.map((local, index) => (
+                <View
+                  key={local.storeId}
+                  style={{
+                    gap: spacing(2),
+                    paddingVertical: spacing(3),
+                    borderTopWidth: index === 0 ? 0 : 1,
+                    borderTopColor: colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(2),
+                    }}
+                  >
+                    <Tap
+                      onPress={() =>
+                        navigation.navigate("StoreProfile", { storeId: local.storeId })
+                      }
+                      accessibilityLabel={local.name}
+                      style={{ flex: 1, gap: 2 }}
+                    >
+                      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                        {local.name}
+                      </Text>
+                      <Text
+                        style={{
+                          color: local.liveNow ? colors.accent : colors.textMuted,
+                          fontSize: 12,
+                        }}
+                      >
+                        {nextLine(local)}
+                      </Text>
+                    </Tap>
+                    <Tap
+                      onPress={() => void unfollow(local.storeId)}
+                      disabled={unfollowing === local.storeId}
+                      accessibilityLabel={`Unfollow ${local.name}`}
+                      hitSlop={8}
+                    >
+                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                        {unfollowing === local.storeId ? "Unfollowing…" : "Unfollow"}
+                      </Text>
+                    </Tap>
+                  </View>
+
+                  {/* The button carries the count so the tap never posts
+                      more than it said. */}
+                  {local.earlyOpen && local.nextEventCode && (
+                    <Button
+                      label={
+                        rsvping === local.storeId
+                          ? "Posting…"
+                          : wantCount > 0
+                            ? `I'll be there. Post my ${wantCount} ${
+                                wantCount === 1 ? "Flare" : "Flares"
+                              }`
+                            : "I'll be there"
+                      }
+                      variant="secondary"
+                      onPress={() => void rsvp(local)}
+                      busy={rsvping === local.storeId}
+                    />
+                  )}
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
+      </ScrollView>
     );
   }
 
@@ -576,7 +761,21 @@ function RoomScreen({
           )}
           <Title>{room.name}</Title>
           {room.status !== "open" && !room.early ? (
-            <Body>This room is not open right now.</Body>
+            /* The website's two states, word for word. Closed points at
+               the Follow button only when there is one to press: an
+               account that does not follow the store yet. */
+            <>
+              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                {room.status === "closed" ? "This room has closed" : "Not open yet"}
+              </Text>
+              <Body>
+                {room.status !== "closed"
+                  ? "The store has not opened this room yet. Scan the code again when it starts."
+                  : state.account && state.following === false
+                    ? `This room has closed. Follow ${room.storeName} above to hear about the next one.`
+                    : "This room has closed. Thanks for coming."}
+              </Body>
+            </>
           ) : (
             <>
               <Body>
@@ -800,7 +999,7 @@ function RoomScreen({
                       day: "numeric",
                     })
                   : "soon"
-              }. Post what you're hunting so people know what to bring from home.`}
+              }. Post what you're looking for so people know what to bring from home.`}
             </Body>
           </Card>
         )}
@@ -826,7 +1025,7 @@ function RoomScreen({
                 gap: spacing(2),
               }}
             >
-              <Title>Still hunting these?</Title>
+              <Title>Still looking for these?</Title>
               <View
                 style={{
                   flexDirection: "row",
@@ -990,7 +1189,7 @@ function RoomScreen({
            * They stay visibly separate - the two sections below are
            * untouched - but the swipe runs through both, which is what
            * the website has always done. The zoom reads `direction` off
-           * each card, so swiping onto a showcase says "Letting go of"
+           * each card, so swiping onto a showcase says "Offering"
            * on its own.
            */
           const orderedRail = [
@@ -1260,7 +1459,7 @@ function RoomScreen({
                   {labelled && (
                     <View style={{ gap: spacing(1) }}>
                       <Text style={styles.folderLabel}>
-                        {`Letting go · ${showcases.length} ${
+                        {`Offering · ${showcases.length} ${
                           showcases.length === 1 ? "card" : "cards"
                         }`}
                       </Text>
@@ -1934,6 +2133,9 @@ function CarouselFlare({
                 onPress={() =>
                   offered && count === 0 ? void takeBack() : void pledge(count)
                 }
+                accessibilityLabel={
+                  offered && count === 0 ? "Take the offer back" : "Change your offer"
+                }
                 hitSlop={6}
               >
                 <View
@@ -1990,6 +2192,7 @@ function CarouselFlare({
                     : void pledge()
               }
               disabled={pledging}
+              accessibilityLabel={offered ? "Change your offer" : "Offer"}
               style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
               hitSlop={4}
             >

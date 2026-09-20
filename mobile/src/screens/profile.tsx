@@ -43,7 +43,6 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { OrganizerChips } from "../remote-entry";
 import { CoverBanner } from "../showcase-zoom";
 import { LockedRows, TradeHistoryRow, TradeHistoryWall } from "../trade-history";
 import {
@@ -110,7 +109,7 @@ export function ProfileScreen() {
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [checked, setChecked] = useState(false);
   /* A fresh account finishes choosing a name before anything else -
-     the website's /welcome/username, in place. */
+     the website's /welcome, in place. */
   const [needsSetup, setNeedsSetup] = useState(false);
   /* A token exists but the profile fetch failed: say so WITH the error's
      name, never pretend the player is signed out. The generic version of
@@ -639,6 +638,7 @@ export function ProfileScreen() {
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}
+            organizerAt={profile.organizerAt}
             onFollowers={() => setPeople("followers")}
             onFollowing={() => setPeople("following")}
             actions={
@@ -650,46 +650,10 @@ export function ProfileScreen() {
               </>
             }
           />
-          {/* The TO badge: the stores that named them an organizer. */}
-          <OrganizerChips profile={profile} />
         </View>
 
-        {/*
-         * The upgrade, where the look lives. This screen is where
-         * somebody admires their own profile, so it is where the pitch
-         * belongs — one row, gone entirely once they are Pro. `pro`
-         * is optional in the payload; absent reads as free, so a stale
-         * cache shows the row for a beat and the fresh load removes it.
-         */}
-        {!profile.pro && (
-          <Tap
-            onPress={() => navigation.navigate("Pro")}
-            accessibilityLabel="Get cardflare Pro"
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing(2.5),
-              borderRadius: radius.control,
-              borderWidth: 1,
-              borderColor: colors.accent,
-              backgroundColor: "rgba(198,238,79,0.1)",
-              padding: spacing(3),
-            }}
-          >
-            <Ionicons name="sparkles" size={18} color={colors.accent} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "800" }}>
-                Get cardflare Pro
-              </Text>
-              {/* No price here: the paywall states it in the
-                  storefront's own currency, which this row cannot. */}
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                Wear your cosmetics, animated, on web and app.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-          </Tap>
-        )}
+        {/* No Pro row here: the website's profile has none. The pitch
+            lives in Customize and behind the animated-picture door. */}
 
         {/*
          * Picture, cover and name, editable right where they show -
@@ -775,13 +739,12 @@ export function ProfileScreen() {
              for the truth, so the counts on the row move with the
              stepper rather than going stale until the next open. */
           onChanged={() => void load()}
-          onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
         />
 
         {/* The one showcase, editable in place: tap a card to dress
-            it, remove below it, add at the end. The wand carries the
-            shelf's cosmetics in a menu of its own. Its own rounded
-            panel inside the block, same as the website. */}
+            it, remove below it, add at the end. The header's wand is
+            the one wand; Customize switches between its two menus. Its
+            own rounded panel inside the block, same as the website. */}
         <View
           style={{
             gap: spacing(2),
@@ -792,14 +755,7 @@ export function ProfileScreen() {
             padding: spacing(3),
           }}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: spacing(2),
-            }}
-          >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
             >
@@ -833,22 +789,6 @@ export function ProfileScreen() {
                 </Text>
               </Tap>
             </View>
-            <Tap
-              onPress={() => navigation.navigate("Customize", { area: "showcase" })}
-              accessibilityLabel="Customize your showcase"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.elevated,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
-            </Tap>
           </View>
           {/* The explanation read as clutter once you knew it - the
               founder's call. It folds behind the "?" now: there for the
@@ -857,7 +797,7 @@ export function ProfileScreen() {
           {showcaseHelp && (
             <Muted>
               Up to nine cards you are proud of. Tap a card to dress it. Not a trade
-              list, so nobody can pledge on it.
+              list, so nobody can offer on it.
             </Muted>
           )}
 
@@ -942,17 +882,13 @@ export function ProfileScreen() {
         <Title>Embers</Title>
         <Body>Earned by confirming trades, and nothing else.</Body>
 
+        {/* One tile, the public number. What is left to spend is on the
+            store's door below, where spending happens. */}
         <View style={{ flexDirection: "row", gap: spacing(3) }}>
           <Stat
             label="Earned, all time"
             value={profile.embersEarned}
             note="Public. This is the number on your badge, and it never goes down."
-          />
-          <Stat
-            label="Left to spend"
-            value={profile.embersBalance}
-            note="Private. Nobody else sees this, only you."
-            accent
           />
         </View>
       </Card>

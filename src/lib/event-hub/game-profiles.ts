@@ -150,7 +150,7 @@ export const NIGHT_BASICS: readonly string[] = [
   "Turn up, tell the counter you are playing, and pay the entry if there is one. That is the whole sign-up.",
   "Everyone plays every round - it is not a knockout. You get paired against someone new each round.",
   "A round has a clock, and the big screen counts it down. When it hits zero you finish the turn you are in; the screen shows exactly what happens next.",
-  "Between rounds you are free: trade, buy singles, post a card you are hunting to the room board.",
+  "Between rounds you are free: trade, buy singles, post a card you are looking for to the room board.",
   "Nobody expects you to know everything. Tell your opponent it is your first event - it goes well.",
 ];
 

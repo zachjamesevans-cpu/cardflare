@@ -696,8 +696,8 @@ export function CardImage({
                     <Text style={styles.zoomLooking}>
                       {direction === "showcase"
                         ? lookingFor === 1
-                          ? "Letting this go"
-                          : `Letting go of ${lookingFor}`
+                          ? "Offering this"
+                          : `Offering ${lookingFor}`
                         : `Looking for ${lookingFor}${
                             stillNeeds != null && stillNeeds !== lookingFor
                               ? stillNeeds === 0

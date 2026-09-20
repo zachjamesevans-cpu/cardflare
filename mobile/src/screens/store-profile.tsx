@@ -8,6 +8,7 @@ import type { StackParams } from "../../App";
 import {
   claimStore,
   getStore,
+  joinRoom,
   storedAccessToken,
   CLAIM_ROLES,
   type ClaimFields,
@@ -17,6 +18,7 @@ import { FollowStoreButton } from "../follow-store-button";
 import { gameShortName } from "../games";
 import { RemoteImage } from "../remote-image";
 import { CoverBanner } from "../showcase-zoom";
+import { openRoom } from "../open-room";
 import { hoursLines } from "../store-hours";
 import { colors, gutter, radius, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
@@ -63,15 +65,27 @@ const LOGO = 64;
  * tab that should have been native: a link out of the app is a link out
  * of the app.
  *
- * FOLLOWING is the same row as the locals list - joining a room signed
+ * FOLLOWING is the same row the Room tab lists - joining a room signed
  * in has always written it - with a button here for the player who
- * found the shop before they walked in. A guest sees "Sign in to
- * follow", the website's words, because a Follow that cannot work is a
- * lie.
+ * found the shop before they walked in. A guest's button is the same
+ * word, Follow, and it starts sign-up: one look for Follow, whoever is
+ * being followed, the website's rule.
  */
 export function StoreProfileScreen({ storeId }: { storeId: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [store, setStore] = useState<PublicStore | null>(null);
+  /* "Next: Friday Locals · Fri, Sep 25, 6:30 PM", in the store's own zone. */
+  const nextEvent =
+    store?.board?.nextEventAt && store.board.nextEventName
+      ? `${store.board.nextEventName} · ${new Intl.DateTimeFormat("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: store.board.timeZone ?? undefined,
+        }).format(new Date(store.board.nextEventAt))}`
+      : null;
   /* The case as one shelf, so the zoom swipes along it. */
   const caseShelf = (store?.casePicks ?? []).map((pick) => ({
     imageUrl: pick.imageUrl,
@@ -234,6 +248,25 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
           ) : null}
         </View>
 
+        {/* The same line the website draws: a room open right now
+            opens it, otherwise the next night on the calendar. */}
+        {store.board?.liveNow ? (
+          <Text
+            accessibilityRole="link"
+            onPress={() => {
+              const code = store.board?.joinCode;
+              if (!code) return;
+              void joinRoom(code).catch(() => {});
+              openRoom(navigation);
+            }}
+            style={{ color: colors.accent, fontSize: 15, fontWeight: "600" }}
+          >
+            A room is open right now
+          </Text>
+        ) : nextEvent ? (
+          <Body>Next: {nextEvent}</Body>
+        ) : null}
+
         {store.description ? <Body>{store.description}</Body> : null}
 
         {store.games && store.games.length > 0 ? (
@@ -260,9 +293,9 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
           </View>
         ) : null}
 
-        {/* Follow, for a signed-in account; the way to become one, for
-            anyone else. Keyed on the server's answer so a follow made in
-            a room shows here without a restart. */}
+        {/* Follow, for a signed-in account; for a guest, the same button
+            starts sign-up. Keyed on the server's answer so a follow made
+            in a room shows here without a restart. */}
         {signedIn === null ? null : signedIn && store.following !== undefined ? (
           <FollowStoreButton
             key={`${store.storeId}:${store.following}`}
@@ -270,14 +303,11 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
             initial={store.following}
           />
         ) : (
-          <Button
-            label="Sign in to follow"
-            variant="secondary"
-            onPress={() => navigation.navigate("SignIn")}
-          />
+          <Button label="Follow" onPress={() => navigation.navigate("CreateAccount")} />
         )}
         <Muted>
-          Following puts this store&rsquo;s nights in your Feed and your locals.
+          Following puts this store&rsquo;s nights in your Feed and on your Following
+          list.
         </Muted>
 
         {store.hours ? (
@@ -356,8 +386,8 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         <Card>
           <Title>Own or manage this store?</Title>
           <Muted>
-            cardflare listed this shop from public map data so players could find it. If
-            you work there, tell us and we&rsquo;ll hand the listing over.
+            Claiming lets you keep the details right and run rooms from your own counter
+            code. cardflare confirms ownership before anything changes.
           </Muted>
 
           {claiming ? (

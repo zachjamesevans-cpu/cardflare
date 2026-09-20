@@ -16,16 +16,15 @@ import {
   rememberRoom,
 } from "../api";
 import { FlareComposer } from "./flare-composer";
-import type { PostTarget } from "./post-flare";
+import type { PostTarget } from "../flare-bits";
 import { Body, Button, Card, Muted, Title } from "../ui";
 import { gutter, spacing } from "../theme";
 import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
-import { HaveList } from "../nearby";
 
 /**
  * The centre tab — the mark itself, and behind it the list the whole
- * product orbits: the Flares you are hunting. The founder's reframe.
+ * product orbits: the Flares you are looking for. The founder's reframe.
  * Search on top, your standing list underneath, and every place you
  * scan into — a room, a store counter, a card show — is set up to
  * answer that list. Where a new Flare lands depends on where you are:
@@ -162,10 +161,21 @@ export function HubScreen() {
         <Card>
           <Title>Post a Flare</Title>
           <Body>
-            A Flare goes up in a room. Scan the store&rsquo;s counter code first, and
-            this button becomes the fastest way to say what you&rsquo;re hunting.
+            A Flare says what card you are looking for, and the people who can help see
+            it: the room at a store event and everyone who follows you.
           </Body>
-          <Button label="Scan a code" onPress={() => navigation.navigate("Scan")} />
+          {/* The account first: it is what a Flare needs to reach anyone.
+              The room door stays for the guest already standing at a
+              counter, the same two buttons the website's guest card has. */}
+          <Button
+            label="Create free account"
+            onPress={() => navigation.navigate("CreateAccount")}
+          />
+          <Button
+            label="Scan a code"
+            variant="secondary"
+            onPress={() => navigation.navigate("Scan")}
+          />
         </Card>
       </View>
     );
@@ -183,49 +193,46 @@ export function HubScreen() {
       onPosted={() => void loadWants()}
       footer={
         wants !== null ? (
-          <>
-            <Card>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: spacing(2),
-                }}
-              >
-                <Title>Saved requests</Title>
-                <Muted>
-                  {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
-                </Muted>
-              </View>
+          <Card>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing(2),
+              }}
+            >
+              <Title>Saved requests</Title>
+              <Muted>
+                {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
+              </Muted>
+            </View>
 
-              {wants.length === 0 ? (
-                <Body>
-                  Post a Flare above and its cards stay here until you find them. Every
-                  room, store and show you scan into helps answer this list.
-                </Body>
-              ) : (
-                <View>
-                  {wants.map((want) => (
-                    <WantRow
-                      key={want.id}
-                      want={want}
-                      onNudge={(delta) => editWant(() => nudgeWant(want.id, delta))}
-                      onDrop={() => editWant(() => dropWant(want.id))}
-                      /* Remember the room, then open it - the same two
+            {wants.length === 0 ? (
+              <Body>
+                Post a Flare above and its cards stay here until you find them. Every
+                room, store and show you scan into helps answer this list.
+              </Body>
+            ) : (
+              <View>
+                {wants.map((want) => (
+                  <WantRow
+                    key={want.id}
+                    want={want}
+                    onNudge={(delta) => editWant(() => nudgeWant(want.id, delta))}
+                    onDrop={() => editWant(() => dropWant(want.id))}
+                    /* Remember the room, then open it - the same two
                        steps the Feed's own buttons take. */
-                      onOpenRoom={(code) => {
-                        void rememberRoom(code.trim().toUpperCase()).then(() =>
-                          openRoom(navigation),
-                        );
-                      }}
-                    />
-                  ))}
-                </View>
-              )}
-            </Card>
-            <HaveList />
-          </>
+                    onOpenRoom={(code) => {
+                      void rememberRoom(code.trim().toUpperCase()).then(() =>
+                        openRoom(navigation),
+                      );
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+          </Card>
         ) : undefined
       }
     />

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { Modal, Platform, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,7 +70,6 @@ export function HuntsPanel({
   onAdd,
   onTick,
   onChanged,
-  onOpenHunt,
 }: {
   hunts: Hunt[];
   limit?: number;
@@ -85,8 +84,6 @@ export function HuntsPanel({
   onTick?: (flareId: string, found: boolean) => Promise<void>;
   /** Something was written; the owner of the list should re-read it. */
   onChanged?: () => void;
-  /** Open a hunt on its own screen. */
-  onOpenHunt?: (huntId: string) => void;
 }) {
   void onTick;
   /*
@@ -145,7 +142,13 @@ export function HuntsPanel({
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <Ionicons name="locate-outline" size={16} color={colors.accent} />
+          {/* A list with checks, not the crosshair: the crosshair is the
+              Flare status mark and nothing else's. */}
+          <MaterialCommunityIcons
+            name="format-list-checks"
+            size={16}
+            color={colors.accent}
+          />
           <Title>Hunts</Title>
         </View>
         {limit ? (
@@ -158,7 +161,7 @@ export function HuntsPanel({
       {hunts.length === 0 ? (
         <Body>
           {yours
-            ? "A hunt is a list of cards you are collecting. Start one here, or name one when you post a Flare, and every card you add joins it with what is found and what is left."
+            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole list follows you."
             : "No hunts yet."}
         </Body>
       ) : (
@@ -172,7 +175,6 @@ export function HuntsPanel({
               yours={Boolean(yours)}
               onAdd={yours ? onAdd : undefined}
               onChanged={onChanged}
-              onOpenHunt={onOpenHunt}
             />
           ))}
           {hunts.length > ROWS_ON_PROFILE ? (
@@ -256,7 +258,6 @@ export function HuntRow({
   yours,
   onAdd,
   onChanged,
-  onOpenHunt,
 }: {
   hunt: Hunt;
   open: boolean;
@@ -264,7 +265,6 @@ export function HuntRow({
   yours: boolean;
   onAdd?: (huntId: string) => void;
   onChanged?: () => void;
-  onOpenHunt?: (huntId: string) => void;
 }) {
   const cards = hunt.cards ?? [];
   const remaining = remainingCopies(hunt, cards);
@@ -351,13 +351,7 @@ export function HuntRow({
 
       {open ? (
         <View style={{ paddingHorizontal: spacing(3), paddingBottom: spacing(3) }}>
-          <HuntExpanded
-            hunt={hunt}
-            yours={yours}
-            onAdd={onAdd}
-            onChanged={onChanged}
-            onOpenHunt={onOpenHunt}
-          />
+          <HuntExpanded hunt={hunt} yours={yours} onAdd={onAdd} onChanged={onChanged} />
         </View>
       ) : null}
     </View>
@@ -412,14 +406,11 @@ export function HuntExpanded({
   yours,
   onAdd,
   onChanged,
-  onOpenHunt,
 }: {
   hunt: Hunt;
   yours: boolean;
   onAdd?: (huntId: string) => void;
   onChanged?: () => void;
-  /** Absent on the Hunt screen, which is already the whole thing. */
-  onOpenHunt?: (huntId: string) => void;
 }) {
   const cards = hunt.cards ?? [];
 
@@ -551,13 +542,6 @@ export function HuntExpanded({
             icon={editing ? "close-outline" : "create-outline"}
             label={editing ? "Cancel" : "Edit"}
             onPress={() => setEditing((value) => !value)}
-          />
-        ) : null}
-        {onOpenHunt && hunt.id ? (
-          <IconChip
-            icon="open-outline"
-            label="Open"
-            onPress={() => onOpenHunt(hunt.id ?? "")}
           />
         ) : null}
       </ScrollView>

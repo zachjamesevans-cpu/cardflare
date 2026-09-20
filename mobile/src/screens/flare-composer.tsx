@@ -52,7 +52,7 @@ import {
   Tap,
   Title,
 } from "../ui";
-import { Highlighted, Pill, Stats, leadArt, type PostTarget } from "./post-flare";
+import { Highlighted, Pill, Stats, leadArt, type PostTarget } from "../flare-bits";
 
 /**
  * The one composer: select cards, compose, preview, post.
@@ -355,7 +355,7 @@ export function FlareComposer({
             onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
           />
           <Button
-            label="New flare"
+            label="Post another Flare"
             variant="secondary"
             onPress={() => setPosted(null)}
           />
@@ -370,7 +370,7 @@ export function FlareComposer({
               gap: spacing(2),
             }}
           >
-            <Title>New flare</Title>
+            <Title>Post a Flare</Title>
             {target.kind === "room" ? (
               <Muted>{`To room ${target.code}`}</Muted>
             ) : (
@@ -494,7 +494,10 @@ export function FlareComposer({
                 />
               ) : null}
 
-              {draftKey && draftKey !== "guest" ? <NearbyRow /> : null}
+              {/* Nearby matching rides with Local: off the screen entirely
+                  while Local is off, the same rule the website's form
+                  follows. See src/local-enabled.ts. */}
+              {LOCAL_ENABLED && draftKey && draftKey !== "guest" ? <NearbyRow /> : null}
 
               <ErrorLine message={error} />
               <Button

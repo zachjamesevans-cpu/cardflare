@@ -460,7 +460,7 @@ describe("posting a Flare wakes the Feed", () => {
    * usually already in hand.
    */
   const refresh = read("mobile/src/feed-refresh.ts");
-  const composer = read("mobile/src/screens/post-flare.tsx");
+  const composer = read("mobile/src/screens/flare-composer.tsx");
 
   it("has one place that says the Feed is out of date", () => {
     expect(refresh).toContain("export function onFeedStale");
