@@ -113,3 +113,36 @@ describe("one shelf, both directions", () => {
     expect(ui).toContain("Letting this go");
   });
 });
+
+describe("a tap closes the zoom the instant it lands, even mid-swipe", () => {
+  /*
+   * The founder: "when swiping between cards, i want to close out of it
+   * immediately, but i cant until the swipe animation is done."
+   *
+   * Two different locks, one per platform. On the website a swipe set a
+   * flag to swallow the click it might leave behind, but a real swipe
+   * never produces a click, so the flag sat there and ate the NEXT tap.
+   * In the app a finger landing while the rail was still sliding went to
+   * the rail, which stopped the slide and told nobody, so the tap was
+   * lost. Both now read a still finger as intent to close.
+   */
+  it("the website clears the swipe flag on its own", async () => {
+    const zoom = await read("src/components/cards/card-image-zoom.tsx");
+    /* A new finger is new intent. */
+    expect(zoom).toContain(
+      "touchFrom.current = event.touches[0]?.clientX ?? null;\n          /*",
+    );
+    expect(zoom).toContain("swiped.current = false;\n        }}");
+    /* And the flag a swipe sets lets go by itself. */
+    expect(zoom).toMatch(
+      /swiped\.current = true;\s*window\.setTimeout\(\(\) => \{\s*swiped\.current = false;\s*\}, 120\);/,
+    );
+  });
+
+  it("the app closes on a still tap while the rail settles", async () => {
+    const ui = await read("mobile/src/ui.tsx");
+    expect(ui).toContain("const settling = useRef(false);");
+    expect(ui).toContain("settling.current = true;");
+    expect(ui).toContain("if (moved < 12) close();");
+  });
+});
