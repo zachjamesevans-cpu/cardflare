@@ -23,6 +23,14 @@ vi.mock("@/lib/billing/repository", () => ({
     syncStoreTierFromSubscription(...a),
 }));
 
+const notifyTrialChange = vi.fn();
+vi.mock("@/lib/billing/trial-alerts", async () => {
+  const real = await vi.importActual<typeof import("@/lib/billing/trial-alerts")>(
+    "@/lib/billing/trial-alerts",
+  );
+  return { ...real, notifyTrialChange: (...a: unknown[]) => notifyTrialChange(...a) };
+});
+
 const route = await import("@/app/api/webhooks/stripe/route");
 
 const SECRET = "whsec_route_test";
@@ -41,6 +49,7 @@ function signedRequest(body: string, secret = SECRET): Request {
 }
 
 beforeEach(() => {
+  notifyTrialChange.mockReset();
   upsertStripeSubscription.mockReset();
   markStripeSubscriptionCanceled.mockReset();
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", SECRET);
@@ -129,5 +138,66 @@ describe("POST /api/webhooks/stripe", () => {
     const response = await route.POST(signedRequest("not json"));
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("trial alerts", () => {
+  it("tells the founder when a store's trial starts, converts, or ends", async () => {
+    const send = async (body: object) =>
+      route.POST(signedRequest(JSON.stringify(body)));
+
+    await send({
+      type: "customer.subscription.created",
+      data: {
+        object: { id: "sub_1", status: "trialing", metadata: { store_id: "st_1" } },
+      },
+    });
+    expect(notifyTrialChange).toHaveBeenLastCalledWith("started", "st_1");
+
+    await send({
+      type: "customer.subscription.updated",
+      data: {
+        object: { id: "sub_1", status: "active", metadata: { store_id: "st_1" } },
+        previous_attributes: { status: "trialing" },
+      },
+    });
+    expect(notifyTrialChange).toHaveBeenLastCalledWith("converted", "st_1");
+
+    await send({
+      type: "customer.subscription.deleted",
+      data: {
+        object: { id: "sub_1", status: "trialing", metadata: { store_id: "st_1" } },
+      },
+    });
+    expect(notifyTrialChange).toHaveBeenLastCalledWith("ended", "st_1");
+  });
+
+  it("stays quiet for a player's subscription and for changes that are not trial moments", async () => {
+    await route.POST(
+      signedRequest(
+        JSON.stringify({
+          type: "customer.subscription.updated",
+          data: {
+            object: { id: "sub_2", status: "active", metadata: { store_id: "st_2" } },
+            previous_attributes: { cancel_at_period_end: false },
+          },
+        }),
+      ),
+    );
+    await route.POST(
+      signedRequest(
+        JSON.stringify({
+          type: "customer.subscription.created",
+          data: {
+            object: {
+              id: "sub_3",
+              status: "trialing",
+              metadata: { player_id: "pl_1" },
+            },
+          },
+        }),
+      ),
+    );
+    expect(notifyTrialChange).not.toHaveBeenCalled();
   });
 });

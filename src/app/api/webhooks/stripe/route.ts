@@ -1,4 +1,5 @@
 import { verifyStripeSignature } from "@/lib/billing/stripe-webhook";
+import { notifyTrialChange, trialChangeFor } from "@/lib/billing/trial-alerts";
 import {
   markStripeSubscriptionCanceled,
   syncPlayerTierFromSubscription,
@@ -37,6 +38,8 @@ type StripeEvent = {
       current_period_end?: number | null;
       metadata?: Record<string, string>;
     };
+    /** Stripe sends the old values of whatever changed, on an update. */
+    previous_attributes?: { status?: string };
   };
 };
 
@@ -80,6 +83,14 @@ export async function POST(request: Request): Promise<Response> {
       }
       if (subscription.metadata?.store_id) {
         await syncStoreTierFromSubscription(subscription.metadata.store_id);
+        /* The founder hears about a trial starting, paying, or lapsing.
+           After the tier sync so the admin link lands on the truth. */
+        const change = trialChangeFor(
+          event.type,
+          subscription.status,
+          event.data.previous_attributes?.status,
+        );
+        if (change) await notifyTrialChange(change, subscription.metadata.store_id);
       }
       break;
     }
@@ -89,7 +100,11 @@ export async function POST(request: Request): Promise<Response> {
       const playerId = event.data.object.metadata?.player_id ?? null;
       if (playerId) await syncPlayerTierFromSubscription(playerId);
       const storeId = event.data.object.metadata?.store_id ?? null;
-      if (storeId) await syncStoreTierFromSubscription(storeId);
+      if (storeId) {
+        await syncStoreTierFromSubscription(storeId);
+        const change = trialChangeFor(event.type, event.data.object.status, undefined);
+        if (change) await notifyTrialChange(change, storeId);
+      }
       break;
     }
 
