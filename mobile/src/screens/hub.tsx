@@ -3,6 +3,7 @@ import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -18,7 +19,7 @@ import {
 import { FlareComposer } from "./flare-composer";
 import type { PostTarget } from "../flare-bits";
 import { Body, Button, Card, Muted, Title } from "../ui";
-import { gutter, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
 
@@ -182,7 +183,7 @@ export function HubScreen() {
   }
 
   // No redirect after posting: the screen confirms in place and offers
-  // the Feed. The composer is the one composer; the saved requests
+  // the Feed. The composer is the one composer; the Flares
   // under it are what is published, so a draft and a post never look
   // like the same thing.
   return (
@@ -202,7 +203,12 @@ export function HubScreen() {
                 gap: spacing(2),
               }}
             >
-              <Title>Saved requests</Title>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
+              >
+                <MaterialCommunityIcons name="fire" size={18} color={colors.accent} />
+                <Title>Flares</Title>
+              </View>
               <Muted>
                 {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
               </Muted>

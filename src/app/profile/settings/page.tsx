@@ -47,7 +47,7 @@ export const dynamic = "force-dynamic";
  * moving it basically". Nothing here changed but where it lives.
  *
  * Housekeeping only. The lists that used to live here have one home
- * each now: saved wants are the Flare tab's "Saved requests", and the
+ * each now: saved wants are the Flare tab's "Flares", and the
  * stores you follow are the Room tab's "Following". What is left is
  * what is about the account itself.
  *
@@ -189,7 +189,7 @@ export default async function ProfileSettingsPage() {
    * The paste box, as its own card. The wants it produces are not
    * listed here: "the 'saved wants' section in the settings is kinda
    * redundant, since it's just the flare section, just elsewhere", so
-   * the Flare tab's "Saved requests" is the one list and this card
+   * the Flare tab's "Flares" is the one list and this card
    * only feeds it. The app carries a card under exactly this title.
    */
   const deckListCard = !playerId ? null : (
@@ -202,8 +202,8 @@ export default async function ProfileSettingsPage() {
         <div className="flex flex-col gap-1">
           <p className="font-semibold text-text-primary">Paste a deck list</p>
           <p className="text-sm text-text-secondary">
-            Every card in it becomes a saved request. Walk into any room and it offers
-            to post the lot in one go.
+            Every card in it becomes a Flare. Walk into any room and it offers to post
+            the lot in one go.
           </p>
         </div>
       </div>
@@ -214,7 +214,7 @@ export default async function ProfileSettingsPage() {
         href="/flare"
         className="w-fit text-sm font-semibold text-accent underline-offset-4 hover:underline"
       >
-        Your saved requests live on the Flare tab
+        Your Flares live on the Flare tab
       </Link>
     </Card>
   );

@@ -4,7 +4,16 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
@@ -1428,6 +1437,10 @@ function DressModal({
   /** The caption under the card. Resolves true when it saved. */
   onNote: (entryId: string, note: string) => Promise<boolean>;
 }) {
+  /* The editor is taller than a phone: it scrolls inside the safe
+     area rather than running under the status bar. The founder: "in
+     the customize showcase screen, it's clipping through header." */
+  const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<{ frame: string | null; holo: string | null }>({
     frame: null,
     holo: null,
@@ -1466,192 +1479,215 @@ function DressModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: spacing(4),
-        }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Pressable
-          onPress={() => {}}
+          onPress={onClose}
           style={{
-            alignSelf: "stretch",
-            borderRadius: radius.card,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            padding: spacing(4),
-            gap: spacing(3),
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: spacing(4),
+            paddingTop: insets.top + spacing(2),
+            paddingBottom: insets.bottom + spacing(2),
           }}
         >
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              alignSelf: "stretch",
+              maxHeight: "100%",
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              overflow: "hidden",
+            }}
           >
-            {entry.name}
-          </Text>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+              >
+                {entry.name}
+              </Text>
 
-          {/* The card between its arrows. A swipe across it steps the
+              {/* The card between its arrows. A swipe across it steps the
               same way the arrows do - the founder's ask, the Feed's
               gesture on the shelf - and the room re-opens on the
               neighbour with its own picks and note. */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            onTouchStart={(event) => {
-              touchFrom.current = event.nativeEvent.pageX;
-            }}
-            onTouchEnd={(event) => {
-              const from = touchFrom.current;
-              touchFrom.current = null;
-              if (from === null) return;
-              const travelled = event.nativeEvent.pageX - from;
-              if (Math.abs(travelled) < 40) return;
-              const target = travelled < 0 ? next : previous;
-              if (target) onSwitch(target);
-            }}
-          >
-            <Tap
-              disabled={!previous}
-              onPress={() => previous && onSwitch(previous)}
-              accessibilityLabel="Previous card"
-              hitSlop={8}
-              style={{ padding: spacing(2), opacity: previous ? 1 : 0.25 }}
-            >
-              <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
-            </Tap>
-            <CosmeticCard
-              imageUrl={entry.imageUrl}
-              width={150}
-              frame={picked.frame}
-              holo={picked.holo}
-              effect={effect}
-              border={border}
-            />
-            <Tap
-              disabled={!next}
-              onPress={() => next && onSwitch(next)}
-              accessibilityLabel="Next card"
-              hitSlop={8}
-              style={{ padding: spacing(2), opacity: next ? 1 : 0.25 }}
-            >
-              <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
-            </Tap>
-          </View>
-          {shelf.length > 1 ? (
-            <Text
-              style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}
-            >
-              {`${index + 1} of ${shelf.length}`}
-            </Text>
-          ) : null}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onTouchStart={(event) => {
+                  touchFrom.current = event.nativeEvent.pageX;
+                }}
+                onTouchEnd={(event) => {
+                  const from = touchFrom.current;
+                  touchFrom.current = null;
+                  if (from === null) return;
+                  const travelled = event.nativeEvent.pageX - from;
+                  if (Math.abs(travelled) < 40) return;
+                  const target = travelled < 0 ? next : previous;
+                  if (target) onSwitch(target);
+                }}
+              >
+                <Tap
+                  disabled={!previous}
+                  onPress={() => previous && onSwitch(previous)}
+                  accessibilityLabel="Previous card"
+                  hitSlop={8}
+                  style={{ padding: spacing(2), opacity: previous ? 1 : 0.25 }}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </Tap>
+                <CosmeticCard
+                  imageUrl={entry.imageUrl}
+                  width={150}
+                  frame={picked.frame}
+                  holo={picked.holo}
+                  effect={effect}
+                  border={border}
+                />
+                <Tap
+                  disabled={!next}
+                  onPress={() => next && onSwitch(next)}
+                  accessibilityLabel="Next card"
+                  hitSlop={8}
+                  style={{ padding: spacing(2), opacity: next ? 1 : 0.25 }}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </Tap>
+              </View>
+              {shelf.length > 1 ? (
+                <Text
+                  style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}
+                >
+                  {`${index + 1} of ${shelf.length}`}
+                </Text>
+              ) : null}
 
-          <DressingPicker
-            imageUrl={entry.imageUrl}
-            frames={frames}
-            holos={holos}
-            frame={picked.frame}
-            holo={picked.holo}
-            effect={effect}
-            onPick={(next) => {
-              setPicked(next);
-              setApplyState("idle");
-              onDress(entry.id, next.frame, next.holo);
-            }}
-          />
+              <DressingPicker
+                imageUrl={entry.imageUrl}
+                frames={frames}
+                holos={holos}
+                frame={picked.frame}
+                holo={picked.holo}
+                effect={effect}
+                onPick={(next) => {
+                  setPicked(next);
+                  setApplyState("idle");
+                  onDress(entry.id, next.frame, next.holo);
+                }}
+              />
 
-          <Button
-            label={
-              applyState === "busy"
-                ? "Applying…"
-                : applyState === "saved"
-                  ? "Saved!"
-                  : applyState === "failed"
-                    ? "Did not save. Try again."
-                    : "Apply to all cards"
-            }
-            variant="secondary"
-            disabled={applyState === "busy"}
-            onPress={() => {
-              setApplyState("busy");
-              void onDressAll(picked.frame, picked.holo).then((landed) =>
-                setApplyState(landed ? "saved" : "failed"),
-              );
-            }}
-          />
-          <Muted>
-            Every card on your shelf wears this border and holo, and new cards will too.
-          </Muted>
-
-          {/* The note: how they got it, why it matters. One field, one
-              button, and it shows under the card wherever it is opened. */}
-          <View
-            style={{
-              gap: spacing(2),
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              paddingTop: spacing(3),
-            }}
-          >
-            <Text
-              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}
-            >
-              Note
-            </Text>
-            <Input
-              value={note}
-              onChangeText={(text) => {
-                setNote(text.slice(0, SHOWCASE_NOTE_MAX));
-                setNoteState("idle");
-              }}
-              placeholder="How you got it, or why it matters (optional)"
-              multiline
-              maxLength={SHOWCASE_NOTE_MAX}
-              style={{ minHeight: 64, textAlignVertical: "top" }}
-            />
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: spacing(2),
-              }}
-            >
-              <Text style={{ color: colors.textMuted, fontSize: 12, flexShrink: 1 }}>
-                Shown under the card when somebody opens it.
-              </Text>
               <Button
                 label={
-                  noteState === "busy"
-                    ? "Saving…"
-                    : noteState === "saved"
+                  applyState === "busy"
+                    ? "Applying…"
+                    : applyState === "saved"
                       ? "Saved!"
-                      : noteState === "failed"
-                        ? "Did not save"
-                        : "Save note"
+                      : applyState === "failed"
+                        ? "Did not save. Try again."
+                        : "Apply to all cards"
                 }
                 variant="secondary"
-                disabled={noteState === "busy"}
+                disabled={applyState === "busy"}
                 onPress={() => {
-                  setNoteState("busy");
-                  void onNote(entry.id, note).then((landed) =>
-                    setNoteState(landed ? "saved" : "failed"),
+                  setApplyState("busy");
+                  void onDressAll(picked.frame, picked.holo).then((landed) =>
+                    setApplyState(landed ? "saved" : "failed"),
                   );
                 }}
               />
-            </View>
-          </View>
+              <Muted>
+                Every card on your shelf wears this border and holo, and new cards will
+                too.
+              </Muted>
 
-          <Button label="Done" onPress={onClose} />
+              {/* The note: how they got it, why it matters. One field, one
+              button, and it shows under the card wherever it is opened. */}
+              <View
+                style={{
+                  gap: spacing(2),
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border,
+                  paddingTop: spacing(3),
+                }}
+              >
+                <Text
+                  style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}
+                >
+                  Note
+                </Text>
+                <Input
+                  value={note}
+                  onChangeText={(text) => {
+                    setNote(text.slice(0, SHOWCASE_NOTE_MAX));
+                    setNoteState("idle");
+                  }}
+                  placeholder="How you got it, or why it matters (optional)"
+                  multiline
+                  maxLength={SHOWCASE_NOTE_MAX}
+                  style={{ minHeight: 64, textAlignVertical: "top" }}
+                />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: spacing(2),
+                  }}
+                >
+                  <Text
+                    style={{ color: colors.textMuted, fontSize: 12, flexShrink: 1 }}
+                  >
+                    Shown under the card when somebody opens it.
+                  </Text>
+                  <Button
+                    label={
+                      noteState === "busy"
+                        ? "Saving…"
+                        : noteState === "saved"
+                          ? "Saved!"
+                          : noteState === "failed"
+                            ? "Did not save"
+                            : "Save note"
+                    }
+                    variant="secondary"
+                    disabled={noteState === "busy"}
+                    onPress={() => {
+                      setNoteState("busy");
+                      void onNote(entry.id, note).then((landed) =>
+                        setNoteState(landed ? "saved" : "failed"),
+                      );
+                    }}
+                  />
+                </View>
+              </View>
+
+              <Button label="Done" onPress={onClose} />
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

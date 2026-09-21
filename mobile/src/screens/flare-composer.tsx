@@ -127,7 +127,7 @@ export function FlareComposer({
   resetSignal?: number;
   /** A post landed; the hub refreshes its list. */
   onPosted?: () => void;
-  /** The Flare tab's saved requests, rendered under the composer. */
+  /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();

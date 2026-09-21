@@ -124,7 +124,7 @@ export function RoomTab() {
 
   /*
    * "I'll be there", the app's way: join the early board under the
-   * account's own name and post every saved request. Duplicates already
+   * account's own name and post every Flare. Duplicates already
    * on the board are skipped by the server, so this is safe to repeat.
    */
   const rsvp = async (local: Me["locals"][number]) => {

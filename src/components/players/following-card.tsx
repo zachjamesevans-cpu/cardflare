@@ -9,7 +9,7 @@ import type { LocalStore } from "@/lib/players/locals";
  * The stores a player follows, in their one home: under the code box
  * on the Room tab, where "which room?" is the question being asked.
  * Each row opens the store page; a night whose board is already open
- * gets the RSVP, which posts the saved requests along with the tap.
+ * gets the RSVP, which posts the Flares along with the tap.
  * Nothing renders when the list is empty.
  */
 export function FollowingCard({

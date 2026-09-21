@@ -352,8 +352,8 @@ export function SettingsScreen() {
       <Card>
         <Title>Paste a deck list</Title>
         <Body>
-          Every card in it becomes a saved request. Walk into any room and it offers to
-          post the lot in one go.
+          Every card in it becomes a Flare. Walk into any room and it offers to post the
+          lot in one go.
         </Body>
 
         <DeckListField />

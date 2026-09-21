@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Flame } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { FlareComposer } from "@/components/flares/flare-composer";
@@ -31,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The app's centre tab, on the website: one composer for one Flare of
- * one or many cards, and the saved requests underneath it. Where a new
+ * one or many cards, and the Flares underneath it. Where a new
  * Flare lands is the same three-way answer it always was:
  *
  * - in a room they have joined: onto that board;
@@ -40,7 +41,7 @@ export const dynamic = "force-dynamic";
  *   no account for a list to live on, so the hub is the payoff of
  *   signing in, never a gate.
  *
- * The Have list used to sit under the saved requests. It is gone from
+ * The Have list used to sit under the Flares. It is gone from
  * here: the cards you would trade belong to the case, and this tab is
  * for asking.
  */
@@ -149,14 +150,17 @@ export default async function FlarePage({
 
           {/*
            * The standing list, under the composer that feeds it: the
-           * requests saved to the account, which every room, store and
+           * Flares on the account, which every room, store and
            * show they scan into helps answer. Named for what it is, so
-           * a draft above and a saved request below are never confused.
+           * a draft above and a posted Flare below are never confused.
            */}
           {wants !== null && (
             <Card className="flex flex-col">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="font-semibold text-text-primary">Saved requests</h2>
+                <h2 className="flex items-center gap-2 font-semibold text-text-primary">
+                  <Flame className="size-4 text-accent" aria-hidden="true" />
+                  Flares
+                </h2>
                 <span className="text-sm text-text-muted tabular-nums">
                   {wants.length} {wants.length === 1 ? "card" : "cards"}
                 </span>

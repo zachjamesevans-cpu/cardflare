@@ -374,7 +374,7 @@ describe("the home screen's furniture", () => {
        comment why the list is no longer here. */
     expect(settings).not.toContain("<Title>Your saved wants</Title>");
     /* The website's settings page is the same housekeeping-only page:
-       no wants list (the Flare tab's "Saved requests" is the one list)
+       no wants list (the Flare tab's "Flares" is the one list)
        and no followed-store list (the Room tab's "Following" is). */
     const webSettings = read("src/app/profile/settings/page.tsx");
     expect(webSettings).not.toContain("Your saved wants");

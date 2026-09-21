@@ -125,7 +125,7 @@ const STARTERS = {
   deck: {
     icon: "clipboard-list-outline",
     headline: "What are you looking for?",
-    body: "Paste a deck list and every card in it becomes a saved request. Walk into any room and it offers to post the lot in one go.",
+    body: "Paste a deck list and every card in it becomes a Flare. Walk into any room and it offers to post the lot in one go.",
     label: "Paste a deck list",
   },
 } as const;
@@ -540,7 +540,7 @@ export function HomeScreen() {
 
   /*
    * "I'll be there" from a store's post: join the early board under the
-   * account's own name and post every saved request, keyed on the
+   * account's own name and post every Flare, keyed on the
    * night's own code because the post names the board it is about.
    * Duplicates already on the board are skipped by the server, so this
    * is safe to repeat. The card keeps its own busy state, so this only

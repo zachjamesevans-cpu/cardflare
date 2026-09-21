@@ -1,6 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Modal, Platform, ScrollView, Share, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -1042,67 +1050,83 @@ function HuntOfferReview({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
-          justifyContent: "flex-end",
-        }}
+      {/* The sheet rides up with the keyboard, so the note is never
+          typed into blind. The founder: "i click the text box and it
+          gets covered by the keyboard." */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View
           style={{
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: radius.panel,
-            borderTopRightRadius: radius.panel,
-            borderWidth: 1,
-            borderColor: colors.border,
-            padding: spacing(4),
-            paddingBottom: spacing(4) + insets.bottom,
-            gap: spacing(3),
-            maxHeight: "85%",
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            justifyContent: "flex-end",
           }}
         >
-          <Title>Your offer</Title>
-          <ScrollView
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ gap: spacing(2) }}
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: radius.panel,
+              borderTopRightRadius: radius.panel,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: spacing(4),
+              paddingBottom: spacing(4) + insets.bottom,
+              gap: spacing(3),
+              maxHeight: "85%",
+            }}
           >
-            {items.map(({ card, quantity }) => (
-              <View
-                key={card.cardId}
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.textPrimary, fontSize: 14, flex: 1 }}
+            <Title>Your offer</Title>
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ gap: spacing(2) }}
+            >
+              {items.map(({ card, quantity }) => (
+                <View
+                  key={card.cardId}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                  }}
                 >
-                  {card.cardName}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                  {copiesLabel(quantity)}
-                </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textPrimary, fontSize: 14, flex: 1 }}
+                  >
+                    {card.cardName}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                    {copiesLabel(quantity)}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+            <Input
+              value={message}
+              onChangeText={setMessage}
+              placeholder="A note, like where you will be (optional)"
+              maxLength={280}
+              multiline
+              style={{ minHeight: 64, textAlignVertical: "top" }}
+            />
+            <View style={{ flexDirection: "row", gap: spacing(2) }}>
+              <View style={{ flex: 1 }}>
+                <AsyncButton
+                  label="Send offer"
+                  pendingLabel="Sending…"
+                  onPress={send}
+                />
               </View>
-            ))}
-          </ScrollView>
-          <Input
-            value={message}
-            onChangeText={setMessage}
-            placeholder="A note, like where you will be (optional)"
-            maxLength={280}
-            multiline
-            style={{ minHeight: 64, textAlignVertical: "top" }}
-          />
-          <View style={{ flexDirection: "row", gap: spacing(2) }}>
-            <View style={{ flex: 1 }}>
-              <AsyncButton label="Send offer" pendingLabel="Sending…" onPress={send} />
+              <View style={{ flex: 1 }}>
+                <Button label="Back" variant="secondary" onPress={onClose} />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Button label="Back" variant="secondary" onPress={onClose} />
-            </View>
+            <ErrorLine message={error} />
           </View>
-          <ErrorLine message={error} />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
