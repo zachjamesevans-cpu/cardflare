@@ -380,10 +380,11 @@ stops mail arriving, and the failure is silent from the sender's side.
 **API Keys → Create API Key**, then in Vercel → Settings → Environment
 Variables:
 
-| Name                   | Value                            | Environments        |
-| ---------------------- | -------------------------------- | ------------------- |
-| `RESEND_API_KEY`       | The key from Resend              | Production, Preview |
-| `CARDFLARE_FROM_EMAIL` | `CardFlare <hello@cardflare.gg>` | Production, Preview |
+| Name                    | Value                                                                         | Environments        |
+| ----------------------- | ----------------------------------------------------------------------------- | ------------------- |
+| `RESEND_API_KEY`        | The key from Resend                                                           | Production, Preview |
+| `CARDFLARE_FROM_EMAIL`  | `CardFlare <hello@cardflare.gg>`                                              | Production, Preview |
+| `CARDFLARE_ALERT_EMAIL` | Who hears about every Ultra trial (started, paid, lapsed); commas for several | Production          |
 
 Both are required. One without the other counts as unconfigured and nothing
 sends. The address must be on the domain you just verified.
