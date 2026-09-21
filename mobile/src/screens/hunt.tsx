@@ -8,7 +8,7 @@ import type { StackParams } from "../../App";
 import { describeError, getHunt, type HuntView } from "../api";
 import { HuntExpanded } from "../hunts-panel";
 import { colors, gutter, spacing } from "../theme";
-import { Card, Muted, Tap, Title } from "../ui";
+import { Card, Loading, Muted, Tap, Title } from "../ui";
 
 /**
  * One hunt on its own screen: the website's /hunts/[huntId].
@@ -54,11 +54,13 @@ export function HuntScreen({ huntId }: { huntId: string }) {
           paddingVertical: spacing(4),
         }}
       >
-        <Muted>
-          {error
-            ? `This hunt could not be opened (${error}). It may be private, or gone.`
-            : "Loading…"}
-        </Muted>
+        {error ? (
+          <Muted>
+            {`This hunt could not be opened (${error}). It may be private, or gone.`}
+          </Muted>
+        ) : (
+          <Loading />
+        )}
       </View>
     );
   }

@@ -27,7 +27,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
 import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
-import { AsyncButton, Button, ErrorLine, Input, Muted, Tap } from "../ui";
+import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
 
 /**
  * One Flare post, opened from its bubble in the Feed.
@@ -113,7 +113,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           paddingVertical: spacing(4),
         }}
       >
-        <Muted>Loading…</Muted>
+        <Loading />
       </View>
     );
   }

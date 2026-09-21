@@ -1122,7 +1122,37 @@ export function ErrorLine({ message }: { message: string | null }) {
   return <Text style={styles.error}>{message}</Text>;
 }
 
+/**
+ * The one loading state, everywhere something is still on its way.
+ *
+ * It used to be a line of muted "Loading…" text in the top-left corner
+ * of whatever screen was waiting, which the founder called out on the
+ * Room: "not pretty to go into a room and there's just this tiny
+ * 'loading' text in top left." So a centred green spinner instead, with
+ * room around it, and a one-line label only where the label says
+ * something the spinner does not (which room, for instance).
+ */
+export function Loading({ label }: { label?: string }) {
+  return (
+    <View
+      style={styles.loading}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+    >
+      <ActivityIndicator size="large" color={colors.accent} />
+      {label ? <Muted>{label}</Muted> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    minHeight: 240,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(2),
+  },
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,

@@ -52,6 +52,7 @@ import {
   Card,
   HandleInput,
   Input,
+  Loading,
   Muted,
   Tap,
   Title,
@@ -401,18 +402,7 @@ export function ProfileScreen() {
   };
 
   if (!checked) {
-    return (
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-          /* Clear of the floating tab bar. */
-          paddingBottom: spacing(4) + tabInset,
-        }}
-      >
-        <Muted>Loading…</Muted>
-      </ScrollView>
-    );
+    return <Loading />;
   }
 
   if (!profile && loadFailed) {
@@ -927,7 +917,7 @@ export function ProfileScreen() {
           ) : null}
         </View>
         {!history ? (
-          <Muted>Loading…</Muted>
+          <Loading />
         ) : history.locked ? (
           <View>
             <LockedRows count={3} />

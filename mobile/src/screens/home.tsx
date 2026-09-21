@@ -50,7 +50,17 @@ import { FeedFilterTabs } from "../feed-filter-tabs";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import { StorePostCard } from "../store-post-card";
-import { Body, Button, Card, CardImage, Muted, Tap, Title, type ZoomCard } from "../ui";
+import {
+  Body,
+  Button,
+  Card,
+  CardImage,
+  Loading,
+  Muted,
+  Tap,
+  Title,
+  type ZoomCard,
+} from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
@@ -700,6 +710,14 @@ export function HomeScreen() {
          * to an undefined room. That is how the website and the app came to
          * show different feeds the week the new kinds landed.
          */}
+        {/*
+         * Until the cached read has answered, the list area is a spinner,
+         * not an empty column. The founder: "the 'loading' screen
+         * everywhere needs to be updated." Nothing that means "you have
+         * nothing" is drawn before we know that is true.
+         */}
+        {!hydrated && shown.length === 0 && <Loading />}
+
         {shown.map((item, index) => {
           const body =
             item.kind === "nearbyMatch" ? (
@@ -1380,7 +1398,13 @@ export function HomeScreen() {
            * black above the first card, with nothing in it to see or to
            * blame. Same forgiving rule the item kinds already follow.
            */
-          const heading = sectionHeading(item.section);
+          /*
+           * And never on Following: the server sends that tab as one
+           * chronological list, so a heading there would carve up a
+           * timeline that is meant to read as one. The website draws
+           * none there either.
+           */
+          const heading = tab === "following" ? null : sectionHeading(item.section);
           const opensSection =
             heading !== null &&
             sectionsShown > 1 &&

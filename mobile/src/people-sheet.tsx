@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { FollowedPlayer } from "./api";
 import { PlayerAvatar } from "./player-avatar";
-import { Muted, Tap } from "./ui";
+import { Loading, Muted, Tap } from "./ui";
 import { colors, radius, spacing } from "./theme";
 
 /**
@@ -60,7 +60,9 @@ export function PeopleSheet({
               gap: spacing(3),
             }}
           >
-            <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+            >
               {which === "followers" ? "Followers" : "Following"}{" "}
               <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
                 {people ? `· ${people.length}` : ""}
@@ -72,17 +74,17 @@ export function PeopleSheet({
           </View>
           <ScrollView>
             {people === null ? (
-              <Muted>Loading…</Muted>
+              <Loading />
             ) : (
-            <PeopleList
-              people={people}
-              empty={
-                which === "followers"
-                  ? "Nobody yet. Share your profile."
-                  : "Nobody yet. The next time somebody impresses you at a table, tap their name."
-              }
-              onOpen={onOpen}
-            />
+              <PeopleList
+                people={people}
+                empty={
+                  which === "followers"
+                    ? "Nobody yet. Share your profile."
+                    : "Nobody yet. The next time somebody impresses you at a table, tap their name."
+                }
+                onOpen={onOpen}
+              />
             )}
           </ScrollView>
         </Pressable>
@@ -139,4 +141,3 @@ export function PeopleList({
     </View>
   );
 }
-

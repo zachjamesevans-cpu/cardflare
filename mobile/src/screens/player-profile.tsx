@@ -18,7 +18,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
-import { Body, Card, Muted, Tap } from "../ui";
+import { Body, Card, Loading, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
 
 /** The trade-room carousel's tile width; the profile shelf matches it. */
@@ -128,16 +128,7 @@ export function PlayerProfileScreen() {
   }
 
   if (!profile) {
-    return (
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-        }}
-      >
-        <Muted>Loading…</Muted>
-      </ScrollView>
-    );
+    return <Loading />;
   }
 
   /* The shelf the zoom pages along, with each card's note riding

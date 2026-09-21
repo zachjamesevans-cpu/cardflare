@@ -25,7 +25,7 @@ import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
 import { meetLine, suggestText } from "../meet";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, spacing } from "../theme";
-import { AsyncButton, Button, ErrorLine, Input, Muted } from "../ui";
+import { AsyncButton, Button, ErrorLine, Input, Loading, Muted } from "../ui";
 
 /**
  * One conversation about one Flare.
@@ -174,15 +174,19 @@ export function ThreadScreen() {
            a fixed-height list has to be told. */
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <Text
-            style={{
-              color: colors.textMuted,
-              textAlign: "center",
-              paddingVertical: spacing(8),
-            }}
-          >
-            {messages === null ? "Loading…" : "No messages yet."}
-          </Text>
+          messages === null ? (
+            <Loading />
+          ) : (
+            <Text
+              style={{
+                color: colors.textMuted,
+                textAlign: "center",
+                paddingVertical: spacing(8),
+              }}
+            >
+              No messages yet.
+            </Text>
+          )
         }
         renderItem={({ item }) => (
           <View
