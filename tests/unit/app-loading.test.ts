@@ -39,7 +39,7 @@ describe("Loading, the app's one loading state", () => {
     expect(body).toContain('accessibilityRole="progressbar"');
     expect(body).toContain('accessibilityLabel="Loading"');
     expect(ui).toMatch(
-      /loading: \{[^}]*alignItems: "center"[^}]*justifyContent: "center"/s,
+      /loading: \{[^}]*alignItems: "center"[^}]*justifyContent: "center"/,
     );
   });
 

@@ -25,7 +25,6 @@ import {
   PledgeSummary,
 } from "@/components/matching/offer-controls";
 import { GroupView } from "@/components/lists/group-view";
-import { QuickPledge } from "@/components/matching/quick-pledge";
 import { inRailOrder, pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -236,7 +235,7 @@ function RailDivider() {
     <li className="flex shrink-0 items-stretch gap-1.5 self-stretch py-0.5 pr-0.5">
       <span aria-hidden="true" className="w-px bg-border" />
       <span className="flex items-center text-[10px] font-medium tracking-wide whitespace-nowrap text-accent [writing-mode:vertical-rl]">
-        Letting go
+        Offering
       </span>
     </li>
   );
@@ -267,7 +266,7 @@ function DirectionHeading({
   return (
     <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
       <Icon className="size-4 shrink-0 text-accent" aria-hidden="true" />
-      <span>{direction === "showcase" ? "Letting go" : "Looking for"}</span>
+      <span>{direction === "showcase" ? "Offering" : "Looking for"}</span>
       <span className="font-normal text-text-muted tabular-nums">
         · {count} {count === 1 ? "card" : "cards"}
       </span>
@@ -311,9 +310,14 @@ const TILE_ART_HEIGHT = (TILE_ART_WIDTH * 84) / 60;
  *
  * Sized so five cards share a phone's width — the founder's number, after
  * two rounds of "still too big". At this size the item is for browsing:
- * art (tap to zoom for everything else), name, count, and one-line
- * signals. Acting — offering, reading offers, confirming a trade — lives
- * in the stacked view, one tap away, same as the app.
+ * art, name, count, and one-line signals. Tapping the art opens the
+ * card large, and THAT is where somebody says they have it: the zoom
+ * carries the offer form (`offer`), so the tile draws no control of its
+ * own. There used to be a handshake button under every tile whose
+ * stepper opened over the art; the founder cut it: "the small
+ * contextual menu that opens up over the tiny card needs to go... just
+ * have people tap the card to open full menu to say they have it or
+ * not." The one thing left under the art is Remove, on your own tiles.
  */
 function CarouselEntry({
   entry,
@@ -325,10 +329,6 @@ function CarouselEntry({
   removable,
   pledgeLine = null,
   pledges = [],
-  canOffer = false,
-  offered = false,
-  ownQuantity = 1,
-  early = false,
   covered = false,
   remaining,
   reserveCaption = false,
@@ -348,13 +348,6 @@ function CarouselEntry({
   pledgeLine?: string | null;
   /** Who has raised a hand, shown by name in the large view. */
   pledges?: { name: string; quantity: number }[];
-  /** Somebody else's Flare: the pledge control renders. */
-  canOffer?: boolean;
-  /** The viewer's pledge is already standing: filled button, editable. */
-  offered?: boolean;
-  /** How many the standing pledge promised. */
-  ownQuantity?: number;
-  early?: boolean;
   /** Every asked-for copy is pledged: dimmed and parked at the rail's end. */
   covered?: boolean;
   /** Copies still unpledged; equals the ask until someone raises a hand. */
@@ -363,15 +356,19 @@ function CarouselEntry({
    * Hold a line open under the name for a deck label.
    *
    * Decided for the whole rail, not per card: the line exists so the
-   * action row sits at one height across tiles standing side by side, and
-   * when nobody in a rail has named a deck there is no drift to prevent —
-   * only an empty row between the names and the buttons.
+   * tiles' bottoms sit at one height across a rail, and when nobody in
+   * a rail has named a deck there is no drift to prevent — only an
+   * empty row under the names.
    */
   reserveCaption?: boolean;
   /** The rest of this player's rail, so the viewer can walk it. */
   siblings?: ZoomCard[];
   position?: number;
-  /** The zoom's offer form, for a tile that is alone on its shelf. */
+  /**
+   * The zoom's offer form: how the viewer says they have this card.
+   * Null on your own tiles and on a card someone is offering, and null
+   * again for a viewer who cannot offer.
+   */
   offer?: ZoomOffer | null;
 }) {
   /*
@@ -470,10 +467,10 @@ function CarouselEntry({
         {/*
          * Every signal that used to be its own caption line lives on
          * the art as a badge now. The founder's screenshot counted the
-         * handshake at three different heights in one rail — variable
+         * name line at three different heights in one rail — variable
          * caption stacks were the culprit, so the tile below the art is
-         * a fixed grid: one name line, one caption slot, one action
-         * row. Same anatomy on every tile, buttons on one line, always.
+         * a fixed grid: one name line, one caption slot. Same anatomy
+         * on every tile, always.
          */}
         {match && (
           <span
@@ -522,14 +519,14 @@ function CarouselEntry({
 
       {/*
        * The caption slot: exactly one line tall whether or not THIS card
-       * has a deck to name, so the action row never drifts across a rail.
+       * has a deck to name, so tiles never drift across a rail.
        *
        * Reserved per rail rather than per tile, which is the correction.
        * Every tile held the line open, so a board where nobody had named
-       * a deck — nearly every board — carried an empty row between the
-       * card names and the buttons, and the founder saw a section with a
-       * hole in it. The guarantee only ever needed to hold between tiles
-       * standing next to each other.
+       * a deck — nearly every board — carried an empty row under the
+       * card names, and the founder saw a section with a hole in it. The
+       * guarantee only ever needed to hold between tiles standing next
+       * to each other.
        */}
       {reserveCaption && (
         <p className="flex min-h-[13px] items-center gap-1 text-[10px] leading-[13px] text-text-muted">
@@ -542,21 +539,12 @@ function CarouselEntry({
         </p>
       )}
 
-      {/* The action row: reserved on every tile, one control per side
-          of the trade. Pledging is open to anyone — no binder required,
-          the founder's call — and the stepper opens over the art. */}
-      <div className="h-7">
-        {canOffer && (
-          <QuickPledge
-            code={code}
-            flareId={entry.id}
-            early={early}
-            flareQuantity={entry.quantity}
-            offered={offered}
-            ownQuantity={ownQuantity}
-          />
-        )}
-        {removable && !found && (
+      {/* Remove, under your own tiles only. Nobody else's tile draws a
+          row here at all: offering happens in the zoom, so a row held
+          open for a control that no longer exists would be a hole under
+          every card on the board. */}
+      {removable && !found && (
+        <div className="h-7">
           <RemoveEntry
             code={code}
             kind={kind}
@@ -568,8 +556,8 @@ function CarouselEntry({
               cardWidth: TILE_ART_WIDTH,
             }}
           />
-        )}
-      </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -683,10 +671,10 @@ export function FlareBoard({
         const { folders, loose } = partitionByDeck(wants);
 
         /*
-         * The carousel tile is a contact sheet with one quick action:
-         * anyone can tap the handshake on somebody else's card. The
-         * coverage is public — the founder's ask — so the next holder
-         * knows whether a hunt still needs them.
+         * The carousel tile is a contact sheet: tapping the art opens
+         * the card large, and the offer form lives there. The coverage
+         * is public — the founder's ask — so the next holder knows
+         * whether a hunt still needs them.
          */
         /* One answer for the whole rail, so tiles beside each other still
            agree on where their buttons sit. */
@@ -748,9 +736,6 @@ export function FlareBoard({
         const renderTile = (entry: ListEntry) => {
           const match = isYou ? null : (matches.get(entry.id) ?? null);
           const entryOffers = offers.get(entry.id) ?? [];
-          const ownOffer = entryOffers.find(
-            (offer) => offer.responderSessionId === youId,
-          );
           const { remaining } = pledgeTally(entryOffers, entry.quantity);
           const covered = entryOffers.length > 0 && remaining === 0;
           const pledgeLine =
@@ -781,10 +766,6 @@ export function FlareBoard({
               removable={isYou}
               pledgeLine={pledgeLine}
               pledges={pledges}
-              canOffer={!isYou}
-              offered={Boolean(ownOffer)}
-              ownQuantity={ownOffer?.quantity ?? 1}
-              early={early}
               covered={covered}
               remaining={remaining}
               reserveCaption={railHasDecks}
@@ -1038,7 +1019,7 @@ export function FlareBoard({
                     <div className="flex flex-col gap-1.5">
                       <DirectionHeading direction="showcase" count={showcases.length} />
                       <ul
-                        aria-label="Cards this player is letting go"
+                        aria-label="Cards this player is offering"
                         className="flex flex-col"
                       >
                         {showcases.map(renderRow)}

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Heart, Loader2, MessageCircle, PackageCheck } from "lucide-react";
+import { Heart, MessageCircle, PackageCheck } from "lucide-react";
 
 import Link from "next/link";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import {
   addPostCommentAction,
@@ -134,9 +135,12 @@ export function PostSocial({
       {open && (
         <div className="flex flex-col gap-3 border-t border-border pt-3">
           {thread === null || (loading && thread === null) ? (
-            <p className="flex items-center gap-2 text-sm text-text-muted">
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Loading…
+            <p
+              role="status"
+              className="flex items-center justify-center py-2 text-sm text-text-muted"
+            >
+              <Spinner size="sm" />
+              <span className="sr-only">Loading comments</span>
             </p>
           ) : thread.length === 0 ? (
             <p className="text-sm text-text-muted">Nothing here yet. Say something.</p>

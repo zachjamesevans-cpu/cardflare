@@ -17,6 +17,7 @@ import { PostalAsk } from "@/components/feed/postal-ask";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
+import { Spinner } from "@/components/ui/spinner";
 import {
   closeThreadAction,
   localFeedAtAction,
@@ -617,7 +618,10 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
 
       <Card className="flex min-h-64 flex-col gap-2">
         {messages === null ? (
-          <p className="py-8 text-center text-text-muted">Loading…</p>
+          <p role="status" className="flex justify-center py-8">
+            <Spinner />
+            <span className="sr-only">Loading messages</span>
+          </p>
         ) : messages.length === 0 ? (
           <p className="py-8 text-center text-text-muted">No messages yet.</p>
         ) : (
