@@ -39,11 +39,13 @@ describe("which way a Flare points", () => {
   });
 
   it("says offer, never pledge, to a person", () => {
-    const tile = read("src/components/matching/quick-pledge.tsx");
-    expect(tile).toContain('"Take the offer back"');
-    expect(tile).toContain('"Change your offer"');
-    /* The component keeps its name; no word anybody reads says pledge. */
-    expect(tile).not.toMatch(/\bpledges?\b/i);
+    /* The tile's handshake button is gone (see board-tile-offer.test.ts);
+       the offer now lives in the zoom, and the words a person reads
+       there say offer. */
+    const zoom = read("src/components/cards/card-image-zoom.tsx");
+    expect(zoom).toContain("You offered.");
+    /* `pledges` stays as a prop name; no label or sentence says it. */
+    expect(zoom).not.toMatch(/\bPledge\b|your pledge|pledge back|"pledge/);
     expect(read("src/app/p/[playerId]/page.tsx")).not.toContain("pledge");
   });
 });

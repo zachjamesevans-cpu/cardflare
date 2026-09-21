@@ -681,8 +681,11 @@ export function CardImageZoom({
   /*
    * Nothing to open, so nothing to press. Rendering a button over the
    * placeholder would promise a bigger picture that does not exist.
+   * Unless there is an offer to make: with no control under the tile,
+   * the sheet is the one way to say you have the card, so a card with
+   * no art still opens to it.
    */
-  if (!enabled || !isRenderableImageUrl(ownImageUrl)) return thumbnail;
+  if ((!enabled || !isRenderableImageUrl(ownImageUrl)) && !ownOffer) return thumbnail;
 
   const intent = () => {
     if (isOpen.current) return;

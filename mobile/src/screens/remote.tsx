@@ -9,7 +9,7 @@ import { controlTimer, getHub, type HubView } from "../remote-api";
 import type { RemoteOp, RemoteTimer } from "../remote-wire";
 import { readRoomTimer } from "../room-timer-wire";
 import { colors, gutter, radius, spacing } from "../theme";
-import { Card, ErrorLine, Muted, Tap, Title } from "../ui";
+import { Card, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
 
 /**
  * The timer remote: the store's round clocks, run from a pocket.
@@ -173,7 +173,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
       >
         <ErrorLine message={error} />
         {staff === null ? (
-          <Muted>Loading…</Muted>
+          <Loading />
         ) : staff.length === 0 ? (
           <Card>
             <Title>No store to run</Title>
@@ -253,7 +253,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
       {store && <Muted>{store.name}</Muted>}
 
       {hub === null ? (
-        <Muted>Loading…</Muted>
+        <Loading />
       ) : hub.displays.length === 0 ? (
         <Card>
           <Title>Nothing on the wall</Title>

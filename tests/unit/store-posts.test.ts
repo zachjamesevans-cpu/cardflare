@@ -153,17 +153,16 @@ describe("a store post in the Feed", () => {
     expect(appCard).toContain("<PostSocialRow");
   });
 
-  it("lands among the followed Flares in time order, under your own posts", () => {
-    const yours = repo.indexOf(
-      'boards.filter((item) => item.kind === "hunt" && item.yours)',
-    );
+  it("lands among the followed Flares and your own in one time order", () => {
+    /* The founder: "Following tab needs to be sorted in chronological
+       order, with most recent." One list, own posts included. */
     const merged = repo.indexOf("byPostedAt<HuntItem | StorePostItem>");
     const boardsOfOthers = repo.indexOf(
       'boards.filter((item) => item.kind === "board" && item.yours)',
     );
-    expect(yours).toBeGreaterThan(-1);
-    expect(merged).toBeGreaterThan(yours);
+    expect(merged).toBeGreaterThan(-1);
     expect(boardsOfOthers).toBeGreaterThan(merged);
+    expect(repo).not.toContain('item.kind === "hunt" && item.yours)');
     expect(repo).toContain("...storePosts,");
   });
 

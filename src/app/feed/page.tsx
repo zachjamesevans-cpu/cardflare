@@ -163,13 +163,16 @@ export default async function FeedPage({
      stricter of the two clients: an item from a newer server, filed
      under a tab this build has never heard of, vanished on the website
      while the app still showed it. Headings only where a tab holds
-     more than one section. */
+     more than one section, and never on Following: the server sends
+     that tab as one chronological list, and the founder wants it read
+     as one, with no section titles cutting it up. */
   /* How this reader wants their Feed drawn. Read here rather than in
      the card, so one query answers it for the whole page. */
   const view = playerId ? await feedViewFor(playerId) : "classic";
 
   const shown = items.filter((item) => belongsToTab(item, tab));
-  const sectionsShown = new Set(shown.map((item) => item.section)).size;
+  const sectionsShown =
+    tab === "following" ? 0 : new Set(shown.map((item) => item.section)).size;
 
   return (
     <Shell>

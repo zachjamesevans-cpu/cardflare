@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { CalendarClock, MapPin } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
@@ -16,6 +17,7 @@ import { RoomComposerDoor } from "@/components/events/room-composer-door";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { RoomTimers } from "@/components/event-hub/room-timers";
 import { ShowSearch } from "@/components/shows/show-search";
+import { RoomLoading } from "@/components/events/room-loading";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { TradedTonight } from "@/components/trades/traded-tonight";
 import { Badge, Card } from "@/components/ui/card";
@@ -138,13 +140,32 @@ export default async function JoinByCodePage({
   searchParams: Promise<{ resumed?: string; g?: string }>;
 }) {
   const { code } = await params;
+  const params_ = await searchParams;
+  const normalized = normalizeJoinCode(decodeURIComponent(code));
+
+  /* Before anything suspends, so a malformed code is still a 404. */
+  if (!isValidJoinCode(normalized)) notFound();
+
+  return (
+    <Suspense fallback={<RoomLoading />}>
+      <RoomBody normalized={normalized} params_={params_} />
+    </Suspense>
+  );
+}
+
+async function RoomBody({
+  normalized,
+  params_,
+}: {
+  normalized: string;
+  params_: { resumed?: string; g?: string };
+}) {
   /*
    * Set by the join action when the tap picked up a seat this account
    * already had — from the app, or from this browser earlier. Saying so is
    * the point: a join that appears to do nothing is exactly what a duplicate
    * used to look like from the inside.
    */
-  const params_ = await searchParams;
   const resumed = params_.resumed === "1";
 
   /*
@@ -160,10 +181,6 @@ export default async function JoinByCodePage({
   const games = scannedGame
     ? [scannedGame, ...playerGames.filter((game) => game !== scannedGame)]
     : playerGames;
-
-  const normalized = normalizeJoinCode(decodeURIComponent(code));
-
-  if (!isValidJoinCode(normalized)) notFound();
 
   /*
    * A well-formed code that cannot be looked up is not the same as one that
@@ -549,7 +566,7 @@ export default async function JoinByCodePage({
               <FollowStoreButton
                 storeId={event.storeId}
                 initial={followingStore}
-                code={code}
+                code={normalized}
               />
             )}
           </div>

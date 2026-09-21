@@ -30,6 +30,7 @@ import {
   CardImage,
   ErrorLine,
   Input,
+  Loading,
   Muted,
   Title,
 } from "../ui";
@@ -144,18 +145,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
   }
 
   if (!store) {
-    return (
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-        }}
-      >
-        <Card>
-          <Muted>Loading…</Muted>
-        </Card>
-      </ScrollView>
-    );
+    return <Loading />;
   }
 
   return (

@@ -56,6 +56,7 @@ import {
   type ZoomCard,
   ErrorLine,
   Input,
+  Loading,
   Muted,
   Tap,
   Title,
@@ -571,12 +572,14 @@ function RoomScreen({
   };
 
   if (!state) {
+    if (!error) {
+      return <Loading label="Opening the room" />;
+    }
     return (
       <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
         <Card>
-          {error ? <Title>No room on that code</Title> : null}
+          <Title>No room on that code</Title>
           <ErrorLine message={error} />
-          {!error && <Muted>Loading the room…</Muted>}
           {error && (
             <AsyncButton
               label="Try again"
@@ -1128,28 +1131,17 @@ function RoomScreen({
              still agree on where their buttons sit. */
           const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
 
-          const tile = (flare: RoomFlare) => {
-            const own = flare.offers.find((o) => o.responderSessionId === youId);
-
-            return (
-              <CarouselFlare
-                key={flare.id}
-                flare={flare}
-                mine={mine}
-                reserveCaption={railHasDecks}
-                siblings={shelf}
-                position={shelfAt.get(flare.id) ?? 0}
-                offered={Boolean(own)}
-                ownQuantity={own?.quantity ?? 1}
-                early={room.early}
-                onOffer={(quantity) =>
-                  act(() => offerOnFlare(code, flare.id, undefined, quantity))
-                }
-                onWithdraw={() => act(() => withdrawOffer(code, flare.id))}
-                onRemove={() => act(() => removeFlare(code, flare.id))}
-              />
-            );
-          };
+          const tile = (flare: RoomFlare) => (
+            <CarouselFlare
+              key={flare.id}
+              flare={flare}
+              mine={mine}
+              reserveCaption={railHasDecks}
+              siblings={shelf}
+              position={shelfAt.get(flare.id) ?? 0}
+              onRemove={() => act(() => removeFlare(code, flare.id))}
+            />
+          );
 
           /* Fully pledged hunts park at the rail's far end, dimmed but
              present — the bring-extras crowd can still see the ask. */
@@ -1285,7 +1277,9 @@ function RoomScreen({
                      block of things at slightly different sizes. */
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
-                  paddingBottom: spacing(1.5),
+                  /* Two points shorter than it was, given to the rail
+                     below so a held card's ring clears this line. */
+                  paddingBottom: spacing(1),
                 }}
               >
                 <View
@@ -1413,12 +1407,22 @@ function RoomScreen({
                      * leaves its bounds, and the ring sits two pixels
                      * outside the art with a glow past that. The website
                      * had this bug and this fix.
+                     *
+                     * The same allowance on top. The rail used to start
+                     * four points under the header's hairline with no
+                     * vertical padding of its own, so a held card's ring
+                     * sat two points off the divider and its glow drew
+                     * straight across it: the founder's screenshot. Four
+                     * more points on top put the ring and its whole
+                     * shadow under the line, and the header gives back
+                     * two of its own so the row does not visibly loosen.
                      */
                     style={{ marginHorizontal: -spacing(2) }}
                     contentContainerStyle={{
                       gap: spacing(2),
                       paddingHorizontal: spacing(2),
-                      paddingVertical: 0,
+                      paddingTop: spacing(1),
+                      paddingBottom: 0,
                       alignItems: "flex-start",
                     }}
                   >
@@ -1825,23 +1829,13 @@ function partitionByDeck(flares: RoomFlare[]): {
 function CarouselFlare({
   flare,
   mine,
-  offered,
-  ownQuantity,
-  early,
   reserveCaption,
   siblings,
   position,
-  onOffer,
-  onWithdraw,
   onRemove,
 }: {
   flare: RoomFlare;
   mine: boolean;
-  /** The viewer's pledge on this Flare is already standing. */
-  offered: boolean;
-  /** How many the standing pledge promised, the stepper's start. */
-  ownQuantity: number;
-  early: boolean;
   /**
    * Hold a line open under the name for a deck label.
    *
@@ -1855,8 +1849,6 @@ function CarouselFlare({
   /** The rest of this player's rail, so the viewer can walk it. */
   siblings: ZoomCard[];
   position: number;
-  onOffer: (quantity?: number) => Promise<void>;
-  onWithdraw: () => Promise<void>;
   onRemove: () => Promise<void>;
 }) {
   const covered =
@@ -1864,43 +1856,14 @@ function CarouselFlare({
     pledgeTally(flare.offers, flare.quantity).remaining === 0;
 
   /*
-   * "I got it" was a silent button: nothing on screen said the tap took
-   * until the next poll repainted the board, which on store wifi reads
-   * as broken — the founder's complaint. While the pledge is in flight
-   * the art greys out under a spinner, and the button cannot double-fire.
+   * No offer control on the tile. There used to be a handshake under
+   * the art that opened a quantity stepper over the picture, and the
+   * founder called it: "the small contextual menu that opens up over
+   * the tiny card needs to go... just have people tap the card to
+   * open full menu to say they have it or not." Tapping the art opens
+   * the zoom sheet, and the sheet carries the offer, the count and the
+   * take-back. One place to answer a card, on every rail.
    */
-  const [pledging, setPledging] = useState(false);
-
-  /*
-   * The founder's shape for the multi-copy case: tapping the handshake
-   * flips it in place to a minimal stepper — minus, count, plus, check —
-   * and the check submits. No second screen; the tile is the form.
-   */
-  const [picking, setPicking] = useState(false);
-  const [count, setCount] = useState(Math.max(offered ? ownQuantity : 1, 1));
-
-  const pledge = async (quantity?: number) => {
-    if (pledging) return;
-    setPicking(false);
-    setPledging(true);
-    try {
-      await onOffer(quantity);
-    } finally {
-      setPledging(false);
-    }
-  };
-
-  const takeBack = async () => {
-    if (pledging) return;
-    setPicking(false);
-    setPledging(true);
-    try {
-      await onWithdraw();
-      setCount(1);
-    } finally {
-      setPledging(false);
-    }
-  };
 
   /*
    * Same complaint, the other side of the trade: Remove sat there
@@ -2096,72 +2059,6 @@ function CarouselFlare({
               <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
             </View>
           ) : null}
-
-          {/* The stepper opens OVER the art, never in the flow: inline it
-              shoved the neighbouring tiles' buttons around, which is the
-              misalignment the founder photographed. */}
-          {picking ? (
-            <View style={styles.stepperPanel}>
-              <Tap
-                onPress={() => setPicking(false)}
-                hitSlop={6}
-                style={styles.stepperClose}
-              >
-                <Text style={{ color: colors.textMuted, fontSize: 11 }}>✕</Text>
-              </Tap>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-              >
-                <Tap
-                  onPress={() => setCount((n) => Math.max(offered ? 0 : 1, n - 1))}
-                  hitSlop={6}
-                >
-                  <Text style={styles.stepperGlyph}>−</Text>
-                </Tap>
-                <Text style={styles.stepperCount}>{count}</Text>
-                <Tap
-                  onPress={() =>
-                    setCount((n) => Math.min(Math.max(flare.quantity, 1), n + 1))
-                  }
-                  hitSlop={6}
-                >
-                  <Text style={styles.stepperGlyph}>+</Text>
-                </Tap>
-              </View>
-              {/* Zero is a real answer once a pledge stands: it withdraws. */}
-              <Tap
-                onPress={() =>
-                  offered && count === 0 ? void takeBack() : void pledge(count)
-                }
-                accessibilityLabel={
-                  offered && count === 0 ? "Take the offer back" : "Change your offer"
-                }
-                hitSlop={6}
-              >
-                <View
-                  style={[
-                    styles.stepperGo,
-                    offered && count === 0 && styles.stepperGoOff,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.stepperGoGlyph,
-                      offered && count === 0 && { color: colors.textSecondary },
-                    ]}
-                  >
-                    {offered && count === 0 ? "Undo" : "✓"}
-                  </Text>
-                </View>
-              </Tap>
-            </View>
-          ) : null}
-
-          {pledging ? (
-            <View style={styles.pledgeOverlay}>
-              <ActivityIndicator size="small" color={colors.accent} />
-            </View>
-          ) : null}
         </View>
 
         <Text numberOfLines={1} style={styles.tileName}>
@@ -2178,31 +2075,11 @@ function CarouselFlare({
           </Text>
         )}
 
-        {/* The action row: reserved on every tile. Pledging is open to
-            anyone — no binder required, the founder's call — and a
-            standing pledge keeps the button, filled in, tap to edit. */}
-        <View style={{ height: 24 }}>
-          {!mine ? (
-            <Tap
-              onPress={() =>
-                picking
-                  ? setPicking(false)
-                  : offered || flare.quantity > 1
-                    ? setPicking(true)
-                    : void pledge()
-              }
-              disabled={pledging}
-              accessibilityLabel={offered ? "Change your offer" : "Offer"}
-              style={[styles.pledgeButton, offered && styles.pledgeButtonOn]}
-              hitSlop={4}
-            >
-              <MaterialCommunityIcons
-                name={offered ? "handshake" : "handshake-outline"}
-                size={14}
-                color={offered ? colors.accent : colors.textMuted}
-              />
-            </Tap>
-          ) : (
+        {/* The action row, only on the viewer's own tiles: Remove is the
+            one thing left to do under a tile, and somebody else's rail
+            would otherwise carry an empty strip under every card. */}
+        {mine && (
+          <View style={{ height: 24 }}>
             <Tap
               onPress={() => void remove()}
               disabled={removing}
@@ -2215,8 +2092,8 @@ function CarouselFlare({
                 Remove
               </Text>
             </Tap>
-          )}
-        </View>
+          </View>
+        )}
       </View>
 
       {/* Over the front card only, not the fan: "dead centre of the
@@ -2496,17 +2373,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "700",
   },
-  pledgeOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: radius.control / 2,
-    backgroundColor: `${colors.canvas}99`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   stackGhost: {
     position: "absolute",
     // Pinned to the bottom, not the top: the founder's rule is that a
@@ -2520,26 +2386,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.canvas,
     opacity: 0.4,
-  },
-  // Grey means "you could", green means "you are" — the founder's
-  // rule: the card carries everyone else's status, the button's
-  // colour answers only whether the viewer is on this hunt.
-  pledgeButton: {
-    height: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pledgeButtonOn: {
-    borderColor: colors.accent,
-    backgroundColor: `${colors.accent}40`,
-  },
-  stepperGoOff: {
-    backgroundColor: colors.elevated,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   countBadge: {
     position: "absolute",
@@ -2595,54 +2441,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
-  },
-  stepperPanel: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: 56,
-    // The art's 63:88 box, covered edge to edge.
-    height: 78,
-    borderRadius: radius.control / 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: `${colors.canvas}F2`,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing(1.5),
-  },
-  stepperClose: {
-    position: "absolute",
-    top: 1,
-    right: 3,
-  },
-  stepperGlyph: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: "700",
-    width: 12,
-    textAlign: "center",
-  },
-  stepperCount: {
-    color: colors.textPrimary,
-    fontSize: 11,
-    fontWeight: "700",
-    minWidth: 10,
-    textAlign: "center",
-  },
-  stepperGo: {
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperGoGlyph: {
-    color: colors.accentContrast,
-    fontSize: 10,
-    fontWeight: "700",
   },
   actionBar: {
     position: "absolute",

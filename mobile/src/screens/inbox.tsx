@@ -9,7 +9,7 @@ import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
 import { getNotifications, markRead, type InboxItem } from "../api";
 import { PlayerAvatar } from "../player-avatar";
-import { Button, Card, Muted, Tap } from "../ui";
+import { Button, Card, Loading, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 
@@ -88,7 +88,7 @@ export function InboxScreen() {
       {/* No heading here: the navigation bar above already says
           "Inbox", and printing it twice on one screen reads as a
           mistake. The website has one because it has no nav bar. */}
-      {items === null && <Muted>Loading…</Muted>}
+      {items === null && <Loading />}
 
       {items?.length === 0 && (
         <Card>

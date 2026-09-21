@@ -95,11 +95,14 @@ export function Rail({
          * where those tiles now sort to. This is the room it needs.
          *
          * Twelve, not eight: the shadow is a 10px blur sitting outside
-         * a 2px ring, so eight pixels cut the last of it off. Measure
-         * the glow before changing this, and keep the negative margin
-         * above in step or the shelf stops lining up with its header.
+         * a 2px ring, so eight pixels cut the last of it off. The list is
+         * pulled up by six so the tiles sit where the founder's spacing
+         * cut left them; the founder saw the glow "cut through the
+         * header" when it was clipped flat under the divider. Measure the
+         * glow before changing this, and keep the negative margins in
+         * step or the shelf stops lining up with its header.
          */
-        className="flex items-start gap-2 overflow-x-auto px-3 pt-1.5 pb-1"
+        className="-mt-1.5 flex items-start gap-2 overflow-x-auto px-3 pt-3 pb-1"
       >
         {children}
       </ul>

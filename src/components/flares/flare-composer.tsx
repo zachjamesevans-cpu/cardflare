@@ -27,6 +27,7 @@ import {
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, Textarea, TextInput } from "@/components/ui/controls";
+import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
 import { printingLabel } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
@@ -90,7 +91,10 @@ export function FlareComposer(props: {
     return (
       <Card className="flex flex-col gap-2 p-4 sm:p-6">
         <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
-        <p className="text-sm text-text-muted">Loading your draft…</p>
+        <p role="status" className="flex items-center gap-2 text-sm text-text-muted">
+          <Spinner size="sm" />
+          Loading your draft…
+        </p>
       </Card>
     );
   }

@@ -14,7 +14,7 @@ import {
   TradeHistoryTotalsRow,
   TradeHistoryWall,
 } from "../trade-history";
-import { Body, Card, Muted, Title } from "../ui";
+import { Body, Card, Loading, Muted, Title } from "../ui";
 
 /**
  * Every trade you confirmed, grouped by month, newest first: the
@@ -59,16 +59,7 @@ export function TradeHistoryScreen() {
   }
 
   if (!history) {
-    return (
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-        }}
-      >
-        <Muted>Loading…</Muted>
-      </ScrollView>
-    );
+    return <Loading />;
   }
 
   /* One card per month, so a year of Fridays reads as a calendar. */
