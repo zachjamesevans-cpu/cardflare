@@ -48,6 +48,7 @@ import {
   CardImage,
   ErrorLine,
   Input,
+  Loading,
   Muted,
   Tap,
   Title,
@@ -1212,6 +1213,10 @@ export function FlareComposerPreview({
 function useCardSearch(target: PostTarget) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
+  /* True from the keystroke until the answer lands, debounce included,
+     so the screen never sits still while it works. The founder: "just
+     a frozen screen basically for a second or two." */
+  const [searching, setSearching] = useState(false);
   const [roomGame, setRoomGame] = useState<string | null>(null);
   const [playerGames, setPlayerGames] = useState<string[]>([]);
   const [remembered, setRemembered] = useState<string | null>(null);
@@ -1261,21 +1266,34 @@ function useCardSearch(target: PostTarget) {
   useEffect(() => {
     if (query.trim().length < 2) {
       setHits([]);
+      setSearching(false);
       return;
     }
+    setSearching(true);
+    let stale = false;
     const timer = setTimeout(() => {
       if (scopedGame && !scope.locked && remembered !== scopedGame) {
         setRemembered(scopedGame);
         void rememberSearchGame(scopedGame);
       }
       void searchCards(query.trim(), scopedGame)
-        .then((result) => setHits(result.cards))
-        .catch(() => setHits([]));
+        .then((result) => {
+          if (!stale) setHits(result.cards);
+        })
+        .catch(() => {
+          if (!stale) setHits([]);
+        })
+        .finally(() => {
+          if (!stale) setSearching(false);
+        });
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
   }, [query, scopedGame, scope.locked, remembered]);
 
-  return { query, setQuery, hits, scope, scopedGame, playerGames, pickGame };
+  return { query, setQuery, hits, searching, scope, scopedGame, playerGames, pickGame };
 }
 
 /**
@@ -1300,12 +1318,27 @@ export function CardPicker({
   const insets = useSafeAreaInsets();
   const search = useCardSearch(target);
 
-  const pick = (hit: CardHit) => {
+  /*
+   * A printing named here is the exact art asked for; the row's own
+   * tap takes any printing, as it always did. The founder: "Should
+   * have a way to click the alt arts from this screen."
+   */
+  const pick = (hit: CardHit, printingId: string | null = null) => {
+    const art = printingId
+      ? (hit.printings.find((printing) => printing.id === printingId)?.imageUrl ??
+        leadArt(hit))
+      : leadArt(hit);
     const index = items.findIndex((item) => item.cardId === hit.id);
     if (index >= 0) {
       onChange(
         items.map((item, at) =>
-          at === index ? { ...item, quantity: Math.min(99, item.quantity + 1) } : item,
+          at === index
+            ? {
+                ...item,
+                quantity: Math.min(99, item.quantity + 1),
+                ...(printingId ? { printingId, imageUrl: art } : {}),
+              }
+            : item,
         ),
       );
       return;
@@ -1316,13 +1349,16 @@ export function CardPicker({
         cardId: hit.id,
         name: hit.name,
         cardNumber: hit.cardNumber,
-        imageUrl: leadArt(hit),
+        imageUrl: art,
         printings: hit.printings,
-        printingId: null,
+        printingId,
         quantity: 1,
       },
     ]);
   };
+
+  /* Which row has its printings fanned out, one at a time. */
+  const [fanned, setFanned] = useState<string | null>(null);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -1362,7 +1398,10 @@ export function CardPicker({
           contentContainerStyle={{ gap: spacing(2), paddingBottom: spacing(4) }}
           keyboardShouldPersistTaps="handled"
         >
-          {search.query.trim().length >= 2 && search.hits.length === 0 ? (
+          {search.searching && search.hits.length === 0 ? <Loading /> : null}
+          {search.query.trim().length >= 2 &&
+          search.hits.length === 0 &&
+          !search.searching ? (
             <Muted>
               {search.scopedGame && !search.scope.locked
                 ? `No ${gameShortName(search.scopedGame)} cards yet. Keep typing, check the number, or try All games.`
@@ -1378,96 +1417,176 @@ export function CardPicker({
           {search.hits.map((hit) => {
             const index = items.findIndex((item) => item.cardId === hit.id);
             const chosen = index >= 0 ? items[index] : null;
+            const many = hit.printings.length > 1;
+            const open = fanned === hit.id;
             return (
-              <Tap
+              <View
                 key={hit.id}
-                onPress={() => pick(hit)}
-                accessibilityLabel={
-                  chosen ? `${hit.name}, picked, add a copy` : `Add ${hit.name}`
-                }
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing(3),
                   borderColor: chosen ? colors.accent : colors.border,
                   borderWidth: 1,
                   borderRadius: radius.control,
                   backgroundColor: colors.surface,
-                  padding: spacing(2),
                 }}
               >
-                <CardImage
-                  imageUrl={leadArt(hit)}
-                  width={40}
-                  name={hit.name}
-                  cardNumber={hit.cardNumber}
-                />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                    <Highlighted text={hit.name} term={search.query} />
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                      columnGap: spacing(2),
-                    }}
-                  >
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                      <Highlighted text={hit.cardNumber} term={search.query} />
+                <Tap
+                  onPress={() => pick(hit)}
+                  accessibilityLabel={
+                    chosen ? `${hit.name}, picked, add a copy` : `Add ${hit.name}`
+                  }
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(3),
+                    padding: spacing(2),
+                  }}
+                >
+                  <CardImage
+                    imageUrl={leadArt(hit)}
+                    width={40}
+                    name={hit.name}
+                    cardNumber={hit.cardNumber}
+                  />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                      <Highlighted text={hit.name} term={search.query} />
                     </Text>
-                    {[
-                      hit.printings.length === 1
-                        ? (hit.printings[0]?.label ?? null)
-                        : `${hit.printings.length} printings`,
-                      hit.cardType,
-                    ]
-                      .filter((part): part is string => !!part)
-                      .map((part) => (
-                        <Text
-                          key={part}
-                          style={{ color: colors.textMuted, fontSize: 12 }}
-                        >
-                          {part}
-                        </Text>
-                      ))}
-                  </View>
-                  <Stats hit={hit} />
-                </View>
-                {chosen ? (
-                  <View style={{ alignItems: "center", gap: 2 }}>
                     <View
                       style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        backgroundColor: colors.accent,
-                        alignItems: "center",
-                        justifyContent: "center",
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        columnGap: spacing(2),
                       }}
                     >
-                      <Text
+                      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                        <Highlighted text={hit.cardNumber} term={search.query} />
+                      </Text>
+                      {many ? (
+                        <Tap
+                          onPress={() => setFanned(open ? null : hit.id)}
+                          hitSlop={6}
+                          accessibilityLabel={
+                            open
+                              ? `Hide the printings of ${hit.name}`
+                              : `Show the ${hit.printings.length} printings of ${hit.name}`
+                          }
+                          style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                        >
+                          <Text
+                            style={{
+                              color: colors.accent,
+                              fontSize: 12,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {`${hit.printings.length} printings`}
+                          </Text>
+                          <Ionicons
+                            name={open ? "chevron-up" : "chevron-down"}
+                            size={12}
+                            color={colors.accent}
+                          />
+                        </Tap>
+                      ) : hit.printings[0]?.label ? (
+                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                          {hit.printings[0].label}
+                        </Text>
+                      ) : null}
+                      {hit.cardType ? (
+                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                          {hit.cardType}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Stats hit={hit} />
+                  </View>
+                  {chosen ? (
+                    <View style={{ alignItems: "center", gap: 2 }}>
+                      <View
                         style={{
-                          color: colors.accentContrast,
-                          fontSize: 12,
-                          fontWeight: "800",
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: colors.accent,
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        {index + 1}
+                        <Text
+                          style={{
+                            color: colors.accentContrast,
+                            fontSize: 12,
+                            fontWeight: "800",
+                          }}
+                        >
+                          {index + 1}
+                        </Text>
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 10 }}>
+                        {`x${chosen.quantity}`}
                       </Text>
                     </View>
-                    <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-                      {`x${chosen.quantity}`}
-                    </Text>
-                  </View>
-                ) : (
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={22}
-                    color={colors.textSecondary}
-                  />
-                )}
-              </Tap>
+                  ) : (
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={22}
+                      color={colors.textSecondary}
+                    />
+                  )}
+                </Tap>
+                {/* The printings, fanned out under the row: tap one to ask
+                  for that exact art. The row above still takes any. */}
+                {open ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{
+                      gap: spacing(2),
+                      paddingHorizontal: spacing(2),
+                      paddingBottom: spacing(2),
+                    }}
+                  >
+                    {hit.printings.map((printing) => {
+                      const exact = chosen?.printingId === printing.id;
+                      return (
+                        <Tap
+                          key={printing.id}
+                          onPress={() => pick(hit, printing.id)}
+                          accessibilityLabel={`Add ${hit.name}, ${printing.label ?? "standard printing"}`}
+                          style={{
+                            width: 72,
+                            gap: 4,
+                            alignItems: "center",
+                            borderWidth: 1,
+                            borderColor: exact ? colors.accent : colors.border,
+                            borderRadius: radius.control,
+                            padding: spacing(1),
+                          }}
+                        >
+                          <CardImage
+                            imageUrl={printing.imageUrl}
+                            width={56}
+                            name={hit.name}
+                            cardNumber={hit.cardNumber}
+                          />
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              color: exact ? colors.accent : colors.textSecondary,
+                              fontSize: 10,
+                              fontWeight: "600",
+                              textAlign: "center",
+                            }}
+                          >
+                            {printing.label ?? "Standard"}
+                          </Text>
+                        </Tap>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+              </View>
             );
           })}
         </ScrollView>

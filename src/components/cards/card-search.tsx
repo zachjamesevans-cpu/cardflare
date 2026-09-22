@@ -814,7 +814,7 @@ export function CardSearch({
           {status === "loading" && (
             <Loader2
               aria-hidden="true"
-              className="size-4 shrink-0 animate-spin text-text-muted"
+              className="size-4 shrink-0 animate-spin text-accent"
             />
           )}
         </div>
