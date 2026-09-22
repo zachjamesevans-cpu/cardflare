@@ -1461,33 +1461,7 @@ export function CardPicker({
                       <Text style={{ color: colors.textMuted, fontSize: 12 }}>
                         <Highlighted text={hit.cardNumber} term={search.query} />
                       </Text>
-                      {many ? (
-                        <Tap
-                          onPress={() => setFanned(open ? null : hit.id)}
-                          hitSlop={6}
-                          accessibilityLabel={
-                            open
-                              ? `Hide the printings of ${hit.name}`
-                              : `Show the ${hit.printings.length} printings of ${hit.name}`
-                          }
-                          style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
-                        >
-                          <Text
-                            style={{
-                              color: colors.accent,
-                              fontSize: 12,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {`${hit.printings.length} printings`}
-                          </Text>
-                          <Ionicons
-                            name={open ? "chevron-up" : "chevron-down"}
-                            size={12}
-                            color={colors.accent}
-                          />
-                        </Tap>
-                      ) : hit.printings[0]?.label ? (
+                      {!many && hit.printings[0]?.label ? (
                         <Text style={{ color: colors.textMuted, fontSize: 12 }}>
                           {hit.printings[0].label}
                         </Text>
@@ -1500,7 +1474,7 @@ export function CardPicker({
                     </View>
                     <Stats hit={hit} />
                   </View>
-                  {chosen ? (
+                  {chosen && !chosen.printingId ? (
                     <View style={{ alignItems: "center", gap: 2 }}>
                       <View
                         style={{
@@ -1534,57 +1508,128 @@ export function CardPicker({
                     />
                   )}
                 </Tap>
-                {/* The printings, fanned out under the row: tap one to ask
-                  for that exact art. The row above still takes any. */}
-                {open ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                    contentContainerStyle={{
-                      gap: spacing(2),
-                      paddingHorizontal: spacing(2),
-                      paddingBottom: spacing(2),
-                    }}
-                  >
-                    {hit.printings.map((printing) => {
-                      const exact = chosen?.printingId === printing.id;
-                      return (
-                        <Tap
-                          key={printing.id}
-                          onPress={() => pick(hit, printing.id)}
-                          accessibilityLabel={`Add ${hit.name}, ${printing.label ?? "standard printing"}`}
-                          style={{
-                            width: 72,
-                            gap: 4,
-                            alignItems: "center",
-                            borderWidth: 1,
-                            borderColor: exact ? colors.accent : colors.border,
-                            borderRadius: radius.control,
-                            padding: spacing(1),
-                          }}
-                        >
-                          <CardImage
-                            imageUrl={printing.imageUrl}
-                            width={56}
-                            name={hit.name}
-                            cardNumber={hit.cardNumber}
-                          />
-                          <Text
-                            numberOfLines={2}
-                            style={{
-                              color: exact ? colors.accent : colors.textSecondary,
-                              fontSize: 10,
-                              fontWeight: "600",
-                              textAlign: "center",
-                            }}
-                          >
-                            {printing.label ?? "Standard"}
-                          </Text>
-                        </Tap>
-                      );
-                    })}
-                  </ScrollView>
+                {/* The website's "versions" bar, word for word: a door
+                    under the row, and behind it every printing as its
+                    own line. Tap the label to ask for that exact one;
+                    the badge lands on the version tapped, not on the
+                    card above it. The thumbnail opens full size. */}
+                {many ? (
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <Tap
+                      onPress={() => setFanned(open ? null : hit.id)}
+                      accessibilityLabel={
+                        open
+                          ? `Hide the versions of ${hit.name}`
+                          : `Show the ${hit.printings.length} versions of ${hit.name}`
+                      }
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                        paddingHorizontal: spacing(3),
+                        paddingVertical: spacing(2.5),
+                      }}
+                    >
+                      <Ionicons
+                        name={open ? "chevron-down" : "chevron-forward"}
+                        size={16}
+                        color={colors.accent}
+                      />
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {`${hit.printings.length} versions, alt arts and promos`}
+                      </Text>
+                    </Tap>
+                    {open ? (
+                      <View
+                        style={{
+                          borderTopWidth: 1,
+                          borderTopColor: colors.border,
+                          padding: spacing(3),
+                          gap: spacing(2),
+                        }}
+                      >
+                        <Muted>
+                          Tap a version to ask for that exact one, or the card above to
+                          take any printing. Tap any picture to see it full size.
+                        </Muted>
+                        {hit.printings.map((printing) => {
+                          const exact = chosen?.printingId === printing.id;
+                          const label = printing.label ?? "Standard printing";
+                          return (
+                            <View
+                              key={printing.id}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: spacing(2.5),
+                                borderWidth: 1,
+                                borderColor: exact ? colors.accent : colors.border,
+                                borderRadius: radius.control,
+                                backgroundColor: colors.elevated,
+                                padding: spacing(1.5),
+                              }}
+                            >
+                              <CardImage
+                                imageUrl={printing.imageUrl}
+                                width={36}
+                                name={hit.name}
+                                cardNumber={hit.cardNumber}
+                                caption={label}
+                              />
+                              <Tap
+                                onPress={() => pick(hit, printing.id)}
+                                accessibilityLabel={`Add ${hit.name}, ${label}`}
+                                style={{ flex: 1, paddingVertical: spacing(1) }}
+                              >
+                                <Text
+                                  style={{
+                                    color: exact
+                                      ? colors.textPrimary
+                                      : colors.textSecondary,
+                                    fontSize: 13,
+                                    lineHeight: 18,
+                                  }}
+                                >
+                                  {label}
+                                </Text>
+                              </Tap>
+                              {exact && chosen ? (
+                                <View
+                                  style={{
+                                    minWidth: 24,
+                                    height: 24,
+                                    borderRadius: 12,
+                                    paddingHorizontal: 6,
+                                    backgroundColor: colors.accent,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: colors.accentContrast,
+                                      fontSize: 12,
+                                      fontWeight: "800",
+                                    }}
+                                  >
+                                    {chosen.quantity > 1
+                                      ? `${index + 1} x${chosen.quantity}`
+                                      : index + 1}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
             );
