@@ -4,7 +4,12 @@ import { X } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
 import { Button } from "@/components/ui/button";
-import { chosenPrinting, type DraftCard } from "@/components/flares/draft";
+import {
+  chosenPrinting,
+  keyOf,
+  lineKey,
+  type DraftCard,
+} from "@/components/flares/draft";
 import { draftSummary } from "@/lib/flares/draft-rules";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
 
@@ -17,9 +22,14 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * than a second row. The search stays as it was between taps, so
  * somebody adding three Zoros does not type "zoro" three times.
  */
-/** "1", or "1 · 2 copies" once there is more than one. */
-function markText(index: number, quantity: number): string {
-  return quantity > 1 ? `${index + 1} · ${quantity} copies` : `${index + 1}`;
+/**
+ * How many copies are in, and nothing else. The founder: "Should now
+ * just have a 1, 2, 3, etc… when clicking these cards whether base
+ * rarity or not." The order they went in is not a number anybody
+ * needs while picking.
+ */
+function markText(quantity: number): string {
+  return `${quantity}`;
 }
 
 export function CardPicker({
@@ -29,6 +39,7 @@ export function CardPicker({
   cards,
   onAdd,
   onRemove,
+  onLess,
   onDone,
 }: {
   imagesEnabled: boolean;
@@ -37,7 +48,10 @@ export function CardPicker({
   game?: string | null;
   cards: DraftCard[];
   onAdd: (card: CardResult, printing?: CardPrinting) => void;
-  onRemove: (cardId: string) => void;
+  /** Both take a line key (`keyOf`): one card in one printing. */
+  onRemove: (key: string) => void;
+  /** One fewer copy; gone at none. The minus beside the badge. */
+  onLess: (key: string) => void;
   onDone: () => void;
 }) {
   return (
@@ -62,7 +76,7 @@ export function CardPicker({
           {cards.map((item, index) => {
             const printing = chosenPrinting(item);
             return (
-              <li key={item.card.id} className="relative shrink-0">
+              <li key={keyOf(item)} className="relative shrink-0">
                 <span className="block h-[70px] w-[50px] overflow-hidden rounded-[6px] border border-border bg-elevated">
                   {printing?.imageUrl && (
                     /* eslint-disable-next-line @next/next/no-img-element */
@@ -79,7 +93,7 @@ export function CardPicker({
                 </span>
                 <button
                   type="button"
-                  onClick={() => onRemove(item.card.id)}
+                  onClick={() => onRemove(keyOf(item))}
                   aria-label={`Remove ${item.card.exactName}`}
                   className="absolute -top-1.5 -right-1.5 flex size-5 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary hover:text-text-primary"
                 >
@@ -97,6 +111,7 @@ export function CardPicker({
         game={game}
         autoFocus
         onSelect={onAdd}
+        onUnpick={(card, printing) => onLess(lineKey(card.id, printing?.id ?? null))}
         /*
          * THE NUMBER GOES WHERE THE TAP WENT.
          *
@@ -111,19 +126,19 @@ export function CardPicker({
          * down in the list where the finger already is.
          */
         markFor={(card) => {
-          const index = cards.findIndex((item) => item.card.id === card.id);
-          if (index === -1) return null;
-          const item = cards[index];
-          if (item.printingId) return null;
-          return markText(index, item.quantity);
+          const line = cards.find((item) => keyOf(item) === lineKey(card.id, null));
+          return line ? markText(line.quantity) : null;
         }}
         markForPrintingFor={(card) => {
-          const index = cards.findIndex((item) => item.card.id === card.id);
-          if (index === -1) return undefined;
-          const item = cards[index];
-          if (!item.printingId) return undefined;
-          return (printing) =>
-            printing.id === item.printingId ? markText(index, item.quantity) : null;
+          if (!cards.some((item) => item.card.id === card.id && item.printingId)) {
+            return undefined;
+          }
+          return (printing) => {
+            const line = cards.find(
+              (item) => keyOf(item) === lineKey(card.id, printing.id),
+            );
+            return line ? markText(line.quantity) : null;
+          };
         }}
       />
     </div>

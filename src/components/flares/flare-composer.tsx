@@ -14,6 +14,7 @@ import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
 import {
   addCard,
+  lessCard,
   CAPTION_MAX,
   chosenPrinting,
   clearDraft,
@@ -23,6 +24,9 @@ import {
   saveDraft,
   type Draft,
   type DraftCard,
+  changePrinting,
+  keyOf,
+  lineKey,
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -146,30 +150,31 @@ function ComposerBody({
 
   const patch = (next: Partial<Draft>) =>
     setDraft((current) => ({ ...current, ...next }));
-  const patchCard = (cardId: string, next: Partial<DraftCard>) =>
+  /* Every line is one card in one printing; `keyOf` is its name. */
+  const patchCard = (key: string, next: Partial<DraftCard>) =>
     patch({
       cards: draft.cards.map((item) =>
-        item.card.id === cardId ? { ...item, ...next } : item,
+        keyOf(item) === key ? { ...item, ...next } : item,
       ),
     });
-  const move = (cardId: string, by: -1 | 1) => {
-    const index = draft.cards.findIndex((item) => item.card.id === cardId);
+  const move = (key: string, by: -1 | 1) => {
+    const index = draft.cards.findIndex((item) => keyOf(item) === key);
     const to = index + by;
     if (index === -1 || to < 0 || to >= draft.cards.length) return;
     const cards = [...draft.cards];
     [cards[index], cards[to]] = [cards[to], cards[index]];
     patch({ cards });
   };
-  const makeCover = (cardId: string) => {
-    const item = draft.cards.find((entry) => entry.card.id === cardId);
+  const makeCover = (key: string) => {
+    const item = draft.cards.find((entry) => keyOf(entry) === key);
     if (!item) return;
     patch({
-      cards: [item, ...draft.cards.filter((entry) => entry.card.id !== cardId)],
+      cards: [item, ...draft.cards.filter((entry) => keyOf(entry) !== key)],
     });
   };
-  const remove = (cardId: string) => {
-    patch({ cards: draft.cards.filter((item) => item.card.id !== cardId) });
-    if (editing === cardId) setEditing(null);
+  const remove = (key: string) => {
+    patch({ cards: draft.cards.filter((item) => keyOf(item) !== key) });
+    if (editing === key) setEditing(null);
   };
 
   const choice = draft.hunt;
@@ -273,6 +278,13 @@ function ComposerBody({
             patch({ cards: addCard(draft.cards, card, printing) })
           }
           onRemove={remove}
+          onLess={(key) => {
+            const cards = lessCard(draft.cards, key);
+            patch({ cards });
+            if (editing === key && !cards.some((item) => keyOf(item) === key)) {
+              setEditing(null);
+            }
+          }}
           onDone={() => setStep("compose")}
         />
       </Card>
@@ -296,7 +308,7 @@ function ComposerBody({
   }
 
   const editingCard = editing
-    ? (draft.cards.find((item) => item.card.id === editing) ?? null)
+    ? (draft.cards.find((item) => keyOf(item) === editing) ?? null)
     : null;
   const copiesLabel = draft.intent === "want" ? "Copies needed" : "Copies available";
 
@@ -356,12 +368,13 @@ function ComposerBody({
         >
           {draft.cards.map((item, index) => {
             const printing = chosenPrinting(item);
-            const active = editing === item.card.id;
+            const key = keyOf(item);
+            const active = editing === key;
             return (
-              <li key={item.card.id} className="relative shrink-0">
+              <li key={key} className="relative shrink-0">
                 <button
                   type="button"
-                  onClick={() => setEditing(active ? null : item.card.id)}
+                  onClick={() => setEditing(active ? null : key)}
                   aria-pressed={active}
                   aria-label={`Edit ${item.card.exactName}`}
                   className={cn(
@@ -407,16 +420,18 @@ function ComposerBody({
         {editingCard && (
           <CardEditor
             item={editingCard}
-            index={draft.cards.findIndex(
-              (item) => item.card.id === editingCard.card.id,
-            )}
+            index={draft.cards.findIndex((item) => keyOf(item) === keyOf(editingCard))}
             count={draft.cards.length}
             copiesLabel={copiesLabel}
-            onPrinting={(printingId) => patchCard(editingCard.card.id, { printingId })}
-            onQuantity={(quantity) => patchCard(editingCard.card.id, { quantity })}
-            onMove={(by) => move(editingCard.card.id, by)}
-            onCover={() => makeCover(editingCard.card.id)}
-            onRemove={() => remove(editingCard.card.id)}
+            onPrinting={(printingId) => {
+              const key = keyOf(editingCard);
+              patch({ cards: changePrinting(draft.cards, key, printingId) });
+              setEditing(lineKey(editingCard.card.id, printingId));
+            }}
+            onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
+            onMove={(by) => move(keyOf(editingCard), by)}
+            onCover={() => makeCover(keyOf(editingCard))}
+            onRemove={() => remove(keyOf(editingCard))}
           />
         )}
       </div>

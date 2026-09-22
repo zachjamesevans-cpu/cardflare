@@ -86,6 +86,17 @@ interface DraftItem {
   quantity: number;
 }
 
+/**
+ * ONE LINE PER PRINTING. A line is one card in one printing (null being
+ * any), so tapping an alternate art adds a line of its own instead of
+ * folding into the card's. The founder: "if I keep tapping a bunch of
+ * cards, whichever the final card is that's the quantity of that card.
+ * Math is wrong." Same rule as the website's draft.
+ */
+function keyOf(item: { cardId: string; printingId: string | null }): string {
+  return `${item.cardId}::${item.printingId ?? "any"}`;
+}
+
 type HuntChoice =
   { kind: "existing"; id: string } | { kind: "new"; name: string } | null;
 
@@ -419,26 +430,48 @@ export function FlareComposer({
               <CardTray
                 items={draft.items}
                 editing={editing}
-                onEdit={(cardId) => setEditing(editing === cardId ? null : cardId)}
+                onEdit={(key) => setEditing(editing === key ? null : key)}
                 onAdd={() => setPicking(true)}
               />
 
               {editing ? (
                 <CardEditor
-                  item={draft.items.find((item) => item.cardId === editing) ?? null}
-                  index={draft.items.findIndex((item) => item.cardId === editing)}
+                  item={draft.items.find((item) => keyOf(item) === editing) ?? null}
+                  index={draft.items.findIndex((item) => keyOf(item) === editing)}
                   count={draft.items.length}
                   intent={draft.intent}
-                  onChange={(next) =>
-                    setItems(
-                      draft.items.map((item) =>
-                        item.cardId === next.cardId ? next : item,
-                      ),
-                    )
-                  }
+                  onChange={(next) => {
+                    /* A printing change re-keys the line; landing on a
+                       line already there folds the two into one. */
+                    const target = keyOf(next);
+                    const twin = draft.items.find(
+                      (item) => keyOf(item) === target && keyOf(item) !== editing,
+                    );
+                    if (twin) {
+                      setItems(
+                        draft.items
+                          .filter((item) => keyOf(item) !== editing)
+                          .map((item) =>
+                            keyOf(item) === target
+                              ? {
+                                  ...item,
+                                  quantity: Math.min(99, item.quantity + next.quantity),
+                                }
+                              : item,
+                          ),
+                      );
+                    } else {
+                      setItems(
+                        draft.items.map((item) =>
+                          keyOf(item) === editing ? next : item,
+                        ),
+                      );
+                    }
+                    setEditing(target);
+                  }}
                   onMove={(delta) => {
                     const from = draft.items.findIndex(
-                      (item) => item.cardId === editing,
+                      (item) => keyOf(item) === editing,
                     );
                     const to = from + delta;
                     if (from < 0 || to < 0 || to >= draft.items.length) return;
@@ -448,12 +481,12 @@ export function FlareComposer({
                     setItems(next);
                   }}
                   onCover={() => {
-                    const item = draft.items.find((entry) => entry.cardId === editing);
+                    const item = draft.items.find((entry) => keyOf(entry) === editing);
                     if (!item) return;
                     setItems([item, ...draft.items.filter((entry) => entry !== item)]);
                   }}
                   onRemove={() => {
-                    setItems(draft.items.filter((item) => item.cardId !== editing));
+                    setItems(draft.items.filter((item) => keyOf(item) !== editing));
                     setEditing(null);
                   }}
                 />
@@ -657,7 +690,8 @@ function CardTray({
 }: {
   items: DraftItem[];
   editing: string | null;
-  onEdit: (cardId: string) => void;
+  /** The line key (`keyOf`), one card in one printing. */
+  onEdit: (key: string) => void;
   onAdd: () => void;
 }) {
   return (
@@ -667,11 +701,11 @@ function CardTray({
       contentContainerStyle={{ gap: spacing(2), paddingVertical: 2 }}
     >
       {items.map((item, index) => {
-        const on = editing === item.cardId;
+        const on = editing === keyOf(item);
         return (
           <Tap
-            key={item.cardId}
-            onPress={() => onEdit(item.cardId)}
+            key={keyOf(item)}
+            onPress={() => onEdit(keyOf(item))}
             accessibilityLabel={`${item.name}, ${index === 0 ? "cover" : `card ${index + 1}`}, ${copiesLabel(item.quantity)}`}
             style={{
               width: 64,
@@ -1302,6 +1336,58 @@ function useCardSearch(target: PostTarget) {
  * again adds a copy rather than a second row. "Done" goes back to the
  * tray with everything chosen.
  */
+/**
+ * How many copies are in, as the badge, with a minus beside it. The
+ * founder: "Should now just have a 1, 2, 3, etc… when clicking these
+ * cards whether base rarity or not... also a way to lessen your
+ * quantity of cards."
+ */
+function PickCount({
+  count,
+  name,
+  onLess,
+}: {
+  count: number;
+  name: string;
+  onLess: () => void;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+      <Tap
+        onPress={onLess}
+        hitSlop={6}
+        accessibilityLabel={`One fewer ${name}`}
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name="remove" size={14} color={colors.textSecondary} />
+      </Tap>
+      <View
+        style={{
+          minWidth: 24,
+          height: 24,
+          borderRadius: 12,
+          paddingHorizontal: 6,
+          backgroundColor: colors.accent,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ color: colors.accentContrast, fontSize: 12, fontWeight: "800" }}>
+          {count}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export function CardPicker({
   visible,
   target,
@@ -1328,17 +1414,12 @@ export function CardPicker({
       ? (hit.printings.find((printing) => printing.id === printingId)?.imageUrl ??
         leadArt(hit))
       : leadArt(hit);
-    const index = items.findIndex((item) => item.cardId === hit.id);
+    const key = keyOf({ cardId: hit.id, printingId });
+    const index = items.findIndex((item) => keyOf(item) === key);
     if (index >= 0) {
       onChange(
         items.map((item, at) =>
-          at === index
-            ? {
-                ...item,
-                quantity: Math.min(99, item.quantity + 1),
-                ...(printingId ? { printingId, imageUrl: art } : {}),
-              }
-            : item,
+          at === index ? { ...item, quantity: Math.min(99, item.quantity + 1) } : item,
         ),
       );
       return;
@@ -1355,6 +1436,18 @@ export function CardPicker({
         quantity: 1,
       },
     ]);
+  };
+
+  /* One fewer copy, and gone at none. The founder: "a way to lessen
+     your quantity of cards." */
+  const unpick = (hit: CardHit, printingId: string | null = null) => {
+    const key = keyOf({ cardId: hit.id, printingId });
+    onChange(
+      items.flatMap((item) => {
+        if (keyOf(item) !== key) return [item];
+        return item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : [];
+      }),
+    );
   };
 
   /* Which row has its printings fanned out, one at a time. */
@@ -1415,8 +1508,12 @@ export function CardPicker({
             </Muted>
           ) : null}
           {search.hits.map((hit) => {
-            const index = items.findIndex((item) => item.cardId === hit.id);
-            const chosen = index >= 0 ? items[index] : null;
+            /* The card's own line is the any-printing one; a version
+               has a line of its own, badged down in the list. */
+            const anyLine = items.find(
+              (item) => item.cardId === hit.id && !item.printingId,
+            );
+            const chosen = items.some((item) => item.cardId === hit.id);
             const many = hit.printings.length > 1;
             const open = fanned === hit.id;
             return (
@@ -1474,32 +1571,12 @@ export function CardPicker({
                     </View>
                     <Stats hit={hit} />
                   </View>
-                  {chosen && !chosen.printingId ? (
-                    <View style={{ alignItems: "center", gap: 2 }}>
-                      <View
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
-                          backgroundColor: colors.accent,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: colors.accentContrast,
-                            fontSize: 12,
-                            fontWeight: "800",
-                          }}
-                        >
-                          {index + 1}
-                        </Text>
-                      </View>
-                      <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-                        {`x${chosen.quantity}`}
-                      </Text>
-                    </View>
+                  {anyLine ? (
+                    <PickCount
+                      count={anyLine.quantity}
+                      name={hit.name}
+                      onLess={() => unpick(hit)}
+                    />
                   ) : (
                     <Ionicons
                       name="add-circle-outline"
@@ -1559,7 +1636,11 @@ export function CardPicker({
                           take any printing. Tap any picture to see it full size.
                         </Muted>
                         {hit.printings.map((printing) => {
-                          const exact = chosen?.printingId === printing.id;
+                          const line = items.find(
+                            (item) =>
+                              item.cardId === hit.id && item.printingId === printing.id,
+                          );
+                          const exact = Boolean(line);
                           const label = printing.label ?? "Standard printing";
                           return (
                             <View
@@ -1599,30 +1680,12 @@ export function CardPicker({
                                   {label}
                                 </Text>
                               </Tap>
-                              {exact && chosen ? (
-                                <View
-                                  style={{
-                                    minWidth: 24,
-                                    height: 24,
-                                    borderRadius: 12,
-                                    paddingHorizontal: 6,
-                                    backgroundColor: colors.accent,
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      color: colors.accentContrast,
-                                      fontSize: 12,
-                                      fontWeight: "800",
-                                    }}
-                                  >
-                                    {chosen.quantity > 1
-                                      ? `${index + 1} x${chosen.quantity}`
-                                      : index + 1}
-                                  </Text>
-                                </View>
+                              {line ? (
+                                <PickCount
+                                  count={line.quantity}
+                                  name={hit.name}
+                                  onLess={() => unpick(hit, printing.id)}
+                                />
                               ) : null}
                             </View>
                           );
