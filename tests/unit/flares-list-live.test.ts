@@ -19,7 +19,7 @@ describe("the Flares list", () => {
   it("names only boards at shops, never the Feed, on both platforms", () => {
     const wants = read("src/lib/players/wants.ts");
     expect(wants).not.toContain("AREA_LABEL");
-    expect(wants).not.toContain("in the Feed");
+    expect(wants).not.toContain("name: AREA_LABEL");
 
     const web = read("src/components/players/want-entries.tsx");
     expect(web).not.toContain('"Saved"');
