@@ -221,9 +221,11 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
         })
         .eq("id", flareId);
     }
-    /* A want follows the player to the next store as a saved request,
-       exactly as a board post always has. */
-    if (input.intent === "want" && input.eventId) {
+    /* A want follows the player to the next store as a Flare on their
+       list, whether it went up on a board or into the Feed. The founder,
+       on Feed posts missing from the list: "This section needs to
+       update the second a flare gets posted." */
+    if (input.intent === "want") {
       await saveWant(input.playerId, {
         cardId: item.cardId,
         printingId: item.printingId,

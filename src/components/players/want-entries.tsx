@@ -91,28 +91,27 @@ export function WantEntries({
                   {want.printingLabel ?? "Any printing"}
                 </span>
                 {want.deckLabel && <span className="font-sans">{want.deckLabel}</span>}
-                <span
-                  className={`font-sans ${want.postedWhere?.length ? "font-semibold text-accent" : "text-text-muted"}`}
-                >
-                  {/* Tappable, one per shop. The founder: "make label
-                      tappable so it opens the rooms." A name that could
-                      only be read was the least useful half of it. */}
-                  {want.postedWhere?.length
-                    ? want.postedWhere.map((where) =>
-                        where.code ? (
-                          <Link
-                            key={where.name}
-                            href={`/e/${where.code}`}
-                            className="underline underline-offset-2 hover:text-accent-hover"
-                          >
-                            Live at {where.name}
-                          </Link>
-                        ) : (
-                          <span key={where.name}>Live {where.name}</span>
-                        ),
-                      )
-                    : "Saved"}
-                </span>
+                {/* Only a board at a shop is named, tappable, one per
+                    shop: "make label tappable so it opens the rooms." A
+                    card that is not on a board says nothing here; it is
+                    on the list, which is the whole statement. */}
+                {want.postedWhere && want.postedWhere.length > 0 && (
+                  <span className="font-sans font-semibold text-accent">
+                    {want.postedWhere.map((where) =>
+                      where.code ? (
+                        <Link
+                          key={where.name}
+                          href={`/e/${where.code}`}
+                          className="underline underline-offset-2 hover:text-accent-hover"
+                        >
+                          Live at {where.name}
+                        </Link>
+                      ) : (
+                        <span key={where.name}>Live at {where.name}</span>
+                      ),
+                    )}
+                  </span>
+                )}
               </p>
 
               {want.note && (
