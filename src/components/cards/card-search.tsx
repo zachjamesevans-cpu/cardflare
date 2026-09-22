@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { Check, ChevronDown, ChevronRight, Loader2, Lock, Search } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Lock,
+  Minus,
+  Search,
+} from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { Card } from "@/components/ui/card";
@@ -250,11 +258,26 @@ function Stats({ card }: { card: CardResult }) {
  * and "which version" is a question for after that — the Flare form asks it
  * properly, and this list answers it on a tap for the curious.
  */
+/** The minus beside a pick's badge: one fewer copy, gone at none. */
+function UnpickButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="One fewer"
+      className="flex size-7 shrink-0 items-center justify-center self-center rounded-full border border-border text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+    >
+      <Minus className="size-3.5" aria-hidden="true" />
+    </button>
+  );
+}
+
 function PrintingList({
   card,
   imagesEnabled,
   onPick,
   markFor,
+  onUnpick,
   composerFor = null,
   composer = null,
 }: {
@@ -272,6 +295,8 @@ function PrintingList({
   onPick?: (printing: CardPrinting) => void;
   /** The badge for one version, when the caller is counting picks. */
   markFor?: (printing: CardPrinting) => string | null;
+  /** One fewer of that version; drawn as a minus beside its badge. */
+  onUnpick?: (printing: CardPrinting) => void;
 }) {
   return (
     <ul className="flex flex-col gap-1.5" aria-label="Versions">
@@ -334,9 +359,12 @@ function PrintingList({
                * to see that."
                */}
               {markFor?.(printing) && (
-                <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
-                  {markFor(printing)}
-                </span>
+                <>
+                  {onUnpick && <UnpickButton onClick={() => onUnpick(printing)} />}
+                  <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
+                    {markFor(printing)}
+                  </span>
+                </>
               )}
             </div>
 
@@ -360,6 +388,7 @@ function Row({
   composer = null,
   mark = null,
   markForPrinting,
+  onUnpick,
 }: {
   card: CardResult;
   term: string;
@@ -377,6 +406,8 @@ function Row({
   mark?: string | null;
   /** The same, per version, so a tapped alt art wears its own number. */
   markForPrinting?: (printing: CardPrinting) => string | null;
+  /** One fewer of this card, or of one version of it, from the minus beside its badge. */
+  onUnpick?: (card: CardResult, printing?: CardPrinting) => void;
 }) {
   /*
    * The headline is the base printing, not whichever set code sorted first —
@@ -480,6 +511,10 @@ function Row({
 
           <Stats card={card} />
         </button>
+
+        {/* A sibling of the select button, not a child: a button cannot
+            hold a button, and the two answer opposite questions. */}
+        {mark && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}
       </div>
 
       {/* Opened from the header, so it appears right below it. */}
@@ -518,6 +553,7 @@ function Row({
                 imagesEnabled={imagesEnabled}
                 onPick={onSelect && ((printing) => onSelect(card, printing))}
                 markFor={markForPrinting}
+                onUnpick={onUnpick && ((printing) => onUnpick(card, printing))}
                 composerFor={composerFor}
                 composer={composer}
               />
@@ -590,6 +626,11 @@ export interface CardSearchProps {
   markForPrintingFor?: (
     card: CardResult,
   ) => ((printing: CardPrinting) => string | null) | undefined;
+  /**
+   * One fewer copy of a picked card, from the minus beside its badge.
+   * The founder: "a way to lessen your quantity of cards."
+   */
+  onUnpick?: (card: CardResult, printing?: CardPrinting) => void;
 }
 
 /**
@@ -610,6 +651,7 @@ export function CardSearch({
   resetSignal = 0,
   markFor,
   markForPrintingFor,
+  onUnpick,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -888,6 +930,7 @@ export function CardSearch({
                 markForPrinting={
                   markForPrintingFor ? markForPrintingFor(card) : undefined
                 }
+                onUnpick={onUnpick}
               />
             );
           })}

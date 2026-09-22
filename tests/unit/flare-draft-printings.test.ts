@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { addCard } from "@/components/flares/draft";
+import {
+  addCard,
+  changePrinting,
+  keyOf,
+  lessCard,
+  lineKey,
+} from "@/components/flares/draft";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
 
 /**
@@ -53,29 +59,56 @@ describe("adding a card to a Flare draft", () => {
     expect(entry.printingId).toBeNull();
   });
 
-  it("lets a later version tap override an earlier any-printing pick", () => {
-    /* THE BUG. Tap the card, then tap its alternate art: the alt art was
-       thrown away and the Flare went out asking for the base. */
+  it("gives a version its own line beside the any-printing pick", () => {
+    /*
+     * THE BUG, the second time round. One line per card meant every art
+     * tapped folded into that line and bumped its count: "whichever the
+     * final card is that's the quantity of that card. Math is wrong."
+     */
     const first = addCard([], card);
-    const [entry] = addCard(first, card, ALT);
+    const cards = addCard(first, card, ALT);
 
-    expect(entry.printingId, "the tapped alt art must win").toBe("alt-id");
-    expect(entry.quantity, "and it is still one more copy").toBe(2);
+    expect(cards).toHaveLength(2);
+    expect(cards.map(keyOf)).toEqual([
+      lineKey("card-1", null),
+      lineKey("card-1", "alt-id"),
+    ]);
+    expect(cards.map((item) => item.quantity)).toEqual([1, 1]);
   });
 
-  it("lets a version tap replace a different version", () => {
-    const first = addCard([], card, BASE);
-    const [entry] = addCard(first, card, ALT);
-    expect(entry.printingId).toBe("alt-id");
+  it("keeps two versions of one card as two lines", () => {
+    const cards = addCard(addCard([], card, BASE), card, ALT);
+    expect(cards.map((item) => item.printingId)).toEqual(["base-id", "alt-id"]);
   });
 
-  it("leaves a chosen printing alone when the next tap names none", () => {
-    /* Tapping the card row after choosing a version is "one more copy",
-       not "forget which art I asked for". */
-    const first = addCard([], card, ALT);
-    const [entry] = addCard(first, card);
-    expect(entry.printingId).toBe("alt-id");
-    expect(entry.quantity).toBe(2);
+  it("counts a second tap on the same version as one more copy of that line", () => {
+    const cards = addCard(addCard(addCard([], card, ALT), card, ALT), card);
+    expect(cards.map((item) => [item.printingId, item.quantity])).toEqual([
+      ["alt-id", 2],
+      [null, 1],
+    ]);
+  });
+});
+
+describe("one fewer, and changing a line's printing", () => {
+  it("takes one copy off the named line and drops it at none", () => {
+    const two = addCard(addCard([], card, ALT), card, ALT);
+    const one = lessCard(two, lineKey("card-1", "alt-id"));
+    expect(one[0]?.quantity).toBe(1);
+    expect(lessCard(one, lineKey("card-1", "alt-id"))).toHaveLength(0);
+    /* A key that is not there changes nothing. */
+    expect(lessCard(one, lineKey("card-1", null))).toEqual(one);
+  });
+
+  it("re-keys a line when its printing changes, folding into a twin if one exists", () => {
+    const cards = addCard(addCard([], card), card, ALT);
+    const moved = changePrinting(cards, lineKey("card-1", null), "base-id");
+    expect(moved.map((item) => item.printingId)).toEqual(["base-id", "alt-id"]);
+
+    const folded = changePrinting(moved, lineKey("card-1", "base-id"), "alt-id");
+    expect(folded).toHaveLength(1);
+    expect(folded[0]?.printingId).toBe("alt-id");
+    expect(folded[0]?.quantity).toBe(2);
   });
 });
 
@@ -90,11 +123,11 @@ describe("where the picker draws its number", () => {
     const picker = await readFile("src/components/flares/card-picker.tsx", "utf8");
     const search = await readFile("src/components/cards/card-search.tsx", "utf8");
 
-    /* The card row wears it only for an any-printing pick. */
-    expect(picker).toContain("if (item.printingId) return null;");
-    /* And a named version wears it itself. */
+    /* The card row wears it only for the any-printing line. */
+    expect(picker).toContain("keyOf(item) === lineKey(card.id, null)");
+    /* And a named version wears its own line's count. */
     expect(picker).toContain("markForPrintingFor={");
-    expect(picker).toContain("printing.id === item.printingId");
+    expect(picker).toContain("keyOf(item) === lineKey(card.id, printing.id)");
     /* Which the version list can actually draw. */
     expect(search).toContain("markFor?.(printing)");
   });

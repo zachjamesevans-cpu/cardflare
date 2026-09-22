@@ -35,8 +35,10 @@ describe("the app card picker", () => {
       "const pick = (hit: CardHit, printingId: string | null = null)",
     );
     expect(composer).toContain("onPress={() => pick(hit, printing.id)}");
-    expect(composer).toContain("{chosen && !chosen.printingId ? (");
-    expect(composer).toContain("{exact && chosen ? (");
+    /* The card row badges the any-printing line; a version badges its own. */
+    expect(composer).toContain("{anyLine ? (");
+    expect(composer).toContain("{line ? (");
+    expect(composer).toContain("onLess={() => unpick(hit, printing.id)}");
   });
 
   it("shows the accent ring from the keystroke until the answer lands", () => {
@@ -50,5 +52,30 @@ describe("the app card picker", () => {
 
   it("tints the website's search loader the same accent", () => {
     expect(web).toContain('className="size-4 shrink-0 animate-spin text-accent"');
+  });
+});
+
+describe("how many copies, and one fewer", () => {
+  it("badges the copies count alone and puts a minus beside it, on both platforms", () => {
+    const composer = read("mobile/src/screens/flare-composer.tsx");
+    expect(composer).toContain("function PickCount({");
+    expect(composer).toContain("accessibilityLabel={`One fewer ${name}`}");
+    expect(composer).not.toContain("`x${chosen.quantity}`");
+    expect(composer).not.toContain("`${index + 1} x${chosen.quantity}`");
+
+    const picker = read("src/components/flares/card-picker.tsx");
+    expect(picker).toContain(
+      "function markText(quantity: number): string {\n  return `${quantity}`;",
+    );
+    expect(picker).toContain("onLess(lineKey(card.id, printing?.id ?? null))");
+
+    const search = read("src/components/cards/card-search.tsx");
+    expect(search).toContain('aria-label="One fewer"');
+    expect(search).toContain(
+      "{mark && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}",
+    );
+
+    const draft = read("src/components/flares/draft.ts");
+    expect(draft).toContain("export function lessCard(");
   });
 });

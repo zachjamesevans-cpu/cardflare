@@ -78,24 +78,78 @@ export function isEmptyDraft(draft: Draft): boolean {
  * want, so it is the one answer that should never be discarded. Tapping
  * the card itself still means "any printing", and still says so.
  */
+/**
+ * ONE LINE PER PRINTING.
+ *
+ * A card asked for as any printing and the same card asked for as its
+ * alternate art are two different asks, and the founder found what
+ * happens when they share a line: "if I keep tapping a bunch of cards,
+ * whichever the final card is that's the quantity of that card. Math
+ * is wrong." So a line is keyed by card AND printing (null being any),
+ * and a tap on a version that is not in yet adds a line of its own.
+ */
+export function lineKey(cardId: string, printingId: string | null): string {
+  return `${cardId}::${printingId ?? "any"}`;
+}
+
+export function keyOf(item: DraftCard): string {
+  return lineKey(item.card.id, item.printingId);
+}
+
 export function addCard(
   cards: DraftCard[],
   card: CardResult,
   printing?: CardPrinting,
 ): DraftCard[] {
-  const index = cards.findIndex((item) => item.card.id === card.id);
+  const key = lineKey(card.id, printing?.id ?? null);
+  const index = cards.findIndex((item) => keyOf(item) === key);
   if (index === -1) {
     return [...cards, { card, printingId: printing?.id ?? null, quantity: 1 }];
   }
   return cards.map((item, at) =>
     at === index
-      ? {
-          ...item,
-          quantity: Math.min(MAX_COPIES, item.quantity + 1),
-          printingId: printing ? printing.id : item.printingId,
-        }
+      ? { ...item, quantity: Math.min(MAX_COPIES, item.quantity + 1) }
       : item,
   );
+}
+
+/**
+ * The editor changing which printing a line asks for. When a line for
+ * that printing already exists the two become one, copies added, so
+ * the same ask never sits on the list twice.
+ */
+export function changePrinting(
+  cards: DraftCard[],
+  key: string,
+  printingId: string | null,
+): DraftCard[] {
+  const source = cards.find((item) => keyOf(item) === key);
+  if (!source) return cards;
+  const target = lineKey(source.card.id, printingId);
+  if (target === key) return cards;
+  const existing = cards.find((item) => keyOf(item) === target);
+  if (!existing) {
+    return cards.map((item) => (keyOf(item) === key ? { ...item, printingId } : item));
+  }
+  return cards
+    .filter((item) => keyOf(item) !== key)
+    .map((item) =>
+      keyOf(item) === target
+        ? { ...item, quantity: Math.min(MAX_COPIES, item.quantity + source.quantity) }
+        : item,
+    );
+}
+
+/**
+ * One fewer of a card, and gone at none. The founder: "a way to lessen
+ * your quantity of cards. So if you have 4 of the same card, a way to
+ * lessen that amount if you want to change it."
+ */
+export function lessCard(cards: DraftCard[], key: string): DraftCard[] {
+  return cards.flatMap((item) => {
+    if (keyOf(item) !== key) return [item];
+    return item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : [];
+  });
 }
 
 /** The printing a draft card shows: the chosen one, or the base art. */
