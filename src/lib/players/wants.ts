@@ -3,7 +3,6 @@ import "server-only";
 import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
 import { markCardFound } from "@/lib/players/found";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { afterWantSaved } from "@/lib/nearby/matching";
 import { liveEventIds } from "@/lib/events/rooms";
 
@@ -371,28 +370,18 @@ export async function postedCardStores(
   const sessionIds = (sessions ?? []).map((row) => row.id);
 
   /*
-   * Both shapes of Flare, because both are "live" and the list's whole
-   * job is to say which cards already are. An area Flare has no session
-   * and no store, so it is matched on the account and named for where it
-   * actually is: near you, rather than at a shop it was never posted to.
+   * Board Flares only. A Feed post names no place, so it is not listed
+   * here: only a board at a shop is somewhere to walk into.
    */
-  const [board, area] = await Promise.all([
+  const board =
     sessionIds.length > 0
-      ? admin
+      ? await admin
           .from("flares")
           .select("card_id, event_id")
           .in("player_session_id", sessionIds)
           .eq("status", "open")
           .eq("intent", "want")
-      : Promise.resolve({ data: [] as { card_id: string; event_id: string | null }[] }),
-    admin
-      .from("flares")
-      .select("card_id")
-      .eq("player_id", playerId)
-      .is("event_id", null)
-      .eq("status", "open")
-      .eq("intent", "want"),
-  ]);
+      : { data: [] as { card_id: string; event_id: string | null }[] };
 
   const boardFlares = board.data ?? [];
   const eventIds = [
@@ -464,24 +453,11 @@ export async function postedCardStores(
     }
   }
 
-  /* A board wins the label when a card is on both: "live at Mox Valley
-     Games tonight" is the more useful of the two sentences. */
-  for (const flare of area.data ?? []) {
-    if (!out.has(flare.card_id))
-      out.set(flare.card_id, [{ name: AREA_LABEL, code: null }]);
-  }
-
+  /* The founder, on "Live in the Feed" beside one card and nothing
+     beside the rest: "they're all technically live on the feed...
+     Delete that entirely." So a Feed post adds no line. */
   return out;
 }
-
-/**
- * What an area Flare is called where a store's name would go.
- *
- * Both platforms read this map and print `Live at {value}`, so the value
- * has to finish that sentence. "Live near you" does; a store name it was
- * never posted to would be a lie.
- */
-export const AREA_LABEL = LOCAL_ENABLED ? "near you" : "in the Feed";
 
 /**
  * The old one-line label, kept for app builds that predate the tappable

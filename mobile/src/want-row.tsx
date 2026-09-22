@@ -143,13 +143,7 @@ export function WantRow({
                 ),
               )}
             </View>
-          ) : want.postedAt ? (
-            <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}>
-              {`Live at ${want.postedAt}`}
-            </Text>
-          ) : (
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Saved</Text>
-          )}
+          ) : null}
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
             {/* Minus counts all the way down: at one it removes the

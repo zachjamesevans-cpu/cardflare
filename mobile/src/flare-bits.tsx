@@ -51,16 +51,19 @@ export function Pill({
         paddingHorizontal: spacing(3),
         borderRadius: radius.control,
         borderWidth: active ? 2 : 1,
-        borderColor: active ? colors.accent : colors.border,
+        borderColor: active ? colors.accent : colors.borderStrong,
         backgroundColor: active ? `${colors.accent}22` : colors.elevated,
-        opacity: disabled ? 0.5 : 1,
+        /* The last chip left on cannot be switched off, but it is ON,
+           not disabled: dimming it read as greyed out. The founder: "the
+           'trade' and 'cash' buttons are kinda grayed out." */
+        opacity: disabled && !active ? 0.5 : 1,
       }}
     >
       <Text
         style={{
-          color: active ? colors.textPrimary : colors.textMuted,
+          color: active ? colors.textPrimary : colors.textSecondary,
           fontSize: 13,
-          fontWeight: active ? "700" : "500",
+          fontWeight: active ? "700" : "600",
         }}
       >
         {label}
