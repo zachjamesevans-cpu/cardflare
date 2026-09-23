@@ -27,6 +27,21 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      /*
+       * A picture posted to a Server Action. Next's default is one
+       * megabyte, and a cover banner may legitimately be two: the
+       * cropper's ceiling is AVATAR_MAX_BYTES, and a browser that cannot
+       * decode the photo sends the original so the server can say why.
+       * Over the limit, the request died before any message came back;
+       * the founder saw a cover that "never updates or saves". Four is
+       * under the host's own ceiling of four and a half.
+       */
+      bodySizeLimit: "4mb",
+    },
+  },
+
   /**
    * What the server bundle leaves out.
    *

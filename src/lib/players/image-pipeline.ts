@@ -115,6 +115,38 @@ export function cropFor(
   });
 }
 
+/**
+ * A picked photo, decoded into something a canvas can draw.
+ *
+ * `createImageBitmap` first: it decodes off the main thread. Safari,
+ * though, refuses it for some of the photos an iPhone hands over (HEIC
+ * most of all) while decoding the very same file happily in an <img>.
+ * So when the bitmap fails, the picture is decoded the way a web page
+ * always could, and the crop goes ahead. Before this the cropper gave
+ * up and sent the original, which the server could not accept either.
+ */
+async function decodePicked(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.decoding = "async";
+      image.src = url;
+      await image.decode();
+      return image;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
+const sizeOf = (source: ImageBitmap | HTMLImageElement) =>
+  "naturalWidth" in source
+    ? { width: source.naturalWidth, height: source.naturalHeight }
+    : { width: source.width, height: source.height };
+
 /** The file a resize produced, and what it cost. */
 export interface PreparedImage {
   file: File;
@@ -135,7 +167,7 @@ export async function prepareImage(
   target: ImageTarget,
   crop: CropBox = FULL_CROP,
 ): Promise<PreparedImage> {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await decodePicked(file);
 
   try {
     const canvas = document.createElement("canvas");
@@ -150,12 +182,13 @@ export async function prepareImage(
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
 
+    const { width, height } = sizeOf(bitmap);
     context.drawImage(
       bitmap,
-      crop.x * bitmap.width,
-      crop.y * bitmap.height,
-      crop.width * bitmap.width,
-      crop.height * bitmap.height,
+      crop.x * width,
+      crop.y * height,
+      crop.width * width,
+      crop.height * height,
       0,
       0,
       target.width,
@@ -197,8 +230,8 @@ export async function prepareImage(
   } finally {
     /* Released explicitly. A bitmap of a 12MP photo is 48MB of memory,
        and a profile page somebody fiddles with for a minute should not
-       hold six of them. */
-    bitmap.close();
+       hold six of them. An <img> has nothing to close. */
+    if ("close" in bitmap) bitmap.close();
   }
 }
 
