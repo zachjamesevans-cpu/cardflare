@@ -15,6 +15,8 @@ import {
   storedAccessToken,
   type Me,
   rememberRoom,
+  dropOffering,
+  nudgeOffering,
 } from "../api";
 import { FlareComposer } from "./flare-composer";
 import type { PostTarget } from "../flare-bits";
@@ -191,7 +193,11 @@ export function HubScreen() {
       target={target}
       initialHuntId={openInto}
       resetSignal={resetSignal}
-      onPosted={() => void loadWants()}
+      onPosted={(rows) => {
+        /* On the list at once; the re-read confirms it a moment later. */
+        setWants((current) => [...rows, ...(current ?? [])]);
+        void loadWants();
+      }}
       footer={
         wants !== null ? (
           <Card>
@@ -225,8 +231,20 @@ export function HubScreen() {
                   <WantRow
                     key={want.id}
                     want={want}
-                    onNudge={(delta) => editWant(() => nudgeWant(want.id, delta))}
-                    onDrop={() => editWant(() => dropWant(want.id))}
+                    onNudge={(delta) =>
+                      editWant(() =>
+                        want.direction === "offering"
+                          ? nudgeOffering(want.cardId, delta)
+                          : nudgeWant(want.id, delta),
+                      )
+                    }
+                    onDrop={() =>
+                      editWant(() =>
+                        want.direction === "offering"
+                          ? dropOffering(want.cardId)
+                          : dropWant(want.id),
+                      )
+                    }
                     /* Remember the room, then open it - the same two
                        steps the Feed's own buttons take. */
                     onOpenRoom={(code) => {

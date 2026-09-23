@@ -38,3 +38,55 @@ describe("the Flares list", () => {
     );
   });
 });
+
+describe("offerings on the same list", () => {
+  it("lists a player's open offering posts beside their wants, on both platforms", () => {
+    const wants = read("src/lib/players/wants.ts");
+    expect(wants).toContain("export async function listOfferings(");
+    expect(wants).toContain('.eq("intent", "showcase")');
+    expect(wants).toContain('direction?: "want" | "offering";');
+
+    expect(read("src/app/flare/page.tsx")).toContain("listOfferings(playerId),");
+    expect(read("src/app/api/v1/me/route.ts")).toContain(
+      "listOfferings(player.playerId),",
+    );
+    expect(read("mobile/src/screens/hub.tsx")).toContain(
+      'want.direction === "offering"',
+    );
+  });
+
+  it("acts on every open post of the card, on both platforms", () => {
+    const actions = read("src/lib/players/account-actions.ts");
+    expect(actions).toContain('await markCardFound(playerId, cardId, "showcase");');
+    expect(actions).toContain("row.quantity + Math.trunc(delta),");
+    expect(actions).toMatch(/Math\.trunc\(delta\),\s*"showcase",\s*\);/);
+    const api = read("src/app/api/v1/offerings/route.ts");
+    expect(api).toContain(
+      'await markCardFound(player.playerId, body.cardId, "showcase");',
+    );
+    expect(read("mobile/src/api.ts")).toContain('"/api/v1/offerings"');
+  });
+
+  it("shows what was posted the instant the post lands in the app", () => {
+    expect(read("mobile/src/screens/flare-composer.tsx")).toContain(
+      "id: `just-posted:${keyOf(item)}`",
+    );
+    expect(read("mobile/src/screens/hub.tsx")).toContain(
+      "setWants((current) => [...rows, ...(current ?? [])]);",
+    );
+  });
+});
+
+describe("the Feed's green ring", () => {
+  it("never marks the viewer's own post", () => {
+    const repo = read("src/lib/feed/repository.ts");
+    expect(repo).toContain("item.cards.map((card) => ({ ...card, match: null }))");
+  });
+
+  it("has room for its glow in the website's carousel", () => {
+    expect(read("src/components/feed/flare-carousel.tsx")).toContain(
+      "-mx-3 -my-2.5 flex",
+    );
+    expect(read("src/components/feed/flare-carousel.tsx")).toContain("px-3 py-3");
+  });
+});

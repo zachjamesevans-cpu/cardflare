@@ -7,6 +7,9 @@ import { WantNudge, WantRemove } from "@/components/players/want-controls";
 /** One outstanding ask, as the room page resolves it. */
 export interface OutstandingWant {
   id: string;
+  cardId: string;
+  /** Looking for it, or offering it. Both live on this list. */
+  direction?: "want" | "offering";
   cardName: string;
   cardNumber: string;
   printingLabel: string | null;
@@ -82,7 +85,19 @@ export function WantEntries({
                 <p className="min-w-0 font-semibold text-text-primary">
                   {want.cardName}
                 </p>
-                <WantRemove code={code} wantId={want.id} />
+                {want.direction === "offering" && (
+                  <span className="shrink-0 rounded-full border border-accent/60 px-2 py-0.5 text-[11px] font-bold text-accent">
+                    Offering
+                  </span>
+                )}
+                <WantRemove
+                  code={code}
+                  target={{
+                    wantId: want.id,
+                    cardId: want.cardId,
+                    direction: want.direction ?? "want",
+                  }}
+                />
               </div>
 
               <p className="flex flex-wrap items-center gap-x-2 font-mono text-xs text-text-muted">
@@ -129,7 +144,11 @@ export function WantEntries({
               <div className="mt-1 flex items-center gap-1.5">
                 <WantNudge
                   code={code}
-                  wantId={want.id}
+                  target={{
+                    wantId: want.id,
+                    cardId: want.cardId,
+                    direction: want.direction ?? "want",
+                  }}
                   delta={-1}
                   quantity={want.quantity}
                   cardName={want.cardName}
@@ -139,7 +158,11 @@ export function WantEntries({
                 </span>
                 <WantNudge
                   code={code}
-                  wantId={want.id}
+                  target={{
+                    wantId: want.id,
+                    cardId: want.cardId,
+                    direction: want.direction ?? "want",
+                  }}
                   delta={1}
                   quantity={want.quantity}
                   cardName={want.cardName}

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import {
   nudgeWantQuantityAction,
   removeWantAction,
+  nudgeOfferingQuantityAction,
+  removeOfferingAction,
 } from "@/lib/players/account-actions";
 
 /**
@@ -43,26 +45,42 @@ function PendingVeil() {
   );
 }
 
+/** Which way a row points decides which actions its verbs post to. */
+export interface RowTarget {
+  wantId: string;
+  cardId: string;
+  direction: "want" | "offering";
+}
+
 export function WantNudge({
   code,
-  wantId,
+  target,
   delta,
   quantity,
   cardName,
 }: {
   code: string;
-  wantId: string;
+  target: RowTarget;
   delta: 1 | -1;
   quantity: number;
   cardName: string;
 }) {
   /* The last minus is a removal, said plainly to assistive tech too. */
   const removes = delta < 0 && quantity <= 1;
+  const offering = target.direction === "offering";
+  const action = removes
+    ? offering
+      ? removeOfferingAction
+      : removeWantAction
+    : offering
+      ? nudgeOfferingQuantityAction
+      : nudgeWantQuantityAction;
 
   return (
-    <form action={removes ? removeWantAction : nudgeWantQuantityAction}>
+    <form action={action}>
       <input type="hidden" name="code" value={code} />
-      <input type="hidden" name="wantId" value={wantId} />
+      <input type="hidden" name="wantId" value={target.wantId} />
+      <input type="hidden" name="cardId" value={target.cardId} />
       {!removes && <input type="hidden" name="delta" value={delta} />}
       <PendingVeil />
       <button
@@ -87,11 +105,15 @@ export function WantNudge({
   );
 }
 
-export function WantRemove({ code, wantId }: { code: string; wantId: string }) {
+export function WantRemove({ code, target }: { code: string; target: RowTarget }) {
   return (
-    <form action={removeWantAction} className="ml-auto shrink-0">
+    <form
+      action={target.direction === "offering" ? removeOfferingAction : removeWantAction}
+      className="ml-auto shrink-0"
+    >
       <input type="hidden" name="code" value={code} />
-      <input type="hidden" name="wantId" value={wantId} />
+      <input type="hidden" name="wantId" value={target.wantId} />
+      <input type="hidden" name="cardId" value={target.cardId} />
       <PendingVeil />
       <Button type="submit" variant="ghost" size="sm" className="-mr-3.5">
         Remove

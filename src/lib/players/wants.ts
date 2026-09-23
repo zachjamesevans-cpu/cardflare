@@ -37,6 +37,13 @@ export interface SavedWant {
    * one" at a glance.
    */
   imageUrl: string | null;
+  /**
+   * Which way the Flare points. A saved want is "want"; an open post
+   * offering a card is "offering", and it sits on the same list because
+   * the founder posts both and expects both there: "The second I hit
+   * post, it needs to be visible in flares."
+   */
+  direction?: "want" | "offering";
 }
 
 /** The bounds a want's quantity is held to, matching a Flare's. */
@@ -196,8 +203,86 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
     return [];
   }
 
-  const rows = data ?? [];
+  return describeRows(data ?? []);
+}
+
+/** What a row on the list is before its card has a name and a picture. */
+interface ListRow {
+  id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  note: string | null;
+  deck_label: string | null;
+  direction?: "want" | "offering";
+}
+
+/**
+ * The player's open OFFERING posts, as rows for the same list. One row
+ * per card and printing, copies summed across posts; the id names the
+ * card rather than a post, because the actions on it (fewer, remove)
+ * apply to every open post of that card at once.
+ */
+export async function listOfferings(playerId: string): Promise<SavedWant[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const admin = getSupabaseAdmin();
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id")
+    .eq("player_id", playerId);
+  const sessionIds = (sessions ?? []).map((row) => row.id);
+
+  let query = admin
+    .from("flares")
+    .select(
+      "id, card_id, printing_id, quantity, found_quantity, note, deck_label, created_at",
+    )
+    .eq("status", "open")
+    .eq("intent", "showcase")
+    .order("created_at", { ascending: false });
+  query =
+    sessionIds.length > 0
+      ? query.or(
+          `player_id.eq.${playerId},player_session_id.in.(${sessionIds.join(",")})`,
+        )
+      : query.eq("player_id", playerId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("Could not list the offerings", error);
+    return [];
+  }
+
+  const grouped = new Map<string, ListRow>();
+  for (const row of data ?? []) {
+    /* Done is a count: a post fully answered is off the list. */
+    const left = Math.max(0, row.quantity - (row.found_quantity ?? 0));
+    if (left === 0) continue;
+    const key = `offer:${row.card_id}:${row.printing_id ?? "any"}`;
+    const seen = grouped.get(key);
+    if (seen) {
+      seen.quantity = Math.min(99, seen.quantity + left);
+      continue;
+    }
+    grouped.set(key, {
+      id: key,
+      card_id: row.card_id,
+      printing_id: row.printing_id,
+      quantity: left,
+      note: row.note,
+      deck_label: row.deck_label,
+      direction: "offering",
+    });
+  }
+
+  return describeRows([...grouped.values()]);
+}
+
+/** Names and pictures for rows, the way the Flare board resolves them. */
+async function describeRows(rows: ListRow[]): Promise<SavedWant[]> {
   if (rows.length === 0) return [];
+  const admin = getSupabaseAdmin();
 
   const cardIds = [...new Set(rows.map((row) => row.card_id))];
   const printingIds = rows.flatMap((row) => (row.printing_id ? [row.printing_id] : []));
@@ -272,6 +357,7 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
       note: row.note,
       deckLabel: row.deck_label ?? null,
       imageUrl: printing?.image_url ?? base?.imageUrl ?? null,
+      direction: row.direction ?? "want",
     };
   });
 }

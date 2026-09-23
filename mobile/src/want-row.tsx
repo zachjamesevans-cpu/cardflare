@@ -76,6 +76,9 @@ export function WantRow({
             <Text style={styles.wantName} numberOfLines={2}>
               {want.cardName}
             </Text>
+            {want.direction === "offering" ? (
+              <Text style={styles.offeringTag}>Offering</Text>
+            ) : null}
             <Tap onPress={() => void run(onDrop)} disabled={busy} hitSlop={8}>
               <Text style={styles.removeLink}>Remove</Text>
             </Tap>
@@ -204,6 +207,17 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textDecorationLine: "underline",
     fontSize: 14,
+  },
+  offeringTag: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "700",
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    overflow: "hidden",
   },
   stepButton: {
     width: 28,

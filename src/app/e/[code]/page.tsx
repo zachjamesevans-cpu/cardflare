@@ -443,6 +443,7 @@ async function RoomBody({
     .filter((want) => !postedAsks.has(`${want.cardId}:${want.printingId ?? ""}`))
     .map((want) => ({
       id: want.id,
+      cardId: want.cardId,
       cardName: want.cardName,
       cardNumber: want.cardNumber,
       printingLabel: want.printingLabel,

@@ -507,6 +507,8 @@ export interface Me {
   wants: {
     id: string;
     cardId: string;
+    /** Looking for it, or offering it. Absent from an older server: a want. */
+    direction?: "want" | "offering";
     cardName: string;
     cardNumber: string;
     printingId: string | null;
@@ -751,6 +753,17 @@ export const nudgeWant = (wantId: string, delta: number) =>
 /** Drops a saved want for good. */
 export const dropWant = (wantId: string) =>
   call<{ ok: true }>("DELETE", `/api/v1/wants/${encodeURIComponent(wantId)}`);
+
+/** An offering on the same list: the row is the card, so these take a card id. */
+export const nudgeOffering = (cardId: string, delta: number) =>
+  call<{ ok: true; quantity: number }>("POST", "/api/v1/offerings", {
+    action: "nudge",
+    cardId,
+    delta,
+  });
+
+export const dropOffering = (cardId: string) =>
+  call<{ ok: true }>("POST", "/api/v1/offerings", { action: "remove", cardId });
 
 export const postFlare = (
   code: string,

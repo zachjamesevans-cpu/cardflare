@@ -16,7 +16,12 @@ import { currentRoomForSession } from "@/lib/players/current-room";
 import { huntsFor } from "@/lib/players/hunts";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getPlayerSession } from "@/lib/players/session";
-import { listWants, postedCardStores } from "@/lib/players/wants";
+import {
+  listOfferings,
+  listWants,
+  postedCardStores,
+  type PostedWhere,
+} from "@/lib/players/wants";
 import { nearbySettingsFor } from "@/lib/nearby/settings";
 import { NearbyRow } from "@/components/nearby/nearby-row";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -85,9 +90,10 @@ export default async function FlarePage({
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
   const games = await viewerGames();
-  const [wants, posted, nearby, hunts, poster] = playerId
+  const [asked, offering, posted, nearby, hunts, poster] = playerId
     ? await Promise.all([
         listWants(playerId),
+        listOfferings(playerId),
         postedCardStores(playerId),
         /* Nearby matching is part of Local. With Local off there is no
            feed for a match to land on, so the switch is not asked for
@@ -96,7 +102,10 @@ export default async function FlarePage({
         huntsFor(playerId, playerId),
         composerViewer(playerId, viewer.kind === "player" ? viewer.playerName : "You"),
       ])
-    : [null, new Map<string, string>(), null, [], null];
+    : [null, null, new Map<string, PostedWhere[]>(), null, [], null];
+  /* One list, both directions: what you are looking for and what you
+     are offering, since you posted both here. */
+  const wants = asked && offering ? [...asked, ...offering] : asked;
 
   return (
     <>
