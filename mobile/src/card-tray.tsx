@@ -102,10 +102,27 @@ export function CardTray({
    */
   const [order, setOrder] = useState<TrayItem[]>(items);
   const dragging = useRef(false);
+  /*
+   * The same order, readable synchronously.
+   *
+   * The handlers below must not be rebuilt while a finger is down -
+   * that was the bug that stopped the drag working at all: the memo
+   * depended on `order`, reordering mid-drag swapped every tile's
+   * handlers, and React Native cancelled the gesture it was halfway
+   * through. So they are built per CARD, never re-made during a
+   * gesture, and they read the live order from here instead of
+   * closing over it.
+   */
+  const orderRef = useRef(items);
+  const applyOrder = (next: TrayItem[]) => {
+    orderRef.current = next;
+    setOrder(next);
+  };
 
   /* Between gestures the composer is the source of truth. */
   useEffect(() => {
-    if (!dragging.current) setOrder(items);
+    if (!dragging.current) applyOrder(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
   const [wiggling, setWiggling] = useState(false);
@@ -153,8 +170,10 @@ export function CardTray({
 
   const responders = useMemo(
     () =>
-      order.map((item) =>
-        PanResponder.create({
+      new Map(
+        items.map((item) => [
+          item.key,
+          PanResponder.create({
           onStartShouldSetPanResponder: () => false,
           /* Captured, so the move is taken from the Pressable holding
              the touch rather than asked for after it has already
@@ -164,7 +183,9 @@ export function CardTray({
           onMoveShouldSetPanResponder: (_e, g) =>
             wigglingRef.current && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
           onPanResponderGrant: () => {
-            const at = order.findIndex((entry) => entry.key === item.key);
+            const at = orderRef.current.findIndex(
+              (entry) => entry.key === item.key,
+            );
             if (at < 0) return;
             dragging.current = true;
             startIndex.current = at;
@@ -189,7 +210,7 @@ export function CardTray({
             const wanted = Math.max(
               0,
               Math.min(
-                order.length - 1,
+                orderRef.current.length - 1,
                 Math.round((startIndex.current * SLOT + g.dx) / SLOT),
               ),
             );
@@ -200,12 +221,10 @@ export function CardTray({
             const at = slotNow.current;
             slotNow.current = wanted;
             grabSlot.value = wanted;
-            setOrder((current) => {
-              const next = [...current];
-              const [moved] = next.splice(at, 1);
-              if (moved) next.splice(wanted, 0, moved);
-              return next;
-            });
+            const next = [...orderRef.current];
+            const [moved] = next.splice(at, 1);
+            if (moved) next.splice(wanted, 0, moved);
+            applyOrder(next);
           },
           onPanResponderRelease: () => {
             /*
@@ -233,9 +252,13 @@ export function CardTray({
             const to = slotNow.current;
             if (from !== to) onReorder(from, to);
           },
-        }),
+          }),
+        ]),
       ),
-    [order, dragX, dragY, grabSlot, lift, onReorder],
+    /* `items`, not `order`: the props only change between gestures, so
+       a drag never has its handlers pulled out from under it. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, dragX, dragY, grabSlot, lift, onReorder],
   );
 
   return (
@@ -259,7 +282,7 @@ export function CardTray({
             active={editing === item.key}
             wiggling={wiggling}
             count={order.length}
-            handlers={responders[index]?.panHandlers}
+            handlers={responders.get(item.key)?.panHandlers}
             dragX={dragX}
             dragY={dragY}
             grabSlot={grabSlot}
