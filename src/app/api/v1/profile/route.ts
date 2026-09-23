@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
+import { apiPlayer, badRequest, forgetApiPlayer, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
 import {
@@ -236,6 +236,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest("Unrecognised profile action");
 
   const body = parsed.data;
+
+  /* A name or handle change must not be answered from the two-minute
+     memory of who this token is; forget it before the write. */
+  if ("displayName" in body || "handle" in body) forgetApiPlayer(request);
 
   if (body.action === "set-feed-view") {
     const result = await setFeedView(player.playerId, body.view);

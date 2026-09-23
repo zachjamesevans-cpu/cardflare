@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 /**
  * The chunked avatar upload: begin hands out an id, chunks land in the
  * bucket as text, commit stitches them in order, decodes once, and
@@ -48,6 +50,9 @@ function request(payload: unknown, token: string | null = "jwt-1"): Request {
 }
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const fn of [getUser, playerForUser, setAvatar, ...Object.values(storage)]) {
     fn.mockReset();
   }

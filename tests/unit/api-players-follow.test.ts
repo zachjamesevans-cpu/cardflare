@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 /**
  * The follow toggle: option C's one write. Accounts only, no self
  * edges, and the settled state rides back so buttons never guess.
@@ -59,6 +61,9 @@ function request(payload: unknown, token: string | null = "jwt-1"): Request {
 const params = { params: Promise.resolve({ playerId: "target-1" }) };
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const fn of [
     getUser,
     playerForUser,

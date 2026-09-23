@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 /**
  * Editing one saved want from the app.
  *
@@ -53,6 +55,9 @@ function request(
 }
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const fn of [getUser, playerForUser, listWants, removeWant, setWantQuantity]) {
     fn.mockReset();
   }

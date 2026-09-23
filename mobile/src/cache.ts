@@ -72,6 +72,9 @@ export const CACHE_TTL = {
   room: 5 * 60 * 1000,
   /* A shop's address and phone number. */
   store: 7 * 24 * 60 * 60 * 1000,
+  /* Somebody else's profile, as last seen: painted at once on the next
+     open while the fresh one loads. A day: names and shelves move. */
+  peek: 24 * 60 * 60 * 1000,
   /* A Flare the composer has not posted yet: the cards, the caption,
      the hunt. Somebody who picks three cards and gets a phone call
      should find them still there. A week, then it is a stale idea. */

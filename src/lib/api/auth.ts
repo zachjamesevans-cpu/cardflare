@@ -47,12 +47,61 @@ function bearerToken(request: Request): string | null {
   return request.headers.get("x-cf-access-token");
 }
 
+/*
+ * REMEMBERED PER TOKEN, briefly.
+ *
+ * Verifying a bearer token is a round trip to the auth server, and the
+ * player row behind it is another to the database, and the app's
+ * screens asked for both on every request, some of them twice in one
+ * response (a profile peek verified the same token at the top and
+ * again for the follow state). A warm function serves many requests
+ * from the same phone in a row, so the answer is kept for two minutes
+ * per token. A token that expires or is signed out of stays good here
+ * for at most that long, which is well inside the hour the token
+ * itself is valid for. Capped, so a burst of tokens cannot grow it.
+ */
+const AUTH_TTL_MS = 2 * 60 * 1000;
+const AUTH_CAP = 500;
+const remembered = new Map<string, { player: ApiPlayer; at: number }>();
+
+function rememberedPlayer(token: string): ApiPlayer | null {
+  const hit = remembered.get(token);
+  if (!hit) return null;
+  if (Date.now() - hit.at > AUTH_TTL_MS) {
+    remembered.delete(token);
+    return null;
+  }
+  return hit.player;
+}
+
+function rememberPlayer(token: string, player: ApiPlayer): void {
+  if (remembered.size >= AUTH_CAP) {
+    const oldest = remembered.keys().next().value;
+    if (oldest !== undefined) remembered.delete(oldest);
+  }
+  remembered.set(token, { player, at: Date.now() });
+}
+
+/** Forget a token's answer, when the player behind it changes. */
+export function forgetApiPlayer(request: Request): void {
+  const token = bearerToken(request);
+  if (token) remembered.delete(token);
+}
+
+/** Forget every token: for tests, which fake a different player per case. */
+export function resetApiPlayerMemory(): void {
+  remembered.clear();
+}
+
 /** The signed-in player behind this request, or null. Never throws. */
 export async function apiPlayer(request: Request): Promise<ApiPlayer | null> {
   if (!isSupabaseConfigured()) return null;
 
   const token = bearerToken(request);
   if (!token) return null;
+
+  const known = rememberedPlayer(token);
+  if (known) return known;
 
   try {
     const { data, error } = await getSupabaseAdmin().auth.getUser(token);
@@ -61,12 +110,14 @@ export async function apiPlayer(request: Request): Promise<ApiPlayer | null> {
     const player = await playerForUser(data.user.id);
     if (!player) return null;
 
-    return {
+    const answer = {
       playerId: player.id,
       userId: data.user.id,
       displayName: player.display_name,
       handle: player.handle,
     };
+    rememberPlayer(token, answer);
+    return answer;
   } catch (error) {
     console.error("Could not authenticate the API request", error);
     return null;

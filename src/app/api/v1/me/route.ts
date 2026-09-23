@@ -40,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [wants, sync, locals, account, posted] = await Promise.all([
+  const [wants, sync, locals, account, posted, feedView, staff] = await Promise.all([
     listWants(player.playerId),
     collectionSyncFor(player.playerId),
     listLocals(player.playerId),
@@ -61,6 +61,10 @@ export async function GET(request: Request): Promise<Response> {
     /* Which of those cards are live on a board right now - the second of
        the list's two states. See postedCardStores. */
     postedCardStores(player.playerId),
+    feedViewFor(player.playerId),
+    /* The stores this account may RUN, for the remote: owners and
+       organizers alike. Empty for nearly everybody. */
+    staffedStores(player.userId),
   ]);
 
   return Response.json({
@@ -80,7 +84,7 @@ export async function GET(request: Request): Promise<Response> {
        * with. `feedViewFor` logs and falls back to the original card,
        * so a missing column costs a setting rather than a session.
        */
-      feedView: await feedViewFor(player.playerId),
+      feedView,
     },
     wants: wants.map((want) => ({
       id: want.id,
@@ -118,8 +122,6 @@ export async function GET(request: Request): Promise<Response> {
       nextEventCode: local.nextEventCode,
       earlyOpen: local.earlyOpen,
     })),
-    /* The stores this account may RUN, for the remote: owners and
-       organizers alike. Empty for nearly everybody. */
-    staff: await staffedStores(player.userId),
+    staff,
   });
 }

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 /**
  * The no-room save: the founder's midnight bug was the app posting every
  * Flare into the last room, keeping a closed store's room warm. This
@@ -38,6 +40,9 @@ function request(body?: unknown, token: string | null = "jwt-1"): Request {
 }
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const fn of [getUser, playerForUser, saveWant]) fn.mockReset();
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   playerForUser.mockResolvedValue({ id: "player-1", display_name: "Kaito" });

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 import type { PostedWhere } from "@/lib/players/wants";
 
 /**
@@ -102,6 +104,9 @@ function request(
 }
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const store of [queues, calls]) {
     for (const key of Object.keys(store)) delete store[key];
   }
