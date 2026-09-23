@@ -64,6 +64,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  */
 export function Tap({
   onPress,
+  onLongPress,
   disabled = false,
   hitSlop,
   style,
@@ -71,6 +72,8 @@ export function Tap({
   children,
 }: PropsWithChildren<{
   onPress?: () => void;
+  /** Held rather than tapped - how the card tray enters reorder mode. */
+  onLongPress?: () => void;
   disabled?: boolean;
   hitSlop?: number;
   style?: StyleProp<ViewStyle>;
@@ -86,6 +89,16 @@ export function Tap({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         onPress();
       }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              /* A firmer tick than a tap: something has changed mode,
+                 not just been pressed. */
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              onLongPress();
+            }
+          : undefined
+      }
       disabled={disabled}
       hitSlop={hitSlop}
       accessibilityRole={accessibilityLabel ? "button" : undefined}

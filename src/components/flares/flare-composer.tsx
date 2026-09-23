@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Plus, Star, Trash2 } from "lucide-react";
+import { Check, Plus, Star, Trash2 } from "lucide-react";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -137,6 +137,8 @@ function ComposerBody({
   });
   const [step, setStep] = useState<Step>("compose");
   const [editing, setEditing] = useState<string | null>(null);
+  /** The line key being dragged, while a tile is in the air. */
+  const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
     posted: number;
@@ -157,14 +159,19 @@ function ComposerBody({
         keyOf(item) === key ? { ...item, ...next } : item,
       ),
     });
-  const move = (key: string, by: -1 | 1) => {
-    const index = draft.cards.findIndex((item) => keyOf(item) === key);
-    const to = index + by;
-    if (index === -1 || to < 0 || to >= draft.cards.length) return;
-    const cards = [...draft.cards];
-    [cards[index], cards[to]] = [cards[to], cards[index]];
-    patch({ cards });
+  /**
+   * Drop `key` into slot `to`. The same splice `move` did, keyed on
+   * where the tile landed rather than on a direction.
+   */
+  const reorder = (key: string, to: number) => {
+    const from = draft.cards.findIndex((item) => keyOf(item) === key);
+    if (from < 0 || to < 0 || to >= draft.cards.length || from === to) return;
+    const next = [...draft.cards];
+    const [moved] = next.splice(from, 1);
+    if (moved) next.splice(to, 0, moved);
+    patch({ cards: next });
   };
+
   const makeCover = (key: string) => {
     const item = draft.cards.find((entry) => keyOf(entry) === key);
     if (!item) return;
@@ -371,14 +378,62 @@ function ComposerBody({
             const key = keyOf(item);
             const active = editing === key;
             return (
-              <li key={key} className="relative shrink-0">
+              <li
+                key={key}
+                /*
+                 * DRAGGED INTO PLACE, the website's half of the app's
+                 * hold-and-wiggle. The founder asked for drag rather
+                 * than "move left"/"move right", and a mouse needs no
+                 * long press to say it means to drag - so the tile is
+                 * draggable outright, which is what a pointer expects.
+                 */
+                draggable
+                onDragStart={(event) => {
+                  setDragging(key);
+                  event.dataTransfer.effectAllowed = "move";
+                  /* Firefox will not start a drag without payload. */
+                  event.dataTransfer.setData("text/plain", key);
+                }}
+                onDragEnd={() => setDragging(null)}
+                onDragOver={(event) => {
+                  if (!dragging || dragging === key) return;
+                  /* Preventing the default is what marks this a valid
+                     drop target; without it the browser refuses. */
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (!dragging || dragging === key) return;
+                  reorder(dragging, index);
+                  setDragging(null);
+                }}
+                className={cn(
+                  "relative shrink-0 transition-opacity",
+                  dragging === key && "opacity-40",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => setEditing(active ? null : key)}
+                  /*
+                   * KEYBOARD REORDER. Native drag-and-drop is mouse
+                   * only, so deleting "Move left"/"Move right" would
+                   * have left a keyboard with no way to order a Flare
+                   * at all. Arrow keys on a focused tile do what the
+                   * buttons did, and the label says so.
+                   */
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                    event.preventDefault();
+                    reorder(key, index + (event.key === "ArrowLeft" ? -1 : 1));
+                  }}
                   aria-pressed={active}
-                  aria-label={`Edit ${item.card.exactName}`}
+                  aria-label={`${item.card.exactName}, card ${index + 1} of ${
+                    draft.cards.length
+                  }. Drag to reorder, or use the arrow keys.`}
                   className={cn(
-                    "block h-[84px] w-[60px] cursor-pointer overflow-hidden rounded-[6px] border bg-elevated transition-[box-shadow]",
+                    "block h-[84px] w-[60px] cursor-grab overflow-hidden rounded-[6px] border bg-elevated transition-[box-shadow] active:cursor-grabbing",
                     active
                       ? "border-accent shadow-[0_0_8px_rgba(198,238,79,0.5)]"
                       : "border-border hover:border-border-strong",
@@ -429,7 +484,6 @@ function ComposerBody({
               setEditing(lineKey(editingCard.card.id, printingId));
             }}
             onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
-            onMove={(by) => move(keyOf(editingCard), by)}
             onCover={() => makeCover(keyOf(editingCard))}
             onRemove={() => remove(keyOf(editingCard))}
           />
@@ -604,7 +658,6 @@ function CardEditor({
   copiesLabel,
   onPrinting,
   onQuantity,
-  onMove,
   onCover,
   onRemove,
 }: {
@@ -614,7 +667,6 @@ function CardEditor({
   copiesLabel: string;
   onPrinting: (printingId: string | null) => void;
   onQuantity: (quantity: number) => void;
-  onMove: (by: -1 | 1) => void;
   onCover: () => void;
   onRemove: () => void;
 }) {
@@ -673,27 +725,13 @@ function CardEditor({
         />
       </div>
 
+      {/*
+       * "Move left" and "Move right" are gone: the founder asked for a
+       * drag instead, and they described the data structure rather than
+       * the thing anybody wanted - two taps per position, three round
+       * trips to bring the last card of four to the front.
+       */}
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={index === 0}
-          onClick={() => onMove(-1)}
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Move left
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={index >= count - 1}
-          onClick={() => onMove(1)}
-        >
-          Move right
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Button>
         {index !== 0 && (
           <Button type="button" variant="secondary" size="sm" onClick={onCover}>
             <Star className="size-4" aria-hidden="true" />
