@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   PanResponder,
   ScrollView,
@@ -120,6 +120,23 @@ export function CardTray({
   const toSlot = useSharedValue(-1);
   const lift = useSharedValue(0);
   const wobble = useSharedValue(0);
+  /*
+   * ONE MOVEMENT PER DROP, not two.
+   *
+   * The founder: "theres this like secondary animation that's happening
+   * after the card gets locked into place after I move it."
+   *
+   * Committing the reorder re-renders every tile into its new layout
+   * position - that IS the movement, and it is instant. The transforms
+   * that opened the gap were still unwinding from a slot's width back
+   * to zero through a spring, so each tile travelled twice: once
+   * because the row relaid out, once more as its own offset caught up.
+   *
+   * Springs while a finger is down, because a gap opening is worth
+   * animating. Nothing at all on release, because by then the layout
+   * has already said everything.
+   */
+  const settling = useSharedValue(0);
 
   const startWiggle = () => {
     wigglingRef.current = true;
@@ -140,6 +157,23 @@ export function CardTray({
     cancelAnimation(wobble);
     wobble.value = withTiming(0, { duration: 120 });
   };
+
+  /*
+   * The new order is on screen; the offsets that were standing in for
+   * it are now the layout's job.
+   *
+   * `useLayoutEffect`, not `useEffect`: this has to run before the
+   * frame is painted. A tile's shift is worked out from slot numbers
+   * that the reorder has just invalidated, so leaving them set for even
+   * one painted frame draws the row wrong.
+   */
+  useLayoutEffect(() => {
+    if (settling.value === 0) return;
+    dragX.value = 0;
+    fromSlot.value = -1;
+    toSlot.value = -1;
+    settling.value = 0;
+  }, [items, dragX, fromSlot, toSlot, settling]);
 
   /*
    * One responder per tile, rebuilt only when the row's length or the
@@ -178,21 +212,44 @@ export function CardTray({
           },
           onPanResponderRelease: () => {
             const to = toSlot.value;
-            /*
-             * Settle into the slot it is being dropped into, rather
-             * than snapping home: the tile glides the last few points
-             * while React is told about the new order.
-             */
-            dragX.value = withSpring((to - index) * SLOT, SPRING);
-            lift.value = withSpring(0, SPRING, () => {
-              dragX.value = 0;
-            });
             setHeldKey(null);
-            fromSlot.value = -1;
-            toSlot.value = -1;
-            if (to !== index) onReorder(index, to);
+
+            if (to === index) {
+              /* Went nowhere: spring home, nothing to commit. */
+              dragX.value = withSpring(0, SPRING);
+              lift.value = withSpring(0, SPRING);
+              fromSlot.value = -1;
+              toSlot.value = -1;
+              return;
+            }
+
+            /*
+             * LEAVE EVERY TILE WHERE THE REORDER IS ABOUT TO PUT IT.
+             *
+             * The founder: "still a 'flash' that happens when I place a
+             * card." That was a one-frame race. Zeroing the offset at
+             * release put the held card back in its OLD slot, because
+             * React had not re-rendered the new order yet - so it
+             * snapped home for a frame and then reappeared where it was
+             * dropped. The neighbours did the same when their step-aside
+             * was cleared.
+             *
+             * So nothing is cleared here. The held card is parked at
+             * exactly the offset that puts it in its destination slot,
+             * and the neighbours keep the shift that already has them
+             * standing where they will end up. Every tile is now drawn
+             * precisely where the relayout is about to place it, which
+             * makes the swap itself invisible - whichever order the two
+             * threads land in.
+             */
+            settling.value = 1;
+            dragX.value = (to - index) * SLOT;
+            lift.value = 0;
+            onReorder(index, to);
           },
           onPanResponderTerminate: () => {
+            /* Nothing was committed, so there is no relayout to hide
+               behind: this one springs home the way it came. */
             dragX.value = withSpring(0, SPRING);
             lift.value = withSpring(0, SPRING);
             setHeldKey(null);
@@ -203,7 +260,7 @@ export function CardTray({
       ),
     /* No `wiggling` here on purpose: rebuilding mid-touch is what
        broke the hold-then-drag. The ref carries the mode instead. */
-    [items, dragX, fromSlot, toSlot, lift, onReorder],
+    [items, dragX, fromSlot, toSlot, lift, settling, onReorder],
   );
 
   return (
@@ -230,6 +287,7 @@ export function CardTray({
             fromSlot={fromSlot}
             toSlot={toSlot}
             lift={lift}
+            settling={settling}
             wobble={wobble}
             onPress={() => (wiggling ? stopWiggle() : onEdit(item.key))}
             onLongPress={startWiggle}
@@ -315,6 +373,7 @@ function TrayTile({
   fromSlot,
   toSlot,
   lift,
+  settling,
   wobble,
   onPress,
   onLongPress,
@@ -330,6 +389,8 @@ function TrayTile({
   fromSlot: SharedValue<number>;
   toSlot: SharedValue<number>;
   lift: SharedValue<number>;
+  /** 1 while a drop is being committed: snap, do not animate. */
+  settling: SharedValue<number>;
   wobble: SharedValue<number>;
   onPress: () => void;
   onLongPress: () => void;
@@ -367,7 +428,10 @@ function TrayTile({
 
     return {
       transform: [
-        { translateX: withSpring(shift, SPRING) },
+        {
+          translateX:
+            settling.value === 1 ? shift : withSpring(shift, SPRING),
+        },
         { scale: 1 },
         {
           rotate: `${interpolate(wobble.value, [-1, 1], [-2.5, 2.5])}deg`,
