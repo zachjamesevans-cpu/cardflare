@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PanResponder,
@@ -11,7 +12,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   interpolate,
-  LinearTransition,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -28,50 +29,50 @@ import { Tap } from "./ui";
 /**
  * The cards in a Flare, in order, picked up and dragged into place.
  *
- * The founder asked for the home-screen gesture - "you can hold a card,
- * itll wiggle, and you can reorder it by dragging it" - and then, over
- * three rounds of looking at it: "theres this like secondary animation
- * that's happening after the card gets locked into place", "still a
- * 'flash' that happens when I place a card", "its jsut a litte glitchy".
+ * The home-screen gesture the founder asked for: hold a card, the row
+ * wiggles, drag the card to where it goes.
  *
- * ALL THREE WERE ONE BUG, and my first two attempts at it were wrong in
- * the same way. The row used to stay laid out in the OLD order for the
- * whole drag, with neighbours pushed aside by transforms, and the real
- * reorder committed on release. That left two things to reconcile at
- * the drop: a React re-render moving every tile to its new laid-out
- * place, and a pile of UI-thread transforms that had to unwind to zero.
+ * HOW IT STAYS SMOOTH. Three rules, each the answer to a glitch that
+ * was filmed.
  *
- * THEY CANNOT BE SEQUENCED. A shared value written from JavaScript does
- * not reach the UI thread synchronously, so there is always a window
- * where the new order is laid out while the old slot numbers are still
- * driving the transforms - and in that window the row draws nonsense.
- * Recording a drop at 60fps and stepping through it showed exactly
- * that: three tiles overlapping and a fourth stranded, for ~350ms.
+ * 1. The laid-out order never changes while a finger is down. The card
+ *    in hand is an OVERLAY drawn over the row, from where it was picked
+ *    up, and its old place in the row is kept as an invisible
+ *    placeholder of the same size. Neighbours are never re-laid-out
+ *    mid-drag; they slide by a transform driven from one spring-animated
+ *    number, the slot the card is heading for. Nothing on screen
+ *    depends on a React render landing at the right frame.
  *
- * So there is no pending reorder any more. THE ORDER CHANGES WHILE THE
- * FINGER IS STILL DOWN, the moment a card crosses into a new slot.
- * Neighbours are never transformed at all - they are laid out somewhere
- * new and `LinearTransition` glides them there on the UI thread. The
- * held card's offset is measured from where it is laid out RIGHT NOW,
- * so when the order changes underneath it, it stays under the finger.
- * On release the offset goes to zero and the card is already in the
- * right place: nothing to unwind, nothing to race.
+ * 2. The slot changes with a DEAD ZONE. A card sitting on the line
+ *    between two slots used to flip back and forth on every pixel,
+ *    re-laying the row out each time: "super tweaked out when a card
+ *    goes over itself". Now the card has to travel well past the line
+ *    before the slot moves, and well back before it moves again.
  *
- * AND IT ROAMS. The founder: "you should be able to move the cards
- * outside of the frame, just for fun. like, that whole screen, you
- * should be able to drag the cards." So the held card follows in both
- * directions and the row stops clipping while one is in the air.
+ * 3. The drop is one movement. On release the overlay glides to the
+ *    exact place its slot will be laid out, and only when it has landed
+ *    is the order committed, in one React render that swaps the overlay
+ *    for the real tile in the same pixels. There is no unwind and no
+ *    frame where two ideas of the order are both on screen.
+ *
+ * And it roams: the card follows the finger in both directions, out of
+ * the row if it likes, because the founder wanted that "just for fun".
  */
 
 const TILE_W = 64;
 const TILE_H = 90;
 const GAP = spacing(2);
 const SLOT = TILE_W + GAP;
+/* The row's own vertical padding: the overlay starts level with it. */
+const ROW_PAD = 4;
+/* How far past the line a card must go before its slot changes, as a
+   fraction of a slot. Over a half, so hovering the line cannot flip. */
+const DEAD_ZONE = 0.6;
 
-/** Snappy, not rigid. The pick-up, and the card settling back down. */
+/** Snappy, not rigid: the pick-up, and the neighbours making way. */
 const SPRING = { damping: 20, stiffness: 240, mass: 0.6 } as const;
-/** How the neighbours glide when the order changes under the finger. */
-const SHUFFLE = LinearTransition.springify().damping(22).stiffness(260).mass(0.6);
+/** The drop: one glide onto the slot, deterministic so it can be waited for. */
+const DROP = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
 
 export interface TrayItem {
   key: string;
@@ -79,6 +80,9 @@ export interface TrayItem {
   imageUrl: string | null;
   quantity: number;
 }
+
+const clamp = (value: number, low: number, high: number) =>
+  Math.max(low, Math.min(high, value));
 
 export function CardTray({
   items,
@@ -91,62 +95,41 @@ export function CardTray({
   editing: string | null;
   onEdit: (key: string) => void;
   onAdd: () => void;
-  /** Told once, on release: the card at `from` now sits at `to`. */
+  /** Told once, when the card has landed: the card at `from` now sits at `to`. */
   onReorder: (from: number, to: number) => void;
 }) {
-  /*
-   * The row as it is drawn. Its own state, because the order changes
-   * several times during one drag and the composer only needs to hear
-   * the result - a draft write per slot crossed would be a lot of work
-   * for something nobody has finished saying yet.
-   */
-  const [order, setOrder] = useState<TrayItem[]>(items);
-  const dragging = useRef(false);
-  /*
-   * The same order, readable synchronously.
-   *
-   * The handlers below must not be rebuilt while a finger is down -
-   * that was the bug that stopped the drag working at all: the memo
-   * depended on `order`, reordering mid-drag swapped every tile's
-   * handlers, and React Native cancelled the gesture it was halfway
-   * through. So they are built per CARD, never re-made during a
-   * gesture, and they read the live order from here instead of
-   * closing over it.
-   */
-  const orderRef = useRef(items);
-  const applyOrder = (next: TrayItem[]) => {
-    orderRef.current = next;
-    setOrder(next);
-  };
-
-  /* Between gestures the composer is the source of truth. */
-  useEffect(() => {
-    if (!dragging.current) applyOrder(items);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
   const [wiggling, setWiggling] = useState(false);
-  const [heldKey, setHeldKey] = useState<string | null>(null);
+  /* The card in the air, and where it was picked up from. */
+  const [held, setHeld] = useState<{ key: string; from: number } | null>(null);
   /*
    * Read at the moment of the question rather than captured when the
-   * responder was built - otherwise the touch that starts the wiggle is
-   * bound to handlers that still think the row is still, and you have
-   * to lift and press again. The founder: "shouldn't have to hold down
-   * AND then press again to move them."
+   * responder was built, so the touch that starts the wiggle can turn
+   * into the drag without lifting: "shouldn't have to hold down AND
+   * then press again to move them."
    */
   const wigglingRef = useRef(false);
+  const heldRef = useRef(false);
+  /* The list, readable inside handlers built once per card. */
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
-  /* Where the finger is, relative to where it grabbed. */
+  /* Where the finger has taken the card, from where it grabbed it. */
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
-  /* The slot the held card currently occupies in the live order. */
-  const grabSlot = useSharedValue(0);
+  /* The slot the card is heading for, as a spring-smoothed number the
+     neighbours slide by. Integer at rest, in between while gliding. */
+  const slot = useSharedValue(0);
+  /* The slot it was picked up from, for the neighbours' arithmetic. */
+  const from = useSharedValue(0);
   const lift = useSharedValue(0);
   const wobble = useSharedValue(0);
 
-  /* Where this drag started, and where it has got to. */
   const startIndex = useRef(0);
   const slotNow = useRef(0);
+  /* How far the row is scrolled: the overlay is drawn in the row's
+     parent, so it has to subtract this to sit on the picked-up tile. */
+  const scrollX = useRef(0);
+  const [overlayLeft, setOverlayLeft] = useState(0);
 
   const startWiggle = () => {
     wigglingRef.current = true;
@@ -168,158 +151,179 @@ export function CardTray({
     wobble.value = withTiming(0, { duration: 140 });
   };
 
+  /*
+   * The overlay has landed on its slot: commit the order and take the
+   * overlay away, in ONE render. The real tile appears exactly where
+   * the overlay was, so the swap is invisible.
+   */
+  const land = (fromIndex: number, toIndex: number) => {
+    heldRef.current = false;
+    setHeld(null);
+    if (fromIndex !== toIndex) onReorder(fromIndex, toIndex);
+    /* Nothing reads these once nothing is held; reset for next time. */
+    dragX.value = 0;
+    dragY.value = 0;
+    lift.value = 0;
+  };
+
+  const release = () => {
+    if (!heldRef.current) return;
+    const fromIndex = startIndex.current;
+    const toIndex = slotNow.current;
+    /* Glide to where the slot will be laid out, then land. The three
+       run the same clock, so they finish together. */
+    lift.value = withTiming(0, DROP);
+    dragY.value = withTiming(0, DROP);
+    dragX.value = withTiming((toIndex - fromIndex) * SLOT, DROP, (finished) => {
+      if (finished) runOnJS(land)(fromIndex, toIndex);
+    });
+  };
+
   const responders = useMemo(
     () =>
       new Map(
         items.map((item) => [
           item.key,
           PanResponder.create({
-          onStartShouldSetPanResponder: () => false,
-          /* Captured, so the move is taken from the Pressable holding
-             the touch rather than asked for after it has already
-             decided the gesture was a press. */
-          onMoveShouldSetPanResponderCapture: (_e, g) =>
-            wigglingRef.current && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
-          onMoveShouldSetPanResponder: (_e, g) =>
-            wigglingRef.current && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
-          onPanResponderGrant: () => {
-            const at = orderRef.current.findIndex(
-              (entry) => entry.key === item.key,
-            );
-            if (at < 0) return;
-            dragging.current = true;
-            startIndex.current = at;
-            slotNow.current = at;
-            grabSlot.value = at;
-            dragX.value = 0;
-            dragY.value = 0;
-            lift.value = withSpring(1, SPRING);
-            setHeldKey(item.key);
-          },
-          onPanResponderMove: (_e, g) => {
-            /* Straight to shared values: no setState, no render, and
-               the card is under the finger on the very next frame. */
-            dragX.value = g.dx;
-            dragY.value = g.dy;
+            onStartShouldSetPanResponder: () => false,
+            /* Captured, so the move is taken from the Pressable holding
+               the touch rather than asked for after it has already
+               decided the gesture was a press. */
+            onMoveShouldSetPanResponderCapture: (_e, g) =>
+              wigglingRef.current &&
+              !heldRef.current &&
+              (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
+            onMoveShouldSetPanResponder: (_e, g) =>
+              wigglingRef.current &&
+              !heldRef.current &&
+              (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
+            onPanResponderGrant: () => {
+              const at = itemsRef.current.findIndex((entry) => entry.key === item.key);
+              if (at < 0) return;
+              heldRef.current = true;
+              startIndex.current = at;
+              slotNow.current = at;
+              from.value = at;
+              slot.value = at;
+              dragX.value = 0;
+              dragY.value = 0;
+              lift.value = withSpring(1, SPRING);
+              setOverlayLeft(at * SLOT - scrollX.current);
+              setHeld({ key: item.key, from: at });
+            },
+            onPanResponderMove: (_e, g) => {
+              if (!heldRef.current) return;
+              /* Straight to shared values: no render, and the card is
+                 under the finger on the very next frame. */
+              dragX.value = g.dx;
+              dragY.value = g.dy;
 
-            /*
-             * Crossed into a new slot? Measured from where the drag
-             * began, so it is stable however many times the order has
-             * already changed underneath it.
-             */
-            const wanted = Math.max(
-              0,
-              Math.min(
-                orderRef.current.length - 1,
-                Math.round((startIndex.current * SLOT + g.dx) / SLOT),
-              ),
-            );
-            if (wanted === slotNow.current) return;
-
-            /* Reorder NOW, with the finger still down. The neighbours
-               relayout and glide; nothing is left pending for later. */
-            const at = slotNow.current;
-            slotNow.current = wanted;
-            grabSlot.value = wanted;
-            const next = [...orderRef.current];
-            const [moved] = next.splice(at, 1);
-            if (moved) next.splice(wanted, 0, moved);
-            applyOrder(next);
-          },
-          onPanResponderRelease: () => {
-            /*
-             * The card is already in its final slot - the order moved
-             * as the finger did - so the offset simply goes to zero.
-             * No re-render to wait for and nothing to unwind, which is
-             * the whole reason the drop is clean now.
-             */
-            dragX.value = withSpring(0, SPRING);
-            dragY.value = withSpring(0, SPRING);
-            lift.value = withSpring(0, SPRING);
-            setHeldKey(null);
-            dragging.current = false;
-            const from = startIndex.current;
-            const to = slotNow.current;
-            if (from !== to) onReorder(from, to);
-          },
-          onPanResponderTerminate: () => {
-            dragX.value = withSpring(0, SPRING);
-            dragY.value = withSpring(0, SPRING);
-            lift.value = withSpring(0, SPRING);
-            setHeldKey(null);
-            dragging.current = false;
-            const from = startIndex.current;
-            const to = slotNow.current;
-            if (from !== to) onReorder(from, to);
-          },
+              /*
+               * The slot the card is over, measured from where it was
+               * picked up, with a dead zone around the current slot so
+               * a card resting on a line does not flicker between two.
+               */
+              const over = (startIndex.current * SLOT + g.dx) / SLOT;
+              const away = over - slotNow.current;
+              if (Math.abs(away) < DEAD_ZONE) return;
+              const wanted = clamp(
+                slotNow.current + Math.round(away),
+                0,
+                itemsRef.current.length - 1,
+              );
+              if (wanted === slotNow.current) return;
+              slotNow.current = wanted;
+              slot.value = withSpring(wanted, SPRING);
+              Haptics.selectionAsync().catch(() => {});
+            },
+            onPanResponderRelease: release,
+            onPanResponderTerminate: release,
           }),
         ]),
       ),
-    /* `items`, not `order`: the props only change between gestures, so
-       a drag never has its handlers pulled out from under it. */
+    /* Built per card from the list only: a drag never has its handlers
+       pulled out from under it, and they read live state from refs. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, dragX, dragY, grabSlot, lift, onReorder],
+    [items],
   );
+
+  const heldItem = held ? items.find((item) => item.key === held.key) : undefined;
 
   return (
     <View style={{ gap: spacing(1.5) }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={!heldKey}
-        /* The held card is allowed out of the row. Clipping comes back
-           the moment it is put down, so a long row still scrolls. */
-        removeClippedSubviews={false}
-        style={heldKey ? { overflow: "visible" } : undefined}
-        contentContainerStyle={{ gap: GAP, paddingVertical: 4 }}
-      >
-        {order.map((item, index) => (
-          <TrayTile
-            key={item.key}
-            item={item}
-            index={index}
-            held={heldKey === item.key}
-            active={editing === item.key}
-            wiggling={wiggling}
-            count={order.length}
-            handlers={responders.get(item.key)?.panHandlers}
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={!held}
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            scrollX.current = event.nativeEvent.contentOffset.x;
+          }}
+          /* The card in the air is drawn outside the row, so the row
+             itself can keep clipping and scrolling like any other. */
+          contentContainerStyle={{ gap: GAP, paddingVertical: ROW_PAD }}
+        >
+          {items.map((item, index) => (
+            <TrayTile
+              key={item.key}
+              item={item}
+              index={index}
+              count={items.length}
+              placeholder={held?.key === item.key}
+              dragging={held !== null}
+              active={editing === item.key}
+              wiggling={wiggling}
+              handlers={responders.get(item.key)?.panHandlers}
+              slot={slot}
+              from={from}
+              wobble={wobble}
+              onPress={() => (wiggling ? stopWiggle() : onEdit(item.key))}
+              onLongPress={startWiggle}
+            />
+          ))}
+
+          {/* Hidden while rearranging: an "add" target under a dragging
+              finger is somewhere to drop a card by accident. */}
+          {wiggling ? null : (
+            <Tap
+              onPress={onAdd}
+              accessibilityLabel="Add cards"
+              style={{
+                width: TILE_W,
+                height: TILE_H,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderStyle: "dashed",
+                borderColor: colors.borderStrong,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+              }}
+            >
+              <Ionicons name="add" size={22} color={colors.accent} />
+              <Text
+                style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}
+              >
+                Add cards
+              </Text>
+            </Tap>
+          )}
+        </ScrollView>
+
+        {/* The card in hand, over the row, following the finger. */}
+        {held && heldItem ? (
+          <HeldCard
+            item={heldItem}
+            index={held.from}
+            count={items.length}
+            left={overlayLeft}
             dragX={dragX}
             dragY={dragY}
-            grabSlot={grabSlot}
             lift={lift}
-            wobble={wobble}
-            onPress={() => (wiggling ? stopWiggle() : onEdit(item.key))}
-            onLongPress={startWiggle}
           />
-        ))}
-
-        {/* Hidden while rearranging: an "add" target under a dragging
-            finger is somewhere to drop a card by accident. */}
-        {wiggling ? null : (
-          <Tap
-            onPress={onAdd}
-            accessibilityLabel="Add cards"
-            style={{
-              width: TILE_W,
-              height: TILE_H,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderStyle: "dashed",
-              borderColor: colors.borderStrong,
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 2,
-            }}
-          >
-            <Ionicons name="add" size={22} color={colors.accent} />
-            <Text
-              style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}
-            >
-              Add cards
-            </Text>
-          </Tap>
-        )}
-      </ScrollView>
+        ) : null}
+      </View>
 
       {/* A mode you cannot see the edge of is a mode people get stuck
           in, and "tap a card" is not guessable. */}
@@ -350,97 +354,139 @@ export function CardTray({
   );
 }
 
+/** What a tile looks like: shared by the row and the card in hand. */
+function TileFace({
+  item,
+  index,
+  outlined,
+}: {
+  item: TrayItem;
+  index: number;
+  outlined: boolean;
+}) {
+  return (
+    <View
+      style={{
+        width: TILE_W,
+        height: TILE_H,
+        borderRadius: 8,
+        borderWidth: outlined ? 2 : 1,
+        borderColor: outlined ? colors.accent : colors.border,
+        backgroundColor: colors.elevated,
+        overflow: "hidden",
+      }}
+    >
+      <RemoteImage uri={item.imageUrl} style={{ width: "100%", height: "100%" }} />
+      <View
+        style={{
+          position: "absolute",
+          top: 3,
+          left: 3,
+          minWidth: 18,
+          height: 18,
+          borderRadius: 9,
+          paddingHorizontal: 4,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: index === 0 ? colors.accent : colors.canvas,
+        }}
+      >
+        <Text
+          style={{
+            color: index === 0 ? colors.accentContrast : colors.textPrimary,
+            fontSize: 10,
+            fontWeight: "700",
+          }}
+        >
+          {index + 1}
+        </Text>
+      </View>
+      {item.quantity > 1 ? (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 3,
+            right: 3,
+            borderRadius: 999,
+            paddingHorizontal: 5,
+            paddingVertical: 1,
+            backgroundColor: colors.canvas,
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontSize: 10, fontWeight: "700" }}>
+            {`x${item.quantity}`}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 /**
- * One tile.
- *
- * Its own component because `useAnimatedStyle` is a hook and a `.map()`
- * cannot hold one - the good kind of forced hand, since each tile now
- * re-evaluates only its own worklet.
- *
- * A tile that is NOT held carries no drag transform at all. It is laid
- * out where the live order puts it and `layout` glides it there. That
- * is the whole trick: nothing to unwind on release.
+ * One tile in the row. Laid out where the list puts it, always; while
+ * a card is in the air it slides aside by a transform driven from the
+ * slot that card is heading for, and the picked-up card's own tile
+ * stays as an invisible placeholder so the row keeps its length.
  */
 function TrayTile({
   item,
   index,
-  held,
+  count,
+  placeholder,
+  dragging,
   active,
   wiggling,
-  count,
   handlers,
-  dragX,
-  dragY,
-  grabSlot,
-  lift,
+  slot,
+  from,
   wobble,
   onPress,
   onLongPress,
 }: {
   item: TrayItem;
   index: number;
-  held: boolean;
+  count: number;
+  placeholder: boolean;
+  dragging: boolean;
   active: boolean;
   wiggling: boolean;
-  count: number;
   handlers: GestureResponderHandlers | undefined;
-  dragX: SharedValue<number>;
-  dragY: SharedValue<number>;
-  grabSlot: SharedValue<number>;
-  lift: SharedValue<number>;
+  slot: SharedValue<number>;
+  from: SharedValue<number>;
   wobble: SharedValue<number>;
   onPress: () => void;
   onLongPress: () => void;
 }) {
   const style = useAnimatedStyle(() => {
-    if (!held) {
-      return {
-        transform: [
-          { translateX: 0 },
-          { translateY: 0 },
-          { scale: 1 },
-          { rotate: `${interpolate(wobble.value, [-1, 1], [-2.5, 2.5])}deg` },
-        ],
-        shadowOpacity: 0,
-        zIndex: 1,
-      };
-    }
-
     /*
-     * Measured from where this tile is laid out RIGHT NOW. When the
-     * order changes under the finger its slot changes with it, and
-     * taking the difference here is what keeps the card pinned to the
-     * finger through the shuffle rather than hopping a slot.
+     * Making way. A tile after the pick-up point slides one slot left
+     * once the card is heading for its slot or beyond; a tile before it
+     * slides one slot right. `slot` is a spring, so the slide is a glide
+     * and the tile is exactly where its new slot will be when it stops.
      */
-    const slid = grabSlot.value * SLOT + dragX.value - index * SLOT;
+    let shift = 0;
+    if (dragging && !placeholder) {
+      const origin = from.value;
+      const heading = slot.value;
+      if (index > origin) {
+        shift = -SLOT * Math.max(0, Math.min(1, heading - index + 1));
+      } else if (index < origin) {
+        shift = SLOT * Math.max(0, Math.min(1, index + 1 - heading));
+      }
+    }
     return {
+      opacity: placeholder ? 0 : 1,
       transform: [
-        { translateX: slid },
-        { translateY: dragY.value },
-        { scale: 1 + 0.12 * lift.value },
-        { rotate: "0deg" },
+        { translateX: shift },
+        { rotate: `${interpolate(wobble.value, [-1, 1], [-2.5, 2.5])}deg` },
       ],
-      shadowOpacity: 0.5 * lift.value,
-      zIndex: 10,
     };
   });
 
   return (
     <Animated.View
       {...(handlers ?? {})}
-      /* No layout animation on the card in hand: it is following a
-         finger, and a transition would fight the transform. */
-      layout={held ? undefined : SHUFFLE}
-      style={[
-        {
-          width: TILE_W,
-          height: TILE_H,
-          shadowColor: "#000",
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 6 },
-        },
-        style,
-      ]}
+      style={[{ width: TILE_W, height: TILE_H }, style]}
     >
       <Tap
         onPress={onPress}
@@ -448,61 +494,65 @@ function TrayTile({
         accessibilityLabel={`${item.name}, ${
           index === 0 ? "cover" : `card ${index + 1} of ${count}`
         }${wiggling ? ", drag to reorder" : ", hold to reorder"}`}
-        style={{
+      >
+        <TileFace item={item} index={index} outlined={active} />
+      </Tap>
+    </Animated.View>
+  );
+}
+
+/**
+ * The card in hand: drawn over the row from the picked-up tile's place,
+ * moved only by the finger, lifted a little. It never re-lays out, so it
+ * never jumps; on release it glides onto its slot and the row takes over.
+ */
+function HeldCard({
+  item,
+  index,
+  count,
+  left,
+  dragX,
+  dragY,
+  lift,
+}: {
+  item: TrayItem;
+  index: number;
+  count: number;
+  left: number;
+  dragX: SharedValue<number>;
+  dragY: SharedValue<number>;
+  lift: SharedValue<number>;
+}) {
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: dragX.value },
+      { translateY: dragY.value },
+      { scale: 1 + 0.12 * lift.value },
+    ],
+    shadowOpacity: 0.5 * lift.value,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityLabel={`${item.name}, card ${index + 1} of ${count}, in hand`}
+      style={[
+        {
+          position: "absolute",
+          left,
+          top: ROW_PAD,
           width: TILE_W,
           height: TILE_H,
-          borderRadius: 8,
-          borderWidth: active || held ? 2 : 1,
-          borderColor: active || held ? colors.accent : colors.border,
-          backgroundColor: colors.elevated,
-          overflow: "hidden",
-        }}
-      >
-        <RemoteImage uri={item.imageUrl} style={{ width: "100%", height: "100%" }} />
-        <View
-          style={{
-            position: "absolute",
-            top: 3,
-            left: 3,
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            paddingHorizontal: 4,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: index === 0 ? colors.accent : colors.canvas,
-          }}
-        >
-          <Text
-            style={{
-              color: index === 0 ? colors.accentContrast : colors.textPrimary,
-              fontSize: 10,
-              fontWeight: "700",
-            }}
-          >
-            {index + 1}
-          </Text>
-        </View>
-        {item.quantity > 1 ? (
-          <View
-            style={{
-              position: "absolute",
-              bottom: 3,
-              right: 3,
-              borderRadius: 999,
-              paddingHorizontal: 5,
-              paddingVertical: 1,
-              backgroundColor: colors.canvas,
-            }}
-          >
-            <Text
-              style={{ color: colors.textPrimary, fontSize: 10, fontWeight: "700" }}
-            >
-              {`x${item.quantity}`}
-            </Text>
-          </View>
-        ) : null}
-      </Tap>
+          zIndex: 10,
+          elevation: 10,
+          shadowColor: colors.canvas,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 6 },
+        },
+        style,
+      ]}
+    >
+      <TileFace item={item} index={index} outlined />
     </Animated.View>
   );
 }

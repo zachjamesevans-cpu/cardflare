@@ -53,3 +53,6 @@ public/rive/
 
 # Personal Claude Code overrides, per machine
 .claude/settings.local.json
+
+# Local app builds never belong in the repo.
+mobile/*.ipa
