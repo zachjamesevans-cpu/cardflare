@@ -2777,11 +2777,21 @@ export async function listFeed(
    */
   return items.map((item) => {
     const section = sectionFor(item);
+    /*
+     * No "you have this" ring on your own post. The founder: "If I have
+     * a card in my binder... it should not glow green for myself. I
+     * know I have a printing of that card." The ring is for a card
+     * somebody ELSE needs; on your own it says nothing.
+     */
+    const own =
+      item.kind === "hunt" && item.yours
+        ? { ...item, cards: item.cards.map((card) => ({ ...card, match: null })) }
+        : item;
     return {
-      ...item,
+      ...own,
       section,
-      reason: reasonFor(item),
-      tab: tabFor(item, section),
+      reason: reasonFor(own),
+      tab: tabFor(own, section),
     };
   });
 }

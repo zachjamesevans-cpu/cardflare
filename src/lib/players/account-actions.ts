@@ -30,8 +30,8 @@ import {
   type RepostState,
 } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
-import { syncCardQuantity } from "@/lib/players/found";
-import { listWants, removeWant, setWantQuantity } from "./wants";
+import { markCardFound, syncCardQuantity } from "@/lib/players/found";
+import { listOfferings, listWants, removeWant, setWantQuantity } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -241,6 +241,38 @@ export async function removeWantAction(formData: FormData): Promise<void> {
  * repository clamps; one at minus stays one, and removal has its own
  * button.
  */
+/**
+ * An offering on the list: the two verbs act on every open post of that
+ * card at once, since the row is the card, not one post. Removing it is
+ * "found" on each post, which greys the tile in the Feed the way a
+ * hunted card that was found does.
+ */
+export async function removeOfferingAction(formData: FormData): Promise<void> {
+  const cardId = text(formData, "cardId");
+  if (!cardId) return;
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return;
+  await markCardFound(playerId, cardId, "showcase");
+  revalidateWants(text(formData, "code"));
+}
+
+export async function nudgeOfferingQuantityAction(formData: FormData): Promise<void> {
+  const cardId = text(formData, "cardId");
+  const delta = Number(text(formData, "delta"));
+  if (!cardId || !Number.isFinite(delta) || delta === 0) return;
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return;
+  const row = (await listOfferings(playerId)).find((entry) => entry.cardId === cardId);
+  if (!row) return;
+  await syncCardQuantity(
+    playerId,
+    cardId,
+    row.quantity + Math.trunc(delta),
+    "showcase",
+  );
+  revalidateWants(text(formData, "code"));
+}
+
 export async function nudgeWantQuantityAction(formData: FormData): Promise<void> {
   const wantId = text(formData, "wantId");
   const delta = Number(text(formData, "delta"));

@@ -64,7 +64,11 @@ export function FlareCarousel({
           tabIndex={0}
           aria-roledescription="carousel"
           aria-label={`${cards.length} cards`}
-          className="flex snap-x snap-mandatory [scrollbar-width:none] gap-2.5 overflow-x-auto rounded-[var(--radius-control)] py-0.5 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
+          /* Twelve pixels of room on every side: `overflow-x-auto` clips
+             vertically too, and a card you hold wears a 2px ring with a
+             10px glow that was sliced flat along the top. The negative
+             margin gives the room back so the cards sit where they did. */
+          className="-mx-3 -my-2.5 flex snap-x snap-mandatory [scrollbar-width:none] gap-2.5 overflow-x-auto rounded-[var(--radius-control)] px-3 py-3 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
         >
           {cards.map((card, index) => (
             <div

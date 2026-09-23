@@ -139,7 +139,12 @@ export function FlareComposer({
   /** Bumped by the Flare tab on a re-tap while focused. */
   resetSignal?: number;
   /** A post landed; the hub refreshes its list. */
-  onPosted?: () => void;
+  /**
+   * Told what went up, so the list under the composer can show the
+   * cards the instant the post lands rather than after a re-read. The
+   * founder: "The second I hit post, it needs to be visible in flares."
+   */
+  onPosted?: (rows: Me["wants"]) => void;
   /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
@@ -314,7 +319,25 @@ export function FlareComposer({
       }
       /* The Feed starts catching up now, not when it is next looked at. */
       markFeedStale();
-      onPosted?.();
+      onPosted?.(
+        draft.items.map((item) => ({
+          id: `just-posted:${keyOf(item)}`,
+          cardId: item.cardId,
+          direction: draft.intent === "want" ? "want" : "offering",
+          cardName: item.name,
+          cardNumber: item.cardNumber,
+          printingId: item.printingId,
+          printingLabel:
+            item.printings.find((printing) => printing.id === item.printingId)?.label ??
+            null,
+          quantity: item.quantity,
+          note: null,
+          deckLabel: null,
+          imageUrl: item.imageUrl,
+          postedAt: null,
+          postedBoards: [],
+        })),
+      );
       void loadHunts();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
