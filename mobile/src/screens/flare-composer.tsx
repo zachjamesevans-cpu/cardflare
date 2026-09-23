@@ -25,6 +25,7 @@ import {
   type Me,
   type NearbySettings,
 } from "../api";
+import { CardTray } from "../card-tray";
 import { readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { cardsLabel, copiesLabel } from "../flare-copy";
@@ -428,10 +429,23 @@ export function FlareComposer({
               </View>
 
               <CardTray
-                items={draft.items}
+                items={draft.items.map((item) => ({
+                  key: keyOf(item),
+                  name: item.name,
+                  imageUrl: artFor(item),
+                  quantity: item.quantity,
+                }))}
                 editing={editing}
                 onEdit={(key) => setEditing(editing === key ? null : key)}
                 onAdd={() => setPicking(true)}
+                /* Drag replaced "Move left"/"Move right"; the arithmetic
+                   is the same splice those buttons did. */
+                onReorder={(from, to) => {
+                  const next = [...draft.items];
+                  const [moved] = next.splice(from, 1);
+                  if (moved) next.splice(to, 0, moved);
+                  setItems(next);
+                }}
               />
 
               {editing ? (
@@ -468,17 +482,6 @@ export function FlareComposer({
                       );
                     }
                     setEditing(target);
-                  }}
-                  onMove={(delta) => {
-                    const from = draft.items.findIndex(
-                      (item) => keyOf(item) === editing,
-                    );
-                    const to = from + delta;
-                    if (from < 0 || to < 0 || to >= draft.items.length) return;
-                    const next = [...draft.items];
-                    const [moved] = next.splice(from, 1);
-                    if (moved) next.splice(to, 0, moved);
-                    setItems(next);
                   }}
                   onCover={() => {
                     const item = draft.items.find((entry) => keyOf(entry) === editing);
@@ -681,113 +684,6 @@ function IntentControl({
   );
 }
 
-/** The thumbnails in order, the cover first, and the tile that adds. */
-function CardTray({
-  items,
-  editing,
-  onEdit,
-  onAdd,
-}: {
-  items: DraftItem[];
-  editing: string | null;
-  /** The line key (`keyOf`), one card in one printing. */
-  onEdit: (key: string) => void;
-  onAdd: () => void;
-}) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: spacing(2), paddingVertical: 2 }}
-    >
-      {items.map((item, index) => {
-        const on = editing === keyOf(item);
-        return (
-          <Tap
-            key={keyOf(item)}
-            onPress={() => onEdit(keyOf(item))}
-            accessibilityLabel={`${item.name}, ${index === 0 ? "cover" : `card ${index + 1}`}, ${copiesLabel(item.quantity)}`}
-            style={{
-              width: 64,
-              height: 90,
-              borderRadius: 8,
-              borderWidth: on ? 2 : 1,
-              borderColor: on ? colors.accent : colors.border,
-              backgroundColor: colors.elevated,
-              overflow: "hidden",
-            }}
-          >
-            <RemoteImage uri={artFor(item)} style={{ width: "100%", height: "100%" }} />
-            <View
-              style={{
-                position: "absolute",
-                top: 3,
-                left: 3,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                paddingHorizontal: 4,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: index === 0 ? colors.accent : colors.canvas,
-              }}
-            >
-              <Text
-                style={{
-                  color: index === 0 ? colors.accentContrast : colors.textPrimary,
-                  fontSize: 10,
-                  fontWeight: "700",
-                }}
-              >
-                {index + 1}
-              </Text>
-            </View>
-            {item.quantity > 1 ? (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 3,
-                  right: 3,
-                  borderRadius: 999,
-                  paddingHorizontal: 5,
-                  paddingVertical: 1,
-                  backgroundColor: colors.canvas,
-                }}
-              >
-                <Text
-                  style={{ color: colors.textPrimary, fontSize: 10, fontWeight: "700" }}
-                >
-                  {`x${item.quantity}`}
-                </Text>
-              </View>
-            ) : null}
-          </Tap>
-        );
-      })}
-      <Tap
-        onPress={onAdd}
-        accessibilityLabel="Add cards"
-        style={{
-          width: 64,
-          height: 90,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderStyle: "dashed",
-          borderColor: colors.borderStrong,
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 2,
-        }}
-      >
-        <Ionicons name="add" size={22} color={colors.accent} />
-        <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}>
-          Add cards
-        </Text>
-      </Tap>
-    </ScrollView>
-  );
-}
-
 /** The art for a tray tile: the chosen printing's, else the lead's. */
 function artFor(item: DraftItem): string | null {
   if (item.printingId) {
@@ -804,7 +700,6 @@ function CardEditor({
   count,
   intent,
   onChange,
-  onMove,
   onCover,
   onRemove,
 }: {
@@ -813,7 +708,6 @@ function CardEditor({
   count: number;
   intent: "want" | "showcase";
   onChange: (next: DraftItem) => void;
-  onMove: (delta: -1 | 1) => void;
   onCover: () => void;
   onRemove: () => void;
 }) {
@@ -920,12 +814,6 @@ function CardEditor({
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
         {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
-        {index > 0 ? (
-          <SmallAction label="Move left" onPress={() => onMove(-1)} />
-        ) : null}
-        {index < count - 1 ? (
-          <SmallAction label="Move right" onPress={() => onMove(1)} />
-        ) : null}
         <SmallAction label="Remove" onPress={onRemove} danger />
       </View>
     </View>
