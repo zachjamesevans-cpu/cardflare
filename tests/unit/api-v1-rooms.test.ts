@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetApiPlayerMemory } from "@/lib/api/auth";
+
 /**
  * The room-loop API's guards. Same invariants as the website's Server
  * Actions: every write re-establishes session, room and membership from
@@ -128,6 +130,9 @@ function request(
 }
 
 beforeEach(() => {
+  /* apiPlayer remembers a token for two minutes; every case here fakes
+     a different answer for the same token. */
+  resetApiPlayerMemory();
   for (const fn of [
     findPlayerSession,
     touchPlayerSession,

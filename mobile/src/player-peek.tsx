@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { peekPlayer, type PeekProfile } from "./api";
+import { readCache, writeCache } from "./cache";
 import { CosmeticCard } from "./cosmetic-card";
 import { WornBadge, WornName } from "./worn-name";
 import { EmberBadge } from "./ember-badge";
@@ -60,13 +61,22 @@ export function PlayerPeekModal({
     if (!playerId) return;
 
     let live = true;
+    /* The last look first, then the fresh one over it: see the profile
+       screen for why. */
+    void readCache<PeekProfile>("peek", playerId).then((cached) => {
+      if (live && cached) {
+        setProfile((current) => current ?? cached);
+        setShelfReady(true);
+      }
+    });
     peekPlayer(playerId)
       .then(async (result) => {
         if (!live) return;
         setProfile(result);
+        void writeCache("peek", playerId, result);
 
-        /* Prefetch the five shelf images, but never wait forever: after
-           four seconds the shelf shows with whatever has arrived. */
+        /* Prefetch the five shelf images, but only briefly: cached art
+           is instant and the rest fades in. */
         const warm = Promise.all(
           result.showcase
             .slice(0, PEEK_SHELF)
@@ -74,7 +84,7 @@ export function PlayerPeekModal({
               entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
             ),
         );
-        await Promise.race([warm, new Promise((done) => setTimeout(done, 4000))]);
+        await Promise.race([warm, new Promise((done) => setTimeout(done, 700))]);
         if (live) setShelfReady(true);
       })
       .catch(() => {

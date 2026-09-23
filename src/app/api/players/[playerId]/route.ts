@@ -28,6 +28,14 @@ async function viewerPlayerId(request: Request): Promise<string | null> {
   return (await apiPlayer(request))?.playerId ?? null;
 }
 
+/** Anybody standing in a room: an account, a guest seat, or a bearer. */
+async function mayLook(request: Request): Promise<boolean> {
+  const viewer = await getViewer();
+  if (viewer.kind !== "anonymous") return true;
+  const [session, api] = await Promise.all([getPlayerSession(), apiPlayer(request)]);
+  return Boolean(session || api);
+}
+
 /**
  * A player's public face, as JSON — what the room's profile popup shows.
  *
@@ -49,31 +57,31 @@ export async function GET(
 ) {
   const { playerId } = await params;
 
-  const viewer = await getViewer();
-  if (
-    viewer.kind === "anonymous" &&
-    !(await getPlayerSession()) &&
-    !(await apiPlayer(request))
-  ) {
+  /*
+   * Everything that needs only the id, at once: who is asking, whether
+   * they may, and the profile itself. These used to run one after
+   * another, with the bearer token verified twice, and a profile took
+   * the sum of nine round trips to open. Now it takes the longest one.
+   */
+  const [allowed, me, profile, dressed] = await Promise.all([
+    mayLook(request),
+    viewerPlayerId(request),
+    publicProfile(playerId),
+    dressedEquipsFor(playerId),
+  ]);
+  if (!allowed) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
-
-  const profile = await publicProfile(playerId);
   if (!profile) {
     return Response.json({ error: "No such player." }, { status: 404 });
   }
 
-  const [worn, dressed] = await Promise.all([
-    resolveEquipped(profile.equipped),
-    dressedEquipsFor(playerId),
-  ]);
-  const dressedArt = await wornArtFor(dressed);
-
   /* Viewer-relative: whether YOU follow them and they follow you. Only
      a signed-in player has a side of that relationship; a guest gets
      nulls and the clients hide the button. */
-  const me = await viewerPlayerId(request);
-  const [follow, stats] = await Promise.all([
+  const [worn, dressedArt, follow, stats] = await Promise.all([
+    resolveEquipped(profile.equipped),
+    wornArtFor(dressed),
     me ? followState(me, playerId) : null,
     profileStats(playerId),
   ]);

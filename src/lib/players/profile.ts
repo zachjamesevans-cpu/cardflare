@@ -129,13 +129,13 @@ async function loadProfile(
     return null;
   }
 
-  return {
-    playerId: player.id,
-    displayName: player.display_name,
-    handle: player.handle,
-    /* Read here so both the owner's profile and the public one carry
-       them, rather than each caller remembering to ask. */
-    hunts: await huntsFor(playerId, viewerId),
+  /*
+   * Four reads that need only the id, asked for together. One after
+   * another they were four round trips to the database for every
+   * profile opened, which is most of why a profile felt slow to open.
+   */
+  const [hunts, avatarUrl, showcase, organizerAt] = await Promise.all([
+    huntsFor(playerId, viewerId),
     /*
      * Resolved to a src here rather than at every render point, and
      * VERIFIED against storage — see `verifiedAvatar`. This is the page
@@ -143,7 +143,19 @@ async function loadProfile(
      * saved but could not be loaded", which is the worst state the
      * profile has: a message with nothing anybody can do about it.
      */
-    avatarUrl: await verifiedAvatar(playerId, avatarPathFor(player)),
+    verifiedAvatar(playerId, avatarPathFor(player)),
+    listShowcase(playerId),
+    organizerStoresFor(playerId),
+  ]);
+
+  return {
+    playerId: player.id,
+    displayName: player.display_name,
+    handle: player.handle,
+    /* Read here so both the owner's profile and the public one carry
+       them, rather than each caller remembering to ask. */
+    hunts,
+    avatarUrl,
     coverUrl: avatarSrc(player.cover_image),
     /* The badge: lifetime minus anything a dispute took back. The old
        column stands in until the migration lands. */
@@ -156,8 +168,8 @@ async function loadProfile(
       holo: player.equipped_holo,
       effect: player.equipped_effect,
     },
-    showcase: await listShowcase(playerId),
-    organizerAt: await organizerStoresFor(playerId),
+    showcase,
+    organizerAt,
     joinedAt: player.created_at,
   };
 }

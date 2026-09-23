@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { z } from "zod";
 
 import { apiPlayer, apiSession, badRequest } from "@/lib/api/auth";
@@ -92,18 +93,18 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   const code = normalized((await params).code);
   if (!code) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const resolved = await resolveCode(code);
+  /*
+   * The code and the account, resolved together: neither needs the
+   * other, and each is a round trip. The account is read once for every
+   * branch below, and remembered by `apiPlayer` for the seat lookup.
+   */
+  const [resolved, account] = await Promise.all([
+    resolveCode(code),
+    apiPlayer(request),
+  ]);
   if (resolved.outcome === "not-found") {
     return Response.json({ error: "not-found" }, { status: 404 });
   }
-
-  /*
-   * Resolved once for every branch below. Each of them can be the screen
-   * that used to ask a signed-in player to pick a name, and verifying a
-   * bearer token is a round trip to the auth server — not something to
-   * do twice in one response.
-   */
-  const account = await apiPlayer(request);
 
   // Shows and quiet/lobby states are real answers, not errors. A lobby is
   // a joinable one — the POST below opens the walk-in room, exactly as the
@@ -125,24 +126,30 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
 
   const room = resolved.room;
   const session = await apiSession(request, room.id);
-  const participation = session ? await findParticipation(room.id, session.id) : null;
+  const [participation, following] = await Promise.all([
+    session ? findParticipation(room.id, session.id) : null,
+    /*
+     * Whether the account already follows this store, for the Follow
+     * chip beside the store's name. False for a guest, who has no chip.
+     * Read on the not-joined answer too, because the join screen
+     * carries the store's name as well.
+     */
+    account ? hasLocal(account.playerId, room.storeId) : false,
+  ]);
 
+  /* Bookkeeping, not part of the answer: written after it is sent. */
   if (session && participation) {
-    await touchParticipation(room.id, session.id, participation.lastSeenAt);
+    const seen = participation.lastSeenAt;
+    after(() =>
+      touchParticipation(room.id, session.id, seen).catch((error) => {
+        console.error("Could not touch the participation", error);
+      }),
+    );
   }
 
   // An early board is a joinable room days before doors; the flag lets
   // the app say so instead of pretending the event is live.
   const phase = roomPhase(room, Date.now());
-
-  /*
-   * Whether the account already follows this store, for the Follow chip
-   * beside the store's name. False for a guest, who has no chip: the
-   * website shows its button to signed-in players only, and so does the
-   * app. Read on the not-joined answer too, because the join screen
-   * carries the store's name as well.
-   */
-  const following = account ? await hasLocal(account.playerId, room.storeId) : false;
 
   const base = {
     state: "room" as const,
@@ -190,22 +197,19 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
      proves printings, never quantities. */
   const heldCounts = heldCountByCard(binder);
 
-  if (session.player_id) {
-    const collection = await collectionAvailability(
-      session.player_id,
-      flares.map((entry) => entry.cardId),
-    );
+  /* Two more reads off the same card ids, together. */
+  const cardIds = flares.map((entry) => entry.cardId);
+  const [collection, counterHas] = await Promise.all([
+    session.player_id ? collectionAvailability(session.player_id, cardIds) : null,
+    counterAvailability(room.storeId, cardIds),
+  ]);
+  if (collection) {
     for (const [cardId, printings] of collection) {
       const proven = held.get(cardId) ?? new Set<string>();
       for (const printingId of printings) proven.add(printingId);
       held.set(cardId, proven);
     }
   }
-
-  const counterHas = await counterAvailability(
-    room.storeId,
-    flares.map((entry) => entry.cardId),
-  );
   const grouped = offersByFlare(offers);
 
   return Response.json({

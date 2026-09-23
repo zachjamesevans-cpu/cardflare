@@ -76,7 +76,9 @@ describe("feed views", () => {
      * rather than a session.
      */
     const route = await read("src/app/api/v1/me/route.ts");
-    expect(route).toContain("feedView: await feedViewFor(player.playerId)");
+    /* Its own read, in the same batch as the rest, never folded into
+       the players select. */
+    expect(route).toContain("feedViewFor(player.playerId),");
     expect(route).not.toContain('select("avatar_url, embers_balance, feed_view")');
   });
 

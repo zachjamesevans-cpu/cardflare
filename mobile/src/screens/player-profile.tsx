@@ -19,6 +19,7 @@ import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Card, Loading, Muted, Tap } from "../ui";
+import { readCache, writeCache } from "../cache";
 import { colors, gutter, radius, spacing } from "../theme";
 
 /** The trade-room carousel's tile width; the profile shelf matches it. */
@@ -38,6 +39,9 @@ const HEADER_TOP = 60;
  * server builds this from a type with no balance field, so this screen
  * could not leak one.
  */
+/* How long the shelf waits for its art before showing what it has. */
+const WARM_MS = 700;
+
 export function PlayerProfileScreen() {
   const route = useRoute<RouteProp<StackParams, "PlayerProfile">>();
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -91,17 +95,33 @@ export function PlayerProfileScreen() {
 
   useEffect(() => {
     let live = true;
+    /*
+     * THE LAST LOOK, FIRST. A profile seen before is painted from the
+     * cache the instant the screen opens, and the fresh one lands over
+     * it. The founder: "when clicking a profile... it just feels like it
+     * takes a second too long." The second was the network, and a
+     * repeat visit no longer waits for it.
+     */
+    void readCache<PeekProfile>("peek", playerId).then((cached) => {
+      if (live && cached) {
+        setProfile((current) => current ?? cached);
+        setShelfReady(true);
+      }
+    });
     peekPlayer(playerId)
       .then(async (result) => {
         if (!live) return;
         setProfile(result);
+        void writeCache("peek", playerId, result);
 
+        /* Warm the shelf's art so the cards land together, but only
+           briefly: cached art is instant, and the rest fades in. */
         const warm = Promise.all(
           result.showcase.map((entry) =>
             entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
           ),
         );
-        await Promise.race([warm, new Promise((done) => setTimeout(done, 4000))]);
+        await Promise.race([warm, new Promise((done) => setTimeout(done, WARM_MS))]);
         if (live) setShelfReady(true);
       })
       .catch(() => {
