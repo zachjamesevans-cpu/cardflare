@@ -236,6 +236,19 @@ export function CardTray({
               slot.value = withSpring(wanted, SPRING);
               Haptics.selectionAsync().catch(() => {});
             },
+            /*
+             * ONCE THE CARD IS IN HAND, NOBODY ELSE GETS THE TOUCH.
+             *
+             * The row is a horizontal ScrollView and a drag is a
+             * horizontal pan, so the ScrollView asks for the gesture
+             * back the moment the finger moves sideways - and the
+             * default answer to that request is yes. Logging the
+             * handlers showed the whole drag living and dying in three
+             * lines: grant, one move, terminate. The card never went
+             * anywhere because the row took the finger off it.
+             */
+            onPanResponderTerminationRequest: () => false,
+            onShouldBlockNativeResponder: () => true,
             onPanResponderRelease: release,
             onPanResponderTerminate: release,
           }),
