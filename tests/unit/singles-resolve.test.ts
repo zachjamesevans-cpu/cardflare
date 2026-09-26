@@ -58,14 +58,24 @@ vi.mock("@/lib/supabase/admin", () => ({
       };
       return query;
     },
-    rpc: async (_name: string, args: { p_game: string; p_names: string[] }) => ({
-      data: (SETS[args.p_game] ?? []).filter((set) =>
-        args.p_names.includes(set.set_name.toLowerCase().replace(/[^a-z0-9]/g, "")),
-      ),
-      error: null,
-    }),
+    rpc: async (_name: string, args: { p_game: string; p_names: string[] }) =>
+      rpcDown
+        ? {
+            data: null,
+            error: { message: "function card_sets_by_name does not exist" },
+          }
+        : {
+            data: (SETS[args.p_game] ?? []).filter((set) =>
+              args.p_names.includes(
+                set.set_name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+              ),
+            ),
+            error: null,
+          },
   }),
 }));
+
+let rpcDown = false;
 
 const { resolveSinglesCards, setNameCandidates, setNumberCandidates } =
   await import("@/lib/singles/repository");
@@ -116,6 +126,22 @@ describe("resolveSinglesCards", () => {
   it("never matches a number across games when the file names the game", async () => {
     const found = await resolveSinglesCards([line(2, "pokemon", "", "OP01016")]);
     expect(found.size).toBe(0);
+  });
+});
+
+describe("when the set lookup is unavailable", () => {
+  /* The migration not yet applied, or the database refusing it: a store's
+     One Piece and Flesh and Blood lines never needed it and still sync. */
+  it("keeps every line that matched by number", async () => {
+    rpcDown = true;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const found = await resolveSinglesCards([
+      line(2, "one-piece", "Romance Dawn", "OP01016"),
+      line(3, "mtg", "Modern Horizons 3", "0123"),
+    ]);
+    rpcDown = false;
+
+    expect(Object.fromEntries(found)).toEqual({ 2: "nami" });
   });
 });
 
