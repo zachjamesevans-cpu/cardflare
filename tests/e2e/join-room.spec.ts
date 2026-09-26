@@ -56,9 +56,12 @@ test.describe("event room", () => {
   test("the room is never indexed", async ({ page }) => {
     await page.goto("/e/K3M9PZ");
 
-    const robots = page.locator('meta[name="robots"]');
-    if ((await robots.count()) > 0) {
-      await expect(robots).toHaveAttribute("content", /noindex/);
+    /* Every robots tag, not "the" one: an unknown code is a not-found
+       page, and Next adds its own noindex tags to those. Each of them
+       must say noindex; how many there are does not matter. */
+    const robots = await page.locator('meta[name="robots"]').all();
+    for (const tag of robots) {
+      await expect(tag).toHaveAttribute("content", /noindex/);
     }
 
     const txt = await (await page.request.get("/robots.txt")).text();

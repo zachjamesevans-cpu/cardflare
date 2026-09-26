@@ -260,6 +260,14 @@ test.describe("sign-in page", () => {
       "Needs Supabase to exercise the real sign-in path.",
     );
 
+    /* Its own address: sign-in allows five tries in fifteen minutes per
+       address, and the rest of the suite signs in from this machine too,
+       so the second ask here could meet the limit's message instead. */
+    const octet = () => Math.floor(Math.random() * 254) + 1;
+    await page.setExtraHTTPHeaders({
+      "x-forwarded-for": `198.51.${octet()}.${octet()}`,
+    });
+
     const responses: string[] = [];
 
     for (const email of ["definitely-not-a-store@example.com", "owner@example.com"]) {

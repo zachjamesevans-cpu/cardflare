@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Checkbox, Select, TextInput } from "@/components/ui/controls";
 import { addTimerAction } from "@/lib/event-hub/actions";
+import { FORM_IDLE } from "@/lib/forms/notice";
 import {
   allProfiles,
   GAME_PROFILES,
@@ -23,6 +24,7 @@ import { EVENT_NAME_MAX, FORMAT_MAX } from "@/lib/event-hub/schema";
  * a defensible default, and the preset already knows the round length.
  */
 export function AddTimerForm({ displayId }: { displayId: string }) {
+  const [notice, formAction] = useActionState(addTimerAction, FORM_IDLE);
   const [game, setGame] = useState<GameId>("one-piece");
   const [presetId, setPresetId] = useState(GAME_PROFILES["one-piece"].defaultPresetId);
   const [bracket, setBracket] = useState<Bracket>("swiss");
@@ -34,7 +36,17 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
   const procedure = procedureFor(profile, bracket);
 
   return (
-    <form action={addTimerAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4">
+      {/* The draft check's own words, when it refuses: the form used to
+          do nothing at all. */}
+      {notice.status === "error" && (
+        <p
+          role="alert"
+          className="rounded-[var(--radius-control)] border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+        >
+          {notice.message}
+        </p>
+      )}
       <input type="hidden" name="displayId" value={displayId} />
 
       <div className="grid gap-4 sm:grid-cols-2">

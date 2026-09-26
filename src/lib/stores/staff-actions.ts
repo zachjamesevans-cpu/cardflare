@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
+import type { FormNotice } from "@/lib/forms/notice";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { addOrganizer, removeOrganizer } from "./staff";
@@ -40,21 +41,37 @@ async function authorizeOwner(storeId: string): Promise<{ userId: string } | nul
   return null;
 }
 
-export async function addOrganizerAction(formData: FormData): Promise<void> {
+export async function addOrganizerAction(
+  _previous: FormNotice,
+  formData: FormData,
+): Promise<FormNotice> {
   const storeId = text(formData, "storeId");
   const playerId = text(formData, "playerId");
-  if (!storeId || !playerId) return;
+  if (!storeId || !playerId) {
+    return { status: "error", message: "Pick a player to add." };
+  }
 
   const actor = await authorizeOwner(storeId);
-  if (!actor) return;
+  if (!actor) {
+    return { status: "error", message: "Only the store's owner can add organizers." };
+  }
 
   const rate = checkRateLimit(`organizers:${actor.userId}`, LIMIT, WINDOW_MS);
-  if (!rate.allowed) return;
+  if (!rate.allowed) {
+    return {
+      status: "error",
+      message: "That is a lot of changes at once. Try again in a few minutes.",
+    };
+  }
 
-  await addOrganizer(storeId, playerId);
+  /* "Already an organizer here", "No such player", a failed write: each
+     used to vanish, and the Add button simply did nothing. */
+  const added = await addOrganizer(storeId, playerId);
+  if (!added.ok) return { status: "error", message: added.message };
 
   revalidatePath(ORGANIZERS);
   revalidatePath(SETUP);
+  return { status: "done" };
 }
 
 export async function removeOrganizerAction(formData: FormData): Promise<void> {
