@@ -24,14 +24,51 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  */
 const EXPIRED = "/login/reset?expired=1";
 
+/**
+ * Opening the link spends nothing.
+ *
+ * The token is single-use, and plenty of things open a link before the
+ * person it was sent to: Outlook's Safe Links and other mail gateways
+ * fetch every link in a message to scan it, and a link texted or pasted
+ * into iMessage or Slack is fetched to draw its preview. When GET redeemed
+ * the token, any of those spent it and the shop owner's own tap landed on
+ * "expired". So GET only forwards to a page with a Continue button, and
+ * the token is redeemed by that button's POST, which no scanner sends.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const next = safeNextPath(searchParams.get("next"));
 
   if (!tokenHash || type !== "recovery") {
     return NextResponse.redirect(`${origin}${EXPIRED}`);
+  }
+
+  const open = new URL("/auth/open", origin);
+  open.searchParams.set("token_hash", tokenHash);
+  open.searchParams.set("next", safeNextPath(searchParams.get("next")));
+  return NextResponse.redirect(open);
+}
+
+export async function POST(request: NextRequest) {
+  const { origin } = request.nextUrl;
+
+  /* The button is ours. A form on another site posting here could sign a
+     visitor in as whoever's token it holds. */
+  const sentFrom = request.headers.get("origin");
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (sentFrom && host && new URL(sentFrom).host !== host) {
+    return NextResponse.redirect(`${origin}${EXPIRED}`, 303);
+  }
+
+  const form = await request.formData();
+  const tokenHash = form.get("token_hash");
+  const next = safeNextPath(
+    typeof form.get("next") === "string" ? String(form.get("next")) : null,
+  );
+
+  if (typeof tokenHash !== "string" || !tokenHash) {
+    return NextResponse.redirect(`${origin}${EXPIRED}`, 303);
   }
 
   const supabase = await createSupabaseServerClient();
@@ -48,12 +85,12 @@ export async function GET(request: NextRequest) {
      * invited store for a password they do not have yet.
      */
     console.error("Could not verify the setup link", error?.message);
-    return NextResponse.redirect(`${origin}${EXPIRED}`);
+    return NextResponse.redirect(`${origin}${EXPIRED}`, 303);
   }
 
   // First sign-in after an invitation binds the account to its store. Awaited
   // rather than deferred so the destination page sees the membership.
   await claimPendingInvite(data.user);
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(`${origin}${next}`, 303);
 }

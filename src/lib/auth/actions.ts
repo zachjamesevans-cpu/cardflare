@@ -13,6 +13,9 @@ import { clientKey } from "@/lib/request-context";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { handleAvailability } from "@/lib/players/handle-availability";
 import { HANDLE_MAX, type HandleAvailability } from "@/lib/players/handle";
+import { isEmailConfigured, sendEmail } from "@/lib/email/client";
+import { setupLinkEmail } from "@/lib/email/setup-link";
+import { generateSetupLink } from "./invite-link";
 import { ensureAuthUser } from "./provision";
 import { isProviderEnabled } from "./providers";
 import { claimPendingInvite } from "./session";
@@ -172,6 +175,24 @@ async function provisionIfInvited(email: string): Promise<void> {
   }
 
   if (data) await ensureAuthUser(email);
+}
+
+/**
+ * Whether this address was ever invited as a store, so its fresh link
+ * lands on the store's "finish setting up" page rather than the player's
+ * password page.
+ */
+async function hasStoreInvite(email: string): Promise<boolean> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("store_invites")
+    .select("id")
+    .eq("email", email.toLowerCase())
+    .limit(1);
+  if (error) {
+    console.error("Could not check for a store invitation", error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
 }
 
 /**
@@ -387,6 +408,38 @@ export async function requestPasswordReset(
   // Same recovery as the magic link: an address invited before accounts were
   // provisioned at invite time still has no auth user to send anything to.
   await provisionIfInvited(parsed.data.email);
+
+  /*
+   * Our own link when our own mail is configured. Supabase's reset email
+   * redirects through a PKCE code that only opens in the browser that
+   * asked, so an owner who asks at the counter and opens it on their phone
+   * lands on "expired" again; and its built-in sender allows two emails an
+   * hour across the whole project. The hashed-token link the invitation
+   * carries has neither problem. An address with no account mints nothing,
+   * and the page says "sent" either way, so nothing leaks.
+   */
+  if (isEmailConfigured()) {
+    const email = parsed.data.email;
+    const perAddress = checkRateLimit(
+      `password-reset-address:${email.toLowerCase()}`,
+      3,
+      SIGN_IN_WINDOW_MS,
+    );
+    if (!perAddress.allowed) return { status: "sent" };
+
+    const link = await generateSetupLink(
+      email,
+      (await hasStoreInvite(email)) ? "/welcome" : "/profile/password",
+    );
+    if (!link) return { status: "sent" };
+
+    const sent = await sendEmail(setupLinkEmail(email, link, siteUrl()));
+    if (sent.status === "sent") return { status: "sent" };
+    console.error(
+      "Fresh link email failed; falling back to Supabase",
+      sent.status === "failed" ? sent.reason : sent.status,
+    );
+  }
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {

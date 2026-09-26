@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-store-form";
 import { DeletePanel } from "@/components/admin/delete-panel";
+import { ResendSetupLinkForm } from "@/components/admin/resend-setup-link";
 import { StoreListingControls } from "@/components/admin/store-listing-controls";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
 import { listStoreMembers } from "@/lib/admin/records";
@@ -202,6 +203,7 @@ async function StoreDetailsSection({
       </div>
 
       <Card className="flex flex-col gap-5">
+        <ResendSetupLinkForm storeId={store.id} />
         {members.length === 0 ? (
           <p className="text-sm text-text-muted">
             Nobody has finished setting up yet. The invitation link is what creates

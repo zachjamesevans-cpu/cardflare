@@ -70,6 +70,20 @@ export type InviteStoreState =
 
 export const INVITE_STORE_IDLE: InviteStoreState = { status: "idle" };
 
+/** A fresh setup link for a store that was already invited. */
+export type ResendSetupLinkState =
+  | { status: "idle" }
+  | {
+      status: "success";
+      to: string;
+      email: InviteEmailOutcome;
+      /** Only when nothing was delivered, for the same reason as above. */
+      setupLink: string | null;
+    }
+  | { status: "error"; message: string };
+
+export const RESEND_SETUP_LINK_IDLE: ResendSetupLinkState = { status: "idle" };
+
 export function toInviteFieldErrors(error: z.ZodError): InviteStoreFieldErrors {
   const fieldErrors: InviteStoreFieldErrors = {};
 

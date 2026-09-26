@@ -47,7 +47,7 @@ export function waitlistConfirmationEmail(
   <body style="margin:0;padding:24px;background-color:${COLOR.canvas};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <div style="max-width:520px;margin:0 auto;background-color:${COLOR.surface};border:1px solid ${COLOR.border};border-radius:16px;padding:32px;">
       <p style="margin:0 0 24px;font-size:20px;font-weight:700;color:${COLOR.textPrimary};">
-        Card<span style="color:${COLOR.accent};">Flare</span>
+        <span style="color:${COLOR.accent};">${SITE.name}</span>
       </p>
 
       <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:${COLOR.textPrimary};">

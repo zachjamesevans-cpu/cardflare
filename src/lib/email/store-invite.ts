@@ -113,7 +113,7 @@ export function storeInviteEmail(
   <body style="margin:0;padding:24px;background-color:${COLOR.canvas};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <div style="max-width:520px;margin:0 auto;background-color:${COLOR.surface};border:1px solid ${COLOR.border};border-radius:16px;padding:32px;">
       <p style="margin:0 0 24px;font-size:20px;font-weight:700;color:${COLOR.textPrimary};">
-        Card<span style="color:${COLOR.accent};">Flare</span>
+        <span style="color:${COLOR.accent};">${SITE.name}</span>
       </p>
 
       <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:${COLOR.textPrimary};">
@@ -145,7 +145,7 @@ export function storeInviteEmail(
       </p>
 
       <p style="margin:0;padding-top:24px;border-top:1px solid ${COLOR.border};font-size:13px;line-height:1.6;color:${COLOR.textMuted};">
-        Sign in any time at <a href="${signInUrl}" style="color:${COLOR.accent};">${SITE.domain}/login</a>.
+        Once your password is set, sign in any time at <a href="${signInUrl}" style="color:${COLOR.accent};">${SITE.domain}/login</a>.
         Not expecting this? Reply and let us know; nothing happens until
         you sign in.
       </p>
@@ -249,7 +249,7 @@ export function passwordResetEmail(
   <body style="margin:0;padding:24px;background-color:${COLOR.canvas};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <div style="max-width:520px;margin:0 auto;background-color:${COLOR.surface};border:1px solid ${COLOR.border};border-radius:16px;padding:32px;">
       <p style="margin:0 0 24px;font-size:20px;font-weight:700;color:${COLOR.textPrimary};">
-        Card<span style="color:${COLOR.accent};">Flare</span>
+        <span style="color:${COLOR.accent};">${SITE.name}</span>
       </p>
 
       <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:${COLOR.textPrimary};">

@@ -43,7 +43,11 @@ import { siteUrl } from "@/lib/site";
  * a password, which is exactly the case here, and the store never sees the
  * word either way.
  */
-export async function generateSetupLink(email: string): Promise<string | null> {
+export async function generateSetupLink(
+  email: string,
+  /** Where the link lands once it has signed its holder in. */
+  next: "/welcome" | "/profile/password" = "/welcome",
+): Promise<string | null> {
   const admin = getSupabaseAdmin();
 
   const { data, error } = await admin.auth.admin.generateLink({
@@ -67,7 +71,7 @@ export async function generateSetupLink(email: string): Promise<string | null> {
   const link = new URL("/auth/confirm", siteUrl());
   link.searchParams.set("token_hash", tokenHash);
   link.searchParams.set("type", "recovery");
-  link.searchParams.set("next", "/welcome");
+  link.searchParams.set("next", next);
 
   return link.toString();
 }

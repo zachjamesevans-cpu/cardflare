@@ -185,7 +185,15 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
        carries `?g=<game>` and the room narrows its card search to that
        TCG. A mixed screen stays universal, like the counter. */
     joinUrl: store?.join_code ? joinUrl(store.join_code, singleGameOf(timers)) : null,
-    timers,
+    /* Who last pressed a control is stamped on the row for the remote's
+       "someone else has it" hint, and for a store login it is the email's
+       local part. The display link is public to anyone holding it and
+       the wall is never a person's account, so it stops here. */
+    timers: timers.map((timer) => ({
+      ...timer,
+      controlledBy: null,
+      controlledAt: null,
+    })),
     flares: [],
     serverNow: Date.now(),
   };

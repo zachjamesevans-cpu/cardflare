@@ -33,10 +33,30 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({
     from: () => ({
       select: () => ({
-        eq: () => ({ is: () => ({ maybeSingle: async () => ({ data: null }) }) }),
+        eq: (_column: string, email: string) => ({
+          is: () => ({ maybeSingle: async () => ({ data: null }) }),
+          limit: async () => ({
+            data: storeInviteEmails.includes(email) ? [{ id: "i1" }] : [],
+            error: null,
+          }),
+        }),
       }),
     }),
   }),
+}));
+
+const sendEmail = vi.fn();
+const generateSetupLink = vi.fn();
+let emailConfigured = false;
+let storeInviteEmails: string[] = [];
+
+vi.mock("@/lib/email/client", () => ({
+  isEmailConfigured: () => emailConfigured,
+  sendEmail: (...a: unknown[]) => sendEmail(...a),
+}));
+
+vi.mock("@/lib/auth/invite-link", () => ({
+  generateSetupLink: (...a: unknown[]) => generateSetupLink(...a),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -105,6 +125,15 @@ beforeEach(() => {
 
   clientIp = "203.0.113.7";
   supabaseConfigured = true;
+  emailConfigured = false;
+  storeInviteEmails = [];
+  sendEmail.mockReset();
+  generateSetupLink.mockReset();
+  sendEmail.mockResolvedValue({ status: "sent", id: "e1" });
+  generateSetupLink.mockImplementation(
+    async (_email: string, next: string) =>
+      `https://cardflare.gg/auth/confirm?token_hash=abc&type=recovery&next=${next}`,
+  );
   resetRateLimits();
 
   signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
@@ -356,6 +385,84 @@ describe("requestPasswordReset", () => {
     }
 
     expect(blocked).toBe(true);
+  });
+});
+
+/*
+ * With our own mail configured, the fresh link is the invitation's kind:
+ * a hashed token that opens on any device, sent by us. Supabase's reset
+ * email only opened in the browser that asked, and its built-in sender
+ * allows two emails an hour for the whole project.
+ */
+describe("requestPasswordReset, with cardflare's own email", () => {
+  beforeEach(() => {
+    emailConfigured = true;
+  });
+
+  it("sends our own any-device link instead of Supabase's", async () => {
+    const state = await requestPasswordReset(
+      RESET_REQUEST_IDLE,
+      form({ email: "owner@store.example" }),
+    );
+
+    expect(state).toEqual({ status: "sent" });
+    expect(resetPasswordForEmail).not.toHaveBeenCalled();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const [message] = sendEmail.mock.calls[0];
+    expect(message.to).toBe("owner@store.example");
+    expect(message.html).toContain("/auth/confirm?token_hash=abc");
+  });
+
+  it("lands an invited store on its setup page, and anyone else on the password page", async () => {
+    storeInviteEmails = ["owner@store.example"];
+    await requestPasswordReset(
+      RESET_REQUEST_IDLE,
+      form({ email: "owner@store.example" }),
+    );
+    await requestPasswordReset(RESET_REQUEST_IDLE, form({ email: "player@b.example" }));
+
+    expect(generateSetupLink.mock.calls.map((call) => call[1])).toEqual([
+      "/welcome",
+      "/profile/password",
+    ]);
+  });
+
+  it("says sent for an address with no account, and sends nothing", async () => {
+    generateSetupLink.mockResolvedValue(null);
+    const state = await requestPasswordReset(
+      RESET_REQUEST_IDLE,
+      form({ email: "nobody@b.example" }),
+    );
+
+    expect(state).toEqual({ status: "sent" });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("stops filling one inbox after a few asks, without saying so", async () => {
+    const states = [];
+    for (let i = 0; i < 5; i += 1) {
+      clientIp = `203.0.113.${i + 10}`;
+      states.push(
+        await requestPasswordReset(
+          RESET_REQUEST_IDLE,
+          form({ email: "owner@store.example" }),
+        ),
+      );
+    }
+
+    expect(states.every((state) => state.status === "sent")).toBe(true);
+    expect(sendEmail).toHaveBeenCalledTimes(3);
+  });
+
+  it("falls back to Supabase's email when ours fails to send", async () => {
+    sendEmail.mockResolvedValue({ status: "failed", reason: "http-500" });
+    const state = await requestPasswordReset(
+      RESET_REQUEST_IDLE,
+      form({ email: "owner@store.example" }),
+    );
+
+    expect(state).toEqual({ status: "sent" });
+    expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
   });
 });
 

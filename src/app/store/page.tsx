@@ -69,9 +69,46 @@ export default async function StorePage({
         description="This account is signed in but is not linked to a store."
         areas={areas}
       >
-        <Card className="text-text-secondary">
-          If you were invited, make sure you signed in with the same email address the
-          invitation was sent to. Otherwise, get in touch and we will sort it out.
+        {/* Almost always an invited owner who signed in with another
+            address, or whose setup link had run out. Each way out is a
+            link, not an instruction to go and find one. */}
+        <Card className="flex flex-col gap-4 text-text-secondary">
+          <p>
+            You are signed in as{" "}
+            <strong className="font-semibold text-text-primary">
+              {viewer.user.email ?? "this account"}
+            </strong>
+            , which is not linked to a store.
+          </p>
+          <ul className="flex flex-col gap-3 text-sm">
+            <li>
+              <strong className="font-semibold text-text-primary">
+                Invited to cardflare?
+              </strong>{" "}
+              Your store is on the address the invitation went to. Sign out, then use
+              the button in that email, or{" "}
+              <Link href="/login/reset" className="text-accent hover:text-accent-hover">
+                get a fresh setup link
+              </Link>{" "}
+              sent to it.
+            </li>
+            <li>
+              <strong className="font-semibold text-text-primary">
+                Want to put your store on cardflare?
+              </strong>{" "}
+              <Link href="/ultra" className="text-accent hover:text-accent-hover">
+                Start with cardflare Ultra
+              </Link>
+              .
+            </li>
+            <li>
+              <strong className="font-semibold text-text-primary">Still stuck?</strong>{" "}
+              <Link href="/contact" className="text-accent hover:text-accent-hover">
+                Tell us
+              </Link>{" "}
+              and we will link it by hand.
+            </li>
+          </ul>
         </Card>
       </AppShell>
     );
