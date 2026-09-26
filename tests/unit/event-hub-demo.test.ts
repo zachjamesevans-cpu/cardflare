@@ -42,7 +42,9 @@ describe("the sample night", () => {
       expect(flare.imageUrl).toBe(file);
       expect(existsSync(join(process.cwd(), "public", file))).toBe(true);
     }
-    expect(flares.some((flare) => flare.storeMayHave)).toBe(true);
+    /* The founder: the "Store may have" band on the sample cards "looks
+       ugly". The preview shows the art clean. */
+    expect(flares.some((flare) => flare.storeMayHave)).toBe(false);
   });
 
   it("points the code on screen back at the store page", () => {
