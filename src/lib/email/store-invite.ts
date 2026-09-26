@@ -1,4 +1,5 @@
 import { SITE } from "@/lib/site";
+import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 import type { EmailMessage } from "./client";
 
 /**
@@ -31,6 +32,13 @@ const COLOR = {
   textSecondary: "#b3becc",
   textMuted: "#8593a4",
 };
+
+/*
+ * The step after setting a password, for a game store: invited stores
+ * start the Ultra trial from their console (the founder's plan for this
+ * round of invites), so the email says what that is and what it costs.
+ */
+const ULTRA_LINE = `Once you are in, your console has one button to start your ${ULTRA_TRIAL_DAYS}-day free trial of ${SITE.name} Ultra: FlareCast on your TV with Auto Mode running the rounds, your singles matched to every Flare in the room, and posts to your followers. ${ULTRA_PRICE_LABEL} a month after that; cancel before day ${ULTRA_TRIAL_DAYS} and nothing is charged.`;
 
 function escapeHtml(value: string): string {
   return value
@@ -130,6 +138,12 @@ export function storeInviteEmail(
         }
       </p>
 
+      ${
+        kind === "lgs"
+          ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">${ULTRA_LINE}</p>`
+          : ""
+      }
+
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
         ${lead}
       </p>
@@ -201,6 +215,7 @@ export function storeInviteEmail(
     "",
     ...intro,
     "",
+    ...(kind === "lgs" ? [ULTRA_LINE, ""] : []),
     ...middle,
     "",
     `Sign in: ${signInUrl}`,

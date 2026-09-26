@@ -16,6 +16,24 @@ import type { Tier } from "./schema";
 export const FEATURE_TIERS = {
   /** Posting a card you want to move, rather than one you need. */
   showcase: null as Tier | null,
+
+  /*
+   * A store's Ultra. The founder: "Ultra unlocks FlareCast, store
+   * profiles, and the other stuff" - the list on /ultra. Only what a
+   * STORE runs is here. The counter code, the rooms and a store's basic
+   * listing stay free, because players stand in those whatever plan
+   * the shop is on.
+   */
+  /** Screens, timers, Auto Mode, the phone remote. */
+  flarecast: "ultra" as Tier | null,
+  /** The TCGplayer upload, matched against the room's Flares. */
+  singles: "ultra" as Tier | null,
+  /** Posts to the store's followers. */
+  storePosts: "ultra" as Tier | null,
+  /** The case: six singles on a shelf on the store page. */
+  storeCase: "ultra" as Tier | null,
+  /** The push to regulars when an early board takes its first Flares. */
+  earlyBoardPush: "ultra" as Tier | null,
 } as const satisfies Record<string, Tier | null>;
 
 export type Feature = keyof typeof FEATURE_TIERS;

@@ -25,18 +25,37 @@
  */
 
 /** Reject anything bigger before reading it; no inventory file is this big. */
-export const MAX_FILE_BYTES = 8 * 1024 * 1024;
+/*
+ * Four, not eight: Server Action bodies are capped at 4 MB in
+ * next.config.ts (the host's own ceiling is about 4.5), so anything
+ * bigger was dropped before this check could explain it.
+ */
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 /** Data rows a file may carry; far above any real store's distinct lines. */
 export const MAX_LINES = 50_000;
 
 export type SkipReason = "no-number" | "no-quantity" | "zero-quantity" | "other-game";
 
+/** The games the catalogue carries, as `cards.game` spells them. */
+export type SinglesGame =
+  "one-piece" | "pokemon" | "lorcana" | "riftbound" | "flesh-and-blood" | "mtg";
+
 export interface SinglesLine {
   /** 1-based line number in the file, for honest reporting. */
   line: number;
   /** The card number, compacted the way the catalog indexes it (OP01013). */
   compactNumber: string;
+  /**
+   * The game, from the product line; null when the file does not say,
+   * in which case the number is matched across every game.
+   */
+  game: SinglesGame | null;
+  /**
+   * The set as the export names it ("Modern Horizons 3"), for the games
+   * whose printed number only means something inside its set.
+   */
+  setName: string;
   /** The product name, for showing unmatched lines back to a human. */
   name: string;
   quantity: number;
@@ -135,6 +154,7 @@ const HEADERS = {
   name: ["product name", "name", "card name"],
   quantity: ["total quantity", "quantity", "qty"],
   productLine: ["product line", "game", "category"],
+  set: ["set name", "set", "expansion", "edition"],
 } as const;
 
 function findColumn(header: string[], aliases: readonly string[]): number {
@@ -151,8 +171,36 @@ export function compactNumber(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-/** One Piece product lines as TCGplayer names them. */
-const ONE_PIECE_LINE = /one\s*piece/i;
+/**
+ * Product lines as TCGplayer (and Collectr) name them, to the catalogue's
+ * games. The founder: "make it read all games already on the site." A
+ * line naming none of them (Yu-Gi-Oh!, sealed accessories) is skipped on
+ * purpose, not counted as a failure.
+ */
+const PRODUCT_LINES: [RegExp, SinglesGame][] = [
+  [/one\s*piece/i, "one-piece"],
+  [/pok[eé]mon/i, "pokemon"],
+  [/lorcana/i, "lorcana"],
+  [/riftbound/i, "riftbound"],
+  [/flesh\s*(and|&)\s*blood/i, "flesh-and-blood"],
+  [/magic/i, "mtg"],
+];
+
+export function gameForProductLine(productLine: string): SinglesGame | null {
+  for (const [pattern, game] of PRODUCT_LINES) {
+    if (pattern.test(productLine)) return game;
+  }
+  return null;
+}
+
+/**
+ * The number as printed, without its set size: TCGplayer writes Pokémon
+ * and Lorcana numbers as "045/142", and only the first half names the
+ * card.
+ */
+export function printedCardNumber(raw: string): string {
+  return raw.split("/")[0]?.trim() ?? "";
+}
 
 /* -------------------------------------------------------------------------- */
 /* The parse                                                                  */
@@ -170,6 +218,7 @@ export function parseSinglesExport(text: string): ParsedSingles {
   const nameCol = findColumn(header, HEADERS.name);
   const quantityCol = findColumn(header, HEADERS.quantity);
   const lineCol = findColumn(header, HEADERS.productLine);
+  const setCol = findColumn(header, HEADERS.set);
 
   /*
    * A file is only readable if it names a quantity column and at least one
@@ -192,20 +241,17 @@ export function parseSinglesExport(text: string): ParsedSingles {
     const rawNumber = (row[numberCol] ?? "").trim();
     const label = name || rawNumber || `line ${line}`;
 
-    /*
-     * Stores sell more games than One Piece, and their export carries all
-     * of them. Other product lines are ignored on purpose — not a failure,
-     * just not ours yet.
-     */
+    let game: SinglesGame | null = null;
     if (lineCol !== -1) {
       const productLine = (row[lineCol] ?? "").trim();
-      if (productLine && !ONE_PIECE_LINE.test(productLine)) {
+      game = productLine ? gameForProductLine(productLine) : null;
+      if (productLine && !game) {
         skipped.push({ line, reason: "other-game", label });
         return;
       }
     }
 
-    const number = compactNumber(rawNumber);
+    const number = compactNumber(printedCardNumber(rawNumber));
     if (!number || !/[0-9]/.test(number)) {
       skipped.push({ line, reason: "no-number", label });
       return;
@@ -228,7 +274,8 @@ export function parseSinglesExport(text: string): ParsedSingles {
       return;
     }
 
-    lines.push({ line, compactNumber: number, name, quantity });
+    const setName = (setCol === -1 ? "" : (row[setCol] ?? "")).trim();
+    lines.push({ line, compactNumber: number, game, setName, name, quantity });
   });
 
   return { ok: true, linesSeen: dataRows.length, lines, skipped };

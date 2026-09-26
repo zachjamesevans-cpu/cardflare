@@ -15,8 +15,19 @@ const replaceSingles = vi.fn();
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ getViewer: () => getViewer() }));
+/* The resolver answers per line; these tests describe the catalogue as
+   numbers, and the mock turns that into lines. */
 vi.mock("@/lib/singles/repository", () => ({
-  cardsByCompactNumbers: (...a: unknown[]) => cardsByCompactNumbers(...a),
+  resolveSinglesCards: async (lines: { line: number; compactNumber: string }[]) => {
+    const byNumber = (await cardsByCompactNumbers(
+      lines.map((line) => line.compactNumber),
+    )) as Map<string, string>;
+    return new Map(
+      lines
+        .filter((line) => byNumber.has(line.compactNumber))
+        .map((line) => [line.line, byNumber.get(line.compactNumber)]),
+    );
+  },
   replaceSingles: (...a: unknown[]) => replaceSingles(...a),
 }));
 
@@ -112,12 +123,12 @@ describe("syncSinglesAction", () => {
     }
   });
 
-  it("does not call sold-out rows or other games failures", async () => {
+  it("does not call sold-out rows or a game the site does not carry failures", async () => {
     const state = await syncSinglesAction(
       SYNC_SINGLES_IDLE,
       form(
         csvFile(
-          '"Magic: The Gathering","Llanowar Elves",0193,NM,0.25,4',
+          '"YuGiOh","Blue-Eyes White Dragon",LOB-001,NM,20.00,4',
           '"One Piece Card Game","Nami, Cat Burglar",OP01-016,NM,45.00,0',
           '"One Piece Card Game","Nami, Cat Burglar",OP01-016,NM,45.00,2',
         ),

@@ -106,7 +106,7 @@ export function UltraSignupForm({ sellable }: { sellable: boolean }) {
 
       <p className="text-xs leading-relaxed text-text-muted">
         {sellable
-          ? `Your card goes on file with Stripe and nothing is charged for ${ULTRA_TRIAL_DAYS} days. Cancel any time from your store console.`
+          ? `Your card goes on file with Stripe and nothing is charged for ${ULTRA_TRIAL_DAYS} days. Cancel before day ${ULTRA_TRIAL_DAYS} from Settings in your store console and nothing is charged.`
           : "Billing is not switched on yet. Your store is created now and we will sort the subscription out with you."}
       </p>
     </form>

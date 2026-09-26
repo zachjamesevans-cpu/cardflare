@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { StoreSinglesSyncRow } from "@/lib/supabase/types";
+import { compactNumber, type SinglesGame, type SinglesLine } from "./csv";
 
 /** Keeps `.in()` lists inside PostgREST's URL limits. */
 const CHUNK = 200;
@@ -43,6 +44,148 @@ export async function cardsByCompactNumbers(
 
     for (const row of data ?? []) {
       found.set(row.compact_card_number, row.id);
+    }
+  }
+
+  return found;
+}
+
+/** A set name as letters and digits only, the way the database compares it. */
+export function normalizeSetName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * The spellings a set name is looked up under: whole, and without a
+ * leading code. TCGplayer writes "SV07: Stellar Crown" where the
+ * catalogue says "Stellar Crown".
+ */
+export function setNameCandidates(name: string): string[] {
+  const whole = normalizeSetName(name);
+  const colon = name.indexOf(":");
+  const tail = colon === -1 ? "" : normalizeSetName(name.slice(colon + 1));
+  return [...new Set([whole, tail].filter((value) => value.length > 0))];
+}
+
+/**
+ * The catalogue numbers a printed number could be inside a set. The
+ * importers pad some games' collector numbers to three digits (Pokémon,
+ * Lorcana, Riftbound) and not others (Magic), and an export may or may
+ * not carry the zeros, so every spelling is tried and only the catalogue
+ * decides.
+ */
+export function setNumberCandidates(setCode: string, printed: string): string[] {
+  const bare = printed.replace(/^0+(?=\d)/, "");
+  const padded = /^\d+$/.test(bare) ? bare.padStart(3, "0") : bare;
+  return [
+    ...new Set(
+      [printed, bare, padded].map((number) => compactNumber(`${setCode}-${number}`)),
+    ),
+  ];
+}
+
+/**
+ * Every line's card, by line number.
+ *
+ * Two rules, both exact:
+ *
+ * - The printed number, within the line's game (or any game, when the
+ *   file does not say). One Piece's OP01-016 and Flesh and Blood's WTR001
+ *   name a card on their own.
+ * - For a line that did not match: the set, from its name, then the
+ *   number inside that set. Magic, Pokémon, Lorcana and Riftbound print
+ *   numbers that repeat in every set, and the catalogue keys them
+ *   SETCODE-NUMBER.
+ *
+ * No fuzzy name matching, as before: a wrong guess would tell a player
+ * the counter has a card the store never listed.
+ */
+export async function resolveSinglesCards(
+  lines: SinglesLine[],
+): Promise<Map<number, string>> {
+  const found = new Map<number, string>();
+  if (lines.length === 0 || !isSupabaseConfigured()) return found;
+
+  const admin = getSupabaseAdmin();
+
+  /* Cards by compact number, within a game or across all of them. */
+  const lookUp = async (
+    game: SinglesGame | null,
+    numbers: string[],
+  ): Promise<Map<string, string> | null> => {
+    const byNumber = new Map<string, string>();
+    for (const batch of chunks([...new Set(numbers)], CHUNK)) {
+      let query = admin
+        .from("cards")
+        .select("id, compact_card_number")
+        .in("compact_card_number", batch);
+      if (game) query = query.eq("game", game);
+      const { data, error } = await query;
+      if (error) {
+        console.error("Could not look up cards by number", error);
+        return null;
+      }
+      for (const row of data ?? []) byNumber.set(row.compact_card_number, row.id);
+    }
+    return byNumber;
+  };
+
+  const byGame = new Map<SinglesGame | null, SinglesLine[]>();
+  for (const line of lines) {
+    byGame.set(line.game, [...(byGame.get(line.game) ?? []), line]);
+  }
+
+  for (const [game, group] of byGame) {
+    const direct = await lookUp(
+      game,
+      group.map((line) => line.compactNumber),
+    );
+    if (!direct) return new Map();
+
+    const rest: SinglesLine[] = [];
+    for (const line of group) {
+      const cardId = direct.get(line.compactNumber);
+      if (cardId) found.set(line.line, cardId);
+      else if (game && line.setName) rest.push(line);
+    }
+    if (!game || rest.length === 0) continue;
+
+    /* The set codes behind the names this game's lines use. */
+    const names = [...new Set(rest.flatMap((line) => setNameCandidates(line.setName)))];
+    const codesByName = new Map<string, string[]>();
+    for (const batch of chunks(names, CHUNK)) {
+      const { data, error } = await admin.rpc("card_sets_by_name", {
+        p_game: game,
+        p_names: batch,
+      });
+      if (error) {
+        console.error("Could not look up sets by name", error);
+        return new Map();
+      }
+      for (const row of data ?? []) {
+        const key = normalizeSetName(row.set_name);
+        codesByName.set(key, [
+          ...new Set([...(codesByName.get(key) ?? []), row.set_code]),
+        ]);
+      }
+    }
+
+    const candidatesByLine = new Map<number, string[]>();
+    for (const line of rest) {
+      const codes = setNameCandidates(line.setName).flatMap(
+        (name) => codesByName.get(name) ?? [],
+      );
+      candidatesByLine.set(
+        line.line,
+        codes.flatMap((code) => setNumberCandidates(code, line.compactNumber)),
+      );
+    }
+
+    const inSet = await lookUp(game, [...candidatesByLine.values()].flat());
+    if (!inSet) return new Map();
+    for (const [lineNumber, candidates] of candidatesByLine) {
+      const cardId = candidates.map((candidate) => inSet.get(candidate)).find(Boolean);
+      if (cardId) found.set(lineNumber, cardId);
     }
   }
 

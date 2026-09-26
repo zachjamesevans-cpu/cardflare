@@ -1,4 +1,5 @@
 import { apiPlayer, apiStoreRole, badRequest, unauthorized } from "@/lib/api/auth";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { readJsonPayload } from "@/lib/api/payload";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
 import { controlTimer } from "@/lib/event-hub/control";
@@ -58,6 +59,10 @@ export async function POST(
 
   const role = await apiStoreRole(player.userId, display.storeId);
   if (role === null) return Response.json({ error: "forbidden" }, { status: 403 });
+  /* FlareCast is Ultra's, on the phone as on the web. */
+  if (!(await storeHasFeature(display.storeId, "flarecast"))) {
+    return Response.json({ error: "ultra-required" }, { status: 402 });
+  }
 
   const asText = (value: unknown): string | null =>
     typeof value === "string" ? value : null;

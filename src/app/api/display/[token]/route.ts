@@ -1,5 +1,6 @@
 import { displayPayload } from "@/lib/event-hub/display-payload";
 import { findDisplayByToken } from "@/lib/event-hub/repository";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,12 @@ export async function GET(
    */
   if (!display) {
     return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  /* A plan that lapsed while the TV was on: the screen reloads onto
+     the page, which says FlareCast is paused, instead of freezing. */
+  if (!(await storeHasFeature(display.storeId, "flarecast"))) {
+    return Response.json({ error: "ultra-required" }, { status: 402 });
   }
 
   const payload = await displayPayload(display);

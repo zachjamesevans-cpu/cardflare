@@ -262,4 +262,32 @@ describe("playerInviteEmail", () => {
     expect(shop.subject).toBe("Test Cards is in the cardflare beta");
     expect(shop.html).toContain("Test Cards is in the cardflare beta.");
   });
+
+  /* Invited stores start the Ultra trial from their console, so the
+     email says what that is and what it costs, in both parts. */
+  it("tells a game store about the Ultra trial and its terms", () => {
+    const shop = storeInviteEmail(
+      "Test Cards",
+      "shop@example.test",
+      "https://cardflare.gg",
+    );
+    for (const body of [shop.html, shop.text]) {
+      expect(body).toContain("14-day free trial of cardflare Ultra");
+      expect(body).toContain("$50 a month");
+      expect(body).toContain("cancel before day 14 and nothing is charged");
+    }
+  });
+
+  it("says nothing about Ultra to a vendor or a player", () => {
+    for (const kind of ["vendor", "player"] as const) {
+      const other = storeInviteEmail(
+        "X",
+        "x@example.test",
+        "https://cardflare.gg",
+        null,
+        kind,
+      );
+      expect(other.text).not.toContain("Ultra");
+    }
+  });
 });

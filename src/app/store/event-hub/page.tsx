@@ -4,6 +4,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ScreenCard } from "@/components/event-hub/screen-card";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { createDisplayAction } from "@/lib/event-hub/actions";
 import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { RULES_DISCLAIMER } from "@/lib/event-hub/game-profiles";
@@ -51,6 +53,23 @@ export default async function FlareCastPage({
     "/store/event-hub",
   );
   if (!store || store.kind === "vendor") return null;
+
+  /* Ultra's. A store without it gets the trial card in place of the tab. */
+  if (!tierHasFeature("flarecast", store.tier)) {
+    return (
+      <ConsoleLocked
+        email={viewer.user.email ?? ""}
+        areas={areas}
+        currentArea={currentArea}
+        title="FlareCast"
+        description="Your screens: tournament timers, the room's Flares and your counter code, on every TV."
+        storeId={store.id}
+        owner={store.role === "owner"}
+        feature="FlareCast"
+        pitch="Your tournament clocks, the room's Flares and your counter code on the TV, with Auto Mode running the rounds and a remote on your phone."
+      />
+    );
+  }
 
   const storeId = store.id;
   const displays = await listDisplays(storeId);

@@ -35,8 +35,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "cardflare Ultra for game stores",
-  description:
-    "Sell more singles, run tournaments on Auto Mode, and put the whole room on your TV. Fourteen days free, then $50 a month.",
+  description: `Sell more singles, run tournaments on Auto Mode, and put the whole room on your TV. ${ULTRA_TRIAL_DAYS} days free, then ${ULTRA_PRICE_LABEL} a month.`,
   alternates: { canonical: "/ultra" },
 };
 
@@ -67,7 +66,7 @@ const SALES = [
   {
     icon: BellRing,
     title: "A reason to walk in on a Tuesday",
-    body: "Your early board opens before the event and everybody who follows your store gets a push. Flares go up from the couch and get answered at the counter.",
+    body: "Your early board opens before the event, and when the first Flares land the players who follow your store hear about it. Flares go up from the couch and get answered at the counter.",
   },
 ] as const;
 
@@ -292,8 +291,8 @@ export default async function ForStoresPage() {
                 ))}
               </ul>
               <p className="text-sm text-text-muted">
-                {ULTRA_TRIAL_DAYS} days free. Cancel any time from your store console
-                and nothing is charged.
+                {ULTRA_TRIAL_DAYS} days free. Cancel before day {ULTRA_TRIAL_DAYS} from
+                Settings in your store console and nothing is charged.
               </p>
             </Card>
 
@@ -322,7 +321,7 @@ export default async function ForStoresPage() {
                         <Button type="submit" size="sm">
                           {sellable
                             ? `Start the ${ULTRA_TRIAL_DAYS}-day trial`
-                            : "Go to the console"}
+                            : "Set up your store"}
                         </Button>
                       ) : (
                         <Link
@@ -349,6 +348,13 @@ export default async function ForStoresPage() {
                         className="text-accent underline-offset-4 hover:underline"
                       >
                         Sign in
+                      </Link>
+                      . Invited by email? Use the button in that email, or{" "}
+                      <Link
+                        href="/login/reset"
+                        className="text-accent underline-offset-4 hover:underline"
+                      >
+                        get a fresh setup link
                       </Link>
                       .
                     </p>
