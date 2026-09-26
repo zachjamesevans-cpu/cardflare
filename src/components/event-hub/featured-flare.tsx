@@ -70,19 +70,29 @@ export function FeaturedCard({ flare }: { flare: DisplayFlare }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center gap-[clamp(0.4rem,0.9vw,1.1rem)]">
       <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <span className="relative block h-full max-h-full overflow-hidden rounded-[12px] border border-border bg-elevated shadow-[0_10px_40px_-18px_rgba(0,0,0,0.8)]">
-          <span className="block aspect-[60/84] h-full">
-            {flare.imageUrl && (
-              /* Plain img on purpose — immutable, CDN-cached art. */
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={flare.imageUrl}
-                alt=""
-                decoding="async"
-                className="size-full object-cover"
-              />
-            )}
-          </span>
+        {/*
+         * The picture sets the box. It used to sit inside an aspect-ratio
+         * wrapper sized from a percentage height, which Safari on a phone
+         * resolved as the full panel width: the art drew at its own width
+         * and the rest of the box showed as a grey block beside it. The
+         * founder: "There's a weird gray block on mobile in the card
+         * section." A replaced element with a height and an auto width
+         * computes its width from the art itself in every browser, so
+         * the box is exactly the card and centres as one.
+         */}
+        <span className="relative block h-full max-h-full w-auto overflow-hidden rounded-[12px] border border-border shadow-[0_10px_40px_-18px_rgba(0,0,0,0.8)]">
+          {flare.imageUrl ? (
+            /* Plain img on purpose — immutable, CDN-cached art. */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={flare.imageUrl}
+              alt=""
+              decoding="async"
+              className="block h-full w-auto max-w-none object-contain"
+            />
+          ) : (
+            <span className="block aspect-[60/84] h-full bg-elevated" />
+          )}
           {flare.storeMayHave && (
             <span className="absolute inset-x-0 bottom-0 bg-text-primary py-[0.25em] text-center text-[clamp(0.7rem,1vw,1.2rem)] font-bold tracking-[0.04em] text-accent-contrast">
               Store may have
