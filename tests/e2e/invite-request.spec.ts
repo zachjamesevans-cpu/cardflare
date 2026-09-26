@@ -15,6 +15,19 @@ const MIN_FILL_MS = 2_000;
  * submission is silently classified as a bot — the form reports success and
  * nothing is stored. Wait for the field to be populated first.
  */
+/**
+ * One visitor per test that really submits. The form allows five tries
+ * in ten minutes per address, and with a database every project's
+ * submissions come from this one machine, so the later ones were refused
+ * by a limit working exactly as designed.
+ */
+async function asOwnVisitor(page: Page) {
+  const octet = () => Math.floor(Math.random() * 254) + 1;
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": `198.51.${octet()}.${octet()}`,
+  });
+}
+
 async function settleFillWindow(page: Page) {
   await expect(page.locator('input[name="form_rendered_at"]')).not.toHaveValue("");
   await page.waitForTimeout(MIN_FILL_MS);
@@ -169,6 +182,7 @@ test.describe("invite request form", () => {
       "Supabase is not configured in this environment.",
     );
 
+    await asOwnVisitor(page);
     const email = `e2e-${Date.now()}@cardflare.test`;
     await fillValidForm(page, email);
 
@@ -183,12 +197,17 @@ test.describe("invite request form", () => {
       "Supabase is not configured in this environment.",
     );
 
+    await asOwnVisitor(page);
     const email = `e2e-dupe-${Date.now()}@cardflare.test`;
 
     await fillValidForm(page, email);
     await page.getByRole("button", { name: /request an invite/i }).click();
     await expect(page.getByRole("status")).toBeVisible();
 
+    /* A fresh page, as a returning requester would have. Going to the
+       same URL again is a same-document hash change, which leaves the
+       success panel up and the form's fields gone. */
+    await page.reload();
     await fillValidForm(page, email);
     await page.getByRole("button", { name: /request an invite/i }).click();
 

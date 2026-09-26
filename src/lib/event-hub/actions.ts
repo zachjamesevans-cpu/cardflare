@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
+import type { FormNotice } from "@/lib/forms/notice";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { text } from "@/lib/form-value";
 import { controlTimer } from "./control";
@@ -187,9 +188,18 @@ export async function rotateDisplayTokenAction(formData: FormData): Promise<void
 /* Timers                                                               */
 /* -------------------------------------------------------------------- */
 
-export async function addTimerAction(formData: FormData): Promise<void> {
+export async function addTimerAction(
+  _previous: FormNotice,
+  formData: FormData,
+): Promise<FormNotice> {
   const display = await authorizedDisplay(text(formData, "displayId"));
-  if (!display) return;
+  if (!display) {
+    return {
+      status: "error",
+      message:
+        "This screen could not take a tournament. If your store's Ultra plan is off, start it from Settings.",
+    };
+  }
 
   const checked = checkTimerDraft({
     game: text(formData, "game"),
@@ -201,9 +211,11 @@ export async function addTimerAction(formData: FormData): Promise<void> {
     customMinutes: text(formData, "customMinutes"),
   });
 
-  if (!checked.ok) return;
+  /* The draft check already says what is wrong in words; it used to be
+     thrown away, and the form simply did nothing. */
+  if (!checked.ok) return { status: "error", message: checked.message };
 
-  await addTimer({
+  const added = await addTimer({
     displayId: display.id,
     ...checked.value,
     /* The founder: "anything involving extra turns will be in the
@@ -222,8 +234,10 @@ export async function addTimerAction(formData: FormData): Promise<void> {
       text(formData, "intermissionCustom"),
     ),
   });
+  if (!added.ok) return { status: "error", message: added.message };
 
   revalidatePath(CONTROL_PANEL);
+  return { status: "done" };
 }
 
 export async function editTimerAction(formData: FormData): Promise<void> {

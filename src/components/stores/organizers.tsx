@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { formatHandle } from "@/lib/players/handle";
+import { FORM_IDLE } from "@/lib/forms/notice";
 import { addOrganizerAction } from "@/lib/stores/staff-actions";
 
 /**
@@ -41,6 +42,7 @@ export function AddOrganizer({
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<FoundPlayer[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [notice, addFormAction] = useActionState(addOrganizerAction, FORM_IDLE);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(0);
@@ -103,6 +105,14 @@ export function AddOrganizer({
         </p>
       )}
 
+      {/* "Already an organizer here", "Try again in a few minutes": the
+          Add button used to swallow every one of these. */}
+      {notice.status === "error" && (
+        <p role="alert" className="text-sm text-danger">
+          {notice.message}
+        </p>
+      )}
+
       {found && found.length > 0 && (
         <ul className="flex flex-col">
           {found.map((person) => {
@@ -132,7 +142,7 @@ export function AddOrganizer({
                 {already ? (
                   <span className="text-xs text-text-muted">Already here</span>
                 ) : (
-                  <form action={addOrganizerAction}>
+                  <form action={addFormAction}>
                     <input type="hidden" name="storeId" value={storeId} />
                     <input type="hidden" name="playerId" value={person.playerId} />
                     <Button type="submit" size="sm" variant="secondary">

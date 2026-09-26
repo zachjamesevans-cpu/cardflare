@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/controls";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { buttonStyles } from "@/components/ui/button";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { qrSvgFor } from "@/lib/stores/setup-qr";
 import { tierHasFeature } from "@/lib/stores/ultra-access";
 import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { moveTimerToScreenAction } from "@/lib/event-hub/actions";
@@ -86,6 +87,7 @@ export default async function ManageScreenPage({
 
   const otherScreens = displays.filter((entry) => entry.id !== display.id);
   const displayUrl = `${siteUrl()}/display/${display.token}`;
+  const displayQr = await qrSvgFor(displayUrl);
   const backHref = `/store/event-hub?as=${store.id}`;
 
   return (
@@ -202,25 +204,37 @@ export default async function ManageScreenPage({
 
       <section className="flex flex-col gap-4" aria-labelledby="display-heading">
         <h2 id="display-heading" className="text-xl font-bold text-text-primary">
-          Display link
+          On the TV
         </h2>
 
-        {/* How to get it on the TV (fullscreen, no sign-in) is said once,
-            on the hub's About paragraph, and not again here. */}
-        <Card className="flex flex-col gap-3">
-          <p className="text-sm text-text-secondary">
-            Open on the TV, at the top of this page, opens this screen in a new tab. Do
-            that on whatever drives the TV. Copy display link puts the same link on the
-            clipboard for a browser you cannot type into.
-          </p>
-          <details>
-            <summary className="cursor-pointer text-xs font-semibold text-text-secondary select-none">
-              View display link
-            </summary>
-            <p className="mt-2 font-mono text-xs break-all text-text-muted">
-              {displayUrl}
+        {/* The code used to appear once, in the setup wizard, and never
+            again; getting a second TV on, or the same one back after a
+            new display link, meant hunting for a 60-character URL. */}
+        <Card className="flex flex-wrap items-start gap-5">
+          <div
+            className="w-32 shrink-0 rounded-md bg-white p-1.5"
+            /* Generated server-side by the `qrcode` package from a URL
+               this app built, never from user input. */
+            dangerouslySetInnerHTML={{ __html: displayQr }}
+          />
+          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-3">
+            <p className="font-semibold text-text-primary">Put this screen on a TV</p>
+            {/* Fullscreen and the rest are said once, on the FlareCast
+                tab's About paragraph, not on every screen's page. */}
+            <p className="text-sm text-text-secondary">
+              Open this screen&rsquo;s link on the TV&rsquo;s browser or the laptop
+              plugged into it, or scan the code with a phone and cast that tab to the
+              TV.
             </p>
-          </details>
+            <details>
+              <summary className="cursor-pointer text-xs font-semibold text-text-secondary select-none">
+                View display link
+              </summary>
+              <p className="mt-2 font-mono text-xs break-all text-text-muted">
+                {displayUrl}
+              </p>
+            </details>
+          </div>
         </Card>
       </section>
 

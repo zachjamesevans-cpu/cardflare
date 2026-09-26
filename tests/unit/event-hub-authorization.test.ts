@@ -102,6 +102,46 @@ describe("a store acting on its own display", () => {
     });
   });
 
+  /* The draft check's words used to be thrown away, and the form did
+     nothing at all. */
+  it("tells the form why a tournament was not added", async () => {
+    const notice = await addTimerAction(
+      { status: "idle" },
+      form({
+        displayId: "display-1",
+        game: "one-piece",
+        eventName: "",
+        round: "",
+        format: "",
+        bracket: "swiss",
+        presetId: "store-tournament",
+        customMinutes: "",
+      }),
+    );
+
+    expect(notice).toEqual({ status: "error", message: "Give the tournament a name." });
+    expect(addTimer).not.toHaveBeenCalled();
+  });
+
+  it("says so when the tournament could not be saved", async () => {
+    addTimer.mockResolvedValue({ ok: false, message: "That didn't save." });
+    const notice = await addTimerAction(
+      { status: "idle" },
+      form({
+        displayId: "display-1",
+        game: "one-piece",
+        eventName: "Store Tournament",
+        round: "",
+        format: "",
+        bracket: "swiss",
+        presetId: "store-tournament",
+        customMinutes: "",
+      }),
+    );
+
+    expect(notice).toEqual({ status: "error", message: "That didn't save." });
+  });
+
   it("starts a timer", async () => {
     await timerControlAction(form({ timerId: "timer-1", op: "start" }));
 
@@ -183,6 +223,7 @@ describe("a store acting on somebody else's display", () => {
 
   it("cannot add a tournament", async () => {
     await addTimerAction(
+      { status: "idle" },
       form({
         displayId: "display-1",
         game: "one-piece",
