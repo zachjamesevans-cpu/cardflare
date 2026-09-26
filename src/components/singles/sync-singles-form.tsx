@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2, PackageSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/card";
 import { syncSinglesAction } from "@/lib/singles/actions";
+import { MAX_FILE_BYTES } from "@/lib/singles/csv";
 import { SYNC_SINGLES_IDLE, type SyncOutcome } from "@/lib/singles/schema";
 
 function SubmitButton() {
@@ -68,7 +69,9 @@ export function SyncSinglesForm({
             {lastSync.cardsMatched === 1 ? "card" : "cards"} synced · updated{" "}
             {lastSync.when}
             {lastSync.linesUnmatched > 0 &&
-              ` · ${lastSync.linesUnmatched.toLocaleString()} lines not recognised`}
+              ` · ${lastSync.linesUnmatched.toLocaleString()} ${
+                lastSync.linesUnmatched === 1 ? "line" : "lines"
+              } not recognised`}
           </p>
         ) : (
           <p className="text-sm text-text-secondary">
@@ -76,7 +79,7 @@ export function SyncSinglesForm({
             here.
           </p>
         )}
-        {lastSync && <Badge tone="neutral">counter search on</Badge>}
+        {lastSync && <Badge tone="neutral">matching Flares</Badge>}
       </div>
 
       {state.status === "synced" && (
@@ -120,15 +123,28 @@ export function SyncSinglesForm({
             name="file"
             accept=".csv,text/csv"
             required
+            /* Checked here, before sending: a file over the limit is
+               dropped on the way to the server, before anything there
+               could explain why. */
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.setCustomValidity(
+                file && file.size > MAX_FILE_BYTES
+                  ? "That file is over 4 MB. Export in-stock items only from TCGplayer and upload that."
+                  : "",
+              );
+            }}
             className="max-w-full text-sm text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[var(--radius-control)] file:border file:border-border file:bg-elevated file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-text-primary"
           />
           <SubmitButton />
         </div>
 
         <p className="text-xs text-text-muted">
-          Your TCGplayer inventory export (CSV). Prices in the file are ignored and
-          never stored. cardflare keeps card names and quantities only, and players are
-          pointed to your counter, not to a price.
+          Your TCGplayer inventory export (CSV), up to 4 MB. Every game on cardflare is
+          read: One Piece, Pokémon, Magic, Lorcana, Riftbound and Flesh and Blood; other
+          product lines are skipped. Prices in the file are ignored and never stored.
+          cardflare keeps card names and quantities only, and players are pointed to
+          your counter, not to a price.
         </p>
       </form>
     </Card>

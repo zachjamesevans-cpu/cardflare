@@ -181,6 +181,10 @@ export async function createCheckoutSession(entry: {
   playerId?: string;
   storeId?: string;
   customerEmail?: string;
+  /** The Stripe customer this owner already is, so a second checkout
+      reuses it (one card on file, one billing portal) rather than
+      minting another from the email. Wins over `customerEmail`. */
+  customerId?: string;
   successUrl: string;
   cancelUrl: string;
   /**
@@ -207,7 +211,11 @@ export async function createCheckoutSession(entry: {
     line_items: [{ price, quantity: 1 }],
     success_url: entry.successUrl,
     cancel_url: entry.cancelUrl,
-    ...(entry.customerEmail ? { customer_email: entry.customerEmail } : {}),
+    ...(entry.customerId
+      ? { customer: entry.customerId }
+      : entry.customerEmail
+        ? { customer_email: entry.customerEmail }
+        : {}),
     /* A code a rep hands a store at a convention works at the till. */
     allow_promotion_codes: true,
     metadata,

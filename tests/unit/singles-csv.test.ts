@@ -60,25 +60,68 @@ describe("parseSinglesExport", () => {
     expect(parsed).toMatchObject({ ok: true, linesSeen: 2 });
     if (parsed.ok) {
       expect(parsed.lines).toEqual([
-        { line: 2, compactNumber: "OP01016", name: "Nami, Cat Burglar", quantity: 3 },
-        { line: 3, compactNumber: "OP01025", name: "Roronoa Zoro", quantity: 1 },
+        {
+          line: 2,
+          compactNumber: "OP01016",
+          game: "one-piece",
+          setName: "Romance Dawn",
+          name: "Nami, Cat Burglar",
+          quantity: 3,
+        },
+        {
+          line: 3,
+          compactNumber: "OP01025",
+          game: "one-piece",
+          setName: "Romance Dawn",
+          name: "Roronoa Zoro",
+          quantity: 1,
+        },
       ]);
       // The output shape carries no price, so none can be stored downstream.
       for (const entry of parsed.lines) {
         expect(Object.keys(entry).sort()).toEqual([
           "compactNumber",
+          "game",
           "line",
           "name",
           "quantity",
+          "setName",
         ]);
       }
     }
   });
 
-  it("skips other product lines as intentional, not failures", () => {
+  /* The founder: "make it read all games already on the site." */
+  it("reads every game the site carries, with its set", () => {
     const parsed = parseSinglesExport(
       file(
-        "1,Magic: The Gathering,Foundations,Llanowar Elves,0193,C,Near Mint,0.25,0.10,12,0,0.20",
+        "1,Magic: The Gathering,Modern Horizons 3,Ocelot Pride,0123,M,Near Mint,20.00,18.00,2,0,19.00",
+        "2,Pokemon,SV07: Stellar Crown,Terapagos ex,045/142,R,Near Mint,5.00,4.00,1,0,4.75",
+        "3,Disney Lorcana,The First Chapter,Elsa,12/204,L,Near Mint,5.00,4.00,1,0,4.75",
+        "4,Flesh and Blood TCG,Welcome to Rathe,Rhinar,WTR001,T,Near Mint,5.00,4.00,1,0,4.75",
+        "5,One Piece Card Game,OP-05,Sabo,OP05-007,SR,Near Mint,5.00,4.00,2,0,4.75",
+      ),
+    );
+
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      expect(
+        parsed.lines.map((line) => [line.game, line.setName, line.compactNumber]),
+      ).toEqual([
+        ["mtg", "Modern Horizons 3", "0123"],
+        ["pokemon", "SV07: Stellar Crown", "045"],
+        ["lorcana", "The First Chapter", "12"],
+        ["flesh-and-blood", "Welcome to Rathe", "WTR001"],
+        ["one-piece", "OP-05", "OP05007"],
+      ]);
+      expect(parsed.skipped).toEqual([]);
+    }
+  });
+
+  it("skips a game the site does not carry as intentional, not a failure", () => {
+    const parsed = parseSinglesExport(
+      file(
+        "1,YuGiOh,Legend of Blue Eyes,Blue-Eyes White Dragon,LOB-001,UR,Near Mint,20.00,18.00,1,0,19.00",
         "2,One Piece Card Game,OP-05,Sabo,OP05-007,SR,Near Mint,5.00,4.00,2,0,4.75",
       ),
     );
@@ -86,9 +129,8 @@ describe("parseSinglesExport", () => {
     expect(parsed).toMatchObject({ ok: true });
     if (parsed.ok) {
       expect(parsed.lines).toHaveLength(1);
-      expect(parsed.lines[0]?.compactNumber).toBe("OP05007");
       expect(parsed.skipped).toEqual([
-        { line: 2, reason: "other-game", label: "Llanowar Elves" },
+        { line: 2, reason: "other-game", label: "Blue-Eyes White Dragon" },
       ]);
     }
   });
@@ -191,16 +233,29 @@ describe("parseSinglesExport with a Collectr export", () => {
 
     expect(parsed).toMatchObject({ ok: true, linesSeen: 2 });
     if (parsed.ok) {
-      expect(parsed.lines).toEqual([
+      expect(
+        parsed.lines.map(({ line, compactNumber, game, setName, name, quantity }) => ({
+          line,
+          compactNumber,
+          game,
+          setName,
+          name,
+          quantity,
+        })),
+      ).toEqual([
         {
           line: 2,
           compactNumber: "OP07051",
+          game: "one-piece",
+          setName: "500 Years in the Future",
           name: "Boa Hancock (051) (Parallel)",
           quantity: 1,
         },
         {
           line: 3,
           compactNumber: "OP13028",
+          game: "one-piece",
+          setName: "Carrying On His Will",
           name: "Shanks (028) (Alternate Art)",
           quantity: 2,
         },
@@ -208,9 +263,11 @@ describe("parseSinglesExport with a Collectr export", () => {
       for (const entry of parsed.lines) {
         expect(Object.keys(entry).sort()).toEqual([
           "compactNumber",
+          "game",
           "line",
           "name",
           "quantity",
+          "setName",
         ]);
       }
     }
@@ -231,20 +288,23 @@ describe("parseSinglesExport with a Collectr export", () => {
     }
   });
 
-  it("filters other games through the Category column", () => {
+  it("reads the game through the Category column", () => {
     const parsed = parseSinglesExport(
       collectr(
         "Binder,Pokemon,Base Set,Charizard,4/102,Rare Holo,Holo,Ungraded,Near Mint,0,1,300.00,0,false,2026-01-01,",
+        "Binder,YuGiOh,Legend of Blue Eyes,Blue-Eyes White Dragon,LOB-001,UR,Holo,Ungraded,Near Mint,0,1,90.00,0,false,2026-01-01,",
         "One Piece,One Piece,Paramount War,Nami (Alternate Art),OP02-036,SR,Foil,Ungraded,Near Mint,0,1,89.33,0,false,2026-07-20,",
       ),
     );
 
     expect(parsed).toMatchObject({ ok: true });
     if (parsed.ok) {
-      expect(parsed.lines).toHaveLength(1);
-      expect(parsed.lines[0]?.compactNumber).toBe("OP02036");
+      expect(parsed.lines.map((line) => [line.game, line.compactNumber])).toEqual([
+        ["pokemon", "4"],
+        ["one-piece", "OP02036"],
+      ]);
       expect(parsed.skipped).toEqual([
-        { line: 2, reason: "other-game", label: "Charizard" },
+        { line: 3, reason: "other-game", label: "Blue-Eyes White Dragon" },
       ]);
     }
   });
@@ -275,9 +335,30 @@ describe("compactNumber and aggregation", () => {
 
   it("sums conditions and printings into one quantity per card", () => {
     const totals = aggregateByNumber([
-      { line: 2, compactNumber: "OP01016", name: "Nami", quantity: 3 },
-      { line: 3, compactNumber: "OP01016", name: "Nami (Alt)", quantity: 2 },
-      { line: 4, compactNumber: "OP01025", name: "Zoro", quantity: 1 },
+      {
+        line: 2,
+        compactNumber: "OP01016",
+        game: null,
+        setName: "",
+        name: "Nami",
+        quantity: 3,
+      },
+      {
+        line: 3,
+        compactNumber: "OP01016",
+        game: null,
+        setName: "",
+        name: "Nami (Alt)",
+        quantity: 2,
+      },
+      {
+        line: 4,
+        compactNumber: "OP01025",
+        game: null,
+        setName: "",
+        name: "Zoro",
+        quantity: 1,
+      },
     ]);
 
     expect(totals.get("OP01016")).toBe(5);

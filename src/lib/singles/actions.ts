@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { text } from "@/lib/form-value";
-import { aggregateByNumber, MAX_FILE_BYTES, parseSinglesExport } from "./csv";
+import { MAX_FILE_BYTES, parseSinglesExport } from "./csv";
 import { UNMATCHED_SAMPLE, type SyncSinglesState } from "./schema";
-import { cardsByCompactNumbers, replaceSingles } from "./repository";
+import { replaceSingles, resolveSinglesCards } from "./repository";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -14,10 +15,12 @@ const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 async function authorizeStore(storeId: string): Promise<boolean> {
   const viewer = await getViewer();
 
-  return (
+  const member =
     viewer.kind === "admin" ||
-    (viewer.kind === "store" && viewer.storeIds.includes(storeId))
-  );
+    (viewer.kind === "store" && viewer.storeIds.includes(storeId));
+
+  /* The singles sync is Ultra's; the page shows the trial card instead. */
+  return member && (await storeHasFeature(storeId, "singles"));
 }
 
 /**
@@ -49,7 +52,8 @@ export async function syncSinglesAction(
   if (file.size > MAX_FILE_BYTES) {
     return {
       status: "error",
-      message: "That file is larger than any inventory export should be.",
+      message:
+        "That file is over 4 MB. Export in-stock items only from TCGplayer and upload that.",
     };
   }
 
@@ -65,25 +69,22 @@ export async function syncSinglesAction(
     return { status: "error", message };
   }
 
-  const totalsByNumber = aggregateByNumber(parsed.lines);
-  const cardIds = await cardsByCompactNumbers([...totalsByNumber.keys()]);
+  const cardByLine = await resolveSinglesCards(parsed.lines);
 
+  /* The export lists a card once per condition and printing; the room
+     only asks "does the counter have it", so quantities sum per card. */
   const totalsByCard = new Map<string, number>();
   const unmatchedLabels: string[] = [];
   let matchedRows = 0;
 
   for (const line of parsed.lines) {
-    const cardId = cardIds.get(line.compactNumber);
+    const cardId = cardByLine.get(line.line);
     if (cardId) {
       matchedRows += 1;
+      totalsByCard.set(cardId, (totalsByCard.get(cardId) ?? 0) + line.quantity);
     } else {
       unmatchedLabels.push(line.name || line.compactNumber);
     }
-  }
-
-  for (const [number, quantity] of totalsByNumber) {
-    const cardId = cardIds.get(number);
-    if (cardId) totalsByCard.set(cardId, quantity);
   }
 
   /*
@@ -113,7 +114,9 @@ export async function syncSinglesAction(
     return { status: "error", message: GENERIC_ERROR };
   }
 
+  /* The form lives on /store/singles; its stat line is read there. */
   revalidatePath("/store");
+  revalidatePath("/store/singles");
   return {
     status: "synced",
     outcome: { syncedAt: new Date().toISOString(), ...stats },

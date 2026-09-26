@@ -7,6 +7,8 @@ import { CounterCode } from "@/components/events/counter-code";
 import { AppShell } from "@/components/layout/app-shell";
 import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { WelcomeHero } from "@/components/stores/onboarding";
+import { UltraLocked } from "@/components/stores/ultra-locked";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import {
   ORGANIZER_DESCRIPTION,
   OrganizerList,
@@ -96,6 +98,9 @@ export default async function StoreSetupPage({
   }
 
   const step: SetupStep = isSetupStep(params.step) ? params.step : "welcome";
+  /* Read after the reconcile above, so a store straight back from
+     checkout is already on. */
+  const onUltra = justStarted || (await storeHasFeature(store.id, "flarecast"));
   const timeZone = store.timezone ?? "UTC";
 
   return (
@@ -111,10 +116,32 @@ export default async function StoreSetupPage({
         <StepDots storeId={store.id} step={step} />
 
         {step === "welcome" && (
-          <WelcomeStep storeId={store.id} storeName={store.name} fresh={justStarted} />
+          <WelcomeStep
+            storeId={store.id}
+            storeName={store.name}
+            fresh={justStarted}
+            onUltra={onUltra}
+          />
         )}
         {step === "page" && <PageStep storeId={store.id} tier={store.tier} />}
-        {step === "screens" && <ScreensStep storeId={store.id} />}
+        {step === "screens" &&
+          (onUltra ? (
+            <ScreensStep storeId={store.id} />
+          ) : (
+            <StepFrame
+              storeId={store.id}
+              step="screens"
+              title={STEP_TITLES.screens}
+              lede="A screen is a TV in your shop running FlareCast: your counter code, tonight's round clocks and what the room is looking for."
+            >
+              <UltraLocked
+                storeId={store.id}
+                owner
+                feature="FlareCast"
+                pitch="Your tournament clocks, the room's Flares and your counter code on the TV, with Auto Mode running the rounds and a remote on your phone."
+              />
+            </StepFrame>
+          ))}
         {step === "event" && <EventStep storeId={store.id} timeZone={timeZone} />}
         {step === "team" && <TeamStep storeId={store.id} />}
         {step === "done" && (
@@ -138,10 +165,12 @@ async function WelcomeStep({
   storeId,
   storeName,
   fresh,
+  onUltra,
 }: {
   storeId: string;
   storeName: string;
   fresh: boolean;
+  onUltra: boolean;
 }) {
   const plan = await storePlan(storeId);
   const trialUntil = plan.state === "trialing" ? planDate(plan.until) : null;
@@ -153,11 +182,32 @@ async function WelcomeStep({
       title={STEP_TITLES.welcome}
       lede="Your store page, your screens, your first night and your team. Each one is a minute, and each one can wait."
     >
-      <WelcomeHero storeName={storeName} trialUntil={trialUntil} fresh={fresh} />
+      <WelcomeHero
+        storeName={storeName}
+        trialUntil={trialUntil}
+        fresh={fresh}
+        onUltra={onUltra}
+      />
+
+      {/* An invited store's first step is the trial: the founder's, "first
+          thing I see is a button that says start your 14 day free trial". */}
+      {!onUltra && (
+        <UltraLocked
+          storeId={storeId}
+          owner
+          feature="Ultra"
+          heading="Start with your free trial"
+          pitch="Card on file with Stripe, nothing charged for fourteen days, and everything in Ultra on straight away. You come straight back here to finish setting up."
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <ButtonLink href={setupHref(storeId, "page")} size="lg">
-          Set up in five minutes
+        <ButtonLink
+          href={setupHref(storeId, "page")}
+          size="lg"
+          variant={onUltra ? "primary" : "secondary"}
+        >
+          {onUltra ? "Set up in five minutes" : "Set up first, trial later"}
         </ButtonLink>
         {/* Later stamps the store as set up and goes to the console; the
             wizard stays one link away in Settings. */}
@@ -453,12 +503,22 @@ async function DoneStep({
           <div className="flex items-center gap-2">
             <Smartphone className="size-5 text-accent" aria-hidden="true" />
             <p className="font-semibold text-text-primary">
-              Follow your own store from the app
+              See your store the way players do
             </p>
           </div>
+          {/* It used to say "find it under Nearby", which a new store
+              is not in until it has a location on the map, and which is
+              switched off on web and app for now. The page is certain. */}
           <p className="text-sm text-text-secondary">
-            Open cardflare on your phone, find {storeName} under Nearby and tap Follow.
-            You will see your nights the way your players do.
+            Your store page is what a player sees when they scan your code or find you,
+            and where they tap Follow.{" "}
+            <Link
+              href={`/s/${storeId}`}
+              className="text-accent underline-offset-4 hover:underline"
+            >
+              Open {storeName}&rsquo;s page
+            </Link>
+            .
           </p>
         </Card>
       </div>

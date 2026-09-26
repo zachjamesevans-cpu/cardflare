@@ -5,6 +5,8 @@ import { SyncSinglesForm } from "@/components/singles/sync-singles-form";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { singlesSyncFor } from "@/lib/singles/repository";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { ConsoleLocked } from "@/components/stores/ultra-locked";
 
 export const metadata: Metadata = {
   title: "Singles",
@@ -25,6 +27,23 @@ export default async function StoreSinglesPage({
     "/store/singles",
   );
   if (!store || store.kind === "vendor") return null;
+
+  /* Ultra's. A store without it gets the trial card in place of the tab. */
+  if (!tierHasFeature("singles", store.tier)) {
+    return (
+      <ConsoleLocked
+        email={viewer.user.email ?? ""}
+        areas={areas}
+        currentArea={currentArea}
+        title="Singles"
+        description="Upload your TCGplayer export, and every Flare in your room for a card you stock tells the player your counter may have it."
+        storeId={store.id}
+        owner={store.role === "owner"}
+        feature="Singles"
+        pitch="Upload your TCGplayer export, and every Flare in your room for a card you stock tells the player your counter may have it."
+      />
+    );
+  }
 
   const sync = await singlesSyncFor(store.id);
   const timeZone = store.timezone ?? "UTC";

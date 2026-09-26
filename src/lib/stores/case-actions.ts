@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { setCasePicks, singlesCatalog } from "@/lib/stores/case";
@@ -30,6 +31,8 @@ async function authorizedCurator(storeId: string): Promise<string | null> {
     console.error("Rejected a case change from an unauthorised viewer.");
     return null;
   }
+  /* The case is Ultra's. */
+  if (!(await storeHasFeature(storeId, "storeCase"))) return null;
   return viewer.user.id;
 }
 

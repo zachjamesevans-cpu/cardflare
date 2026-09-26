@@ -66,7 +66,7 @@ describe("FlareCast says screen, TV and display link", () => {
   it("the settings form saves screen settings and issues a display link", () => {
     expect(settings).toContain("Screen name");
     expect(settings).toContain('label="Save screen settings"');
-    expect(settings).toContain('label="Issue a new display link"');
+    expect(settings).toContain("Issue a new display link");
     expect(settings).not.toContain("Save display settings");
   });
 

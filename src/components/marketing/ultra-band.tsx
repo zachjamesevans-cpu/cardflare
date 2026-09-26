@@ -60,7 +60,8 @@ export function UltraBand() {
           Start your {ULTRA_TRIAL_DAYS}-day free trial
         </ButtonLink>
         <p className="text-sm text-text-muted">
-          {ULTRA_PRICE_LABEL} a month after. Cancel any time.
+          {ULTRA_PRICE_LABEL} a month after. Cancel before day {ULTRA_TRIAL_DAYS} and
+          nothing is charged.
         </p>
       </div>
     </Section>

@@ -86,6 +86,13 @@ export function useDisplayClock(
           signal: controller.signal,
         });
 
+        /* Not a wifi blip: the link was revoked (404) or the store's
+           plan is off (402). Reloading lands on the page that says so,
+           rather than a wall frozen on the last clock it knew. */
+        if (response.status === 404 || response.status === 402) {
+          window.location.reload();
+          return;
+        }
         if (!response.ok) throw new Error(String(response.status));
 
         const fresh = (await response.json()) as DisplayPayload;

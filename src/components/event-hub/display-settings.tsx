@@ -5,6 +5,7 @@ import { Megaphone } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Checkbox, Select, TextInput } from "@/components/ui/controls";
 import { rotateDisplayTokenAction, updateDisplayAction } from "@/lib/event-hub/actions";
+import { ConfirmButton } from "./confirm-button";
 import type { LayoutChoice } from "@/lib/event-hub/layout";
 import { ANNOUNCEMENT_MAX, NIGHT_TITLE_MAX } from "@/lib/event-hub/schema";
 
@@ -170,12 +171,15 @@ export function DisplaySettings({
           Issuing a new display link stops the old one working straight away. Do this if
           a TV leaves the building or the link gets out.
         </p>
-        <SubmitButton
-          label="Issue a new display link"
-          pendingLabel="Issuing…"
+        <ConfirmButton
+          type="submit"
           variant="ghost"
           size="sm"
-        />
+          className="self-start"
+          confirmLabel="Tap again: the TV's link stops working"
+        >
+          Issue a new display link
+        </ConfirmButton>
       </form>
     </div>
   );

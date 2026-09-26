@@ -1862,6 +1862,10 @@ export type Database = {
         };
         Returns: boolean;
       };
+      card_sets_by_name: {
+        Args: { p_game: string; p_names: string[] };
+        Returns: { set_code: string; set_name: string }[];
+      };
     };
     Enums: {
       waitlist_user_type: UserType;

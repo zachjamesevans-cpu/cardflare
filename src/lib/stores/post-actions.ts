@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { text } from "@/lib/form-value";
 import { notifyStorePost } from "@/lib/notifications/notify";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -33,6 +34,8 @@ async function authorizedPoster(storeId: string): Promise<string | null> {
     console.error("Rejected a store post from an unauthorised viewer.");
     return null;
   }
+  /* Posts to followers are Ultra's. */
+  if (!(await storeHasFeature(storeId, "storePosts"))) return null;
   return viewer.user.id;
 }
 

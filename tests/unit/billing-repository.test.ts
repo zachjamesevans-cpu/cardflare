@@ -14,7 +14,7 @@ const calls: Record<string, unknown[][]> = {};
 
 function chain(response: Response) {
   const c: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "update", "upsert"]) {
+  for (const method of ["select", "eq", "update", "upsert", "insert"]) {
     c[method] = vi.fn((...args: unknown[]) => {
       (calls[method] ??= []).push(args);
       return c;
@@ -55,12 +55,13 @@ beforeEach(() => {
 });
 
 describe("upsertStripeSubscription", () => {
-  it("writes a well-shaped event, keyed on the Stripe subscription id", async () => {
-    queues.subscriptions = [{ error: null }];
+  it("writes a well-shaped event as the owner's first row", async () => {
+    /* The owner lookup finds nothing, then the insert succeeds. */
+    queues.subscriptions = [{ data: null, error: null }, { error: null }];
 
     await expect(upsertStripeSubscription(FACTS)).resolves.toBe("written");
 
-    const [values, options] = calls.upsert![0] as [Record<string, unknown>, unknown];
+    const [values] = calls.insert![0] as [Record<string, unknown>];
     expect(values).toMatchObject({
       tier: "pro",
       player_id: "player-1",
@@ -70,7 +71,65 @@ describe("upsertStripeSubscription", () => {
       stripe_subscription_id: "sub_1",
       current_period_end: new Date(1_700_000_000 * 1000).toISOString(),
     });
-    expect(options).toEqual({ onConflict: "stripe_subscription_id" });
+  });
+
+  /*
+   * A re-subscribe or a second checkout is a NEW Stripe subscription for
+   * an owner who already has a row. Inserting it hit the one-row-per-
+   * owner index, so Stripe billed and the site recorded nothing.
+   */
+  it("lets a newer subscription take over the owner's row", async () => {
+    queues.subscriptions = [
+      {
+        data: { id: "row-1", stripe_subscription_id: "sub_old", status: "canceled" },
+        error: null,
+      },
+      { error: null },
+    ];
+
+    await expect(
+      upsertStripeSubscription({
+        ...FACTS,
+        stripeSubscriptionId: "sub_new",
+        stripeStatus: "trialing",
+      }),
+    ).resolves.toBe("written");
+
+    expect(calls.insert).toBeUndefined();
+    const [values] = calls.update![0] as [Record<string, unknown>];
+    expect(values).toMatchObject({
+      stripe_subscription_id: "sub_new",
+      status: "trialing",
+    });
+  });
+
+  it("ignores a stale cancellation of an old subscription a live one replaced", async () => {
+    queues.subscriptions = [
+      {
+        data: { id: "row-1", stripe_subscription_id: "sub_new", status: "trialing" },
+        error: null,
+      },
+    ];
+
+    await expect(
+      upsertStripeSubscription({
+        ...FACTS,
+        stripeSubscriptionId: "sub_old",
+        stripeStatus: "canceled",
+      }),
+    ).resolves.toBe("ignored");
+
+    expect(calls.update).toBeUndefined();
+    expect(calls.insert).toBeUndefined();
+  });
+
+  it("reports a failed write so the webhook can ask Stripe to retry", async () => {
+    queues.subscriptions = [
+      { data: null, error: null },
+      { error: { message: "down" } },
+    ];
+
+    await expect(upsertStripeSubscription(FACTS)).resolves.toBe("unavailable");
   });
 
   it("ignores an event with a tier this product does not sell", async () => {
@@ -78,7 +137,7 @@ describe("upsertStripeSubscription", () => {
       upsertStripeSubscription({ ...FACTS, tier: "platinum" }),
     ).resolves.toBe("ignored");
 
-    expect(calls.upsert).toBeUndefined();
+    expect(calls.insert).toBeUndefined();
   });
 
   it("ignores an event with no owner, and one claiming two owners", async () => {
@@ -89,15 +148,15 @@ describe("upsertStripeSubscription", () => {
       upsertStripeSubscription({ ...FACTS, storeId: "store-1" }),
     ).resolves.toBe("ignored");
 
-    expect(calls.upsert).toBeUndefined();
+    expect(calls.insert).toBeUndefined();
   });
 
   it("folds Stripe's status on the way in", async () => {
-    queues.subscriptions = [{ error: null }];
+    queues.subscriptions = [{ data: null, error: null }, { error: null }];
 
     await upsertStripeSubscription({ ...FACTS, stripeStatus: "unpaid" });
 
-    const [values] = calls.upsert![0] as [Record<string, unknown>];
+    const [values] = calls.insert![0] as [Record<string, unknown>];
     expect(values.status).toBe("canceled");
   });
 });

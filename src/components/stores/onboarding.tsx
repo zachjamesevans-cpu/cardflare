@@ -30,12 +30,19 @@ export function WelcomeHero({
   storeName,
   trialUntil,
   fresh,
+  onUltra,
 }: {
   storeName: string;
   /** Printed when the trial's first charge date is known. */
   trialUntil: string | null;
   /** Straight from checkout: the biggest welcome. */
   fresh: boolean;
+  /**
+   * Whether Ultra is on. An invited store arrives before its trial, and
+   * welcoming it "to cardflare Ultra" read as a plan it did not have yet,
+   * beside a Settings page asking for a card.
+   */
+  onUltra: boolean;
 }) {
   return (
     <Card className="flex flex-col gap-3 border-accent">
@@ -43,12 +50,18 @@ export function WelcomeHero({
         {fresh ? "You are in" : "Getting set up"}
       </p>
       <h2 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
-        Welcome to {SITE.name} <UltraMark />
+        Welcome to {SITE.name}
+        {onUltra && (
+          <>
+            {" "}
+            <UltraMark />
+          </>
+        )}
       </h2>
       <p className="max-w-2xl text-text-secondary">
-        {storeName} is on. Your counter code is ready to print, and the next four steps
-        put the rest of Ultra to work: your page, your screens, your first night and
-        your team.
+        {onUltra
+          ? `${storeName} is on. Your counter code is ready to print, and the next four steps put the rest of Ultra to work: your page, your screens, your first night and your team.`
+          : `${storeName} is on ${SITE.name}: players scan your counter code and find the cards they need from each other, right in your store. Start your Ultra trial to put FlareCast on your TV with Auto Mode running the rounds, match your singles to every Flare and post to your followers.`}
         {trialUntil &&
           ` Your free trial runs until ${trialUntil}; nothing is charged before then.`}
       </p>

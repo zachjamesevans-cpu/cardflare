@@ -23,8 +23,19 @@ vi.mock("@/lib/players/collection", () => ({
   replaceCollection: (...a: unknown[]) => replaceCollection(...a),
   printingNamesByCard: (...a: unknown[]) => printingNamesByCard(...a),
 }));
+/* The resolver answers per line; these tests keep describing the catalogue
+   as numbers, and the mock turns that into lines. */
 vi.mock("@/lib/singles/repository", () => ({
-  cardsByCompactNumbers: (...a: unknown[]) => cardsByCompactNumbers(...a),
+  resolveSinglesCards: async (lines: { line: number; compactNumber: string }[]) => {
+    const byNumber = (await cardsByCompactNumbers(
+      lines.map((line) => line.compactNumber),
+    )) as Map<string, string>;
+    return new Map(
+      lines
+        .filter((line) => byNumber.has(line.compactNumber))
+        .map((line) => [line.line, byNumber.get(line.compactNumber)]),
+    );
+  },
 }));
 
 const { syncCollectionAction } = await import("@/lib/players/collection-actions");
@@ -197,14 +208,14 @@ describe("syncCollectionAction", () => {
     expect(replaceCollection).not.toHaveBeenCalled();
   });
 
-  it("does not count other games as unrecognised lines", async () => {
+  it("does not count a game the site does not carry as unrecognised", async () => {
     const state = await syncCollectionAction(
       IDLE,
       upload(
         [
           HEADER,
           ROWS[0],
-          "Binder,Pokemon,Base Set,Charizard,4/102,Rare Holo,Holo,Ungraded,Near Mint,0,1,300.00,0,false,2026-01-01,",
+          "Binder,YuGiOh,Legend of Blue Eyes,Blue-Eyes White Dragon,LOB-001,UR,Holo,Ungraded,Near Mint,0,1,90.00,0,false,2026-01-01,",
         ].join("\n"),
       ),
     );

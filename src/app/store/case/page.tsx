@@ -8,6 +8,8 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { caseFor, hasSingles } from "@/lib/stores/case";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { ConsoleLocked } from "@/components/stores/ultra-locked";
 
 export const metadata: Metadata = {
   title: "In the case",
@@ -32,6 +34,23 @@ export default async function StoreCasePage({
     "/store/case",
   );
   if (!store || store.kind === "vendor") return null;
+
+  /* Ultra's. A store without it gets the trial card in place of the tab. */
+  if (!tierHasFeature("storeCase", store.tier)) {
+    return (
+      <ConsoleLocked
+        email={viewer.user.email ?? ""}
+        areas={areas}
+        currentArea={currentArea}
+        title="The case"
+        description="Six cards from your singles, on a shelf on your store page, for every player who finds you."
+        storeId={store.id}
+        owner={store.role === "owner"}
+        feature="The case"
+        pitch="Six cards from your singles, on a shelf on your store page, for every player who finds you."
+      />
+    );
+  }
 
   const [stocked, picks] = await Promise.all([hasSingles(store.id), caseFor(store.id)]);
 

@@ -1,4 +1,5 @@
 import { apiPlayer, apiStoreRole, unauthorized } from "@/lib/api/auth";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { remoteDisplaysFor } from "@/lib/event-hub/remote";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export async function GET(
 
   const role = await apiStoreRole(player.userId, storeId);
   if (role === null) return Response.json({ error: "forbidden" }, { status: 403 });
+  if (!(await storeHasFeature(storeId, "flarecast"))) {
+    return Response.json({ error: "ultra-required" }, { status: 402 });
+  }
 
   const now = Date.now();
   const displays = await remoteDisplaysFor(storeId, now);

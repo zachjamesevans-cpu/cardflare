@@ -115,25 +115,59 @@ export async function upsertStripeSubscription(
   const ownerCount = Number(Boolean(facts.playerId)) + Number(Boolean(facts.storeId));
   if (!isTier(facts.tier) || ownerCount !== 1) return "ignored";
 
-  const { error } = await getSupabaseAdmin()
+  const admin = getSupabaseAdmin();
+  const status = foldStripeStatus(facts.stripeStatus);
+  const row = {
+    tier: facts.tier,
+    player_id: facts.playerId,
+    store_id: facts.storeId,
+    source: "stripe" as const,
+    status,
+    stripe_customer_id: facts.stripeCustomerId,
+    stripe_subscription_id: facts.stripeSubscriptionId,
+    current_period_end: facts.currentPeriodEnd
+      ? new Date(facts.currentPeriodEnd * 1000).toISOString()
+      : null,
+    cancel_at_period_end: facts.cancelAtPeriodEnd,
+    updated_at: new Date().toISOString(),
+  };
+
+  /*
+   * One row per owner (a unique index on each of store_id and player_id),
+   * but a NEW Stripe subscription for an owner who already has a row — a
+   * re-subscribe after a lapse, or a second checkout — used to upsert on
+   * the new subscription id, which is an INSERT, which that index refused.
+   * Stripe billed the store; the site recorded nothing. So an owner's row
+   * is found by owner and taken over by the newer subscription, unless
+   * the incoming event is a stale "canceled" for an old subscription
+   * arriving after a live one replaced it.
+   */
+  const ownerColumn = facts.storeId ? "store_id" : "player_id";
+  const ownerId = (facts.storeId ?? facts.playerId) as string;
+  const { data: existing, error: readError } = await admin
     .from("subscriptions")
-    .upsert(
-      {
-        tier: facts.tier,
-        player_id: facts.playerId,
-        store_id: facts.storeId,
-        source: "stripe",
-        status: foldStripeStatus(facts.stripeStatus),
-        stripe_customer_id: facts.stripeCustomerId,
-        stripe_subscription_id: facts.stripeSubscriptionId,
-        current_period_end: facts.currentPeriodEnd
-          ? new Date(facts.currentPeriodEnd * 1000).toISOString()
-          : null,
-        cancel_at_period_end: facts.cancelAtPeriodEnd,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+    .select("id, stripe_subscription_id, status")
+    .eq(ownerColumn, ownerId)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("Could not read the owner's subscription", readError);
+    return "unavailable";
+  }
+
+  const replacing =
+    existing !== null && existing.stripe_subscription_id !== facts.stripeSubscriptionId;
+  if (
+    replacing &&
+    status === "canceled" &&
+    (existing.status === "active" || existing.status === "trialing")
+  ) {
+    return "ignored";
+  }
+
+  const { error } = existing
+    ? await admin.from("subscriptions").update(row).eq("id", existing.id)
+    : await admin.from("subscriptions").insert(row);
 
   if (error) {
     console.error("Could not write the subscription", error);
@@ -294,13 +328,17 @@ export async function syncStoreTierFromSubscription(storeId: string): Promise<vo
     whatever period was already paid. */
 export async function markStripeSubscriptionCanceled(
   stripeSubscriptionId: string,
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+): Promise<"written" | "unavailable"> {
+  if (!isSupabaseConfigured()) return "unavailable";
 
   const { error } = await getSupabaseAdmin()
     .from("subscriptions")
     .update({ status: "canceled", updated_at: new Date().toISOString() })
     .eq("stripe_subscription_id", stripeSubscriptionId);
 
-  if (error) console.error("Could not mark the subscription canceled", error);
+  if (error) {
+    console.error("Could not mark the subscription canceled", error);
+    return "unavailable";
+  }
+  return "written";
 }
