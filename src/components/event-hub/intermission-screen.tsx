@@ -306,7 +306,10 @@ function IntermissionSlides({
       className="flex h-full min-h-0 flex-col gap-[clamp(0.4rem,0.8vw,1rem)] rounded-[var(--radius-panel)] border-2 border-border bg-surface p-[clamp(0.75rem,1.5vw,2rem)]"
       aria-label={isAnnouncement ? "Store announcement" : "Wanted in the room"}
     >
-      <p className="shrink-0 text-[clamp(0.85rem,1.5vw,1.7rem)] font-bold tracking-[0.18em] text-accent uppercase">
+      {/* Centred over the card it labels. The indent matches the
+          tracking, which trails a space after the last letter and would
+          otherwise sit the line a hair left of the card's centre. */}
+      <p className="shrink-0 text-center indent-[0.18em] text-[clamp(0.85rem,1.5vw,1.7rem)] font-bold tracking-[0.18em] text-accent uppercase">
         {isAnnouncement ? "Store announcement" : "Wanted in the room"}
       </p>
 
