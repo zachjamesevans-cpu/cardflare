@@ -63,7 +63,7 @@ export function InventoryPreview() {
       <p className="text-sm text-text-muted">
         What your console says after one upload. From then on, a Flare for a card in the
         file carries a &ldquo;Store may have&rdquo; band on the wall and in the room, as
-        on the Zoro above.
+        on the Law above.
       </p>
     </Card>
   );

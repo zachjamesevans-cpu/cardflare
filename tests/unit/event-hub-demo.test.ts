@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { intermissionFor } from "@/lib/event-hub/auto-mode";
@@ -27,11 +30,19 @@ describe("the sample night", () => {
     expect(intermission?.remainingMs).toBe(135_000);
   });
 
-  it("draws its own card art rather than borrowing a publisher's", () => {
-    for (const flare of demoFlares()) {
-      expect(flare.imageUrl).toMatch(/^data:image\/svg\+xml/);
+  it("hunts the three cards the founder picked, each with its trimmed art", () => {
+    const flares = demoFlares();
+    expect(flares.map((flare) => [flare.cardName, flare.cardNumber])).toEqual([
+      ["Trafalgar Law", "OP14-009"],
+      ["Nami", "OP15-086"],
+      ["Boa Hancock", "OP07-051"],
+    ]);
+    for (const flare of flares) {
+      const file = `/flarecast/${flare.cardNumber.toLowerCase()}.webp`;
+      expect(flare.imageUrl).toBe(file);
+      expect(existsSync(join(process.cwd(), "public", file))).toBe(true);
     }
-    expect(demoFlares().some((flare) => flare.storeMayHave)).toBe(true);
+    expect(flares.some((flare) => flare.storeMayHave)).toBe(true);
   });
 
   it("points the code on screen back at the store page", () => {

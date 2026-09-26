@@ -78,37 +78,20 @@ export function demoTimer(scene: DemoScene, now: number): HubTimer {
 }
 
 /**
- * Card art for the sample, drawn rather than fetched.
+ * The cards the sample room is hunting, with their real art.
  *
- * Real card images belong to their publishers and are served only
- * when a provider supplied them for a real card. A preview does not
- * get to borrow one, so each sample card is a small SVG: the game's
- * colour, the name, the number. It reads as a card at television size
- * and it is ours.
+ * The founder picked these three by hand. Each image is the card
+ * trimmed to its own edge: cut to the exact 5:7 frame and its rounded
+ * corners made transparent, so no white scanner margin shows on the
+ * wall. They ship in `public/flarecast`, so the preview fetches
+ * nothing from anybody else.
  */
-function sampleArt(name: string, number: string, hue: number): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="hsl(${hue} 70% 34%)"/>
-      <stop offset="1" stop-color="hsl(${(hue + 40) % 360} 60% 16%)"/>
-    </linearGradient>
-  </defs>
-  <rect width="300" height="420" rx="18" fill="url(#g)"/>
-  <rect x="18" y="18" width="264" height="300" rx="12" fill="rgba(0,0,0,0.28)"/>
-  <circle cx="150" cy="168" r="78" fill="hsl(${hue} 80% 60% / 0.35)"/>
-  <circle cx="150" cy="168" r="46" fill="hsl(${hue} 85% 72% / 0.55)"/>
-  <text x="150" y="360" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#f2f5f7">${name}</text>
-  <text x="150" y="392" text-anchor="middle" font-family="Menlo, monospace" font-size="16" fill="#b3becc">${number}</text>
-</svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
-const SAMPLE_FLARES: Omit<DisplayFlare, "imageUrl">[] = [
+export const DEMO_FLARES: DisplayFlare[] = [
   {
     cardId: "demo-1",
-    cardName: "Roronoa Zoro",
-    cardNumber: "OP01-025",
+    cardName: "Trafalgar Law",
+    cardNumber: "OP14-009",
+    imageUrl: "/flarecast/op14-009.webp",
     quantity: 1,
     people: 1,
     askedBy: "Priya",
@@ -116,8 +99,9 @@ const SAMPLE_FLARES: Omit<DisplayFlare, "imageUrl">[] = [
   },
   {
     cardId: "demo-2",
-    cardName: "Trafalgar Law",
-    cardNumber: "OP05-069",
+    cardName: "Nami",
+    cardNumber: "OP15-086",
+    imageUrl: "/flarecast/op15-086.webp",
     quantity: 3,
     people: 3,
     askedBy: null,
@@ -125,40 +109,18 @@ const SAMPLE_FLARES: Omit<DisplayFlare, "imageUrl">[] = [
   },
   {
     cardId: "demo-3",
-    cardName: "Nami",
-    cardNumber: "OP01-016",
+    cardName: "Boa Hancock",
+    cardNumber: "OP07-051",
+    imageUrl: "/flarecast/op07-051.webp",
     quantity: 2,
     people: 1,
     askedBy: "Marcus",
     storeMayHave: true,
   },
-  {
-    cardId: "demo-4",
-    cardName: "Boa Hancock",
-    cardNumber: "OP07-051",
-    quantity: 1,
-    people: 1,
-    askedBy: "Jules",
-    storeMayHave: false,
-  },
-  {
-    cardId: "demo-5",
-    cardName: "Monkey.D.Luffy",
-    cardNumber: "OP05-119",
-    quantity: 1,
-    people: 2,
-    askedBy: null,
-    storeMayHave: true,
-  },
 ];
 
-const HUES = [4, 210, 28, 320, 0];
-
 export function demoFlares(): DisplayFlare[] {
-  return SAMPLE_FLARES.map((flare, index) => ({
-    ...flare,
-    imageUrl: sampleArt(flare.cardName, flare.cardNumber, HUES[index] ?? 200),
-  }));
+  return DEMO_FLARES.map((flare) => ({ ...flare }));
 }
 
 export function demoDisplayPayload(
