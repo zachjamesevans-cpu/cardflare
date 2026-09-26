@@ -153,14 +153,19 @@ export async function resolveSinglesCards(
     /* The set codes behind the names this game's lines use. */
     const names = [...new Set(rest.flatMap((line) => setNameCandidates(line.setName)))];
     const codesByName = new Map<string, string[]>();
+    let setsUnavailable = false;
     for (const batch of chunks(names, CHUNK)) {
       const { data, error } = await admin.rpc("card_sets_by_name", {
         p_game: game,
         p_names: batch,
       });
       if (error) {
+        /* Keep what already matched by number. A missing or failing set
+           lookup must not throw away a store's One Piece and Flesh and
+           Blood lines, which never needed it. */
         console.error("Could not look up sets by name", error);
-        return new Map();
+        setsUnavailable = true;
+        break;
       }
       for (const row of data ?? []) {
         const key = normalizeSetName(row.set_name);
@@ -169,6 +174,8 @@ export async function resolveSinglesCards(
         ]);
       }
     }
+
+    if (setsUnavailable) continue;
 
     const candidatesByLine = new Map<number, string[]>();
     for (const line of rest) {
