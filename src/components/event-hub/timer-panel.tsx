@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import {
   intermissionFor,
   TAKEOVER_MS,
@@ -144,10 +146,13 @@ export function TimerPanel({
   timer,
   layout,
   now,
+  join = null,
 }: {
   timer: HubTimer;
   layout: ResolvedLayout;
   now: number;
+  /** The join code, on a single-tournament wall: the footer's far end. */
+  join?: ReactNode;
 }) {
   const profile = GAME_PROFILES[timer.game];
   const repeats = nameRepeatsGame(profile, timer.eventName);
@@ -304,6 +309,8 @@ export function TimerPanel({
               {URGENCY_WORD[band]}
             </span>
           )}
+
+          {join && <div className="ml-auto">{join}</div>}
         </footer>
       </div>
 
