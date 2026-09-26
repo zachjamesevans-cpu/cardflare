@@ -25,17 +25,47 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 const { NextRequest } = await import("next/server");
-const { GET } = await import("@/app/auth/confirm/route");
+const { GET, POST } = await import("@/app/auth/confirm/route");
 
 const EXPIRED = "https://cardflare.gg/login/reset?expired=1";
 
-/** Follows the link, returning where the visitor ends up. */
-async function follow(query: string) {
+/** Opens the link, returning where the visitor is sent. */
+async function open(query: string) {
   const response = await GET(
     new NextRequest(`https://cardflare.gg/auth/confirm${query}`),
   );
-
   return response.headers.get("location");
+}
+
+/** Presses Continue, returning where the visitor ends up. */
+async function press(
+  fields: Record<string, string>,
+  origin: string | null = "https://cardflare.gg",
+) {
+  const body = new URLSearchParams(fields);
+  const response = await POST(
+    new NextRequest("https://cardflare.gg/auth/confirm", {
+      method: "POST",
+      body,
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        host: "cardflare.gg",
+        ...(origin ? { origin } : {}),
+      },
+    }),
+  );
+  return response.headers.get("location");
+}
+
+/** Opens the link, then presses Continue with what the page carries. */
+async function follow(query: string) {
+  const to = await open(query);
+  if (!to || !to.includes("/auth/open")) return to;
+  const url = new URL(to);
+  return press({
+    token_hash: url.searchParams.get("token_hash") ?? "",
+    next: url.searchParams.get("next") ?? "",
+  });
 }
 
 beforeEach(() => {
@@ -48,6 +78,26 @@ beforeEach(() => {
 });
 
 describe("/auth/confirm", () => {
+  /*
+   * Mail scanners and link previews fetch links. When opening the link
+   * redeemed it, they spent a shop owner's one-time token before the
+   * owner ever tapped it.
+   */
+  it("spends nothing when the link is merely opened", async () => {
+    const to = await open("?token_hash=abc123&type=recovery&next=%2Fwelcome");
+
+    expect(to).toBe("https://cardflare.gg/auth/open?token_hash=abc123&next=%2Fwelcome");
+    expect(verifyOtp).not.toHaveBeenCalled();
+    expect(claimPendingInvite).not.toHaveBeenCalled();
+  });
+
+  it("refuses a Continue posted from another site", async () => {
+    await expect(
+      press({ token_hash: "abc123", next: "/welcome" }, "https://evil.example"),
+    ).resolves.toBe(EXPIRED);
+    expect(verifyOtp).not.toHaveBeenCalled();
+  });
+
   it("lands the store on the setup screen the invitation aimed at", async () => {
     await expect(
       follow("?token_hash=abc123&type=recovery&next=%2Fwelcome"),

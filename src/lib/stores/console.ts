@@ -123,7 +123,16 @@ export async function loadStoreConsole(
   if (viewer.kind === "player" && viewer.organizerStoreIds.length === 0) {
     redirect("/profile");
   }
-  if (viewer.kind === "unaffiliated") redirect("/store");
+  /*
+   * Signed in, but nothing to run: most often an invited owner who
+   * signed in with a different address from the one invited, or whose
+   * invite could not be claimed. Every tab sends them to the overview,
+   * and the overview itself RENDERS for them (its "No store yet" card
+   * says what to do). It used to redirect to /store as well, which is
+   * this page, so the browser looped until it gave up on a blank
+   * screen.
+   */
+  if (viewer.kind === "unaffiliated" && path !== "/store") redirect("/store");
 
   const memberOf = consoleStoreIds(viewer);
 
@@ -167,7 +176,10 @@ export async function loadStoreConsole(
             viewer.organizerStoreIds.map((id) => [id, "staff"] as const),
           ),
         }
-      : viewer;
+      : viewer.kind === "unaffiliated"
+        ? /* A store account with no store yet: the overview's empty state. */
+          { kind: "store", user: viewer.user, storeIds: [], storeRoles: {} }
+        : viewer;
 
   return {
     viewer: consoleViewer,

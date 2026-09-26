@@ -118,6 +118,24 @@ describe("the display payload", () => {
     });
   });
 
+  /* The row stamps who last pressed a control; for a store login that is
+     their email's local part. The display link is public to whoever
+     holds it, and the wall is never a person's account. */
+  it("does not say who last pressed a control", async () => {
+    listTimers.mockResolvedValue([
+      {
+        id: "t1",
+        game: "one-piece",
+        controlledBy: "zachjamesevans",
+        controlledAt: "2026-09-26T19:00:00Z",
+      },
+    ]);
+    const payload = await displayPayload(DISPLAY);
+
+    expect(JSON.stringify(payload)).not.toContain("zachjamesevans");
+    expect(payload.timers[0]).toMatchObject({ controlledBy: null, controlledAt: null });
+  });
+
   it("never hands back the token it was reached with", async () => {
     const payload = await displayPayload(DISPLAY);
 
