@@ -170,23 +170,26 @@ export function DisplayScreen({
               item stretches to the full track by default where a flex
               child would sit at its content height. */}
           <div className="grid min-h-0 flex-[5] [&>*]:min-h-0">
-            <TimerPanel timer={timers[0]} layout="single" now={at} />
+            <TimerPanel
+              timer={timers[0]}
+              layout="single"
+              now={at}
+              join={
+                /* Bottom-right of the clock's panel, across from the
+                   phase pill: the widest dead space on the wall, and
+                   the seam between the clock and the card, so it never
+                   sits on the art. */
+                payload.showQr && qrSvg && payload.joinCode ? (
+                  <JoinPanel code={payload.joinCode} qrSvg={qrSvg} corner />
+                ) : null
+              }
+            />
           </div>
 
-          {/* The Flare panel runs the FULL height of the column, and the
-              QR sits as a badge in its corner — the founder, looking at
-              a wall: the standalone QR block "has too much negative
-              space where it's at." */}
+          {/* The Flare panel runs the FULL height of the column, with
+              nothing over it — the card is the whole point of it. */}
           <div className="relative min-h-0 flex-[3]">
             <FeaturedFlare flares={payload.flares} tick={tick} />
-            {/* Top-right: the one corner that is reliably dead space —
-                the panel's label sits top-left and the card's name and
-                ask are centred along the bottom. */}
-            {payload.showQr && qrSvg && payload.joinCode && (
-              <div className="absolute top-[clamp(0.5rem,1vw,1.25rem)] right-[clamp(0.5rem,1vw,1.25rem)]">
-                <JoinPanel code={payload.joinCode} qrSvg={qrSvg} corner />
-              </div>
-            )}
           </div>
         </div>
 
@@ -323,28 +326,45 @@ function JoinPanel({
 }: {
   code: string;
   qrSvg: string;
-  /** Compact, for sitting in the corner of another panel as a badge. */
+  /**
+   * Frameless, for sitting inside another panel's dead space. No card
+   * of its own: the code fades up out of the panel with a soft halo,
+   * so it reads as part of the screen rather than a block over it.
+   */
   corner?: boolean;
 }) {
+  if (corner) {
+    return (
+      <aside className="flex items-center gap-[clamp(0.5rem,1vw,1.25rem)] motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]">
+        <div className="flex flex-col items-end gap-[clamp(0.1rem,0.25vw,0.3rem)] text-right">
+          <p className="text-[clamp(0.6rem,0.85vw,1rem)] font-semibold tracking-[0.18em] text-accent uppercase">
+            Scan to join
+          </p>
+          <p className="font-mono text-[clamp(0.8rem,1.4vw,1.6rem)] font-bold tracking-[0.15em] text-text-primary">
+            {code}
+          </p>
+        </div>
+        <div
+          /* White plate behind the code: a QR on a dark panel is a QR
+             that does not scan from four metres away. Only the halo
+             around it moves. */
+          className="rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate] [&>svg]:block [&>svg]:size-[clamp(3.5rem,9vh,8rem)]"
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: qrSvg }}
+        />
+      </aside>
+    );
+  }
+
   return (
-    <aside
-      className={`flex shrink-0 flex-col items-center justify-center gap-[clamp(0.2rem,0.5vw,0.6rem)] rounded-[var(--radius-card)] border border-border bg-surface ${
-        corner
-          ? "p-[clamp(0.35rem,0.6vw,0.75rem)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.9)]"
-          : "p-[clamp(0.4rem,0.8vw,1rem)]"
-      }`}
-    >
+    <aside className="flex shrink-0 flex-col items-center justify-center gap-[clamp(0.2rem,0.5vw,0.6rem)] rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]">
       <p className="text-[clamp(0.6rem,0.85vw,1rem)] font-semibold tracking-[0.18em] text-accent uppercase">
         Scan to join
       </p>
       <div
         /* White plate behind the code: a QR on a dark panel is a QR that
            does not scan from four metres away. */
-        className={`rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block ${
-          corner
-            ? "[&>svg]:size-[clamp(3.5rem,8vh,7.5rem)]"
-            : "[&>svg]:size-[clamp(4rem,9vh,9rem)]"
-        }`}
+        className="rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block [&>svg]:size-[clamp(4rem,9vh,9rem)]"
         aria-hidden="true"
         dangerouslySetInnerHTML={{ __html: qrSvg }}
       />

@@ -421,6 +421,34 @@
   }
 }
 
+/*
+ * The join code arriving on a wall: it surfaces out of the panel
+ * rather than landing as a block, then breathes a soft accent halo so
+ * the eye finds it. Only the halo moves; the code itself never dims,
+ * because a QR that fades is a QR that does not scan.
+ */
+@keyframes cf-join-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+@keyframes cf-join-glow {
+  from {
+    box-shadow: 0 0 18px -10px --alpha(var(--color-accent) / 35%);
+  }
+  to {
+    box-shadow: 0 0 42px -6px --alpha(var(--color-accent) / 60%);
+  }
+}
+
 @keyframes cf-slide-open {
   from {
     opacity: 0;
