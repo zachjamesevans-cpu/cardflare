@@ -58,12 +58,10 @@ async function start(): Promise<string> {
 
 beforeEach(() => {
   subscription = null;
-  createCheckoutSession
-    .mockReset()
-    .mockResolvedValue({
-      ok: true,
-      data: { id: "cs_1", url: "https://checkout.stripe.com/x" },
-    });
+  createCheckoutSession.mockReset().mockResolvedValue({
+    ok: true,
+    data: { id: "cs_1", url: "https://checkout.stripe.com/x" },
+  });
 });
 
 describe("startUltraCheckoutAction", () => {

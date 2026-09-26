@@ -101,7 +101,9 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     case "customer.subscription.deleted": {
-      if ((await markStripeSubscriptionCanceled(event.data.object.id)) === "unavailable") {
+      if (
+        (await markStripeSubscriptionCanceled(event.data.object.id)) === "unavailable"
+      ) {
         return new Response("Could not record the cancellation", { status: 500 });
       }
       const playerId = event.data.object.metadata?.player_id ?? null;
