@@ -1,6 +1,7 @@
 import { PackageSearch } from "lucide-react";
 
 import { ControlPanel } from "@/components/event-hub/control-panel";
+import { DemoStudio } from "@/components/stores/demo-studio";
 import { PhoneFrame, TvFrame } from "@/components/stores/device-frames";
 import { Card } from "@/components/ui/card";
 import { demoDisplayPayload, demoNow } from "@/lib/event-hub/demo";
@@ -16,14 +17,12 @@ import { siteUrl } from "@/lib/site";
  * open. Both count in real time.
  */
 
-/** The wall during a round: the clock, the Flare, the code. */
+/**
+ * The wall on a sample night, with the switches under it: every scene
+ * a store can put on its TV, and a builder for their own night.
+ */
 export function FlareCastPreview() {
-  return (
-    <TvFrame
-      scene="focus"
-      label="FlareCast on the wall during round 3: the clock, what the room is hunting, and the code to scan in."
-    />
-  );
+  return <DemoStudio variant="full" />;
 }
 
 /** Between rounds: the wall's countdown and the organizer's phone. */

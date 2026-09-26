@@ -217,7 +217,7 @@ export default async function ForStoresPage() {
           </div>
           {/* The product itself, running: the TV a store leaves on
               all night, on a sample night. It counts in real time. */}
-          <div className="mx-auto mt-12 w-full max-w-5xl">
+          <div id="demo" className="mx-auto mt-12 w-full max-w-5xl scroll-mt-24">
             <FlareCastPreview />
           </div>
         </Section>
