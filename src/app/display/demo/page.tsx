@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import QRCode from "qrcode";
 
-import { DisplayScreen } from "@/components/event-hub/display-screen";
-import { demoDisplayPayload, demoNow, isDemoScene } from "@/lib/event-hub/demo";
+import { DemoDisplay } from "@/components/event-hub/demo-display";
+import {
+  DEMO_SCENES,
+  demoNow,
+  demoPayload,
+  parseDemoConfig,
+} from "@/lib/event-hub/demo";
 import { siteUrl } from "@/lib/site";
 
 /**
@@ -25,10 +30,19 @@ export const dynamic = "force-dynamic";
 export default async function DemoDisplayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scene?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { scene } = await searchParams;
-  const chosen = isDemoScene(scene) ? scene : "focus";
+  /* A repeated parameter is somebody editing the address by hand; the
+     first value is the one that counts. Anything the parser does not
+     recognise falls back to the opening scene. */
+  const raw = await searchParams;
+  const params = Object.fromEntries(
+    Object.entries(raw).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value[0] : value,
+    ]),
+  );
+  const config = parseDemoConfig(params) ?? DEMO_SCENES[0].config;
   const back = `${siteUrl()}/ultra`;
 
   const qrSvg = await QRCode.toString(back, {
@@ -39,9 +53,9 @@ export default async function DemoDisplayPage({
   });
 
   return (
-    <DisplayScreen
-      initial={demoDisplayPayload(chosen, demoNow(), back)}
-      token={null}
+    <DemoDisplay
+      initial={demoPayload(config, demoNow(), back)}
+      joinUrl={back}
       qrSvg={qrSvg}
     />
   );

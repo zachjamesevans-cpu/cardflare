@@ -1,6 +1,6 @@
 import { Tv } from "lucide-react";
 
-import { TvFrame } from "@/components/stores/device-frames";
+import { DemoStudio } from "@/components/stores/demo-studio";
 import { UltraMark } from "@/components/stores/ultra-mark";
 import { ButtonLink } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
@@ -46,10 +46,7 @@ export function UltraBand() {
       </div>
 
       <div className="relative mt-6 md:mt-8">
-        <TvFrame
-          scene="focus"
-          label="FlareCast on the wall during round 3: the clock, what the room is looking for, and the code to scan in."
-        />
+        <DemoStudio variant="compact" />
       </div>
 
       <div className="relative mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:mt-8">
