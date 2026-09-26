@@ -95,7 +95,7 @@ export const DEMO_FLARES: DisplayFlare[] = [
     quantity: 1,
     people: 1,
     askedBy: "Priya",
-    storeMayHave: true,
+    storeMayHave: false,
   },
   {
     cardId: "demo-2",
@@ -115,7 +115,7 @@ export const DEMO_FLARES: DisplayFlare[] = [
     quantity: 2,
     people: 1,
     askedBy: "Marcus",
-    storeMayHave: true,
+    storeMayHave: false,
   },
 ];
 

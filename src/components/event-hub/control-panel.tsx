@@ -252,17 +252,21 @@ function TimerCard({
     >
       <span aria-hidden="true" className="block h-1 w-full bg-[var(--game)]" />
 
-      <div className="flex flex-col gap-4 p-4">
+      {/* A container, so the button grids below answer to the panel's own
+          width, not the screen's: the same panel sits full-width on an
+          organizer's phone, beside three others on a laptop, and inside
+          the phone drawn on /ultra. */}
+      <div className="@container flex flex-col gap-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-[var(--game)] uppercase">
-              <span>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold tracking-[0.16em] text-[var(--game)] uppercase">
+              <span className="whitespace-nowrap">
                 {profile.shortName}
                 {timer.bracket === "elimination" ? " · Elimination" : ""}
               </span>
               {/* The founder's indicator: "a small obvious status". */}
               {timer.autoMode && (
-                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-accent normal-case">
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold tracking-wide whitespace-nowrap text-accent normal-case">
                   AUTO MODE ON
                 </span>
               )}
@@ -317,7 +321,10 @@ function TimerCard({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {/* One to a row until three fit side by side. Two to a row
+                on a phone cut "Hold next round" into a word per line,
+                and the third button sat alone beside a hole. */}
+            <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
               {intermission.state === "held" ? (
                 <Control
                   label="Resume"
@@ -379,7 +386,7 @@ function TimerCard({
             Mode intermission the row keeps only the judge tools: a
             second green Start beside "Start round now" would relaunch
             the SAME round, and time is already called. */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
           {!intermission &&
             (phase === "running" ? (
               <Control
@@ -427,7 +434,7 @@ function TimerCard({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 @sm:grid-cols-2">
               {/* The one-press next round, for tournaments running by
                   hand. Auto Mode's cockpit above owns this door when it
                   is on — two "start the round" buttons is one too many. */}
@@ -498,7 +505,7 @@ function TimerCard({
                   the in-the-moment hide only exists once it is on. A
                   full row on a phone, because its label is the longest
                   in the grid. */}
-              <div className="col-span-2 sm:col-span-1">
+              <div className="col-span-full @lg:col-span-1">
                 <Control
                   label={
                     timer.beginnerMode ? "Beginner mode is on" : "Beginner mode is off"
@@ -1011,7 +1018,19 @@ function Control({
   onClick: () => void;
 }) {
   return (
-    <Button variant={variant} size="lg" onClick={onClick} className="w-full">
+    <Button
+      variant={variant}
+      size="lg"
+      onClick={onClick}
+      /* The large size's h-13 and px-7 are built for one line of text
+         on a wide row. Two to a row on a phone, 56px of side padding
+         left "Hold next round" three words deep and pushed a wrapped
+         label out of the button's fixed height. Here the button grows
+         with its label and keeps the padding to what a thumb needs.
+         Important, because cn() joins rather than merges: without it
+         the size's own h-13 and px-7 still win. */
+      className="h-auto! min-h-13 w-full px-3! py-2"
+    >
       <Icon className="size-5 shrink-0" aria-hidden="true" />
       {/* Wraps rather than truncates: "Beginner mode is off" cut to
           "Begi…" on a phone is a button nobody can read, and these sit
