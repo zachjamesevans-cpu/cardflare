@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 
 import { TvFrame } from "@/components/stores/device-frames";
 import { cn } from "@/lib/cn";
@@ -30,8 +30,12 @@ import type { LayoutChoice } from "@/lib/event-hub/layout";
  * the wall.
  */
 
-/** The scenes the homepage offers: the four that differ most. */
-const COMPACT_SCENES = ["locals", "two-games", "big-night", "between-rounds"];
+/**
+ * The four scenes that differ most, always on show. The rest, and the
+ * switches, wait in a drawer: the founder, "no need to have it there if
+ * they're not useful unless someone wants to see a further demo."
+ */
+const LEAD_SCENES = ["locals", "two-games", "big-night", "between-rounds"];
 
 const LAYOUTS: { id: LayoutChoice; label: string }[] = [
   { id: "auto", label: "Auto" },
@@ -72,30 +76,33 @@ function sharedMoment(config: DemoConfig): DemoMoment | null {
 
 export function DemoStudio({ variant }: { variant: "full" | "compact" }) {
   const [config, setConfig] = useState<DemoConfig>(DEMO_SCENES[0].config);
+  const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const active = matchingScene(config);
-  const scenes =
-    variant === "full"
-      ? DEMO_SCENES
-      : DEMO_SCENES.filter((scene) => COMPACT_SCENES.includes(scene.id));
+  const lead = DEMO_SCENES.filter((scene) => LEAD_SCENES.includes(scene.id));
+  const more = DEMO_SCENES.filter((scene) => !LEAD_SCENES.includes(scene.id));
+  const expanded = open && !closing;
+
+  const sceneChip = (scene: (typeof DEMO_SCENES)[number]) => (
+    <Chip
+      key={scene.id}
+      pressed={active?.id === scene.id}
+      onClick={() => setConfig(scene.config)}
+    >
+      {scene.label}
+    </Chip>
+  );
 
   return (
     <div className="flex flex-col gap-5">
       <div
         role="group"
         aria-label="FlareCast scenes"
-        /* One row that scrolls sideways on a phone, rather than four
-           rows of buttons pushing the television off the screen. */
+        /* One row that scrolls sideways on a phone, rather than rows of
+           buttons pushing the television off the screen. */
         className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0 sm:pb-0"
       >
-        {scenes.map((scene) => (
-          <Chip
-            key={scene.id}
-            pressed={active?.id === scene.id}
-            onClick={() => setConfig(scene.config)}
-          >
-            {scene.label}
-          </Chip>
-        ))}
+        {lead.map(sceneChip)}
       </div>
 
       <TvFrame
@@ -105,7 +112,48 @@ export function DemoStudio({ variant }: { variant: "full" | "compact" }) {
       />
 
       {variant === "full" ? (
-        <Switches config={config} onChange={setConfig} />
+        <div className="flex flex-col items-center gap-4">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls="demo-builder"
+            onClick={() => (expanded ? setClosing(true) : setOpen(true))}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-accent hover:text-accent-hover"
+          >
+            Build your own night
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-4 transition-transform duration-[var(--duration-base)]",
+                expanded && "rotate-180",
+              )}
+            />
+          </button>
+
+          {open && (
+            <div
+              id="demo-builder"
+              className={cn("w-full", closing ? "fold-up" : "unfold-down")}
+              /* Removed only once it has finished folding away, so the
+                 drawer closes the way it opened. Guarded on the target:
+                 a chip inside finishing its own transition is not the
+                 drawer finishing. */
+              onAnimationEnd={(event) => {
+                if (!closing || event.target !== event.currentTarget) return;
+                setClosing(false);
+                setOpen(false);
+              }}
+            >
+              <div className="overflow-hidden">
+                <Switches
+                  config={config}
+                  onChange={setConfig}
+                  more={more.map(sceneChip)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <p className="text-center">
           <Link
@@ -124,9 +172,12 @@ export function DemoStudio({ variant }: { variant: "full" | "compact" }) {
 function Switches({
   config,
   onChange,
+  more,
 }: {
   config: DemoConfig;
   onChange: (config: DemoConfig) => void;
+  /** The scenes that are not on show above the television. */
+  more: React.ReactNode;
 }) {
   const running = new Set(config.tournaments.map((tournament) => tournament.game));
   const full = config.tournaments.length >= DEMO_MAX_TOURNAMENTS;
@@ -156,7 +207,7 @@ function Switches({
 
   return (
     <div className="flex flex-col gap-5 rounded-[var(--radius-card)] border border-border bg-surface p-4 sm:p-5">
-      <p className="text-sm font-semibold text-text-primary">Build your own night</p>
+      <Row title="More scenes">{more}</Row>
 
       <Row
         title="Games running"

@@ -138,10 +138,37 @@ test.describe("the tier pages", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("keeps the switches in a drawer until somebody asks", async ({ page }) => {
+    await page.goto("/ultra");
+    const toggle = page.getByRole("button", { name: "Build your own night" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("group", { name: "Games running" })).toHaveCount(0);
+
+    await expect(async () => {
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+    }).toPass();
+    await expect(page.getByRole("group", { name: "Games running" })).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "More scenes" }).getByRole("button", {
+        name: "Beginner night",
+      }),
+    ).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("group", { name: "Games running" })).toHaveCount(0);
+  });
+
   test("builds a night of the owner's own from the switches", async ({ page }) => {
     await page.goto("/ultra");
     const tv = page.frameLocator("#demo iframe");
     await expect(tv.getByText(/wanted in the room/i)).toBeVisible();
+    const toggle = page.getByRole("button", { name: "Build your own night" });
+    await expect(async () => {
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+    }).toPass();
 
     await press(
       page.getByRole("group", { name: "Games running" }).getByRole("button", {
