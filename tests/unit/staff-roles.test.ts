@@ -70,7 +70,7 @@ describe("what an organizer may run", () => {
     );
 
     expect(authorize).toContain(
-      'if (viewer.kind === "player") return viewer.organizerStoreIds.includes(storeId);',
+      '(viewer.kind === "player" && viewer.organizerStoreIds.includes(storeId))',
     );
   });
 

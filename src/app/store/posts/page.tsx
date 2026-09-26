@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { listEventsForStore } from "@/lib/events/repository";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { archiveStorePostAction } from "@/lib/stores/post-actions";
 import { upcomingEventChoices } from "@/lib/stores/post-schema";
 import { listStorePosts } from "@/lib/stores/posts";
@@ -62,6 +64,23 @@ export default async function StorePostsPage({
     "/store/posts",
   );
   if (!store || store.kind === "vendor") return null;
+
+  /* Ultra's. A store without it gets the trial card in place of the tab. */
+  if (!tierHasFeature("storePosts", store.tier)) {
+    return (
+      <ConsoleLocked
+        email={viewer.user.email ?? ""}
+        areas={areas}
+        currentArea={currentArea}
+        title="Posts"
+        description="Post to everyone who follows your store: events, restocks, a new case. Each post lands in their Feed with a thread under it."
+        storeId={store.id}
+        owner={store.role === "owner"}
+        feature="Posts"
+        pitch="Post to everyone who follows your store: events, restocks, a new case. Each post lands in their Feed with a thread under it."
+      />
+    );
+  }
 
   const timeZone = store.timezone ?? "UTC";
   const [events, posts] = await Promise.all([

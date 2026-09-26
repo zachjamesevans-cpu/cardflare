@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { PASSWORD_MAX } from "@/lib/auth/schema";
 import { PASSWORD_MIN } from "@/lib/auth/signup-schema";
 
 /**
@@ -29,7 +30,9 @@ export const ultraSignupSchema = z.object({
   password: z
     .string()
     .min(PASSWORD_MIN, `At least ${PASSWORD_MIN} characters.`)
-    .max(200, "That is longer than a password needs to be."),
+    /* The rest of the site's cap: a longer one failed inside Supabase
+       as "Something went wrong". */
+    .max(PASSWORD_MAX, "That password is too long."),
   city: z.string().trim().max(80, "That city name is too long.").optional(),
   region: z.string().trim().max(80, "That state or region is too long.").optional(),
 });

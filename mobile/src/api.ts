@@ -342,6 +342,11 @@ export class ApiError extends Error {
  * "unauthorized (401)" point at different bugs from the same couch.
  */
 export function describeError(caught: unknown): string {
+  /* Not a bug to diagnose but a plan to start: said in words, the same
+     words the web console uses. */
+  if (caught instanceof ApiError && caught.code === "ultra-required") {
+    return "FlareCast is part of cardflare Ultra. The store's owner can start the 14-day free trial from the store console at cardflare.gg/store.";
+  }
   if (caught instanceof ApiError) {
     if (caught.status === 0) return caught.code;
     return `${caught.code} ${caught.status}`;

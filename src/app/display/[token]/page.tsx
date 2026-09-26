@@ -6,6 +6,7 @@ import { displayPayload } from "@/lib/event-hub/display-payload";
 import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
 import { findDisplayByToken, listTimers } from "@/lib/event-hub/repository";
 import { joinQrSvg } from "@/lib/events/qr";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 
 /**
  * The tab names its game.
@@ -63,6 +64,7 @@ export default async function DisplayPage({
   const display = await findDisplayByToken(token);
 
   if (!display) return <NotConnected />;
+  if (!(await storeHasFeature(display.storeId, "flarecast"))) return <UltraPaused />;
 
   const payload = await displayPayload(display);
 
@@ -95,6 +97,30 @@ function NotConnected() {
         <p className="max-w-md text-text-secondary">
           This display link is no longer live. Open the screen&rsquo;s page in FlareCast
           in your store console and use its current display link.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * A store whose Ultra is not on. Said to the room in words a player
+ * can pass on, and to the owner in the words that fix it; never a
+ * frozen clock that looks like the tournament stopped.
+ */
+function UltraPaused() {
+  return (
+    <main
+      id="main"
+      className="flex h-dvh flex-col items-center justify-center gap-6 bg-canvas p-8 text-center"
+    >
+      <Logo size={56} />
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold text-text-primary">FlareCast is paused</h1>
+        <p className="max-w-md text-text-secondary">
+          FlareCast is part of cardflare Ultra, and this store&rsquo;s plan is not on
+          right now. The owner can start the free trial from Settings in the store
+          console, and this screen picks up by itself.
         </p>
       </div>
     </main>

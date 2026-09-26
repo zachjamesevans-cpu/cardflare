@@ -3,6 +3,7 @@ import "server-only";
 import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { siteUrl } from "@/lib/site";
 import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
 
@@ -351,6 +352,8 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
       .eq("id", eventId)
       .maybeSingle();
     if (!event?.join_code) return;
+    /* The push to a store's regulars is part of its Ultra. */
+    if (!(await storeHasFeature(event.store_id, "earlyBoardPush"))) return;
 
     const [{ data: store }, { data: flares }, { data: savers }, { data: inRoom }] =
       await Promise.all([

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, MonitorPlay, Sparkles } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { UltraLocked } from "@/components/stores/ultra-locked";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { SITE } from "@/lib/site";
 import { AppShell } from "@/components/layout/app-shell";
 import { SetupChecklist, type SetupStep } from "@/components/stores/onboarding";
 import { StoreTabs } from "@/components/stores/store-tabs";
@@ -122,6 +125,7 @@ export default async function StorePage({
    * owner-only, are not offered to them.
    */
   const owner = store.role === "owner";
+  const hasUltra = tierHasFeature("flarecast", store.tier);
 
   const [events, displays, sync, counterQr, page, onboardedAt] = await Promise.all([
     listEventsForStore(store.id),
@@ -215,6 +219,19 @@ export default async function StorePage({
       currentArea={currentArea}
     >
       <StoreTabs storeId={store.id} />
+
+      {/* First thing on the page until Ultra is on: the founder, after his
+          own trial, "first thing I see is a button that says start your
+          14 day free trial." */}
+      {!hasUltra && (
+        <UltraLocked
+          storeId={store.id}
+          owner={owner}
+          feature="Ultra"
+          heading={`Turn on ${SITE.name} Ultra for ${store.name}`}
+          pitch="FlareCast on your TV with Auto Mode running the rounds, your singles matched to every Flare in the room, posts to your followers and the case on your store page. Your counter code and rooms work either way."
+        />
+      )}
 
       {/* The wizard, until the owner has finished or skipped it. */}
       {offerWizard && (

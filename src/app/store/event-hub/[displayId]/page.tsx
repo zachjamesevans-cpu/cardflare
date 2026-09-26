@@ -13,6 +13,8 @@ import { Select } from "@/components/ui/controls";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { buttonStyles } from "@/components/ui/button";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { moveTimerToScreenAction } from "@/lib/event-hub/actions";
 import { displayPayload } from "@/lib/event-hub/display-payload";
 import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
@@ -61,6 +63,21 @@ export default async function ManageScreenPage({
   const store = display ? stores.find((entry) => entry.id === display.storeId) : null;
 
   if (!display || !store) notFound();
+  /* Ultra's. A screen's page has nothing to run without it. */
+  if (!tierHasFeature("flarecast", store.tier)) {
+    return (
+      <ConsoleLocked
+        email={viewer.user.email ?? ""}
+        areas={areas}
+        title="FlareCast"
+        description="Your screens: tournament timers, the room's Flares and your counter code, on every TV."
+        storeId={store.id}
+        owner={store.role === "owner"}
+        feature="FlareCast"
+        pitch="Your tournament clocks, the room's Flares and your counter code on the TV, with Auto Mode running the rounds and a remote on your phone."
+      />
+    );
+  }
 
   const [payload, displays] = await Promise.all([
     displayPayload(display),

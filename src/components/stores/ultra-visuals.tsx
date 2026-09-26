@@ -56,7 +56,7 @@ export function InventoryPreview() {
           synced · updated tonight, 6:40 PM · 12 lines not recognised
         </p>
         <span className="rounded-full border border-border bg-elevated px-2 py-0.5 text-xs font-semibold text-text-secondary">
-          counter search on
+          matching Flares
         </span>
       </div>
       <p className="text-sm text-text-muted">

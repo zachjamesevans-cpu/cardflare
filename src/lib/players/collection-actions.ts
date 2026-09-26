@@ -10,13 +10,9 @@ import {
   type CollectionEntry,
 } from "@/lib/players/collection";
 import { resolvePrintingId } from "@/lib/players/collection-match";
-import {
-  aggregateByNumber,
-  MAX_FILE_BYTES,
-  parseSinglesExport,
-} from "@/lib/singles/csv";
+import { MAX_FILE_BYTES, parseSinglesExport } from "@/lib/singles/csv";
 import { UNMATCHED_SAMPLE, type SyncSinglesState } from "@/lib/singles/schema";
-import { cardsByCompactNumbers } from "@/lib/singles/repository";
+import { resolveSinglesCards } from "@/lib/singles/repository";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -70,8 +66,9 @@ export async function syncCollectionAction(
     return { status: "error", message };
   }
 
-  const totalsByNumber = aggregateByNumber(parsed.lines);
-  const cardIds = await cardsByCompactNumbers([...totalsByNumber.keys()]);
+  /* The same resolver as a store's singles: every game the catalogue
+     carries, by number, or by set and number where the number repeats. */
+  const cardByLine = await resolveSinglesCards(parsed.lines);
 
   /*
    * Printing resolution, line by line: the file's product name against the
@@ -81,7 +78,7 @@ export async function syncCollectionAction(
    * printing-unknown, which downgrades honestly instead of guessing.
    */
   const printingsByCard = await printingNamesByCard([
-    ...new Set([...cardIds.values()]),
+    ...new Set([...cardByLine.values()]),
   ]);
 
   const totals = new Map<string, CollectionEntry>();
@@ -89,7 +86,7 @@ export async function syncCollectionAction(
   let matchedRows = 0;
 
   for (const line of parsed.lines) {
-    const cardId = cardIds.get(line.compactNumber);
+    const cardId = cardByLine.get(line.line);
 
     if (!cardId) {
       unmatchedLabels.push(line.name || line.compactNumber);

@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "./confirm-button";
 import { Select } from "@/components/ui/controls";
 import {
   GAME_PROFILES,
@@ -655,15 +656,16 @@ function TimerCard({
             as "quite bad" on the founder's screen — and a plain row
             once there is width for one. */}
         <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 sm:flex sm:flex-wrap sm:items-center">
-          <Button
+          <ConfirmButton
             variant="ghost"
             size="sm"
             className="w-full justify-center sm:w-auto"
-            onClick={() => onRun(timer, "reset", reset(timer))}
+            confirmLabel="Tap again to reset"
+            onConfirm={() => onRun(timer, "reset", reset(timer))}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             Reset
-          </Button>
+          </ConfirmButton>
 
           {/* Reorder only means something with a neighbour to swap. */}
           {!solo && (
@@ -719,15 +721,16 @@ function TimerCard({
 
           <form action={removeTimerAction} className="w-full sm:ml-auto sm:w-auto">
             <input type="hidden" name="timerId" value={timer.id} />
-            <Button
+            <ConfirmButton
               variant="ghost"
               size="sm"
               type="submit"
               className="w-full justify-center sm:w-auto"
+              confirmLabel="Tap again to end it"
             >
               <Trash2 className="size-4" aria-hidden="true" />
               End tournament
-            </Button>
+            </ConfirmButton>
           </form>
         </div>
       </div>

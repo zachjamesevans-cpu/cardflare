@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/auth/session";
+import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { text } from "@/lib/form-value";
 import { controlTimer } from "./control";
 import { GAME_PROFILES, nameRepeatsGame } from "./game-profiles";
@@ -61,10 +62,16 @@ async function authorizeStore(storeId: string): Promise<boolean> {
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect("/login?next=/store/event-hub");
-  if (viewer.kind === "admin") return true;
-  if (viewer.kind === "player") return viewer.organizerStoreIds.includes(storeId);
 
-  return viewer.kind === "store" && viewer.storeIds.includes(storeId);
+  const member =
+    viewer.kind === "admin" ||
+    (viewer.kind === "player" && viewer.organizerStoreIds.includes(storeId)) ||
+    (viewer.kind === "store" && viewer.storeIds.includes(storeId));
+
+  /* FlareCast is Ultra's. The console shows a store without it the trial
+     card instead of these controls; this is the same rule for a POST
+     that skipped the page. */
+  return member && (await storeHasFeature(storeId, "flarecast"));
 }
 
 /**
