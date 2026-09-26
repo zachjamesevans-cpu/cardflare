@@ -1,3 +1,5 @@
+import { subscriptionFacts } from "@/lib/billing/reconcile";
+import type { StripeSubscriptionObject } from "@/lib/billing/stripe";
 import { verifyStripeSignature } from "@/lib/billing/stripe-webhook";
 import { notifyTrialChange, trialChangeFor } from "@/lib/billing/trial-alerts";
 import {
@@ -66,16 +68,19 @@ export async function POST(request: Request): Promise<Response> {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const subscription = event.data.object;
-      await upsertStripeSubscription({
-        stripeSubscriptionId: subscription.id,
-        stripeCustomerId: subscription.customer ?? null,
-        tier: subscription.metadata?.tier ?? "",
-        playerId: subscription.metadata?.player_id ?? null,
-        storeId: subscription.metadata?.store_id ?? null,
-        stripeStatus: subscription.status ?? "canceled",
-        currentPeriodEnd: subscription.current_period_end ?? null,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
-      });
+      /* The same reading the success page uses: newer Stripe API
+         versions carry the period end on the item, not the
+         subscription, and reading only the top level wrote null over
+         the trial's end date on every event. */
+      const outcome = await upsertStripeSubscription(
+        subscriptionFacts(subscription as StripeSubscriptionObject),
+      );
+      /* A write that did not happen must not be acknowledged: a 500 is
+         what makes Stripe retry, and its retries are the only safety
+         net between a card being charged and the store seeing it. */
+      if (outcome === "unavailable") {
+        return new Response("Could not record the subscription", { status: 500 });
+      }
       /* The gates read players.tier, so the money table's change is
          pushed there — same as the Apple paths. */
       if (subscription.metadata?.player_id) {
@@ -96,7 +101,9 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     case "customer.subscription.deleted": {
-      await markStripeSubscriptionCanceled(event.data.object.id);
+      if ((await markStripeSubscriptionCanceled(event.data.object.id)) === "unavailable") {
+        return new Response("Could not record the cancellation", { status: 500 });
+      }
       const playerId = event.data.object.metadata?.player_id ?? null;
       if (playerId) await syncPlayerTierFromSubscription(playerId);
       const storeId = event.data.object.metadata?.store_id ?? null;

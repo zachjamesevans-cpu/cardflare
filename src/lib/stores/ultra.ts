@@ -2,11 +2,16 @@ import "server-only";
 
 import { subscriptionForStore } from "@/lib/billing/repository";
 import { isEntitled } from "@/lib/billing/schema";
-import { stripePriceId } from "@/lib/billing/stripe";
+import { sellableTiers } from "@/lib/billing/stripe";
 
-/** Whether Ultra can actually be bought right now: a price exists in Stripe. */
+/**
+ * Whether Ultra can actually be bought right now: Stripe's key AND the
+ * price. With the price but no key, the trial button used to show, the
+ * store got created, and every checkout failed as "Stripe could not be
+ * reached".
+ */
 export function ultraIsSellable(): boolean {
-  return Boolean(stripePriceId("ultra"));
+  return sellableTiers().includes("ultra");
 }
 
 /**

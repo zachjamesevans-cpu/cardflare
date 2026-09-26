@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { subscriptionForStore } from "@/lib/billing/repository";
+import { isEntitled } from "@/lib/billing/schema";
 import {
   createBillingPortalSession,
   createCheckoutSession,
@@ -132,13 +133,32 @@ async function sendToCheckout(
 
   if (!stripePriceId("ultra")) redirect(setup);
 
+  /*
+   * One subscription per store. The /ultra button, a double tap, or a
+   * hand-made POST could start a second checkout for a store already on
+   * its trial, and Stripe would bill both. A store with a live
+   * subscription goes to its plan card instead; one that lapsed reuses
+   * its Stripe customer, and its fourteen free days were already spent.
+   */
+  const existing = await subscriptionForStore(storeId);
+  if (
+    existing &&
+    isEntitled({
+      status: existing.status,
+      currentPeriodEnd: existing.current_period_end,
+    })
+  ) {
+    redirect(settings);
+  }
+
   const session = await createCheckoutSession({
     tier: "ultra",
     storeId,
     customerEmail: email,
+    customerId: existing?.stripe_customer_id ?? undefined,
     successUrl: `${origin}${setup}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${origin}${settings}&checkout=cancelled`,
-    trialDays: ULTRA_TRIAL_DAYS,
+    trialDays: existing ? undefined : ULTRA_TRIAL_DAYS,
   });
 
   if (!session.ok) redirect(`${settings}&checkout=failed`);

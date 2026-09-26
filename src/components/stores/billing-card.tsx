@@ -31,7 +31,7 @@ export function BillingCard({
   plan: StorePlan;
   sellable: boolean;
   /** What the query string said on arrival, already turned into words. */
-  notice: string | null;
+  notice: BillingNotice | null;
 }) {
   const line = planLine(plan);
   const canStart = plan.state === "none" || plan.state === "ended";
@@ -50,8 +50,17 @@ export function BillingCard({
       </div>
 
       {notice && (
-        <p role="status" className="text-sm text-success">
-          {notice}
+        <p
+          role={notice.tone === "danger" ? "alert" : "status"}
+          className={`text-sm ${
+            notice.tone === "danger"
+              ? "text-danger"
+              : notice.tone === "neutral"
+                ? "text-text-secondary"
+                : "text-success"
+          }`}
+        >
+          {notice.text}
         </p>
       )}
 
@@ -117,16 +126,28 @@ function planLine(plan: StorePlan): string {
   }
 }
 
-/** The one sentence the query string earns, or nothing. */
-export function billingNotice(params: { checkout?: string }): string | null {
+/** The one sentence the query string earns, and how loudly to say it. */
+export interface BillingNotice {
+  text: string;
+  /* A failure used to show in the success green. */
+  tone: "success" | "neutral" | "danger";
+}
+
+export function billingNotice(params: { checkout?: string }): BillingNotice | null {
   if (params.checkout === "success") {
-    return "Welcome to Ultra. Your free trial has started.";
+    return { text: "Welcome to Ultra. Your free trial has started.", tone: "success" };
   }
   if (params.checkout === "cancelled") {
-    return "Checkout was closed. Your store is ready; start the trial whenever you like.";
+    return {
+      text: "Checkout was closed. Your store is ready; start the trial whenever you like.",
+      tone: "neutral",
+    };
   }
   if (params.checkout === "failed") {
-    return "Stripe could not be reached. Try again in a moment.";
+    return {
+      text: "Stripe could not be reached. Try again in a moment.",
+      tone: "danger",
+    };
   }
   return null;
 }

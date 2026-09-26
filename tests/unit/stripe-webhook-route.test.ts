@@ -76,6 +76,59 @@ describe("POST /api/webhooks/stripe", () => {
     expect(upsertStripeSubscription).not.toHaveBeenCalled();
   });
 
+  /* A 200 tells Stripe to stop. Acknowledging a write that failed threw
+     away the retries, the only safety net between a charge and the
+     store seeing it. */
+  it("asks Stripe to retry when the subscription could not be recorded", async () => {
+    upsertStripeSubscription.mockResolvedValue("unavailable");
+    const body = JSON.stringify({
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_1",
+          status: "active",
+          metadata: { tier: "ultra", store_id: "s1" },
+        },
+      },
+    });
+
+    const response = await route.POST(signedRequest(body));
+
+    expect(response.status).toBe(500);
+  });
+
+  it("asks Stripe to retry when a cancellation could not be recorded", async () => {
+    markStripeSubscriptionCanceled.mockResolvedValue("unavailable");
+    const body = JSON.stringify({
+      type: "customer.subscription.deleted",
+      data: { object: { id: "sub_1", status: "canceled", metadata: {} } },
+    });
+
+    expect((await route.POST(signedRequest(body))).status).toBe(500);
+  });
+
+  /* Newer Stripe API versions moved the period end onto the item. */
+  it("reads the trial's end from the item on newer API versions", async () => {
+    upsertStripeSubscription.mockResolvedValue("written");
+    const body = JSON.stringify({
+      type: "customer.subscription.created",
+      data: {
+        object: {
+          id: "sub_1",
+          status: "trialing",
+          items: { data: [{ current_period_end: 1_800_000_000 }] },
+          metadata: { tier: "ultra", store_id: "s1" },
+        },
+      },
+    });
+
+    await route.POST(signedRequest(body));
+
+    expect(upsertStripeSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ currentPeriodEnd: 1_800_000_000 }),
+    );
+  });
+
   it("applies a subscription lifecycle event through the repository", async () => {
     const body = JSON.stringify({
       type: "customer.subscription.updated",
