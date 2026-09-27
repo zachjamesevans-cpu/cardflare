@@ -41,3 +41,17 @@ export function selectionLabel(cards: number, copies: number): string {
 /** The printing somebody asked for, or the honest default. */
 export const printingLabel = (label: string | null | undefined): string =>
   label ?? "Any printing";
+
+/**
+ * What the poster will take for it, in one phrase: "Trade or cash",
+ * "Trade only", "Cash only". It rides the status line ("is looking for
+ * · Trade or cash") instead of a row of chips under it, which said
+ * "Looking for" a second time. The website spells it the same
+ * (src/lib/feed/card-copy.ts).
+ */
+export function termsLabel(trade: boolean, cash: boolean): string | null {
+  if (trade && cash) return "Trade or cash";
+  if (trade) return "Trade only";
+  if (cash) return "Cash only";
+  return null;
+}

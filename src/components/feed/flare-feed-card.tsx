@@ -10,7 +10,7 @@ import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { cardCountLabel } from "@/lib/feed/card-copy";
+import { cardCountLabel, termsLabel } from "@/lib/feed/card-copy";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { HuntItem } from "@/lib/feed/repository";
 
@@ -46,7 +46,8 @@ export function awayLabel(miles: number): string {
  * What the person did, in two words.
  *
  * A Flare points one of two ways: wanted, or offered up. The count of
- * cards is its own chip beside this, so the line itself stays short.
+ * cards and the terms follow it in the quiet colour. This is the only
+ * place the direction is said: the post once repeated it as a chip.
  */
 function statusLabel(item: HuntItem): string {
   return item.direction === "showcase" ? "is offering" : "is looking for";
@@ -69,7 +70,7 @@ export function FlareStatus({
   glow?: boolean;
 }) {
   return (
-    <span className="flex items-center gap-1.5 text-sm font-semibold text-accent">
+    <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-accent">
       <Crosshair
         className={cn(
           "size-[17px] shrink-0",
@@ -78,28 +79,6 @@ export function FlareStatus({
         strokeWidth={1.75}
         aria-hidden="true"
       />
-      {label}
-    </span>
-  );
-}
-
-/** Looking for, Trade, Cash ok: the primary one filled, the rest outlined. */
-export function FlareTypeChip({
-  label,
-  primary = false,
-}: {
-  label: string;
-  primary?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "rounded-full border px-3 py-1 text-xs font-bold",
-        primary
-          ? "border-accent bg-accent text-accent-contrast"
-          : "border-border-strong text-text-secondary",
-      )}
-    >
       {label}
     </span>
   );
@@ -121,16 +100,15 @@ export function FlareFeedCard({
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours || preview };
 
-  const chips = (
-    <>
-      <FlareTypeChip
-        label={direction === "showcase" ? "Offering" : "Looking for"}
-        primary
-      />
-      {item.acceptsTrade && <FlareTypeChip label="Trade" />}
-      {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
-    </>
-  );
+  /* How many and what they will take for it ride the status line.
+     The row of chips that used to sit under the cards said "Looking
+     for" a second time. */
+  const detail = [
+    item.total > 1 ? `${item.total} cards` : null,
+    termsLabel(item.acceptsTrade, item.acceptsCash),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   /* The zoom pages along the whole deck from any card. */
   const shelf: ZoomCard[] = item.cards.map((card) => ({
@@ -164,9 +142,9 @@ export function FlareFeedCard({
 
   return (
     <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+      {/* The header: face, name with time and distance on the right,
+          then the status line under it at full width. "Your Flare" is a
+          small label inside this row, never a line between posts. */}
       <div className="flex items-start gap-3">
         <Link
           href={`/p/${item.playerId}`}
@@ -180,7 +158,7 @@ export function FlareFeedCard({
             ring={item.ring}
             size="md"
           />
-          <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-base font-extrabold text-text-primary">
                 {item.displayName}
@@ -191,26 +169,28 @@ export function FlareFeedCard({
                   Your Flare
                 </span>
               )}
+              {/* On the name's line, so the status line below gets the
+                  card's whole width. */}
+              <span className="ml-auto flex shrink-0 items-center gap-1 pl-2 text-[13px] font-normal text-text-muted">
+                <span>{agoFrom(item.postedAt)}</span>
+                {typeof item.milesAway === "number" && (
+                  <span className="flex items-center gap-1">
+                    <span aria-hidden="true">·</span>
+                    {awayLabel(item.milesAway)}
+                  </span>
+                )}
+              </span>
             </span>
-            <span className="flex flex-wrap items-center gap-1.5">
+            <span className="flex min-w-0 items-center gap-1.5">
               <FlareStatus label={statusLabel(item)} glow={direction === "want"} />
-              {item.total > 1 && (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
-                  {item.total} cards
+              {detail && (
+                <span className="truncate text-[13px] text-text-muted tabular-nums">
+                  · {detail}
                 </span>
               )}
             </span>
           </span>
         </Link>
-        <div className="flex shrink-0 items-center gap-1 text-[13px] text-text-muted">
-          <span>{agoFrom(item.postedAt)}</span>
-          {typeof item.milesAway === "number" && (
-            <span className="flex items-center gap-1">
-              <span aria-hidden="true">·</span>
-              {awayLabel(item.milesAway)}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* What they wrote with it. Nothing at all when they wrote nothing. */}
@@ -273,14 +253,11 @@ export function FlareFeedCard({
         <FlareCarousel cards={item.cards} direction={direction} tiles={tiles} />
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {chips}
-        {!single && item.youCanAnswer > 0 && (
-          <span className="text-xs font-semibold text-accent">
-            You can answer {item.youCanAnswer} of {item.total}
-          </span>
-        )}
-      </div>
+      {!single && item.youCanAnswer > 0 && (
+        <p className="text-xs font-semibold text-accent">
+          You can answer {item.youCanAnswer} of {item.total}
+        </p>
+      )}
 
       {/* The counts and the doors: the full list, and the one action
           the post is for. The author updates; anyone else offers. */}

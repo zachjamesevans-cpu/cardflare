@@ -561,6 +561,21 @@ export interface Me {
 
 export const getMe = () => call<Me>("GET", "/api/v1/me");
 
+
+/**
+ * The Room tab's first screen: stores they have been in, most recent
+ * first, then the ones they only follow.
+ */
+export type RecentStore = Me["locals"][number] & {
+  walkIn: boolean;
+  /** When they were last in one of its rooms; null for followed-only. */
+  visitedAt: string | null;
+  following: boolean;
+};
+
+export const getRecentStores = () =>
+  call<{ stores: RecentStore[] }>("GET", "/api/v1/locals");
+
 export const removeLocal = (storeId: string) =>
   call<{ ok: true }>("DELETE", "/api/v1/locals", { storeId });
 
@@ -827,8 +842,25 @@ export const setOpenToTrades = (code: string, open: boolean) =>
 /** The last room joined, so the Room tab reopens where the player was. */
 const LAST_ROOM_KEY = "cf_last_room";
 
+/*
+ * A room somebody just asked to open - a scan, a typed code, "Go to
+ * Mox Valley" on a post - for the Room tab to walk into on its next
+ * focus. Kept apart from the remembered code on purpose: the tab opens
+ * on the list of stores, not on whichever room was last, so it needs
+ * to tell "take me there now" from "this is where I was".
+ */
+let requestedRoom: string | null = null;
+
 export async function rememberRoom(code: string): Promise<void> {
+  requestedRoom = code;
   await SecureStore.setItemAsync(LAST_ROOM_KEY, code);
+}
+
+/** The room asked for since the tab last looked, once. */
+export function takeRoomRequest(): string | null {
+  const code = requestedRoom;
+  requestedRoom = null;
+  return code;
 }
 
 export async function lastRoom(): Promise<string | null> {

@@ -21,7 +21,12 @@ function SubmitButton() {
   );
 }
 
-export function JoinCodeForm() {
+export function JoinCodeForm({
+  autoFocus = true,
+}: {
+  /** Off when the field is not the first thing on the page. */
+  autoFocus?: boolean;
+} = {}) {
   const [state, formAction] = useActionState<JoinCodeState, FormData>(
     lookUpJoinCode,
     JOIN_CODE_IDLE,
@@ -46,7 +51,7 @@ export function JoinCodeForm() {
           {...fieldIds("code")}
           name="code"
           required
-          autoFocus
+          autoFocus={autoFocus}
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}

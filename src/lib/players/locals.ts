@@ -229,6 +229,85 @@ export async function listLocals(playerId: string): Promise<LocalStore[]> {
 }
 
 /**
+ * The stores this player has actually been in, most recent first, then
+ * any they follow but have not been in.
+ *
+ * What the Room tab opens on. The founder: "When clicking 'room' it
+ * defaults to Mox Valley games. But really it should give me an option
+ * for all stores I've been at recently. First." Recency comes from the
+ * room seats their account held (`event_participants.last_seen_at`
+ * through `player_sessions.player_id`), because `player_locals` only
+ * records the FIRST visit and a store you were in last night would sort
+ * below one you went to once in the spring.
+ */
+export interface RecentStore extends LocalStore {
+  /** When they were last in one of its rooms; null for followed-only. */
+  visitedAt: string | null;
+  following: boolean;
+}
+
+export async function listRecentStores(
+  playerId: string,
+  limit = 12,
+): Promise<RecentStore[]> {
+  if (!isSupabaseConfigured()) return [];
+  const admin = getSupabaseAdmin();
+
+  const [{ data: sessions }, { data: follows }] = await Promise.all([
+    admin.from("player_sessions").select("id").eq("player_id", playerId),
+    admin
+      .from("player_locals")
+      .select("store_id, created_at")
+      .eq("player_id", playerId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const visited = new Map<string, string>();
+  const sessionIds = (sessions ?? []).map((row) => row.id);
+  if (sessionIds.length > 0) {
+    const { data: seats, error } = await admin
+      .from("event_participants")
+      .select("event_id, last_seen_at")
+      .in("player_session_id", sessionIds)
+      .order("last_seen_at", { ascending: false })
+      .limit(200);
+    if (error) console.error("Could not read the player's recent rooms", error);
+
+    const eventIds = [...new Set((seats ?? []).map((seat) => seat.event_id))];
+    if (eventIds.length > 0) {
+      const { data: events } = await admin
+        .from("events")
+        .select("id, store_id")
+        .in("id", eventIds);
+      const storeOf = new Map(
+        (events ?? []).map((event) => [event.id, event.store_id]),
+      );
+      /* Seats arrive newest first, so the first seat per store is its
+         most recent visit. */
+      for (const seat of seats ?? []) {
+        const storeId = storeOf.get(seat.event_id);
+        if (storeId && !visited.has(storeId)) visited.set(storeId, seat.last_seen_at);
+      }
+    }
+  }
+
+  const followed = new Map(
+    (follows ?? []).map((row) => [row.store_id, row.created_at]),
+  );
+  const order = [
+    ...visited.keys(),
+    ...[...followed.keys()].filter((storeId) => !visited.has(storeId)),
+  ].slice(0, limit);
+
+  const boards = await boardsForStores(order, followed);
+  return boards.map((board) => ({
+    ...board,
+    visitedAt: visited.get(board.storeId) ?? null,
+    following: followed.has(board.storeId),
+  }));
+}
+
+/**
  * Stores with something on right now, anywhere.
  *
  * The Feed's answer to a brand-new player. Every other item is

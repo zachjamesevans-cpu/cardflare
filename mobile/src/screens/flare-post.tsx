@@ -20,7 +20,7 @@ import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
-import { FlareActions, FlareTypeChip, statusLabel } from "../flare-feed-card";
+import { FlareActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
 import { PlayerAvatar } from "../player-avatar";
@@ -191,13 +191,6 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               }`}
               onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
             />
-
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-              <FlareTypeChip
-                label={direction === "showcase" ? "Offering" : "Looking for"}
-                primary
-              />
-            </View>
 
             {/* The cards, the way the Feed draws them: one row, or the
                 same row swiped. Tap one to open it big and say you have it. */}

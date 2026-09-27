@@ -20,9 +20,25 @@ describe("which way a Flare points", () => {
     const card = read("src/components/feed/flare-feed-card.tsx");
     expect(card).toContain('"is looking for"');
     expect(card).toContain('"is offering"');
-    expect(card).toContain('"Offering" : "Looking for"');
     expect(card).not.toMatch(/hunting/i);
     expect(card).not.toContain('"Want"');
+  });
+
+  it("says it once, on the status line, on both platforms", () => {
+    /* The founder, on a post reading "is looking for" over a chip that
+       said "Looking for": "See how there's 'looking for' twice? Needs to
+       be less clunkier." The terms ride the status line instead. */
+    for (const path of [
+      "src/components/feed/flare-feed-card.tsx",
+      "mobile/src/flare-feed-card.tsx",
+      "mobile/src/screens/flare-post.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).not.toContain('"Offering" : "Looking for"');
+      expect(source).not.toContain("FlareTypeChip");
+    }
+    expect(read("src/components/feed/flare-feed-card.tsx")).toContain("termsLabel(");
+    expect(read("mobile/src/flare-feed-card.tsx")).toContain("termsLabel(");
   });
 
   it("says the same on the older row", () => {
