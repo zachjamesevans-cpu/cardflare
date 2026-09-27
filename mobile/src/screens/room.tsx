@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,6 +30,7 @@ import {
   dropWant,
   forgetRoom,
   getMe,
+  getRecentStores,
   getRoom,
   joinRoom,
   storedSessionToken,
@@ -40,10 +41,11 @@ import {
   withdrawOffer,
   rememberRoom,
   removeFlare,
-  removeLocal,
   setOpenToTrades,
   storedAccessToken,
+  takeRoomRequest,
   type Me,
+  type RecentStore,
   type RoomFlare,
   type RoomState,
 } from "../api";
@@ -76,42 +78,94 @@ import { WantRow } from "../want-row";
 // the same rhythm so an offer never looks slower in the pocket client.
 const POLL_MS = 12_000;
 
+/** The code a store's row walks into, or null when there is no room to enter. */
+export function enterCode(store: RecentStore): string | null {
+  if (store.liveNow || store.walkIn) return store.code;
+  if (store.earlyOpen && store.nextEventCode) return store.nextEventCode;
+  return null;
+}
+
+/** The row's second line: the website's, word for word. */
+export function storeLine(store: RecentStore): string {
+  if (store.liveNow) return "Room open now";
+  if (store.nextEventAt && store.nextEventName) {
+    const day = new Date(store.nextEventAt).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    return `Next: ${store.nextEventName} · ${day}`;
+  }
+  if (store.walkIn) return "Walk in any time";
+  return [store.city, store.region].filter(Boolean).join(", ") || "Nothing on yet";
+}
+
 /**
  * The Room tab — the app's rendering of `/e/[code]`, at the website's
  * depth: the lobby with presence, the board grouped under whoever posted
  * (because "who do I go and talk to" is the actual question), offers
  * with a where-to-find-me note, open-to-trades, and a bottom action bar
  * that keeps Post a Flare one thumb away.
+ *
+ * It opens on "which store?". It used to walk straight into the last
+ * room, and the founder: "When clicking 'room' it defaults to Mox Valley
+ * games. But really it should give me an option for all stores I've
+ * been at recently. First." So the stores come first, most recently
+ * visited at the top, with the last room one tap back above them. A
+ * scan, a typed code or a "Go to" from anywhere else still walks
+ * straight in (`takeRoomRequest`). The website's /room is the same
+ * screen.
  */
 export function RoomTab() {
   const [code, setCode] = useState<string | null>(null);
+  /* The room this device was last in, for "Back to your room". */
+  const [last, setLast] = useState<string | null>(null);
   /* What is being typed, for the player whose camera will not focus. */
   const [typed, setTyped] = useState("");
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const tabInset = useTabBarInset();
   /*
-   * The account, for the stores it follows. Null while signed out or
-   * until the read lands, and the card below simply does not draw:
-   * a guest has nothing to follow with.
+   * The account, for its wants (the RSVP's count) and name. Null while
+   * signed out or until the read lands.
    */
   const [me, setMe] = useState<Me | null>(null);
+  /* Their stores, most recent first; empty for a guest. */
+  const [stores, setStores] = useState<RecentStore[]>([]);
   const [rsvping, setRsvping] = useState<string | null>(null);
-  const [unfollowing, setUnfollowing] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let live = true;
+      const requested = takeRoomRequest();
+      if (requested) setCode(requested);
       void lastRoom().then((value) => {
-        if (live) setCode(value);
+        if (live) setLast(value);
       });
       void (async () => {
         if (!(await storedAccessToken())) {
-          if (live) setMe(null);
+          if (live) {
+            setMe(null);
+            setStores([]);
+          }
           return;
         }
         try {
-          const result = await getMe();
-          if (live) setMe(result);
+          const [result, recent] = await Promise.all([
+            getMe(),
+            /* An older server has no list: its followed stores stand in. */
+            getRecentStores().catch(() => null),
+          ]);
+          if (!live) return;
+          setMe(result);
+          setStores(
+            recent?.stores ??
+              result.locals.map((local) => ({
+                ...local,
+                walkIn: false,
+                visitedAt: null,
+                following: true,
+              })),
+          );
         } catch {
           /* Keep whatever was on screen; the next focus retries. */
         }
@@ -122,18 +176,26 @@ export function RoomTab() {
     }, []),
   );
 
+  const enter = async (next: string) => {
+    await rememberRoom(next);
+    /* Already acted on here; the next focus must not act on it again. */
+    takeRoomRequest();
+    setLast(next);
+    setCode(next);
+  };
+
   /*
    * "I'll be there", the app's way: join the early board under the
    * account's own name and post every Flare. Duplicates already
    * on the board are skipped by the server, so this is safe to repeat.
    */
-  const rsvp = async (local: Me["locals"][number]) => {
-    if (!me || !local.nextEventCode || rsvping) return;
-    setRsvping(local.storeId);
+  const rsvp = async (store: RecentStore) => {
+    if (!me || !store.nextEventCode || rsvping) return;
+    setRsvping(store.storeId);
     try {
-      await joinRoom(local.nextEventCode, me.player.displayName);
+      await joinRoom(store.nextEventCode, me.player.displayName);
       for (const want of me.wants) {
-        await postFlare(local.nextEventCode, {
+        await postFlare(store.nextEventCode, {
           cardId: want.cardId,
           printingId: want.printingId,
           quantity: want.quantity,
@@ -141,8 +203,7 @@ export function RoomTab() {
           deckLabel: want.deckLabel,
         }).catch(() => {});
       }
-      await rememberRoom(local.nextEventCode);
-      setCode(local.nextEventCode);
+      await enter(store.nextEventCode);
     } catch {
       // The room shows the truthful state; nothing to add here.
     } finally {
@@ -150,44 +211,18 @@ export function RoomTab() {
     }
   };
 
-  /* Unfollow: the row goes at once, and the server is told after. */
-  const unfollow = async (storeId: string) => {
-    if (unfollowing) return;
-    setUnfollowing(storeId);
-    try {
-      await removeLocal(storeId);
-      setMe((current) =>
-        current
-          ? {
-              ...current,
-              locals: current.locals.filter((entry) => entry.storeId !== storeId),
-            }
-          : current,
-      );
-    } catch {
-      /* Still followed; the row stays, honestly. */
-    } finally {
-      setUnfollowing(null);
-    }
-  };
-
-  /* The row's second line: the website's, word for word. */
-  const nextLine = (local: Me["locals"][number]) => {
-    if (local.liveNow) return "A room is open right now";
-    if (local.nextEventAt) {
-      const day = new Date(local.nextEventAt).toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      return `Next: ${local.nextEventName} · ${day}`;
-    }
-    return [local.city, local.region].filter(Boolean).join(", ");
-  };
-
   if (!code) {
-    const locals = me?.locals ?? [];
     const wantCount = me?.wants.length ?? 0;
+    /* The last room, named after its store when it is one of theirs. */
+    const lastStore = last
+      ? (stores.find(
+          (store) => store.code === last || store.nextEventCode === last,
+        ) ?? null)
+      : null;
+    /* Only a room that can still be walked into: the store's own row
+       already covers one that has closed. */
+    const back = last && (lastStore ? enterCode(lastStore) !== null : stores.length === 0);
+    const picking = stores.length > 0 || Boolean(back);
 
     return (
       <ScrollView
@@ -199,19 +234,175 @@ export function RoomTab() {
           paddingBottom: spacing(4) + tabInset,
         }}
       >
+        {picking ? (
+          <Card>
+            <Title>Your stores</Title>
+            <Muted>Where you have traded lately. Pick one to walk into its room.</Muted>
+
+            {back && last ? (
+              <Tap
+                onPress={() => void enter(last)}
+                accessibilityLabel="Back to your room"
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(3),
+                  borderRadius: radius.control,
+                  borderWidth: 1,
+                  borderColor: colors.accent,
+                  backgroundColor: colors.elevated,
+                  paddingHorizontal: spacing(3),
+                  paddingVertical: spacing(2.5),
+                }}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
+                    Back to your room
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textPrimary, fontWeight: "700" }}
+                  >
+                    {lastStore?.name ?? `Room ${last}`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+              </Tap>
+            ) : null}
+
+            {/*
+             * A row walks into the store's room when there is one (open
+             * now, open to walk-ins, or a board taking Flares early) and
+             * opens the store's page when there is not, so no row is a
+             * door to nothing. Follow and Unfollow live on that page.
+             */}
+            <View>
+              {stores.map((store, index) => {
+                const target = enterCode(store);
+                return (
+                  <View
+                    key={store.storeId}
+                    style={{
+                      gap: spacing(2),
+                      paddingVertical: spacing(3),
+                      borderTopWidth: index === 0 ? 0 : 1,
+                      borderTopColor: colors.border,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Tap
+                          onPress={() =>
+                            target
+                              ? void enter(target)
+                              : navigation.navigate("StoreProfile", {
+                                  storeId: store.storeId,
+                                })
+                          }
+                          accessibilityLabel={store.name}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: spacing(2),
+                          }}
+                        >
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text
+                              numberOfLines={1}
+                              style={{ color: colors.textPrimary, fontWeight: "700" }}
+                            >
+                              {store.name}
+                            </Text>
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                color: store.liveNow ? colors.accent : colors.textMuted,
+                                fontSize: 12,
+                                fontWeight: store.liveNow ? "700" : "400",
+                              }}
+                            >
+                              {storeLine(store)}
+                            </Text>
+                          </View>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color={colors.textMuted}
+                          />
+                        </Tap>
+                      </View>
+                      {/* The store's own page, when the row goes to its room. */}
+                      {target ? (
+                        <Tap
+                          onPress={() =>
+                            navigation.navigate("StoreProfile", { storeId: store.storeId })
+                          }
+                          accessibilityLabel={`${store.name} store page`}
+                          hitSlop={8}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Ionicons
+                            name="storefront-outline"
+                            size={17}
+                            color={colors.textMuted}
+                          />
+                        </Tap>
+                      ) : (
+                        /* Keeps every chevron in one column. */
+                        <View style={{ width: 36 }} />
+                      )}
+                    </View>
+
+                    {/* The button carries the count so the tap never posts
+                        more than it said. */}
+                    {store.earlyOpen && store.nextEventCode ? (
+                      <Button
+                        label={
+                          rsvping === store.storeId
+                            ? "Posting…"
+                            : wantCount > 0
+                              ? `I'll be there. Post my ${wantCount} ${
+                                  wantCount === 1 ? "Flare" : "Flares"
+                                }`
+                              : "I'll be there"
+                        }
+                        variant="secondary"
+                        onPress={() => void rsvp(store)}
+                        busy={rsvping === store.storeId}
+                      />
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        ) : null}
+
         {/*
-         * Getting INTO a room happens here now, not on the Feed. The
-         * founder: "move the qr code scanner/code entry to Room. No need
-         * to have that in the feed." Both ways in are on this card,
-         * because typing is a first-class route and not a consolation —
-         * a meaningful share of players have a camera that will not
-         * focus, a locked-down work phone or a cracked screen.
+         * Getting INTO a new room. The founder: "move the qr code
+         * scanner/code entry to Room. No need to have that in the feed."
+         * Both ways in are on this card, because typing is a first-class
+         * route and not a consolation - a meaningful share of players
+         * have a camera that will not focus, a locked-down work phone or
+         * a cracked screen.
          */}
         <Card>
-          <Title>No room yet</Title>
+          <Title>{picking ? "Somewhere new?" : "No room yet"}</Title>
           <Body>
-            Scan the code at your store&rsquo;s counter, or type it here. Either way
-            cardflare reopens the room where you left it.
+            {picking
+              ? "Scan the code at the store\u2019s counter, or type it here."
+              : "Scan the code at your store\u2019s counter, or type it here. Either way cardflare reopens the room where you left it."}
           </Body>
 
           <Button label="Scan a code" onPress={() => navigation.navigate("Scan")} />
@@ -233,109 +424,50 @@ export function RoomTab() {
               onPress={async () => {
                 const entered = typed.trim().toUpperCase();
                 if (!entered) return;
-                await rememberRoom(entered);
                 setTyped("");
-                setCode(entered);
+                await enter(entered);
               }}
             />
           </View>
         </Card>
-
-        {/*
-         * The stores you follow, in the one place that list lives: the
-         * website's /room card, row for row. A row opens the store's
-         * page; "I'll be there" walks onto a board that is open early,
-         * Flares and all; Unfollow is the way off the list.
-         */}
-        {locals.length > 0 && (
-          <Card>
-            <Title>Following</Title>
-            <Muted>Stores you follow. Joining a room follows the store too.</Muted>
-            <View>
-              {locals.map((local, index) => (
-                <View
-                  key={local.storeId}
-                  style={{
-                    gap: spacing(2),
-                    paddingVertical: spacing(3),
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: colors.border,
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(2),
-                    }}
-                  >
-                    <Tap
-                      onPress={() =>
-                        navigation.navigate("StoreProfile", { storeId: local.storeId })
-                      }
-                      accessibilityLabel={local.name}
-                      style={{ flex: 1, gap: 2 }}
-                    >
-                      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                        {local.name}
-                      </Text>
-                      <Text
-                        style={{
-                          color: local.liveNow ? colors.accent : colors.textMuted,
-                          fontSize: 12,
-                        }}
-                      >
-                        {nextLine(local)}
-                      </Text>
-                    </Tap>
-                    <Tap
-                      onPress={() => void unfollow(local.storeId)}
-                      disabled={unfollowing === local.storeId}
-                      accessibilityLabel={`Unfollow ${local.name}`}
-                      hitSlop={8}
-                    >
-                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                        {unfollowing === local.storeId ? "Unfollowing…" : "Unfollow"}
-                      </Text>
-                    </Tap>
-                  </View>
-
-                  {/* The button carries the count so the tap never posts
-                      more than it said. */}
-                  {local.earlyOpen && local.nextEventCode && (
-                    <Button
-                      label={
-                        rsvping === local.storeId
-                          ? "Posting…"
-                          : wantCount > 0
-                            ? `I'll be there. Post my ${wantCount} ${
-                                wantCount === 1 ? "Flare" : "Flares"
-                              }`
-                            : "I'll be there"
-                      }
-                      variant="secondary"
-                      onPress={() => void rsvp(local)}
-                      busy={rsvping === local.storeId}
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
-          </Card>
-        )}
       </ScrollView>
     );
   }
 
   return (
-    <RoomScreen
-      code={code}
-      onSwitch={setCode}
-      onForget={() => {
-        void forgetRoom();
-        setCode(null);
-      }}
-    />
+    <View style={{ flex: 1 }}>
+      {/* The way back to the list, without forgetting the room. */}
+      <Tap
+        onPress={() => setCode(null)}
+        accessibilityLabel="Your stores"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          paddingHorizontal: gutter,
+          paddingTop: spacing(2),
+          paddingBottom: spacing(1),
+        }}
+      >
+        <Ionicons name="chevron-back" size={16} color={colors.accent} />
+        <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
+          Your stores
+        </Text>
+      </Tap>
+      <RoomScreen
+        code={code}
+        onSwitch={(next) => {
+          takeRoomRequest();
+          setLast(next);
+          setCode(next);
+        }}
+        onForget={() => {
+          void forgetRoom();
+          setLast(null);
+          setCode(null);
+        }}
+      />
+    </View>
   );
 }
 

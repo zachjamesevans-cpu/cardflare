@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
 
 import type { FeedEntry } from "./api";
-import { cardsLabel, doneLabel } from "./flare-copy";
+import { cardsLabel, doneLabel, termsLabel } from "./flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { PlayerAvatar } from "./player-avatar";
@@ -88,40 +88,10 @@ export function FlareStatus({
         {label}
       </Text>
       {detail ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{`· ${detail}`}</Text>
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}>
+          {`· ${detail}`}
+        </Text>
       ) : null}
-    </View>
-  );
-}
-
-/** Want, Trade, Cash ok: the primary one filled, the rest outlined. */
-export function FlareTypeChip({
-  label,
-  primary = false,
-}: {
-  label: string;
-  primary?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: primary ? colors.accent : colors.borderStrong,
-        backgroundColor: primary ? colors.accent : "transparent",
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1),
-      }}
-    >
-      <Text
-        style={{
-          color: primary ? colors.accentContrast : colors.textSecondary,
-          fontSize: 12,
-          fontWeight: "700",
-        }}
-      >
-        {label}
-      </Text>
     </View>
   );
 }
@@ -222,9 +192,9 @@ export function FlareFeedCard({
         gap: spacing(2.5),
       }}
     >
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+      {/* The header: face, name with time and distance on the right,
+          then the status line under it at full width. "Your Flare" is a
+          small label inside this row, never a line between posts. */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}>
         {/*
          * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
@@ -290,47 +260,58 @@ export function FlareFeedCard({
                     YOUR FLARE
                   </Text>
                 ) : null}
+                {/* On the name's line, so the status line below gets the
+                    card's whole width: two muted facts with a dot. */}
+                <View
+                  style={{
+                    marginLeft: "auto",
+                    paddingLeft: spacing(2),
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.postedAt ? (
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                      {agoFrom(item.postedAt)}
+                    </Text>
+                  ) : null}
+                  {typeof item.milesAway === "number" ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                      {item.postedAt ? (
+                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
+                      ) : (
+                        <Ionicons
+                          name="location-outline"
+                          size={13}
+                          color={colors.textMuted}
+                        />
+                      )}
+                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                        {awayLabel(item.milesAway)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
+              {/* Which way it points, how many, and what they will take
+                  for it: one line. It used to be followed by a row of
+                  chips that said "Looking for" a second time. */}
               <FlareStatus
                 label={statusLabel(item)}
-                detail={item.total > 1 ? cardsLabel(item.total) : null}
+                detail={
+                  [
+                    item.total > 1 ? cardsLabel(item.total) : null,
+                    termsLabel(item.acceptsTrade !== false, item.acceptsCash === true),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || null
+                }
               />
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: two muted facts with a dot. */}
-        <View
-          style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}
-        >
-          {item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-              {agoFrom(item.postedAt)}
-            </Text>
-          ) : null}
-          {typeof item.milesAway === "number" ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              {item.postedAt ? (
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
-              ) : (
-                <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-              )}
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                {awayLabel(item.milesAway)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      {/* Which way it points and what they will do for it. Post-level,
-          because they are true of every card in it. */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        <FlareTypeChip
-          label={direction === "showcase" ? "Offering" : "Looking for"}
-          primary
-        />
-        {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
-        {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
       </View>
 
       {/* The card and what is asked of it. Several cards are the same

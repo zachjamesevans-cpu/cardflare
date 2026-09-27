@@ -94,7 +94,7 @@ describe("client boundary", () => {
       "components/feed/flare-cards-sheet.tsx",
     ]) {
       expect(readFileSync(join(SRC, file), "utf8")).toMatch(
-        /import \{ cardCountLabel \} from "@\/lib\/feed\/card-copy"/,
+        /import \{ cardCountLabel(, \w+)* \} from "@\/lib\/feed\/card-copy"/,
       );
     }
   });

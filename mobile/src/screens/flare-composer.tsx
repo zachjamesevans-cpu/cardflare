@@ -423,6 +423,20 @@ export function FlareComposer({
               onBack={() => setPreviewing(false)}
               onPost={post}
               error={error}
+              /* The hunt is chosen here, under the post it will join,
+                 rather than as a small row in the middle of the compose
+                 step. The founder: "a bit small and kinda sticks out...
+                 maybe it gets moved somewhere to the preview screen." */
+              hunt={
+                draft.intent === "want" && draftKey && draftKey !== "guest" ? (
+                  <HuntPicker
+                    hunts={hunts}
+                    limit={huntLimit}
+                    value={draft.hunt}
+                    onChange={(hunt) => patch({ hunt })}
+                  />
+                ) : null
+              }
             />
           ) : (
             <>
@@ -544,15 +558,6 @@ export function FlareComposer({
                   onPress={() => patch({ acceptsCash: !draft.acceptsCash })}
                 />
               </View>
-
-              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
-                <HuntPicker
-                  hunts={hunts}
-                  limit={huntLimit}
-                  value={draft.hunt}
-                  onChange={(hunt) => patch({ hunt })}
-                />
-              ) : null}
 
               {/* Nearby matching rides with Local: off the screen entirely
                   while Local is off, the same rule the website's form
@@ -878,7 +883,12 @@ function SmallAction({
   );
 }
 
-/** "Add to a hunt": one of theirs, or a new one by name. Wants only. */
+/**
+ * "Add to a hunt", on the preview: no hunt, one of theirs, or a new one
+ * by name. Wants only. Laid open as a panel, because on the preview it
+ * is the last choice before posting and there is room for it; the
+ * website's preview draws the same panel.
+ */
 function HuntPicker({
   hunts,
   limit,
@@ -890,54 +900,51 @@ function HuntPicker({
   value: HuntChoice;
   onChange: (next: HuntChoice) => void;
 }) {
-  const [open, setOpen] = useState(value !== null);
-  useEffect(() => {
-    if (value) setOpen(true);
-  }, [value]);
   const atLimit = limit !== null && hunts.length >= limit;
+  const chip = (on: boolean) => ({
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: on ? colors.accent : colors.borderStrong,
+    backgroundColor: on ? colors.accent : "transparent",
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  });
+  const chipText = (on: boolean) => ({
+    color: on ? colors.accentContrast : colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  });
 
-  if (!open) {
-    return (
-      <Tap
-        onPress={() => setOpen(true)}
-        accessibilityLabel="Add to a hunt"
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-      >
+  return (
+    <View
+      style={{
+        gap: spacing(2.5),
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.elevated,
+        padding: spacing(3),
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
         <Ionicons name="locate-outline" size={18} color={colors.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
             Add to a hunt
           </Text>
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            Building a deck? Keep the cards together with what is found.
+            Building a deck? Keep these cards together with what is found.
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
-      </Tap>
-    );
-  }
-
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}>
-          Add to a hunt
-        </Text>
-        <Tap
-          accessibilityLabel="Not in a hunt"
-          onPress={() => {
-            onChange(null);
-            setOpen(false);
-          }}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>Clear</Text>
-        </Tap>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
-      >
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+        <Tap
+          onPress={() => onChange(null)}
+          accessibilityLabel="No hunt"
+          style={chip(value === null)}
+        >
+          <Text style={chipText(value === null)}>No hunt</Text>
+        </Tap>
         {hunts
           .filter((hunt): hunt is Hunt & { id: string } => Boolean(hunt.id))
           .map((hunt) => {
@@ -947,22 +954,9 @@ function HuntPicker({
                 key={hunt.id}
                 onPress={() => onChange({ kind: "existing", id: hunt.id })}
                 accessibilityLabel={hunt.name}
-                style={{
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: on ? colors.accent : colors.borderStrong,
-                  backgroundColor: on ? colors.accent : "transparent",
-                  paddingHorizontal: spacing(3),
-                  paddingVertical: spacing(1),
-                }}
+                style={chip(on)}
               >
-                <Text
-                  style={{
-                    color: on ? colors.accentContrast : colors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: "700",
-                  }}
-                >
+                <Text numberOfLines={1} style={chipText(on)}>
                   {hunt.name}
                 </Text>
               </Tap>
@@ -975,26 +969,19 @@ function HuntPicker({
           disabled={atLimit}
           accessibilityLabel="New hunt"
           style={{
+            ...chip(false),
             flexDirection: "row",
             alignItems: "center",
             gap: 3,
-            borderRadius: 999,
-            borderWidth: 1,
             borderStyle: "dashed",
             borderColor: value?.kind === "new" ? colors.accent : colors.borderStrong,
-            paddingHorizontal: spacing(3),
-            paddingVertical: spacing(1),
             opacity: atLimit ? 0.5 : 1,
           }}
         >
-          <Ionicons name="add" size={12} color={colors.accent} />
-          <Text
-            style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "700" }}
-          >
-            New hunt
-          </Text>
+          <Ionicons name="add" size={13} color={colors.accent} />
+          <Text style={chipText(false)}>New hunt</Text>
         </Tap>
-      </ScrollView>
+      </View>
       {value?.kind === "new" ? (
         <Input
           value={value.name}
@@ -1067,6 +1054,7 @@ export function FlareComposerPreview({
   onBack,
   onPost,
   error,
+  hunt,
 }: {
   draft: Draft;
   me: Me | null;
@@ -1074,6 +1062,8 @@ export function FlareComposerPreview({
   onBack: () => void;
   onPost: () => Promise<void>;
   error: string | null;
+  /** "Add to a hunt", under the card it will change. */
+  hunt?: React.ReactNode;
 }) {
   const copies = draft.items.reduce((sum, item) => sum + item.quantity, 0);
   const item: Extract<FeedEntry, { kind: "hunt" }> = {
@@ -1143,6 +1133,7 @@ export function FlareComposerPreview({
         onOpenThread={() => undefined}
         onEnterRoom={() => undefined}
       />
+      {hunt}
       <ErrorLine message={error} />
       <AsyncButton label="Post flare" pendingLabel="Posting…" onPress={onPost} />
       <Button label="Back to editing" variant="secondary" onPress={onBack} />

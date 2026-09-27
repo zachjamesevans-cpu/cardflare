@@ -31,3 +31,17 @@ export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): 
   if (card.state === "found" || remaining === 0) return "Found";
   return `Need ${remaining} more`;
 }
+
+/**
+ * What the poster will take for it, in one phrase: "Trade or cash",
+ * "Trade only", "Cash only". It rides the status line ("is looking for
+ * · Trade or cash") instead of a row of chips under it, which said
+ * "Looking for" a second time. The app spells it the same
+ * (mobile/src/flare-copy.ts).
+ */
+export function termsLabel(trade: boolean, cash: boolean): string | null {
+  if (trade && cash) return "Trade or cash";
+  if (trade) return "Trade only";
+  if (cash) return "Cash only";
+  return null;
+}

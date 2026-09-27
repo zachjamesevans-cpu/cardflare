@@ -30,7 +30,7 @@ import {
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, Textarea, TextInput } from "@/components/ui/controls";
+import { Select, Textarea } from "@/components/ui/controls";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
 import { printingLabel } from "@/lib/cards/schema";
@@ -305,6 +305,8 @@ function ComposerBody({
           draft={draft}
           viewer={viewer}
           huntName={huntName}
+          hunts={draft.intent === "want" ? hunts : null}
+          onHunt={(hunt) => patch({ hunt })}
           onBack={() => setStep("compose")}
           onPost={post}
           pending={pending}
@@ -515,61 +517,6 @@ function ComposerBody({
           className="min-h-0"
         />
       </label>
-
-      {draft.intent === "want" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-text-secondary">
-              Add to a hunt
-            </span>
-            <Select
-              value={
-                draft.hunt.kind === "existing"
-                  ? draft.hunt.id
-                  : draft.hunt.kind === "new"
-                    ? "__new"
-                    : ""
-              }
-              onChange={(event) => {
-                const value = event.target.value;
-                patch({
-                  hunt:
-                    value === ""
-                      ? { kind: "none" }
-                      : value === "__new"
-                        ? { kind: "new", name: "" }
-                        : { kind: "existing", id: value },
-                });
-              }}
-            >
-              <option value="">No hunt</option>
-              {hunts.map((hunt) => (
-                <option key={hunt.id} value={hunt.id}>
-                  {hunt.name}
-                </option>
-              ))}
-              <option value="__new">New hunt</option>
-            </Select>
-          </label>
-          {draft.hunt.kind === "new" && (
-            <TextInput
-              value={draft.hunt.name}
-              onChange={(event) =>
-                patch({ hunt: { kind: "new", name: event.target.value.slice(0, 60) } })
-              }
-              maxLength={60}
-              placeholder="Hunt name, like Green Zoro"
-              aria-label="Hunt name"
-              autoFocus
-            />
-          )}
-          {draft.hunt.kind !== "none" && (
-            <p className="text-xs text-text-muted">
-              Cards already on the hunt keep their copies; new cards are added.
-            </p>
-          )}
-        </div>
-      )}
 
       {/* What they will do for it. */}
       <div className="flex flex-col gap-1.5">
