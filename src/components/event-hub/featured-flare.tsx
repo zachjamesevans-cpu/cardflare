@@ -1,5 +1,7 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
+
 import type { DisplayFlare } from "@/lib/event-hub/display-payload";
 
 /**
@@ -116,27 +118,59 @@ export function FeaturedCard({ flare }: { flare: DisplayFlare }) {
   );
 }
 
-/** Everything at a glance, between close-ups. */
+/** A card's proportions, width over height. */
+const CARD_RATIO = 60 / 84;
+
+/**
+ * Everything at a glance, between close-ups.
+ *
+ * The cards are laid out to the SPACE, not to a column count. One
+ * column per card was the old rule, and the founder photographed what
+ * it did with three Flares in a tall column: three thumbnails in a row
+ * across the middle of the panel, with most of the panel empty above
+ * and below them. Cards are portrait and the column is portrait, so the
+ * arrangement that makes them biggest is two across and as many rows as
+ * it takes, each card as large as BOTH the width and the height allow.
+ * Measuring the area is the only way to know which of the two is the
+ * limit, so the panel is measured and the card size follows.
+ */
 function Overview({ flares }: { flares: DisplayFlare[] }) {
   const shown = flares.slice(0, 4);
   const more = flares.length - shown.length;
+  const area = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ width: 0, height: 0 });
+
+  useLayoutEffect(() => {
+    const node = area.current;
+    if (!node) return;
+    const measure = () =>
+      setBox({ width: node.clientWidth, height: node.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const columns = Math.min(shown.length, 2);
+  const rows = Math.ceil(shown.length / columns);
+  /* The gap scales with the area so a 4K wall is not left with hairlines. */
+  const gap = Math.round(Math.max(6, box.width * 0.03));
+  const byWidth = (box.width - gap * (columns - 1)) / columns;
+  const byHeight = ((box.height - gap * (rows - 1)) / rows) * CARD_RATIO;
+  const cardWidth = Math.max(0, Math.floor(Math.min(byWidth, byHeight)));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[clamp(0.5rem,1vw,1.25rem)]">
+    <div className="flex min-h-0 flex-1 flex-col items-center gap-[clamp(0.5rem,1vw,1.25rem)]">
       <div
-        /* Width-driven, one column per card: each card takes an equal
-           share of the row and its height follows from the card aspect,
-           so nothing is ever cropped into a sliver when four cards meet
-           a narrow column. */
-        className="grid w-full items-center gap-[clamp(0.4rem,0.9vw,1.1rem)]"
-        style={{
-          gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))`,
-        }}
+        ref={area}
+        className="flex min-h-0 w-full flex-1 flex-wrap content-center items-center justify-center"
+        style={{ gap }}
       >
         {shown.map((flare) => (
           <span
             key={flare.cardId}
-            className="block w-full overflow-hidden rounded-[8px] border border-border bg-elevated"
+            className="block overflow-hidden rounded-[8px] border border-border bg-elevated"
+            style={{ width: cardWidth }}
           >
             <span className="block aspect-[60/84] w-full">
               {flare.imageUrl && (

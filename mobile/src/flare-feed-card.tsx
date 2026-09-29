@@ -94,38 +94,6 @@ export function FlareStatus({
   );
 }
 
-/** Want, Trade, Cash ok: the primary one filled, the rest outlined. */
-export function FlareTypeChip({
-  label,
-  primary = false,
-}: {
-  label: string;
-  primary?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: primary ? colors.accent : colors.borderStrong,
-        backgroundColor: primary ? colors.accent : "transparent",
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1),
-      }}
-    >
-      <Text
-        style={{
-          color: primary ? colors.accentContrast : colors.textSecondary,
-          fontSize: 12,
-          fontWeight: "700",
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 /**
  * The buttons under a post's cards, decided by whose post it is and
  * which way it points. Shared with the post's own screen so the two
@@ -322,16 +290,9 @@ export function FlareFeedCard({
         </View>
       </View>
 
-      {/* Which way it points and what they will do for it. Post-level,
-          because they are true of every card in it. */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        <FlareTypeChip
-          label={direction === "showcase" ? "Offering" : "Looking for"}
-          primary
-        />
-        {item.acceptsTrade !== false ? <FlareTypeChip label="Trade" /> : null}
-        {item.acceptsCash ? <FlareTypeChip label="Cash ok" /> : null}
-      </View>
+      {/* No row of chips here. The status line above already says which
+          way the post points, and the founder read "Looking for" twice
+          on every post. Same on the website. */}
 
       {/* The card and what is asked of it. Several cards are the same
           row, swiped, with the next one peeking in. */}

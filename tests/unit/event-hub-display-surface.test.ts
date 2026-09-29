@@ -20,6 +20,7 @@ const read = (path: string) =>
 const panel = read("src/components/event-hub/timer-panel.tsx");
 const screen = read("src/components/event-hub/display-screen.tsx");
 const board = read("src/components/event-hub/flare-board.tsx");
+const featured = read("src/components/event-hub/featured-flare.tsx");
 const page = read("src/app/display/[token]/page.tsx");
 const css = read("src/app/globals.css");
 
@@ -110,7 +111,9 @@ describe("readable from across a shop", () => {
     const cap = (scale: string, layout: string) => {
       const block = panel.slice(panel.indexOf(`const ${scale}`));
       const line = block.slice(block.indexOf(`${layout}:`)).split("\n")[0];
-      const max = /,([0-9.]+)rem\)/.exec(line);
+      /* Either shape: a clamp() class, or the {min, max} bounds the
+         game's name is built from. */
+      const max = /,([0-9.]+)rem\)/.exec(line) ?? /max: "([0-9.]+)rem"/.exec(line);
       if (!max) throw new Error(`No ${layout} size in ${scale}`);
       return Number(max[1]);
     };
@@ -122,6 +125,34 @@ describe("readable from across a shop", () => {
         cap("META_SIZE", layout),
       );
     }
+  });
+
+  it("sizes the game's name from its panel, so it never truncates", () => {
+    /*
+     * The founder's photograph of a 1080p wall: "ONE PIE..." with a
+     * third of the panel empty beside it. The name took a share of the
+     * VIEWPORT, which assumed a panel the width of the wall. Now it
+     * takes a share of the panel — container width divided by how many
+     * letters must fit — and the panel declares itself the container.
+     */
+    expect(panel).toContain("cqw");
+    expect(panel).toMatch(/gameNameSize\(layout, profile\.shortName\)/);
+    expect(panel).not.toMatch(/\$\{GAME_SIZE\[layout\]\}/);
+    expect([...panel.matchAll(/@container/g)].length).toBeGreaterThanOrEqual(2);
+    /* The estimate has to be pessimistic: a wide capital is 0.7em. */
+    expect(panel).toMatch(/const CAP_ADVANCE = 0\.7;/);
+  });
+
+  it("lays the overview cards out to the space, not to a column count", () => {
+    /*
+     * Three Flares in a tall column used to be three thumbnails across
+     * the middle of the panel with the rest empty. The panel is measured
+     * and each card is as large as both the width and the height allow.
+     */
+    expect(featured).toContain("ResizeObserver");
+    expect(featured).toContain("Math.min(byWidth, byHeight)");
+    expect(featured).toContain("Math.min(shown.length, 2)");
+    expect(featured).not.toContain("gridTemplateColumns");
   });
 
   it("uses the short name, which is the one that reads at forty feet", () => {

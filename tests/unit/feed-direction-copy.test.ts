@@ -20,9 +20,33 @@ describe("which way a Flare points", () => {
     const card = read("src/components/feed/flare-feed-card.tsx");
     expect(card).toContain('"is looking for"');
     expect(card).toContain('"is offering"');
-    expect(card).toContain('"Offering" : "Looking for"');
     expect(card).not.toMatch(/hunting/i);
     expect(card).not.toContain('"Want"');
+  });
+
+  it("says it once, in the status line, on both platforms", () => {
+    /*
+     * The founder, on the post as it was: "site is still showing
+     * 'looking for' twice per flare, with the looking for text and
+     * looking for button. Delete the 'looking for' and trade/cash
+     * buttons... It's redundant when it already says it at the top in
+     * bright green." So the chip row under the cards is gone: no
+     * Looking for, no Trade, no Cash ok. The header's status line is
+     * the one place the direction is said.
+     */
+    for (const path of [
+      "src/components/feed/flare-feed-card.tsx",
+      "mobile/src/flare-feed-card.tsx",
+      "mobile/src/screens/flare-post.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).not.toContain("FlareTypeChip");
+      expect(source).not.toContain('"Cash ok"');
+      expect(source).not.toContain('label="Trade"');
+    }
+    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
+      "<FlareStatus label={statusLabel(item)}",
+    );
   });
 
   it("says the same on the older row", () => {

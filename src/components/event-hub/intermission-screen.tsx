@@ -196,11 +196,16 @@ function NextRoundPanel({
       {/* Said in so many words. The founder, reading the old face off a
           real television: a bare "ROUND 2 · 01:20" looks like a round in
           progress. The state now names itself before it shows a number. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[clamp(0.3rem,0.7vw,0.9rem)] text-center">
-        <p className="text-[clamp(1.3rem,2.8vw,3.25rem)] leading-none font-bold tracking-[0.18em] text-accent uppercase">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[clamp(0.4rem,0.9vw,1.2rem)] text-center">
+        {/* Sized to the column, which is two fifths of the wall: the
+            founder's photograph of the old face had the countdown at a
+            third of the width with air above and below it. The clock
+            is now the widest thing in the column, "01:42" edge to edge
+            on a 1080p television, and the word above it grew with it. */}
+        <p className="text-[clamp(1.4rem,3.6vw,4rem)] leading-none font-bold tracking-[0.18em] text-accent uppercase">
           Intermission
         </p>
-        <p className="text-[clamp(0.9rem,1.7vw,2rem)] font-semibold tracking-[0.1em] text-text-secondary uppercase">
+        <p className="text-[clamp(0.9rem,1.9vw,2.2rem)] font-semibold tracking-[0.1em] text-text-secondary uppercase">
           Round {intermission.nextRound} starting soon
         </p>
 
@@ -208,7 +213,7 @@ function NextRoundPanel({
           <p
             role="timer"
             aria-label={`Round ${intermission.nextRound} starts in ${formatClock(intermission.remainingMs)}`}
-            className="font-mono text-[clamp(3rem,7.5vw,7.5rem)] leading-none font-bold text-text-primary tabular-nums"
+            className="font-mono text-[clamp(3rem,11vw,13rem)] leading-none font-bold text-text-primary tabular-nums"
           >
             {formatClock(intermission.remainingMs)}
           </p>
