@@ -40,8 +40,12 @@ import {
 
 /** Digit sizes per layout. Fluid, so a 4:3 projector is not left with gaps. */
 const CLOCK_SIZE: Record<ResolvedLayout, string> = {
-  single: "text-[clamp(5rem,19vw,17rem)]",
-  split: "text-[clamp(3.5rem,10vw,9.5rem)]",
+  /* The cap is the width of "13:42" on a 1080p wall's panel, not the
+     height, which had a third of the panel to spare. */
+  single: "text-[clamp(5rem,19vw,20rem)]",
+  /* Two panels side by side on a 1080p wall had the digits at 152px in
+     a panel 600px tall: the cap, not the width, was the limit. */
+  split: "text-[clamp(3.5rem,10vw,12rem)]",
   grid: "text-[clamp(2.5rem,6.5vw,6rem)]",
 };
 
@@ -62,12 +66,48 @@ const CLOCK_SIZE: Record<ResolvedLayout, string> = {
  * `shortName` rather than `displayName`, because this is exactly the job
  * the short name exists for: "One Piece" reads at forty feet, "One Piece
  * Card Game" wraps.
+ *
+ * SIZED FROM THE PANEL, NOT THE SCREEN. The name used to take a share of
+ * the viewport, which assumed a panel the width of the wall; on a 1080p
+ * television the single layout gives it five eighths, and the founder
+ * photographed the result: "ONE PIE..." with a third of the panel still
+ * empty beside the round. So the middle of the clamp is container
+ * width, divided by how many letters have to fit, and the bounds below
+ * only keep it sane: a name can be as big as its panel allows and never
+ * bigger than the clock. See `gameNameSize`.
  */
-const GAME_SIZE: Record<ResolvedLayout, string> = {
-  single: "text-[clamp(2.75rem,8.5vw,9.5rem)]",
-  split: "text-[clamp(1.75rem,4.6vw,5rem)]",
-  grid: "text-[clamp(1rem,2.4vw,2.4rem)]",
+const GAME_SIZE: Record<ResolvedLayout, { min: string; max: string }> = {
+  single: { min: "2.75rem", max: "9.5rem" },
+  split: { min: "1.75rem", max: "6rem" },
+  grid: { min: "1rem", max: "2.4rem" },
 };
+
+/**
+ * The share of the panel's width the name may take, leaving the rest
+ * for the round and format beside it.
+ */
+const GAME_NAME_SHARE = 0.7;
+
+/**
+ * A bold capital's advance, as a fraction of the font size, at the wide
+ * end. "ONE PIECE" comes in under this; the estimate only has to never
+ * be optimistic, since `truncate` behind it is the failure the founder
+ * photographed.
+ */
+const CAP_ADVANCE = 0.7;
+
+/**
+ * The name's font size: as large as its panel lets it be, in one line.
+ *
+ * `cqw` is a hundredth of the nearest container's width, and both panels
+ * below declare themselves one. Where nothing does, it falls back to the
+ * viewport, which is what the old sizes assumed anyway.
+ */
+export function gameNameSize(layout: ResolvedLayout, name: string): string {
+  const letters = Math.max(1, name.length);
+  const share = ((GAME_NAME_SHARE * 100) / (CAP_ADVANCE * letters)).toFixed(1);
+  return `clamp(${GAME_SIZE[layout].min}, ${share}cqw, ${GAME_SIZE[layout].max})`;
+}
 
 /**
  * The game's name on the rules card.
@@ -203,7 +243,10 @@ export function TimerPanel({
       /* The one place a game's colour is set. Everything below reads it
          from here, so a panel is never five hardcoded classes. */
       style={{ ["--game" as string]: `var(${profile.accentToken})` }}
-      className={`relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 bg-surface ${
+      /* `@container`: the name above sizes itself from this panel's
+         width, so one tournament and four get the largest name that
+         fits their share of the wall. */
+      className={`@container relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 bg-surface ${
         atTime
           ? "border-danger motion-safe:animate-[cf-overtime-glow_2.4s_ease-in-out_infinite_alternate]"
           : URGENCY_RING[band]
@@ -219,7 +262,8 @@ export function TimerPanel({
           <div className="flex min-w-0 flex-col">
             {/* The game, at the size somebody reads from the door. */}
             <h2
-              className={`truncate font-bold tracking-tight text-[var(--game)] uppercase ${GAME_SIZE[layout]} leading-none`}
+              style={{ fontSize: gameNameSize(layout, profile.shortName) }}
+              className="truncate leading-none font-bold tracking-tight text-[var(--game)] uppercase"
             >
               {profile.shortName}
             </h2>
@@ -342,7 +386,7 @@ function PanelIntermission({
   return (
     <section
       style={{ ["--game" as string]: `var(${profile.accentToken})` }}
-      className="relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 border-border bg-surface"
+      className="@container relative flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border-2 border-border bg-surface"
       aria-label={`${profile.displayName}, ${timer.eventName}, intermission`}
     >
       <span aria-hidden="true" className="h-1.5 w-full shrink-0 bg-[var(--game)]" />
@@ -351,7 +395,8 @@ function PanelIntermission({
         <header className="flex items-baseline justify-between gap-4">
           <div className="flex min-w-0 flex-col">
             <h2
-              className={`truncate font-bold tracking-tight text-[var(--game)] uppercase ${GAME_SIZE[layout]} leading-none`}
+              style={{ fontSize: gameNameSize(layout, profile.shortName) }}
+              className="truncate leading-none font-bold tracking-tight text-[var(--game)] uppercase"
             >
               {profile.shortName}
             </h2>

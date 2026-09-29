@@ -83,28 +83,6 @@ export function FlareStatus({
   );
 }
 
-/** Looking for, Trade, Cash ok: the primary one filled, the rest outlined. */
-export function FlareTypeChip({
-  label,
-  primary = false,
-}: {
-  label: string;
-  primary?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "rounded-full border px-3 py-1 text-xs font-bold",
-        primary
-          ? "border-accent bg-accent text-accent-contrast"
-          : "border-border-strong text-text-secondary",
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
 export function FlareFeedCard({
   item,
   preview = false,
@@ -120,17 +98,6 @@ export function FlareFeedCard({
   const lead = item.cards[0];
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours || preview };
-
-  const chips = (
-    <>
-      <FlareTypeChip
-        label={direction === "showcase" ? "Offering" : "Looking for"}
-        primary
-      />
-      {item.acceptsTrade && <FlareTypeChip label="Trade" />}
-      {item.acceptsCash && <FlareTypeChip label="Cash ok" />}
-    </>
-  );
 
   /* The zoom pages along the whole deck from any card. */
   const shelf: ZoomCard[] = item.cards.map((card) => ({
@@ -273,14 +240,16 @@ export function FlareFeedCard({
         <FlareCarousel cards={item.cards} direction={direction} tiles={tiles} />
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {chips}
-        {!single && item.youCanAnswer > 0 && (
-          <span className="text-xs font-semibold text-accent">
-            You can answer {item.youCanAnswer} of {item.total}
-          </span>
-        )}
-      </div>
+      {/* No row of chips under the cards. The status line in the header
+          already says which way the post points, in the accent, and the
+          founder read "Looking for" twice on every post: "Delete the
+          'looking for' and trade/cash buttons... It's redundant when it
+          already says it at the top in bright green." */}
+      {!single && item.youCanAnswer > 0 && (
+        <p className="text-xs font-semibold text-accent">
+          You can answer {item.youCanAnswer} of {item.total}
+        </p>
+      )}
 
       {/* The counts and the doors: the full list, and the one action
           the post is for. The author updates; anyone else offers. */}
