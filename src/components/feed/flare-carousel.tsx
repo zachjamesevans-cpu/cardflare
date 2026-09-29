@@ -131,7 +131,9 @@ export function FlareCarousel({
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-3 px-1">
+      {/* The dots alone say where you are; the "1 / 2" that sat beside
+          them said it twice. */}
+      <div className="flex items-center gap-3 px-1">
         <div className="flex gap-1.5" aria-hidden="true">
           {cards.map((card, index) => (
             <button
@@ -146,9 +148,6 @@ export function FlareCarousel({
             />
           ))}
         </div>
-        <span className="text-xs font-semibold text-text-muted tabular-nums">
-          {at + 1} / {cards.length}
-        </span>
       </div>
     </div>
   );

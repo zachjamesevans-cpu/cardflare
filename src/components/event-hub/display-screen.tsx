@@ -319,6 +319,16 @@ function Header({
   );
 }
 
+/**
+ * The way in, said in one word.
+ *
+ * "JOIN", the code, and the code under it. The founder, on the corner
+ * of the wall: "The scan to join text can just be changed to 'JOIN'. So
+ * that it stays in line. Then the room code can just be fit under the
+ * QR code." One word beside the square, the six letters directly
+ * beneath it, and that is the language for every QR on the site: the
+ * counter sheet says the same (join-poster.tsx).
+ */
 function JoinPanel({
   code,
   qrSvg,
@@ -333,44 +343,47 @@ function JoinPanel({
    */
   corner?: boolean;
 }) {
+  const plate = (
+    <div
+      /* White plate behind the code: a QR on a dark panel is a QR that
+         does not scan from four metres away. In the corner only the
+         halo around it moves. */
+      className={`rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block [&>svg]:size-[clamp(3.5rem,9vh,8rem)] ${
+        corner
+          ? "motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate]"
+          : ""
+      }`}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: qrSvg }}
+    />
+  );
+  const codeLine = (
+    <p className="font-mono text-[clamp(0.75rem,1.2vw,1.4rem)] font-bold tracking-[0.15em] text-text-primary">
+      {code}
+    </p>
+  );
+
   if (corner) {
     return (
       <aside className="flex items-center gap-[clamp(0.5rem,1vw,1.25rem)] motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]">
-        <div className="flex flex-col items-end gap-[clamp(0.1rem,0.25vw,0.3rem)] text-right">
-          <p className="text-[clamp(0.6rem,0.85vw,1rem)] font-semibold tracking-[0.18em] text-accent uppercase">
-            Scan to join
-          </p>
-          <p className="font-mono text-[clamp(0.8rem,1.4vw,1.6rem)] font-bold tracking-[0.15em] text-text-primary">
-            {code}
-          </p>
+        <p className="text-[clamp(0.9rem,1.6vw,1.9rem)] font-bold tracking-[0.18em] text-accent uppercase">
+          Join
+        </p>
+        <div className="flex flex-col items-center gap-[clamp(0.15rem,0.3vw,0.4rem)]">
+          {plate}
+          {codeLine}
         </div>
-        <div
-          /* White plate behind the code: a QR on a dark panel is a QR
-             that does not scan from four metres away. Only the halo
-             around it moves. */
-          className="rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate] [&>svg]:block [&>svg]:size-[clamp(3.5rem,9vh,8rem)]"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: qrSvg }}
-        />
       </aside>
     );
   }
 
   return (
     <aside className="flex shrink-0 flex-col items-center justify-center gap-[clamp(0.2rem,0.5vw,0.6rem)] rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]">
-      <p className="text-[clamp(0.6rem,0.85vw,1rem)] font-semibold tracking-[0.18em] text-accent uppercase">
-        Scan to join
+      <p className="text-[clamp(0.8rem,1.3vw,1.5rem)] font-bold tracking-[0.18em] text-accent uppercase">
+        Join
       </p>
-      <div
-        /* White plate behind the code: a QR on a dark panel is a QR that
-           does not scan from four metres away. */
-        className="rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block [&>svg]:size-[clamp(4rem,9vh,9rem)]"
-        aria-hidden="true"
-        dangerouslySetInnerHTML={{ __html: qrSvg }}
-      />
-      <p className="font-mono text-[clamp(0.8rem,1.4vw,1.6rem)] font-bold tracking-[0.15em] text-text-primary">
-        {code}
-      </p>
+      {plate}
+      {codeLine}
     </aside>
   );
 }

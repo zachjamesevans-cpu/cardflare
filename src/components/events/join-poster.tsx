@@ -163,10 +163,19 @@ export function JoinPoster({
                 />
               ))}
 
+              {/*
+               * The one word every QR on the site wears, and the code
+               * right under the square: the wall's corner says the same
+               * (display-screen.tsx). Somebody with no camera reads the
+               * code off the same window they would have scanned.
+               */}
+              <p className="text-center text-sm font-bold tracking-[0.22em] uppercase print:text-[11pt]">
+                Join
+              </p>
               <div
                 /* On screen the code fills the window; the printed cap
-                   stays at 105mm, which already scans across a counter. */
-                className="mx-auto w-full max-w-[140mm] print:max-w-[105mm]"
+                   stays at 100mm, which already scans across a counter. */
+                className="mx-auto w-full max-w-[130mm] print:max-w-[100mm]"
                 /*
                  * Generated server-side by the `qrcode` package from a URL this
                  * app built — never from user input — so there is no untrusted
@@ -175,6 +184,9 @@ export function JoinPoster({
                  */
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
+              <p className="text-center font-mono text-[30px] leading-none font-bold tracking-[0.18em] print:text-[30pt]">
+                {joinCode}
+              </p>
             </div>
 
             {/* ---- Type line ------------------------------------------- */}
@@ -208,20 +220,15 @@ export function JoinPoster({
               </ol>
 
               {/*
-               * The typed route in, given its own panel rather than a footnote.
-               * A dashed rule reads as "or", and keeps it from looking like the
-               * small print nobody reads.
+               * The typed route in. The code itself sits under the QR,
+               * where the eye already is; this line says where to type
+               * it. A dashed rule reads as "or".
                */}
-              <div className="flex flex-col items-center gap-1 border-t border-dashed border-neutral-300 pt-[3mm]">
-                <p className="text-xs text-neutral-600 print:text-[9pt]">
-                  No camera? Go to{" "}
-                  <span className="font-semibold text-black">{SITE.domain}/join</span>{" "}
-                  and enter
-                </p>
-                <p className="font-mono text-[30px] leading-none font-bold tracking-[0.18em] print:text-[32pt]">
-                  {joinCode}
-                </p>
-              </div>
+              <p className="border-t border-dashed border-neutral-300 pt-[3mm] text-center text-xs text-neutral-600 print:text-[9pt]">
+                No camera? Go to{" "}
+                <span className="font-semibold text-black">{SITE.domain}/join</span> and
+                enter the code above.
+              </p>
             </div>
 
             {/* ---- Collector line -------------------------------------- */}

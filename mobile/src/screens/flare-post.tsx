@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
+import { ActionSheet, DotsButton } from "../action-menu";
 import {
   commentOnPost,
   describeError,
@@ -20,7 +21,7 @@ import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
-import { FlareActions, statusLabel } from "../flare-feed-card";
+import { FlareActions, postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
 import { PlayerAvatar } from "../player-avatar";
@@ -54,6 +55,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     (FlareSheetPost & { mode: "view" | "offer" }) | null
   >(null);
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
+  const [menu, setMenu] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -139,6 +141,13 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     completed: post.completed ?? false,
     cards: post.cards,
   };
+  const actions = postActions({
+    total,
+    yours: post.yours,
+    direction,
+    onViewAll: () => setCardsSheet({ ...sheetPost, mode: "view" }),
+    onProgress: () => setProgressSheet(sheetPost),
+  });
 
   return (
     <KeyboardAvoidingView
@@ -179,18 +188,35 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           </>
         ) : (
           <>
-            <FeedPerson
-              playerId={post.author.playerId}
-              displayName={post.author.displayName}
-              avatarUrl={post.author.avatarUrl}
-              frame={post.author.frame}
-              ring={post.author.ring}
-              aura={post.author.aura ?? null}
-              detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
-                post.eventName ? ` · ${post.eventName}` : ""
-              }`}
-              onOpen={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
-            />
+            {/* The person, and the three dots at the row's end: the full
+                list and, on your own post, the progress ticks. */}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <FeedPerson
+                  playerId={post.author.playerId}
+                  displayName={post.author.displayName}
+                  avatarUrl={post.author.avatarUrl}
+                  frame={post.author.frame}
+                  ring={post.author.ring}
+                  aura={post.author.aura ?? null}
+                  detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
+                    post.eventName ? ` · ${post.eventName}` : ""
+                  }`}
+                  onOpen={(id) =>
+                    navigation.navigate("PlayerProfile", { playerId: id })
+                  }
+                />
+              </View>
+              {actions.length > 0 ? (
+                <DotsButton
+                  onPress={() => setMenu(true)}
+                  label="More about this post"
+                />
+              ) : null}
+            </View>
+            <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
 
             {/* The cards, the way the Feed draws them: one row, or the
                 same row swiped. Tap one to open it big and say you have it. */}
@@ -203,14 +229,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                 position={0}
               />
             ) : (
-              <FlareCarousel
-                cards={post.cards}
-                total={total}
-                direction={direction}
-                post={ref}
-                remainingCopies={post.remainingCopies}
-                onViewAll={() => setCardsSheet({ ...sheetPost, mode: "view" })}
-              />
+              <FlareCarousel cards={post.cards} direction={direction} post={ref} />
             )}
 
             {post.caption ? (
@@ -248,7 +267,6 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               direction={direction}
               completed={post.completed ?? false}
               onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
-              onProgress={() => setProgressSheet(sheetPost)}
             />
             {!post.yours && direction === "want" && !post.completed ? (
               <Muted>Tap a card to say you have it, or offer several at once.</Muted>

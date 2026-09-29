@@ -117,7 +117,9 @@ test.describe("the tier pages", () => {
     await page.goto("/display/demo?scene=focus");
     await expect(page.getByText(/wanted in the room/i)).toBeVisible();
     await expect(page.getByText(/mox valley games/i)).toBeVisible();
-    await expect(page.getByText(/scan to join/i)).toBeVisible();
+    /* One word for every QR on the site, and the code right under it. */
+    await expect(page.getByText(/^join$/i)).toBeVisible();
+    await expect(page.getByText("MOX7VG")).toBeVisible();
   });
 
   test("switches the sample television between scenes in place", async ({ page }) => {

@@ -184,9 +184,16 @@ describe("the QR code", () => {
     expect(screen).toContain("bg-white");
   });
 
-  it("shows the short code underneath it", () => {
-    expect(screen).toContain("Scan to join");
+  it("says JOIN, with the short code under the square", () => {
+    /* The founder: "The scan to join text can just be changed to
+       'JOIN'... Then the room code can just be fit under the QR code."
+       One word for every QR on the site; the counter sheet says the
+       same. */
+    expect(screen).not.toContain("Scan to join");
+    expect(screen).toMatch(/>\s*Join\s*</);
     expect(screen).toContain("{code}");
+    expect(read("src/components/events/join-poster.tsx")).toMatch(/>\s*Join\s*</);
+    expect(read("src/lib/events/poster-pdf.ts")).toContain('"JOIN"');
   });
 
   it("is encoded once on the server rather than in the browser", () => {

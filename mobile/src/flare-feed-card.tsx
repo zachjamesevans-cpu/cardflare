@@ -1,6 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useState } from "react";
 import { Text, View } from "react-native";
 
+import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import type { FeedEntry } from "./api";
 import { cardsLabel, doneLabel } from "./flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
@@ -95,7 +97,7 @@ export function FlareStatus({
 }
 
 /**
- * The buttons under a post's cards, decided by whose post it is and
+ * The one button under a post's cards, decided by whose post it is and
  * which way it points. Shared with the post's own screen so the two
  * never offer different things.
  */
@@ -104,24 +106,16 @@ export function FlareActions({
   direction,
   completed,
   onOffer,
-  onProgress,
 }: {
   yours: boolean;
   direction: "want" | "showcase";
   completed: boolean;
   onOffer?: () => void;
-  onProgress?: () => void;
 }) {
   if (direction === "showcase") return null;
-  if (yours) {
-    return onProgress ? (
-      <Button
-        label={completed ? "All found · Update progress" : "Update progress"}
-        variant="secondary"
-        onPress={onProgress}
-      />
-    ) : null;
-  }
+  /* Your own post has no button here: "Update progress" waits behind
+     the three dots in the corner, with the full list. */
+  if (yours) return null;
   if (completed) {
     return (
       <View
@@ -141,6 +135,44 @@ export function FlareActions({
     );
   }
   return onOffer ? <Button label="Offer cards" onPress={onOffer} /> : null;
+}
+
+/**
+ * What waits behind the three dots: the full list when there is more
+ * than one card, and the progress ticks on your own want. Shared with
+ * the post's own screen so the two menus never differ.
+ */
+export function postActions({
+  total,
+  yours,
+  direction,
+  onViewAll,
+  onProgress,
+}: {
+  total: number;
+  yours: boolean;
+  direction: "want" | "showcase";
+  onViewAll?: () => void;
+  onProgress?: () => void;
+}): ActionItem[] {
+  const items: ActionItem[] = [];
+  if (total > 1 && onViewAll) {
+    items.push({
+      key: "cards",
+      label: `View all ${total} cards`,
+      icon: "list-outline",
+      onPress: onViewAll,
+    });
+  }
+  if (yours && direction === "want" && onProgress) {
+    items.push({
+      key: "progress",
+      label: "Update progress",
+      icon: "checkmark-done-outline",
+      onPress: onProgress,
+    });
+  }
+  return items;
 }
 
 export function FlareFeedCard({
@@ -178,6 +210,14 @@ export function FlareFeedCard({
   const single = item.total === 1 && lead;
   const shelf = shelfFor(item.cards, post);
   const completed = item.completed ?? false;
+  const [menu, setMenu] = useState(false);
+  const actions = postActions({
+    total: item.total,
+    yours: item.yours,
+    direction,
+    onViewAll,
+    onProgress,
+  });
 
   return (
     <View
@@ -266,7 +306,8 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: two muted facts with a dot. */}
+        {/* One line, not a stacked block: two muted facts with a dot,
+            then the three dots when the post has extras to offer. */}
         <View
           style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}
         >
@@ -287,8 +328,14 @@ export function FlareFeedCard({
               </Text>
             </View>
           ) : null}
+          {actions.length > 0 ? (
+            <View style={{ marginLeft: spacing(1) }}>
+              <DotsButton onPress={() => setMenu(true)} label="More about this post" />
+            </View>
+          ) : null}
         </View>
       </View>
+      <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
 
       {/* No row of chips here. The status line above already says which
           way the post points, and the founder read "Looking for" twice
@@ -305,14 +352,7 @@ export function FlareFeedCard({
           position={0}
         />
       ) : (
-        <FlareCarousel
-          cards={item.cards}
-          total={item.total}
-          direction={direction}
-          post={post}
-          remainingCopies={item.remainingCopies}
-          onViewAll={onViewAll}
-        />
+        <FlareCarousel cards={item.cards} direction={direction} post={post} />
       )}
 
       {/* An offer with nothing left to give, said once. A want that is
@@ -361,7 +401,6 @@ export function FlareFeedCard({
         direction={direction}
         completed={completed}
         onOffer={onOffer}
-        onProgress={onProgress}
       />
 
       <PostSocialRow
