@@ -2,12 +2,12 @@ import Link from "next/link";
 import {
   CalendarClock,
   ClipboardList,
+  Flame,
   MapPin,
   PackageCheck,
   Sparkles,
 } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
 import { agoFrom, FlareFeedCard } from "@/components/feed/flare-feed-card";
 import { FlareFeedCardCompact } from "@/components/feed/flare-feed-card-compact";
 import { StorePostCard } from "@/components/feed/store-post-card";
@@ -112,10 +112,10 @@ export function Item({
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
-          {/* The mark, not a face. There is no cardflare player and this
+          {/* A flame, not a face. There is no cardflare player and this
               is the item that has to look like it knows that. */}
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-elevated">
-            <Logo size={20} markOnly />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-elevated text-accent">
+            <Flame className="size-5" aria-hidden="true" />
           </span>
           <div className="flex min-w-0 flex-col">
             <p className="truncate font-semibold text-text-primary">{item.headline}</p>

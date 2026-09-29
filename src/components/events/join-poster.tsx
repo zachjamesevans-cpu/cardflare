@@ -1,11 +1,8 @@
-import Image from "next/image";
-
 import { Card } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { CopyLink } from "./copy-link";
 import { PrintButton } from "./print-button";
 import { SITE } from "@/lib/site";
-import mark from "@public/brand/cardflare-mark.png";
 
 /**
  * The thing that actually goes on the counter, laid out as a trading card.
@@ -41,10 +38,6 @@ import mark from "@public/brand/cardflare-mark.png";
  * button, status controls, breadcrumb.
  */
 
-/** The mark is taller than it is wide; height leads and width follows. */
-const MARK_HEIGHT = 26;
-const MARK_ASPECT = mark.width / mark.height;
-
 /**
  * What a player can actually do, in order.
  *
@@ -75,21 +68,6 @@ const TYPE_LINE: Record<PosterKind, string> = {
 function BrandLockup() {
   return (
     <div className="flex items-center gap-2">
-      {/*
-       * The mark sits on the brand backdrop rather than on bare paper. Its
-       * card face is dark and much of the artwork is near-white, so on white it
-       * would half disappear — the same reason BRAND.md puts the favicons on
-       * this backdrop. The artwork itself is untouched.
-       */}
-      <span className="flex items-center justify-center rounded-[6px] bg-[#12151b] px-1.5 py-1 print-exact">
-        <Image
-          src={mark}
-          alt=""
-          aria-hidden="true"
-          width={Math.round(MARK_HEIGHT * MARK_ASPECT)}
-          height={MARK_HEIGHT}
-        />
-      </span>
       <span className="text-base font-bold tracking-tight text-black">{SITE.name}</span>
     </div>
   );

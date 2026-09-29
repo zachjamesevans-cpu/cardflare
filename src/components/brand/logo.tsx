@@ -2,16 +2,20 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
-import mark from "@public/brand/cardflare-mark.png";
 import wordmark from "@public/brand/cardflare-wordmark-cut.png";
 
-/**
- * The mark is taller than it is wide, so it is sized by height and its width
- * is derived from the file's own dimensions. Reading the aspect ratio from the
- * static import means a future master with different proportions stays
- * correctly shaped without touching this component.
+/*
+ * THE WORDMARK ALONE, FOR NOW.
+ *
+ * The mark, the little card, used to ride beside the name everywhere.
+ * The founder (2026-09-29): "Remove the cardflare logo from everywhere
+ * on website... keep cardflare. But just remove the little PNG
+ * everywhere. Just going to see what it looks like." So the lockup is
+ * the drawn name on its own. `size` still means what it meant, the
+ * height the mark would have had, so the name stays exactly the size it
+ * was beside it and nothing else on the page moves. Putting the mark
+ * back is one import and one <Image>.
  */
-const ASPECT = mark.width / mark.height;
 const WORDMARK_ASPECT = wordmark.width / wordmark.height;
 
 /**
@@ -29,10 +33,8 @@ const WORDMARK_ASPECT = wordmark.width / wordmark.height;
 const WORDMARK_SCALE = 0.62;
 
 interface LogoProps {
-  /** Rendered height of the mark in pixels. Width follows the artwork. */
+  /** The height the mark had, in pixels; the name is scaled from it. */
   size?: number;
-  /** Hides the wordmark, leaving the mark alone (used in tight spaces). */
-  markOnly?: boolean;
   className?: string;
   /**
    * Set on the single most important instance (the header) so the mark is not
@@ -41,36 +43,20 @@ interface LogoProps {
   priority?: boolean;
 }
 
-export function Logo({
-  size = 36,
-  markOnly = false,
-  className,
-  priority = false,
-}: LogoProps) {
+export function Logo({ size = 36, className, priority = false }: LogoProps) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
+    <span className={cn("inline-flex items-center", className)}>
+      {/* The name, in the founder's own artwork. The alt carries the
+          product name so the lockup still reads "cardflare" to a screen
+          reader and to the header link's accessible name. */}
       <Image
-        src={mark}
-        alt={markOnly ? `${SITE.name} logo` : ""}
-        aria-hidden={markOnly ? undefined : true}
-        width={Math.round(size * ASPECT)}
-        height={size}
+        src={wordmark}
+        alt={SITE.name}
+        width={Math.round(size * WORDMARK_SCALE * WORDMARK_ASPECT)}
+        height={Math.round(size * WORDMARK_SCALE)}
         priority={priority}
         className="shrink-0"
       />
-      {!markOnly && (
-        /* The name, in the founder's own artwork. The alt carries the
-           product name so the lockup still reads "cardflare" to a
-           screen reader and to the header link's accessible name. */
-        <Image
-          src={wordmark}
-          alt={SITE.name}
-          width={Math.round(size * WORDMARK_SCALE * WORDMARK_ASPECT)}
-          height={Math.round(size * WORDMARK_SCALE)}
-          priority={priority}
-          className="shrink-0"
-        />
-      )}
     </span>
   );
 }
