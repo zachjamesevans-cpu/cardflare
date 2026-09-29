@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Home, MapPin, UserCircle2, Users } from "lucide-react";
+import { Bell, Flame, Home, MapPin, UserCircle2, Users } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
@@ -86,12 +85,11 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                   {Icon ? (
                     <Icon className="size-5" aria-hidden="true" />
                   ) : (
-                    /* The centre tab wears the mark, as the app's does.
-                       Sized by height; the artwork sets its own width. */
-                    <Logo
-                      size={22}
-                      markOnly
-                      className={active ? undefined : "opacity-50"}
+                    /* The centre tab: a flame, since the mark is off the
+                       site for now. The same glyph the Flares list wears. */
+                    <Flame
+                      className={cn("size-5", active ? undefined : "opacity-50")}
+                      aria-hidden="true"
                     />
                   )}
 

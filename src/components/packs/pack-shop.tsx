@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { HelpCircle, Loader2, X } from "lucide-react";
 
 import { FRAME_CLASS } from "@/components/players/cosmetic-card";
+import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
 
 /**
@@ -94,13 +94,6 @@ export function PackArt({
       )}
     >
       <div className="cf-holo cf-holo-classic-holo" aria-hidden="true" />
-      <Image
-        src="/brand/cardflare-mark.png"
-        alt=""
-        width={64}
-        height={80}
-        className="relative h-20 w-auto"
-      />
       <p className="relative font-bold tracking-wide text-text-primary">cardflare</p>
       <p className="relative text-xs text-text-muted">
         {name} · Set {setNumber}
@@ -402,13 +395,7 @@ function FlipCard({ pull, name, last }: { pull: Pull; name: string; last: boolea
       >
         {/* The back: the set's wrapper art, face down. */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl border border-border-strong bg-[linear-gradient(160deg,#1a2030,#0e1116_55%,#1c1430)] [backface-visibility:hidden]">
-          <Image
-            src="/brand/cardflare-mark.png"
-            alt=""
-            width={64}
-            height={80}
-            className="h-24 w-auto opacity-80"
-          />
+          <Logo size={44} className="opacity-80" />
           {last && <p className="text-xs text-text-muted">Your best pull waits here</p>}
         </div>
 
