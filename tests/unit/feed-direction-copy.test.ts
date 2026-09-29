@@ -49,6 +49,45 @@ describe("which way a Flare points", () => {
     );
   });
 
+  it("keeps a post's extras behind the three dots, on both platforms", () => {
+    /*
+     * The founder, on a post wearing "Update progress", "2 copies still
+     * needed" and "View all 2" under its cards: "Delete... nest all of
+     * this in a 3 dot menu in top right. Similar to how instagram does
+     * it." So the card carries none of them, the menu carries the list
+     * and the progress ticks, and the one button left under the cards
+     * is "Offer cards" on somebody else's want.
+     */
+    const webCard = read("src/components/feed/flare-feed-card.tsx");
+    const webMenu = read("src/components/feed/post-actions.tsx");
+    const appCard = read("mobile/src/flare-feed-card.tsx");
+    const appPager = read("mobile/src/flare-deck-pager.tsx");
+
+    for (const source of [webCard, appCard, appPager]) {
+      expect(source).not.toContain("still needed");
+      expect(source).not.toContain("copies available");
+    }
+    /* No buttons for them under the cards: the pager lost "View all",
+       and the card lost the progress button that named itself twice. */
+    expect(appPager).not.toMatch(/View all \$\{/);
+    expect(appCard).not.toContain('label={completed ? "All found');
+    expect(webCard).not.toContain("Update progress");
+    expect(webCard).not.toMatch(/View all/);
+    expect(webCard).toContain("<PostMenu");
+    expect(webCard).toContain("<OfferCardsButton");
+    expect(webMenu).toContain("<DotsMenu");
+    expect(webMenu).toContain("View all ${post.total} cards");
+    expect(webMenu).toContain('label: "Update progress"');
+    expect(appCard).toContain("<DotsButton");
+    expect(appCard).toContain("<ActionSheet");
+    expect(appCard).toContain("View all ${total} cards");
+    expect(appCard).toContain('label: "Update progress"');
+    expect(read("mobile/src/screens/flare-post.tsx")).toContain("<DotsButton");
+    /* The dots say where you are; the "1 / 2" beside them said it twice. */
+    expect(read("src/components/feed/flare-carousel.tsx")).not.toContain("{at + 1} /");
+    expect(appPager).not.toContain("${at + 1} /");
+  });
+
   it("says the same on the older row", () => {
     const items = read("src/components/feed/feed-items.tsx");
     expect(items).toContain('"Offering" : "Looking for"');

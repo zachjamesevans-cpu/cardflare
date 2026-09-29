@@ -165,7 +165,9 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
   const qrBoxH = frameW; // square art window
   const typeLineH = 8 * MM;
   const stepH = 6.2 * MM;
-  const rulesH = 12 * MM + STEPS.length * stepH + 22 * MM;
+  /* The code no longer needs a block of its own down here: it sits
+     under the QR, in the art window, so the panel ends on one line. */
+  const rulesH = 12 * MM + STEPS.length * stepH + 12 * MM;
   const collectorH = 6 * MM;
   const gap = 3 * MM;
 
@@ -292,14 +294,31 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
      * error-correction level as the on-screen SVG. Vector rectangles, so it
      * stays razor sharp at any print size.
      */
+    /*
+     * The one word every QR on the site wears, above the square, and
+     * the code right under it, exactly as the HTML sheet and the wall's
+     * corner draw them (join-poster.tsx, display-screen.tsx).
+     */
+    const labelH = 7 * MM;
+    const codeH = 11 * MM;
+    tracked(
+      page,
+      "JOIN",
+      bold,
+      11,
+      (PAGE.width - trackedWidth("JOIN", bold, 11, 2.4)) / 2,
+      top - 6 * MM,
+      2.4,
+    );
+
     const qr = QRCode.create(joinUrl(input.joinCode), { errorCorrectionLevel: "Q" });
     const modules = qr.modules.size;
     // ~4 modules of quiet zone inside the window, per the QR spec.
-    const quiet = 8 * MM;
-    const qrSize = qrBoxH - quiet * 2;
+    const quiet = 7 * MM;
+    const qrSize = qrBoxH - labelH - codeH - quiet * 2;
     const cell = qrSize / modules;
     const qrX = left + (frameW - qrSize) / 2;
-    const qrTop = top - quiet;
+    const qrTop = top - labelH - quiet;
 
     for (let row = 0; row < modules; row += 1) {
       for (let col = 0; col < modules; col += 1) {
@@ -313,6 +332,21 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
           color: BLACK,
         });
       }
+    }
+
+    {
+      const codeSize = 24;
+      const codeGap = 4;
+      const codeW = trackedWidth(input.joinCode, mono, codeSize, codeGap);
+      tracked(
+        page,
+        input.joinCode,
+        mono,
+        codeSize,
+        (PAGE.width - codeW) / 2,
+        boxY + 4 * MM,
+        codeGap,
+      );
     }
 
     top = boxY - gap;
@@ -385,7 +419,7 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
       });
     }
 
-    // Dashed rule, then the typed route in.
+    // Dashed rule, then where to type the code that sits under the QR.
     lineY -= 4.5 * MM;
     for (let x = left + 6 * MM; x < left + frameW - 6 * MM; x += 4) {
       page.drawRectangle({ x, y: lineY, width: 2, height: 0.7, color: RULE });
@@ -394,25 +428,11 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
     lineY -= 4.5 * MM;
     centred(
       page,
-      `No camera? Go to ${SITE.domain}/join and enter`,
+      `No camera? Go to ${SITE.domain}/join and enter the code above.`,
       helv,
       8,
       lineY,
       GREY_TEXT,
-    );
-
-    lineY -= 8.5 * MM;
-    const codeSize = 26;
-    const codeGap = 4;
-    const codeW = trackedWidth(input.joinCode, mono, codeSize, codeGap);
-    tracked(
-      page,
-      input.joinCode,
-      mono,
-      codeSize,
-      (PAGE.width - codeW) / 2,
-      lineY,
-      codeGap,
     );
 
     top = panelY - gap;

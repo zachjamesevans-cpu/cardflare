@@ -102,9 +102,13 @@ describe("found, everywhere", () => {
   });
 
   it("a done post says so once, on both platforms and in both views", () => {
-    const sheet = read("src/components/feed/flare-cards-sheet.tsx");
-    expect(sheet).toContain('"All gone"');
-    expect(sheet).toContain('"All found"');
+    /* On the card itself now: the sheet's count line went with the rest
+       of the chrome under the cards, behind the three dots. */
+    const card = read("src/components/feed/flare-feed-card.tsx");
+    expect(card).toContain('"All gone" : "All found"');
+    expect(read("src/components/feed/flare-cards-sheet.tsx")).not.toContain(
+      "still needed",
+    );
     /* And the tile's foot agrees with the words beside it. */
     expect(read("src/components/feed/feed-tile.tsx")).toContain(
       'state === "found" && direction === "showcase" ? "gone" : state',

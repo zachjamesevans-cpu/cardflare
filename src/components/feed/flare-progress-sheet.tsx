@@ -11,7 +11,7 @@ import { setFlareFoundAction } from "@/lib/players/hunt-actions";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
- * "Update progress", on your own post in the Feed.
+ * "Update progress", behind the menu on your own post in the Feed.
  *
  * The same ticks the profile's hunt panel makes, addressed by the Flare
  * instead of the request: the server maps a hunt-linked Flare onto its
@@ -23,13 +23,14 @@ import type { FeedCard } from "@/lib/feed/repository";
 const UNDO_MS = 6000;
 
 export function FlareProgressSheet({
+  open,
+  onClose,
   cards,
-  completed,
 }: {
+  open: boolean;
+  onClose: () => void;
   cards: FeedCard[];
-  completed: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [lastChange, setLastChange] = useState<{
     flareId: string;
@@ -93,16 +94,7 @@ export function FlareProgressSheet({
 
   return (
     <>
-      <Button
-        type="button"
-        variant={completed || allFound ? "secondary" : "primary"}
-        size="sm"
-        onClick={() => setOpen(true)}
-      >
-        Update progress
-      </Button>
-
-      <Sheet open={open} onClose={() => setOpen(false)} title="Update progress">
+      <Sheet open={open} onClose={onClose} title="Update progress">
         <div className="flex flex-col gap-3">
           <p className="text-xs font-semibold text-text-secondary tabular-nums">
             {foundCopies} of {neededCopies} {neededCopies === 1 ? "copy" : "copies"}{" "}

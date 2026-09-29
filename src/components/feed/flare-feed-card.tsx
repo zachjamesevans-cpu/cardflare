@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { Crosshair, Heart, MessageCircle } from "lucide-react";
+import { Check, Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
-import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { FlareCarousel } from "@/components/feed/flare-carousel";
-import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
+import { OfferCardsButton, PostMenu } from "@/components/feed/post-actions";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -169,13 +168,30 @@ export function FlareFeedCard({
             </span>
           </span>
         </Link>
-        <div className="flex shrink-0 items-center gap-1 text-[13px] text-text-muted">
-          <span>{agoFrom(item.postedAt)}</span>
-          {typeof item.milesAway === "number" && (
-            <span className="flex items-center gap-1">
-              <span aria-hidden="true">·</span>
-              {awayLabel(item.milesAway)}
-            </span>
+        <div className="flex shrink-0 items-center gap-2 text-[13px] text-text-muted">
+          <span className="flex items-center gap-1">
+            <span>{agoFrom(item.postedAt)}</span>
+            {typeof item.milesAway === "number" && (
+              <span className="flex items-center gap-1">
+                <span aria-hidden="true">·</span>
+                {awayLabel(item.milesAway)}
+              </span>
+            )}
+          </span>
+          {/* The three dots: the full list and, on your own post, the
+              progress ticks. Nothing renders when there is nothing to
+              offer. */}
+          {!preview && (
+            <PostMenu
+              post={{
+                postId: item.postId,
+                cards: item.cards,
+                total: item.total,
+                direction,
+                yours: item.yours,
+                completed: item.completed,
+              }}
+            />
           )}
         </div>
       </div>
@@ -251,32 +267,30 @@ export function FlareFeedCard({
         </p>
       )}
 
-      {/* The counts and the doors: the full list, and the one action
-          the post is for. The author updates; anyone else offers. */}
-      {preview ? (
-        <p className="text-sm font-semibold text-text-secondary tabular-nums">
-          {direction === "showcase"
-            ? `${item.cards.reduce((sum, card) => sum + (card.quantity ?? 1), 0)} copies available`
-            : `${item.remainingCopies} ${item.remainingCopies === 1 ? "copy" : "copies"} still needed`}
+      {/* Done, said once for the whole post: every card above wears the
+          tick. Nothing else under the cards — no count line, no list
+          button, no progress button. Those wait behind the dots in the
+          corner; the founder: "only visible when you need it". */}
+      {item.completed && (
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-accent">
+          <Check className="size-4" aria-hidden="true" />
+          {direction === "showcase" ? "All gone" : "All found"}
         </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <FlareCardsSheet
-            postId={item.postId}
-            cards={item.cards}
-            total={item.total}
-            direction={direction}
-            yours={item.yours}
-            completed={item.completed}
-            remainingCopies={item.remainingCopies}
+      )}
+
+      {/* The one button a post is for: somebody else's want, still open. */}
+      {!preview && direction === "want" && !item.yours && !item.completed && (
+        <div>
+          <OfferCardsButton
+            post={{
+              postId: item.postId,
+              cards: item.cards,
+              total: item.total,
+              direction,
+              yours: item.yours,
+              completed: item.completed,
+            }}
           />
-          {item.yours &&
-            direction === "want" &&
-            item.cards.some((card) => card.flareId) && (
-              <div>
-                <FlareProgressSheet cards={item.cards} completed={item.completed} />
-              </div>
-            )}
         </div>
       )}
 

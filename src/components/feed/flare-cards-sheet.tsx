@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
-
 import {
   OfferReview,
   selectionSummary,
@@ -20,31 +18,37 @@ import type { FeedCard } from "@/lib/feed/repository";
 /**
  * Every card of a post, in one list, and the way to say which you have.
  *
- * Opened by "View all" to read, or by "Offer cards" to answer: the same
- * sheet either way, because reading the list is how you decide. A
- * visitor picks cards and how many copies of each, never above what is
- * still wanted, then reviews and sends one offer for the lot. The
- * author's own post opens the list with no boxes; a post with nothing
- * left says so instead of offering a button that cannot work.
+ * Opened from the post's menu to read, or by "Offer cards" to answer:
+ * the same sheet either way, because reading the list is how you
+ * decide. A visitor picks cards and how many copies of each, never
+ * above what is still wanted, then reviews and sends one offer for the
+ * lot. The author's own post opens the list with no boxes; a post with
+ * nothing left says so instead of offering a button that cannot work.
+ *
+ * Controlled: whoever renders the button that opens it holds `open`.
+ * The count line and the buttons that used to sit beside them are gone
+ * from under the cards — the founder wanted the post concise, with its
+ * extras "only visible when you need it".
  */
 export function FlareCardsSheet({
+  open,
+  onClose,
   postId,
   cards,
   total,
   direction,
   yours,
   completed,
-  remainingCopies,
 }: {
+  open: boolean;
+  onClose: () => void;
   postId: string;
   cards: FeedCard[];
   total: number;
   direction: "want" | "showcase";
   yours: boolean;
   completed: boolean;
-  remainingCopies: number;
 }) {
-  const [open, setOpen] = useState(false);
   const [review, setReview] = useState(false);
 
   const offerable = direction === "want" && !yours && !completed;
@@ -76,57 +80,11 @@ export function FlareCardsSheet({
     },
   );
 
-  const copies =
-    direction === "showcase"
-      ? cards.reduce((sum, card) => sum + (card.quantity ?? 1), 0)
-      : remainingCopies;
-  /* Done, said once for the whole post: every card above wears the
-     tick. The post stays, for the thread and for what it shows
-     somebody built. */
-  const countLine = completed
-    ? direction === "showcase"
-      ? "All gone"
-      : "All found"
-    : direction === "showcase"
-      ? `${copies} ${copies === 1 ? "copy" : "copies"} available`
-      : `${copies} ${copies === 1 ? "copy" : "copies"} still needed`;
-
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p
-          className={cn(
-            "text-sm font-semibold tabular-nums",
-            completed ? "text-accent" : "text-text-secondary",
-          )}
-        >
-          {completed && (
-            <Check className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
-          )}
-          {countLine}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {total > 1 && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setOpen(true)}
-            >
-              View all {total}
-            </Button>
-          )}
-          {offerable && (
-            <Button type="button" size="sm" onClick={() => setOpen(true)}>
-              Offer cards
-            </Button>
-          )}
-        </div>
-      </div>
-
       <Sheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={onClose}
         title={
           direction === "showcase"
             ? `${total} ${total === 1 ? "card" : "cards"} on offer`
@@ -237,7 +195,7 @@ export function FlareCardsSheet({
           }
           onSent={() => {
             selection.clear();
-            setOpen(false);
+            onClose();
           }}
         />
       )}
