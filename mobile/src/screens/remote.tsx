@@ -10,6 +10,7 @@ import type { RemoteOp, RemoteTimer } from "../remote-wire";
 import { readRoomTimer } from "../room-timer-wire";
 import { colors, gutter, radius, spacing } from "../theme";
 import { Card, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
+import { refreshTick } from "../refresh-tick";
 
 /**
  * The timer remote: the store's round clocks, run from a pocket.
@@ -223,6 +224,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
           refreshing={refreshing}
           tintColor={colors.accent}
           onRefresh={() => {
+            refreshTick();
             setRefreshing(true);
             void poll().finally(() => setRefreshing(false));
           }}

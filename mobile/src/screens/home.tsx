@@ -65,6 +65,7 @@ import { silentCoords } from "../location";
 import { FeedPerson, GuestChip } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { onFeedStale } from "../feed-refresh";
+import { refreshTick } from "../refresh-tick";
 import {
   CollapsingHeader,
   HEADER_CONTENT_HEIGHT,
@@ -315,16 +316,31 @@ export function HomeScreen() {
     void refresh();
   }, []);
 
+  /* Whether the pull has crossed the trigger on this drag, so the tick
+     fires once at the crossing and not on every frame past it. */
+  const armed = useSharedValue(false);
+
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       onHeaderScroll(header, event.contentOffset.y);
       /* Past the top is a negative offset, and the inset puts the top at
          `-headerRoom` rather than at zero. */
       pull.value = Math.max(0, -(event.contentOffset.y + headerRoom));
+      /* The tick, the instant the indicator becomes solid: the founder
+         asked for "a small haptic vibration when it pulls all the way
+         up to refresh". Re-arms if the thumb backs off, so a wobble at
+         the line does not buzz twice. */
+      if (pull.value >= PULL_TRIGGER && !armed.value) {
+        armed.value = true;
+        runOnJS(refreshTick)();
+      } else if (pull.value < PULL_TRIGGER * 0.75 && armed.value) {
+        armed.value = false;
+      }
     },
     /* On release. The threshold is the distance the indicator takes to
        become solid, so it commits exactly when it looks committed. */
     onEndDrag: () => {
+      armed.value = false;
       if (pull.value >= PULL_TRIGGER) runOnJS(askForRefresh)();
     },
   });

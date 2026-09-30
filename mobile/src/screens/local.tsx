@@ -33,6 +33,7 @@ import {
   Title,
   type ZoomCard,
 } from "../ui";
+import { refreshTick } from "../refresh-tick";
 
 /**
  * Local — the tab that took Room's place in the bar.
@@ -137,6 +138,7 @@ export function LocalScreen({
   );
 
   const refresh = async () => {
+    refreshTick();
     setRefreshing(true);
     try {
       await load();

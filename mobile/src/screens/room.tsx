@@ -71,6 +71,7 @@ import { PlayerPeekModal } from "../player-peek";
 import { useTabBarInset } from "../glass";
 import { colors, gutter, radius, spacing } from "../theme";
 import { WantRow } from "../want-row";
+import { refreshTick } from "../refresh-tick";
 
 // The website's room ticker runs at twelve seconds now; the app keeps
 // the same rhythm so an offer never looks slower in the pocket client.
@@ -899,6 +900,7 @@ function RoomScreen({
             refreshing={refreshing}
             tintColor={colors.accent}
             onRefresh={() => {
+              refreshTick();
               setRefreshing(true);
               void refresh().finally(() => setRefreshing(false));
             }}
