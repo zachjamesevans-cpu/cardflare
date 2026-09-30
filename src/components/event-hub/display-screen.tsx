@@ -322,12 +322,11 @@ function Header({
 /**
  * The way in, said in one word.
  *
- * "JOIN", the code, and the code under it. The founder, on the corner
- * of the wall: "The scan to join text can just be changed to 'JOIN'. So
- * that it stays in line. Then the room code can just be fit under the
- * QR code." One word beside the square, the six letters directly
- * beneath it, and that is the language for every QR on the site: the
- * counter sheet says the same (join-poster.tsx).
+ * "JOIN" above the square and the code under it. The founder, on the
+ * corner of the wall: "The scan to join text can just be changed to
+ * 'JOIN'... Then the room code can just be fit under the QR code."
+ * That is the language for every QR on the site: the counter sheet
+ * says the same (join-poster.tsx).
  */
 function JoinPanel({
   code,
@@ -343,48 +342,93 @@ function JoinPanel({
    */
   corner?: boolean;
 }) {
-  const plate = (
+  /*
+   * One column, wherever the panel sits: JOIN above the square, the
+   * code below it, and both EXACTLY as wide as the square. The founder:
+   * "I'd like it if the spacing matched the exact width of the QR code
+   * so it looks more uniform." The column is sized to the white plate,
+   * and each line is an SVG text stretched to the column with
+   * `textLength`, so the letters space themselves out to the plate's
+   * edges at any screen size rather than sitting centred at whatever
+   * width the font gave them.
+   */
+  const column = (
     <div
-      /* White plate behind the code: a QR on a dark panel is a QR that
-         does not scan from four metres away. In the corner only the
-         halo around it moves. */
-      className={`rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block [&>svg]:size-[clamp(3.5rem,9vh,8rem)] ${
-        corner
-          ? "motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate]"
-          : ""
-      }`}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: qrSvg }}
-    />
-  );
-  const codeLine = (
-    <p className="font-mono text-[clamp(0.75rem,1.2vw,1.4rem)] font-bold tracking-[0.15em] text-text-primary">
-      {code}
-    </p>
+      className="flex flex-col items-stretch gap-[clamp(0.2rem,0.5vw,0.6rem)]"
+      style={{ width: PLATE_WIDTH }}
+    >
+      <FittedLine className="fill-accent text-[clamp(0.8rem,1.3vw,1.5rem)] font-bold uppercase">
+        Join
+      </FittedLine>
+      <div
+        /* White plate behind the code: a QR on a dark panel is a QR that
+           does not scan from four metres away. In the corner only the
+           halo around it moves. */
+        className={`rounded-[8px] bg-white p-[var(--plate-pad)] [&>svg]:block [&>svg]:size-[var(--qr)] ${
+          corner
+            ? "motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate]"
+            : ""
+        }`}
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: qrSvg }}
+      />
+      <FittedLine className="fill-text-primary font-mono text-[clamp(0.75rem,1.2vw,1.4rem)] font-bold">
+        {code}
+      </FittedLine>
+    </div>
   );
 
   if (corner) {
     return (
-      <aside className="flex items-center gap-[clamp(0.5rem,1vw,1.25rem)] motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]">
-        <p className="text-[clamp(0.9rem,1.6vw,1.9rem)] font-bold tracking-[0.18em] text-accent uppercase">
-          Join
-        </p>
-        <div className="flex flex-col items-center gap-[clamp(0.15rem,0.3vw,0.4rem)]">
-          {plate}
-          {codeLine}
-        </div>
+      <aside
+        style={PLATE_VARS}
+        className="motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]"
+      >
+        {column}
       </aside>
     );
   }
 
   return (
-    <aside className="flex shrink-0 flex-col items-center justify-center gap-[clamp(0.2rem,0.5vw,0.6rem)] rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]">
-      <p className="text-[clamp(0.8rem,1.3vw,1.5rem)] font-bold tracking-[0.18em] text-accent uppercase">
-        Join
-      </p>
-      {plate}
-      {codeLine}
+    <aside
+      style={PLATE_VARS}
+      className="flex shrink-0 flex-col items-center justify-center rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]"
+    >
+      {column}
     </aside>
+  );
+}
+
+/** The square's size and the white margin around it, as one truth. */
+const PLATE_VARS = {
+  ["--qr" as string]: "clamp(3.5rem, 9vh, 8rem)",
+  ["--plate-pad" as string]: "clamp(0.2rem, 0.4vw, 0.5rem)",
+};
+const PLATE_WIDTH = "calc(var(--qr) + 2 * var(--plate-pad))";
+
+/**
+ * One line of text, stretched to its container's width.
+ *
+ * SVG's `textLength` with `lengthAdjust="spacing"` opens the gaps
+ * between letters until the first sits on the left edge and the last on
+ * the right: the only way to make a word exactly as wide as the square
+ * under it without measuring anything. The text is real text, read out
+ * as such.
+ */
+function FittedLine({ children, className }: { children: string; className: string }) {
+  return (
+    <svg className={`block h-[1.15em] w-full overflow-visible ${className}`}>
+      <text
+        x="0"
+        y="50%"
+        dominantBaseline="central"
+        textLength="100%"
+        lengthAdjust="spacing"
+        fontSize="1em"
+      >
+        {children}
+      </text>
+    </svg>
   );
 }
 

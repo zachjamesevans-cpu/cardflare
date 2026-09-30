@@ -204,7 +204,10 @@ describe("the QR code", () => {
   });
 
   it("scales with the viewport rather than being fixed enormous", () => {
-    expect(screen).toMatch(/size-\[clamp\([^)]*vh/);
+    /* The square's size is one variable, in viewport height, and the
+       plate, the column and both lines are sized from it. */
+    expect(screen).toMatch(/"--qr" as string\]: "clamp\([^)]*vh/);
+    expect(screen).toContain("size-[var(--qr)]");
   });
 });
 
