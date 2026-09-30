@@ -925,6 +925,10 @@ export type PlayerRow = {
   avatar_animated: string | null;
   /** Cover banner object path in the same bucket, or null for none. */
   cover_image: string | null;
+  /** The short public line under the name, up to 150 characters. */
+  bio: string | null;
+  /** How to refer to them, "he/him", up to 20 characters. */
+  pronouns: string | null;
   /** Lifetime Embers. Public, monotonic, the badge. */
   embers_earned: number;
   /** Unspent Embers. Private, and the only number spending touches. */
@@ -1050,6 +1054,8 @@ export type PlayerInsert = Omit<
   | "avatar_url"
   | "avatar_animated"
   | "cover_image"
+  | "bio"
+  | "pronouns"
   | "tier"
   | "embers_earned"
   | "embers_balance"
@@ -1072,6 +1078,8 @@ export type PlayerInsert = Omit<
   avatar_url?: string | null;
   avatar_animated?: string | null;
   cover_image?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
   embers_earned?: number;
   embers_balance?: number;
   embers_reversed?: number;

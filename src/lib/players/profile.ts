@@ -71,6 +71,10 @@ export interface PublicProfile {
   avatarUrl: string | null;
   /** The banner behind the picture, ready for an `<img>`. */
   coverUrl: string | null;
+  /** The short line under the name, or null. Up to four lines. */
+  bio: string | null;
+  /** "he/him", or null. Shown beside the handle. */
+  pronouns: string | null;
   /** Lifetime. The badge. */
   embersEarned: number;
   /**
@@ -157,6 +161,8 @@ async function loadProfile(
     hunts,
     avatarUrl,
     coverUrl: avatarSrc(player.cover_image),
+    bio: player.bio ?? null,
+    pronouns: player.pronouns ?? null,
     /* The badge: lifetime minus anything a dispute took back. The old
        column stands in until the migration lands. */
     embersEarned: player.embers_badge ?? player.embers_earned,
@@ -1313,6 +1319,30 @@ export async function setIdentity(
 
   await syncSessionNames(playerId, name);
   return "renamed";
+}
+
+/**
+ * Sets the bio and pronouns, the two lines under the username on Edit
+ * profile. Null clears. The values arrive already checked by
+ * `aboutSchema`; the columns' own constraints are the last word.
+ */
+export async function setAbout(
+  playerId: string,
+  about: { bio: string | null; pronouns: string | null },
+): Promise<"saved" | "failed"> {
+  if (!isSupabaseConfigured()) return "failed";
+
+  const { error } = await getSupabaseAdmin()
+    .from("players")
+    .update({ bio: about.bio, pronouns: about.pronouns })
+    .eq("id", playerId);
+
+  if (error) {
+    console.error("Could not save the player's bio", error);
+    return "failed";
+  }
+
+  return "saved";
 }
 
 /**

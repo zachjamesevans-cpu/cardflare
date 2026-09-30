@@ -16,6 +16,43 @@ export const displayNameSchema = z.object({
     .max(40, "Keep the name under 40 characters."),
 });
 
+/** The bio's ceiling. Mirrors `players_bio_length` in the migration. */
+export const BIO_MAX = 150;
+/** The pronouns' ceiling. Mirrors `players_pronouns_length`. */
+export const PRONOUNS_MAX = 20;
+
+/**
+ * The two lines Instagram's Edit profile has under the username, saved
+ * together. Both optional: an empty field clears the column. The bio
+ * keeps its line breaks, up to three lines, because "Married to the
+ * bit / founder / My new song" is three lines on purpose.
+ */
+export const aboutSchema = z.object({
+  pronouns: z
+    .string()
+    .trim()
+    .max(PRONOUNS_MAX, `Keep pronouns under ${PRONOUNS_MAX} characters.`)
+    .transform((value): string | null => value || null),
+  bio: z
+    .string()
+    .transform((value: string) => value.replace(/\r\n?/g, "\n").trim())
+    .pipe(
+      z
+        .string()
+        .max(BIO_MAX, `Keep the bio under ${BIO_MAX} characters.`)
+        .refine(
+          (value: string) => value.split("\n").length <= 4,
+          "Keep the bio to four lines.",
+        ),
+    )
+    .transform((value): string | null => value || null),
+});
+
+export interface About {
+  pronouns: string | null;
+  bio: string | null;
+}
+
 export type ProfileState =
   | { status: "idle" }
   | { status: "error"; message: string }
