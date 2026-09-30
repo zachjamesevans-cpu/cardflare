@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetApiPlayerMemory } from "@/lib/api/auth";
@@ -104,6 +105,29 @@ describe("POST /api/v1/avatar", () => {
       expect.anything(),
       expect.objectContaining({ upsert: true }),
     );
+  });
+
+  it("stages a chunk as a type the avatars bucket accepts", async () => {
+    /*
+     * The bucket's allowed_mime_types never included text/plain, so a
+     * chunk declared as text was refused by storage on every app
+     * upload: the founder's "chunk-failed 500". Bytes are on the list.
+     */
+    await route.POST(
+      request({
+        action: "chunk",
+        uploadId: "8b7df143-d91c-4396-a527-9a341b3c295d",
+        index: 0,
+        data: "aGVsbG8=",
+      }),
+    );
+    expect(storage.upload).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      expect.objectContaining({ contentType: "application/octet-stream" }),
+    );
+    const source = readFileSync("src/app/api/v1/avatar/route.ts", "utf8");
+    expect(source).not.toContain('"text/plain"');
   });
 
   it("commit stitches the chunks in order and feeds setAvatar", async () => {
