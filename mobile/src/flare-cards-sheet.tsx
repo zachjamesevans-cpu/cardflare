@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SheetBackdrop } from "./action-menu";
 import { describeError, offerItemsOnPost, type FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
 import {
@@ -121,19 +122,16 @@ export function FlareCardsSheet({
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    /* Fade, not slide: a sliding Modal carries its backdrop up with it,
+       which was the black wall the founder saw. The blur fades in
+       behind and the panel with it. */
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Pressable
-          onPress={onClose}
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.75)",
-            justifyContent: "flex-end",
-          }}
-        >
+        <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
           <Pressable
             onPress={() => undefined}
             style={{

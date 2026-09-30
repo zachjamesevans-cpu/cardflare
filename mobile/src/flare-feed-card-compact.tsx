@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
+import { ActionSheet, DotsButton } from "./action-menu";
 import type { FeedEntry } from "./api";
-import { doneLabel } from "./flare-copy";
-import { agoFrom } from "./flare-feed-card";
+import { agoFrom, postActions } from "./flare-feed-card";
 import { shelfFor } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
@@ -39,8 +40,11 @@ type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
  *   a row of buttons under every post is what made a Feed one post
  *   tall.
  *
- * The header keeps a face, a name and a time, on ONE line. You still
- * have to know whose hunt you are looking at.
+ * The header keeps a face, a name and a time, on ONE line, and at its
+ * end the same three dots the classic card wears: the founder, "the 3
+ * dots contextual menu isn't present in the compact view. Fix it."
+ * Behind them, the same items as the classic card, from `postActions`.
+ * You still have to know whose hunt you are looking at.
  */
 export function FlareFeedCardCompact({
   item,
@@ -49,6 +53,8 @@ export function FlareFeedCardCompact({
   onLike,
   onOpenThread,
   onMessage,
+  onViewAll,
+  onProgress,
 }: {
   item: Hunt;
   post: PostRef;
@@ -56,9 +62,22 @@ export function FlareFeedCardCompact({
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
   onMessage?: () => void;
+  /** The full list, to read; behind the three dots. */
+  onViewAll?: () => void;
+  /** The progress ticks on your own post; behind the three dots. */
+  onProgress?: () => void;
 }) {
   const shelf = shelfFor(item.cards, post);
-  const offering = (item.direction ?? "want") === "showcase";
+  const direction = item.direction ?? "want";
+  const offering = direction === "showcase";
+  const [menu, setMenu] = useState(false);
+  const actions = postActions({
+    total: item.total,
+    yours: item.yours,
+    direction,
+    onViewAll,
+    onProgress,
+  });
 
   /* Cash is the only term that is not the default, so it is the only
      one worth a word. "Want · Trade" on every post said nothing. */
@@ -67,8 +86,8 @@ export function FlareFeedCardCompact({
       ? "Trade or cash"
       : "Cash"
     : null;
-  /* Done, said once: every tile below wears the tick. */
-  const done = item.completed ? doneLabel(offering ? "showcase" : "want") : null;
+  /* No "All found" line: a finished post's glyph in the header is the
+     check, and every finished tile below already wears its own. */
 
   return (
     <View
@@ -115,7 +134,13 @@ export function FlareFeedCardCompact({
             {item.displayName}
           </Text>
           <Ionicons
-            name={offering ? "arrow-up-circle-outline" : "locate-outline"}
+            name={
+              item.completed
+                ? "checkmark-circle"
+                : offering
+                  ? "arrow-up-circle-outline"
+                  : "locate-outline"
+            }
             size={13}
             color={colors.accent}
           />
@@ -127,7 +152,13 @@ export function FlareFeedCardCompact({
             {agoFrom(item.postedAt)}
           </Text>
         ) : null}
+        {actions.length > 0 ? (
+          <View style={{ marginLeft: spacing(1) }}>
+            <DotsButton onPress={() => setMenu(true)} label="More about this post" />
+          </View>
+        ) : null}
       </View>
+      <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
 
       {/* The strip. Art only, each with what is still wanted. */}
       <ScrollView
@@ -153,13 +184,8 @@ export function FlareFeedCardCompact({
 
       {/* Contextual, all of it: a term that is not the default, a note
           somebody wrote, a place to go. Nothing draws an empty row. */}
-      {(done || terms || item.note) && (
+      {(terms || item.note) && (
         <Text numberOfLines={2} style={{ color: colors.textSecondary, fontSize: 12 }}>
-          {done ? (
-            <Text
-              style={{ color: colors.accent, fontWeight: "700" }}
-            >{`${done} · `}</Text>
-          ) : null}
           {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
         </Text>
       )}

@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AvatarForm } from "@/components/players/avatar-form";
 import { CoverForm } from "@/components/players/cover-form";
+import { EditProfileRows } from "@/components/players/edit-profile-rows";
+import { PictureDoor } from "@/components/players/picture-door";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { Card } from "@/components/ui/card";
 import { areasForUser } from "@/lib/auth/areas";
@@ -13,7 +16,6 @@ import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
-import { formatHandle } from "@/lib/players/handle";
 import { needsSetup, ownProfile } from "@/lib/players/profile";
 import { tierAllows } from "@/lib/tiers";
 
@@ -25,12 +27,16 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Edit profile: what Instagram opens from the button of that name.
+ * Edit profile, laid out the way Instagram lays it out.
  *
- * The picture and the cover used to sit as forms on the profile
- * itself. Now the profile shows them and this page changes them, so
- * the profile reads the way anybody else's does. Name and handle stay
- * in settings, one link down.
+ * The founder: "match the edit profile screen to this. Add bio,
+ * pronouns, username editing, name changing, into a menu that looks
+ * like this. The avatar effects should also be here." So: the picture
+ * beside the avatar effects with one link under them, then a list of
+ * four rows, Name, Username, Pronouns, Bio, each opening in place.
+ * Name and username used to live in settings; they are here now, and
+ * settings points here. The app draws the same screen
+ * (mobile/src/screens/edit-profile.tsx).
  */
 export default async function EditProfilePage() {
   const viewer = await getViewer();
@@ -59,7 +65,7 @@ export default async function EditProfilePage() {
         area="Profile"
         email={viewer.user.email ?? ""}
         title="Edit profile"
-        description="Your picture and your cover. Name and handle are in settings."
+        description="Your picture, your name and the lines under it."
         areas={areas}
         currentArea={
           areas.some((area) => area.href === "/profile") ? "/profile" : undefined
@@ -74,41 +80,51 @@ export default async function EditProfilePage() {
             Back to your profile
           </Link>
 
-          <Card className="flex flex-col items-center gap-4 text-center">
-            <p className="font-semibold text-text-primary">Picture</p>
-            <AvatarForm
+          {/* The picture, dressed as the profile draws it, beside the
+              door to the avatar effects. "Edit picture or avatar" under
+              them opens the picture and cover controls. */}
+          <Card>
+            <PictureDoor
+              picture={
+                <PlayerAvatar
+                  displayName={profile.displayName}
+                  seed={profile.playerId}
+                  avatarUrl={profile.avatarUrl}
+                  frame={worn.avatarFrame}
+                  ring={dressed.ring}
+                  aura={dressed.aura}
+                  ringArt={dressedArt.ring}
+                  auraArt={dressedArt.aura}
+                  className="size-24 text-2xl"
+                />
+              }
+              editor={
+                <AvatarForm
+                  displayName={profile.displayName}
+                  seed={profile.playerId}
+                  avatarUrl={profile.avatarUrl}
+                  frame={worn.avatarFrame}
+                  ring={dressed.ring}
+                  aura={dressed.aura}
+                  ringArt={dressedArt.ring}
+                  auraArt={dressedArt.aura}
+                  animatedAllowed={tierAllows(profile.tier, "animatedAvatar")}
+                />
+              }
+              cover={<CoverForm coverUrl={profile.coverUrl} />}
+            />
+          </Card>
+
+          {/* The four rows. The list is the card's whole inside, so the
+              hairlines run edge to edge. */}
+          <Card className="overflow-hidden p-0">
+            <EditProfileRows
               displayName={profile.displayName}
-              seed={profile.playerId}
-              avatarUrl={profile.avatarUrl}
-              frame={worn.avatarFrame}
-              ring={dressed.ring}
-              aura={dressed.aura}
-              ringArt={dressedArt.ring}
-              auraArt={dressedArt.aura}
-              animatedAllowed={tierAllows(profile.tier, "animatedAvatar")}
+              handle={profile.handle}
+              pronouns={profile.pronouns}
+              bio={profile.bio}
             />
           </Card>
-
-          <Card className="flex flex-col gap-3">
-            <p className="font-semibold text-text-primary">Cover</p>
-            <CoverForm coverUrl={profile.coverUrl} />
-          </Card>
-
-          <Link
-            href="/profile/settings"
-            className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
-          >
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-semibold text-text-primary">Name and handle</span>
-              <span className="truncate text-sm text-text-secondary">
-                {profile.displayName} · {formatHandle(profile.handle)}
-              </span>
-            </span>
-            <ChevronRight
-              className="size-4 shrink-0 text-text-muted"
-              aria-hidden="true"
-            />
-          </Link>
 
           <TabBarSpacer />
         </div>

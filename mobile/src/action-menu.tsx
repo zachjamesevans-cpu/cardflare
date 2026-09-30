@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import type { ComponentProps } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "./theme";
@@ -40,6 +41,32 @@ export function DotsButton({
   );
 }
 
+/**
+ * What sits behind a sheet: the page, blurred a little and dimmed a
+ * little, fading in with the sheet over it.
+ *
+ * It was a solid black wash that slid up with the panel. The founder:
+ * "there's like a black full screen opaque thing that slides up from
+ * the bottom and covers the whole screen behind the new UI pop up.
+ * Remove that thing entirely... Maybe slightly blur the background
+ * instead, like fade into it." So: a BlurView the size of the screen,
+ * in a Modal that fades rather than slides, with the tap-to-close
+ * Pressable laid over it by the sheet. One backdrop, so every sheet
+ * the three dots can open looks the same behind (the cards sheet and
+ * the progress sheet use it too). The website's <dialog> backdrop is
+ * the same wash and blur.
+ */
+export function SheetBackdrop() {
+  return (
+    <BlurView
+      intensity={30}
+      tint="dark"
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+    />
+  );
+}
+
 /** The rows, rising from the bottom the way a phone expects them to. */
 export function ActionSheet({
   items,
@@ -54,11 +81,11 @@ export function ActionSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
       <Pressable
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.6)",
           justifyContent: "flex-end",
           padding: spacing(3),
           paddingBottom: Math.max(spacing(3), insets.bottom),

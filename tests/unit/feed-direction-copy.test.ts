@@ -44,9 +44,12 @@ describe("which way a Flare points", () => {
       expect(source).not.toContain('"Cash ok"');
       expect(source).not.toContain('label="Trade"');
     }
-    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
-      "<FlareStatus label={statusLabel(item)}",
-    );
+    const status = read("src/components/feed/flare-feed-card.tsx");
+    expect(status).toContain("<FlareStatus");
+    expect(status).toContain("label={statusLabel(item)}");
+    /* A finished post changes the line's tense and its glyph; it never
+       grows a second line (see found-everywhere.test.ts). */
+    expect(status).toContain("done={item.completed}");
   });
 
   it("keeps a post's extras behind the three dots, on both platforms", () => {

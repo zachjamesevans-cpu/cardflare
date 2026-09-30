@@ -38,6 +38,8 @@ export function ProfileHeader({
   stats,
   people,
   organizerAt = [],
+  pronouns = null,
+  bio = null,
   actions,
 }: {
   /** The picture, already dressed; the own profile passes its editable one. */
@@ -54,6 +56,13 @@ export function ProfileHeader({
    * under the handle, linking to the store's page. Empty for most.
    */
   organizerAt?: { storeId: string; name: string }[];
+  /**
+   * "he/him", muted, right after the handle on the same line. The app
+   * draws the same line. Nothing when null.
+   */
+  pronouns?: string | null;
+  /** The lines under the handle, breaks kept, up to four. Nothing when null. */
+  bio?: string | null;
   /** The button row: edit and share, or follow and share. */
   actions: ReactNode;
 }) {
@@ -115,7 +124,18 @@ export function ProfileHeader({
             <EmberBadge earned={embersEarned} size="sm" />
           </div>
         </div>
-        <p className="text-sm leading-[18px] text-text-muted">{formatHandle(handle)}</p>
+        <p className="text-sm leading-[18px] text-text-muted">
+          {formatHandle(handle)}
+          {pronouns && (
+            <>
+              <span aria-hidden="true"> · </span>
+              <span className="text-text-muted">{pronouns}</span>
+            </>
+          )}
+        </p>
+        {bio && (
+          <p className="text-sm whitespace-pre-line text-text-secondary">{bio}</p>
+        )}
         {organizerAt.length > 0 && (
           <ul
             className="flex flex-wrap items-center gap-1.5 pt-1"

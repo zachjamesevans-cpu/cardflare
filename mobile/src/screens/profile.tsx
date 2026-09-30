@@ -1,8 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -17,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
-import { HANDLE_MAX, HANDLE_MIN, handleSeedFrom, handleWhileTyping } from "../handle";
+import { handleSeedFrom } from "../handle";
 import {
   addToShowcase,
   chooseUsername,
@@ -32,13 +30,11 @@ import {
   lastSearchGame,
   rememberSearchGame,
   removeFromShowcase,
-  renameProfile,
   searchCards,
   setShowcaseNote,
   SHOWCASE_NOTE_MAX,
   signOut,
   storedAccessToken,
-  uploadAvatar,
   type CardHit,
   type CosmeticItem,
   type FollowedPlayer,
@@ -59,7 +55,6 @@ import {
   Body,
   Button,
   Card,
-  HandleInput,
   Input,
   Loading,
   Muted,
@@ -138,10 +133,6 @@ export function ProfileScreen() {
   const [followers, setFollowers] = useState<FollowedPlayer[]>([]);
   /* The trade history's counts and, for Pro, its three newest rows. */
   const [history, setHistory] = useState<TradeHistory | null>(null);
-
-  /* Edit profile, Instagram's button: it opens the picture, cover and
-     GIF controls in place rather than a separate screen. */
-  const [editing, setEditing] = useState(false);
 
   /* The list open over the page: the followers or following tile. */
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
@@ -249,144 +240,10 @@ export function ProfileScreen() {
     }, [load]),
   );
 
-  /**
-   * Pick, shrink, convert, send. Everything lands as a JPEG well under
-   * 200KB regardless of what the camera roll held - the founder's brief:
-   * it must work first time and it must not be a server load.
-   */
-  const changePicture = async (kind: "avatar" | "cover" = "avatar") => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setMessage("cardflare needs photo access to change your picture.");
-      return;
-    }
-
-    const chosen = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      /*
-       * The crop the server will make anyway, offered up front — and it
-       * has to be the shape the cover is actually DRAWN in, or the
-       * cropper is lying. It asked for 8:3 while the profile drew the
-       * result into roughly 1.3:1, which magnified it past twice and cut
-       * half the width away: the founder's "appears quite zoomed in".
-       * Four by three is the tallest box a cover is ever shown in; every
-       * wider one crops the bottom, which is the half already fading out
-       * behind the name. Kept in step with COVER_WIDTH/COVER_HEIGHT on
-       * the server by tests/unit/app-cover-aspect.test.ts.
-       */
-      aspect: kind === "cover" ? [4, 3] : [1, 1],
-      quality: 1,
-    });
-    if (chosen.canceled || chosen.assets.length === 0) return;
-
-    setBusy(kind);
-    setMessage("Preparing picture…");
-    try {
-      /* Resize to the stored size and re-encode as JPEG, walking the
-         quality down until it is comfortably small. Base64 length is a
-         fine proxy: 200000 characters is roughly 150KB of image. */
-      let quality = 0.8;
-      let encoded: string | null = null;
-      while (quality >= 0.2) {
-        const out = await manipulateAsync(
-          chosen.assets[0].uri,
-          [{ resize: { width: kind === "cover" ? 1200 : 512 } }],
-          { compress: quality, format: SaveFormat.JPEG, base64: true },
-        );
-        encoded = out.base64 ?? null;
-        if (encoded && encoded.length <= (kind === "cover" ? 300_000 : 200_000)) break;
-        quality -= 0.15;
-      }
-      if (!encoded) {
-        setMessage("That picture could not be read. Try a different one.");
-        return;
-      }
-
-      await uploadAvatar(
-        encoded,
-        (sent, total) => setMessage(`Uploading picture… ${sent} of ${total}`),
-        kind,
-      );
-      await load();
-      setMessage(kind === "cover" ? "Cover updated." : "Picture updated.");
-    } catch (caught) {
-      setMessage(
-        `The picture did not go through (${describeError(caught)}). Try again.`,
-      );
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  /**
-   * The animated picture: a GIF, sent as it was picked.
-   *
-   * Deliberately not the flow above. That one resizes and re-encodes to
-   * a JPEG, which is exactly the thing that turns an animation into one
-   * frame of an animation - so a GIF cannot go through it and there was
-   * no other way in. No crop either: the editor hands back a still.
-   *
-   * The size ceiling is the transport's, not the format's. Every 6KB of
-   * GIF is another request, so this is a couple of hundred of them at
-   * 2MB, counted out loud while they go. The website takes larger ones
-   * because a browser can send a body and this cannot.
-   */
-  const changeAnimatedPicture = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setMessage("cardflare needs photo access to change your picture.");
-      return;
-    }
-
-    const chosen = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      /* No editing: cropping re-encodes, and a re-encoded GIF is a JPEG
-         of its first frame. The server squares it instead. */
-      allowsEditing: false,
-      quality: 1,
-      base64: true,
-    });
-    if (chosen.canceled || chosen.assets.length === 0) return;
-
-    const asset = chosen.assets[0];
-    const looksAnimated =
-      asset.mimeType === "image/gif" || /\.gif($|\?)/i.test(asset.uri);
-
-    if (!looksAnimated) {
-      setMessage("An animated picture has to be a GIF.");
-      return;
-    }
-
-    const encoded = asset.base64 ?? null;
-    if (!encoded) {
-      setMessage("That GIF could not be read. Try a different one.");
-      return;
-    }
-
-    /* Said before the wait rather than after it: base64 is four
-       characters per three bytes, so this is the real file size. */
-    if (encoded.length > 2_800_000) {
-      setMessage("That GIF is over 2MB. Try a shorter or smaller one.");
-      return;
-    }
-
-    setBusy("avatar");
-    setMessage("Uploading GIF…");
-    try {
-      await uploadAvatar(
-        encoded,
-        (sent, total) => setMessage(`Uploading GIF… ${sent} of ${total}`),
-        "avatar-animated",
-      );
-      await load();
-      setMessage("Animated picture updated.");
-    } catch (caught) {
-      setMessage(`The GIF did not go through (${describeError(caught)}). Try again.`);
-    } finally {
-      setBusy(null);
-    }
-  };
+  /* Picture, cover, name, handle, pronouns and bio are all edited on
+     the Edit profile screen now (src/screens/edit-profile.tsx), the
+     website's /profile/edit. The tab re-reads on focus, so whatever
+     changed there is on screen by the time Back lands here. */
 
   const act = async (
     key: string,
@@ -634,6 +491,8 @@ export function ProfileScreen() {
             }
             name={profile.displayName}
             handle={profile.handle}
+            pronouns={profile.pronouns ?? null}
+            bio={profile.bio ?? null}
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}
@@ -642,9 +501,11 @@ export function ProfileScreen() {
             onFollowing={() => setPeople("following")}
             actions={
               <>
+                {/* Instagram's button, to Instagram's screen: picture,
+                    effects, name, username, pronouns and bio, in rows. */}
                 <HeaderButton
-                  label={editing ? "Done" : "Edit profile"}
-                  onPress={() => setEditing((open) => !open)}
+                  label="Edit profile"
+                  onPress={() => navigation.navigate("EditProfile")}
                 />
               </>
             }
@@ -653,71 +514,6 @@ export function ProfileScreen() {
 
         {/* No Pro row here: the website's profile has none. The pitch
             lives in Customize and behind the animated-picture door. */}
-
-        {/*
-         * Picture, cover and name, editable right where they show -
-         * the founder's call after the separate edit block read as a
-         * duplicate: "it should all go live from the actual edit
-         * button... everything can be changed up top."
-         *
-         * A real upload: the picture is resized and re-compressed to a
-         * small JPEG on the phone, then rides the header transport in
-         * chunks. The button narrates each stage because a dozen small
-         * requests on shop wifi takes a visible moment.
-         */}
-        {(editing || busy === "avatar" || busy === "cover") && (
-          <View style={{ flexDirection: "row", gap: spacing(2) }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={busy === "avatar" ? (message ?? "Uploading…") : "Change picture"}
-                variant="secondary"
-                disabled={busy === "avatar" || busy === "cover"}
-                onPress={() => void changePicture("avatar")}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={busy === "cover" ? (message ?? "Uploading…") : "Change cover"}
-                variant="secondary"
-                disabled={busy === "avatar" || busy === "cover"}
-                onPress={() => void changePicture("cover")}
-              />
-            </View>
-          </View>
-        )}
-
-        {/*
-         * The GIF, on its own line and its own flow. It cannot share the
-         * button above: that one resizes and re-encodes to a JPEG, which
-         * is what turns an animation into one frame of an animation.
-         *
-         * Offered to everybody rather than hidden behind the tier. The
-         * server refuses a non-Pro upload by name, and a button that
-         * says what it is teaches the feature exists; a button that is
-         * simply absent teaches nothing. For a free account it opens
-         * the paywall instead of walking them through picking a GIF
-         * that then bounces — the wall goes at the door, not the till.
-         */}
-        {(editing || busy === "avatar" || busy === "cover") && (
-          <Button
-            label={busy === "avatar" ? (message ?? "Uploading…") : "Use a GIF (Pro)"}
-            variant="secondary"
-            disabled={busy === "avatar" || busy === "cover"}
-            onPress={() =>
-              profile.pro ? void changeAnimatedPicture() : navigation.navigate("Pro")
-            }
-          />
-        )}
-
-        {/* Name and handle live in Settings; Edit profile points there
-            too, the website's "Name and handle" card. */}
-        {editing && (
-          <Button
-            label="Name and handle"
-            variant="secondary"
-            onPress={() => navigation.navigate("Settings")}
-          />
-        )}
 
         {/* Your hunts, above the shelf. What you are looking for is the
             live thing; the showcase is what you are done with. */}
@@ -1144,45 +940,6 @@ export function NameField({
         variant="secondary"
         busy={busy}
         disabled={value.trim().length === 0 || value.trim() === current}
-        onPress={() => onSave(value.trim())}
-      />
-    </View>
-  );
-}
-
-/**
- * The handle, changed on its own.
- *
- * Separate from the name for the same reason it is separate on the
- * website: only one of the two can come back "taken", and one message
- * trying to explain both situations would explain neither.
- */
-export function HandleField({
-  current,
-  busy,
-  onSave,
-}: {
-  current: string;
-  busy: boolean;
-  onSave: (handle: string) => void;
-}) {
-  const [value, setValue] = useState(current);
-
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <HandleInput
-        value={value}
-        /* The TYPING shaper, so an underscore can actually be typed:
-           the stored-handle one strips it the moment it lands. */
-        onChangeText={(next) => setValue(handleWhileTyping(next))}
-        maxLength={HANDLE_MAX}
-        placeholder="your_handle"
-      />
-      <Button
-        label="Save"
-        variant="secondary"
-        busy={busy}
-        disabled={value.trim().length < HANDLE_MIN || value.trim() === current}
         onPress={() => onSave(value.trim())}
       />
     </View>

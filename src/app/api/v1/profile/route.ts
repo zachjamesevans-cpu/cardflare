@@ -12,6 +12,7 @@ import {
   ownProfile,
   removeFromShowcase,
   SHOWCASE_LIMIT,
+  setAbout,
   setDisplayName,
   setHandle,
   setIdentity,
@@ -22,7 +23,7 @@ import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
 import { buyCosmetic } from "@/lib/players/cosmetics";
 import { avatarWearFor, dressedEquipsFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
-import { displayNameSchema } from "@/lib/players/profile-schema";
+import { aboutSchema, displayNameSchema } from "@/lib/players/profile-schema";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
@@ -92,6 +93,8 @@ export async function GET(request: Request): Promise<Response> {
       playerId: profile.playerId,
       displayName: profile.displayName,
       handle: profile.handle,
+      bio: profile.bio,
+      pronouns: profile.pronouns,
       /*
        * Absolute, because a native client has no origin to resolve
        * "/api/avatars/..." against. The website gets the relative form
@@ -171,6 +174,12 @@ export async function GET(request: Request): Promise<Response> {
  */
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rename"), displayName: z.string() }),
+  /* Pronouns and bio together: one screen, and an empty field clears. */
+  z.object({
+    action: z.literal("set-about"),
+    pronouns: z.string().max(200),
+    bio: z.string().max(2000),
+  }),
   /* How the Feed is drawn. Narrowed again server-side by `setFeedView`,
      so a client that sends a view nothing can draw stores the original
      rather than an unreadable Feed. */
@@ -298,6 +307,17 @@ export async function POST(request: Request): Promise<Response> {
 
     return outcome === "renamed"
       ? Response.json({ ok: true, handle: wanted.data.handle })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "set-about") {
+    const about = aboutSchema.safeParse({ pronouns: body.pronouns, bio: body.bio });
+    if (!about.success) {
+      return badRequest(about.error.issues[0]?.message ?? "That will not fit.");
+    }
+    const outcome = await setAbout(player.playerId, about.data);
+    return outcome === "saved"
+      ? Response.json({ ok: true, ...about.data })
       : Response.json({ error: "unavailable" }, { status: 503 });
   }
 

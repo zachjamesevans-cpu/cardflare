@@ -1138,6 +1138,10 @@ export interface Profile {
   displayName: string;
   /** The unique one, written `@handle` wherever a person reads it. */
   handle: string;
+  /** The short line under the name, up to four lines, or null. */
+  bio?: string | null;
+  /** "he/him", or null. */
+  pronouns?: string | null;
   avatarUrl: string | null;
   embersEarned: number;
   /** The stores that named this player an organizer: the TO badge. */
@@ -1230,6 +1234,14 @@ export const chooseUsername = (displayName: string, handle?: string) =>
     handle,
   });
 
+/** Pronouns and bio, saved together. An empty string clears either. */
+export const setAbout = (about: { pronouns: string; bio: string }) =>
+  call<{ ok: true; pronouns: string | null; bio: string | null }>(
+    "POST",
+    "/api/v1/profile",
+    { action: "set-about", ...about },
+  );
+
 export const renameProfile = (displayName: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", { action: "rename", displayName });
 
@@ -1308,6 +1320,10 @@ export interface PeekProfile {
   displayName: string;
   /** The unique one, so a popup can say who this actually is. */
   handle: string;
+  /** The short line under the name, or null. */
+  bio?: string | null;
+  /** "he/him", or null. */
+  pronouns?: string | null;
   avatarUrl: string | null;
   /** The stores that named this player an organizer: the TO badge. */
   organizerAt?: { storeId: string; name: string }[];

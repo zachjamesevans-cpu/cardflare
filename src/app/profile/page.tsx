@@ -213,6 +213,8 @@ export default async function ProfilePage() {
                 embersEarned={profile.embersEarned}
                 stats={stats}
                 organizerAt={profile.organizerAt}
+                pronouns={profile.pronouns}
+                bio={profile.bio}
                 people={{
                   followers: (
                     <PeopleList

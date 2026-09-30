@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SheetBackdrop } from "./action-menu";
 import { setFlareFound, type FeedCard } from "./api";
 import type { FlareSheetPost } from "./flare-cards-sheet";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
@@ -64,15 +65,10 @@ export function FlareProgressSheet({
   const done = needed > 0 && found >= needed;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
-          justifyContent: "flex-end",
-        }}
-      >
+    /* Fade, not slide: see SheetBackdrop for the black wall this replaces. */
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
+      <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
         <Pressable
           onPress={() => undefined}
           style={{

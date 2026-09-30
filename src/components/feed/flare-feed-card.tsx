@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Crosshair, Heart, MessageCircle } from "lucide-react";
+import { CheckCircle2, Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareCarousel } from "@/components/feed/flare-carousel";
@@ -46,8 +46,19 @@ export function awayLabel(miles: number): string {
  *
  * A Flare points one of two ways: wanted, or offered up. The count of
  * cards is its own chip beside this, so the line itself stays short.
+ *
+ * A finished post says so HERE and nowhere else. The founder, on the
+ * All found / All gone line under the cards: "Delete... Just
+ * clutters the feed. Remember, contextual." So the status line the
+ * post already has changes tense instead: "found it" for one card,
+ * "found them all" for several, "offered it all" for an offer. The
+ * app's `statusLabel` says the same words (mobile/src/flare-feed-card.tsx).
  */
 function statusLabel(item: HuntItem): string {
+  if (item.completed) {
+    if (item.direction === "showcase") return "offered it all";
+    return item.total === 1 ? "found it" : "found them all";
+  }
   return item.direction === "showcase" ? "is offering" : "is looking for";
 }
 
@@ -58,25 +69,38 @@ function statusLabel(item: HuntItem): string {
  * "is looking for" in the same green. Meant to be the recognisable mark of
  * a Flare wherever one is drawn, so it is one component and nothing
  * else draws the pair. An offer wears the same reticle without the
- * glow: the mark is the same, the aim is not.
+ * glow: the mark is the same, the aim is not. A finished post trades
+ * the reticle for a check-circle and the glow goes out: nothing left
+ * to aim at.
  */
 export function FlareStatus({
   label = "is looking for",
   glow = true,
+  done = false,
 }: {
   label?: string;
   glow?: boolean;
+  /** The post is complete: the check-circle instead of the crosshair, no glow. */
+  done?: boolean;
 }) {
   return (
     <span className="flex items-center gap-1.5 text-sm font-semibold text-accent">
-      <Crosshair
-        className={cn(
-          "size-[17px] shrink-0",
-          glow && "drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]",
-        )}
-        strokeWidth={1.75}
-        aria-hidden="true"
-      />
+      {done ? (
+        <CheckCircle2
+          className="size-[17px] shrink-0"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
+      ) : (
+        <Crosshair
+          className={cn(
+            "size-[17px] shrink-0",
+            glow && "drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]",
+          )}
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
+      )}
       {label}
     </span>
   );
@@ -159,7 +183,11 @@ export function FlareFeedCard({
               )}
             </span>
             <span className="flex flex-wrap items-center gap-1.5">
-              <FlareStatus label={statusLabel(item)} glow={direction === "want"} />
+              <FlareStatus
+                label={statusLabel(item)}
+                glow={direction === "want"}
+                done={item.completed}
+              />
               {item.total > 1 && (
                 <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
                   {item.total} cards
@@ -267,17 +295,10 @@ export function FlareFeedCard({
         </p>
       )}
 
-      {/* Done, said once for the whole post: every card above wears the
-          tick. Nothing else under the cards — no count line, no list
+      {/* Nothing else under the cards: no done line (the status line in
+          the header says "found them all"), no count line, no list
           button, no progress button. Those wait behind the dots in the
           corner; the founder: "only visible when you need it". */}
-      {item.completed && (
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-accent">
-          <Check className="size-4" aria-hidden="true" />
-          {direction === "showcase" ? "All gone" : "All found"}
-        </p>
-      )}
-
       {/* The one button a post is for: somebody else's want, still open. */}
       {!preview && direction === "want" && !item.yours && !item.completed && (
         <div>

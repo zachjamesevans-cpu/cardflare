@@ -205,6 +205,8 @@ export function PlayerProfileScreen() {
             }
             name={profile.displayName}
             handle={profile.handle}
+            pronouns={profile.pronouns ?? null}
+            bio={profile.bio ?? null}
             equips={profile.equips ?? {}}
             embersEarned={profile.embersEarned}
             stats={profile.stats}

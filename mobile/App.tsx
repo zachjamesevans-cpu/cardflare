@@ -20,7 +20,6 @@ import * as Notifications from "expo-notifications";
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
-  Image,
   Pressable,
   ScrollView,
   Text,
@@ -35,6 +34,7 @@ import { HuntScreen } from "./src/screens/hunt";
 import { RemoteScreen } from "./src/screens/remote";
 import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { ProfileScreen } from "./src/screens/profile";
+import { EditProfileScreen } from "./src/screens/edit-profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
@@ -119,6 +119,9 @@ export type StackParams = {
   CreateAccount: undefined;
   Scan: undefined;
   Settings: undefined;
+  /** Instagram's Edit profile: picture, effects, name, username,
+      pronouns, bio. The website's /profile/edit. */
+  EditProfile: undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
@@ -166,6 +169,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   CreateAccount: "Back",
   Scan: "Back",
   Settings: "Profile",
+  EditProfile: "Profile",
   Store: "Profile",
   Customize: "Profile",
   Pro: "Back",
@@ -227,25 +231,13 @@ const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>
 };
 
 /*
- * The centre tab wears the mark itself — the approved asset, copied
- * byte-for-byte from public/brand, sized by height as the brand rules
- * require. Dimmed when inactive the same way the icon tabs are.
+ * The centre tab is the flame, the same glyph the website's dock draws
+ * (lucide Flame in src/components/players/player-tabs.tsx). It used to
+ * wear the old mark image; the founder: "use the same 'flare' logo from
+ * the website to the app... it shows old logo." Filled when it is the
+ * open tab, outlined otherwise, in the tint every other tab gets.
  */
-function MarkIcon({ focused, size }: { focused: boolean; size: number }) {
-  /* The same box every Ionicons tab gets, sized by height per the brand
-     rules - at 34px the mark leaned into its own label and ate it. */
-  return (
-    <Image
-      source={require("./assets/cardflare-mark.png")}
-      style={{
-        height: size,
-        width: size,
-        resizeMode: "contain",
-        opacity: focused ? 1 : 0.55,
-      }}
-    />
-  );
-}
+const FLARE_TAB_ICON = { focused: "flame", idle: "flame-outline" } as const;
 
 /*
  * The tab bar draws its own buttons, so the app-wide Tap primitive never
@@ -389,12 +381,10 @@ function Tabs() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarIcon: ({ color, size, focused }) => {
-          const icon = TAB_ICONS[route.name as keyof TabParams];
-          return icon ? (
-            <Ionicons name={icon} color={color} size={size} />
-          ) : (
-            <MarkIcon focused={focused} size={size} />
-          );
+          const icon =
+            TAB_ICONS[route.name as keyof TabParams] ??
+            (focused ? FLARE_TAB_ICON.focused : FLARE_TAB_ICON.idle);
+          return <Ionicons name={icon} color={color} size={size} />;
         },
       })}
     >
@@ -716,6 +706,11 @@ export default function App() {
             name="Settings"
             component={SettingsScreen}
             options={{ title: "Settings", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ title: "Edit profile", headerBackTitle: "Profile" }}
           />
           <Stack.Screen
             name="Store"

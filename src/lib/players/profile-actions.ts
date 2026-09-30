@@ -17,6 +17,7 @@ import {
   dressAllShowcase,
   dressShowcaseCard,
   removeFromShowcase,
+  setAbout,
   setAnimatedAvatar,
   setAvatar,
   setCover,
@@ -32,6 +33,7 @@ import {
   AVATAR_MIME_TYPES,
 } from "./profile-image";
 import {
+  aboutSchema,
   BUY_REFUSALS,
   displayNameSchema,
   type ProfileState,
@@ -101,6 +103,39 @@ export async function renameProfileAction(
   revalidatePath("/flare");
 
   return { status: "saved", message: "Name updated." };
+}
+
+/**
+ * The two lines under the username on Edit profile: pronouns and bio.
+ *
+ * One action for both because they are edited on one screen and an
+ * empty field means "clear it", which a per-field action would have to
+ * be told twice.
+ */
+export async function setAboutAction(
+  _previous: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  const playerId = await playerIdFor(await getViewer());
+  if (!playerId) return { status: "error", message: GENERIC_ERROR };
+
+  const parsed = aboutSchema.safeParse({
+    pronouns: text(formData, "pronouns"),
+    bio: text(formData, "bio"),
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? GENERIC_ERROR,
+    };
+  }
+
+  const outcome = await setAbout(playerId, parsed.data);
+  if (outcome === "failed") return { status: "error", message: GENERIC_ERROR };
+
+  revalidateProfile();
+  revalidatePath("/profile/edit");
+  return { status: "saved", message: "Profile updated." };
 }
 
 /*

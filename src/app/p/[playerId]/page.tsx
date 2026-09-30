@@ -163,6 +163,8 @@ export default async function PublicProfilePage({
             embersEarned={profile.embersEarned}
             stats={stats}
             organizerAt={profile.organizerAt}
+            pronouns={profile.pronouns}
+            bio={profile.bio}
             /* Their lists open too, as Instagram's do. The Trade
                    partners mark is theirs, not the viewer's. */
             people={{

@@ -4,7 +4,7 @@ import { Text, View } from "react-native";
 
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import type { FeedEntry } from "./api";
-import { cardsLabel, doneLabel } from "./flare-copy";
+import { cardsLabel } from "./flare-copy";
 import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { PlayerAvatar } from "./player-avatar";
@@ -53,9 +53,30 @@ export function awayLabel(miles: number): string {
  * showcase post reading "is looking for" would have been backwards.
  * "Looking for" and "Offering" are the two directions everywhere, the
  * same words the composer's control uses.
+ *
+ * A FINISHED post says so HERE, in the line it already has, rather than
+ * on a row of its own. The founder: "Delete the 'all gone' 'all found'
+ * stuff. Just clutters the feed." So a want that is done reads "found
+ * it" (one card) or "found them all" (several), and an offer with
+ * nothing left reads "offered it all", and the glyph beside it is a
+ * check rather than the crosshair. The website's statusLabel says the
+ * same words (src/components/feed/flare-feed-card.tsx).
  */
-export function statusLabel(item: Pick<Hunt, "direction">): string {
-  return item.direction === "showcase" ? "is offering" : "is looking for";
+export function statusLabel(item: {
+  direction?: "want" | "showcase" | null;
+  completed?: boolean | null;
+  /** How many cards: `total` on a Feed post, the cards themselves on the post screen. */
+  total?: number;
+  cards?: unknown[];
+}): string {
+  const offering = item.direction === "showcase";
+  if (item.completed) {
+    if (offering) return "offered it all";
+    return (item.total ?? item.cards?.length ?? 1) === 1
+      ? "found it"
+      : "found them all";
+  }
+  return offering ? "is offering" : "is looking for";
 }
 
 /**
@@ -65,27 +86,38 @@ export function statusLabel(item: Pick<Hunt, "direction">): string {
  * "is looking for" in the same green. Meant to be the recognisable mark of
  * a Flare wherever one is drawn, so it is one component and nothing
  * else draws the pair.
+ *
+ * Done, the reticle gives way to a check in the same accent and the
+ * glow goes out: nothing is being hunted any more, and the line says
+ * so in its own words (see statusLabel). One glyph swap, no new row.
  */
 export function FlareStatus({
   label = "is looking for",
   detail,
+  done = false,
 }: {
   label?: string;
   /** "3 cards", in the quiet colour after the status. */
   detail?: string | null;
+  /** Every copy in hand or given away: the check instead of the crosshair. */
+  done?: boolean;
 }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
-      <View
-        style={{
-          shadowColor: colors.accent,
-          shadowOpacity: 0.7,
-          shadowRadius: 5,
-          shadowOffset: { width: 0, height: 0 },
-        }}
-      >
-        <MaterialCommunityIcons name="crosshairs" size={17} color={colors.accent} />
-      </View>
+      {done ? (
+        <Ionicons name="checkmark-circle" size={17} color={colors.accent} />
+      ) : (
+        <View
+          style={{
+            shadowColor: colors.accent,
+            shadowOpacity: 0.7,
+            shadowRadius: 5,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        >
+          <MaterialCommunityIcons name="crosshairs" size={17} color={colors.accent} />
+        </View>
+      )}
       <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
         {label}
       </Text>
@@ -116,24 +148,9 @@ export function FlareActions({
   /* Your own post has no button here: "Update progress" waits behind
      the three dots in the corner, with the full list. */
   if (yours) return null;
-  if (completed) {
-    return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: spacing(1.5),
-          paddingVertical: spacing(2),
-        }}
-      >
-        <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
-        <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
-          All found
-        </Text>
-      </View>
-    );
-  }
+  /* Nothing left to offer on, and no row saying so: the status line at
+     the top already reads "found it". */
+  if (completed) return null;
   return onOffer ? <Button label="Offer cards" onPress={onOffer} /> : null;
 }
 
@@ -301,6 +318,7 @@ export function FlareFeedCard({
               </View>
               <FlareStatus
                 label={statusLabel(item)}
+                done={completed}
                 detail={item.total > 1 ? cardsLabel(item.total) : null}
               />
             </View>
@@ -355,16 +373,8 @@ export function FlareFeedCard({
         <FlareCarousel cards={item.cards} direction={direction} post={post} />
       )}
 
-      {/* An offer with nothing left to give, said once. A want that is
-          done says "All found" in its actions row below. */}
-      {completed && item.direction === "showcase" ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
-            {doneLabel("showcase")}
-          </Text>
-        </View>
-      ) : null}
+      {/* No "All found" or "All gone" row: a finished post says it in
+          its status line, where the crosshair became a check. */}
 
       {/* What they wrote with it, once, in the quiet colour. Nothing at
           all when they wrote nothing: no empty row. */}
