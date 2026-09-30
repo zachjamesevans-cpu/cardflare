@@ -1083,6 +1083,12 @@ export function HomeScreen() {
                             posterName: item.displayName,
                           })
                   }
+                  /* The same two doors the classic card keeps behind its
+                     three dots, so the menu is one menu in both views. */
+                  onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+                  onProgress={
+                    item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
+                  }
                 />
               ) : (
                 <FlareFeedCard

@@ -39,6 +39,8 @@ export function ProfileHeader({
   avatar,
   name,
   handle,
+  pronouns = null,
+  bio = null,
   equips,
   embersEarned,
   stats,
@@ -51,6 +53,10 @@ export function ProfileHeader({
   avatar: ReactNode;
   name: string;
   handle: string;
+  /** "he/him", after the handle on its line; nothing when null. */
+  pronouns?: string | null;
+  /** The line or four under the handle, kept as written; nothing when null. */
+  bio?: string | null;
   /** The name style, badge and title worn from the catalogue. */
   equips: { nameplate?: string | null; badge?: string | null; title?: string | null };
   embersEarned: number;
@@ -117,9 +123,21 @@ export function ProfileHeader({
             <EmberBadge earned={embersEarned} size="sm" />
           </View>
         </View>
+        {/* "@zachjevans · he/him": the pronouns ride the handle's line in
+            the same muted colour, the way Instagram sets them. The bio
+            goes under, as written, up to four lines. Neither draws a
+            thing when there is nothing to say. Same on the website. */}
         <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 18 }}>
-          {formatHandle(handle)}
+          {pronouns ? `${formatHandle(handle)} · ${pronouns}` : formatHandle(handle)}
         </Text>
+        {bio ? (
+          <Text
+            numberOfLines={4}
+            style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 19 }}
+          >
+            {bio}
+          </Text>
+        ) : null}
         {/* The TO badge, part of the header so both profile screens get
             it from one place, the website's ProfileHeader's shape. */}
         <OrganizerChips stores={organizerAt} />

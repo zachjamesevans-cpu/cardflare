@@ -23,16 +23,6 @@ export const availableLabel = (n: number): string => `${n} available`;
 /** An offered card with nothing left to give. */
 export const GONE_LABEL = "Gone";
 
-/** "All found" on a want, "All gone" on an offer: the post is done. */
-export const doneLabel = (direction: "want" | "showcase"): string =>
-  direction === "showcase" ? "All gone" : "All found";
-
-/** "5 copies still needed", or "All found" when nothing is. */
-export function stillNeededLabel(remaining: number): string {
-  if (remaining <= 0) return "All found";
-  return `${copiesLabel(remaining)} still needed`;
-}
-
 /** "2 cards selected · 3 copies", the footer under a selection. */
 export function selectionLabel(cards: number, copies: number): string {
   return `${cardsLabel(cards)} selected · ${copiesLabel(copies)}`;

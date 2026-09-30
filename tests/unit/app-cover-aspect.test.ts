@@ -4,38 +4,41 @@ import { readFileSync } from "node:fs";
 import { COVER_HEIGHT, COVER_WIDTH } from "@/lib/players/profile-image";
 
 /**
- * The shape a cover is cropped to, on both platforms and on the server.
+ * The shape a cover is cropped to, and WHO crops it.
  *
- * The founder's report: changing the profile banner left it "quite
- * zoomed in". Nothing was scaling wrongly — three numbers disagreed. The
- * cropper offered a 2.67:1 strip, the server stored 1200x450, and the
- * profile drew the result into a box about 1.3:1. Covering a 1.3 box
- * with a 2.67 image magnifies it a little over twice and discards half
- * the width, so the composition somebody chose was never the one they
- * got. A cropper that lies is worse than no cropper at all.
+ * The founder's first report: changing the profile banner left it "quite
+ * zoomed in". Three numbers disagreed - the cropper offered a 2.67:1
+ * strip, the server stored 1200x450, the profile drew a 1.3:1 box - and
+ * they were brought to 4:3 everywhere.
  *
- * They agree now, and this is what keeps them agreeing: the app hardcodes
- * its picker's aspect and cannot import the server's constants, exactly
- * like `local-shared` and `avatar-geometry` before it.
+ * The second report, after that: "Changing a header banner in website
+ * works, but STILL does not work in app... it takes 4-5 seconds just for
+ * the photo selection to come up." Both symptoms were the app's cropper
+ * itself. `allowsEditing: true` forces iOS onto the legacy picker, which
+ * is slow to present on a big library and IGNORES the aspect it is
+ * handed - its crop is always a square - so the cover that reached the
+ * server was a square whatever the app asked for.
+ *
+ * So the app no longer crops at all. The picker hands over the whole
+ * picture through the modern PHPicker, and the server is the one
+ * cropper for both platforms: `setAvatar` squares, `setCover` cuts 4:3
+ * from the top. The website keeps its in-browser cropper because a
+ * browser can show one that tells the truth; it passes the server's own
+ * constants through, which is what keeps it honest.
  */
 
 const source = (path: string) => readFileSync(path, "utf8");
 
+/**
+ * The same file with its block comments stripped. The picker's comment
+ * names the option it dropped, and a guard that trips on its own
+ * explanation is a guard nobody can write the explanation for.
+ */
+const code = (path: string) => source(path).replace(/\/\*[\s\S]*?\*\//g, "");
+
 describe("the cover's shape", () => {
   it("is four by three on the server", () => {
     expect(COVER_WIDTH / COVER_HEIGHT).toBeCloseTo(4 / 3, 5);
-  });
-
-  it("is the same shape the app's cropper offers", () => {
-    const profile = source("mobile/src/screens/profile.tsx");
-
-    /* The tuple expo-image-picker is handed. Read rather than trusted,
-       because the two files can only ever be held together from here. */
-    const match = /aspect:\s*kind === "cover" \? \[(\d+), (\d+)\]/.exec(profile);
-    expect(match, "the app's cover aspect could not be found").not.toBeNull();
-
-    const [, width, height] = match!;
-    expect(Number(width) / Number(height)).toBeCloseTo(COVER_WIDTH / COVER_HEIGHT, 5);
   });
 
   it("is the same shape the website's cropper offers", () => {
@@ -47,12 +50,71 @@ describe("the cover's shape", () => {
     expect(form).toContain("aspect={COVER_WIDTH / COVER_HEIGHT}");
   });
 
-  it("keeps a picture square on both platforms", () => {
-    const profile = source("mobile/src/screens/profile.tsx");
-    const avatar = source("src/components/players/avatar-form.tsx");
+  it("keeps a picture square on the website", () => {
+    expect(source("src/components/players/avatar-form.tsx")).toContain("aspect={1}");
+  });
+});
 
-    expect(profile).toContain('aspect: kind === "cover" ? [4, 3] : [1, 1]');
-    expect(avatar).toContain("aspect={1}");
+describe("the app's picker", () => {
+  const picker = code("mobile/src/change-picture.ts");
+
+  it("opens with no cropper, so iOS presents the modern picker", () => {
+    /*
+     * `allowsEditing` is the switch that brings the legacy picker back,
+     * with its four-second open and its square-only crop. Absent
+     * entirely rather than false, so nobody re-adds it "just for the
+     * avatar": the server squares that one too.
+     */
+    expect(picker).not.toContain("allowsEditing");
+    /* And no aspect, because nothing here crops any more. */
+    expect(picker).not.toMatch(/\baspect:/);
+    expect(picker).toContain('mediaTypes: ["images"]');
+    expect(picker).toContain("quality: 1");
+    expect(picker).toContain("exif: false");
+    expect(picker).toContain("UIImagePickerPreferredAssetRepresentationMode.Current");
+  });
+
+  it("is the one picker for the picture, the cover and the GIF", () => {
+    /* One options object, spread into the GIF flow, so the three
+       cannot pick differently. */
+    expect(picker).toContain("const PICK: ImagePicker.ImagePickerOptions");
+    expect(picker.match(/launchImageLibraryAsync\(/g)?.length).toBe(2);
+    expect(picker).toContain("launchImageLibraryAsync(PICK)");
+    expect(picker).toContain("launchImageLibraryAsync({ ...PICK, base64: true })");
+  });
+
+  it("says what the server said when a commit is refused, and logs it", () => {
+    /* A refused cover used to read as "try again". The server answers
+       with a sentence; it reaches the screen and the console. */
+    expect(picker).toContain("describeError(caught)");
+    expect(picker).toContain('"cover upload failed"');
+    expect(picker).toContain("console.warn(");
+  });
+
+  it("is what the Edit profile screen uses, and the profile tab no longer picks", () => {
+    const edit = source("mobile/src/screens/edit-profile.tsx");
+    expect(edit).toMatch(
+      /import \{[^}]*changePicture[^}]*\} from "\.\.\/change-picture"/,
+    );
+    expect(edit).toContain("changeAnimatedPicture(");
+
+    const profile = code("mobile/src/screens/profile.tsx");
+    expect(profile).not.toContain("ImagePicker");
+    expect(profile).not.toContain("launchImageLibraryAsync");
+  });
+});
+
+describe("what survives the crop", () => {
+  it("keeps the top of the picture the app sends", () => {
+    /*
+     * The app sends the whole picture now, and the server decides which
+     * band of it to keep. Both display layers have always anchored to
+     * the top so a face in the upper half survives; the stored file
+     * agrees.
+     */
+    expect(source("src/lib/players/profile.ts")).toContain(
+      'fit: "cover", position: "top"',
+    );
   });
 
   it("is taller than it is drawn anywhere but the profile, on purpose", () => {
@@ -64,21 +126,5 @@ describe("the cover's shape", () => {
      */
     expect(source("mobile/src/showcase-zoom.tsx")).toContain('contentPosition="top"');
     expect(source("src/components/players/profile-cover.tsx")).toContain("object-top");
-  });
-});
-
-describe("what survives the crop", () => {
-  it("keeps the top of the square a phone sends", () => {
-    /*
-     * iOS ignores the aspect an image picker asks for — its own types
-     * say "on iOS the crop rectangle is always a square" — so a cover
-     * from the app is a square somebody composed, and the server decides
-     * which quarter of it to lose. Centre pushed the top of their
-     * composition off the banner; both display layers have always
-     * anchored to the top, and now the stored file agrees.
-     */
-    expect(source("src/lib/players/profile.ts")).toContain(
-      'fit: "cover", position: "top"',
-    );
   });
 });

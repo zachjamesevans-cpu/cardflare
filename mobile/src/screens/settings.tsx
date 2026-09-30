@@ -15,15 +15,12 @@ import {
   getMe,
   getProfile,
   previewDeckList,
-  renameProfile,
   saveDeckList,
-  setHandle,
   signOut,
   type DeckPreviewEntry,
   type Me,
   type Profile,
 } from "../api";
-import { HandleField, NameField } from "./profile";
 import {
   AsyncButton,
   Body,
@@ -49,12 +46,14 @@ import {
  * Settings: what the Account tab used to be, now behind the profile's cog.
  *
  * Nothing here changed but where it lives — the founder's instruction was
- * exactly that. Your name, your handle, your collection, the deck-list
+ * exactly that. Your collection, how the Feed is drawn, the deck-list
  * paste box, and the connection test that has earned its keep more than
  * once.
  *
  * The wants list is deliberately NOT here any more: it was a second copy
- * of the Flare tab's, which is the tab named after it.
+ * of the Flare tab's, which is the tab named after it. Your name and
+ * handle moved too: they are rows on Edit profile now, with the
+ * pronouns and the bio, the way Instagram keeps them.
  */
 
 /** GET and POST the no-auth ping; the verdict names where POSTs die. */
@@ -166,47 +165,9 @@ export function SettingsScreen() {
    * setting that does not work rather than one that could not save.
    */
   const [viewError, setViewError] = useState<string | null>(null);
-  /*
-   * Your name lives here rather than on the front of the profile.
-   * The founder: "no need to have the name editor front and center on
-   * a profile. that should be buried somewhere in the profile
-   * settings." Renaming is a once-a-year act; the profile is a place
-   * to look at, not a form.
-   */
+  /* The handle, for the delete-account lock at the bottom. Name and
+     handle are edited on Edit profile, not here. */
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [renaming, setRenaming] = useState(false);
-  const [renamed, setRenamed] = useState<string | null>(null);
-
-  const [rehandling, setRehandling] = useState(false);
-  const [rehandled, setRehandled] = useState<string | null>(null);
-
-  async function rename(displayName: string) {
-    setRenaming(true);
-    setRenamed(null);
-    try {
-      await renameProfile(displayName);
-      setProfile((was) => (was ? { ...was, displayName } : was));
-      setRenamed("Name updated.");
-    } catch (caught) {
-      setRenamed(`Could not save that name. ${describeError(caught)}`);
-    } finally {
-      setRenaming(false);
-    }
-  }
-
-  async function rehandle(handle: string) {
-    setRehandling(true);
-    setRehandled(null);
-    try {
-      await setHandle(handle);
-      setProfile((was) => (was ? { ...was, handle } : was));
-      setRehandled(`You are now @${handle}.`);
-    } catch (caught) {
-      setRehandled(describeError(caught));
-    } finally {
-      setRehandling(false);
-    }
-  }
 
   useFocusEffect(
     useCallback(() => {
@@ -240,28 +201,6 @@ export function SettingsScreen() {
         gap: spacing(4),
       }}
     >
-      {profile && (
-        <Card>
-          <Title>Your name</Title>
-          <Body>
-            What people see next to everything you post. Spaces and capitals are fine,
-            and it does not have to be unique.
-          </Body>
-          <NameField current={profile.displayName} busy={renaming} onSave={rename} />
-          {renamed && <Muted>{renamed}</Muted>}
-
-          {/* The other half of the same question, in the same card, the
-              same way the website groups them. */}
-          <Title>How people find you</Title>
-          <Body>
-            Your handle is yours alone. Letters, numbers and underscores, so it can be
-            said out loud and typed without guessing.
-          </Body>
-          <HandleField current={profile.handle} busy={rehandling} onSave={rehandle} />
-          {rehandled && <Muted>{rehandled}</Muted>}
-        </Card>
-      )}
-
       {me?.collection && (
         <Card>
           <Title>Your collection</Title>

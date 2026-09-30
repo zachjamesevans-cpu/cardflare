@@ -51,7 +51,15 @@ export function Sheet({
         if (event.target === dialog.current) onClose();
       }}
       className={cn(
-        "m-auto max-h-[92dvh] w-[min(96vw,28rem)] overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]",
+        "m-auto max-h-[92dvh] w-[min(96vw,28rem)] overflow-visible border-0 bg-transparent p-0",
+        /* A light wash with a real blur behind, and both the wash and
+           the panel fade in. The founder, on the old three-quarters
+           black: "a black full screen opaque thing that slides up from
+           the bottom... Remove that thing entirely, it's jarring. Maybe
+           slightly blur the background instead, like fade into it."
+           Opacity only: the dialog never slides. */
+        "backdrop:bg-black/30 backdrop:backdrop-blur-md",
+        "motion-safe:animate-[cf-sheet-in_var(--duration-base)_var(--ease-out-soft)] motion-safe:backdrop:animate-[cf-sheet-in_var(--duration-base)_var(--ease-out-soft)]",
         className,
       )}
     >

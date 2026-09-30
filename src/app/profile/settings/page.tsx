@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft,
+  ChevronRight,
   ClipboardList,
   KeyRound,
   Library,
   Mail,
   MapPin,
+  UserPen,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -24,10 +26,9 @@ import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { postalCodeForPlayer } from "@/lib/players/location";
 import { PostalAsk } from "@/components/feed/postal-ask";
-import { DisplayNameForm } from "@/components/players/display-name-form";
 import { DeckListForm } from "@/components/players/deck-list-form";
-import { HandleForm } from "@/components/players/handle-form";
 import { DeleteAccountForm } from "@/components/players/delete-account-form";
+import { formatHandle } from "@/lib/players/handle";
 import { ownProfile } from "@/lib/players/profile";
 
 export const metadata: Metadata = {
@@ -105,33 +106,27 @@ export default async function ProfileSettingsPage() {
   const isPlayerHome = viewer.kind === "player";
 
   /*
-   * Your name, which is housekeeping rather than decoration. It used
-   * to sit on the front of the profile; the founder moved it here:
-   * "no need to have the name editor front and center on a profile."
+   * Your name and username moved to Edit profile, with the pronouns
+   * and bio beside them, because that is where Instagram keeps them
+   * and where the founder asked for them. This card is the pointer,
+   * so somebody who comes here for their name is one tap away rather
+   * than lost.
    */
   const nameCard = !playerId ? null : (
-    <Card key="name" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-semibold text-text-primary">Your name</h2>
-        <p className="text-sm text-text-secondary">
-          What people see next to everything you post. Spaces and capitals are fine, and
-          it does not have to be unique.
-        </p>
-      </div>
-      <DisplayNameForm displayName={displayName} />
-
-      {/* The other half of the same question, so both are changed in
-          the same place. Its own explanation, because "unique, no
-          spaces" is exactly the part that surprises people. */}
-      <div className="flex flex-col gap-1 border-t border-border pt-4">
-        <h3 className="font-semibold text-text-primary">How people find you</h3>
-        <p className="text-sm text-text-secondary">
-          Your handle is yours alone. Letters, numbers and underscores, so it can be
-          said out loud and typed without guessing.
-        </p>
-      </div>
-      <HandleForm handle={handle} />
-    </Card>
+    <Link
+      key="name"
+      href="/profile/edit"
+      className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
+    >
+      <UserPen className="size-5 shrink-0 text-accent" aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="font-semibold text-text-primary">Name and username</span>
+        <span className="truncate text-sm text-text-secondary">
+          {displayName} · {formatHandle(handle)}. Change them on Edit profile.
+        </span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+    </Link>
   );
 
   /*

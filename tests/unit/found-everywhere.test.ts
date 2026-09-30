@@ -101,11 +101,41 @@ describe("found, everywhere", () => {
     }
   });
 
-  it("a done post says so once, on both platforms and in both views", () => {
-    /* On the card itself now: the sheet's count line went with the rest
-       of the chrome under the cards, behind the three dots. */
+  it("a done post says so in its status line and nowhere else, on both platforms", () => {
+    /*
+     * The founder, on the "All found" / "All gone" line under the
+     * cards: "Delete... Just clutters the feed. Offer up another
+     * solution for this elsewhere that doesn't take up as much space.
+     * Remember, contextual." So the status line the post already has
+     * changes tense instead: "found it" for one card, "found them
+     * all" for several, "offered it all" for an offer, with the
+     * check-circle in place of the crosshair and no glow. No separate
+     * line on either card, in either view, on either platform.
+     */
     const card = read("src/components/feed/flare-feed-card.tsx");
-    expect(card).toContain('"All gone" : "All found"');
+    const status = card.slice(
+      card.indexOf("function statusLabel("),
+      card.indexOf("export function FlareStatus("),
+    );
+    expect(status).toContain('return "offered it all"');
+    expect(status).toContain('item.total === 1 ? "found it" : "found them all"');
+    expect(card).toContain("done={item.completed}");
+    expect(card).toContain("<CheckCircle2");
+    expect(card).not.toContain('"All found"');
+    expect(card).not.toContain('"All gone"');
+
+    const compact = read("src/components/feed/flare-feed-card-compact.tsx");
+    expect(compact).not.toContain("All found");
+    expect(compact).not.toContain("All gone");
+    expect(compact).toContain("item.completed ? (\n            <CheckCircle2");
+
+    const appCard = read("mobile/src/flare-feed-card.tsx");
+    expect(appCard).toContain('"offered it all"');
+    expect(appCard).toContain('"found it"');
+    expect(appCard).toContain('"found them all"');
+    expect(appCard).not.toContain("doneLabel(");
+    expect(read("mobile/src/flare-feed-card-compact.tsx")).not.toContain("doneLabel(");
+
     expect(read("src/components/feed/flare-cards-sheet.tsx")).not.toContain(
       "still needed",
     );
@@ -113,11 +143,6 @@ describe("found, everywhere", () => {
     expect(read("src/components/feed/feed-tile.tsx")).toContain(
       'state === "found" && direction === "showcase" ? "gone" : state',
     );
-    expect(read("src/components/feed/flare-feed-card-compact.tsx")).toContain(
-      'item.completed ? (offering ? "All gone" : "All found") : null',
-    );
-    expect(read("mobile/src/flare-feed-card-compact.tsx")).toContain("doneLabel(");
-    expect(read("mobile/src/flare-feed-card.tsx")).toContain('doneLabel("showcase")');
   });
 
   it("a found card goes to the far right, on the Feed and on the post page", () => {

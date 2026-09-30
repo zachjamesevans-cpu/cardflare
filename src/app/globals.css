@@ -410,6 +410,21 @@
   }
 }
 
+/*
+ * A sheet arriving: the panel and its backdrop fade in together.
+ * Opacity only, on purpose. The founder asked for the black wall that
+ * slid up behind a menu to go, and for the page to "fade into" a
+ * blur instead. Used by `Sheet` on the dialog and on `::backdrop`.
+ */
+@keyframes cf-sheet-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes cf-flare-in {
   from {
     opacity: 0;

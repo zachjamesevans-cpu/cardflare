@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Crosshair, PackageOpen } from "lucide-react";
+import { CheckCircle2, Crosshair, PackageOpen } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
+import { PostMenu } from "@/components/feed/post-actions";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { agoFrom } from "@/components/feed/flare-feed-card";
@@ -28,8 +29,6 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
 export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
   const post = { postId: item.postId, yours: item.yours };
   const offering = item.direction === "showcase";
-  /* Done, said once: every tile below wears the tick. */
-  const done = item.completed ? (offering ? "All gone" : "All found") : null;
 
   const shelf: ZoomCard[] = item.cards.map((card) => ({
     imageUrl: card.imageUrl,
@@ -70,7 +69,16 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
           <span className="truncate text-sm font-bold text-text-primary">
             {item.displayName}
           </span>
-          {offering ? (
+          {/* Which way it points, as a glyph; a finished post wears the
+              check-circle instead, the same mark the classic card's
+              status line wears. No done line anywhere: every tile
+              below already carries its tick. */}
+          {item.completed ? (
+            <CheckCircle2
+              className="size-3.5 shrink-0 text-accent"
+              aria-hidden="true"
+            />
+          ) : offering ? (
             <PackageOpen className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
           ) : (
             <Crosshair className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
@@ -79,6 +87,19 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
         <span className="shrink-0 text-[11px] text-text-muted">
           {agoFrom(item.postedAt)}
         </span>
+        {/* The same three dots the classic card has: the full list and,
+            on your own post, the progress ticks. The founder: "The 3
+            dots contextual menu isn't present in the compact view." */}
+        <PostMenu
+          post={{
+            postId: item.postId,
+            cards: item.cards,
+            total: item.total,
+            direction: offering ? "showcase" : "want",
+            yours: item.yours,
+            completed: item.completed,
+          }}
+        />
       </div>
 
       {/* The strip. Scrolls inside itself, so a long post never makes
@@ -103,9 +124,8 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
         ))}
       </div>
 
-      {(done || terms || item.note) && (
+      {(terms || item.note) && (
         <p className="line-clamp-2 text-xs text-text-secondary">
-          {done && <span className="font-semibold text-accent">{done} · </span>}
           {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
         </p>
       )}
