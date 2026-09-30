@@ -342,20 +342,29 @@ function JoinPanel({
    */
   corner?: boolean;
 }) {
-  /* One column, wherever the panel sits: JOIN above the square, the
-     code below it, the same gap on both sides. The founder, on a first
-     draft that put the word beside the square: "'Join' should always
-     just be above the QR code. Same spacing as the code below." */
+  /*
+   * One column, wherever the panel sits: JOIN above the square, the
+   * code below it, and both EXACTLY as wide as the square. The founder:
+   * "I'd like it if the spacing matched the exact width of the QR code
+   * so it looks more uniform." The column is sized to the white plate,
+   * and each line is an SVG text stretched to the column with
+   * `textLength`, so the letters space themselves out to the plate's
+   * edges at any screen size rather than sitting centred at whatever
+   * width the font gave them.
+   */
   const column = (
-    <>
-      <p className="text-[clamp(0.8rem,1.3vw,1.5rem)] font-bold tracking-[0.18em] text-accent uppercase">
+    <div
+      className="flex flex-col items-stretch gap-[clamp(0.2rem,0.5vw,0.6rem)]"
+      style={{ width: PLATE_WIDTH }}
+    >
+      <FittedLine className="fill-accent text-[clamp(0.8rem,1.3vw,1.5rem)] font-bold uppercase">
         Join
-      </p>
+      </FittedLine>
       <div
         /* White plate behind the code: a QR on a dark panel is a QR that
            does not scan from four metres away. In the corner only the
            halo around it moves. */
-        className={`rounded-[8px] bg-white p-[clamp(0.2rem,0.4vw,0.5rem)] [&>svg]:block [&>svg]:size-[clamp(3.5rem,9vh,8rem)] ${
+        className={`rounded-[8px] bg-white p-[var(--plate-pad)] [&>svg]:block [&>svg]:size-[var(--qr)] ${
           corner
             ? "motion-safe:animate-[cf-join-glow_3.2s_ease-in-out_infinite_alternate]"
             : ""
@@ -363,24 +372,63 @@ function JoinPanel({
         aria-hidden="true"
         dangerouslySetInnerHTML={{ __html: qrSvg }}
       />
-      <p className="font-mono text-[clamp(0.75rem,1.2vw,1.4rem)] font-bold tracking-[0.15em] text-text-primary">
+      <FittedLine className="fill-text-primary font-mono text-[clamp(0.75rem,1.2vw,1.4rem)] font-bold">
         {code}
-      </p>
-    </>
+      </FittedLine>
+    </div>
   );
 
   if (corner) {
     return (
-      <aside className="flex flex-col items-center gap-[clamp(0.2rem,0.5vw,0.6rem)] motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]">
+      <aside
+        style={PLATE_VARS}
+        className="motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]"
+      >
         {column}
       </aside>
     );
   }
 
   return (
-    <aside className="flex shrink-0 flex-col items-center justify-center gap-[clamp(0.2rem,0.5vw,0.6rem)] rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]">
+    <aside
+      style={PLATE_VARS}
+      className="flex shrink-0 flex-col items-center justify-center rounded-[var(--radius-card)] border border-border bg-surface p-[clamp(0.4rem,0.8vw,1rem)]"
+    >
       {column}
     </aside>
+  );
+}
+
+/** The square's size and the white margin around it, as one truth. */
+const PLATE_VARS = {
+  ["--qr" as string]: "clamp(3.5rem, 9vh, 8rem)",
+  ["--plate-pad" as string]: "clamp(0.2rem, 0.4vw, 0.5rem)",
+};
+const PLATE_WIDTH = "calc(var(--qr) + 2 * var(--plate-pad))";
+
+/**
+ * One line of text, stretched to its container's width.
+ *
+ * SVG's `textLength` with `lengthAdjust="spacing"` opens the gaps
+ * between letters until the first sits on the left edge and the last on
+ * the right: the only way to make a word exactly as wide as the square
+ * under it without measuring anything. The text is real text, read out
+ * as such.
+ */
+function FittedLine({ children, className }: { children: string; className: string }) {
+  return (
+    <svg className={`block h-[1.15em] w-full overflow-visible ${className}`}>
+      <text
+        x="0"
+        y="50%"
+        dominantBaseline="central"
+        textLength="100%"
+        lengthAdjust="spacing"
+        fontSize="1em"
+      >
+        {children}
+      </text>
+    </svg>
   );
 }
 
