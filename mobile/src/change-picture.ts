@@ -2,6 +2,7 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 
 import { describeError, uploadAvatar } from "./api";
+import { cropInPixels, type CropBox } from "./crop-box";
 
 /**
  * Picking a picture and sending it, shared by every screen that offers
@@ -31,12 +32,13 @@ export interface PictureReporter {
  * banner "STILL does not work in app".
  *
  * Without it the modern PHPicker presents at once, and the whole picture
- * goes up. The server is the one cropper now: `setAvatar` squares a
- * picture and `setCover` cuts 4:3 from the top (src/lib/players/profile.ts),
- * the same as it does for the website's upload. No `aspect`, because
- * nothing here crops any more. `exif: false` keeps the orientation and
- * location blob off the wire; "current" hands over the asset as stored
- * rather than transcoding it first, which is the other half of the wait.
+ * comes back. The crop happens on our own screen instead, with the
+ * profile drawn under it (crop-picture.tsx), and the server's resize
+ * (`setAvatar`, `setCover` in src/lib/players/profile.ts) then has
+ * nothing to cut. No `aspect`, because the picker crops nothing.
+ * `exif: false` keeps the orientation and location blob off the wire;
+ * "current" hands over the asset as stored rather than transcoding it
+ * first, which is the other half of the wait.
  */
 const PICK: ImagePicker.ImagePickerOptions = {
   mediaTypes: ["images"],
@@ -46,40 +48,70 @@ const PICK: ImagePicker.ImagePickerOptions = {
     ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
 };
 
+/** What the picker handed over, ready for the crop. */
+export interface PickedPicture {
+  uri: string;
+  width: number;
+  height: number;
+}
+
 /**
- * Pick, shrink, convert, send. Everything lands as a JPEG well under
- * 200KB regardless of what the camera roll held - the founder's brief:
- * it must work first time and it must not be a server load.
- *
- * Resolves true when a new picture is on the server, so the caller
- * knows to re-read the profile. False for a cancel or a failure, which
- * has already been said through the reporter.
+ * Open the library and hand back what was chosen, or null for a cancel
+ * or a refusal (which has already been said through the reporter). The
+ * crop comes next, on screen, with the profile drawn under it
+ * (crop-picture.tsx); the upload is `uploadPicture` once the crop is
+ * chosen.
  */
-export async function changePicture(
-  kind: PictureKind,
+export async function pickPicture(
   report: PictureReporter,
-): Promise<boolean> {
+): Promise<PickedPicture | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     report.say("cardflare needs photo access to change your picture.");
-    return false;
+    return null;
   }
 
   const chosen = await ImagePicker.launchImageLibraryAsync(PICK);
-  if (chosen.canceled || chosen.assets.length === 0) return false;
+  if (chosen.canceled || chosen.assets.length === 0) return null;
 
+  const asset = chosen.assets[0];
+  return { uri: asset.uri, width: asset.width, height: asset.height };
+}
+
+/**
+ * Crop, shrink, convert, send. Everything lands as a JPEG well under
+ * 200KB regardless of what the camera roll held - the founder's brief:
+ * it must work first time and it must not be a server load.
+ *
+ * The crop is the one chosen on screen, in the picture's own pixels,
+ * so the server's resize is a resize and nothing more. No counting out
+ * loud: the founder, on "Uploading picture… 9 of 17": "Why not just
+ * have a loading icon or something?" The screen shows a spinner; this
+ * says one word.
+ *
+ * Resolves true when a new picture is on the server, so the caller
+ * knows to re-read the profile. False for a failure, which has already
+ * been said through the reporter.
+ */
+export async function uploadPicture(
+  kind: PictureKind,
+  picked: PickedPicture,
+  crop: CropBox,
+  report: PictureReporter,
+): Promise<boolean> {
   report.busy(kind);
-  report.say("Preparing picture…");
+  report.say("Uploading…");
   try {
     /* Resize to the stored size and re-encode as JPEG, walking the
        quality down until it is comfortably small. Base64 length is a
        fine proxy: 200000 characters is roughly 150KB of image. */
+    const box = cropInPixels(crop, picked.width, picked.height);
     let quality = 0.8;
     let encoded: string | null = null;
     while (quality >= 0.2) {
       const out = await manipulateAsync(
-        chosen.assets[0].uri,
-        [{ resize: { width: kind === "cover" ? 1200 : 512 } }],
+        picked.uri,
+        [{ crop: box }, { resize: { width: kind === "cover" ? 1200 : 512 } }],
         { compress: quality, format: SaveFormat.JPEG, base64: true },
       );
       encoded = out.base64 ?? null;
@@ -91,11 +123,7 @@ export async function changePicture(
       return false;
     }
 
-    await uploadAvatar(
-      encoded,
-      (sent, total) => report.say(`Uploading picture… ${sent} of ${total}`),
-      kind,
-    );
+    await uploadAvatar(encoded, undefined, kind);
     report.say(kind === "cover" ? "Cover updated." : "Picture updated.");
     return true;
   } catch (caught) {
@@ -126,8 +154,8 @@ export async function changePicture(
  *
  * The size ceiling is the transport's, not the format's. Every 6KB of
  * GIF is another request, so this is a couple of hundred of them at
- * 2MB, counted out loud while they go. The website takes larger ones
- * because a browser can send a body and this cannot.
+ * 2MB behind one spinner. The website takes larger ones because a
+ * browser can send a body and this cannot.
  */
 export async function changeAnimatedPicture(report: PictureReporter): Promise<boolean> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -164,11 +192,7 @@ export async function changeAnimatedPicture(report: PictureReporter): Promise<bo
   report.busy("avatar");
   report.say("Uploading GIF…");
   try {
-    await uploadAvatar(
-      encoded,
-      (sent, total) => report.say(`Uploading GIF… ${sent} of ${total}`),
-      "avatar-animated",
-    );
+    await uploadAvatar(encoded, undefined, "avatar-animated");
     report.say("Animated picture updated.");
     return true;
   } catch (caught) {

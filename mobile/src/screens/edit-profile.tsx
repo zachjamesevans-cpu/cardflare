@@ -15,10 +15,13 @@ import {
 } from "../api";
 import {
   changeAnimatedPicture,
-  changePicture,
+  pickPicture,
+  uploadPicture,
+  type PickedPicture,
   type PictureKind,
   type PictureReporter,
 } from "../change-picture";
+import { CropSheet, type CropSubject } from "../crop-picture";
 import { HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, spacing } from "../theme";
@@ -74,6 +77,8 @@ export function EditProfileScreen() {
   const [pictureOpen, setPictureOpen] = useState(false);
   const [busy, setBusy] = useState<PictureKind | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  /* The picture being cropped, between the picker and the upload. */
+  const [cropping, setCropping] = useState<CropSubject | null>(null);
 
   /* The row that is open for editing, or none. One at a time, the way
      Instagram opens one field per screen. */
@@ -120,7 +125,28 @@ export function EditProfileScreen() {
   /* A new picture is on the server: read the profile back so the
      circle at the top shows it. The profile tab re-reads on focus. */
   const picture = async (kind: PictureKind) => {
-    if (await changePicture(kind, reporter)) await load();
+    const picked = await pickPicture(reporter);
+    if (!picked) return;
+    setCropping({
+      kind,
+      ...picked,
+      displayName: profile.displayName,
+      handle: profile.handle,
+      avatarUrl: profile.avatarUrl,
+      coverUrl: profile.coverUrl,
+    });
+  };
+  const cropped = async (
+    subject: CropSubject,
+    crop: Parameters<typeof uploadPicture>[2],
+  ) => {
+    setCropping(null);
+    const picked: PickedPicture = {
+      uri: subject.uri,
+      width: subject.width,
+      height: subject.height,
+    };
+    if (await uploadPicture(subject.kind, picked, crop, reporter)) await load();
   };
   const animated = async () => {
     if (await changeAnimatedPicture(reporter)) await load();
@@ -195,18 +221,18 @@ export function EditProfileScreen() {
             <View style={{ flexDirection: "row", gap: spacing(2) }}>
               <View style={{ flex: 1 }}>
                 <Button
-                  label={
-                    busy === "avatar" ? (message ?? "Uploading…") : "Change picture"
-                  }
+                  label={busy === "avatar" ? "Uploading…" : "Change picture"}
                   variant="secondary"
+                  busy={busy === "avatar"}
                   disabled={busy !== null}
                   onPress={() => void picture("avatar")}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  label={busy === "cover" ? (message ?? "Uploading…") : "Change cover"}
+                  label={busy === "cover" ? "Uploading…" : "Change cover"}
                   variant="secondary"
+                  busy={busy === "cover"}
                   disabled={busy !== null}
                   onPress={() => void picture("cover")}
                 />
@@ -230,6 +256,16 @@ export function EditProfileScreen() {
         )}
         {message && busy === null ? <Muted>{message}</Muted> : null}
       </Card>
+
+      {/* The crop, with the profile drawn under it, between the picker
+          and the upload. */}
+      <CropSheet
+        subject={cropping}
+        onCancel={() => setCropping(null)}
+        onDone={(crop) => {
+          if (cropping) void cropped(cropping, crop);
+        }}
+      />
 
       {/* The four rows. Label left, value right, a hairline between;
           tap one and it opens into its field and a Save. */}

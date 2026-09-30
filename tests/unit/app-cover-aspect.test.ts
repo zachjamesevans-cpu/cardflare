@@ -94,8 +94,9 @@ describe("the app's picker", () => {
   it("is what the Edit profile screen uses, and the profile tab no longer picks", () => {
     const edit = source("mobile/src/screens/edit-profile.tsx");
     expect(edit).toMatch(
-      /import \{[^}]*changePicture[^}]*\} from "\.\.\/change-picture"/,
+      /import \{[^}]*pickPicture[^}]*\} from "\.\.\/change-picture"/,
     );
+    expect(edit).toContain("uploadPicture(");
     expect(edit).toContain("changeAnimatedPicture(");
 
     const profile = code("mobile/src/screens/profile.tsx");
