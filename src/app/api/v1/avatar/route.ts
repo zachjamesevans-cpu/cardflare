@@ -90,6 +90,9 @@ const schema = z.discriminatedUnion("action", [
   }),
 ]);
 
+/** What a staged chunk is stored as. Has to be on the bucket's allowed list. */
+const CHUNK_TYPE = "application/octet-stream";
+
 const chunkPath = (playerId: string, upload: string, index: number) =>
   `tmp/${playerId}/${upload}/${String(index).padStart(3, "0")}`;
 
@@ -120,17 +123,31 @@ export async function POST(request: Request): Promise<Response> {
       LIMITS.avatarChunk.windowMs,
     );
     if (limited) return limited;
+    /*
+     * Declared as bytes, not as text. The avatars bucket takes only the
+     * types listed in its `allowed_mime_types` (images, SVG, HTML and
+     * application/octet-stream since the 2026-09-16 migration), and a
+     * chunk labelled text/plain was refused at the door on every
+     * upload: the founder's screen read "chunk-failed 500" for a cover
+     * that never got past its first piece. The chunk is base64 text
+     * either way; commit reads it back with `.text()` as before.
+     */
     const { error } = await admin.storage
       .from("avatars")
       .upload(
         chunkPath(player.playerId, body.uploadId, body.index),
-        new Blob([body.data], { type: "text/plain" }),
-        { contentType: "text/plain", upsert: true },
+        new Blob([body.data], { type: CHUNK_TYPE }),
+        { contentType: CHUNK_TYPE, upsert: true },
       );
 
     if (error) {
       console.error("Could not store an avatar chunk", error);
-      return Response.json({ error: "chunk-failed" }, { status: 500 });
+      /* The storage refusal rides along, so the next time this fails
+         the phone says why instead of a number. */
+      return Response.json(
+        { error: `chunk-failed (${error.message})` },
+        { status: 500 },
+      );
     }
 
     return Response.json({ ok: true });
