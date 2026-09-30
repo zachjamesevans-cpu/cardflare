@@ -215,3 +215,21 @@ describe("what sits behind a sheet", () => {
     }
   });
 });
+
+describe("pull to refresh ticks when it commits", () => {
+  /* The founder: "a small haptic vibration when it pulls all the way
+     up to refresh." The Feed draws its own pull and ticks at the
+     crossing; the screens on RefreshControl tick when it fires. */
+  it("has one tick, used by every pull", () => {
+    const tick = read("mobile/src/refresh-tick.ts");
+    expect(tick).toContain("Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)");
+    for (const screen of ["home", "room", "remote", "local"]) {
+      const source = read(`mobile/src/screens/${screen}.tsx`);
+      expect(source).toContain('from "../refresh-tick"');
+      /* Called outright, or handed to runOnJS from the Feed's worklet. */
+      expect(source).toMatch(/refreshTick\(\)|runOnJS\(refreshTick\)\(\)/);
+    }
+    const home = read("mobile/src/screens/home.tsx");
+    expect(home).toContain("pull.value >= PULL_TRIGGER && !armed.value");
+  });
+});
