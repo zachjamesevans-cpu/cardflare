@@ -97,7 +97,12 @@ describe("one shelf, both directions", () => {
        still be visibly separate in carousel, but when clicking on one,
        it's same swiping carousel." */
     const app = await read("mobile/src/screens/room.tsx");
-    expect(app).toContain("{showcases.map(tile)}");
+    /* Wants, the divider, then the showcases, each drawn ONCE: the rail
+       used to draw the shelf (which already ends in the showcases) and
+       then the showcases again past the divider. */
+    expect(app).toContain("{railWantsShown.map(tile)}");
+    expect(app).toContain("{railShowcasesShown.map(tile)}");
+    expect(app).not.toContain("{orderedRail.map(tile)}");
     expect(app).toMatch(/Offering ·/);
   });
 

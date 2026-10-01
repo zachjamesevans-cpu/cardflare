@@ -75,6 +75,15 @@ import { refreshTick } from "../refresh-tick";
 // the same rhythm so an offer never looks slower in the pocket client.
 const POLL_MS = 12_000;
 
+/*
+ * How many cards a player's section shows before it folds. The founder
+ * asked what a hundred Flares does to the room: past this many, a
+ * control at the section's end says "and N more" and opens the whole
+ * section in place, and reads "Show less" while it is open. The website
+ * folds at the same count, with the same words.
+ */
+const SECTION_FOLD = 6;
+
 /**
  * The Room tab — the app's rendering of `/e/[code]`, at the website's
  * depth: the lobby with presence, the board grouped under whoever posted
@@ -378,6 +387,9 @@ function RoomScreen({
    * the player is reading the board the answer has been given.
    */
   const [resumed, setResumed] = useState(false);
+  /* How many of the account's Flares did not fit on the board at the
+     join, and what the board holds. Said once, like `resumed`. */
+  const [skipped, setSkipped] = useState<{ count: number; cap: number } | null>(null);
 
   /*
    * The names, behind the door card's meta line. They were a folded
@@ -394,6 +406,13 @@ function RoomScreen({
    * the roster taught. Detail is a per-person question, not a mode.
    */
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  /*
+   * Which long sections have been opened past SECTION_FOLD, keyed by
+   * player. Per visit, like `expandedGroups`: a board someone unfolded
+   * is not a setting.
+   */
+  const [foldOpen, setFoldOpen] = useState<Record<string, boolean>>({});
 
   /*
    * Which player's rail has nothing further to scroll, so the trailing
@@ -496,6 +515,7 @@ function RoomScreen({
   useEffect(() => {
     setState(null);
     setResumed(false);
+    setSkipped(null);
     setExpandedGroups({});
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
@@ -514,6 +534,11 @@ function RoomScreen({
        * and no sign anything had gone wrong.
        */
       setResumed(Boolean(result.resumed));
+      setSkipped(
+        result.skipped && result.skipped > 0
+          ? { count: result.skipped, cap: result.boardCap ?? 100 }
+          : null,
+      );
       await refresh();
     } catch (caught) {
       // The reason is named so a field report can say what actually failed.
@@ -999,6 +1024,15 @@ function RoomScreen({
         <RoomTimersCard timers={state.timers} />
 
         {/* The same words the website uses, for the same moment. */}
+        {skipped && (
+          <Card>
+            <Title>{`${skipped.count} of your Flares did not fit`}</Title>
+            <Body>
+              {`The board holds ${skipped.cap} per player. The rest stay on your list, and the Feed still shows them.`}
+            </Body>
+          </Card>
+        )}
+
         {resumed && (
           <Card>
             <Title>You were already in this room</Title>
@@ -1171,6 +1205,68 @@ function RoomScreen({
                     },
             }));
             const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
+
+            /*
+             * THE FOLD. A section shows at most SECTION_FOLD cards; past
+             * that, a control at its end says how many are waiting and
+             * opens the whole section in place. The shelf above was built
+             * from the whole section on purpose: the zoom still pages
+             * every card, not only the ones the fold left showing.
+             *
+             * The rail and the stacked list each fold by their own drawn
+             * order, so what you see is always the first six of what that
+             * view would have drawn.
+             */
+            const total = group.flares.length;
+            const folded = total > SECTION_FOLD && !foldOpen[sessionId];
+            const foldLabel =
+              total > SECTION_FOLD
+                ? folded
+                  ? `and ${total - SECTION_FOLD} more`
+                  : "Show less"
+                : null;
+            const toggleFold = () => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setFoldOpen((current) => ({
+                ...current,
+                [sessionId]: !current[sessionId],
+              }));
+            };
+
+            /* The rail draws the shelf's order: wants, the divider, then
+               the showcases. Cut at six, the divider only stands when a
+               showcase made it through. */
+            const railShown = folded ? orderedRail.slice(0, SECTION_FOLD) : orderedRail;
+            const railWantsShown = railShown.filter((f) => f.intent !== "showcase");
+            const railShowcasesShown = railShown.filter((f) => f.intent === "showcase");
+
+            /* The stacked list draws showcases first, then the folders,
+               then the loose cards, and its first six are those. A folder
+               the cut lands inside shows the cards within the six and
+               nothing of the rest; its heading still counts the whole
+               folder, because that is how many it holds. */
+            const stackOrder = [
+              ...showcases,
+              ...folders.flatMap((f) => f.flares),
+              ...loose,
+            ];
+            const stackShown = new Set(
+              (folded ? stackOrder.slice(0, SECTION_FOLD) : stackOrder).map(
+                (f) => f.id,
+              ),
+            );
+            const inStack = (list: RoomFlare[]) =>
+              list.filter((f) => stackShown.has(f.id));
+            const showcasesShown = inStack(showcases);
+            const wantsShown = inStack(wants);
+            const foldersShown = folders
+              .map((folder) => ({
+                label: folder.label,
+                total: folder.flares.length,
+                flares: inStack(folder.flares),
+              }))
+              .filter((folder) => folder.flares.length > 0);
+            const looseShown = inStack(loose);
 
             const rows = (list: RoomFlare[]) =>
               list.map((flare) => (
@@ -1379,8 +1475,8 @@ function RoomScreen({
                         alignItems: "flex-start",
                       }}
                     >
-                      {orderedRail.map(tile)}
-                      {labelled && (
+                      {railWantsShown.map(tile)}
+                      {railShowcasesShown.length > 0 && (
                         <>
                           <View
                             style={{
@@ -1390,8 +1486,15 @@ function RoomScreen({
                               marginHorizontal: spacing(0.5),
                             }}
                           />
-                          {showcases.map(tile)}
+                          {railShowcasesShown.map(tile)}
                         </>
+                      )}
+                      {/* The fold's control, the size of a tile's art so
+                          it stands in the rail like one more card. */}
+                      {foldLabel && (
+                        <Tap onPress={toggleFold} style={styles.foldTile}>
+                          <Text style={styles.foldText}>{foldLabel}</Text>
+                        </Tap>
                       )}
                     </ScrollView>
                     {/*
@@ -1413,18 +1516,18 @@ function RoomScreen({
                   </View>
                 ) : (
                   <>
-                    {labelled && (
+                    {labelled && showcasesShown.length > 0 && (
                       <View style={{ gap: spacing(1) }}>
                         <Text style={styles.folderLabel}>
                           {`Offering · ${showcases.length} ${
                             showcases.length === 1 ? "card" : "cards"
                           }`}
                         </Text>
-                        <View>{rows(showcases)}</View>
+                        <View>{rows(showcasesShown)}</View>
                       </View>
                     )}
 
-                    {labelled && wants.length > 0 && (
+                    {labelled && wantsShown.length > 0 && (
                       <Text style={styles.folderLabel}>
                         {`Looking for · ${wants.length} ${
                           wants.length === 1 ? "card" : "cards"
@@ -1432,21 +1535,29 @@ function RoomScreen({
                       </Text>
                     )}
 
-                    {folders.map((folder) => (
+                    {foldersShown.map((folder) => (
                       <View
                         key={folder.label.toLowerCase()}
                         style={{ gap: spacing(1) }}
                       >
                         <Text style={styles.folderLabel} numberOfLines={1}>
-                          {`${folder.label} · ${folder.flares.length} ${
-                            folder.flares.length === 1 ? "card" : "cards"
+                          {`${folder.label} · ${folder.total} ${
+                            folder.total === 1 ? "card" : "cards"
                           }`}
                         </Text>
                         <View>{rows(folder.flares)}</View>
                       </View>
                     ))}
 
-                    {loose.length > 0 && <View>{rows(loose)}</View>}
+                    {looseShown.length > 0 && <View>{rows(looseShown)}</View>}
+
+                    {/* The fold's control as a row, where the list's eye
+                        already is. */}
+                    {foldLabel && (
+                      <Tap onPress={toggleFold} style={styles.foldRow}>
+                        <Text style={styles.foldText}>{foldLabel}</Text>
+                      </Tap>
+                    )}
                   </>
                 )}
               </View>
@@ -2235,6 +2346,32 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "600",
+  },
+  /* The fold's control in the rail: a tile's art box, dashed so it
+     reads as a place rather than a card. */
+  foldTile: {
+    width: 56,
+    height: Math.round((56 * 88) / 63),
+    borderRadius: radius.control / 2,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing(1),
+  },
+  /* The same control under the stacked list, as a row like the ones
+     above it. */
+  foldRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing(3),
+  },
+  foldText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   railFade: {
     position: "absolute",
