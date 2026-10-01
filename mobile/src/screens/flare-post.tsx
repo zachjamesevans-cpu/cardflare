@@ -27,6 +27,7 @@ import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
 import { FlareActions, postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
+import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
 import { StorePostBody, StorePostHeader } from "../store-post-card";
@@ -60,6 +61,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   >(null);
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
   const [menu, setMenu] = useState(false);
+  /* "Report", on somebody else's post: the same sheet the Feed opens. */
+  const [report, setReport] = useState<ReportTarget | null>(null);
   /* Your own post, taken down: the body gives way to one line and the
      toast offers the minute's undo. The Feed behind is told either way. */
   const [takenDown, setTakenDown] = useState(false);
@@ -205,6 +208,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     onViewAll: () => setCardsSheet({ ...sheetPost, mode: "view" }),
     onProgress: () => setProgressSheet(sheetPost),
     onTakeDown: () => void takeDown(),
+    onReport: () => setReport({ kind: "post", targetId: post.postId }),
   });
 
   return (
@@ -275,6 +279,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               ) : null}
             </View>
             <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
+            <ReportSheet target={report} onClose={() => setReport(null)} />
 
             {/* The cards, the way the Feed draws them: one row, or the
                 same row swiped. Tap one to open it big and say you have it. */}

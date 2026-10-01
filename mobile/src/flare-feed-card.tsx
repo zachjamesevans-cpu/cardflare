@@ -172,6 +172,10 @@ export function FlareActions({
  * copies found and the Feed says so; Take down withdraws the cards
  * everywhere, announces nothing, and can be undone for a minute. The
  * website's `PostMenu` ends in the same item.
+ *
+ * On somebody ELSE's post the last item is "Report" instead: the
+ * report sheet, filed as a post. Never on your own; there is nothing
+ * to tell the admins about yourself.
  */
 export function postActions({
   total,
@@ -180,6 +184,7 @@ export function postActions({
   onViewAll,
   onProgress,
   onTakeDown,
+  onReport,
 }: {
   total: number;
   yours: boolean;
@@ -188,6 +193,8 @@ export function postActions({
   onProgress?: () => void;
   /** "Take down", on your own post. */
   onTakeDown?: () => void;
+  /** "Report", on somebody else's. */
+  onReport?: () => void;
 }): ActionItem[] {
   const items: ActionItem[] = [];
   if (total > 1 && onViewAll) {
@@ -214,6 +221,14 @@ export function postActions({
       onPress: onTakeDown,
     });
   }
+  if (!yours && onReport) {
+    items.push({
+      key: "report",
+      label: "Report",
+      icon: "flag-outline",
+      onPress: onReport,
+    });
+  }
   return items;
 }
 
@@ -229,6 +244,7 @@ export function FlareFeedCard({
   onViewAll,
   onProgress,
   onTakeDown,
+  onReport,
   onOpenHunt,
 }: {
   item: Hunt;
@@ -247,6 +263,8 @@ export function FlareFeedCard({
   onProgress?: () => void;
   /** "Take down", on your own post: withdrawn everywhere, nothing announced. */
   onTakeDown?: () => void;
+  /** "Report", on somebody else's post: the report sheet. */
+  onReport?: () => void;
   /** "View hunt", when the post belongs to one. */
   onOpenHunt?: (huntId: string) => void;
 }) {
@@ -263,6 +281,7 @@ export function FlareFeedCard({
     onViewAll,
     onProgress,
     onTakeDown,
+    onReport,
   });
   /* A Flare posted to a room names it up here, where the time is, and
      not only on the button at the foot: "at Mox Valley · 2h ago". */

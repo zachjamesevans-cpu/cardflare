@@ -93,6 +93,16 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
     name: pick.cardName,
     cardNumber: pick.cardNumber,
   }));
+  /* "Fri, Sep 25, 6:30 PM" in the store's own zone, for the nights list. */
+  const whenAt = (iso: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: store?.timeZone ?? undefined,
+    }).format(new Date(iso));
   const [failed, setFailed] = useState(false);
   const [claiming, setClaiming] = useState(false);
   /* Null until the token has been looked for, so neither word is drawn
@@ -321,6 +331,50 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
                 </Text>
               </View>
             ))}
+          </View>
+        ) : null}
+
+        {/* The next nights on the calendar, after the hours, so somebody
+            deciding whether to walk in can see when. A night running
+            now opens its room; the rest are dated. An older server sends
+            no list and gets no section; a claimed store with nothing
+            booked says so, and an unclaimed listing (which cannot book
+            anything) says nothing. The website's "Upcoming nights"
+            card, after its hours. */}
+        {store.upcoming ? (
+          <View style={{ gap: spacing(1.5) }}>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 14 }}
+            >
+              Upcoming nights
+            </Text>
+            {store.upcoming.length === 0 ? (
+              store.unclaimed ? null : (
+                <Muted>Nothing scheduled yet.</Muted>
+              )
+            ) : (
+              store.upcoming.map((night) => (
+                <View key={night.eventId} style={{ gap: spacing(1.5) }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                      {night.name}
+                    </Text>
+                    {` · ${whenAt(night.startsAt)}`}
+                  </Text>
+                  {night.live && night.joinCode ? (
+                    <Button
+                      label="Join the room"
+                      onPress={() => {
+                        const code = night.joinCode;
+                        if (!code) return;
+                        void joinRoom(code).catch(() => {});
+                        openRoom(navigation);
+                      }}
+                    />
+                  ) : null}
+                </View>
+              ))
+            )}
           </View>
         ) : null}
 

@@ -1406,6 +1406,12 @@ export interface PeekProfile {
   coverUrl: string | null;
   /** The viewer's side of the relationship; null hides the button. */
   follow: FollowState | null;
+  /**
+   * Both directions of a block, false on your own profile and for a
+   * guest. Absent from an older server, which never blocked anybody.
+   */
+  blocked?: boolean;
+  blockedBy?: boolean;
   /** Their three numbers; absent from an older server. */
   stats?: ProfileStats;
   embersEarned: number;
@@ -1471,6 +1477,66 @@ export const getPlayerPeople = (playerId: string) =>
     "GET",
     `/api/players/${encodeURIComponent(playerId)}/people`,
   );
+
+/* ------------------------------------------------------------------ */
+/* Report and block                                                    */
+/* ------------------------------------------------------------------ */
+
+export type ReportKind = "post" | "player" | "thread";
+export type ReportReason = "spam" | "scam" | "harassment" | "other";
+
+/**
+ * The four reasons, in the website's words (src/lib/players/safety.ts
+ * REPORT_REASONS). The server validates the value, so a reason the
+ * list does not know is refused rather than filed blind.
+ */
+export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
+  { value: "spam", label: "Spam" },
+  { value: "scam", label: "Scam or fake listing" },
+  { value: "harassment", label: "Harassment" },
+  { value: "other", label: "Something else" },
+];
+
+/**
+ * A block is quiet: the server never tells the other person, and the
+ * Feed, threads and conversations forget them on the next read. The
+ * profile re-reads `peekPlayer` for the settled state.
+ */
+export const blockPlayer = (playerId: string) =>
+  call<{ ok: boolean }>("POST", "/api/v1/safety", { action: "block", playerId });
+
+export const unblockPlayer = (playerId: string) =>
+  call<{ ok: boolean }>("POST", "/api/v1/safety", { action: "unblock", playerId });
+
+/** One row on the settings page's "Blocked players" card. */
+export interface BlockedPlayer {
+  playerId: string;
+  displayName: string;
+  handle: string | null;
+}
+
+/** The people you have blocked, newest first: the settings card's list. */
+export const listBlockedPlayers = () =>
+  call<{ blocked: BlockedPlayer[] }>("GET", "/api/v1/safety");
+
+/**
+ * A note to the admins about a post, a player or a conversation. A
+ * refusal is an ApiError whose code is the server's reason
+ * ("not-found", "yourself", "unavailable"); the sheet puts it in words.
+ */
+export const reportTarget = (
+  kind: ReportKind,
+  targetId: string,
+  reason: ReportReason,
+  note?: string,
+) =>
+  call<{ ok: boolean }>("POST", "/api/v1/safety", {
+    action: "report",
+    kind,
+    targetId,
+    reason,
+    ...(note ? { note } : {}),
+  });
 
 /* ------------------------------------------------------------------ */
 /* Nearby matching                                                     */
@@ -2628,7 +2694,23 @@ export interface PublicStore {
     nextEventName: string | null;
     timeZone: string | null;
   } | null;
+  /**
+   * The next nights on the calendar, soonest first, three at most; a
+   * night running now is the first of them. Absent from an older
+   * server, which draws no section rather than an empty one.
+   */
+  upcoming?: UpcomingNight[];
   attribution: string | null;
+}
+
+export interface UpcomingNight {
+  eventId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string | null;
+  joinCode: string | null;
+  /** Running right now. */
+  live: boolean;
 }
 
 export const getStore = (storeId: string) =>
