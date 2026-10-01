@@ -2,12 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
+import type { ComponentProps } from "react";
 import { Text, View } from "react-native";
 
 import type { StackParams } from "../App";
 import { getMe, storedAccessToken, type Me } from "./api";
 import { colors, radius, spacing } from "./theme";
-import { Body, Button, Card, Tap, Title } from "./ui";
+import { Tap } from "./ui";
 
 /**
  * The organizer's two doors into the timer remote.
@@ -16,15 +17,63 @@ import { Body, Button, Card, Tap, Title } from "./ui";
  * on the phone app? like a 'remote' in a way. so they can just pull
  * out their phone and not have to run back to the store computer."
  *
- * `RemoteEntry` is the card at the top of a joined room: it asks the
- * server who this account may run a store for (`me.staff`) and draws
- * nothing at all for everybody else, so a player never sees a button
- * that would 403. `OrganizerChips` is the TO badge on a profile, the
- * public side of the same fact: the stores that named this player an
- * organizer, each chip opening the store's own page.
+ * `RemoteEntry` is the stopwatch icon on a joined room's door card: it
+ * asks the server who this account may run a store for (`me.staff`)
+ * and draws nothing at all for everybody else, so a player never sees
+ * a button that would 403. It was a whole card with a sentence and a
+ * button; the founder, on the room: "moving the remote from a big
+ * block to a small little remote icon if they have access to it."
+ * `OrganizerChips` is the TO badge on a profile, the public side of
+ * the same fact: the stores that named this player an organizer, each
+ * chip opening the store's own page.
  */
 
 type Staff = NonNullable<Me["staff"]>[number];
+
+/**
+ * One of the small round buttons at the end of the night's name: a
+ * glyph in a 36-point ring. The remote wears the accent, in the ring
+ * as a tint and in the glyph outright; the help button beside it is
+ * muted, so the one that does something to the room reads first.
+ */
+export function DoorIconButton({
+  icon,
+  label,
+  onPress,
+  accent = false,
+}: {
+  icon: ComponentProps<typeof Ionicons>["name"];
+  /** The accessible name; the glyph says nothing on its own. */
+  label: string;
+  onPress: () => void;
+  accent?: boolean;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityLabel={label}
+      hitSlop={4}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 1,
+        /* The accent at forty percent for the ring, so it tints
+           rather than glows; the glyph carries the full colour. */
+        borderColor: accent ? `${colors.accent}66` : colors.border,
+        backgroundColor: colors.surface,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Ionicons
+        name={icon}
+        size={18}
+        color={accent ? colors.accent : colors.textSecondary}
+      />
+    </Tap>
+  );
+}
 
 export function RemoteEntry() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -55,24 +104,19 @@ export function RemoteEntry() {
   if (staff.length === 0) return null;
 
   return (
-    <Card>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Ionicons name="timer-outline" size={18} color={colors.accent} />
-        <Title>Timer remote</Title>
-      </View>
-      <Body>Run the round clocks from here, no trip to the counter</Body>
-      <Button
-        label="Open remote"
-        onPress={() =>
-          /* One store: straight to its clocks. More: the screen asks
-             which counter first. */
-          navigation.navigate(
-            "Remote",
-            staff.length === 1 ? { storeId: staff[0].storeId } : undefined,
-          )
-        }
-      />
-    </Card>
+    <DoorIconButton
+      icon="timer-outline"
+      label="Timer remote"
+      accent
+      onPress={() =>
+        /* One store: straight to its clocks. More: the screen asks
+           which counter first. */
+        navigation.navigate(
+          "Remote",
+          staff.length === 1 ? { storeId: staff[0].storeId } : undefined,
+        )
+      }
+    />
   );
 }
 

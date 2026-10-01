@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { CalendarClock, MapPin } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
-import { EventLobby } from "@/components/events/event-lobby";
 import { FlareComposer } from "@/components/flares/flare-composer";
 import { AccountPitch } from "@/components/players/account-pitch";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -13,14 +12,16 @@ import { FlareBoard } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import { RoomBoardCard } from "@/components/events/room-board-card";
 import { RoomComposerDoor } from "@/components/events/room-composer-door";
+import { RoomDoor } from "@/components/events/room-door";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { RoomTimers } from "@/components/event-hub/room-timers";
 import { ShowSearch } from "@/components/shows/show-search";
 import { RoomLoading } from "@/components/events/room-loading";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
 import { TradedTonight } from "@/components/trades/traded-tonight";
-import { Badge, Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import {
@@ -40,8 +41,6 @@ import { accountIdentity } from "@/lib/players/account-identity";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { huntsFor } from "@/lib/players/hunts";
-import { FollowStoreButton } from "@/components/stores/follow-store-button";
-import { VerifiedMark } from "@/components/stores/verified-mark";
 import { collectionAvailability } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
 import { RepostWants } from "@/components/players/repost-wants";
@@ -57,6 +56,7 @@ import { roomPhase } from "@/lib/events/schema";
 import { gameProfile } from "@/lib/event-hub/game-profiles";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
+import { organizerStoresFor } from "@/lib/stores/staff";
 import { listMyTrades } from "@/lib/trades/repository";
 import { cn } from "@/lib/cn";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -433,6 +433,18 @@ async function RoomBody({
     ? await hasLocal(accountPlayerId, event.storeId)
     : false;
 
+  /*
+   * The timer remote, as a small icon on the door for the people who
+   * can use it: the store's organizers. The same lookup the TO badge
+   * uses, so whoever the owner named sees the stopwatch and nobody else
+   * does. The console's own gate decides again on the far side.
+   */
+  const organizerStores =
+    inRoom && accountPlayerId ? await organizerStoresFor(accountPlayerId) : [];
+  const remoteHref = organizerStores.some((store) => store.storeId === event.storeId)
+    ? "/store/event-hub"
+    : null;
+
   /* Outstanding = saved but not already an open Flare of theirs here. */
   const postedAsks = new Set(
     flares
@@ -547,94 +559,70 @@ async function RoomBody({
 
   const images = cardImagesEnabled();
   const location = [event.storeCity, event.storeRegion].filter(Boolean).join(", ");
-  const presentCount = participants.filter((participant) => participant.present).length;
+
+  /*
+   * The room is live when the viewer is in it and the night is on:
+   * the ticker, the clocks, the composer and the board all hang off
+   * this one answer.
+   */
+  const live = inRoom && session && phase !== "pending" && phase !== "finished";
 
   return (
     <Shell wide={inRoom}>
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Link
-              href={`/s/${event.storeId}`}
-              className="inline-flex items-center gap-1 text-sm font-medium text-accent underline-offset-4 hover:underline"
-            >
-              {event.storeName}
-              {/* Verified is the badge everybody sees beside a store's
-                  name. Ultra is a tier and is never drawn here. */}
-              {event.storeVerified && <VerifiedMark className="size-4" />}
-            </Link>
-            {accountPlayerId && (
-              <FollowStoreButton
-                storeId={event.storeId}
-                initial={followingStore}
-                code={normalized}
-              />
-            )}
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-            {event.name}
-          </h1>
-        </div>
-
-        <dl className="flex flex-col gap-2 text-sm text-text-secondary">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
-            <dt className="sr-only">When</dt>
-            {/*
-             * A walk-in room has no schedule to report, and a player standing
-             * in the store does not need one. A scheduled event does — knowing
-             * when it finishes is how somebody decides whether to wait around.
-             */}
-            <dd>
-              {event.kind === "walk_in"
-                ? "Trading now"
-                : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}
-            </dd>
-          </div>
-          {location && (
-            <div className="flex items-center gap-2">
-              <MapPin className="size-4 shrink-0 text-text-muted" aria-hidden />
-              <dt className="sr-only">Where</dt>
-              <dd>{location}</dd>
-            </div>
-          )}
-        </dl>
-
-        {/*
-         * The room's pulse, promoted to the door: how many people are
-         * here and how many hunts are live. The founder's reorder — the
-         * roster's count used to be the only place this lived, a whole
-         * tile down the page for two numbers a glance wants first.
-         */}
-        {inRoom && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={presentCount > 0 ? "accent" : "neutral"}>
-              {presentCount} here now
-            </Badge>
-            <Badge tone={flares.length > 0 ? "accent" : "neutral"}>
-              {flares.length} {flares.length === 1 ? "Flare" : "Flares"}
-            </Badge>
-          </div>
-        )}
-
-        {/* For the person deciding whether to sit down next week. A
-            scheduled event is a tournament night; a walk-in room is just
-            trading, where the question does not arise. */}
-        {event.kind !== "walk_in" && (
-          <Link
-            href={`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`}
-            className="w-fit text-sm font-medium text-accent hover:text-accent-hover"
-          >
-            New to tournaments? Here&rsquo;s how a night works &rarr;
-          </Link>
-        )}
-      </Card>
+      {/*
+       * The door: store, night, pulse. The people list opens from the
+       * pulse line; the remote and the help page are the two small
+       * round controls at the end of the night's name.
+       *
+       * A walk-in room has no schedule to report, and a player standing
+       * in the store does not need one. A scheduled event does: knowing
+       * when it finishes is how somebody decides whether to wait around.
+       * The help link is a scheduled event's too, for the person
+       * deciding whether to sit down next week; a walk-in room is just
+       * trading, where the question does not arise.
+       */}
+      <RoomDoor
+        storeId={event.storeId}
+        storeName={event.storeName}
+        storeVerified={event.storeVerified}
+        following={accountPlayerId ? followingStore : null}
+        code={normalized}
+        name={event.name}
+        when={
+          event.kind === "walk_in"
+            ? "Trading now"
+            : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)
+        }
+        location={location}
+        remoteHref={remoteHref}
+        helpHref={
+          event.kind !== "walk_in"
+            ? `/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`
+            : null
+        }
+        people={
+          inRoom && session
+            ? {
+                participants,
+                youId: session.id,
+                imagesEnabled: images,
+                flareCount: flares.length,
+              }
+            : null
+        }
+      />
 
       {/* The pitch, to guests only, right under the door: the one thing
           they lose without an account, and the way to fix it. */}
       {inRoom && !accountPlayerId && (
         <AccountPitch next={`/e/${normalized}`} variant="room" />
       )}
+
+      {/* The wall's clocks, for a seat that cannot see the wall.
+          Self-polling, so a reset or a fresh tournament shows up
+          without anybody refreshing anything; draws nothing when
+          there are no timers. */}
+      {live && <RoomTimers initial={roomTimers} code={normalized} />}
 
       {inRoom && resumed && (
         <Card className="flex flex-col gap-1 border-accent/30">
@@ -682,21 +670,6 @@ async function RoomBody({
           {/* Offers land while people wander; the room re-reads itself. */}
           <RoomTicker />
 
-          {/* The wall's clocks, for a seat that cannot see the wall.
-              Self-polling, so a reset or a fresh tournament shows up
-              without anybody refreshing anything. */}
-          <RoomTimers initial={roomTimers} code={normalized} />
-
-          {outstandingWants.length > 0 && (
-            <RepostWants code={normalized} count={outstandingWants.length}>
-              <WantEntries
-                code={normalized}
-                wants={outstandingWants}
-                imagesEnabled={images}
-              />
-            </RepostWants>
-          )}
-
           <MatchSummary
             offerCount={offersOnMine}
             flareCount={myFlaresWithOffers.length}
@@ -708,14 +681,14 @@ async function RoomBody({
              * The Flare tab's composer, behind one door: a room page is
              * for seeing the room, so the composer opens in place when
              * asked and folds away again. It needs an account, so a
-             * guest keeps the pitch above and only the open-to-any-trade
-             * row here, which is theirs too.
+             * guest keeps the pitch above and gets their open-to-trades
+             * row at the foot of the board instead.
              */}
-            <RoomComposerDoor
-              eventName={event.name}
-              storeName={event.storeName}
-              composer={
-                poster ? (
+            {poster && (
+              <RoomComposerDoor
+                eventName={event.name}
+                storeName={event.storeName}
+                composer={
                   <FlareComposer
                     viewer={poster}
                     hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
@@ -726,25 +699,49 @@ async function RoomBody({
                     initialHuntId={null}
                     footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
                   />
+                }
+              />
+            )}
+
+            {/*
+             * One card for the board. The viewer's own saved wants that
+             * are not on it yet sit at its foot, folded, with the rows
+             * and the post-all button behind one tap.
+             */}
+            <RoomBoardCard
+              empty={flares.length === 0 && openPlayers.length === 0}
+              foot={
+                outstandingWants.length > 0 ? (
+                  <RepostWants code={normalized} count={outstandingWants.length}>
+                    <WantEntries
+                      code={normalized}
+                      wants={outstandingWants}
+                      imagesEnabled={images}
+                    />
+                  </RepostWants>
                 ) : null
               }
-              trades={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
-            />
-
-            <FlareBoard
-              entries={flares}
-              code={normalized}
-              imagesEnabled={images}
-              youId={session.id}
-              matches={matches}
-              offers={offers}
-              openToTrades={openPlayers}
-              identities={boardIdentities}
-              counterHas={counterHas}
-              counterName={event.storeName}
-              heldCounts={heldCounts}
-              early={phase === "early"}
-            />
+              guestTrades={
+                accountPlayerId ? null : (
+                  <OpenToTradesToggle code={normalized} open={youAreOpen} />
+                )
+              }
+            >
+              <FlareBoard
+                entries={flares}
+                code={normalized}
+                imagesEnabled={images}
+                youId={session.id}
+                matches={matches}
+                offers={offers}
+                openToTrades={openPlayers}
+                identities={boardIdentities}
+                counterHas={counterHas}
+                counterName={event.storeName}
+                heldCounts={heldCounts}
+                early={phase === "early"}
+              />
+            </RoomBoardCard>
           </section>
 
           {/*
@@ -759,19 +756,6 @@ async function RoomBody({
             trades={myTrades}
             timeZone={event.storeTimeZone}
             code={normalized}
-          />
-
-          {/*
-           * Who is here, parked at the foot of the page — the founder's
-           * reorder. The names are reference material, not a decision
-           * anyone makes on arrival; the counts they used to headline
-           * now live on the room's door card at the top.
-           */}
-          <EventLobby
-            code={normalized}
-            participants={participants}
-            youId={session.id}
-            imagesEnabled={images}
           />
         </>
       ) : (

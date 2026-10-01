@@ -68,9 +68,13 @@ describe("a room carries the store's trust", () => {
 
 describe("the mark beside a store's name", () => {
   it("is in the room header on both platforms", () => {
-    const web = read("src/app/e/[code]/page.tsx");
+    /* The door card draws the store's line; the page hands it the flag. */
+    const web = read("src/components/events/room-door.tsx");
     expect(web).toContain('from "@/components/stores/verified-mark"');
-    expect(web).toContain("{event.storeVerified && <VerifiedMark");
+    expect(web).toContain("{storeVerified && <VerifiedMark");
+    expect(read("src/app/e/[code]/page.tsx")).toContain(
+      "storeVerified={event.storeVerified}",
+    );
 
     const app = read("mobile/src/screens/room.tsx");
     expect(app).toContain('from "../verified-mark"');

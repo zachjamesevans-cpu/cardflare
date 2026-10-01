@@ -2,10 +2,9 @@
 
 import { useActionState, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckCircle2, ChevronDown, History, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { repostWantsAction } from "@/lib/players/account-actions";
 import { REPOST_IDLE } from "@/lib/players/account-schema";
 
@@ -22,16 +21,23 @@ function SubmitButton({ count }: { count: number }) {
   );
 }
 
+/** "9 cards you are still after are not posted here", or the singular. */
+export function outstandingLine(count: number): string {
+  return count === 1
+    ? "1 card you are still after is not posted here"
+    : `${count} cards you are still after are not posted here`;
+}
+
 /**
- * "Still looking for these?": the payoff of an account, folded shut.
+ * The foot of the board card: the payoff of an account, folded shut.
  *
- * Closed, this tile is EXACTLY the roster's silhouette: icon, question,
- * count, chevron, one line, nothing else. The founder's screenshot of
- * the previous cut had the Post button and a "Never mind" sitting under
- * the header, which made this the one fat tile in a column of thin
- * ones. Both moved: Post lives inside the fold with the list it posts,
- * and "Never mind" is gone entirely — a tile that starts closed no
- * longer needs a second way to be ignored.
+ * One elevated row at the bottom of "Flares in the room": the count of
+ * saved cards not yet on this board on the left, "Post them" in the
+ * accent on the right. It used to be a folded card of its own above
+ * the board, and the founder's read of the Room tab was that it was
+ * one block too many. Tapping the row opens
+ * it in place into the rows and the one button that posts the lot,
+ * and the accent text turns into a chevron while it is open.
  *
  * The rows arrive as server-rendered children, the same slot pattern
  * GroupView uses for the board. That is deliberate twice over: the rows
@@ -41,7 +47,7 @@ function SubmitButton({ count }: { count: number }) {
  * can drift or fail on its own.
  *
  * Shown only when the signed-in player has saved wants that are not
- * already on this board. One tap posts the lot; the panel disappears on
+ * already on this board. One tap posts the lot; the row disappears on
  * the re-render because nothing is outstanding any more.
  */
 export function RepostWants({
@@ -50,7 +56,7 @@ export function RepostWants({
   children,
 }: {
   code: string;
-  /** Outstanding asks, so the header can count without seeing the rows. */
+  /** Outstanding asks, so the row can count without seeing the rows. */
   count: number;
   /** The rows, server-rendered by WantEntries. */
   children: ReactNode;
@@ -60,40 +66,38 @@ export function RepostWants({
 
   if (state.status === "posted") {
     return (
-      <Card className="flex items-center gap-3 border-accent/30 bg-accent/[0.06]">
+      <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.06] px-3 py-2.5">
         <CheckCircle2 className="size-5 shrink-0 text-accent" aria-hidden="true" />
         <p className="text-sm text-text-secondary">
           {state.count === 0
             ? "Everything you are looking for is already on the board."
             : `${state.count} ${state.count === 1 ? "Flare" : "Flares"} posted. The room can see what you are looking for.`}
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="flex flex-col">
+    <div className="flex flex-col rounded-[var(--radius-control)] border border-border bg-elevated">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-left"
       >
-        <h2 className="flex min-w-0 items-center gap-2 font-semibold text-text-primary">
-          <History className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
-          <span className="truncate">Still looking for these?</span>
-        </h2>
-        <span className="flex shrink-0 items-center gap-2">
-          <span className="text-sm text-text-muted tabular-nums">
-            {count} {count === 1 ? "card" : "cards"}
-          </span>
+        <span className="min-w-0 text-sm font-semibold text-text-primary">
+          {outstandingLine(count)}
+        </span>
+        {open ? (
           <ChevronDown
             aria-hidden="true"
-            className={`size-4 text-text-muted transition-transform duration-300 ${
-              open ? "rotate-180" : ""
-            }`}
+            className="size-4 shrink-0 rotate-180 text-text-muted transition-transform duration-300"
           />
-        </span>
+        ) : (
+          <span className="shrink-0 text-sm font-bold text-accent">
+            {count === 1 ? "Post it" : "Post them"}
+          </span>
+        )}
       </button>
 
       <div
@@ -102,19 +106,24 @@ export function RepostWants({
         }`}
       >
         <div className="overflow-hidden">
-          {children}
+          <div className="border-t border-border px-3 pt-3 pb-3">
+            {children}
 
-          <form action={formAction} className="flex flex-wrap items-center gap-3 pt-3">
-            <input type="hidden" name="code" value={code} />
-            <SubmitButton count={count} />
-            {state.status === "error" && (
-              <p role="alert" className="text-sm text-danger">
-                {state.message}
-              </p>
-            )}
-          </form>
+            <form
+              action={formAction}
+              className="flex flex-wrap items-center gap-3 pt-3"
+            >
+              <input type="hidden" name="code" value={code} />
+              <SubmitButton count={count} />
+              {state.status === "error" && (
+                <p role="alert" className="text-sm text-danger">
+                  {state.message}
+                </p>
+              )}
+            </form>
+          </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   publishFlare,
   rememberSearchGame,
   searchCards,
+  setOpenToTrades,
   type CardHit,
   type FeedEntry,
   type Hunt,
@@ -132,12 +133,19 @@ export function FlareComposer({
   resetSignal,
   onPosted,
   footer,
+  openToTrades = false,
 }: {
   target: PostTarget;
   /** The hunt to open into, from a profile's "Add cards". */
   initialHuntId?: string;
   /** Bumped by the Flare tab on a re-tap while focused. */
   resetSignal?: number;
+  /**
+   * Whether the poster is open to trades in the room this posts to,
+   * as the room last read it. Only a room target draws the toggle:
+   * the Flare tab has no room to be open in.
+   */
+  openToTrades?: boolean;
   /** A post landed; the hub refreshes its list. */
   /**
    * Told what went up, so the list under the composer can show the
@@ -157,6 +165,14 @@ export function FlareComposer({
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{ postId: string | null } | null>(null);
+
+  /*
+   * "I'm open to trades" lives at the composer's foot now, not beside
+   * Post a Flare on the room's bar: the founder wanted one button
+   * there. The room hands over what it last read, this holds the tap
+   * until the room's next poll reads the truth back.
+   */
+  const [open, setOpen] = useState(openToTrades);
 
   /* Who is posting: their face for the preview, their id for the draft. */
   const [me, setMe] = useState<Me | null>(null);
@@ -575,6 +591,21 @@ export function FlareComposer({
           )}
         </Card>
       )}
+
+      {/* Being open to trades is a fact about the person, not the
+          post, so it sits under the composer rather than inside it,
+          and stays once the Flare has gone up. */}
+      {target.kind === "room" ? (
+        <AsyncButton
+          label={open ? "Open to trades ✓" : "I'm open to trades"}
+          pendingLabel={open ? "Closing…" : "Opening…"}
+          variant="secondary"
+          onPress={async () => {
+            await setOpenToTrades(target.code, !open);
+            setOpen(!open);
+          }}
+        />
+      ) : null}
 
       {footer}
 
