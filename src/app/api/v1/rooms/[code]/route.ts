@@ -22,6 +22,7 @@ import { roomPhase } from "@/lib/events/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
+import { MAX_FLARES } from "@/lib/lists/schema";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
 import {
   accountRoomIdentity,
@@ -350,6 +351,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   // A bearer-authenticated app user claims the session, exactly as the
   // website links a signed-in viewer. Guests join with nothing extra.
   let accountPlayerId = session.player_id;
+  let posting = { posted: 0, skipped: 0 };
   if (!accountPlayerId && account) {
     await linkSessionToPlayer(session.id, account.playerId);
     accountPlayerId = account.playerId;
@@ -362,7 +364,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     await saveLocal(accountPlayerId, event.storeId);
     /* The player's Flares go up on the board as they walk in; the app's
        next read of the room shows them. See auto-post.ts. */
-    await postFlaresOnJoin(event.id, session, accountPlayerId);
+    posting = await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
 
   return Response.json({
@@ -374,6 +376,11 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
      * like from the inside.
      */
     resumed: resumed || wasAlreadyHere,
+    /* How many of the player's Flares went on the board, and how many
+       did not fit. The board holds MAX_FLARES per player. */
+    posted: posting.posted,
+    skipped: posting.skipped,
+    boardCap: MAX_FLARES,
     you: { sessionId: session.id, displayName: session.display_name },
     // Returned once, stored by the app; the website's cookie in header form.
     ...(freshToken ? { sessionToken: freshToken } : {}),

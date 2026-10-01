@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { text } from "@/lib/form-value";
 import { getViewer } from "@/lib/auth/session";
-import { postFlaresOnJoin } from "@/lib/events/auto-post";
+import { postFlaresOnJoin, type JoinPosting } from "@/lib/events/auto-post";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
 import { accountIdentity } from "@/lib/players/account-identity";
 import {
@@ -227,6 +227,7 @@ export async function joinEventAction(
    * name had to come from it before the session was even created.
    */
   let accountPlayerId = session.player_id;
+  let posting: JoinPosting = { posted: 0, skipped: 0 };
   /* Falsy rather than `=== null`: "has no account" is the question, and
      a row that arrives without the column at all is still an answer. */
   if (!accountPlayerId && account) {
@@ -243,13 +244,19 @@ export async function joinEventAction(
     await saveLocal(accountPlayerId, event.storeId);
     /* And the player's Flares go up on the board, which is the whole
        point of walking in. See auto-post.ts. */
-    await postFlaresOnJoin(event.id, session, accountPlayerId);
+    posting = await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
 
   if (freshToken) await setPlayerCookie(freshToken);
 
   revalidatePath(`/e/${code}`);
-  redirect(resumed || wasAlreadyHere ? `/e/${code}?resumed=1` : `/e/${code}`);
+  /* The two things the room page says once on arrival: that the seat
+     was already yours, and how many of your Flares did not fit. */
+  const query = new URLSearchParams();
+  if (resumed || wasAlreadyHere) query.set("resumed", "1");
+  if (posting.skipped > 0) query.set("skipped", String(posting.skipped));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  redirect(`/e/${code}${suffix}`);
 }
 
 /**

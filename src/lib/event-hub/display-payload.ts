@@ -4,6 +4,9 @@ import { findStoreById } from "@/lib/events/repository";
 import { resolveCode } from "@/lib/events/rooms";
 import { joinUrl } from "@/lib/events/qr";
 import { listRoomFlares } from "@/lib/lists/repository";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { tierAllows } from "@/lib/tiers";
+import { dealWallShare, FREE_WALL_SHARE } from "./wall-share";
 import { counterAvailability } from "@/lib/singles/repository";
 import { intermissionFor, startNextRound } from "./auto-mode";
 import type { LayoutChoice } from "./layout";
@@ -93,6 +96,43 @@ export interface DisplayPayload {
 
 /** The most cards the board will carry. Beyond this nothing new is seen. */
 const FLARE_LIMIT = 24;
+
+/**
+ * How many cards each session may bring to the wall: ten on a free
+ * account, everything on Pro and up. A guest session has no account
+ * and gets the free share. Read in one query for the whole room.
+ */
+async function wallSharesFor(sessionIds: string[]): Promise<Map<string, number>> {
+  const shares = new Map<string, number>();
+  if (!isSupabaseConfigured() || sessionIds.length === 0) return shares;
+
+  const admin = getSupabaseAdmin();
+  const { data: sessions, error } = await admin
+    .from("player_sessions")
+    .select("id, player_id")
+    .in("id", sessionIds);
+  if (error || !sessions) return shares;
+
+  const playerIds = sessions
+    .map((row) => row.player_id)
+    .filter((id): id is string => Boolean(id));
+  if (playerIds.length === 0) return shares;
+
+  const { data: players } = await admin
+    .from("players")
+    .select("id, tier")
+    .in("id", playerIds);
+  const tierById = new Map((players ?? []).map((row) => [row.id, row.tier]));
+
+  for (const row of sessions) {
+    const tier = row.player_id ? (tierById.get(row.player_id) ?? null) : null;
+    shares.set(
+      row.id,
+      tierAllows(tier, "wholeListOnWall") ? Number.POSITIVE_INFINITY : FREE_WALL_SHARE,
+    );
+  }
+  return shares;
+}
 
 /**
  * Builds the payload for one display.
@@ -250,7 +290,19 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
     });
   }
 
-  const grouped = [...byCard.values()].slice(0, FLARE_LIMIT);
+  /*
+   * Dealt out fairly rather than cut at the newest 24: everyone's first
+   * card, then everyone's second, with a card several people want
+   * leading the list, and each person bringing at most their share.
+   * See wall-share.ts.
+   */
+  const shares = await wallSharesFor([...new Set(wants.map((w) => w.playerSessionId))]);
+  const grouped = dealWallShare(
+    [...byCard.values()],
+    (card) => (card.askers.size > 1 ? null : [...card.askers][0]),
+    (session) => shares.get(session) ?? FREE_WALL_SHARE,
+    FLARE_LIMIT,
+  );
 
   const stocked = await counterAvailability(
     store.id,
