@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
+  Ban,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -28,10 +29,12 @@ import { playerForUser } from "@/lib/players/accounts";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { postalCodeForPlayer } from "@/lib/players/location";
 import { PostalAsk } from "@/components/feed/postal-ask";
+import { BlockedList } from "@/components/players/blocked-list";
 import { DeckListForm } from "@/components/players/deck-list-form";
 import { DeleteAccountForm } from "@/components/players/delete-account-form";
 import { formatHandle } from "@/lib/players/handle";
 import { ownProfile } from "@/lib/players/profile";
+import { listBlocked } from "@/lib/players/safety";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -172,6 +175,28 @@ export default async function ProfileSettingsPage() {
     </Card>
   );
 
+  /*
+   * Everyone this player has blocked, with the way back. A block is
+   * taken on a profile and is never announced; this is the one list
+   * of them, and the app shows the same chip and Unblock on the
+   * profile itself.
+   */
+  const blockedCard = !playerId ? null : (
+    <Card key="blocked" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Ban className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Blocked players</p>
+          <p className="text-sm text-text-secondary">
+            You do not see their posts, and neither of you can message the other. They
+            are not told.
+          </p>
+        </div>
+      </div>
+      <BlockedList people={await listBlocked(playerId)} />
+    </Card>
+  );
+
   const emailCard = (
     <Card key="email" className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
@@ -287,6 +312,7 @@ export default async function ProfileSettingsPage() {
         deckListCard,
         collectionCard,
         locationCard,
+        blockedCard,
         nameCard,
         emailCard,
         passwordCard,
@@ -300,6 +326,7 @@ export default async function ProfileSettingsPage() {
         roomsCard,
         deckListCard,
         collectionCard,
+        blockedCard,
         passwordCard,
         deleteCard,
       ];

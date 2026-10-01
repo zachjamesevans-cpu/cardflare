@@ -76,6 +76,14 @@ export default async function StoreEventsPage({
     >
       <StoreTabs storeId={store.id} />
 
+      {/* Two codes, one sentence each: the audit found owners unsure
+          whether a scheduled night needed its own sheet or the counter's. */}
+      <p className="max-w-2xl text-sm text-text-secondary">
+        Your counter code never changes and opens whichever room is running. A scheduled
+        night gets its own code too, for a poster at that table. Either one gets players
+        in.
+      </p>
+
       {/* The cancel action lands here with the night's name, so the tab
           says what just happened instead of a row quietly going grey. */}
       {cancelled && (

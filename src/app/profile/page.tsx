@@ -377,16 +377,18 @@ export default async function ProfilePage() {
             {/* One number here, the public one. The balance is on the
                 store door below and nowhere else on this page, so the
                 two are never read side by side and mistaken for each
-                other. */}
+                other. The audit read "earned" beside "to spend" as one
+                number three ways, so each tile now says what raises it. */}
             <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
               <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-                Earned, all time
+                Earned by trading, all time
               </p>
               <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
                 {profile.embersEarned.toLocaleString()}
               </p>
               <p className="mt-1 text-xs text-text-muted">
-                Public. This is the number on your badge, and it never goes down.
+                Public. The number on your badge. Trades are the only thing that raise
+                it, and it never goes down.
               </p>
             </div>
           </Card>
@@ -415,6 +417,10 @@ export default async function ProfilePage() {
               <span className="font-semibold text-text-primary">Embers store</span>
               <span className="text-sm text-text-secondary">
                 Frames, holo patterns and effects. Spend what you have earned.
+              </span>
+              <span className="text-xs text-text-muted">
+                Packs, duplicates and gifts add to what you can spend. Trading adds to
+                both.
               </span>
             </span>
             <span className="flex shrink-0 items-center gap-2">

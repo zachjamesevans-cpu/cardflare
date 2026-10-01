@@ -40,7 +40,7 @@ export default async function StoreSinglesPage({
         storeId={store.id}
         owner={store.role === "owner"}
         feature="Singles"
-        pitch="Upload your TCGplayer export, and every Flare in your room for a card you stock tells the player your counter may have it."
+        pitch="A Flare for a card you stock tells the player your counter may have it, before they ask."
       />
     );
   }

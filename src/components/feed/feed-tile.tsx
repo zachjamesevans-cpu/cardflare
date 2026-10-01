@@ -5,7 +5,7 @@ import {
   type ZoomCard,
   type ZoomHave,
 } from "@/components/cards/card-image-zoom";
-import { cardImagesEnabled } from "@/lib/cards/images";
+import { cardImageAlt, cardImagesEnabled } from "@/lib/cards/images";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
@@ -198,7 +198,11 @@ export function FeedTile({
            * one-percent difference.
            */
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="size-full object-contain" />
+          <img
+            src={imageUrl}
+            alt={cardImageAlt(name, cardNumber)}
+            className="size-full object-contain"
+          />
         )}
       </span>
       {state !== "open" && (

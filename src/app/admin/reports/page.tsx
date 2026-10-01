@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { StatTile } from "@/components/admin/glance";
+import { ReportQueue } from "@/components/admin/report-queue";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, TextInput } from "@/components/ui/controls";
@@ -20,6 +21,7 @@ import { disputeTradeAction } from "@/lib/admin/embers-actions";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PERIODS, rangeFor } from "@/lib/admin/activity-range";
 import { requireAdmin } from "@/lib/auth/session";
+import { listOpenReports } from "@/lib/players/safety";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -46,9 +48,10 @@ export default async function AdminReportsPage({
   await requireAdmin();
 
   const range = rangeFor(await searchParams);
-  const [report, embers] = await Promise.all([
+  const [report, embers, open] = await Promise.all([
     activityReport(range),
     embersReport(range),
+    listOpenReports(),
   ]);
 
   const dateFormat = new Intl.DateTimeFormat("en-US", {
@@ -77,6 +80,10 @@ export default async function AdminReportsPage({
           What happened across every store, counted over a window. Dates are in UTC.
         </p>
       </div>
+
+      {/* What players sent in, first: a queue is work waiting, and the
+          counts below it are not. Not bound to the window. */}
+      <ReportQueue reports={open} />
 
       <Card>
         <form method="get" className="flex flex-wrap items-end gap-3">
@@ -192,7 +199,11 @@ export default async function AdminReportsPage({
           Embers
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile icon={Flame} label="Embers earned" value={embers.earned} />
+          <StatTile
+            icon={Flame}
+            label="Embers earned by trading"
+            value={embers.earned}
+          />
           <StatTile icon={Flame} label="Embers reversed" value={embers.reversed} />
           <StatTile
             icon={Handshake}

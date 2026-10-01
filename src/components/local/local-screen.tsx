@@ -14,6 +14,7 @@ import {
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
+import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
@@ -552,6 +553,7 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const load = useCallback(() => {
@@ -701,15 +703,33 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
             </Button>
           </div>
           {error && <p className="text-sm text-danger">{error}</p>}
-          <button
-            type="button"
-            onClick={end}
-            className="self-start text-xs text-text-muted hover:text-text-secondary"
-          >
-            End this conversation
-          </button>
+          {/* Two quiet exits side by side: end it, or tell us about it.
+              Report files the conversation, not the person, so the
+              admin opens the thread the reporter was actually in. */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={end}
+              className="text-xs text-text-muted hover:text-text-secondary"
+            >
+              End this conversation
+            </button>
+            <button
+              type="button"
+              onClick={() => setReporting(true)}
+              className="text-xs text-text-muted hover:text-text-secondary"
+            >
+              Report
+            </button>
+          </div>
         </div>
       )}
+      <ReportSheet
+        open={reporting}
+        onClose={() => setReporting(false)}
+        kind="thread"
+        targetId={threadId}
+      />
     </div>
   );
 }

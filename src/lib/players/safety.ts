@@ -17,15 +17,9 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * happens to the reported player.
  */
 
-export type ReportKind = "post" | "player" | "thread";
-export type ReportReason = "spam" | "scam" | "harassment" | "other";
+import { REPORT_REASONS, type ReportKind, type ReportReason } from "./safety-reasons";
 
-export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
-  { value: "spam", label: "Spam" },
-  { value: "scam", label: "Scam or fake listing" },
-  { value: "harassment", label: "Harassment" },
-  { value: "other", label: "Something else" },
-];
+export { REPORT_REASONS, type ReportKind, type ReportReason };
 
 export interface BlockState {
   /** The viewer has blocked them. */

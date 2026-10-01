@@ -24,6 +24,7 @@ import { findStoreById, listEventsForStore } from "@/lib/events/repository";
 import { resolveCode, sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { boothsForStore, listInventory, listShows } from "@/lib/shows/repository";
+import { storeGameLine } from "@/lib/stores/page";
 import { listStores } from "@/lib/stores/repository";
 
 export const metadata: Metadata = {
@@ -324,6 +325,7 @@ async function LgsSections({
         <JoinPoster
           kind="counter"
           title={store.name}
+          gameLine={await storeGameLine(store.id)}
           joinCode={store.join_code}
           url={joinUrl(store.join_code)}
           qrSvg={qrSvg}

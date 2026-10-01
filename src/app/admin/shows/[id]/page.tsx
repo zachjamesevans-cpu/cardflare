@@ -72,6 +72,8 @@ export default async function ShowPage({
           kind="show"
           title={show.name}
           subtitle={formatEventWindow(show.starts_at, show.ends_at, show.timezone)}
+          /* A show has vendors of every game, so the line says so. */
+          gameLine="Trading card games"
           joinCode={show.join_code}
           url={joinUrl(show.join_code)}
           qrSvg={qrSvg}

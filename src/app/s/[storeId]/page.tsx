@@ -2,9 +2,10 @@ import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarClock, Clock, Globe, MapPin, Phone } from "lucide-react";
+import { CalendarClock, CalendarDays, Clock, Globe, MapPin, Phone } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { StorePageHeader } from "@/components/stores/store-page-header";
 import { buttonStyles } from "@/components/ui/button";
@@ -23,6 +24,18 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** "Sat, Oct 4, 7:00 PM", in the store's own clock. */
+function nightLabel(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(iso));
+}
+
 /**
  * A store, as a player sees it — claimed or not.
  *
@@ -38,15 +51,21 @@ export const dynamic = "force-dynamic";
  *
  * A CLAIMED store's page is the player's profile shape without the
  * cosmetics: banner, logo, name, the games it runs, its hours with
- * whether it is open right now. The header is `StorePageHeader`, the
- * same block the console's wizard previews, so what the owner saw
- * while setting it up is what a player sees here.
+ * whether it is open right now, and the next nights on its calendar.
+ * The header is `StorePageHeader`, the same block the console's wizard
+ * previews, so what the owner saw while setting it up is what a player
+ * sees here.
  *
  * FOLLOWING is the same row the Room tab lists under "Following" -
  * joining a room signed in has always written it - with a button on
  * the page for the player who found the shop before they walked in. A
  * guest's Follow is the same button as a door: it starts sign-up and
  * comes back here, because a Follow that cannot work is a lie.
+ *
+ * A PLAYER sees it inside the tab-bar chrome, the same shell a
+ * player's page wears, so a store is one tap from the Feed and never
+ * a dead end on a phone. A visitor without an account keeps the plain
+ * page: there is no tab bar to stand on yet.
  */
 export default async function StoreProfilePage({
   params,
@@ -78,14 +97,7 @@ export default async function StoreProfilePage({
 
   const nextEvent =
     board?.nextEventAt && board.nextEventName
-      ? `${board.nextEventName} · ${new Intl.DateTimeFormat("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          timeZone: board.timeZone,
-        }).format(new Date(board.nextEventAt))}`
+      ? `${board.nextEventName} · ${nightLabel(board.nextEventAt, board.timeZone)}`
       : null;
 
   const lines = store.hours ? hoursLines(store.hours) : [];
@@ -97,11 +109,10 @@ export default async function StoreProfilePage({
   }));
   const open = store.hours ? openNow(store.hours, new Date(), store.timeZone) : null;
 
-  return (
-    <main
-      id="main"
-      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 px-4 pt-6 pb-16"
-    >
+  /* The page's own h1 is the store's name in the header; inside the
+     shell the shell already announces it, so the header steps down. */
+  const content = (
+    <>
       <StorePageHeader
         name={store.name}
         verified={store.verified}
@@ -111,6 +122,7 @@ export default async function StoreProfilePage({
         region={store.region}
         logoUrl={store.logoUrl}
         coverUrl={store.coverUrl}
+        headingLevel={playerId ? "h2" : "h1"}
       >
         {store.description && (
           <p className="text-sm text-text-secondary">{store.description}</p>
@@ -187,6 +199,47 @@ export default async function StoreProfilePage({
             </div>
           )}
 
+          {/* The next nights, soonest first, for a player deciding
+              whether to walk in. A night running now is a door; the
+              rest are dates. Only a claimed store is told it has
+              nothing scheduled, since an unclaimed one never could. */}
+          {(store.upcoming.length > 0 || !store.unclaimed) && (
+            <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-3">
+              <p className="flex items-center gap-2 font-semibold text-text-primary">
+                <CalendarDays className="size-4 shrink-0 text-accent" aria-hidden />
+                Upcoming nights
+              </p>
+              {store.upcoming.length === 0 ? (
+                <p className="text-text-muted">Nothing scheduled yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {store.upcoming.map((night) => (
+                    <li
+                      key={night.eventId}
+                      className="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium text-text-primary">
+                          {night.name}
+                        </span>
+                        <span className="text-text-muted"> · </span>
+                        {nightLabel(night.startsAt, store.timeZone)}
+                      </span>
+                      {night.live && night.joinCode && (
+                        <Link
+                          href={`/e/${night.joinCode}`}
+                          className={buttonStyles("primary", "sm")}
+                        >
+                          Join the room
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {store.casePicks.length > 0 && (
             <div className="flex flex-col gap-2">
               <p className="font-semibold text-text-primary">In the case this week</p>
@@ -259,6 +312,19 @@ export default async function StoreProfilePage({
       {store.attribution && (
         <p className="text-xs text-text-muted">Listing data: {store.attribution}</p>
       )}
+    </>
+  );
+
+  if (playerId) {
+    return <TabPageShell title={store.name}>{content}</TabPageShell>;
+  }
+
+  return (
+    <main
+      id="main"
+      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 px-4 pt-6 pb-16"
+    >
+      {content}
     </main>
   );
 }
