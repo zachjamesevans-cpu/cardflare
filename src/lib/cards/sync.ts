@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { canonicalSetCode, stripNumberFromName } from "./set-codes";
 import {
   compactCardNumber,
   normalizeName,
@@ -211,8 +212,11 @@ function toCardRow(card: NormalizedCard, provider: CardDataProvider) {
     game: provider.game,
     canonical_card_number: card.canonicalCardNumber,
     compact_card_number: compactCardNumber(card.canonicalCardNumber),
-    exact_name: card.exactName,
-    normalized_name: normalizeName(card.exactName),
+    /* A name is a name: the number has a column of its own. */
+    exact_name: stripNumberFromName(card.exactName, card.canonicalCardNumber),
+    normalized_name: normalizeName(
+      stripNumberFromName(card.exactName, card.canonicalCardNumber),
+    ),
     card_type: card.cardType,
     colors: card.colors,
     traits: card.traits,
@@ -252,9 +256,13 @@ async function upsertPrintings(
         card_id: cardId,
         provider_key: provider.providerKey,
         provider_external_id: printing.providerExternalId,
-        set_code: printing.setCode,
+        /* One spelling per set, whichever the provider used. */
+        set_code: canonicalSetCode(printing.setCode),
         set_name: printing.setName,
-        printing_label: printing.printingLabel,
+        printing_label:
+          printing.printingLabel === printing.setCode
+            ? canonicalSetCode(printing.printingLabel)
+            : printing.printingLabel,
         variant_type: printing.variantType,
         rarity: printing.rarity,
         printing_name: printing.name,

@@ -296,6 +296,8 @@ export interface PlayerListing {
   handle: string | null;
   email: string | null;
   createdAt: string;
+  /** Last seen in a room, or null for an account that never joined one. */
+  lastActiveAt: string | null;
 }
 
 /**
@@ -415,7 +417,26 @@ export async function listPlayersForAdmin(): Promise<{
 
   const rows = playersResult.data ?? [];
 
-  const emailByUser = await emailsByUserId();
+  const [emailByUser, lastSeen] = await Promise.all([
+    emailsByUserId(),
+    /* When each account was last seen in a room: the newest session
+       per player. One read over the sessions table, bounded. */
+    admin
+      .from("player_sessions")
+      .select("player_id, last_seen_at")
+      .not("player_id", "is", null)
+      .order("last_seen_at", { ascending: false })
+      .limit(5000)
+      .then(({ data }) => {
+        const seen = new Map<string, string>();
+        for (const session of data ?? []) {
+          if (session.player_id && !seen.has(session.player_id)) {
+            seen.set(session.player_id, session.last_seen_at);
+          }
+        }
+        return seen;
+      }),
+  ]);
 
   return {
     players: rows.map((row) => ({
@@ -424,6 +445,7 @@ export async function listPlayersForAdmin(): Promise<{
       handle: row.handle ?? null,
       email: emailByUser.get(row.user_id) ?? null,
       createdAt: row.created_at,
+      lastActiveAt: lastSeen.get(row.id) ?? null,
     })),
     pending: (invitesResult.data ?? []).map((row) => ({
       email: row.email,

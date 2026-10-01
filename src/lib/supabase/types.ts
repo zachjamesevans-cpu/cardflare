@@ -1467,6 +1467,24 @@ export type LoggedTradeRow = {
   note: string | null;
 };
 
+/** An admin's verdict on one card after reading it against the real one. */
+export type CardSpotCheckRow = {
+  card_id: string;
+  verdict: "ok" | "wrong";
+  note: string | null;
+  checked_at: string;
+  checked_by: string | null;
+};
+
+export type CardSpotCheckInsert = Omit<
+  CardSpotCheckRow,
+  "checked_at" | "note" | "checked_by"
+> & {
+  checked_at?: string;
+  note?: string | null;
+  checked_by?: string | null;
+};
+
 export type LoggedTradeInsert = Omit<
   LoggedTradeRow,
   | "id"
@@ -1816,6 +1834,7 @@ export type Database = {
       flare_post_comments: Table<FlarePostCommentRow, FlarePostCommentInsert>;
       trades: Table<TradeRow, TradeInsert>;
       logged_trades: Table<LoggedTradeRow, LoggedTradeInsert>;
+      card_spot_checks: Table<CardSpotCheckRow, CardSpotCheckInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
       vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;
