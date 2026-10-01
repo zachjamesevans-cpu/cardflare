@@ -28,7 +28,10 @@ describe("the session-based feed items carry an account", () => {
       repo.indexOf("export interface RecentItem") + 2000,
     );
 
-    expect(wanted).toContain("playerId: string | null");
+    /* "Wanted from you" is accounts only since the founder opened the
+       app to a guest's ask with nothing to do about it; a recent item
+       still shows a guest, with the chip. */
+    expect(wanted).toContain("playerId: string;");
     expect(recent).toContain("playerId: string | null");
   });
 
@@ -37,8 +40,8 @@ describe("the session-based feed items carry an account", () => {
 
     /* Both builders already read player_id to look up a face; this is
        the same value, carried one step further. */
-    const filled = repo.match(/playerId: person\?\.player_id \?\? null/g) ?? [];
-    expect(filled).toHaveLength(2);
+    expect(repo).toContain("playerId: person?.player_id ?? null");
+    expect(repo).toContain("playerId: person.player_id,");
   });
 });
 

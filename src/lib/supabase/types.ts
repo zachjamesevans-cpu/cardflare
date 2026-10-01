@@ -1000,9 +1000,12 @@ export type PlayerRow = {
 export type FlareThreadRow = {
   id: string;
   created_at: string;
-  /** The posted Flare this is about, or null for a thread on a saved want. */
+  /** The posted Flare this is about, when it is about one. */
   flare_id: string | null;
-  /** The saved want a nearby match opened this on. Exactly one of the two. */
+  /**
+   * The saved want a nearby match opened this on. At most one of the
+   * two is set; neither means a direct message between the two people.
+   */
   want_id: string | null;
   author_player_id: string;
   responder_player_id: string;
@@ -1435,6 +1438,48 @@ export type PlayerLocalInsert = Omit<PlayerLocalRow, "id" | "created_at"> & {
 };
 
 /**
+ * A trade the player wrote down themselves, outside any room. Their
+ * word only: it earns no Embers and nobody else ever reads it.
+ */
+export type LoggedTradeRow = {
+  id: string;
+  created_at: string;
+  player_id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  /** "got": the card came to the player. "gave": it left their binder. */
+  direction: "got" | "gave";
+  /** The other side as an account, so a renamed partner reads under their current name. */
+  partner_player_id: string | null;
+  /** The other side as typed, for somebody who is not on CardFlare. */
+  partner_name: string | null;
+  place: string | null;
+  /** A calendar date, "YYYY-MM-DD". */
+  traded_on: string;
+  note: string | null;
+};
+
+export type LoggedTradeInsert = Omit<
+  LoggedTradeRow,
+  | "id"
+  | "created_at"
+  | "printing_id"
+  | "partner_player_id"
+  | "partner_name"
+  | "place"
+  | "note"
+> & {
+  id?: string;
+  created_at?: string;
+  printing_id?: string | null;
+  partner_player_id?: string | null;
+  partner_name?: string | null;
+  place?: string | null;
+  note?: string | null;
+};
+
+/**
  * A notice from cardflare, shown on the Feed.
  *
  * The only authored thing on a screen that is otherwise entirely
@@ -1763,6 +1808,7 @@ export type Database = {
       flare_post_likes: Table<FlarePostLikeRow, FlarePostLikeInsert>;
       flare_post_comments: Table<FlarePostCommentRow, FlarePostCommentInsert>;
       trades: Table<TradeRow, TradeInsert>;
+      logged_trades: Table<LoggedTradeRow, LoggedTradeInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
       vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;

@@ -26,6 +26,7 @@ import { storesNear } from "@/lib/stores/nearby";
 import { storePostsForFollowers } from "@/lib/stores/posts";
 import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
 
 /**
@@ -149,6 +150,12 @@ const RECENT_READ = 120;
 const WANTED_CARDS_ASKED = 400;
 const WANTED_READ = 60;
 const WANTED_SHOWN = 4;
+/**
+ * How far back a want still counts as wanted. The founder opened the
+ * app to a guest's three-week-old ask with nothing to do about it; a
+ * Flare from last month is a Flare the room has moved on from.
+ */
+const WANTED_WINDOW_DAYS = 30;
 const RECENT_SHOWN = 4;
 
 /** Cosmetics named in the shop item. Three is a look; twelve is a catalogue. */
@@ -482,21 +489,18 @@ export interface WantedItem {
   entries: {
     playerSessionId: string;
     /**
-     * The account behind the session, or null for a guest.
-     *
-     * Two things at once, and deliberately one field. A session linked
-     * to an account has a profile worth opening, so the row becomes a
-     * link; a session that is not IS A GUEST — somebody who scanned the
-     * counter code and typed a name without signing up — and a guest
-     * has no profile to open, so it says so rather than looking like a
-     * link that does nothing.
-     *
-     * The founder asked for both in one breath: "make sure that we are
-     * able in the feed to click on profiles", and "if someone joins a
-     * room as a guest, it should have 'guest' written after their
-     * profile guest name". Null answers both.
+     * The account behind the session. Never null any more: a guest's
+     * want is left out of this item altogether, because the one thing
+     * this row is for — messaging them that you have it — needs an
+     * inbox on the other end, and a guest has none. The founder, on
+     * seeing a guest's three-week-old ask here: "there's no way for me
+     * to interact with this."
      */
-    playerId: string | null;
+    playerId: string;
+    /** The Flare itself, which is what "I have this" opens a thread on. */
+    flareId: string;
+    /** The conversation you already have open on it, if any. */
+    threadId: string | null;
     displayName: string | null;
     avatarUrl: string | null;
     /** Worn, so a ring somebody paid Embers for is seen here too. */
@@ -1932,6 +1936,7 @@ async function decorateHunts(
  */
 async function wantedItems(
   ownSessionId: string | null,
+  playerId: string | null,
   held: ReturnType<typeof heldByCard>,
 ): Promise<WantedItem[]> {
   const cardIds = [...held.keys()];
@@ -1939,6 +1944,7 @@ async function wantedItems(
 
   const admin = getSupabaseAdmin();
 
+  const since = new Date(Date.now() - WANTED_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const { data: flares, error } = await admin
     .from("flares")
     .select(
@@ -1946,6 +1952,7 @@ async function wantedItems(
     )
     .eq("status", "open")
     .eq("intent", "want")
+    .gte("created_at", since.toISOString())
     .in("card_id", cardIds.slice(0, WANTED_CARDS_ASKED))
     .order("created_at", { ascending: false })
     .limit(WANTED_READ);
@@ -1989,9 +1996,15 @@ async function wantedItems(
     .in("id", [...new Set(usable.map((flare) => flare.player_session_id))]);
   const people = new Map((sessions ?? []).map((row) => [row.id, row]));
 
-  const [facts, faces] = await Promise.all([
+  const [facts, faces, threads] = await Promise.all([
     cardFacts(usable.map((flare) => flare.card_id)),
     facesFor((sessions ?? []).flatMap((row) => (row.player_id ? [row.player_id] : []))),
+    playerId
+      ? threadsOnFlaresFor(
+          playerId,
+          usable.map((flare) => flare.id),
+        )
+      : Promise.resolve(new Map<string, string>()),
   ]);
 
   const entries: WantedItem["entries"] = [];
@@ -2003,11 +2016,15 @@ async function wantedItems(
     if (!store || !fact) continue;
 
     const person = people.get(flare.player_session_id);
-    const face = (person?.player_id ? faces.get(person.player_id) : null) ?? NO_FACE;
+    /* Accounts only: see the field's note. */
+    if (!person?.player_id || person.player_id === playerId) continue;
+    const face = faces.get(person.player_id) ?? NO_FACE;
     entries.push({
       playerSessionId: flare.player_session_id,
-      playerId: person?.player_id ?? null,
-      displayName: person?.display_name ?? null,
+      playerId: person.player_id,
+      flareId: flare.id,
+      threadId: threads.get(flare.id) ?? null,
+      displayName: person.display_name,
       ...face,
       storeName: store.name,
       joinCode: store.join_code,
@@ -2699,7 +2716,7 @@ export async function listFeed(
   /* The lead item, and the one that needs nothing from anybody else
      having posted this week. See wantedItems. */
   const [wantedFromYou, nearby] = await Promise.all([
-    wantedItems(sessionId, held),
+    wantedItems(sessionId, playerId, held),
     nearbyMatchesForHolder(playerId).catch(() => []),
   ]);
   const nearbyItems: NearbyMatchItem[] =

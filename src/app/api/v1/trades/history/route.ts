@@ -1,6 +1,11 @@
-import { apiPlayer, unauthorized } from "@/lib/api/auth";
+import { z } from "zod";
+
+import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
+import { readJsonPayload } from "@/lib/api/payload";
 import { ownProfile } from "@/lib/players/profile";
 import { listTradeHistory } from "@/lib/trades/history";
+import { deleteLoggedTrade, logTrade } from "@/lib/trades/logged";
+import { logTradeSchema } from "@/lib/trades/logged-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -18,4 +23,50 @@ export async function GET(request: Request): Promise<Response> {
   const history = await listTradeHistory(player.playerId, profile?.tier ?? null);
 
   return Response.json({ history });
+}
+
+/**
+ * Logs a trade the player made by hand. The same schema the website's
+ * form goes through; the row is theirs alone and earns no Embers.
+ */
+export async function POST(request: Request): Promise<Response> {
+  const player = await apiPlayer(request);
+  if (!player) return unauthorized();
+
+  const parsed = logTradeSchema.safeParse(await readJsonPayload(request));
+  if (!parsed.success) {
+    return badRequest(
+      parsed.error.issues[0]?.message ?? "Check the trade and try again.",
+    );
+  }
+
+  const profile = await ownProfile(player.playerId);
+  const result = await logTrade(
+    player.playerId,
+    player.displayName,
+    profile?.tier ?? null,
+    parsed.data,
+  );
+
+  if (!result.ok) {
+    const status =
+      result.reason === "locked" ? 403 : result.reason === "no-card" ? 400 : 500;
+    return Response.json({ ok: false, error: result.reason }, { status });
+  }
+
+  return Response.json({ ok: true, id: result.id });
+}
+
+const deleteSchema = z.object({ id: z.string().uuid() });
+
+/** Removes a logged trade. Only the author's own ever match. */
+export async function DELETE(request: Request): Promise<Response> {
+  const player = await apiPlayer(request);
+  if (!player) return unauthorized();
+
+  const parsed = deleteSchema.safeParse(await readJsonPayload(request));
+  if (!parsed.success) return badRequest("id is required");
+
+  const ok = await deleteLoggedTrade(player.playerId, parsed.data.id);
+  return Response.json({ ok }, { status: ok ? 200 : 500 });
 }

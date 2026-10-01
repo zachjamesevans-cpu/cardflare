@@ -6,11 +6,14 @@ import { notifyMessageReceived } from "@/lib/notifications/notify";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 
 /**
- * Conversations tied to one Flare — the Local tab's messaging, chosen
- * over open DMs on purpose: every thread starts from a card somebody
- * publicly asked for, so every conversation has a subject, a context,
- * and a reason to exist. There is no way to message a person; there is
- * only a way to answer their Flare.
+ * Conversations between two accounts.
+ *
+ * They began tied to one Flare — every thread started from a card
+ * somebody publicly asked for, so every conversation had a subject.
+ * The founder's revision (2026-10-01): "I should be able to go on
+ * someone's profile and message them directly about anything." So a
+ * thread may now have no anchor at all: a direct message, one per
+ * pair of people, opened from a profile. Same table, same rules.
  *
  * ACCOUNTS ON BOTH ENDS. The author is resolved from the Flare's
  * session the moment the first message arrives and denormalised onto
@@ -35,12 +38,15 @@ export type ThreadFailure =
 
 export interface ThreadSummary {
   threadId: string;
-  /** The posted Flare it is about, or null for a thread on a saved want. */
+  /** What it is about: a posted Flare, a saved want, or the two people. */
+  kind: "flare" | "want" | "direct";
+  /** The posted Flare it is about, or null. */
   flareId: string | null;
   /** The saved want a nearby match opened it on, or null. */
   wantId: string | null;
-  cardName: string;
-  cardNumber: string;
+  /** The card, or null for a direct message. */
+  cardName: string | null;
+  cardNumber: string | null;
   imageUrl: string | null;
   /** The person on the other end, as Local shows them. */
   withName: string;
@@ -239,6 +245,90 @@ export async function openWantThread(
   });
 
   return sent ? { ok: true, threadId } : { ok: false, reason: "unavailable" };
+}
+
+/**
+ * A direct message: the conversation between two people, about nothing
+ * in particular. Opened from a profile, with no first message — the
+ * composer is the next screen, and a thread nobody wrote in is never
+ * listed (see listThreads), so opening and leaving costs nothing.
+ *
+ * One per pair, whichever side opened it: the unique index orders the
+ * two ids, and this looks the pair up both ways before inserting. A
+ * closed one stays closed; "stop messaging me" means something.
+ */
+export async function openDirectThread(
+  fromPlayerId: string,
+  toPlayerId: string,
+): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  if (fromPlayerId === toPlayerId) return { ok: false, reason: "yourself" };
+
+  const admin = getSupabaseAdmin();
+
+  const { data: other } = await admin
+    .from("players")
+    .select("id")
+    .eq("id", toPlayerId)
+    .maybeSingle();
+  if (!other) return { ok: false, reason: "not-found" };
+
+  const find = () =>
+    admin
+      .from("flare_threads")
+      .select("id, closed_at")
+      .is("flare_id", null)
+      .is("want_id", null)
+      .or(
+        `and(author_player_id.eq.${fromPlayerId},responder_player_id.eq.${toPlayerId}),and(author_player_id.eq.${toPlayerId},responder_player_id.eq.${fromPlayerId})`,
+      )
+      .maybeSingle();
+
+  const { data: existing } = await find();
+  if (existing?.closed_at) return { ok: false, reason: "closed" };
+  if (existing) return { ok: true, threadId: existing.id };
+
+  /* The person written to sits in the author's chair, so the role reads
+     the same way it does on a Flare: the one who was approached. */
+  const { data: made, error } = await admin
+    .from("flare_threads")
+    .insert({ author_player_id: toPlayerId, responder_player_id: fromPlayerId })
+    .select("id")
+    .maybeSingle();
+
+  if (error && error.code === "23505") {
+    const { data: raced } = await find();
+    if (raced?.closed_at) return { ok: false, reason: "closed" };
+    return raced
+      ? { ok: true, threadId: raced.id }
+      : { ok: false, reason: "unavailable" };
+  }
+
+  return made ? { ok: true, threadId: made.id } : { ok: false, reason: "unavailable" };
+}
+
+/**
+ * The threads one person already has open on a set of Flares, keyed by
+ * Flare. "Wanted from you" uses it so a second tap on the same card
+ * opens the conversation instead of sending "I have this" twice.
+ */
+export async function threadsOnFlaresFor(
+  responderPlayerId: string,
+  flareIds: string[],
+): Promise<Map<string, string>> {
+  if (!isSupabaseConfigured() || flareIds.length === 0) return new Map();
+
+  const { data } = await getSupabaseAdmin()
+    .from("flare_threads")
+    .select("id, flare_id")
+    .eq("responder_player_id", responderPlayerId)
+    .in("flare_id", flareIds);
+
+  return new Map(
+    (data ?? []).flatMap((row) =>
+      row.flare_id ? [[row.flare_id, row.id] as const] : [],
+    ),
+  );
 }
 
 /** The two ends of a thread, or null when the viewer is neither. */
@@ -448,21 +538,28 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       row.author_player_id === playerId
         ? row.responder_player_id
         : row.author_player_id;
+    const kind = row.flare_id ? "flare" : row.want_id ? "want" : "direct";
     const cardId = row.flare_id
       ? flareCard.get(row.flare_id)
       : row.want_id
         ? wantCard.get(row.want_id)
         : undefined;
     const card = cardId ? cardById.get(cardId) : undefined;
-    if (!card) return [];
+    /* A thread about a card that no longer exists has nothing to say
+       for itself; a direct one needs no card. */
+    if (kind !== "direct" && !card) return [];
+    /* A direct thread opened and never written in: a profile's Message
+       button was tapped and the person walked away. Nothing to list. */
+    if (kind === "direct" && !preview.has(row.id)) return [];
 
     return [
       {
         threadId: row.id,
+        kind,
         flareId: row.flare_id,
         wantId: row.want_id,
-        cardName: card.exact_name,
-        cardNumber: card.canonical_card_number,
+        cardName: card?.exact_name ?? null,
+        cardNumber: card?.canonical_card_number ?? null,
         imageUrl: (cardId && artByCard.get(cardId)) || null,
         withName: nameById.get(otherId) ?? "A player",
         withPlayerId: otherId,

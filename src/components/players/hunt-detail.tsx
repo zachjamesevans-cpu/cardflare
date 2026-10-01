@@ -376,7 +376,12 @@ export function HuntDetail({
           onSubmit={(message) =>
             offerOnHuntAction(
               hunt.id,
-              lines.map((line) => ({ flareId: line.key, quantity: line.quantity })),
+              lines.flatMap((line) => {
+                const card = cards.find((row) => row.flareId === line.key);
+                return card
+                  ? [{ requestId: card.requestId, quantity: line.quantity }]
+                  : [];
+              }),
               message,
             )
           }
