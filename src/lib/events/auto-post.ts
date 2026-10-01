@@ -70,19 +70,28 @@ export async function setAutoPost(
  * is on. Returns how many landed. Never throws: a join that succeeded
  * must not be undone by the board.
  */
+export interface JoinPosting {
+  /** Cards that landed on the board. */
+  posted: number;
+  /** Cards that did not fit: the board holds MAX_FLARES per player. */
+  skipped: number;
+}
+
+const NOTHING: JoinPosting = { posted: 0, skipped: 0 };
+
 export async function postFlaresOnJoin(
   roomId: string,
   session: { id: string; display_name: string | null },
   playerId: string,
-): Promise<number> {
+): Promise<JoinPosting> {
   try {
-    if (!(await autoPostFor(playerId))) return 0;
+    if (!(await autoPostFor(playerId))) return NOTHING;
 
     const [wants, offerings] = await Promise.all([
       listWants(playerId),
       listOfferings(playerId),
     ]);
-    if (wants.length === 0 && offerings.length === 0) return 0;
+    if (wants.length === 0 && offerings.length === 0) return NOTHING;
 
     const toInputs = (rows: typeof wants) =>
       rows.map((row) => ({
@@ -120,9 +129,14 @@ export async function postFlaresOnJoin(
       posted.push(...batch.posted);
     }
 
-    return posted.length;
+    /* What did not fit, said rather than swallowed: the founder's
+       complaint about the old cap was that it went quiet. */
+    return {
+      posted: posted.length,
+      skipped: Math.max(0, wants.length + offerings.length - posted.length),
+    };
   } catch (error) {
     console.error("Could not post the player's Flares on join", error);
-    return 0;
+    return NOTHING;
   }
 }

@@ -39,6 +39,7 @@ import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
+import { MAX_FLARES } from "@/lib/lists/schema";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { huntsFor } from "@/lib/players/hunts";
@@ -136,7 +137,7 @@ export default async function JoinByCodePage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ resumed?: string; g?: string }>;
+  searchParams: Promise<{ resumed?: string; skipped?: string; g?: string }>;
 }) {
   const { code } = await params;
   const params_ = await searchParams;
@@ -157,7 +158,7 @@ async function RoomBody({
   params_,
 }: {
   normalized: string;
-  params_: { resumed?: string; g?: string };
+  params_: { resumed?: string; skipped?: string; g?: string };
 }) {
   /*
    * Set by the join action when the tap picked up a seat this account
@@ -166,6 +167,9 @@ async function RoomBody({
    * used to look like from the inside.
    */
   const resumed = params_.resumed === "1";
+  /* Set by the join when the player's list was longer than the board
+     holds. Said once, on arrival, rather than going quiet. */
+  const skipped = Math.max(0, Math.min(999, Number(params_.skipped) || 0));
 
   /*
    * The scan's game, when the code came off a tournament's own screen.
@@ -603,6 +607,18 @@ async function RoomBody({
           without anybody refreshing anything; draws nothing when
           there are no timers. */}
       {live && <RoomTimers initial={roomTimers} code={normalized} />}
+
+      {inRoom && skipped > 0 && (
+        <Card className="flex flex-col gap-1 border-accent/30">
+          <h2 className="font-semibold text-text-primary">
+            {skipped} of your Flares did not fit
+          </h2>
+          <p className="text-sm text-text-secondary">
+            The board holds {MAX_FLARES} per player. The rest stay on your list, and the
+            Feed still shows them.
+          </p>
+        </Card>
+      )}
 
       {inRoom && resumed && (
         <Card className="flex flex-col gap-1 border-accent/30">

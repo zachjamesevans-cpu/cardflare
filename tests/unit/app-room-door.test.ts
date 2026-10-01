@@ -107,6 +107,83 @@ describe("the board card", () => {
   });
 });
 
+describe("a long section folds", () => {
+  /*
+   * The founder asked what a hundred Flares does to the room. A
+   * player's section shows six cards, then a control at its end says
+   * "and N more" and opens the whole section in place; while open it
+   * reads "Show less". The zoom shelf is still built from the whole
+   * section, so swiping through a card pages everything, not only the
+   * six the fold left showing. The website folds at the same count
+   * with the same words.
+   */
+  const board = joined.slice(
+    joined.indexOf("THE BOARD CARD"),
+    joined.indexOf("<Title>Traded tonight</Title>"),
+  );
+
+  it("names the count once, as SECTION_FOLD = 6", () => {
+    expect(room.match(/^const SECTION_FOLD = 6;$/gm)).toHaveLength(1);
+    expect(room).not.toMatch(/slice\(0, 6\)/);
+  });
+
+  it("says and N more while folded and Show less while open", () => {
+    expect(board).toContain("`and ${total - SECTION_FOLD} more`");
+    expect(board).toContain('"Show less"');
+    /* One label, drawn by the rail's tile and the stacked list's row. */
+    expect(board.match(/\{foldLabel\}/g)).toHaveLength(2);
+    expect(board).toContain("style={styles.foldTile}");
+    expect(board).toContain("style={styles.foldRow}");
+  });
+
+  it("folds per visit, per player, with the same animation as the chevron", () => {
+    expect(room).toContain(
+      "const [foldOpen, setFoldOpen] = useState<Record<string, boolean>>({});",
+    );
+    expect(board).toContain(
+      "const folded = total > SECTION_FOLD && !foldOpen[sessionId];",
+    );
+    expect(board).toMatch(
+      /const toggleFold = \(\) => \{\s*LayoutAnimation\.configureNext\(LayoutAnimation\.Presets\.easeInEaseOut\);\s*setFoldOpen/,
+    );
+  });
+
+  it("cuts the rail and the stacked list, each in its own drawn order", () => {
+    expect(board).toContain(
+      "const railShown = folded ? orderedRail.slice(0, SECTION_FOLD) : orderedRail;",
+    );
+    expect(board).toContain("{railWantsShown.map(tile)}");
+    expect(board).toContain("{railShowcasesShown.map(tile)}");
+    /* Deck folders count by cards, not folders: the stacked order is
+       flattened before the cut, and a folder shows what survived it. */
+    expect(board).toContain("...folders.flatMap((f) => f.flares),");
+    expect(board).toContain("stackOrder.slice(0, SECTION_FOLD)");
+    expect(board).toContain("flares: inStack(folder.flares),");
+    expect(board).toContain("{foldersShown.map((folder) => (");
+  });
+
+  it("builds the zoom shelf from the whole section", () => {
+    /* The shelf and its index come from `orderedRail`, never from the
+       cut, and the cut is taken after both exist. */
+    expect(board).toContain("const shelf: ZoomCard[] = orderedRail.map((f) => ({");
+    expect(board).toContain(
+      "const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));",
+    );
+    expect(board).not.toContain("railShown.map((f) => ({");
+    expect(board.indexOf("const shelfAt = new Map(orderedRail")).toBeLessThan(
+      board.indexOf("const railShown ="),
+    );
+  });
+
+  it("draws the controls in the theme's colours", () => {
+    const styles = room.slice(room.indexOf("const styles = StyleSheet.create({"));
+    expect(styles).toMatch(
+      /foldTile: \{[^}]*borderStyle: "dashed",[^}]*borderColor: colors\.border,/,
+    );
+    expect(styles).toMatch(/foldText: \{[^}]*color: colors\.accent,/);
+  });
+});
+
 describe("the people list", () => {
   it("replaces the In this room card with a Who's here modal", () => {
     expect(room).not.toContain("<Title>In this room</Title>");

@@ -26,7 +26,13 @@ export type ListKind = "flare" | "have";
  * an event. Higher, because it is private and closer to an inventory —
  * somebody emptying a binder into it is using the feature, not abusing it.
  */
-export const MAX_FLARES = 30;
+/*
+ * A hundred, up from thirty. Thirty was set when a board was typed by
+ * hand at a table; joining a room posts the whole list now
+ * (src/lib/events/auto-post.ts), so the cap has to fit a real binder
+ * list, and the join says what it skipped rather than going quiet.
+ */
+export const MAX_FLARES = 100;
 export const MAX_HAVES = 200;
 
 export const MAX_QUANTITY = 99;

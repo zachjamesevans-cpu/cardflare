@@ -706,6 +706,11 @@ export async function joinRoom(
    * nothing is exactly how the duplicate used to present.
    */
   resumed?: boolean;
+  /** How many of the account's Flares went on the board, and how many
+      did not fit. Absent from an older server. */
+  posted?: number;
+  skipped?: number;
+  boardCap?: number;
   you: { sessionId: string; displayName: string };
 }> {
   // Joining does the most server work of any call (session creation,
@@ -714,6 +719,9 @@ export async function joinRoom(
   const result = await call<{
     joined: boolean;
     resumed?: boolean;
+    posted?: number;
+    skipped?: number;
+    boardCap?: number;
     you: { sessionId: string; displayName: string };
     sessionToken?: string;
   }>(

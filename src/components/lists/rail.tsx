@@ -69,9 +69,19 @@ export function Rail({
     const observer = new ResizeObserver(measure);
     observer.observe(element);
 
+    /*
+     * "and N more" appends tiles to the shelf from inside a client
+     * island, which is neither a scroll nor a resize of the list, so the
+     * fade would keep reporting the old end. Watching the children is
+     * what lets it notice the shelf just got longer.
+     */
+    const children = new MutationObserver(measure);
+    children.observe(element, { childList: true });
+
     return () => {
       element.removeEventListener("scroll", measure);
       observer.disconnect();
+      children.disconnect();
     };
   }, [measure]);
 

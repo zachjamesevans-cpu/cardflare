@@ -23,8 +23,12 @@ describe("every way into a room posts the player's Flares", () => {
     expect(auto).toContain("listOfferings(playerId)");
     expect(auto).toContain('"want"');
     expect(auto).toContain('"showcase"');
-    expect(auto).toContain("if (!(await autoPostFor(playerId))) return 0;");
-    expect(auto).toMatch(/catch \(error\) \{[\s\S]*return 0;/);
+    expect(auto).toContain("if (!(await autoPostFor(playerId))) return NOTHING;");
+    expect(auto).toMatch(/catch \(error\) \{[\s\S]*return NOTHING;/);
+    /* What did not fit is counted, never swallowed. */
+    expect(auto).toContain(
+      "skipped: Math.max(0, wants.length + offerings.length - posted.length)",
+    );
   });
 
   it("runs on the website's join, the app's join, and a guest signing in mid-night", () => {

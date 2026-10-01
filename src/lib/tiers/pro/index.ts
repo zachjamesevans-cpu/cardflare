@@ -34,4 +34,7 @@ export const manifest = {
    * only the switch that says which one applies.
    */
   moreHunts: true,
+  /* Every card of theirs in the wall's rotation; a free account brings
+     ten. The board is never gated, only the television's share. */
+  wholeListOnWall: true,
 } as const;
