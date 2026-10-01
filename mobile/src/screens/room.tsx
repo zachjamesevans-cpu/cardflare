@@ -16,7 +16,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RemoteImage } from "../remote-image";
-import { RemoteEntry } from "../remote-entry";
+import { DoorIconButton, RemoteEntry } from "../remote-entry";
+import { RoomPeopleModal } from "../room-people";
 import { FollowStoreButton } from "../follow-store-button";
 import { VerifiedMark } from "../verified-mark";
 
@@ -398,12 +399,12 @@ function RoomScreen({
   const [repostDone, setRepostDone] = useState<number | null>(null);
 
   /*
-   * The roster folds shut by default — the founder's call: ten names
-   * above the board pushed the product below the fold, and the counts
-   * are what a scanning eye needs. LayoutAnimation makes the unfold
-   * slide instead of snap.
+   * The names, behind the door card's meta line. They were a folded
+   * card at the foot of the page; the counts are what a scanning eye
+   * needs and they sit on the door now, and the list waits in a sheet
+   * for whoever wants to know who the third face is.
    */
-  const [rosterOpen, setRosterOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
 
   /*
    * The founder's synthesis, replacing the stacked/carousel toggle: the
@@ -887,6 +888,10 @@ function RoomScreen({
     groups.set(flare.playerSessionId, group);
   }
 
+  /* The door card's pulse: who is here, and up to three of their faces. */
+  const hereNow = participants.filter((p) => p.present).length;
+  const faces = participants.filter((p) => p.present).slice(0, 3);
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
@@ -907,9 +912,14 @@ function RoomScreen({
           />
         }
       >
-        {/* The organizer's door to the timer remote; nothing for anyone else. */}
-        <RemoteEntry />
-
+        {/*
+         * THE DOOR CARD. The founder, on the old page: "There's just so
+         * many blocks... It's all just disconnected and want it to flow
+         * better." So the remote's card, the help link and the roster's
+         * counts are all on this one card now: the store, the night's
+         * name with two small round buttons at the end of its line,
+         * and a meta line that opens the people list.
+         */}
         <Card>
           {/* The store is linked from the room, with Follow beside it.
               The founder: "if a player is in a room for that store, the
@@ -950,20 +960,69 @@ function RoomScreen({
               />
             ) : null}
           </View>
-          <Title>{room.name}</Title>
-          {/* The room's pulse on the door card, the founder's reorder:
-              the two numbers a glance wants first. "You're in as" is
-              gone — your own board section already says "you". */}
-          <Muted>
-            {`${participants.filter((p) => p.present).length} here now · ${flares.length} ${
-              flares.length === 1 ? "Flare" : "Flares"
-            }`}
-          </Muted>
-          {/* For the person deciding whether to sit down next week —
-              the same guide the website links from its event page. */}
-          <Tap onPress={() => setTournamentHelp(true)} hitSlop={6}>
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-              New to tournaments? Here&rsquo;s how a night works &rarr;
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <Text style={styles.nightName}>{room.name}</Text>
+            <View style={{ flexDirection: "row", gap: spacing(2) }}>
+              {/* The organizer's door to the timer remote; nothing for
+                  anyone else. */}
+              <RemoteEntry />
+              {/* For the person deciding whether to sit down next
+                  week: the same guide the website links from its
+                  event page. */}
+              <DoorIconButton
+                icon="help-circle-outline"
+                label="How a night works"
+                onPress={() => setTournamentHelp(true)}
+              />
+            </View>
+          </View>
+          {/* The room's pulse: the numbers a glance wants first, and
+              the whole line is the door to the names behind them. */}
+          <Tap
+            onPress={() => setPeopleOpen(true)}
+            accessibilityLabel="Who's here"
+            hitSlop={6}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(2),
+              alignSelf: "flex-start",
+            }}
+          >
+            {faces.length > 0 && (
+              <View style={{ flexDirection: "row" }}>
+                {faces.map((p, index) => (
+                  <View
+                    key={p.playerSessionId}
+                    /* Overlapping like a thread's faces; the first one
+                       sits on top so the pile reads left to right. */
+                    style={{
+                      marginLeft: index === 0 ? 0 : -6,
+                      zIndex: faces.length - index,
+                    }}
+                  >
+                    <PlayerAvatar
+                      displayName={p.displayName ?? "A player"}
+                      seed={p.playerSessionId}
+                      avatarUrl={p.avatarUrl ?? null}
+                      frame={p.frame ?? null}
+                      ring={p.ring ?? null}
+                      aura={p.aura ?? null}
+                      ringArt={p.ringArt ?? null}
+                      auraArt={p.auraArt ?? null}
+                      size={22}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+              <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
+                {`${hereNow} here now`}
+              </Text>
+              {` · ${participants.length} tonight · ${flares.length} ${
+                flares.length === 1 ? "Flare" : "Flares"
+              }`}
             </Text>
           </Tap>
         </Card>
@@ -1010,498 +1069,535 @@ function RoomScreen({
         )}
 
         {/*
-         * Closed, this tile is exactly the roster's silhouette: one
-         * header line, nothing under it. The Post button lives inside
-         * the fold with the list it posts, and "Never mind" is gone —
-         * the founder's call: a tile that starts closed does not need a
-         * second way to be ignored.
+         * THE BOARD CARD: every Flare in the room, grouped under
+         * whoever posted it, inside one card. Each player used to be a
+         * card of their own, which is most of the "so many blocks" the
+         * founder was looking at; now a hairline separates them.
          */}
-        {outstanding.length > 0 && (
-          <Card>
-            <Tap
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setRepostOpen((current) => !current);
-              }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: spacing(2),
-              }}
-            >
-              <Title>Still looking for these?</Title>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing(1.5),
-                }}
-              >
-                <Muted>
-                  {`${outstanding.length} ${outstanding.length === 1 ? "card" : "cards"}`}
-                </Muted>
-                <MaterialCommunityIcons
-                  name={repostOpen ? "chevron-up" : "chevron-down"}
-                  size={18}
-                  color={colors.textMuted}
-                />
-              </View>
-            </Tap>
+        <Card>
+          <Title>Flares in the room</Title>
 
-            {/* Open, the panel is the stacked board in miniature — art,
-                name, number, printing — plus the two controls the board
-                has no business carrying: how many of a *saved* ask, and
-                dropping it for good. */}
-            {repostOpen && (
-              <View style={{ gap: spacing(2) }}>
-                <View>
-                  {outstanding.map((want) => (
-                    <WantRow
-                      key={want.id}
-                      want={want}
-                      onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
-                      onDrop={() => act(() => dropWant(want.id))}
-                    />
-                  ))}
-                </View>
-                <Button
-                  busy={repostDone !== null}
-                  label={
-                    repostDone === null
-                      ? `Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`
-                      : outstanding.length === 1
-                        ? "Posting…"
-                        : `Posting… ${repostDone} of ${outstanding.length}`
-                  }
-                  onPress={() => {
-                    if (repostDone !== null) return;
-                    setRepostDone(0);
-                    void act(async () => {
-                      let done = 0;
-                      for (const want of outstanding) {
-                        await postFlare(code, {
-                          cardId: want.cardId,
-                          printingId: want.printingId,
-                          quantity: want.quantity,
-                          note: want.note ?? undefined,
-                          deckLabel: want.deckLabel,
-                        }).catch(() => {});
-                        done += 1;
-                        setRepostDone(done);
-                      }
-                    }).finally(() => setRepostDone(null));
-                  }}
-                />
-              </View>
-            )}
-          </Card>
-        )}
-
-        {groups.size === 0 && (
-          <Card>
+          {groups.size === 0 && (
             <Body>
-              No Flares yet. Post the first one, or say you are open to trades and let
-              people bring cards to you.
+              Nothing posted yet. Yours would be the first one on the board tonight.
             </Body>
-          </Card>
-        )}
+          )}
 
-        {[...groups.entries()].map(([sessionId, group]) => {
-          const mine = sessionId === youId;
+          {[...groups.entries()].map(([sessionId, group], index) => {
+            const mine = sessionId === youId;
 
-          /*
-           * A player's section splits into deck folders and loose cards,
-           * same as the website: "RG Luffy" typed on each card of the
-           * hunt gathers them under one named heading.
-           */
-          /*
-           * Cards pointing the other way come out first and stay out.
-           * A showcase is "I have this", the opposite statement to a
-           * Flare, and reading the two as one list is how somebody
-           * walks over about a card the owner was trying to move.
-           */
-          const showcases = group.flares.filter((f) => f.intent === "showcase");
-          const wants = group.flares.filter((f) => f.intent !== "showcase");
-          const { folders, loose } = partitionByDeck(wants);
+            /*
+             * A player's section splits into deck folders and loose cards,
+             * same as the website: "RG Luffy" typed on each card of the
+             * hunt gathers them under one named heading.
+             */
+            /*
+             * Cards pointing the other way come out first and stay out.
+             * A showcase is "I have this", the opposite statement to a
+             * Flare, and reading the two as one list is how somebody
+             * walks over about a card the owner was trying to move.
+             */
+            const showcases = group.flares.filter((f) => f.intent === "showcase");
+            const wants = group.flares.filter((f) => f.intent !== "showcase");
+            const { folders, loose } = partitionByDeck(wants);
 
-          /* Headings only when both directions are in play; labelling a
+            /* Headings only when both directions are in play; labelling a
              lone hunt "Looking for" is furniture. */
-          const labelled = showcases.length > 0;
+            const labelled = showcases.length > 0;
 
-          /* One answer for the whole rail, so tiles beside each other
+            /* One answer for the whole rail, so tiles beside each other
              still agree on where their buttons sit. */
-          const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
+            const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
 
-          const tile = (flare: RoomFlare) => (
-            <CarouselFlare
-              key={flare.id}
-              flare={flare}
-              mine={mine}
-              reserveCaption={railHasDecks}
-              siblings={shelf}
-              position={shelfAt.get(flare.id) ?? 0}
-              onRemove={() => act(() => removeFlare(code, flare.id))}
-            />
-          );
-
-          /* Fully pledged hunts park at the rail's far end, dimmed but
-             present — the bring-extras crowd can still see the ask. */
-          const isCovered = (flare: RoomFlare) =>
-            flare.offers.length > 0 &&
-            pledgeTally(flare.offers, flare.quantity).remaining === 0;
-
-          /*
-           * Cards you can answer come first — the website's rule, word for
-           * word: "all cards you have will automatically sort to the
-           * leftmost portion of the carousel." A rail you can only read the
-           * front of should open on the part that concerns you, and the
-           * ring then says which without a sentence.
-           *
-           * Covered hunts still park at the far end whatever else is true:
-           * those are settled, and settled outranks interesting.
-           */
-          const held = (flare: RoomFlare) => Boolean(flare.match);
-
-          const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
-          /*
-           * ONE SHELF, BOTH DIRECTIONS - the wants in rail order, then
-           * the showcases in theirs.
-           *
-           * The founder: "when a flare is in the 'letting go' tab if im
-           * trying to offer something up, when i click it, it only shows
-           * the cards that are in cards im looking for. the letting go
-           * cards should be swipable in the carousel like normal, but
-           * should say im offering it up or letting it go once i swipe
-           * to it."
-           *
-           * The shelf was built from `wants` alone, so a showcase tile
-           * was never in it: `shelfAt` missed, the `?? 0` put the viewer
-           * at the FIRST WANTED CARD, and opening a card somebody was
-           * letting go showed a card they were hunting instead.
-           *
-           * They stay visibly separate - the two sections below are
-           * untouched - but the swipe runs through both, which is what
-           * the website has always done. The zoom reads `direction` off
-           * each card, so swiping onto a showcase says "Offering"
-           * on its own.
-           */
-          const orderedRail = [
-            ...inRailOrder(railFlares, held, isCovered),
-            ...inRailOrder(showcases, held, isCovered),
-          ];
-
-          /*
-           * The rail as one shelf, in the order it is drawn, so swiping
-           * goes the way the eye already went. The website's rule and the
-           * website's shape.
-           */
-          const shelf: ZoomCard[] = orderedRail.map((f) => ({
-            imageUrl: f.imageUrl,
-            name: f.cardName,
-            cardNumber: f.cardNumber,
-            caption: f.printingLabel ?? "Any printing",
-            note: f.note,
-            lookingFor: f.quantity,
-            direction: f.intent,
-            stillNeeds:
-              f.offers.length > 0 ? pledgeTally(f.offers, f.quantity).remaining : null,
-            pledges: f.offers.map((offer) => ({
-              name: offer.displayName ?? "A player",
-              quantity: offer.quantity,
-            })),
-            youHave: f.match ? { kind: f.match, count: f.heldCount ?? 0 } : null,
-            /* The offer, for somebody else's want only: your own card
-               has nothing to offer on, and a card on offer is answered
-               at the table, not with a hand. */
-            offer:
-              mine || f.intent === "showcase"
-                ? null
-                : {
-                    early: room.early,
-                    quantity: f.quantity,
-                    own: (() => {
-                      const own = f.offers.find((o) => o.responderSessionId === youId);
-                      return own
-                        ? { quantity: own.quantity, message: own.message }
-                        : null;
-                    })(),
-                    onOffer: (message, quantity) =>
-                      act(() => offerOnFlare(code, f.id, message, quantity)),
-                    onWithdraw: () => act(() => withdrawOffer(code, f.id)),
-                  },
-          }));
-          const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
-
-          const rows = (list: RoomFlare[]) =>
-            list.map((flare) => (
-              <FlareRow
+            const tile = (flare: RoomFlare) => (
+              <CarouselFlare
                 key={flare.id}
                 flare={flare}
                 mine={mine}
-                storeName={room.storeName}
-                early={room.early}
-                onOffer={(message, quantity) =>
-                  void act(() => offerOnFlare(code, flare.id, message, quantity))
-                }
+                reserveCaption={railHasDecks}
+                siblings={shelf}
+                position={shelfAt.get(flare.id) ?? 0}
                 onRemove={() => act(() => removeFlare(code, flare.id))}
-                onTraded={(partner) =>
-                  void act(() => confirmTrade(code, flare.id, partner))
-                }
               />
-            ));
+            );
 
-          const groupOpen = Boolean(expandedGroups[sessionId]);
+            /* Fully pledged hunts park at the rail's far end, dimmed but
+             present — the bring-extras crowd can still see the ask. */
+            const isCovered = (flare: RoomFlare) =>
+              flare.offers.length > 0 &&
+              pledgeTally(flare.offers, flare.quantity).remaining === 0;
 
-          return (
-            <Card key={sessionId} style={{ padding: spacing(2.5), gap: spacing(1) }}>
-              {/*
-               * The founder's synthesis, replacing the page-wide toggle:
-               * the rail is every player's default face, and the chevron
-               * on their header unfolds THEM into the full stacked view —
-               * the same gesture the roster taught.
-               */}
+            /*
+             * Cards you can answer come first — the website's rule, word for
+             * word: "all cards you have will automatically sort to the
+             * leftmost portion of the carousel." A rail you can only read the
+             * front of should open on the part that concerns you, and the
+             * ring then says which without a sentence.
+             *
+             * Covered hunts still park at the far end whatever else is true:
+             * those are settled, and settled outranks interesting.
+             */
+            const held = (flare: RoomFlare) => Boolean(flare.match);
+
+            const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
+            /*
+             * ONE SHELF, BOTH DIRECTIONS - the wants in rail order, then
+             * the showcases in theirs.
+             *
+             * The founder: "when a flare is in the 'letting go' tab if im
+             * trying to offer something up, when i click it, it only shows
+             * the cards that are in cards im looking for. the letting go
+             * cards should be swipable in the carousel like normal, but
+             * should say im offering it up or letting it go once i swipe
+             * to it."
+             *
+             * The shelf was built from `wants` alone, so a showcase tile
+             * was never in it: `shelfAt` missed, the `?? 0` put the viewer
+             * at the FIRST WANTED CARD, and opening a card somebody was
+             * letting go showed a card they were hunting instead.
+             *
+             * They stay visibly separate - the two sections below are
+             * untouched - but the swipe runs through both, which is what
+             * the website has always done. The zoom reads `direction` off
+             * each card, so swiping onto a showcase says "Offering"
+             * on its own.
+             */
+            const orderedRail = [
+              ...inRailOrder(railFlares, held, isCovered),
+              ...inRailOrder(showcases, held, isCovered),
+            ];
+
+            /*
+             * The rail as one shelf, in the order it is drawn, so swiping
+             * goes the way the eye already went. The website's rule and the
+             * website's shape.
+             */
+            const shelf: ZoomCard[] = orderedRail.map((f) => ({
+              imageUrl: f.imageUrl,
+              name: f.cardName,
+              cardNumber: f.cardNumber,
+              caption: f.printingLabel ?? "Any printing",
+              note: f.note,
+              lookingFor: f.quantity,
+              direction: f.intent,
+              stillNeeds:
+                f.offers.length > 0
+                  ? pledgeTally(f.offers, f.quantity).remaining
+                  : null,
+              pledges: f.offers.map((offer) => ({
+                name: offer.displayName ?? "A player",
+                quantity: offer.quantity,
+              })),
+              youHave: f.match ? { kind: f.match, count: f.heldCount ?? 0 } : null,
+              /* The offer, for somebody else's want only: your own card
+               has nothing to offer on, and a card on offer is answered
+               at the table, not with a hand. */
+              offer:
+                mine || f.intent === "showcase"
+                  ? null
+                  : {
+                      early: room.early,
+                      quantity: f.quantity,
+                      own: (() => {
+                        const own = f.offers.find(
+                          (o) => o.responderSessionId === youId,
+                        );
+                        return own
+                          ? { quantity: own.quantity, message: own.message }
+                          : null;
+                      })(),
+                      onOffer: (message, quantity) =>
+                        act(() => offerOnFlare(code, f.id, message, quantity)),
+                      onWithdraw: () => act(() => withdrawOffer(code, f.id)),
+                    },
+            }));
+            const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
+
+            const rows = (list: RoomFlare[]) =>
+              list.map((flare) => (
+                <FlareRow
+                  key={flare.id}
+                  flare={flare}
+                  mine={mine}
+                  storeName={room.storeName}
+                  early={room.early}
+                  onOffer={(message, quantity) =>
+                    void act(() => offerOnFlare(code, flare.id, message, quantity))
+                  }
+                  onRemove={() => act(() => removeFlare(code, flare.id))}
+                  onTraded={(partner) =>
+                    void act(() => confirmTrade(code, flare.id, partner))
+                  }
+                />
+              ));
+
+            const groupOpen = Boolean(expandedGroups[sessionId]);
+
+            return (
+              <View
+                key={sessionId}
+                style={{
+                  gap: spacing(1),
+                  /* The hairline between players; the card's own gap
+                   sits above it and this padding below. */
+                  paddingTop: index === 0 ? 0 : spacing(2),
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: colors.border,
+                }}
+              >
+                {/*
+                 * The founder's synthesis, replacing the page-wide toggle:
+                 * the rail is every player's default face, and the chevron
+                 * on their header unfolds THEM into the full stacked view —
+                 * the same gesture the roster taught.
+                 */}
+                <Tap
+                  onPress={() => {
+                    LayoutAnimation.configureNext(
+                      LayoutAnimation.Presets.easeInEaseOut,
+                    );
+                    setExpandedGroups((current) => ({
+                      ...current,
+                      [sessionId]: !current[sessionId],
+                    }));
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: spacing(2),
+                    /* The website's hairline, for the same reason: the
+                     person and their cards used to run together as one
+                     block of things at slightly different sizes. */
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                    /* Two points shorter than it was, given to the rail
+                     below so a held card's ring clears this line. */
+                    paddingBottom: spacing(1),
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(1.5),
+                      flexShrink: 1,
+                      flexGrow: 1,
+                    }}
+                  >
+                    {/* An account's identity opens their popup; the rest
+                      of the header still folds the section. Same split
+                      as the website's board header. */}
+                    {(() => {
+                      const person = participants.find(
+                        (p) => p.playerSessionId === sessionId,
+                      );
+                      const identity = (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: spacing(2),
+                            flexShrink: 1,
+                          }}
+                        >
+                          <PlayerAvatar
+                            displayName={group.name ?? "A player"}
+                            seed={sessionId}
+                            avatarUrl={person?.avatarUrl ?? null}
+                            frame={person?.frame ?? null}
+                            ring={person?.ring ?? null}
+                            aura={person?.aura ?? null}
+                            ringArt={person?.ringArt ?? null}
+                            auraArt={person?.auraArt ?? null}
+                            /* 64, matching the website's `lg`. The
+                             founder's mockup settles what this row is:
+                             the picture anchors it, and a worn ring is
+                             most of why anybody bought one. */
+                            size={48}
+                          />
+                          {/*
+                           * The name and the line under it are a COLUMN
+                           * beside the picture, never items wrapped around
+                           * it. Placed after the picture-and-name pair, the
+                           * tag lands beneath the PICTURE and reads as a
+                           * caption on the avatar — the same bug the
+                           * website had, reported three times.
+                           */}
+                          <View style={{ flexShrink: 1, gap: spacing(1) }}>
+                            <Title>{group.name ?? "A player"}</Title>
+                            {openIds.has(sessionId) && <OpenToTradesTag />}
+                          </View>
+                        </View>
+                      );
+                      return playerBySession.get(sessionId) ? (
+                        <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
+                          {identity}
+                        </Tap>
+                      ) : (
+                        identity
+                      );
+                    })()}
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(1.5),
+                    }}
+                  >
+                    <Muted>
+                      {`${group.flares.length} ${group.flares.length === 1 ? "card" : "cards"}`}
+                    </Muted>
+                    <MaterialCommunityIcons
+                      name={groupOpen ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={colors.textMuted}
+                    />
+                  </View>
+                </Tap>
+
+                {!groupOpen ? (
+                  <View>
+                    {/* One rail, wants first: the founder's revision.
+                      Nearly all of a board is wants, so a labelled
+                      shelf for one showcase cluttered every section
+                      that had one. Cards on offer sit past the divider
+                      at the far end, same as the website. */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      scrollEventThrottle={16}
+                      onScroll={(event) =>
+                        railMeasure(
+                          sessionId,
+                          event.nativeEvent.contentSize.width,
+                          event.nativeEvent.layoutMeasurement.width,
+                          event.nativeEvent.contentOffset.x,
+                        )
+                      }
+                      onLayout={(event) => {
+                        railLayout.current[sessionId] = event.nativeEvent.layout.width;
+                        const content = railContent.current[sessionId];
+                        if (content != null) {
+                          railMeasure(
+                            sessionId,
+                            content,
+                            event.nativeEvent.layout.width,
+                            0,
+                          );
+                        }
+                      }}
+                      onContentSizeChange={(width) => {
+                        railContent.current[sessionId] = width;
+                        const layout = railLayout.current[sessionId];
+                        if (layout != null) railMeasure(sessionId, width, layout, 0);
+                      }}
+                      /*
+                       * Pulled back by exactly the padding below, so the
+                       * first card's edge lands on the same line as the
+                       * header above it. The padding itself is for the ring
+                       * on a card you are holding: a ScrollView clips what
+                       * leaves its bounds, and the ring sits two pixels
+                       * outside the art with a glow past that. The website
+                       * had this bug and this fix.
+                       *
+                       * The same allowance on top. The rail used to start
+                       * four points under the header's hairline with no
+                       * vertical padding of its own, so a held card's ring
+                       * sat two points off the divider and its glow drew
+                       * straight across it: the founder's screenshot. Four
+                       * more points on top put the ring and its whole
+                       * shadow under the line, and the header gives back
+                       * two of its own so the row does not visibly loosen.
+                       */
+                      style={{ marginHorizontal: -spacing(2) }}
+                      contentContainerStyle={{
+                        gap: spacing(2),
+                        paddingHorizontal: spacing(2),
+                        paddingTop: spacing(1),
+                        paddingBottom: 0,
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      {orderedRail.map(tile)}
+                      {labelled && (
+                        <>
+                          <View
+                            style={{
+                              width: 1,
+                              alignSelf: "stretch",
+                              backgroundColor: colors.border,
+                              marginHorizontal: spacing(0.5),
+                            }}
+                          />
+                          {showcases.map(tile)}
+                        </>
+                      )}
+                    </ScrollView>
+                    {/*
+                     * The edge fades so the rail visibly continues instead
+                     * of the last card looking cut off — and stops fading
+                     * once there is nothing left to continue to, which is
+                     * the founder's correction: a fade that never leaves
+                     * keeps promising cards that are not there.
+                     */}
+                    {!railsAtEnd[sessionId] && (
+                      <LinearGradient
+                        pointerEvents="none"
+                        colors={[`${colors.surface}00`, colors.surface]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.railFade}
+                      />
+                    )}
+                  </View>
+                ) : (
+                  <>
+                    {labelled && (
+                      <View style={{ gap: spacing(1) }}>
+                        <Text style={styles.folderLabel}>
+                          {`Offering · ${showcases.length} ${
+                            showcases.length === 1 ? "card" : "cards"
+                          }`}
+                        </Text>
+                        <View>{rows(showcases)}</View>
+                      </View>
+                    )}
+
+                    {labelled && wants.length > 0 && (
+                      <Text style={styles.folderLabel}>
+                        {`Looking for · ${wants.length} ${
+                          wants.length === 1 ? "card" : "cards"
+                        }`}
+                      </Text>
+                    )}
+
+                    {folders.map((folder) => (
+                      <View
+                        key={folder.label.toLowerCase()}
+                        style={{ gap: spacing(1) }}
+                      >
+                        <Text style={styles.folderLabel} numberOfLines={1}>
+                          {`${folder.label} · ${folder.flares.length} ${
+                            folder.flares.length === 1 ? "card" : "cards"
+                          }`}
+                        </Text>
+                        <View>{rows(folder.flares)}</View>
+                      </View>
+                    ))}
+
+                    {loose.length > 0 && <View>{rows(loose)}</View>}
+                  </>
+                )}
+              </View>
+            );
+          })}
+
+          {/*
+           * The foot row: what the account is still after that is not
+           * on this board. Closed, it is one line with "Post them" at
+           * its end; tapped, it opens in place into the saved list
+           * with its nudge and drop controls and the one button that
+           * posts the lot. The row's right end turns into a chevron
+           * while it is open. No "Never mind": the founder's call, a
+           * row that starts closed does not need a second way to be
+           * ignored, and the wants stay saved either way.
+           */}
+          {outstanding.length > 0 && (
+            <View style={styles.footRow}>
               <Tap
                 onPress={() => {
                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setExpandedGroups((current) => ({
-                    ...current,
-                    [sessionId]: !current[sessionId],
-                  }));
+                  setRepostOpen((current) => !current);
                 }}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: spacing(2),
-                  /* The website's hairline, for the same reason: the
-                     person and their cards used to run together as one
-                     block of things at slightly different sizes. */
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border,
-                  /* Two points shorter than it was, given to the rail
-                     below so a held card's ring clears this line. */
-                  paddingBottom: spacing(1),
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(1.5),
-                    flexShrink: 1,
-                    flexGrow: 1,
-                  }}
-                >
-                  {/* An account's identity opens their popup; the rest
-                      of the header still folds the section. Same split
-                      as the website's board header. */}
-                  {(() => {
-                    const person = participants.find(
-                      (p) => p.playerSessionId === sessionId,
-                    );
-                    const identity = (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: spacing(2),
-                          flexShrink: 1,
-                        }}
-                      >
-                        <PlayerAvatar
-                          displayName={group.name ?? "A player"}
-                          seed={sessionId}
-                          avatarUrl={person?.avatarUrl ?? null}
-                          frame={person?.frame ?? null}
-                          ring={person?.ring ?? null}
-                          aura={person?.aura ?? null}
-                          ringArt={person?.ringArt ?? null}
-                          auraArt={person?.auraArt ?? null}
-                          /* 64, matching the website's `lg`. The
-                             founder's mockup settles what this row is:
-                             the picture anchors it, and a worn ring is
-                             most of why anybody bought one. */
-                          size={48}
-                        />
-                        {/*
-                         * The name and the line under it are a COLUMN
-                         * beside the picture, never items wrapped around
-                         * it. Placed after the picture-and-name pair, the
-                         * tag lands beneath the PICTURE and reads as a
-                         * caption on the avatar — the same bug the
-                         * website had, reported three times.
-                         */}
-                        <View style={{ flexShrink: 1, gap: spacing(1) }}>
-                          <Title>{group.name ?? "A player"}</Title>
-                          {openIds.has(sessionId) && <OpenToTradesTag />}
-                        </View>
-                      </View>
-                    );
-                    return playerBySession.get(sessionId) ? (
-                      <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
-                        {identity}
-                      </Tap>
-                    ) : (
-                      identity
-                    );
-                  })()}
-                </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(1.5),
-                  }}
-                >
-                  <Muted>
-                    {`${group.flares.length} ${group.flares.length === 1 ? "card" : "cards"}`}
-                  </Muted>
+                <Text style={styles.footText}>
+                  {`${outstanding.length} ${outstanding.length === 1 ? "card" : "cards"} you are still after ${
+                    outstanding.length === 1 ? "is" : "are"
+                  } not posted here`}
+                </Text>
+                {repostOpen ? (
                   <MaterialCommunityIcons
-                    name={groupOpen ? "chevron-up" : "chevron-down"}
+                    name="chevron-up"
                     size={18}
                     color={colors.textMuted}
                   />
-                </View>
+                ) : (
+                  <Text style={styles.footAction}>
+                    {outstanding.length === 1 ? "Post it" : "Post them"}
+                  </Text>
+                )}
               </Tap>
 
-              {!groupOpen ? (
-                <View>
-                  {/* One rail, wants first: the founder's revision.
-                      Nearly all of a board is wants, so a labelled
-                      shelf for one showcase cluttered every section
-                      that had one. Cards on offer sit past the divider
-                      at the far end, same as the website. */}
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    scrollEventThrottle={16}
-                    onScroll={(event) =>
-                      railMeasure(
-                        sessionId,
-                        event.nativeEvent.contentSize.width,
-                        event.nativeEvent.layoutMeasurement.width,
-                        event.nativeEvent.contentOffset.x,
-                      )
+              {/* Open, the panel is the stacked board in miniature: art,
+                  name, number, printing, plus the two controls the board
+                  has no business carrying: how many of a *saved* ask, and
+                  dropping it for good. */}
+              {repostOpen && (
+                <View style={{ gap: spacing(2) }}>
+                  <View>
+                    {outstanding.map((want) => (
+                      <WantRow
+                        key={want.id}
+                        want={want}
+                        onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
+                        onDrop={() => act(() => dropWant(want.id))}
+                      />
+                    ))}
+                  </View>
+                  <Button
+                    busy={repostDone !== null}
+                    label={
+                      repostDone === null
+                        ? `Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`
+                        : outstanding.length === 1
+                          ? "Posting…"
+                          : `Posting… ${repostDone} of ${outstanding.length}`
                     }
-                    onLayout={(event) => {
-                      railLayout.current[sessionId] = event.nativeEvent.layout.width;
-                      const content = railContent.current[sessionId];
-                      if (content != null) {
-                        railMeasure(
-                          sessionId,
-                          content,
-                          event.nativeEvent.layout.width,
-                          0,
-                        );
-                      }
+                    onPress={() => {
+                      if (repostDone !== null) return;
+                      setRepostDone(0);
+                      void act(async () => {
+                        let done = 0;
+                        for (const want of outstanding) {
+                          await postFlare(code, {
+                            cardId: want.cardId,
+                            printingId: want.printingId,
+                            quantity: want.quantity,
+                            note: want.note ?? undefined,
+                            deckLabel: want.deckLabel,
+                          }).catch(() => {});
+                          done += 1;
+                          setRepostDone(done);
+                        }
+                      }).finally(() => setRepostDone(null));
                     }}
-                    onContentSizeChange={(width) => {
-                      railContent.current[sessionId] = width;
-                      const layout = railLayout.current[sessionId];
-                      if (layout != null) railMeasure(sessionId, width, layout, 0);
-                    }}
-                    /*
-                     * Pulled back by exactly the padding below, so the
-                     * first card's edge lands on the same line as the
-                     * header above it. The padding itself is for the ring
-                     * on a card you are holding: a ScrollView clips what
-                     * leaves its bounds, and the ring sits two pixels
-                     * outside the art with a glow past that. The website
-                     * had this bug and this fix.
-                     *
-                     * The same allowance on top. The rail used to start
-                     * four points under the header's hairline with no
-                     * vertical padding of its own, so a held card's ring
-                     * sat two points off the divider and its glow drew
-                     * straight across it: the founder's screenshot. Four
-                     * more points on top put the ring and its whole
-                     * shadow under the line, and the header gives back
-                     * two of its own so the row does not visibly loosen.
-                     */
-                    style={{ marginHorizontal: -spacing(2) }}
-                    contentContainerStyle={{
-                      gap: spacing(2),
-                      paddingHorizontal: spacing(2),
-                      paddingTop: spacing(1),
-                      paddingBottom: 0,
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    {orderedRail.map(tile)}
-                    {labelled && (
-                      <>
-                        <View
-                          style={{
-                            width: 1,
-                            alignSelf: "stretch",
-                            backgroundColor: colors.border,
-                            marginHorizontal: spacing(0.5),
-                          }}
-                        />
-                        {showcases.map(tile)}
-                      </>
-                    )}
-                  </ScrollView>
-                  {/*
-                   * The edge fades so the rail visibly continues instead
-                   * of the last card looking cut off — and stops fading
-                   * once there is nothing left to continue to, which is
-                   * the founder's correction: a fade that never leaves
-                   * keeps promising cards that are not there.
-                   */}
-                  {!railsAtEnd[sessionId] && (
-                    <LinearGradient
-                      pointerEvents="none"
-                      colors={[`${colors.surface}00`, colors.surface]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.railFade}
-                    />
-                  )}
+                  />
                 </View>
-              ) : (
-                <>
-                  {labelled && (
-                    <View style={{ gap: spacing(1) }}>
-                      <Text style={styles.folderLabel}>
-                        {`Offering · ${showcases.length} ${
-                          showcases.length === 1 ? "card" : "cards"
-                        }`}
-                      </Text>
-                      <View>{rows(showcases)}</View>
-                    </View>
-                  )}
-
-                  {labelled && wants.length > 0 && (
-                    <Text style={styles.folderLabel}>
-                      {`Looking for · ${wants.length} ${
-                        wants.length === 1 ? "card" : "cards"
-                      }`}
-                    </Text>
-                  )}
-
-                  {folders.map((folder) => (
-                    <View key={folder.label.toLowerCase()} style={{ gap: spacing(1) }}>
-                      <Text style={styles.folderLabel} numberOfLines={1}>
-                        {`${folder.label} · ${folder.flares.length} ${
-                          folder.flares.length === 1 ? "card" : "cards"
-                        }`}
-                      </Text>
-                      <View>{rows(folder.flares)}</View>
-                    </View>
-                  ))}
-
-                  {loose.length > 0 && <View>{rows(loose)}</View>}
-                </>
               )}
-            </Card>
-          );
-        })}
+            </View>
+          )}
 
-        {/* The lobby, parked at the foot of the page: the names are
-            reference material, and their counts now live on the door
-            card at the top. Same fold, same chevron, further down. */}
+          {/* A guest has no composer, so the toggle that moved into the
+              composer's foot would vanish for them. One quiet row here
+              keeps it; a signed-in player finds it under Post a Flare. */}
+          {guest && (
+            <AsyncButton
+              label={youOpen ? "Open to trades ✓" : "I'm open to trades"}
+              pendingLabel={youOpen ? "Closing…" : "Opening…"}
+              variant="secondary"
+              onPress={() => act(() => setOpenToTrades(code, !youOpen))}
+            />
+          )}
+        </Card>
+
         {trades.length > 0 && (
           <Card>
             <Title>Traded tonight</Title>
@@ -1605,123 +1701,41 @@ function RoomScreen({
             </View>
           </Card>
         )}
-
-        <Card>
-          <Tap
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setRosterOpen((current) => !current);
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: spacing(2),
-            }}
-          >
-            <Title>In this room</Title>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
-            >
-              <Muted>
-                {`${participants.filter((p) => p.present).length} here now · ${participants.length} total`}
-              </Muted>
-              <MaterialCommunityIcons
-                name={rosterOpen ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.textMuted}
-              />
-            </View>
-          </Tap>
-
-          {rosterOpen && (
-            <View style={styles.lobby}>
-              {[...participants]
-                .sort((a, b) => Number(b.present) - Number(a.present))
-                .map((p) => {
-                  const row = (
-                    <>
-                      {/* The picture and the border they bought, so a
-                          thing earned is worn where the people are. */}
-                      <PlayerAvatar
-                        displayName={p.displayName ?? "A player"}
-                        seed={p.playerSessionId}
-                        avatarUrl={p.avatarUrl ?? null}
-                        frame={p.frame ?? null}
-                        ring={p.ring ?? null}
-                        aura={p.aura ?? null}
-                        ringArt={p.ringArt ?? null}
-                        auraArt={p.auraArt ?? null}
-                        dimmed={!p.present}
-                      />
-                      <Text
-                        style={{
-                          color: p.present ? colors.textPrimary : colors.textSecondary,
-                          flexShrink: 1,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {p.displayName ?? "A player"}
-                      </Text>
-                      {p.openToTrades && <OpenToTradesTag />}
-                      {!p.present && (
-                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                          away
-                        </Text>
-                      )}
-                    </>
-                  );
-
-                  /*
-                   * An account opens the profile popup right here, the
-                   * website's behaviour. A guest is not a dead button,
-                   * they are somebody who does not need an account to
-                   * trade, so their row stays plain.
-                   */
-                  return p.playerId ? (
-                    <Tap
-                      key={p.playerSessionId}
-                      onPress={() => setPeek(p.playerId!)}
-                      style={styles.person}
-                    >
-                      {row}
-                    </Tap>
-                  ) : (
-                    <View key={p.playerSessionId} style={styles.person}>
-                      {row}
-                    </View>
-                  );
-                })}
-            </View>
-          )}
-        </Card>
       </ScrollView>
+
+      {/* The names, behind the meta line. A row opens the profile popup
+          over the list, so closing it lands back on the people. View
+          full profile leaves both behind for the profile screen. */}
+      <RoomPeopleModal
+        open={peopleOpen}
+        participants={participants}
+        onClose={() => setPeopleOpen(false)}
+        onPeek={setPeek}
+      />
 
       <PlayerPeekModal
         playerId={peek}
         onClose={() => setPeek(null)}
         onViewProfile={(playerId) => {
           setPeek(null);
+          setPeopleOpen(false);
           navigation.navigate("PlayerProfile", { playerId });
         }}
       />
 
-      {/* The action bar: the two things a thumb reaches for in a room.
-          Its own padding plus the home indicator's strip, so the buttons
-          stop above the swipe area rather than sitting inside it. */}
+      {/* The action bar: the one thing a thumb reaches for in a room.
+          The open-to-trades toggle used to share this bar and now sits
+          at the composer's foot, so the bar is one button. Its own padding
+          plus the home indicator's strip, so the button stops above the
+          swipe area rather than sitting inside it. The composer is
+          told whether you are open so its toggle starts right. */}
       <View style={[styles.actionBar, { paddingBottom: spacing(3) + bottomClear }]}>
         <View style={{ flex: 1 }}>
           <Button
             label="Post a Flare"
-            onPress={() => navigation.navigate("PostFlare", { code })}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AsyncButton
-            label={youOpen ? "Open to trades ✓" : "I'm open to trades"}
-            pendingLabel={youOpen ? "Closing…" : "Opening…"}
-            variant="secondary"
-            onPress={() => act(() => setOpenToTrades(code, !youOpen))}
+            onPress={() =>
+              navigation.navigate("PostFlare", { code, openToTrades: youOpen })
+            }
           />
         </View>
       </View>
@@ -2325,9 +2339,34 @@ function FlareRow({
 }
 
 const styles = StyleSheet.create({
-  lobby: { gap: spacing(1.5) },
-  person: { flexDirection: "row", alignItems: "center", gap: spacing(2) },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  /* The night's name: the page's h1, bigger than a card's Title. */
+  nightName: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    fontWeight: "800",
+    flex: 1,
+  },
+  /* The board card's foot: an elevated inline row, the mock's. */
+  footRow: {
+    backgroundColor: colors.elevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.control,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    gap: spacing(2),
+  },
+  footText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+  },
+  footAction: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
   flare: {
     borderTopWidth: 1,
     borderTopColor: colors.border,

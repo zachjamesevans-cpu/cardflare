@@ -87,7 +87,9 @@ describe("the Room tile answers a card through the zoom sheet only", () => {
   });
 
   it("still hands the sheet the offer on somebody else's want", () => {
-    expect(room).toContain('offer:\n              mine || f.intent === "showcase"');
+    /* Indentation-agnostic: the shelf is built inside the board card
+       now, and a nesting change must not read as a lost offer. */
+    expect(room).toMatch(/offer:\s*mine \|\| f\.intent === "showcase"/);
     expect(room).toContain("onWithdraw: () => act(() => withdrawOffer(code, f.id))");
   });
 });

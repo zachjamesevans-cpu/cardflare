@@ -132,7 +132,12 @@ export type StackParams = {
   Customize: { area?: "profile" | "showcase" } | undefined;
   /** The cardflare Pro paywall. Every Pro wall in the app opens this. */
   Pro: undefined;
-  PostFlare: { code: string };
+  /**
+   * The room's composer. `openToTrades` is what the room last read
+   * for this player, so the toggle at the composer's foot starts
+   * right; the room reads the truth back on its next poll.
+   */
+  PostFlare: { code: string; openToTrades?: boolean };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
   /** A Flare post's thread: likes, comments, "I have this" on a card. */
@@ -154,7 +159,7 @@ export type StackParams = {
    * The timer remote: a store's round clocks, run from a pocket. With
    * a storeId it opens on that store; without, it asks which counter
    * when the account runs more than one. Reached from the Timer remote
-   * card at the top of a joined room, drawn only for staff.
+   * icon on a joined room's door card, drawn only for staff.
    */
   Remote: { storeId?: string } | undefined;
 };
@@ -774,7 +779,10 @@ export default function App() {
             options={{ title: "Post a Flare", headerBackTitle: "Room" }}
           >
             {({ route }) => (
-              <FlareComposer target={{ kind: "room", code: route.params.code }} />
+              <FlareComposer
+                target={{ kind: "room", code: route.params.code }}
+                openToTrades={route.params.openToTrades}
+              />
             )}
           </Stack.Screen>
         </Stack.Navigator>

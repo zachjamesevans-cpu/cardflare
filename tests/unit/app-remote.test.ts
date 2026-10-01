@@ -13,8 +13,8 @@ import { REMOTE_OPS } from "../../mobile/src/remote-wire";
  * list would be a button that 400s at the counter. This walks every op
  * the screen can send and holds it against the list, and pins the
  * plumbing around it: the screen is registered, it polls and controls
- * through remote-api, the silence banner exists, the entry card stays
- * away from non-staff, and both profile screens draw the TO chip.
+ * through remote-api, the silence banner exists, the door-card icon
+ * stays away from non-staff, and both profile screens draw the TO chip.
  *
  * Read off the source because the test runner is Node with no renderer.
  * This proves the words are still WRITTEN, not that a phone drew them.
@@ -130,13 +130,31 @@ describe("the timer remote in the app", () => {
     ).toBeTruthy();
   });
 
-  it("draws the entry card only for staff, and opens the Remote screen", () => {
+  it("draws the entry icon only for staff, and opens the Remote screen", () => {
     expect(entry).toContain("if (staff.length === 0) return null;");
     expect(entry).toContain("me.staff ?? []");
-    expect(entry).toContain("Timer remote");
-    expect(entry).toContain("Run the round clocks from here, no trip to the counter");
-    expect(entry).toContain('label="Open remote"');
     expect(entry).toMatch(/navigation\.navigate\(\s*"Remote"/);
+    /*
+     * An icon, not a card. The founder: "moving the remote from a big
+     * block to a small little remote icon if they have access to it."
+     * The stopwatch glyph in the accent, named for a screen reader,
+     * and none of the old card's furniture.
+     */
+    const remote = entry.slice(
+      entry.indexOf("export function RemoteEntry"),
+      entry.indexOf("export function OrganizerChips"),
+    );
+    expect(remote).toContain('icon="timer-outline"');
+    expect(remote).toContain('label="Timer remote"');
+    expect(remote).toMatch(/<DoorIconButton[\s\S]*?\baccent\b/);
+    expect(remote).not.toContain("<Card");
+    expect(remote).not.toContain("Open remote");
+    expect(remote).not.toContain("Run the round clocks from here");
+    /* The ring is the accent at a tint; the glyph is the accent whole. */
+    const button = entry.slice(entry.indexOf("export function DoorIconButton"));
+    expect(button).toContain("accessibilityLabel={label}");
+    expect(button).toContain("`${colors.accent}66`");
+    expect(button).toContain("accent ? colors.accent : colors.textSecondary");
   });
 
   it("draws the TO chip under the name on both profile screens", () => {
