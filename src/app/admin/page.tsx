@@ -15,11 +15,13 @@ import {
 } from "lucide-react";
 
 import { CatalogHealth } from "@/components/admin/catalog-health";
+import { FailuresBox } from "@/components/admin/failures-box";
 import { listAnnouncements } from "@/lib/announcements/repository";
 import { listImportedSets } from "@/lib/cards/imported-sets";
 import { activityReport } from "@/lib/admin/activity";
 import { rangeFor } from "@/lib/admin/activity-range";
 import { catalogForConsole } from "@/lib/admin/catalog";
+import { recentFailures } from "@/lib/admin/failures";
 import { AreaLink, StatTile } from "@/components/admin/glance";
 import { ConfigStatus } from "@/components/admin/config-status";
 import { CatalogueImportForm } from "@/components/admin/catalogue-import-form";
@@ -198,7 +200,7 @@ export default async function AdminPage() {
   const providerName = new OptcgApiProvider().displayName;
 
   // Depends on which run was last, so it cannot join the batch above.
-  const [setCoverage, failures] = await Promise.all([
+  const [setCoverage, failures, wentWrong] = await Promise.all([
     within("catalogBySet", { sets: [], truncated: true }, catalogBySet()),
     within(
       "failuresForRun",
@@ -206,6 +208,11 @@ export default async function AdminPage() {
       lastRun
         ? failuresForRun(lastRun.id)
         : Promise.resolve({ groups: [], total: 0, truncated: false }),
+    ),
+    within(
+      "recentFailures",
+      { failures: [], blindSpots: ["The failure list did not answer in time."] },
+      recentFailures(),
     ),
   ]);
 
@@ -226,6 +233,21 @@ export default async function AdminPage() {
           <StatTile icon={Flame} label="Flares out" value={flaresOut} />
           <StatTile icon={Users} label="Players here now" value={hereNow} />
         </div>
+      </section>
+
+      {/*
+       * Second on the page on purpose. The audit found a failed import
+       * and a stale sync at the bottom of this scroll, where a problem
+       * reads as a fact. A failure is the thing an admin opens the
+       * console to learn about, so it sits right under "is anything
+       * happening".
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="failures-heading">
+        <h2 id="failures-heading" className="text-xl font-bold text-text-primary">
+          What went wrong lately
+        </h2>
+
+        <FailuresBox failures={wentWrong.failures} blindSpots={wentWrong.blindSpots} />
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="areas-heading">

@@ -21,6 +21,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, TextInput } from "@/components/ui/controls";
+import { ago } from "@/lib/notifications/inbox-row";
 import {
   grantEmbersAction,
   resetLinkAction,
@@ -34,6 +35,27 @@ import {
   TEST_NOTICE_LABELS,
   type GrantState,
 } from "@/lib/admin/grant-schema";
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** "1 Oct 2026": built by hand so the server and the browser agree. */
+function shortDate(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
 
 /**
  * One player in the console, and everything an admin can do to them.
@@ -59,6 +81,8 @@ export function AdminPlayerRow({
   purchasedCount,
   setupOwed,
   tier,
+  joinedAt,
+  lastActiveAt,
 }: {
   playerId: string;
   displayName: string;
@@ -75,6 +99,9 @@ export function AdminPlayerRow({
   setupOwed: boolean;
   /** Membership tier: free, pro, ultra or max. */
   tier: string;
+  joinedAt: string;
+  /** Last seen in a room, or null for an account that never joined one. */
+  lastActiveAt: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -132,6 +159,14 @@ export function AdminPlayerRow({
             <span className="truncate text-xs text-text-muted">
               {handle ? `@${handle} · ` : ""}
               {email ?? "No address on file"}
+            </span>
+            {/* The audit's two missing facts: when they arrived, and
+                whether they have been anywhere since. */}
+            <span className="truncate text-xs text-text-muted tabular-nums">
+              Joined {shortDate(joinedAt)} ·{" "}
+              {lastActiveAt
+                ? `Last in a room ${ago(lastActiveAt)} ago`
+                : "Never in a room"}
             </span>
           </span>
 

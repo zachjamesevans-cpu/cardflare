@@ -6,6 +6,7 @@ import { AdminPlayerRow } from "@/components/admin/admin-player-row";
 import { AvatarProbe } from "@/components/admin/avatar-probe";
 import { InvitePlayerForm } from "@/components/admin/invite-player-form";
 import { PlayerSearch } from "@/components/admin/player-search";
+import { PlayerSortControl, type PlayerSort } from "@/components/admin/player-sort";
 import { Badge, Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { avatarDiagnostics } from "@/lib/admin/avatar-check";
@@ -40,7 +41,7 @@ export const maxDuration = 60;
 export default async function AdminPlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; check?: string }>;
+  searchParams: Promise<{ q?: string; check?: string; sort?: string }>;
 }) {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
@@ -48,6 +49,8 @@ export default async function AdminPlayersPage({
 
   const params = await searchParams;
   const query = params.q ?? "";
+  const sort: PlayerSort =
+    params.sort === "active" || params.sort === "name" ? params.sort : "joined";
 
   /* Guest sessions carrying Flares, for the merge tool below the list. */
   /*
@@ -75,7 +78,22 @@ export default async function AdminPlayersPage({
     searchPlayers(query),
   ]);
 
-  const emailFor = new Map(players.map((player) => [player.id, player.email]));
+  const facts = new Map(players.map((player) => [player.id, player]));
+
+  /* Newest first is what the search returns; the other two orders are
+     the audit's: who has actually been in a room lately, and a name to
+     scan for. */
+  const sorted = found.toSorted((a, b) => {
+    if (sort === "name") {
+      return a.displayName.localeCompare(b.displayName, "en", { sensitivity: "base" });
+    }
+    if (sort === "active") {
+      const left = facts.get(a.id)?.lastActiveAt ?? "";
+      const right = facts.get(b.id)?.lastActiveAt ?? "";
+      return right.localeCompare(left);
+    }
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 
   return (
     <div className="flex flex-col gap-10">
@@ -130,7 +148,12 @@ export default async function AdminPlayersPage({
           Tap a player to grant Embers, unlock every cosmetic, or rename them.
         </p>
 
-        <PlayerSearch initial={query} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <PlayerSearch initial={query} />
+          </div>
+          <PlayerSortControl current={sort} />
+        </div>
 
         {/* Guests never appear here. The founder: a directory of guest
             sessions "is not necessary, maybe just a counter somewhere";
@@ -155,13 +178,13 @@ export default async function AdminPlayersPage({
         ) : (
           <Card className="p-4">
             <ul className="flex flex-col">
-              {found.map((player) => (
+              {sorted.map((player) => (
                 <AdminPlayerRow
                   key={player.id}
                   playerId={player.id}
                   displayName={player.displayName}
                   handle={player.handle}
-                  email={emailFor.get(player.id) ?? null}
+                  email={facts.get(player.id)?.email ?? null}
                   avatarUrl={player.avatarUrl}
                   embersEarned={player.embersEarned}
                   embersBalance={player.embersBalance}
@@ -170,6 +193,8 @@ export default async function AdminPlayersPage({
                   purchasedCount={player.purchasedCount}
                   setupOwed={!player.onboardedAt}
                   tier={player.tier}
+                  joinedAt={player.createdAt}
+                  lastActiveAt={facts.get(player.id)?.lastActiveAt ?? null}
                 />
               ))}
               {/* Invitations are not search results: they have no
