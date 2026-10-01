@@ -13,10 +13,14 @@ import { setOpenToTradesAction } from "@/lib/events/join-event-actions";
  *
  * One slim row now, not a card of its own: the founder's call, a whole
  * block was too much furniture for one switch. It rents the bottom of
- * the Post-a-Flare card, under a divider — same block, because it is
- * the other answer to the same question, but visually apart from the
- * form fields so it cannot be read as a property of the Flare being
- * typed above it. It is your status in this room, not the post's.
+ * the composer, under a divider, same block, because it is the other
+ * answer to the same question, but visually apart from the form fields
+ * so it cannot be read as a property of the Flare being typed above
+ * it. It is your status in this room, not the post's. A guest has no
+ * composer, so theirs sits at the foot of the board card instead.
+ *
+ * The button says the state it is in: "I'm open to trades" to go on
+ * the board, "Open to trades ✓" once you are, same words as the app.
  *
  * Still a Server Component. Only the button is a client island, so it
  * can show that a press landed — the founder's rule: a press that waits
@@ -44,7 +48,7 @@ export function OpenToTradesToggle({ code, open }: { code: string; open: boolean
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="open" value={open ? "off" : "on"} />
         <SubmitButton
-          label={open ? "Never mind" : "I'm open to trades"}
+          label={open ? "Open to trades ✓" : "I'm open to trades"}
           pendingLabel="Updating…"
           variant={open ? "secondary" : "primary"}
           size="sm"

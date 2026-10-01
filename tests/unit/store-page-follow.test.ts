@@ -149,8 +149,12 @@ describe("the setup flow", () => {
 describe("following a store", () => {
   it("draws the button on the store page and in the room", () => {
     expect(read("src/app/s/[storeId]/page.tsx")).toContain("FollowStoreButton");
-    expect(read("src/app/e/[code]/page.tsx")).toContain("FollowStoreButton");
-    expect(read("src/app/e/[code]/page.tsx")).toContain("href={`/s/${event.storeId}`}");
+    /* The room's door card carries both the store link and the chip. */
+    expect(read("src/components/events/room-door.tsx")).toContain("FollowStoreButton");
+    expect(read("src/components/events/room-door.tsx")).toContain(
+      "href={`/s/${storeId}`}",
+    );
+    expect(read("src/app/e/[code]/page.tsx")).toContain("<RoomDoor");
   });
 
   it("gives the app a POST for following, beside the DELETE", () => {
