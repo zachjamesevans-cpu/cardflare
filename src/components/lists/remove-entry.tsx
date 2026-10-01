@@ -3,18 +3,31 @@
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 
+import { useTakeDown } from "@/components/feed/undo-toast";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
+import { takeDownRoomFlareAction } from "@/lib/flares/withdraw-actions";
 import { removeListEntryAction } from "@/lib/lists/actions";
 import type { ListKind } from "@/lib/lists/schema";
 
 /**
- * Remove, with the tap acknowledged.
+ * A Flare's two exits, on the board, with the tap acknowledged.
  *
- * The founder's ask: a card should go grey the instant Remove is
- * pressed, with a spinner on it, rather than sitting there looking
- * untouched until the server comes back. On store wifi that gap is
- * seconds long and a silent button reads as broken — the same reason
- * the pledge control grew its overlay.
+ * "Remove" used to be the one control under your own card, and it
+ * meant found: the card went grey with the tick everywhere, and the
+ * Feed told your followers. The audit of 2026-10-01 found the gap in
+ * that: a card posted by mistake had no way out that was not an
+ * announcement. So there are two controls now, and they say what they
+ * do. "Found it" is the old action, a plain form posting to the Server
+ * Action. "Take down" withdraws the card and tells nobody, with a
+ * minute's Undo in the toast beside the tab bar. The app's room draws
+ * the same pair (mobile/src/screens/room.tsx).
+ *
+ * The founder's ask on the tap itself: a card should go grey the
+ * instant a control is pressed, with a spinner on it, rather than
+ * sitting there looking untouched until the server comes back. On
+ * store wifi that gap is seconds long and a silent button reads as
+ * broken. Both controls drop the same veil.
  *
  * The veil is one element doing both jobs: `backdrop-grayscale` drains
  * the colour out of whatever is behind it, and the translucent canvas
@@ -37,14 +50,21 @@ import type { ListKind } from "@/lib/lists/schema";
  */
 export type VeilBox = { width: number; height: number; cardWidth: number };
 
-function RemovingVeil({ cover }: { cover?: VeilBox }) {
-  const { pending } = useFormStatus();
+function Veil({
+  cover,
+  pending,
+  label,
+}: {
+  cover?: VeilBox;
+  pending: boolean;
+  label: string;
+}) {
   if (!pending) return null;
 
   const spinner = <Loader2 className="size-5 animate-spin text-accent" />;
   const announce = (
     <span role="status" className="sr-only">
-      Removing this card
+      {label}
     </span>
   );
 
@@ -92,40 +112,92 @@ function RemovingVeil({ cover }: { cover?: VeilBox }) {
   );
 }
 
-function TileButton() {
+/** The veil for the form, which knows it is pending from the form itself. */
+function FormVeil({ cover }: { cover?: VeilBox }) {
+  const { pending } = useFormStatus();
+  return <Veil cover={cover} pending={pending} label="Marking this card found" />;
+}
+
+const TILE_BUTTON =
+  "flex h-6 w-full cursor-pointer items-center justify-center rounded-[6px] px-0 text-[10px] font-medium transition-colors disabled:cursor-wait";
+
+function FoundTileButton() {
   const { pending } = useFormStatus();
 
   return (
     <button
       type="submit"
       disabled={pending}
-      className="flex h-7 w-full items-center justify-center rounded-[6px] border border-border text-[10px] font-medium text-text-muted transition-colors hover:text-text-secondary disabled:cursor-wait"
+      className={cn(
+        TILE_BUTTON,
+        "border border-border bg-elevated text-text-primary hover:border-border-strong",
+      )}
     >
-      Remove
+      Found it
     </button>
   );
 }
 
-function RowButton() {
+function FoundRowButton() {
   const { pending } = useFormStatus();
 
   return (
-    /*
-     * A negative right margin swallows the ghost button's own padding so
-     * its label sits flush with the card's right edge, level with the "N
-     * cards" count above. The touch target keeps its full size — only the
-     * box's position moves. Nothing vertical: the row aligns this button
-     * to the card name's baseline, and a margin there would undo it.
-     */
-    <Button
-      type="submit"
-      variant="ghost"
-      size="sm"
-      disabled={pending}
-      className="-mr-3.5"
-    >
-      Remove
+    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+      Found it
     </Button>
+  );
+}
+
+/**
+ * "Take down": withdraws the card under the room identity and puts the
+ * Undo up. A button, not a form, because the ids the server returns are
+ * what the toast holds, and a form's action has nowhere to hand them.
+ */
+function TakeDownButton({
+  code,
+  flareId,
+  variant,
+  cover,
+}: {
+  code: string;
+  flareId: string;
+  variant: "tile" | "row";
+  cover?: VeilBox;
+}) {
+  const { takeDown, pending } = useTakeDown(code);
+  const onClick = () => takeDown(() => takeDownRoomFlareAction(code, flareId));
+
+  return (
+    <>
+      <Veil cover={cover} pending={pending} label="Taking this card down" />
+      {variant === "tile" ? (
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={pending}
+          className={cn(TILE_BUTTON, "text-danger hover:bg-danger/10")}
+        >
+          Take down
+        </button>
+      ) : (
+        /*
+         * A negative right margin swallows the ghost button's own
+         * padding so its label sits flush with the card's right edge,
+         * level with the "N cards" count above. The touch target keeps
+         * its full size — only the box's position moves.
+         */
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onClick}
+          disabled={pending}
+          className="-mr-3.5 text-danger hover:bg-danger/10 hover:text-danger"
+        >
+          Take down
+        </Button>
+      )}
+    </>
   );
 }
 
@@ -144,18 +216,38 @@ export function RemoveEntry({
   variant: "tile" | "row";
   /** The card's box, top-left of the entry. Omitted fills the entry. */
   cover?: VeilBox;
-  /** Placement classes for the form itself, which is the flex item. */
+  /** Placement classes for the wrapper, which is the flex item. */
   className?: string;
 }) {
-  return (
-    <form action={removeListEntryAction} className={className}>
+  const found = (
+    <form action={removeListEntryAction}>
       <input type="hidden" name="code" value={code} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="entryId" value={entryId} />
       {/* Positioned against the entry's <li>, so the veil lands on the
           card and not on the button that started it. */}
-      <RemovingVeil cover={cover} />
-      {variant === "tile" ? <TileButton /> : <RowButton />}
+      <FormVeil cover={cover} />
+      {variant === "tile" ? <FoundTileButton /> : <FoundRowButton />}
     </form>
+  );
+
+  /* Only a Flare can be taken down. The Have list's one exit stays the
+     form, under its old meaning. */
+  if (kind !== "flare") {
+    return <div className={className}>{found}</div>;
+  }
+
+  return variant === "tile" ? (
+    /* Stacked, because a 56px tile has room for one word per line. */
+    <div className={cn("flex flex-col gap-1", className)}>
+      {found}
+      <TakeDownButton code={code} flareId={entryId} variant="tile" cover={cover} />
+    </div>
+  ) : (
+    /* Side by side on the name's baseline, the board's rule. */
+    <div className={cn("flex items-center gap-1", className)}>
+      {found}
+      <TakeDownButton code={code} flareId={entryId} variant="row" cover={cover} />
+    </div>
   );
 }

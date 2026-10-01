@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ArrowLeft, Check, X } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
 import { Button } from "@/components/ui/button";
@@ -56,16 +56,34 @@ export function CardPicker({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col">
+      {/*
+       * The way out sits LEFT of the title, never top-right. In a room
+       * the composer opens under the door's own close button, which
+       * lives in that corner; at phone width the two sat on top of each
+       * other (the audit of 2026-10-01). Back when nothing is picked,
+       * Done once something is, one button either way.
+       */}
+      <div className="flex items-center gap-3 pr-8">
+        <Button
+          type="button"
+          size="sm"
+          variant={cards.length === 0 ? "secondary" : "primary"}
+          onClick={onDone}
+          className="shrink-0"
+        >
+          {cards.length === 0 ? (
+            <ArrowLeft className="size-4" aria-hidden="true" />
+          ) : (
+            <Check className="size-4" aria-hidden="true" />
+          )}
+          {cards.length === 0 ? "Back" : "Done"}
+        </Button>
+        <div className="flex min-w-0 flex-col">
           <h2 className="font-semibold text-text-primary">Add cards</h2>
-          <p className="text-xs text-text-muted tabular-nums">
+          <p className="truncate text-xs text-text-muted tabular-nums">
             {cards.length === 0 ? "Nothing picked yet" : draftSummary(cards)}
           </p>
         </div>
-        <Button type="button" size="sm" onClick={onDone}>
-          {cards.length === 0 ? "Back" : "Done"}
-        </Button>
       </div>
 
       {cards.length > 0 && (

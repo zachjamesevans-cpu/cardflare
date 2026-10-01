@@ -19,7 +19,7 @@ function EarlyBoardCard({ board }: { board: EarlyBoard }) {
         {board.name} is taking Flares early
       </h2>
       <p className="text-sm text-text-secondary">
-        The board for {day} is already open. Post what you&rsquo;re hunting now, so
+        The board for {day} is already open. Post what you&rsquo;re looking for now, so
         people know what to bring from home.
       </p>
       <Link

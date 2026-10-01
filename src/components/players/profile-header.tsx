@@ -84,14 +84,14 @@ export function ProfileHeader({
           {people ? (
             <PeopleDialog
               value={stats.followers}
-              label="followers"
+              label={stats.followers === 1 ? "follower" : "followers"}
               title="Followers"
               className={cn(TILE, "cursor-pointer hover:border-border-strong")}
             >
               {people.followers}
             </PeopleDialog>
           ) : (
-            tile(stats.followers, "followers")
+            tile(stats.followers, stats.followers === 1 ? "follower" : "followers")
           )}
           {people ? (
             <PeopleDialog

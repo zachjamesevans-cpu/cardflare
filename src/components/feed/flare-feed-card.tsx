@@ -26,10 +26,19 @@ import type { HuntItem } from "@/lib/feed/repository";
  * (mobile/src/flare-feed-card.tsx).
  */
 
-/** How long ago, in the shortest true form. */
+/**
+ * How long ago, in the shortest true form.
+ *
+ * Under a minute is "now", not "1m ago": the composer's preview draws
+ * the post the instant it is written, and a post written this second
+ * that claimed a minute's age was the audit's first finding. The app's
+ * `agoFrom` says the same (mobile/src/flare-feed-card.tsx).
+ */
 export function agoFrom(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
+  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (seconds < 60) return "now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
@@ -179,6 +188,14 @@ export function FlareFeedCard({
               {item.yours && !preview && (
                 <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
                   Your Flare
+                </span>
+              )}
+              {/* A post from a board names its room on the line, not
+                  only on the button at the foot: "Kaito · at Card
+                  Cavern · 2h ago" is the sentence a reader wants. */}
+              {item.code && item.storeName && (
+                <span className="min-w-0 truncate text-[13px] font-medium text-text-muted">
+                  <span aria-hidden="true">· </span>at {item.storeName}
                 </span>
               )}
             </span>

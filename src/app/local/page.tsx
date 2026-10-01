@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import { LocalScreen } from "@/components/local/local-screen";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -108,7 +109,20 @@ function Shell({ children }: { children: React.ReactNode }) {
         id="main"
         className="flex min-h-dvh flex-col items-center gap-4 px-4 pt-6 pb-16"
       >
-        <div className="flex w-full max-w-2xl flex-col gap-6">{children}</div>
+        <div className="flex w-full max-w-2xl flex-col gap-6">
+          {/* With Local off this is the Messages page, and Messages is
+              a door inside the Inbox: the way back is the way in. */}
+          {!LOCAL_ENABLED && (
+            <Link
+              href="/inbox"
+              className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Inbox
+            </Link>
+          )}
+          {children}
+        </div>
         <TabBarSpacer />
       </main>
       <PlayerTabBar />

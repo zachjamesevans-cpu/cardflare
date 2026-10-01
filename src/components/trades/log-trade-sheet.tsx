@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, PenLine, Search, X } from "lucide-react";
 
@@ -69,6 +69,15 @@ export function LogTradeButton({
      (Sheet renders children only while open), and the key makes sure
      of it after a successful log too. */
   const [formKey, setFormKey] = useState(0);
+
+  /* "Logged." is news for a moment, not a label. It went stale on the
+     audit's screen, still lit after the trade it announced had been
+     removed from the list below it. */
+  useEffect(() => {
+    if (!logged) return;
+    const timer = setTimeout(() => setLogged(false), 4000);
+    return () => clearTimeout(timer);
+  }, [logged]);
 
   return (
     <div className="flex items-center gap-3">
@@ -312,7 +321,7 @@ export function LogTradeSheet({
             value={place}
             onChange={(event) => setPlace(event.target.value)}
             maxLength={LOGGED_PLACE_MAX}
-            placeholder="A store, a kitchen table, a car park"
+            placeholder="A store, a kitchen table, a parking lot"
           />
           {locals.length > 0 && (
             <div className="flex flex-wrap gap-2">

@@ -598,7 +598,7 @@ export const TEST_NOTICES = {
   },
   "new-follower": {
     title: "CHUNC followed you",
-    body: "Follow back and you are Trade partners.",
+    body: "Follow back to become trade partners.",
   },
   "room-flare": {
     title: "CHUNC is looking for Umbreon VMAX",
@@ -690,7 +690,7 @@ export async function notifyNewFollower(
 
     const name = follower?.display_name ?? "A player";
     const title = `${name} followed you`;
-    const body = "Follow back and you are Trade partners.";
+    const body = "Follow back to become trade partners.";
     const path = `/p/${followerId}`;
 
     const id = await record({

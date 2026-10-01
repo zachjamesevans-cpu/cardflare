@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
  * the tiny card needs to go... just have people tap the card to open
  * full menu to say they have it or not." So the tile's art opens the
  * zoom, the zoom carries the offer form, and the only thing left under
- * a tile is Remove, on the viewer's own cards. Pinned here so the
- * button cannot come back on one platform.
+ * a tile is the pair of exits, Found it and Take down, on the viewer's
+ * own cards. Pinned here so the button cannot come back on one platform.
  */
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -41,14 +41,15 @@ describe("the board tile", () => {
     expect(tile).toContain('!isYou && entry.intent !== "showcase"');
   });
 
-  it("reserves the row under the art for Remove on your own tiles only", () => {
+  it("reserves the rows under the art for Found it and Take down on your own tiles only", () => {
     const from = tile.indexOf(
-      '{removable && !found && (\n        <div className="h-7">',
+      '{removable && !found && (\n        <div className="h-13">',
     );
     expect(from).toBeGreaterThan(-1);
     expect(tile.slice(from)).toContain('variant="tile"');
-    /* Exactly one h-7 row, and it is inside the removable branch. */
-    expect(tile.match(/className="h-7"/g)).toHaveLength(1);
+    /* Exactly one two-line slot, and it is inside the removable branch. */
+    expect(tile.match(/className="h-13"/g)).toHaveLength(1);
+    expect(tile).not.toContain('className="h-7"');
   });
 
   it("says Offering, not Letting go, on the rail divider and headings", () => {

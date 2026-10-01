@@ -123,7 +123,7 @@ export default async function ProfileSettingsPage() {
       <UserPen className="size-5 shrink-0 text-accent" aria-hidden="true" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="font-semibold text-text-primary">Name and username</span>
-        <span className="truncate text-sm text-text-secondary">
+        <span className="text-sm break-words text-text-secondary">
           {displayName} · {formatHandle(handle)}. Change them on Edit profile.
         </span>
       </span>
@@ -313,7 +313,7 @@ export default async function ProfileSettingsPage() {
         description={
           isPlayerHome
             ? "Your collection, your ZIP code, and how you sign in."
-            : "How you sign in to cardflare."
+            : "Your account, Feed and room preferences."
         }
         areas={areas}
         currentArea={currentArea}

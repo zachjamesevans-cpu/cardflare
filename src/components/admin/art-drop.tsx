@@ -236,7 +236,7 @@ export function ArtDrop() {
               className="rounded-[var(--radius-control)] border border-border bg-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
             />
             <span className="text-xs text-text-muted">
-              The colour, not the category: Lightning, not Lightning Border.
+              The color, not the category: Lightning, not Lightning Border.
             </span>
           </label>
 

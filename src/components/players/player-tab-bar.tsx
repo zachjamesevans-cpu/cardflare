@@ -1,3 +1,4 @@
+import { UndoToastHost } from "@/components/feed/undo-toast";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { getPlayerSession } from "@/lib/players/session";
@@ -14,6 +15,12 @@ import { PlayerTabs } from "./player-tabs";
  *
  * The unread badge is resolved here rather than in the client bar so
  * the count arrives with the page instead of after it.
+ *
+ * The take-down toast's host rides with the bar. A post that is taken
+ * down leaves the page on the refresh, and the toast that offers to
+ * put it back has to be drawn by something that stays: this is on
+ * every page that draws a post menu or a board, and it sits right
+ * above where the toast lands.
  */
 export async function PlayerTabBar() {
   const viewer = await getViewer();
@@ -30,7 +37,12 @@ export async function PlayerTabBar() {
 
   if (!playerId && !guest) return null;
 
-  return <PlayerTabs unread={playerId ? await unreadCount(playerId) : 0} />;
+  return (
+    <>
+      <PlayerTabs unread={playerId ? await unreadCount(playerId) : 0} />
+      <UndoToastHost />
+    </>
+  );
 }
 
 /**

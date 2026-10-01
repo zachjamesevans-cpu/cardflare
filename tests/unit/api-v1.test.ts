@@ -77,6 +77,9 @@ vi.mock("@/lib/players/wants", async (importOriginal) => ({
   /* Which saved cards are live on a board. Nothing posted in these
      fixtures, so every want reads as saved-only. */
   postedCardStores: () => Promise.resolve(new Map<string, PostedWhere[]>()),
+  /* Which saved cards have every copy in hand. Nothing found in these
+     fixtures either, so nothing reads as Found. */
+  foundCardsFor: () => Promise.resolve(new Set<string>()),
 }));
 vi.mock("@/lib/players/collection", () => ({
   collectionSyncFor: (...a: unknown[]) => collectionSyncFor(...a),
@@ -363,7 +366,7 @@ describe("notifications inbox", () => {
           id: "n2",
           kind: "new-follower",
           title: "Kaito followed you",
-          body: "Follow back and you are Trade partners.",
+          body: "Follow back to become trade partners.",
           url: "/p/kaito",
           created_at: "2026-08-07T00:00:00Z",
           read_at: null,

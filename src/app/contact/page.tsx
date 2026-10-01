@@ -36,9 +36,9 @@ export default function ContactPage() {
               Contact us
             </h1>
             <p className="text-lg text-text-secondary">
-              A store wanting to run cardflare at your locals, a vendor headed to a
-              show, or something that went wrong. It all reaches the same place, and a
-              person reads it.
+              A store that wants to run cardflare, a vendor headed to a show, or
+              something that went wrong. It all reaches the same place, and a person
+              reads it.
             </p>
           </div>
 

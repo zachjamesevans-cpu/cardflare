@@ -16,6 +16,22 @@ import {
 import { EVENT_NAME_MAX, FORMAT_MAX } from "@/lib/event-hub/schema";
 
 /**
+ * "17 Aug 2026" from the profile's ISO date. A date in a sentence is
+ * read, not parsed: the audit of 2026-10-01 flagged "last checked
+ * 2026-08-17" as a machine's way of saying it. UTC on purpose, since
+ * the ISO date names a day and not an instant, and a store west of
+ * Greenwich must not see the day before.
+ */
+export function rulesCheckedOn(isoDate: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${isoDate}T00:00:00Z`));
+}
+
+/**
  * Adding a tournament to the wall.
  *
  * The target the whole feature is measured against: a shop employee
@@ -240,7 +256,7 @@ export function AddTimerForm({ displayId }: { displayId: string }) {
           {profile.displayName} official rules
         </a>
         <span className="text-xs text-text-muted">
-          Rules last checked {profile.rulesLastVerified}
+          Rules last checked {rulesCheckedOn(profile.rulesLastVerified)}
         </span>
       </div>
     </form>

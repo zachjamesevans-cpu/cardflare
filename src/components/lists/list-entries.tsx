@@ -48,9 +48,10 @@ import type { MatchKind, Offer } from "@/lib/matching/schema";
 /**
  * Flare boards.
  *
- * Server components: nothing here is interactive except removing, which is a
- * plain form posting to a Server Action, so a list of forty cards ships no
- * JavaScript at all.
+ * Server components: nothing here is interactive except a card's two
+ * exits (Found it, a plain form posting to a Server Action; Take down, a
+ * small client island), so a list of forty cards ships one copy of that
+ * and nothing else.
  *
  * An entry is a row rather than its own card. The board groups rows under the
  * player who posted them — a busy room is a handful of people, not thirty
@@ -124,7 +125,7 @@ function Entry({
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           {/*
-           * Remove sits *in* the name's line, not in a column beside it.
+           * The controls sit *in* the name's line, not in a column beside it.
            * As its own column the two boxes were aligned by their tops,
            * which is not where either one's text is: the founder's
            * screenshot caught "Yamato" and "Remove" a few pixels apart,
@@ -337,7 +338,8 @@ const SECTION_FOLD = 6;
  * stepper opened over the art; the founder cut it: "the small
  * contextual menu that opens up over the tiny card needs to go... just
  * have people tap the card to open full menu to say they have it or
- * not." The one thing left under the art is Remove, on your own tiles.
+ * not." What is left under the art is the pair of exits, Found it and
+ * Take down, on your own tiles.
  */
 function CarouselEntry({
   entry,
@@ -559,12 +561,13 @@ function CarouselEntry({
         </p>
       )}
 
-      {/* Remove, under your own tiles only. Nobody else's tile draws a
-          row here at all: offering happens in the zoom, so a row held
-          open for a control that no longer exists would be a hole under
-          every card on the board. */}
+      {/* Found it and Take down, under your own tiles only. Nobody
+          else's tile draws a row here at all: offering happens in the
+          zoom, so a row held open for a control that no longer exists
+          would be a hole under every card on the board. Two lines
+          tall, because a 56px tile holds one word per line. */}
       {removable && !found && (
-        <div className="h-7">
+        <div className="h-13">
           <RemoveEntry
             code={code}
             kind={kind}
@@ -676,6 +679,18 @@ export function FlareBoard({
         const alsoOpen = openIds.has(group.playerSessionId);
 
         /*
+         * Your own section leads with what you just posted. The audit
+         * of 2026-10-01 caught a fresh card sitting behind "and N
+         * more": the board draws in posting order, oldest first, so
+         * the seventh card you post is the first one the fold hides.
+         * Newest first here, and only here; everybody else's section
+         * keeps the order the room has always read.
+         */
+        const entries = isYou
+          ? [...group.entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          : group.entries;
+
+        /*
          * A player's section splits into deck folders and loose cards.
          * The fourteen cards of an "RG Luffy" hunt read as one named
          * thing instead of burying the rest of the board; a card wanted
@@ -687,7 +702,7 @@ export function FlareBoard({
          * and reading the two as one list is how somebody walks over
          * about a card the owner was trying to get rid of.
          */
-        const { showcases, wants } = partitionByIntent(group.entries);
+        const { showcases, wants } = partitionByIntent(entries);
         const { folders, loose } = partitionByDeck(wants);
 
         /*
@@ -698,7 +713,7 @@ export function FlareBoard({
          */
         /* One answer for the whole rail, so tiles beside each other still
            agree on where their buttons sit. */
-        const railHasDecks = group.entries.some((item) => Boolean(item.deckLabel));
+        const railHasDecks = entries.some((item) => Boolean(item.deckLabel));
 
         /*
          * The rail as one shelf, in the order it is actually drawn.
@@ -924,7 +939,7 @@ export function FlareBoard({
         const pastFold = (index: number, key: string, node: ReactNode) =>
           index < SECTION_FOLD ? node : <BeyondFold key={key}>{node}</BeyondFold>;
 
-        const hidden = group.entries.length - SECTION_FOLD;
+        const hidden = entries.length - SECTION_FOLD;
 
         /** A stacked row, folded by its place in the stacked order. */
         const foldRow = (entry: ListEntry) =>
@@ -1031,8 +1046,7 @@ export function FlareBoard({
               meta={
                 <>
                   <span className="text-sm whitespace-nowrap text-text-muted tabular-nums">
-                    {group.entries.length}{" "}
-                    {group.entries.length === 1 ? "card" : "cards"}
+                    {entries.length} {entries.length === 1 ? "card" : "cards"}
                   </span>
                 </>
               }

@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { rulesCheckedOn } from "./add-timer-form";
 import { ConfirmButton } from "./confirm-button";
 import { Select } from "@/components/ui/controls";
 import {
@@ -576,8 +577,8 @@ function TimerCard({
               rel="noreferrer noopener"
               className="text-xs font-semibold text-accent hover:underline"
             >
-              View official rules ({profile.displayName}) &mdash; last checked{" "}
-              {profile.rulesLastVerified}
+              View official rules ({profile.displayName}), last checked{" "}
+              {rulesCheckedOn(profile.rulesLastVerified)}
             </a>
           </div>
         )}
