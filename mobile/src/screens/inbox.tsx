@@ -7,7 +7,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
-import { getNotifications, markRead, type InboxItem } from "../api";
+import { getNotifications, listLocalThreads, markRead, type InboxItem } from "../api";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Loading, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -34,6 +34,9 @@ export function InboxScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const tabInset = useTabBarInset();
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  /* Conversations waiting, for the pill on the Messages door. Its own
+     read, so a Messages outage cannot take the notices down with it. */
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     void (async () => {
@@ -47,10 +50,22 @@ export function InboxScreen() {
         setItems([]);
       }
     })();
+    void listLocalThreads()
+      .then(({ threads }) =>
+        setUnreadMessages(threads.reduce((sum, thread) => sum + thread.unread, 0)),
+      )
+      .catch(() => setUnreadMessages(0));
   }, []);
 
   const openProfile = (playerId: string) =>
     navigation.navigate("PlayerProfile", { playerId });
+
+  /* Where conversations live: the Local tab while it is on, the
+     Messages screen otherwise. One door, the same one the notices use. */
+  const openMessages = () =>
+    LOCAL_ENABLED
+      ? navigation.navigate("Tabs", { screen: "Local" })
+      : navigation.navigate("Messages");
 
   /*
    * A notice that names a screen the app has is a door to it. Messages
@@ -59,10 +74,7 @@ export function InboxScreen() {
    */
   const destination = (item: InboxItem): (() => void) | null => {
     if (item.url === "/local") {
-      return () =>
-        LOCAL_ENABLED
-          ? navigation.navigate("Tabs", { screen: "Local" })
-          : navigation.navigate("Messages");
+      return openMessages;
     }
     if (item.url?.startsWith("/p/")) {
       const playerId = item.url.slice("/p/".length);
@@ -88,6 +100,74 @@ export function InboxScreen() {
       {/* No heading here: the navigation bar above already says
           "Inbox", and printing it twice on one screen reads as a
           mistake. The website has one because it has no nav bar. */}
+
+      {/* The door to Messages, above the notices and there even when
+          there are none: the audit found conversations with no way in
+          from the tab that says Inbox. The website's /inbox draws the
+          same row over its list. */}
+      <Card style={{ padding: 0 }}>
+        <Tap
+          onPress={openMessages}
+          accessibilityLabel="Messages"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+            padding: spacing(3),
+          }}
+        >
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.elevated,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color={colors.textPrimary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text
+              style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "700" }}
+            >
+              Messages
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+              Conversations about cards, and with players you message.
+            </Text>
+          </View>
+          {unreadMessages > 0 ? (
+            <View
+              accessibilityLabel={`${unreadMessages} unread`}
+              style={{
+                minWidth: 22,
+                height: 22,
+                borderRadius: 11,
+                paddingHorizontal: 6,
+                backgroundColor: colors.accent,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.accentContrast,
+                  fontSize: 12,
+                  fontWeight: "800",
+                }}
+              >
+                {unreadMessages > 99 ? "99+" : String(unreadMessages)}
+              </Text>
+            </View>
+          ) : null}
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Tap>
+      </Card>
+
       {items === null && <Loading />}
 
       {items?.length === 0 && (

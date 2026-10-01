@@ -70,6 +70,22 @@ export function formatEventWindow(
   return `${startLabel} – ${endLabel} ${zoneAbbreviation(end, timeZone)}`;
 }
 
+/**
+ * One instant, in the store's zone: "Wed, Aug 14, 6:00 PM CDT".
+ *
+ * The same words `formatEventWindow` uses for the start of a window, so
+ * a sentence about when doors open or when a board opens early reads
+ * the way the window above it does.
+ */
+export function formatEventMoment(iso: string, timeZone: string): string {
+  const instant = new Date(iso);
+  const label = new Intl.DateTimeFormat("en-US", { ...FORMAT, timeZone }).format(
+    instant,
+  );
+
+  return `${label} ${zoneAbbreviation(instant, timeZone)}`;
+}
+
 /** Value for a `datetime-local` input, which wants "YYYY-MM-DDTHH:mm". */
 export function toDateTimeLocal(date: Date, timeZone: string): string {
   return instantToLocal(date, timeZone);

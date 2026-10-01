@@ -79,7 +79,11 @@ export function ProfileHeader({
             value={stats?.flares}
             label={stats?.flares === 1 ? "Flare" : "Flares"}
           />
-          <Stat value={stats?.followers} label="followers" onPress={onFollowers} />
+          <Stat
+            value={stats?.followers}
+            label={stats?.followers === 1 ? "follower" : "followers"}
+            onPress={onFollowers}
+          />
           <Stat value={stats?.following} label="following" onPress={onFollowing} />
         </View>
       </View>

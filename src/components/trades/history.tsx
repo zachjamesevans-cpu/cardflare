@@ -17,6 +17,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
+import { formatLocalDate, LocalDate, useMounted } from "@/components/ui/local-date";
 import { DotsMenu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
 import { deleteLoggedTradeAction } from "@/lib/trades/logged-actions";
@@ -37,20 +38,21 @@ import type { TradeHistoryEntry, TradeHistoryTotals } from "@/lib/trades/history
  * only kind they may take back.
  */
 
-/** "Fri, Sep 12", in the reader's own clock. A day is enough. */
-export function dayOf(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(iso));
+/**
+ * "Fri, Sep 12", in the reader's own clock. A day is enough.
+ *
+ * Drawn through `LocalDate`, never on the server: the audit of
+ * 2026-10-01 caught "Sun, Aug 9" from the server and "Sat, Aug 8" after
+ * hydration, because the server's clock is UTC and the reader's is
+ * not. The helper stays for anything that already has a clock to ask.
+ */
+export function dayOf(iso: string, timeZone?: string): string {
+  return formatLocalDate(iso, "day", timeZone);
 }
 
 /** "September 2026", the group heading. */
-export function monthOf(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(
-    new Date(iso),
-  );
+export function monthOf(iso: string, timeZone?: string): string {
+  return formatLocalDate(iso, "month", timeZone);
 }
 
 function statusLine(
@@ -82,6 +84,9 @@ export function TradeHistoryRow({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  /* Two taps to take a trade back: the menu's Remove turns into a
+     question on the row, and only its Remove answers it. */
+  const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
   const Icon = trade.got ? ArrowDownLeft : ArrowUpRight;
   const line = statusLine(trade);
@@ -94,6 +99,7 @@ export function TradeHistoryRow({
       const result = await deleteLoggedTradeAction(trade.id);
       if (!result.ok) {
         setError(result.message);
+        setConfirming(false);
         return;
       }
       router.refresh();
@@ -117,7 +123,7 @@ export function TradeHistoryRow({
   return (
     <li
       className={cn(
-        "flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0",
+        "flex flex-wrap items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0",
         pending && "opacity-55",
       )}
     >
@@ -154,14 +160,22 @@ export function TradeHistoryRow({
             ) : null}
           </span>
         </p>
+        {/* The place and the day, in the reader's clock. The card number
+            only where there is room: on a phone it ate the day. */}
         <p className="truncate text-xs text-text-muted">
-          {[
-            trade.storeName,
-            dayOf(trade.confirmedAt),
-            compact ? null : trade.cardNumber,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          {trade.storeName && (
+            <>
+              {trade.storeName}
+              <span aria-hidden="true"> · </span>
+            </>
+          )}
+          <LocalDate iso={trade.confirmedAt} format="day" />
+          {!compact && trade.cardNumber && (
+            <span className="hidden sm:inline">
+              <span aria-hidden="true"> · </span>
+              {trade.cardNumber}
+            </span>
+          )}
         </p>
         {/* A logged row says so even on the profile card: the word is
             short, and it is the one thing that separates the player's
@@ -199,19 +213,44 @@ export function TradeHistoryRow({
       )}
       {/* Only a logged trade can be taken back: a room trade is two
           people's word, and this page is one of them. */}
-      {logged && !compact && (
-        <DotsMenu
-          label={`More about ${trade.cardName}`}
-          items={[
-            {
-              key: "remove",
-              label: "Remove",
-              icon: <Trash2 />,
-              onSelect: remove,
-            },
-          ]}
-        />
-      )}
+      {logged &&
+        !compact &&
+        (confirming ? (
+          /* Its own line under the row: beside the name it squeezed the
+             card down to a letter at phone width. */
+          <span className="flex basis-full items-center justify-end gap-x-2 text-xs text-text-secondary">
+            <span>Remove this trade?</span>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={pending}
+              className="cursor-pointer font-bold text-danger hover:underline disabled:cursor-wait"
+            >
+              Remove
+            </button>
+            <span aria-hidden="true">/</span>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={pending}
+              className="cursor-pointer font-semibold text-text-secondary hover:text-text-primary"
+            >
+              Keep
+            </button>
+          </span>
+        ) : (
+          <DotsMenu
+            label={`More about ${trade.cardName}`}
+            items={[
+              {
+                key: "remove",
+                label: "Remove",
+                icon: <Trash2 />,
+                onSelect: () => setConfirming(true),
+              },
+            ]}
+          />
+        ))}
     </li>
   );
 }
@@ -232,15 +271,26 @@ const FILTERS: { key: HistoryFilter; label: string }[] = [
  */
 export function TradeHistoryList({ trades }: { trades: TradeHistoryEntry[] }) {
   const [filter, setFilter] = useState<HistoryFilter>("all");
+  const mounted = useMounted();
 
   const shown = trades.filter(
     (trade) => filter === "all" || (filter === "got" ? trade.got : !trade.got),
   );
 
-  /* One card per month, so a year of Fridays reads as a calendar. */
+  /*
+   * One card per month, so a year of Fridays reads as a calendar.
+   *
+   * Grouped in the reader's clock once there is one. The server and
+   * the hydration pass group by UTC, which is the same answer for all
+   * but a trade in the last hours of a month, and draw the heading
+   * blank; the first browser render regroups and writes it. Grouping
+   * on the server by the reader's zone is not possible, and grouping
+   * by UTC and labelling locally would file a trade under the wrong
+   * heading, which is the bug this replaces.
+   */
   const months: { label: string; trades: TradeHistoryEntry[] }[] = [];
   for (const trade of shown) {
-    const label = monthOf(trade.confirmedAt);
+    const label = monthOf(trade.confirmedAt, mounted ? undefined : "UTC");
     const last = months[months.length - 1];
     if (last && last.label === label) last.trades.push(trade);
     else months.push({ label, trades: [trade] });
@@ -289,7 +339,7 @@ export function TradeHistoryList({ trades }: { trades: TradeHistoryEntry[] }) {
         months.map((month) => (
           <Card key={month.label} className="flex flex-col gap-3 p-4">
             <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-              {month.label}
+              <LocalDate iso={month.trades[0].confirmedAt} format="month" />
             </p>
             <ul className="flex flex-col">
               {month.trades.map((trade) => (

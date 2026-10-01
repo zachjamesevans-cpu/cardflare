@@ -157,7 +157,7 @@ export default async function AdminReportsPage({
             label="Flares by accounts"
             value={report.flaresByAccounts}
           />
-          <StatTile icon={Handshake} label="Hands raised" value={report.offers} />
+          <StatTile icon={Handshake} label="Offers" value={report.offers} />
           <StatTile icon={Flame} label="Trades confirmed" value={report.trades} />
         </div>
       </section>

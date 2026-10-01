@@ -277,7 +277,7 @@ export default async function ProfilePage() {
                     </summary>
                     <p className="mt-1 text-sm text-text-secondary">
                       Up to nine cards you are proud of, wearing whatever you have
-                      unlocked. Not a trade list, so there is nothing to pledge on here.
+                      unlocked. Not a trade list, so there is nothing to offer on here.
                       Tap a card to dress it.
                     </p>
                   </details>

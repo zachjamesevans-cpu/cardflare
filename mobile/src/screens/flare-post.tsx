@@ -15,8 +15,11 @@ import {
   offerFromPost,
   POST_COMMENT_MAX,
   rememberRoom,
+  restorePost,
+  takeDownPost,
   type PostDetail,
 } from "../api";
+import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
@@ -29,6 +32,7 @@ import { PostSocialRow, type PostRef } from "../post-social";
 import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
+import { UndoToast, type UndoOffer } from "../undo-toast";
 
 /**
  * One Flare post, opened from its bubble in the Feed.
@@ -56,6 +60,11 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   >(null);
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
   const [menu, setMenu] = useState(false);
+  /* Your own post, taken down: the body gives way to one line and the
+     toast offers the minute's undo. The Feed behind is told either way. */
+  const [takenDown, setTakenDown] = useState(false);
+  const [undo, setUndo] = useState<UndoOffer | null>(null);
+  const dismissUndo = useCallback(() => setUndo(null), []);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +99,34 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     }
   };
 
+  const takeDown = async () => {
+    if (!post) return;
+    setError(null);
+    try {
+      const result = await takeDownPost(post.postId);
+      if (!result.ok) {
+        setError("Could not take that down. Try again in a moment.");
+        return;
+      }
+      setTakenDown(true);
+      markFeedStale();
+      if (result.flareIds.length > 0) {
+        setUndo({
+          key: `${post.postId}:${Date.now()}`,
+          message: "Taken down.",
+          onUndo: async () => {
+            await restorePost(post.postId, result.flareIds).catch(() => undefined);
+            setTakenDown(false);
+            markFeedStale();
+            await load();
+          },
+        });
+      }
+    } catch (caught) {
+      setError(`Could not take that down (${describeError(caught)}).`);
+    }
+  };
+
   if (failed) {
     return (
       <View
@@ -101,6 +138,26 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
       >
         <Muted>This Flare could not be opened. It may have been taken down.</Muted>
+      </View>
+    );
+  }
+
+  if (takenDown) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+        }}
+      >
+        <Muted>Taken down. Nobody was told.</Muted>
+        <UndoToast
+          offer={undo}
+          onDismiss={dismissUndo}
+          bottom={spacing(3) + insets.bottom}
+        />
       </View>
     );
   }
@@ -147,6 +204,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     direction,
     onViewAll: () => setCardsSheet({ ...sheetPost, mode: "view" }),
     onProgress: () => setProgressSheet(sheetPost),
+    onTakeDown: () => void takeDown(),
   });
 
   return (

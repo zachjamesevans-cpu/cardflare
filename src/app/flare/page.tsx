@@ -90,7 +90,7 @@ export default async function FlarePage({
   const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
   const games = await viewerGames();
-  const [asked, offering, posted, nearby, hunts, poster] = playerId
+  const [asked, offering, posted, nearby, hunts, poster, foundCards] = playerId
     ? await Promise.all([
         listWants(playerId),
         listOfferings(playerId),
@@ -102,7 +102,7 @@ export default async function FlarePage({
         huntsFor(playerId, playerId),
         composerViewer(playerId, viewer.kind === "player" ? viewer.playerName : "You"),
       ])
-    : [null, null, new Map<string, PostedWhere[]>(), null, [], null];
+    : [null, null, new Map<string, PostedWhere[]>(), null, [], null, new Set<string>()];
   /* One list, both directions: what you are looking for and what you
      are offering, since you posted both here. */
   const wants = asked && offering ? [...asked, ...offering] : asked;
@@ -186,6 +186,7 @@ export default async function FlarePage({
                   wants={wants.map((want) => ({
                     ...want,
                     postedWhere: posted.get(want.cardId) ?? null,
+                    found: foundCards?.has(want.cardId) ?? false,
                   }))}
                   imagesEnabled={images}
                 />

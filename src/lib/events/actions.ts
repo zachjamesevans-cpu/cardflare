@@ -8,7 +8,9 @@ import { text } from "@/lib/form-value";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 import { isValidTimeZone } from "@/lib/time/zone";
 import { eventWindowIn } from "./format";
+import { cancelNoShowFlares } from "@/lib/lists/repository";
 import {
+  cancelEvent,
   createEvent,
   findEventById,
   findStoreById,
@@ -17,10 +19,13 @@ import {
   setEventStatus,
   setStoreTimeZone,
   setWalkInEnabled,
+  updateEvent,
 } from "./repository";
 import { endWalkInRoomWhenLastUsed, settleClosedOccurrences } from "./rooms";
 import {
   createEventSchema,
+  editEventSchema,
+  NO_TIMEZONE,
   type CreateEventFieldErrors,
   type CreateEventState,
   type CreateEventValues,
@@ -141,6 +146,16 @@ async function createEventFrom(
     return { ok: false, state: failure(GENERIC_ERROR, {}, values) };
   }
 
+  /*
+   * No zone, no night. The audit typed "6 PM" into a store still on the
+   * UTC default and got an event at 11 AM Pacific. A store has to say
+   * where it is before it can say when; the events page offers the
+   * browser's zone in one tap, so this is a sentence, not a chore.
+   */
+  if (store.timezone === "UTC") {
+    return { ok: false, state: failure(NO_TIMEZONE, {}, values) };
+  }
+
   const window = eventWindowIn(
     parsed.data.startsAt,
     parsed.data.endsAt,
@@ -174,6 +189,113 @@ async function createEventFrom(
     console.error("Could not create the event", error);
     return { ok: false, state: failure(GENERIC_ERROR, {}, values) };
   }
+}
+
+/**
+ * Changes a night's name and window, from its own page. Same zone
+ * rule as creating one: the wall-clock times are read in the store's
+ * zone, never the server's.
+ */
+export async function updateEventAction(
+  _previous: CreateEventState,
+  formData: FormData,
+): Promise<CreateEventState> {
+  const values = valuesFrom(formData);
+  const parsed = editEventSchema.safeParse({
+    eventId: text(formData, "eventId"),
+    ...values,
+  });
+
+  if (!parsed.success) {
+    const fieldErrors: CreateEventFieldErrors = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0] as keyof CreateEventFieldErrors;
+      if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
+    }
+    return failure("Please fix the highlighted fields.", fieldErrors, values);
+  }
+
+  const event = await findEventById(parsed.data.eventId);
+  if (!event || event.kind !== "scheduled") {
+    return failure("That night could not be found.", {}, values);
+  }
+
+  const actor = await authorizeStore(event.store_id);
+  if (!actor) return failure("You cannot change that night.", {}, values);
+
+  const store = await findStoreById(event.store_id);
+  if (!store) return failure(GENERIC_ERROR, {}, values);
+  if (store.timezone === "UTC") return failure(NO_TIMEZONE, {}, values);
+
+  const window = eventWindowIn(
+    parsed.data.startsAt,
+    parsed.data.endsAt,
+    store.timezone,
+  );
+  if (!window.ok) {
+    return failure(
+      "Please fix the highlighted fields.",
+      { [window.problem.field]: window.problem.message },
+      values,
+    );
+  }
+
+  try {
+    await updateEvent(event.id, {
+      name: parsed.data.name,
+      startsAt: window.startsAt,
+      endsAt: window.endsAt,
+      repeatWeekly: parsed.data.repeatWeekly,
+    });
+  } catch (error) {
+    console.error("Could not update the event", error);
+    return failure(GENERIC_ERROR, {}, values);
+  }
+
+  revalidatePath(`/store/events/${event.id}`);
+  revalidatePath("/store/events");
+  revalidatePath("/store");
+  revalidatePath("/admin");
+  revalidatePath(`/s/${event.store_id}`);
+  return { status: "idle" };
+}
+
+/**
+ * Cancels a night from its own page. A draft nobody touched is deleted
+ * outright; anything else is closed and marked cancelled. Either way
+ * you land back on the Events tab.
+ */
+export async function cancelEventAction(formData: FormData): Promise<void> {
+  const id = text(formData, "eventId");
+  const event = await findEventById(id);
+  if (!event || event.kind !== "scheduled") return;
+
+  const actor = await authorizeStore(event.store_id);
+  if (!actor) {
+    console.error("Rejected an event cancellation from an unauthorised viewer.");
+    return;
+  }
+
+  let outcome: "deleted" | "cancelled" | null = null;
+  try {
+    outcome = await cancelEvent(event.id);
+  } catch (error) {
+    console.error("Could not cancel the event", error);
+    return;
+  }
+
+  /* A cancelled night with people on it owes what a closed one owes:
+     no-show Flares expire. It does NOT spawn next week; the store
+     cancelled it, and the series resumes from the next one they make. */
+  if (outcome === "cancelled") {
+    await cancelNoShowFlares(event.id, event.starts_at);
+  }
+
+  revalidatePath("/store/events");
+  revalidatePath("/store");
+  revalidatePath("/admin");
+  revalidatePath(`/s/${event.store_id}`);
+  redirect(`/store/events?cancelled=${encodeURIComponent(event.name)}`);
 }
 
 /** The Events tab's door: the new night's page is where you land. */
@@ -315,6 +437,8 @@ export async function setStoreTimeZoneAction(formData: FormData): Promise<void> 
   }
 
   revalidatePath("/store");
+  revalidatePath("/store/events");
+  revalidatePath("/store/setup");
   revalidatePath("/admin");
 }
 
@@ -380,6 +504,13 @@ export async function setEventStatusAction(formData: FormData): Promise<void> {
    */
   if (event.kind !== "scheduled") {
     console.error("Rejected a status change on a walk-in room.");
+    return;
+  }
+
+  /* A cancelled night stays cancelled. The page offers no reopen; a
+     crafted post gets the same answer. */
+  if (event.cancelled_at) {
+    console.error("Rejected a status change on a cancelled night.");
     return;
   }
 

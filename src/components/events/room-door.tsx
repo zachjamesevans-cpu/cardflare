@@ -24,6 +24,43 @@ import { cn } from "@/lib/cn";
  * Plain props on purpose: everything is a string, a number or a list,
  * so the door can be drawn on a page with no database behind it.
  */
+
+/**
+ * One face per person.
+ *
+ * The audit of 2026-10-01: the door said "1 here now" over two faces,
+ * and the same player was in the list twice. An account that joined
+ * from a second device, or rejoined after its session lapsed, has two
+ * sessions in the room, and the roster is written per session. So the
+ * list is folded by account before it is drawn, falling back to the
+ * session for a guest, who has nothing else to be folded by. The one
+ * kept is the viewer's own session when it is among them (so "you"
+ * still reads as you), else the one that is present, else the most
+ * recently seen. The count is then the faces, because it is counted
+ * from the same list.
+ */
+export function dedupeParticipants(
+  participants: Participant[],
+  youId: string,
+): Participant[] {
+  const byPerson = new Map<string, Participant>();
+  for (const participant of participants) {
+    const key = participant.playerId ?? participant.playerSessionId;
+    const kept = byPerson.get(key);
+    if (!kept) {
+      byPerson.set(key, participant);
+      continue;
+    }
+    if (kept.playerSessionId === youId) continue;
+    const better =
+      participant.playerSessionId === youId ||
+      (participant.present && !kept.present) ||
+      (participant.present === kept.present &&
+        participant.lastSeenAt > kept.lastSeenAt);
+    if (better) byPerson.set(key, participant);
+  }
+  return [...byPerson.values()];
+}
 export function RoomDoor({
   storeId,
   storeName,
@@ -127,7 +164,7 @@ export function RoomDoor({
       {people && (
         <EventLobby
           code={code}
-          participants={people.participants}
+          participants={dedupeParticipants(people.participants, people.youId)}
           youId={people.youId}
           imagesEnabled={people.imagesEnabled}
           flareCount={people.flareCount}

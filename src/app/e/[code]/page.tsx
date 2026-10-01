@@ -270,7 +270,7 @@ async function RoomBody({
               </h2>
               <p className="text-sm text-text-secondary">
                 {matchedWants.length} of the {showWants.length}{" "}
-                {showWants.length === 1 ? "card" : "cards"} you&rsquo;re hunting{" "}
+                {showWants.length === 1 ? "card" : "cards"} you&rsquo;re looking for{" "}
                 {matchedWants.length === 1 ? "is" : "are"} here right now.
               </p>
             </div>
@@ -638,7 +638,7 @@ async function RoomBody({
           <p className="text-sm text-text-secondary">
             Everyone here is still on their way. The event starts{" "}
             {formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}. Post
-            what you&rsquo;re hunting now, so people know what to bring from home.
+            what you&rsquo;re looking for now, so people know what to bring from home.
             Flares from players who never make it are cleared when the night ends.
           </p>
         </Card>

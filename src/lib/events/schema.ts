@@ -46,6 +46,21 @@ export const createEventSchema = z.object({
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
+/**
+ * What a store on the UTC default is told when it tries to make a
+ * night. Shared with the events page, which shows the same sentence
+ * beside a one-tap fix before the form is ever submitted.
+ */
+export const NO_TIMEZONE =
+  "Set your store's timezone first, so 6 PM means 6 PM where you are.";
+
+/** Editing a night: the same fields, with the event in place of the store. */
+export const editEventSchema = createEventSchema.omit({ storeId: true }).extend({
+  eventId: z.guid("Please choose an event."),
+});
+
+export type EditEventInput = z.infer<typeof editEventSchema>;
+
 /** What the repository stores: real instants, already converted. */
 export interface CreateEventRecord {
   storeId: string;

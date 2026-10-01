@@ -498,15 +498,18 @@ export type EventRow = {
   join_code: string | null;
   /** When true, closing this occurrence creates the next one, +7 days. */
   repeat_weekly: boolean;
+  /** Set alongside status "closed" when the store cancelled the night. */
+  cancelled_at: string | null;
 };
 
 export type EventInsert = Omit<
   EventRow,
-  "id" | "created_at" | "status" | "game" | "kind" | "repeat_weekly"
+  "id" | "created_at" | "status" | "game" | "kind" | "repeat_weekly" | "cancelled_at"
 > & {
   id?: string;
   created_at?: string;
   status?: EventStatus;
+  cancelled_at?: string | null;
   repeat_weekly?: boolean;
   game?: Game;
   kind?: EventKind;
@@ -570,6 +573,8 @@ export type FlareRow = {
    * is true, and neither is derived from the other.
    */
   found_at: string | null;
+  /** When the poster took it down. Set alongside status "cancelled". */
+  withdrawn_at: string | null;
   /**
    * The hunt request this posted card answers, or null for a card
    * posted outside any hunt. When set, the request holds the
@@ -598,6 +603,7 @@ export type FlareInsert = Omit<
   | "created_at"
   | "updated_at"
   | "found_at"
+  | "withdrawn_at"
   | "player_id"
   | "posted_postal_code"
   | "status"
@@ -626,6 +632,7 @@ export type FlareInsert = Omit<
      ticked and unticked by `markHuntCard` - so optional here rather
      than omitted, or an update could not clear it back to null. */
   found_at?: string | null;
+  withdrawn_at?: string | null;
 };
 
 /**

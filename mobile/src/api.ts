@@ -555,6 +555,12 @@ export interface Me {
     postedAt?: string | null;
     /** Where it is up and how to walk in. Absent from an older server. */
     postedBoards?: { name: string; code: string | null }[];
+    /**
+     * Every copy in hand. The row stays, greyed, saying "Found" where
+     * the "Live at" labels would be. Absent from an older server, which
+     * reads as not found: the forgiving way round.
+     */
+    found?: boolean;
   }[];
   collection: { cardsMatched: number; syncedAt: string } | null;
   locals: {
@@ -619,6 +625,13 @@ export interface RoomFlare {
   /** What the poster will take. Trade-only is the board's default. */
   acceptsTrade: boolean;
   acceptsCash: boolean;
+  /**
+   * When it went up, so your own section can lead with the newest.
+   * Absent from an older server, which leaves the board's order alone.
+   */
+  createdAt?: string;
+  /** Copies found so far. Absent from an older server: none. */
+  foundQuantity?: number;
   match: "exact" | "other-printing" | null;
   /**
    * Copies of this card the viewer's own binder claims.
@@ -842,10 +855,45 @@ export const confirmTrade = (
     partnerSessionId,
   });
 
+/**
+ * "Found it": the old Remove. Every copy in hand, everywhere, and the
+ * Feed says so. A Flare's other exit is `takeDownRoomFlare` below.
+ */
 export const removeFlare = (code: string, flareId: string) =>
   call<{ ok: true }>("DELETE", `/api/v1/rooms/${encodeURIComponent(code)}/flares`, {
     flareId,
   });
+
+/**
+ * "Take down": the card leaves the board and the Feed and nothing is
+ * announced. The ids come back for the one-minute undo. An older
+ * server, which knows no `mode`, sends no ids back; an empty list means
+ * there is nothing to offer an undo on.
+ */
+export const takeDownRoomFlare = async (
+  code: string,
+  flareId: string,
+): Promise<{ ok: boolean; flareIds: string[] }> => {
+  const result = await call<{ ok: boolean; flareIds?: string[] }>(
+    "DELETE",
+    `/api/v1/rooms/${encodeURIComponent(code)}/flares`,
+    { flareId, mode: "take-down" },
+  );
+  return { ok: result.ok, flareIds: result.flareIds ?? [] };
+};
+
+/** The undo: puts back what `takeDownRoomFlare` took down a moment ago. */
+export const restoreRoomFlares = async (
+  code: string,
+  flareIds: string[],
+): Promise<{ ok: boolean; restored: number }> => {
+  const result = await call<{ ok: boolean; restored?: number }>(
+    "DELETE",
+    `/api/v1/rooms/${encodeURIComponent(code)}/flares`,
+    { flareId: flareIds[0], mode: "restore", flareIds },
+  );
+  return { ok: result.ok, restored: result.restored ?? 0 };
+};
 
 export const setOpenToTrades = (code: string, open: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/rooms/${encodeURIComponent(code)}/open`, {
@@ -1928,6 +1976,35 @@ export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
     action: liked ? "like" : "unlike",
   });
+
+/**
+ * "Take down" on your own post: every open card of it withdrawn, nothing
+ * announced, the ids back for the undo. The website's
+ * `takeDownPostAction` does the same.
+ */
+export const takeDownPost = async (
+  postId: string,
+): Promise<{ ok: boolean; flareIds: string[] }> => {
+  const result = await call<{ ok: boolean; flareIds?: string[] }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "take-down" },
+  );
+  return { ok: result.ok, flareIds: result.flareIds ?? [] };
+};
+
+/** The undo, within the server's minute: the same ids, reopened. */
+export const restorePost = async (
+  postId: string,
+  flareIds: string[],
+): Promise<{ ok: boolean; restored: number }> => {
+  const result = await call<{ ok: boolean; restored?: number }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "restore", flareIds },
+  );
+  return { ok: result.ok, restored: result.restored ?? 0 };
+};
 
 export const commentOnPost = (postId: string, body: string) =>
   call<{ ok: true; comment: PostComment }>(

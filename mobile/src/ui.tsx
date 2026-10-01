@@ -365,7 +365,7 @@ function ZoomHaveForm({ have }: { have: ZoomHave }) {
         <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
           {have.state === "offered"
             ? "Somebody already offered. You can too."
-            : "Posts in the thread and tells them."}
+            : "Replies on their Flare and lets them know."}
         </Text>
         <Button
           label={busy ? "Sending…" : "I have this"}

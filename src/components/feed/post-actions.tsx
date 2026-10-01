@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutList, ListChecks } from "lucide-react";
+import { LayoutList, ListChecks, Trash2 } from "lucide-react";
 
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
+import { useTakeDown } from "@/components/feed/undo-toast";
 import { Button } from "@/components/ui/button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
 import type { FeedCard } from "@/lib/feed/repository";
+import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
 
 /**
  * What you can do to a post, behind the three dots.
@@ -20,6 +22,13 @@ import type { FeedCard } from "@/lib/feed/repository";
  * dialogs in the top layer, so they open from the corner as well as
  * they did from under the cards. The app draws the same menu
  * (mobile/src/flare-feed-card.tsx).
+ *
+ * Your own post has two exits, and both are here. "Update progress"
+ * is the first: tick the copies you found, and the post says so.
+ * "Take down" is the second, from the audit of 2026-10-01: a wrong
+ * post had no way out that did not announce "found it" to everybody.
+ * Take down withdraws the cards everywhere, tells nobody, and puts up
+ * an Undo for a minute. It shows for both directions.
  */
 
 interface PostShape {
@@ -33,6 +42,7 @@ interface PostShape {
 
 export function PostMenu({ post }: { post: PostShape }) {
   const [sheet, setSheet] = useState<"cards" | "progress" | null>(null);
+  const { takeDown } = useTakeDown();
 
   const items: MenuItem[] = [];
   if (post.total > 1) {
@@ -53,6 +63,14 @@ export function PostMenu({ post }: { post: PostShape }) {
       label: "Update progress",
       icon: <ListChecks />,
       onSelect: () => setSheet("progress"),
+    });
+  }
+  if (post.yours) {
+    items.push({
+      key: "take-down",
+      label: "Take down",
+      icon: <Trash2 />,
+      onSelect: () => takeDown(() => takeDownPostAction(post.postId)),
     });
   }
 

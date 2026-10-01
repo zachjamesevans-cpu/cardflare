@@ -29,6 +29,13 @@ export interface OutstandingWant {
    */
   /* Where it is up, and how to walk in. See lib/players/wants.ts. */
   postedWhere?: PostedWhere[] | null;
+  /**
+   * Every copy found. The card stays on the list, greyed, saying so:
+   * a found card must never read "Live", because live is a promise
+   * that somebody can still answer it. A taken-down card is simply
+   * absent, since its posts are cancelled.
+   */
+  found?: boolean;
 }
 
 /**
@@ -65,7 +72,9 @@ export function WantEntries({
         /* `relative` anchors the controls' pending veil to the row. */
         <li
           key={want.id}
-          className="relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0"
+          className={`relative flex flex-col border-t border-border py-3 first:border-t-0 first:pt-0 ${
+            want.found ? "opacity-60 grayscale" : ""
+          }`}
         >
           <div className="flex items-start gap-3">
             <CardImageZoom
@@ -109,23 +118,32 @@ export function WantEntries({
                 {/* Only a board at a shop is named, tappable, one per
                     shop: "make label tappable so it opens the rooms." A
                     card that is not on a board says nothing here; it is
-                    on the list, which is the whole statement. */}
-                {want.postedWhere && want.postedWhere.length > 0 && (
-                  <span className="font-sans font-semibold text-accent">
-                    {want.postedWhere.map((where) =>
-                      where.code ? (
-                        <Link
-                          key={where.name}
-                          href={`/e/${where.code}`}
-                          className="underline underline-offset-2 hover:text-accent-hover"
-                        >
-                          Live at {where.name}
-                        </Link>
-                      ) : (
-                        <span key={where.name}>Live at {where.name}</span>
-                      ),
-                    )}
+                    on the list, which is the whole statement. A card
+                    whose every copy is found says that instead, the
+                    same word the board uses. */}
+                {want.found ? (
+                  <span className="font-sans text-xs font-bold tracking-wider text-accent uppercase">
+                    Found
                   </span>
+                ) : (
+                  want.postedWhere &&
+                  want.postedWhere.length > 0 && (
+                    <span className="font-sans font-semibold text-accent">
+                      {want.postedWhere.map((where) =>
+                        where.code ? (
+                          <Link
+                            key={where.name}
+                            href={`/e/${where.code}`}
+                            className="underline underline-offset-2 hover:text-accent-hover"
+                          >
+                            Live at {where.name}
+                          </Link>
+                        ) : (
+                          <span key={where.name}>Live at {where.name}</span>
+                        ),
+                      )}
+                    </span>
+                  )
                 )}
               </p>
 

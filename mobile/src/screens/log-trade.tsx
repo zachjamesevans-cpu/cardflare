@@ -299,7 +299,7 @@ export function LogTradeScreen() {
           <Input
             value={place}
             onChangeText={setPlace}
-            placeholder="A store, a kitchen table, wherever"
+            placeholder="A store, a kitchen table, a parking lot"
             maxLength={LOGGED_PLACE_MAX}
             autoCapitalize="words"
           />

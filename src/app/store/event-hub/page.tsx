@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { MonitorOff } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ScreenCard } from "@/components/event-hub/screen-card";
 import { StoreTabs } from "@/components/stores/store-tabs";
-import { loadStoreConsole } from "@/lib/stores/console";
+import { Card } from "@/components/ui/card";
+import { consoleHref, loadStoreConsole } from "@/lib/stores/console";
 import { tierHasFeature } from "@/lib/stores/ultra-access";
 import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { createDisplayAction } from "@/lib/event-hub/actions";
@@ -52,7 +55,45 @@ export default async function FlareCastPage({
     as,
     "/store/event-hub",
   );
-  if (!store || store.kind === "vendor") return null;
+  if (!store) return null;
+
+  /* A vendor has a table, not a room: the tab says so instead of
+     rendering nothing, which read as a broken page. Same shell, one card. */
+  if (store.kind === "vendor") {
+    return (
+      <AppShell
+        area="Store"
+        email={viewer.user.email ?? ""}
+        title="FlareCast"
+        description="Your screens: tournament timers, the room's Flares and your counter code, on every TV."
+        areas={areas}
+        currentArea={currentArea}
+      >
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <MonitorOff
+              className="mt-0.5 size-5 shrink-0 text-text-muted"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">
+                FlareCast is for stores.
+              </p>
+              <p className="text-sm text-text-secondary">
+                A vendor table has no room to cast.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={consoleHref("/store", store.id)}
+            className="self-start text-sm font-semibold text-accent underline-offset-4 hover:underline"
+          >
+            Back to your console
+          </Link>
+        </Card>
+      </AppShell>
+    );
+  }
 
   /* Ultra's. A store without it gets the trial card in place of the tab. */
   if (!tierHasFeature("flarecast", store.tier)) {

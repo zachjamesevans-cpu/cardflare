@@ -42,7 +42,8 @@ export function EventRowCard({
             <Users className="size-4" aria-hidden="true" />
             {attendance.present}
             <span className="sr-only">
-              players here now, {attendance.total} joined in total
+              {attendance.present === 1 ? "player" : "players"} here now,{" "}
+              {attendance.total} joined in total
             </span>
           </span>
         )}
@@ -60,8 +61,10 @@ export function EventRowCard({
             Walk-in
           </span>
         )}
+        {/* A night the store called off is closed in the database and
+            "Cancelled" to the store, which is the word they used. */}
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
-          {STATUS_LABELS[event.status]}
+          {event.cancelled_at ? "Cancelled" : STATUS_LABELS[event.status]}
         </Badge>
       </div>
     </Card>

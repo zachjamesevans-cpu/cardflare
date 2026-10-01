@@ -65,9 +65,17 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
            * when a player is deepest in the product.
            */
           const roomOwner = LOCAL_ENABLED ? "/feed" : "/room";
+          /*
+           * With Local off, /local is the Messages page, and Messages
+           * is a door inside the Inbox. So the Inbox tab stays lit
+           * while somebody reads a conversation, the way it does in
+           * the app, where Messages is a screen pushed over the Inbox.
+           */
+          const inboxOwnsLocal = !LOCAL_ENABLED && pathname.startsWith("/local");
           const active =
             pathname === tab.href ||
-            (tab.href === roomOwner && pathname.startsWith("/e/"));
+            (tab.href === roomOwner && pathname.startsWith("/e/")) ||
+            (tab.href === "/inbox" && inboxOwnsLocal);
 
           const Icon = tab.icon;
 

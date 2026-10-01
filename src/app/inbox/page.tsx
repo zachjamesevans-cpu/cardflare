@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, ChevronRight, MessageCircle } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { InboxList } from "@/components/inbox/inbox-list";
@@ -9,8 +9,9 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
+import { unreadMessages } from "@/lib/local/threads";
 import { markInboxReadAction } from "@/lib/notifications/inbox-actions";
-import { listInbox } from "@/lib/notifications/inbox";
+import { listInbox, type InboxItem } from "@/lib/notifications/inbox";
 import { playerForUser } from "@/lib/players/accounts";
 import { SITE } from "@/lib/site";
 
@@ -28,6 +29,12 @@ export const dynamic = "force-dynamic";
  * has been delivering them, but the only way to read the inbox itself
  * was the app — so a player on a laptop never saw the offer that landed
  * while they were away. Same rows, same fifty, same order.
+ *
+ * Messages has its door here too. The audit of 2026-10-01: with Local
+ * off, the conversations lived at /local with no tab and no link, so
+ * a reply could only be found from the notice that announced it. The
+ * row at the top is the way in, unread count and all, shown even when
+ * nothing else has arrived. The app's Inbox draws the same row.
  */
 export default async function InboxPage() {
   const viewer = await getViewer();
@@ -42,7 +49,9 @@ export default async function InboxPage() {
   // An inbox belongs to an account. A guest has nowhere for one to live.
   if (viewer.kind === "anonymous") redirect("/login?next=/inbox");
 
-  const items = playerId ? await listInbox(playerId) : [];
+  const [items, unreadThreads]: [InboxItem[], number] = playerId
+    ? await Promise.all([listInbox(playerId), unreadMessages(playerId)])
+    : [[], 0];
   const unread = items.filter((item) => !item.readAt).length;
 
   return (
@@ -68,6 +77,35 @@ export default async function InboxPage() {
               </form>
             )}
           </div>
+
+          {playerId && (
+            <Link
+              href="/local"
+              className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated text-accent">
+                <MessageCircle className="size-5" aria-hidden="true" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-2 font-semibold text-text-primary">
+                  Messages
+                  {unreadThreads > 0 && (
+                    <span className="rounded-full bg-accent px-1.5 text-[11px] leading-5 font-bold text-accent-contrast tabular-nums">
+                      {unreadThreads > 99 ? "99+" : unreadThreads}
+                      <span className="sr-only"> unread</span>
+                    </span>
+                  )}
+                </span>
+                <span className="text-sm text-text-secondary">
+                  Conversations about cards, and with players you message.
+                </span>
+              </span>
+              <ChevronRight
+                className="size-4 shrink-0 text-text-muted"
+                aria-hidden="true"
+              />
+            </Link>
+          )}
 
           {!playerId ? (
             <Card className="flex flex-col gap-3">

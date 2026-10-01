@@ -7,6 +7,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
+import { restoreFlares, withdrawRoomFlare } from "@/lib/flares/withdraw";
 import { addFlare, cancelFlare } from "@/lib/lists/repository";
 import { announceShowcase } from "@/lib/lists/showcase";
 import { keepShowcaseAsHave } from "@/lib/nearby/showcase";
@@ -125,9 +126,19 @@ export async function POST(
   return Response.json({ ok: true });
 }
 
-const removeSchema = z.object({ flareId: z.guid() });
+const removeSchema = z.object({
+  flareId: z.guid(),
+  /*
+   * "found" is the old Remove: every copy in hand, everywhere, and the
+   * Feed says so. "take-down" withdraws the card and says nothing; the
+   * ids come back so the app can offer an undo. "restore" is that undo.
+   * Absent means "found", which is what every older build meant.
+   */
+  mode: z.enum(["found", "take-down", "restore"]).default("found"),
+  flareIds: z.array(z.guid()).max(120).optional(),
+});
 
-/** Taking a Flare down — `cancelFlare` only ever touches the caller's own. */
+/** One of a Flare's two exits, under the caller's own room identity. */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ code: string }> },
@@ -148,6 +159,20 @@ export async function DELETE(
 
   const parsed = removeSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");
+
+  if (parsed.data.mode === "take-down") {
+    const result = await withdrawRoomFlare(parsed.data.flareId, session.id);
+    return Response.json({ ok: result.ok, flareIds: result.flareIds });
+  }
+
+  if (parsed.data.mode === "restore") {
+    const result = await restoreFlares(
+      null,
+      session.id,
+      parsed.data.flareIds ?? [parsed.data.flareId],
+    );
+    return Response.json({ ok: result.ok, restored: result.restored });
+  }
 
   await cancelFlare(parsed.data.flareId, session.id);
 

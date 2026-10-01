@@ -50,8 +50,10 @@ export function WantRow({
         style={{
           flexDirection: "row",
           gap: spacing(2),
-          opacity: busy ? 0.6 : 1,
-          filter: busy ? [{ grayscale: 1 }] : undefined,
+          /* A found card is dimmed the same way a removal is: still
+             on the list, no longer asking. */
+          opacity: busy || want.found ? 0.6 : 1,
+          filter: busy || want.found ? [{ grayscale: 1 }] : undefined,
         }}
       >
         <CardImage
@@ -109,7 +111,21 @@ export function WantRow({
            * code; an older server sends only the line, which still
            * draws, just without the tap.
            */}
-          {want.postedBoards?.length ? (
+          {want.found ? (
+            /* Every copy in hand. "Live" is a promise somebody can walk
+               in and answer it, so a found card never says it. */
+            <Text
+              style={{
+                color: colors.accent,
+                fontSize: 11,
+                fontWeight: "700",
+                letterSpacing: 1.2,
+                textTransform: "uppercase",
+              }}
+            >
+              Found
+            </Text>
+          ) : want.postedBoards?.length ? (
             <View
               style={{
                 flexDirection: "row",

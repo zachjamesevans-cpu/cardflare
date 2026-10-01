@@ -165,7 +165,8 @@ describe("logging a trade", () => {
     expect(web.history).toContain("icon: PenLine");
     expect(web.history).toContain('label: "Remove"');
     expect(web.history).toContain("deleteLoggedTradeAction(trade.id)");
-    expect(web.history).toContain("{logged && !compact && (");
+    /* Behind a two-step since round 5: the menu's Remove asks first. */
+    expect(web.history).toMatch(/\{logged &&\s+!compact &&\s+\(confirming \?/);
     expect(web.history).toContain("href={`/p/${trade.partnerPlayerId}`}");
 
     expect(app.history).toContain("Logged by you");

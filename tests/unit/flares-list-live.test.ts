@@ -23,7 +23,7 @@ describe("the Flares list", () => {
 
     const web = read("src/components/players/want-entries.tsx");
     expect(web).not.toContain('"Saved"');
-    expect(web).toContain("want.postedWhere && want.postedWhere.length > 0 &&");
+    expect(web).toMatch(/want\.postedWhere &&\s+want\.postedWhere\.length > 0 &&/);
 
     const app = read("mobile/src/want-row.tsx");
     expect(app).not.toContain(">Saved<");

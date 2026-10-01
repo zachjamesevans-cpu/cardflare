@@ -231,7 +231,7 @@ function ZoomHaveBlock({ have }: { have: ZoomHave }) {
         <p className="text-xs text-text-muted">
           {have.state === "offered"
             ? "Somebody already offered. You can too."
-            : "Posts in the thread and tells them."}
+            : "Replies on their Flare and lets them know."}
         </p>
         <SubmitButton
           label="I have this"

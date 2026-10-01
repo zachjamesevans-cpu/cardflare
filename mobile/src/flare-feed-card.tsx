@@ -30,10 +30,18 @@ import { Button, Tap } from "./ui";
 
 type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
 
-/** How long ago, in the shortest true form. */
+/**
+ * How long ago, in the shortest true form.
+ *
+ * Under a minute is "now": the composer's preview is a post written
+ * this second, and "1m ago" on it was a rounding, not a fact. The
+ * website's `agoFrom` says the same.
+ */
 export function agoFrom(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
+  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (seconds < 60) return "now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
@@ -156,8 +164,14 @@ export function FlareActions({
 
 /**
  * What waits behind the three dots: the full list when there is more
- * than one card, and the progress ticks on your own want. Shared with
- * the post's own screen so the two menus never differ.
+ * than one card, the progress ticks on your own want, and last, on
+ * your own post whichever way it points, "Take down". Shared with the
+ * post's own screen so the two menus never differ.
+ *
+ * Take down is the second exit a Flare has. "Update progress" marks
+ * copies found and the Feed says so; Take down withdraws the cards
+ * everywhere, announces nothing, and can be undone for a minute. The
+ * website's `PostMenu` ends in the same item.
  */
 export function postActions({
   total,
@@ -165,12 +179,15 @@ export function postActions({
   direction,
   onViewAll,
   onProgress,
+  onTakeDown,
 }: {
   total: number;
   yours: boolean;
   direction: "want" | "showcase";
   onViewAll?: () => void;
   onProgress?: () => void;
+  /** "Take down", on your own post. */
+  onTakeDown?: () => void;
 }): ActionItem[] {
   const items: ActionItem[] = [];
   if (total > 1 && onViewAll) {
@@ -189,6 +206,14 @@ export function postActions({
       onPress: onProgress,
     });
   }
+  if (yours && onTakeDown) {
+    items.push({
+      key: "take-down",
+      label: "Take down",
+      icon: "trash-outline",
+      onPress: onTakeDown,
+    });
+  }
   return items;
 }
 
@@ -203,6 +228,7 @@ export function FlareFeedCard({
   onOffer,
   onViewAll,
   onProgress,
+  onTakeDown,
   onOpenHunt,
 }: {
   item: Hunt;
@@ -219,6 +245,8 @@ export function FlareFeedCard({
   onViewAll?: () => void;
   /** "Update progress", on your own post. */
   onProgress?: () => void;
+  /** "Take down", on your own post: withdrawn everywhere, nothing announced. */
+  onTakeDown?: () => void;
   /** "View hunt", when the post belongs to one. */
   onOpenHunt?: (huntId: string) => void;
 }) {
@@ -234,7 +262,11 @@ export function FlareFeedCard({
     direction,
     onViewAll,
     onProgress,
+    onTakeDown,
   });
+  /* A Flare posted to a room names it up here, where the time is, and
+     not only on the button at the foot: "at Mox Valley · 2h ago". */
+  const atStore = item.code && item.storeName ? `at ${item.storeName}` : null;
 
   return (
     <View
@@ -324,11 +356,30 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: two muted facts with a dot,
-            then the three dots when the post has extras to offer. */}
+        {/* One line, not a stacked block: the room, the time and the
+            distance as muted facts with dots between, then the three
+            dots when the post has extras to offer. The room's name may
+            shrink; the name column beside it keeps its half. */}
         <View
-          style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            flexShrink: 1,
+            maxWidth: "50%",
+          }}
         >
+          {atStore ? (
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}
+            >
+              {atStore}
+            </Text>
+          ) : null}
+          {atStore && item.postedAt ? (
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
+          ) : null}
           {item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>
               {agoFrom(item.postedAt)}

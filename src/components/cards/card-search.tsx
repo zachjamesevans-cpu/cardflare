@@ -866,7 +866,7 @@ export function CardSearch({
             ? `This room searches ${gameShortName(scopedGame)} cards only. `
             : ""}
           Misspellings are fine, and card numbers work with or without the dash. Add a
-          colour, a type or a set to narrow it: &ldquo;luffy leader&rdquo;.
+          color, a type or a set to narrow it: &ldquo;luffy leader&rdquo;.
         </p>
       </div>
 

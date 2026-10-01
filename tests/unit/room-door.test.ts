@@ -256,7 +256,8 @@ describe("a long section folds", () => {
     expect(fold).not.toContain("SECTION_FOLD");
     expect(fold).not.toMatch(/=\s*6\b/);
     expect(fold).toContain("hidden: number;");
-    expect(entries).toContain("const hidden = group.entries.length - SECTION_FOLD;");
+    /* `entries` is the player's section, newest first when it is yours. */
+    expect(entries).toContain("const hidden = entries.length - SECTION_FOLD;");
   });
 
   it("says and N more, then Show less, from one control", () => {
