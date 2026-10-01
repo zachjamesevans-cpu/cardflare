@@ -3,7 +3,12 @@ import { autoPostFor } from "@/lib/events/auto-post";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
-import { listOfferings, listWants, postedCardStores } from "@/lib/players/wants";
+import {
+  foundCardsFor,
+  listOfferings,
+  listWants,
+  postedCardStores,
+} from "@/lib/players/wants";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { postedLabel } from "@/lib/players/wants";
 
@@ -41,36 +46,48 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [asked, offering, sync, locals, account, posted, feedView, autoPost, staff] =
-    await Promise.all([
-      listWants(player.playerId),
-      /* Both directions on one list: see the Flare tab. */
-      listOfferings(player.playerId),
-      collectionSyncFor(player.playerId),
-      listLocals(player.playerId),
-      /*
-       * The picture and the balance, for the app's home header.
-       *
-       * Two columns off one indexed row rather than the whole profile: the
-       * home screen is the most-opened screen in the product and it needs a
-       * face and a number, not a wardrobe. The dressed avatar - rings,
-       * auras, worn files - stays on the Profile tab, which is the screen
-       * that already pays for it.
-       */
-      getSupabaseAdmin()
-        .from("players")
-        .select("avatar_url, embers_balance")
-        .eq("id", player.playerId)
-        .maybeSingle(),
-      /* Which of those cards are live on a board right now - the second of
+  const [
+    asked,
+    offering,
+    sync,
+    locals,
+    account,
+    posted,
+    feedView,
+    autoPost,
+    staff,
+    foundCards,
+  ] = await Promise.all([
+    listWants(player.playerId),
+    /* Both directions on one list: see the Flare tab. */
+    listOfferings(player.playerId),
+    collectionSyncFor(player.playerId),
+    listLocals(player.playerId),
+    /*
+     * The picture and the balance, for the app's home header.
+     *
+     * Two columns off one indexed row rather than the whole profile: the
+     * home screen is the most-opened screen in the product and it needs a
+     * face and a number, not a wardrobe. The dressed avatar - rings,
+     * auras, worn files - stays on the Profile tab, which is the screen
+     * that already pays for it.
+     */
+    getSupabaseAdmin()
+      .from("players")
+      .select("avatar_url, embers_balance")
+      .eq("id", player.playerId)
+      .maybeSingle(),
+    /* Which of those cards are live on a board right now - the second of
        the list's two states. See postedCardStores. */
-      postedCardStores(player.playerId),
-      feedViewFor(player.playerId),
-      autoPostFor(player.playerId),
-      /* The stores this account may RUN, for the remote: owners and
+    postedCardStores(player.playerId),
+    feedViewFor(player.playerId),
+    autoPostFor(player.playerId),
+    /* The stores this account may RUN, for the remote: owners and
        organizers alike. Empty for nearly everybody. */
-      staffedStores(player.userId),
-    ]);
+    staffedStores(player.userId),
+    /* Cards with every copy in hand, which say "Found" instead of "Live". */
+    foundCardsFor(player.playerId),
+  ]);
 
   return Response.json({
     player: {
@@ -114,6 +131,7 @@ export async function GET(request: Request): Promise<Response> {
        */
       postedAt: postedLabel(posted.get(want.cardId) ?? []),
       postedBoards: posted.get(want.cardId) ?? [],
+      found: foundCards.has(want.cardId),
     })),
     collection: sync
       ? { cardsMatched: sync.cards_matched, syncedAt: sync.synced_at }

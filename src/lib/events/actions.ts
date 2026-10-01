@@ -437,6 +437,8 @@ export async function setStoreTimeZoneAction(formData: FormData): Promise<void> 
   }
 
   revalidatePath("/store");
+  revalidatePath("/store/events");
+  revalidatePath("/store/setup");
   revalidatePath("/admin");
 }
 
@@ -502,6 +504,13 @@ export async function setEventStatusAction(formData: FormData): Promise<void> {
    */
   if (event.kind !== "scheduled") {
     console.error("Rejected a status change on a walk-in room.");
+    return;
+  }
+
+  /* A cancelled night stays cancelled. The page offers no reopen; a
+     crafted post gets the same answer. */
+  if (event.cancelled_at) {
+    console.error("Rejected a status change on a cancelled night.");
     return;
   }
 

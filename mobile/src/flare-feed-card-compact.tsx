@@ -55,6 +55,7 @@ export function FlareFeedCardCompact({
   onMessage,
   onViewAll,
   onProgress,
+  onTakeDown,
 }: {
   item: Hunt;
   post: PostRef;
@@ -66,6 +67,8 @@ export function FlareFeedCardCompact({
   onViewAll?: () => void;
   /** The progress ticks on your own post; behind the three dots. */
   onProgress?: () => void;
+  /** "Take down" on your own post; behind the three dots. */
+  onTakeDown?: () => void;
 }) {
   const shelf = shelfFor(item.cards, post);
   const direction = item.direction ?? "want";
@@ -77,6 +80,7 @@ export function FlareFeedCardCompact({
     direction,
     onViewAll,
     onProgress,
+    onTakeDown,
   });
 
   /* Cash is the only term that is not the default, so it is the only

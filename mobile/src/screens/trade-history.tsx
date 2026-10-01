@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { ActionSheet } from "../action-menu";
@@ -98,6 +98,32 @@ export function TradeHistoryScreen() {
     }
   };
 
+  /*
+   * The two-step. A logged trade is the only kind that can go, and one
+   * tap on "Remove" used to be enough to lose a row somebody typed in.
+   * The confirm asks the website's question in the system's own dialog,
+   * with Cancel first and the destructive choice marked as such.
+   */
+  const confirmRemove = (trade: TradeHistoryEntry) => {
+    Alert.alert("Remove this trade?", undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => void remove(trade) },
+    ]);
+  };
+
+  /*
+   * "Logged." is news for a moment, not a label for the visit. It
+   * arrives as a route param from the log form and used to sit there
+   * until the next form cleared it, so a row removed a minute later was
+   * still captioned as just logged. Four seconds, then it goes.
+   */
+  const logged = route.params?.logged ?? false;
+  useEffect(() => {
+    if (!logged) return;
+    const timer = setTimeout(() => navigation.setParams({ logged: undefined }), 4000);
+    return () => clearTimeout(timer);
+  }, [logged, navigation]);
+
   if (failed) {
     return (
       <ScrollView
@@ -187,7 +213,7 @@ export function TradeHistoryScreen() {
           ) : null}
         </View>
 
-        {route.params?.logged ? <Muted>Logged.</Muted> : null}
+        {logged ? <Muted>Logged.</Muted> : null}
 
         <TradeHistoryTotalsRow totals={history.totals} />
 
@@ -291,8 +317,9 @@ export function TradeHistoryScreen() {
         )}
       </ScrollView>
 
-      {/* A logged row's extras, behind the three dots: one item. A
-          room trade is a thing two people did and has no menu. */}
+      {/* A logged row's extras, behind the three dots: one item, and
+          a confirm behind it. A room trade is a thing two people did
+          and has no menu. */}
       <ActionSheet
         items={
           menuFor
@@ -301,7 +328,7 @@ export function TradeHistoryScreen() {
                   key: "remove",
                   label: "Remove",
                   icon: "trash-outline",
-                  onPress: () => void remove(menuFor),
+                  onPress: () => confirmRemove(menuFor),
                 },
               ]
             : null

@@ -161,7 +161,7 @@ export function StoreScreen() {
       <Card>
         <Shelf
           title="Profile borders"
-          blurb="The ring around your profile picture, in every room you join. Separate from your cards. Buying a border once unlocks it for both."
+          blurb="The ring around your profile picture, in every room you join. Buying a border unlocks it for your profile and your cards."
           items={wardrobe.avatarFrames}
           slot="avatarFrame"
           balance={profile.embersBalance}

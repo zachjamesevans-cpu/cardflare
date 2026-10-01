@@ -60,7 +60,7 @@ export function WelcomeHero({
       </h2>
       <p className="max-w-2xl text-text-secondary">
         {onUltra
-          ? `${storeName} is on. Your counter code is ready to print, and the next four steps put the rest of Ultra to work: your page, your screens, your first night and your team.`
+          ? `${storeName} is live on ${SITE.name}. Your counter code is ready to print, and the next four steps put the rest of Ultra to work: your page, your screens, your first night and your team.`
           : `${storeName} is on ${SITE.name}: players scan your counter code and find the cards they need from each other, right in your store. Start your Ultra trial to put FlareCast on your TV with Auto Mode running the rounds, match your singles to every Flare and post to your followers.`}
         {trialUntil &&
           ` Your free trial runs until ${trialUntil}; nothing is charged before then.`}

@@ -463,13 +463,25 @@ export async function postedCardStores(
     sessionIds.length > 0
       ? await admin
           .from("flares")
-          .select("card_id, event_id")
+          .select("card_id, event_id, quantity, found_quantity")
           .in("player_session_id", sessionIds)
           .eq("status", "open")
           .eq("intent", "want")
-      : { data: [] as { card_id: string; event_id: string | null }[] };
+      : {
+          data: [] as {
+            card_id: string;
+            event_id: string | null;
+            quantity: number;
+            found_quantity: number | null;
+          }[],
+        };
 
-  const boardFlares = board.data ?? [];
+  /* A card with every copy in hand is not "live" anywhere, however
+     open the row still is: the audit saw found cards listed as "Live
+     at Mox Valley Games". */
+  const boardFlares = (board.data ?? []).filter(
+    (flare) => (flare.found_quantity ?? 0) < flare.quantity,
+  );
   const eventIds = [
     ...new Set(
       boardFlares
@@ -554,4 +566,45 @@ export function postedLabel(where: PostedWhere[]): string | null {
   if (where.length === 0) return null;
   if (where.length === 1) return where[0].name;
   return `${where.length} stores`;
+}
+
+/**
+ * The cards on the player's list whose every copy is in hand: open
+ * want Flares with nothing left to find, and no other open Flare for
+ * the card still looking. The list draws them greyed and says "Found"
+ * instead of "Live", because live is a promise that somebody can walk
+ * in and answer it.
+ */
+export async function foundCardsFor(playerId: string): Promise<Set<string>> {
+  if (!isSupabaseConfigured()) return new Set();
+
+  const admin = getSupabaseAdmin();
+  const { data: sessions } = await admin
+    .from("player_sessions")
+    .select("id")
+    .eq("player_id", playerId);
+  const sessionIds = (sessions ?? []).map((row) => row.id);
+
+  const owned =
+    sessionIds.length > 0
+      ? `player_id.eq.${playerId},player_session_id.in.(${sessionIds
+          .map((id) => `"${id}"`)
+          .join(",")})`
+      : `player_id.eq.${playerId}`;
+
+  const { data } = await admin
+    .from("flares")
+    .select("card_id, quantity, found_quantity")
+    .or(owned)
+    .eq("status", "open")
+    .eq("intent", "want");
+
+  const found = new Set<string>();
+  const stillLooking = new Set<string>();
+  for (const flare of data ?? []) {
+    if ((flare.found_quantity ?? 0) >= flare.quantity) found.add(flare.card_id);
+    else stillLooking.add(flare.card_id);
+  }
+  for (const cardId of stillLooking) found.delete(cardId);
+  return found;
 }

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { ExternalLink, Smartphone, Store as StoreIcon, Users } from "lucide-react";
 
 import { CounterCode } from "@/components/events/counter-code";
+import { TimeZonePicker } from "@/components/events/timezone-picker";
+import { TimezoneSuggest } from "@/components/events/timezone-suggest";
 import { AppShell } from "@/components/layout/app-shell";
 import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { WelcomeHero } from "@/components/stores/onboarding";
@@ -32,6 +34,7 @@ import { listDisplays } from "@/lib/event-hub/repository";
 import { defaultEventWindow, formatEventWindow } from "@/lib/events/format";
 import { joinQrSvg, joinUrl } from "@/lib/events/qr";
 import { listEventsForStore } from "@/lib/events/repository";
+import { NO_TIMEZONE } from "@/lib/events/schema";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { siteUrl } from "@/lib/site";
@@ -123,7 +126,9 @@ export default async function StoreSetupPage({
             onUltra={onUltra}
           />
         )}
-        {step === "page" && <PageStep storeId={store.id} tier={store.tier} />}
+        {step === "page" && (
+          <PageStep storeId={store.id} tier={store.tier} timeZone={timeZone} />
+        )}
         {step === "screens" &&
           (onUltra ? (
             <ScreensStep storeId={store.id} />
@@ -226,7 +231,15 @@ async function WelcomeStep({
 /* 2. Your store page                                                    */
 /* -------------------------------------------------------------------- */
 
-async function PageStep({ storeId, tier }: { storeId: string; tier: string }) {
+async function PageStep({
+  storeId,
+  tier,
+  timeZone,
+}: {
+  storeId: string;
+  tier: string;
+  timeZone: string;
+}) {
   const page = await storePageFor(storeId);
 
   return (
@@ -236,6 +249,16 @@ async function PageStep({ storeId, tier }: { storeId: string; tier: string }) {
       title={STEP_TITLES.page}
       lede="What a player sees when they find you or follow you: your logo, a banner, a line about the shop, where you are and when you are open."
     >
+      {/* Where the shop's clock is, first: every night the store makes
+          is read in this zone, and the browser already knows it. */}
+      {timeZone === "UTC" && (
+        <TimezoneSuggest
+          storeId={storeId}
+          message="Where is your store? Set its clock so a 6 PM night means 6 PM where you are."
+          picker={<TimeZonePicker storeId={storeId} timeZone={timeZone} />}
+        />
+      )}
+
       {page ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
           <Card className="flex flex-col gap-5">
@@ -384,6 +407,16 @@ async function EventStep({ storeId, timeZone }: { storeId: string; timeZone: str
             ))}
           </ul>
         </Card>
+      )}
+
+      {/* A store that skipped the page step still has to say where it
+          is before the server will take a night from it. */}
+      {timeZone === "UTC" && (
+        <TimezoneSuggest
+          storeId={storeId}
+          message={NO_TIMEZONE}
+          picker={<TimeZonePicker storeId={storeId} timeZone={timeZone} />}
+        />
       )}
 
       {/* The counter code is the next step's: it is what a finished

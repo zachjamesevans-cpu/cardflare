@@ -15,11 +15,11 @@ import {
   type CreateEventState,
 } from "@/lib/events/schema";
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Creating…" : "Create event"}
     </Button>
@@ -48,6 +48,7 @@ export function CreateEventForm({
   stores,
   defaultStartsAt,
   defaultEndsAt,
+  disabled = false,
 }: {
   /** Fixed store, for a store member. */
   storeId?: string;
@@ -56,6 +57,11 @@ export function CreateEventForm({
   /** Pre-filled with a sensible next slot, computed on the server. */
   defaultStartsAt: string;
   defaultEndsAt: string;
+  /**
+   * True while the store has no timezone: the server refuses the night
+   * anyway, so the button says so before the form is filled in vain.
+   */
+  disabled?: boolean;
 }) {
   const [state, formAction] = useActionState<CreateEventState, FormData>(
     createEventAction,
@@ -167,13 +173,13 @@ export function CreateEventForm({
         />
         <span>
           <span className="font-medium text-text-primary">Repeats weekly.</span> When
-          this one closes, next week&rsquo;s appears by itself. Enter your Wednesday
-          locals once, never again.
+          this one closes, next week&rsquo;s appears by itself. Enter your weekly night
+          once, never again.
         </span>
       </label>
 
       <div>
-        <SubmitButton />
+        <SubmitButton disabled={disabled} />
       </div>
     </form>
   );

@@ -38,8 +38,10 @@ import {
   openLocalThread,
   postFlare,
   rememberRoom,
+  restorePost,
   serverMessage,
   storedAccessToken,
+  takeDownPost,
   type Me,
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
@@ -67,7 +69,8 @@ import {
 import { silentCoords } from "../location";
 import { FeedPerson } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
-import { onFeedStale } from "../feed-refresh";
+import { markFeedStale, onFeedStale } from "../feed-refresh";
+import { UndoToast, type UndoOffer } from "../undo-toast";
 import { refreshTick } from "../refresh-tick";
 import {
   CollapsingHeader,
@@ -392,6 +395,9 @@ export function HomeScreen() {
   >(null);
   /* Your own post, with its copies-found stepper open. */
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
+  /* "Taken down. Undo", for the minute the server allows. */
+  const [undo, setUndo] = useState<UndoOffer | null>(null);
+  const dismissUndo = useCallback(() => setUndo(null), []);
 
   /*
    * Refs beside the state, because `load` is a stable useCallback with
@@ -666,6 +672,35 @@ export function HomeScreen() {
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
     openRoom(navigation);
+  };
+
+  /**
+   * "Take down" on your own post: the cards withdrawn everywhere and
+   * nothing announced. The post leaves the list the moment the server
+   * says yes, the Feed is marked stale so the next read agrees, and the
+   * toast holds the undo for a minute. Undo puts the same rows back and
+   * reloads.
+   */
+  const takeDown = async (postId: string) => {
+    try {
+      const result = await takeDownPost(postId);
+      if (!result.ok) return;
+      setFeed((current) =>
+        current.filter((entry) => !(entry.kind === "hunt" && entry.postId === postId)),
+      );
+      markFeedStale();
+      if (result.flareIds.length === 0) return;
+      setUndo({
+        key: `${postId}:${Date.now()}`,
+        message: "Taken down.",
+        onUndo: async () => {
+          await restorePost(postId, result.flareIds).catch(() => undefined);
+          await load(() => true);
+        },
+      });
+    } catch {
+      /* The next load shows the honest state either way. */
+    }
   };
 
   /*
@@ -1160,6 +1195,7 @@ export function HomeScreen() {
                   onProgress={
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
                   }
+                  onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
                 />
               ) : (
                 <FlareFeedCard
@@ -1193,6 +1229,7 @@ export function HomeScreen() {
                   onProgress={
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
                   }
+                  onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
                   onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
                 />
               )
@@ -1607,6 +1644,10 @@ export function HomeScreen() {
           </Card>
         )}
       </Animated.ScrollView>
+
+      {/* The undo, fixed above the floating tab bar so a scroll cannot
+          carry it off before it is read. */}
+      <UndoToast offer={undo} onDismiss={dismissUndo} bottom={tabInset + spacing(2)} />
     </>
   );
 }

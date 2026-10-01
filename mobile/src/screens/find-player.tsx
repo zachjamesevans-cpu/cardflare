@@ -66,7 +66,7 @@ export function FindPlayerScreen() {
           player", and saying it twice is how a screen looks unfinished. */}
       <Body>
         Search by name or @handle. Their profile is where the follow button lives, and
-        following each other makes you Trade partners.
+        following each other makes you trade partners.
       </Body>
 
       <Input

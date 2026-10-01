@@ -278,12 +278,17 @@ export default async function StorePage({
             <MonitorPlay className="size-5 text-accent" aria-hidden="true" />
             <h2 className="font-semibold text-text-primary">FlareCast</h2>
           </div>
+          {/* Without Ultra the tab shows the pitch, so the card says what
+              FlareCast is and sends them to it, rather than counting
+              screens they cannot add. */}
           <p className="text-sm text-text-secondary">
-            {displays.length === 0
-              ? "No screens yet. Add one and open its link on the television."
-              : displays.length === 1
-                ? "One screen. Open its link on the television at the start of the night."
-                : `${displays.length} screens ready for the television.`}
+            {!hasUltra
+              ? "FlareCast puts your counter code, the round clocks and the room's Flares on your TV. Part of Ultra."
+              : displays.length === 0
+                ? "No screens yet. Add one and open its link on the television."
+                : displays.length === 1
+                  ? "One screen. Open its link on the television at the start of the night."
+                  : `${displays.length} screens ready for the television.`}
           </p>
           <div>
             <ButtonLink
@@ -291,7 +296,7 @@ export default async function StorePage({
               variant="secondary"
               size="sm"
             >
-              Open FlareCast
+              {hasUltra ? "Open FlareCast" : "See Ultra"}
             </ButtonLink>
           </div>
         </Card>

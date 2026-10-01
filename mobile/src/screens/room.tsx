@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RemoteImage } from "../remote-image";
 import { DoorIconButton, RemoteEntry } from "../remote-entry";
-import { RoomPeopleModal } from "../room-people";
+import { dedupeParticipants, RoomPeopleModal } from "../room-people";
+import { UndoToast, type UndoOffer } from "../undo-toast";
 import { FollowStoreButton } from "../follow-store-button";
 import { VerifiedMark } from "../verified-mark";
 
@@ -40,8 +41,10 @@ import {
   rememberRoom,
   removeFlare,
   removeLocal,
+  restoreRoomFlares,
   setOpenToTrades,
   storedAccessToken,
+  takeDownRoomFlare,
   type Me,
   type RoomFlare,
   type RoomState,
@@ -436,6 +439,11 @@ function RoomScreen({
      screen dies at exactly the moment a room comes up. */
   const [peek, setPeek] = useState<string | null>(null);
 
+  /* "Taken down. Undo", for the server's minute. Declared up here with
+     the rest, above every early return, for the same reason as `peek`. */
+  const [undo, setUndo] = useState<UndoOffer | null>(null);
+  const dismissUndo = useCallback(() => setUndo(null), []);
+
   /*
    * Whether this phone holds an account, known before the room answers.
    *
@@ -566,6 +574,35 @@ function RoomScreen({
       // The re-render shows the truthful state either way.
     }
     await refresh();
+  };
+
+  /**
+   * "Take down" on your own tile: the Flare's second exit. "Found it"
+   * (`removeFlare`) marks every copy found and the Feed says so; this
+   * withdraws the card and says nothing, and the toast holds the undo
+   * for the minute the server allows. Same two controls on the website's
+   * board.
+   */
+  const takeDown = async (flareId: string) => {
+    let offer: UndoOffer | null = null;
+    try {
+      const result = await takeDownRoomFlare(code, flareId);
+      if (result.ok && result.flareIds.length > 0) {
+        const flareIds = result.flareIds;
+        offer = {
+          key: `${flareId}:${Date.now()}`,
+          message: "Taken down.",
+          onUndo: async () => {
+            await restoreRoomFlares(code, flareIds).catch(() => undefined);
+            await refresh();
+          },
+        };
+      }
+    } catch {
+      // The re-render shows the truthful state either way.
+    }
+    await refresh();
+    if (offer) setUndo(offer);
   };
 
   if (!state) {
@@ -872,9 +909,26 @@ function RoomScreen({
     groups.set(flare.playerSessionId, group);
   }
 
-  /* The door card's pulse: who is here, and up to three of their faces. */
-  const hereNow = participants.filter((p) => p.present).length;
-  const faces = participants.filter((p) => p.present).slice(0, 3);
+  /*
+   * Your own section leads with what you just posted. The audit: a new
+   * card sat behind "and N more" on the rail of the person who had just
+   * put it up. The newest leads, before the fold cuts; everybody
+   * else's section keeps the board's order. An older server sends no
+   * `createdAt`, and ties leave the order as it came.
+   */
+  const own = groups.get(youId);
+  if (own) {
+    own.flares = [...own.flares].sort(
+      (a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? "") || 0,
+    );
+  }
+
+  /* The door card's pulse: who is here, and up to three of their faces.
+     People, not seats: an account in from two devices is one face and
+     one in the count. See dedupeParticipants. */
+  const people = dedupeParticipants(participants);
+  const hereNow = people.filter((p) => p.present).length;
+  const faces = people.filter((p) => p.present).slice(0, 3);
 
   return (
     <View style={{ flex: 1 }}>
@@ -1004,7 +1058,7 @@ function RoomScreen({
               <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
                 {`${hereNow} here now`}
               </Text>
-              {` · ${participants.length} tonight · ${flares.length} ${
+              {` · ${people.length} tonight · ${flares.length} ${
                 flares.length === 1 ? "Flare" : "Flares"
               }`}
             </Text>
@@ -1111,6 +1165,7 @@ function RoomScreen({
                 siblings={shelf}
                 position={shelfAt.get(flare.id) ?? 0}
                 onRemove={() => act(() => removeFlare(code, flare.id))}
+                onTakeDown={() => takeDown(flare.id)}
               />
             );
 
@@ -1280,6 +1335,7 @@ function RoomScreen({
                     void act(() => offerOnFlare(code, flare.id, message, quantity))
                   }
                   onRemove={() => act(() => removeFlare(code, flare.id))}
+                  onTakeDown={() => takeDown(flare.id)}
                   onTraded={(partner) =>
                     void act(() => confirmTrade(code, flare.id, partner))
                   }
@@ -1687,7 +1743,7 @@ function RoomScreen({
           full profile leaves both behind for the profile screen. */}
       <RoomPeopleModal
         open={peopleOpen}
-        participants={participants}
+        participants={people}
         onClose={() => setPeopleOpen(false)}
         onPeek={setPeek}
       />
@@ -1718,9 +1774,20 @@ function RoomScreen({
           />
         </View>
       </View>
+
+      {/* The undo, above the action bar: its button, its padding, and
+          whatever the bar itself clears. */}
+      <UndoToast
+        offer={undo}
+        onDismiss={dismissUndo}
+        bottom={ACTION_BAR_HEIGHT + bottomClear + spacing(2)}
+      />
     </View>
   );
 }
+
+/** The action bar's own height: the button and the padding around it. */
+const ACTION_BAR_HEIGHT = 48 + spacing(3) * 2;
 
 /** The website's pledge arithmetic, in miniature: how much of the ask is
     spoken for, and what is still missing. */
@@ -1828,6 +1895,7 @@ function CarouselFlare({
   siblings,
   position,
   onRemove,
+  onTakeDown,
 }: {
   flare: RoomFlare;
   mine: boolean;
@@ -1844,7 +1912,10 @@ function CarouselFlare({
   /** The rest of this player's rail, so the viewer can walk it. */
   siblings: ZoomCard[];
   position: number;
+  /** "Found it": every copy in hand, said everywhere. */
   onRemove: () => Promise<void>;
+  /** "Take down": withdrawn, nothing said, undo for a minute. */
+  onTakeDown: () => Promise<void>;
 }) {
   const covered =
     flare.offers.length > 0 &&
@@ -1869,11 +1940,11 @@ function CarouselFlare({
    */
   const [removing, setRemoving] = useState(false);
 
-  const remove = async () => {
+  const run = async (work: () => Promise<void>) => {
     if (removing) return;
     setRemoving(true);
     try {
-      await onRemove();
+      await work();
     } finally {
       /* The board usually repaints this tile out of existence first;
          this is for the case where the write failed and it stays. */
@@ -2070,13 +2141,14 @@ function CarouselFlare({
           </Text>
         )}
 
-        {/* The action row, only on the viewer's own tiles: Remove is the
-            one thing left to do under a tile, and somebody else's rail
-            would otherwise carry an empty strip under every card. */}
+        {/* The action rows, only on the viewer's own tiles: a Flare's
+            two exits, and nothing under anybody else's card, where an
+            empty strip would otherwise sit under every one. "Found it"
+            is the old Remove; "Take down" withdraws it with an undo. */}
         {mine && (
-          <View style={{ height: 24 }}>
+          <View style={{ height: 44, gap: 2 }}>
             <Tap
-              onPress={() => void remove()}
+              onPress={() => void run(onRemove)}
               disabled={removing}
               hitSlop={4}
               style={styles.removeButton}
@@ -2084,7 +2156,17 @@ function CarouselFlare({
               <Text
                 style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}
               >
-                Remove
+                Found it
+              </Text>
+            </Tap>
+            <Tap
+              onPress={() => void run(onTakeDown)}
+              disabled={removing}
+              hitSlop={4}
+              style={styles.takeDownButton}
+            >
+              <Text style={{ color: colors.danger, fontSize: 10, fontWeight: "600" }}>
+                Take down
               </Text>
             </Tap>
           </View>
@@ -2112,6 +2194,7 @@ function FlareRow({
   early,
   onOffer,
   onRemove,
+  onTakeDown,
   onTraded,
 }: {
   flare: RoomFlare;
@@ -2120,7 +2203,10 @@ function FlareRow({
   /** Early board: offers read as pledges to bring the card. */
   early: boolean;
   onOffer: (message?: string, quantity?: number) => void;
+  /** "Found it": every copy in hand, said everywhere. */
   onRemove: () => Promise<void>;
+  /** "Take down": withdrawn, nothing said, undo for a minute. */
+  onTakeDown: () => Promise<void>;
   onTraded: (partnerSessionId?: string) => void;
 }) {
   const [offering, setOffering] = useState(false);
@@ -2129,14 +2215,14 @@ function FlareRow({
   const pledgeLine = pledgeLineFor(flare);
 
   /* Same acknowledgement as the carousel tile: the row greys out under
-     a spinner the moment Remove is tapped. */
+     a spinner the moment either exit is tapped. */
   const [removing, setRemoving] = useState(false);
 
-  const remove = async () => {
+  const run = async (work: () => Promise<void>) => {
     if (removing) return;
     setRemoving(true);
     try {
-      await onRemove();
+      await work();
     } finally {
       setRemoving(false);
     }
@@ -2186,9 +2272,16 @@ function FlareRow({
             </Muted>
           </View>
           {mine && (
-            <Tap onPress={() => void remove()} disabled={removing} hitSlop={8}>
-              <Text style={styles.removeLink}>Remove</Text>
-            </Tap>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+            >
+              <Tap onPress={() => void run(onRemove)} disabled={removing} hitSlop={8}>
+                <Text style={styles.removeLink}>Found it</Text>
+              </Tap>
+              <Tap onPress={() => void run(onTakeDown)} disabled={removing} hitSlop={8}>
+                <Text style={styles.takeDownLink}>Take down</Text>
+              </Tap>
+            </View>
           )}
         </View>
 
@@ -2342,6 +2435,12 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     fontSize: 14,
   },
+  /* Take down, in the danger colour: the exit that says nothing. */
+  takeDownLink: {
+    color: colors.danger,
+    textDecorationLine: "underline",
+    fontSize: 14,
+  },
   folderLabel: {
     color: colors.textSecondary,
     fontSize: 13,
@@ -2460,9 +2559,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   removeButton: {
-    height: 24,
+    height: 21,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* The ghost of the pair: no border, the danger colour on the word. */
+  takeDownButton: {
+    height: 21,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",

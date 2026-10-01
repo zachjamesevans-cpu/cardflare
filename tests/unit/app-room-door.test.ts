@@ -50,10 +50,15 @@ describe("the door card", () => {
     expect(door).toContain("setPeopleOpen(true)");
     expect(door).toContain("here now");
     expect(door).toContain("tonight");
-    /* Up to three present faces, tiny and overlapping, present first. */
+    /* Up to three present faces, tiny and overlapping, present first.
+       From the deduped list: an account in from two devices is one
+       face and one in the count, the website's room-door rule. */
+    expect(room).toContain("const people = dedupeParticipants(participants);");
+    expect(room).toContain("const hereNow = people.filter((p) => p.present).length;");
     expect(room).toContain(
-      "const faces = participants.filter((p) => p.present).slice(0, 3);",
+      "const faces = people.filter((p) => p.present).slice(0, 3);",
     );
+    expect(people).toContain("export function dedupeParticipants(");
     expect(door).toMatch(/marginLeft: index === 0 \? 0 : -6/);
     expect(door).toMatch(/<PlayerAvatar[\s\S]*?size=\{22\}/);
   });
@@ -188,7 +193,9 @@ describe("the people list", () => {
   it("replaces the In this room card with a Who's here modal", () => {
     expect(room).not.toContain("<Title>In this room</Title>");
     expect(room).not.toContain("rosterOpen");
-    expect(room).toContain('import { RoomPeopleModal } from "../room-people";');
+    expect(room).toContain(
+      'import { dedupeParticipants, RoomPeopleModal } from "../room-people";',
+    );
     expect(room).toMatch(
       /<RoomPeopleModal[\s\S]*?open=\{peopleOpen\}[\s\S]*?onPeek=\{setPeek\}/,
     );

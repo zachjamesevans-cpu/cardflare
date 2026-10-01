@@ -24,6 +24,39 @@ import { Muted, Tap, Title } from "./ui";
 
 export type RoomPerson = NonNullable<RoomState["participants"]>[number];
 
+/**
+ * One row per person, however many seats they hold.
+ *
+ * The audit: the door said "1 here now" while two faces showed, and a
+ * player appeared twice. An account that joined from the website and
+ * again from the phone has two sessions on the roster, and a roster is
+ * a list of people, not of sessions. Keyed on the account when there is
+ * one, the session otherwise (a guest is one seat by definition). When
+ * the seats disagree about presence the present one wins, so somebody
+ * in the room is never drawn as away because an old tab went quiet.
+ * The website's `room-door.tsx` dedupes the same way.
+ */
+export function dedupeParticipants(participants: RoomPerson[]): RoomPerson[] {
+  const byPerson = new Map<string, RoomPerson>();
+  for (const person of participants) {
+    const key = person.playerId
+      ? `player:${person.playerId}`
+      : `session:${person.playerSessionId}`;
+    const seen = byPerson.get(key);
+    if (!seen) {
+      byPerson.set(key, person);
+    } else if (!seen.present && person.present) {
+      byPerson.set(key, {
+        ...person,
+        openToTrades: seen.openToTrades || person.openToTrades,
+      });
+    } else if (person.openToTrades && !seen.openToTrades) {
+      byPerson.set(key, { ...seen, openToTrades: true });
+    }
+  }
+  return [...byPerson.values()];
+}
+
 export function RoomPeopleModal({
   open,
   participants,
@@ -37,10 +70,10 @@ export function RoomPeopleModal({
   onPeek: (playerId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
-  const hereNow = participants.filter((p) => p.present).length;
-  const sorted = [...participants].sort(
-    (a, b) => Number(b.present) - Number(a.present),
-  );
+  /* People, not seats: the count and the rows agree with the door. */
+  const people = dedupeParticipants(participants);
+  const hereNow = people.filter((p) => p.present).length;
+  const sorted = [...people].sort((a, b) => Number(b.present) - Number(a.present));
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -77,7 +110,7 @@ export function RoomPeopleModal({
           >
             <View style={{ gap: 2, flexShrink: 1 }}>
               <Title>Who&rsquo;s here</Title>
-              <Muted>{`${hereNow} here now · ${participants.length} tonight`}</Muted>
+              <Muted>{`${hereNow} here now · ${people.length} tonight`}</Muted>
             </View>
             <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={colors.textSecondary} />

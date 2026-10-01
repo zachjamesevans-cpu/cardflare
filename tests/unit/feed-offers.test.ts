@@ -38,6 +38,7 @@ describe("offers and your own room posts reach the Feed", () => {
   });
 
   it("nobody is told they can answer an offer", () => {
-    expect(repo.match(/=== "showcase"\s*\?\s*0/g)?.length).toBe(2);
+    /* One of the two now also counts your own post as unanswerable. */
+    expect(repo.match(/=== "showcase"(?: \|\| [^?]+)?\s*\?\s*0/g)?.length).toBe(2);
   });
 });

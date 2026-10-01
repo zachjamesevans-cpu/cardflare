@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { CancelEventForm, EditEventForm } from "@/components/events/edit-event-form";
 import { EventStatsCard } from "@/components/events/event-stats";
 import { EventStatusControls } from "@/components/events/event-status-controls";
 import { JoinPoster } from "@/components/events/join-poster";
@@ -21,7 +22,8 @@ import { sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { eventStats } from "@/lib/trades/repository";
-import { STATUS_LABELS } from "@/lib/events/schema";
+import { earlyBoardOpensAt, roomPhase, STATUS_LABELS } from "@/lib/events/schema";
+import { instantToLocal } from "@/lib/time/zone";
 
 export const metadata: Metadata = {
   title: "Event",
@@ -120,6 +122,36 @@ export default async function EventPage({
 
   const boardHasEntries = flares.length > 0 || openPlayers.length > 0;
 
+  /*
+   * The truth about the early board, for the status card. Both the
+   * moment it opens and whether that moment has passed are decided
+   * here with the same helpers the room door uses, so the console can
+   * never say "not accepting players" about a board already taking
+   * Flares from home.
+   */
+  const scheduled = event.kind === "scheduled";
+  const earlyOpensMs = scheduled
+    ? earlyBoardOpensAt({
+        startsAt: event.starts_at,
+        earlyBoardHours: store.early_board_hours,
+        storeTimeZone: timeZone,
+      })
+    : null;
+  const earlyOpensAt =
+    earlyOpensMs === null ? null : new Date(earlyOpensMs).toISOString();
+  const earlyOpen =
+    roomPhase({
+      kind: event.kind,
+      status: event.status,
+      startsAt: event.starts_at,
+      endsAt: event.ends_at,
+      earlyBoardHours: store.early_board_hours,
+      storeTimeZone: timeZone,
+    }) === "early";
+
+  /* A night the store can still change: scheduled and not called off. */
+  const editable = scheduled && !event.cancelled_at;
+
   return (
     <AppShell
       area="Store"
@@ -133,7 +165,7 @@ export default async function EventPage({
 
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={event.status === "open" ? "accent" : "neutral"}>
-          {STATUS_LABELS[event.status]}
+          {event.cancelled_at ? "Cancelled" : STATUS_LABELS[event.status]}
         </Badge>
         {event.repeat_weekly && (
           <Badge tone="neutral">
@@ -199,10 +231,62 @@ export default async function EventPage({
           {event.kind === "walk_in" ? (
             <WalkInSession eventId={event.id} status={event.status} />
           ) : (
-            <EventStatusControls eventId={event.id} status={event.status} />
+            <EventStatusControls
+              eventId={event.id}
+              status={event.status}
+              startsAt={event.starts_at}
+              earlyOpensAt={earlyOpensAt}
+              earlyOpen={earlyOpen}
+              timeZone={timeZone}
+              cancelledAt={event.cancelled_at}
+            />
           )}
         </Card>
       </section>
+
+      {editable && (
+        <section className="flex flex-col gap-5" aria-labelledby="edit-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="edit-heading" className="text-xl font-bold text-text-primary">
+              Edit
+            </h2>
+            <p className="text-sm text-text-secondary">
+              The name and the window, in your store&rsquo;s clock. The code stays the
+              same.
+            </p>
+          </div>
+          <Card>
+            <EditEventForm
+              eventId={event.id}
+              values={{
+                name: event.name,
+                startsAt: instantToLocal(new Date(event.starts_at), timeZone),
+                endsAt: event.ends_at
+                  ? instantToLocal(new Date(event.ends_at), timeZone)
+                  : "",
+                repeatWeekly: event.repeat_weekly,
+              }}
+            />
+          </Card>
+        </section>
+      )}
+
+      {editable && (
+        <section className="flex flex-col gap-5" aria-labelledby="cancel-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="cancel-heading" className="text-xl font-bold text-text-primary">
+              Cancel this night
+            </h2>
+            <p className="text-sm text-text-secondary">
+              A draft nobody has joined disappears. A night with players on it closes
+              and is marked cancelled; next week&rsquo;s does not appear from it.
+            </p>
+          </div>
+          <Card>
+            <CancelEventForm eventId={event.id} />
+          </Card>
+        </section>
+      )}
 
       {event.join_code && svg && (
         <section className="flex flex-col gap-5" aria-labelledby="qr-heading">
