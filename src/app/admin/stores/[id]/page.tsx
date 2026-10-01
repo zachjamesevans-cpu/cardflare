@@ -5,9 +5,11 @@ import { ArrowLeft } from "lucide-react";
 
 import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-store-form";
 import { DeletePanel } from "@/components/admin/delete-panel";
+import { MergePanel, type MergeCandidate } from "@/components/admin/merge-panel";
 import { ResendSetupLinkForm } from "@/components/admin/resend-setup-link";
 import { StoreListingControls } from "@/components/admin/store-listing-controls";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
+import { duplicatesOf, likelyDuplicates } from "@/lib/admin/duplicates";
 import { listStoreMembers } from "@/lib/admin/records";
 import { RoomRoster } from "@/components/events/room-roster";
 import { JoinPoster } from "@/components/events/join-poster";
@@ -43,25 +45,54 @@ const KIND_LABEL = { lgs: "Game store", vendor: "Card-show vendor" } as const;
  */
 export default async function AdminStorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ merged?: string }>;
 }) {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
   await requireAdmin();
-  const { id } = await params;
+  const [{ id }, { merged }] = await Promise.all([params, searchParams]);
 
   await sweepStaleRooms();
 
   const store = await findStoreById(id);
   if (!store) notFound();
 
-  const listing = (await listStores()).find((row) => row.id === store.id);
+  const allStores = await listStores();
+  const listing = allStores.find((row) => row.id === store.id);
   const location = [store.city, store.region].filter(Boolean).join(", ");
   const isVendor = store.kind === "vendor";
 
+  /*
+   * Every other store is a legal survivor, but the ones that are
+   * probably this same shop twice go first in the list, because that
+   * is the case the merge exists for.
+   */
+  const groups = likelyDuplicates(allStores);
+  const likely = new Set(duplicatesOf(store, groups).map((member) => member.id));
+  const candidates: MergeCandidate[] = allStores
+    .filter((row) => row.id !== store.id)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      city: row.city,
+      region: row.region,
+      joinCode: row.join_code,
+      likely: likely.has(row.id),
+    }));
+
   return (
     <div className="flex flex-col gap-8">
+      {merged && (
+        <Card className="border-accent/40 p-4">
+          <p className="text-sm text-text-primary" role="status">
+            {merged} was merged into this store.
+          </p>
+        </Card>
+      )}
+
       <div className="flex flex-col gap-3">
         <Link
           href="/admin/stores"
@@ -95,6 +126,18 @@ export default async function AdminStorePage({
       <StoreDetailsSection store={store} />
 
       {isVendor ? <VendorSections storeId={store.id} /> : <LgsSections store={store} />}
+
+      {/*
+       * Two shops that are one shop. Above the danger zone because it
+       * is the gentler answer to a duplicate: deleting one half throws
+       * its followers and nights away, merging keeps them.
+       */}
+      <section className="flex flex-col gap-5" aria-labelledby="merge-heading">
+        <h2 id="merge-heading" className="text-xl font-bold text-text-primary">
+          Merge into another store
+        </h2>
+        <MergePanel fromId={store.id} fromName={store.name} candidates={candidates} />
+      </section>
 
       {/*
        * Last on the page, and that is where a destructive control

@@ -24,6 +24,7 @@ const MAX_CARDS = 12;
 
 interface ScanRow {
   id: string;
+  game: string;
   canonical_card_number: string;
   exact_name: string;
   card_type: string | null;
@@ -144,7 +145,7 @@ export function formatReport(
 
   return [
     `cardflare spot check: ${entries.length} of ${catalogSize.toLocaleString()} cards`,
-    "Compare each against the official One Piece card list.",
+    "Compare each against the official card list for its game.",
     "",
     ...entries.map(({ row, because }) =>
       describe(row, because, printingsByCard.get(row.id) ?? []),
@@ -154,7 +155,7 @@ export function formatReport(
 
 export interface SpotCheck {
   report: string;
-  cards: (CardResult & { because: string })[];
+  cards: (CardResult & { because: string; game: string })[];
 }
 
 export async function spotCheck(): Promise<SpotCheck> {
@@ -167,7 +168,7 @@ export async function spotCheck(): Promise<SpotCheck> {
   const { data, error, count } = await admin
     .from("cards")
     .select(
-      "id, canonical_card_number, exact_name, card_type, colors, traits, cost, power, counter, life, rarity, attribute, effect_text, trigger_text",
+      "id, game, canonical_card_number, exact_name, card_type, colors, traits, cost, power, counter, life, rarity, attribute, effect_text, trigger_text",
       { count: "exact" },
     )
     /*
@@ -205,6 +206,7 @@ export async function spotCheck(): Promise<SpotCheck> {
       triggerText: row.trigger_text,
       printings: printingsByCard.get(row.id) ?? [],
       because,
+      game: row.game,
     })),
   };
 }

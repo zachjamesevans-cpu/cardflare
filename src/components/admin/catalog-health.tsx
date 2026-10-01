@@ -1,4 +1,5 @@
-import { CircleCheck, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, CircleCheck, TriangleAlert } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import type { FailureGroup, SetCoverage } from "@/lib/cards/health";
@@ -37,28 +38,25 @@ function SetCoverageBlock({
       ) : (
         <>
           {/*
-           * Scrolls inside itself. A catalog with thirty sets must not make the
-           * admin page taller than the screen on a phone.
+           * A summary, not the list. The audit found 482 codes scrolling
+           * inside this box; the codes have their own page now.
            */}
-          <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
-            {sets.map((set) => (
-              <li
-                key={set.setCode}
-                className="flex items-center justify-between gap-4 text-sm"
-              >
-                <span className="truncate font-mono text-text-secondary">
-                  {set.setCode}
-                </span>
-                <span className="shrink-0 text-text-muted tabular-nums">
-                  {set.cards.toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="text-2xl font-semibold text-text-primary tabular-nums">
+            {sets.length} {sets.length === 1 ? "set" : "sets"} ·{" "}
+            {total.toLocaleString()} cards
+          </p>
+
+          <Link
+            href="/admin/cards/sets"
+            className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+          >
+            See every set
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </Link>
 
           <p className="border-t border-border pt-3 text-xs text-text-muted">
-            {total.toLocaleString()} distinct cards across {sets.length} sets. Compare
-            against the official set list before telling anyone the catalog is complete.
+            Distinct cards, not printings. Compare against the official set list before
+            telling anyone the catalog is complete.
             {truncated &&
               " Counts are partial because the catalog exceeds the read limit."}
           </p>

@@ -145,7 +145,13 @@ export function printingLabel(
      * printings of OP12-034 render as the same string twice.
      */
     printing.rarity,
-    printing.variantType,
+    /* "TR · TR": a provider that puts the rarity in the variant slot too
+       would print it twice. Once is the fact. */
+    printing.variantType &&
+    printing.rarity &&
+    printing.variantType.trim().toLowerCase() === printing.rarity.trim().toLowerCase()
+      ? null
+      : printing.variantType,
     /*
      * A promo reprint carries the same card number and the same set id as the
      * booster printing, so without this both read as "OP09" and a player

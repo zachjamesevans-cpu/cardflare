@@ -11,6 +11,7 @@ import { listClaims, pendingClaimCount } from "@/lib/stores/claims";
 import type { DraftListing } from "@/components/admin/draft-listings";
 import type { DirectoryStore } from "@/components/admin/store-directory";
 import { Card } from "@/components/ui/card";
+import { duplicatesOf, likelyDuplicates } from "@/lib/admin/duplicates";
 import { requireAdmin } from "@/lib/auth/session";
 import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
@@ -66,6 +67,9 @@ export default async function AdminStoresPage() {
     }));
 
   const liveByStore = new Map(liveRooms.map((room) => [room.storeId, room] as const));
+  /* The audit found the same shop twice, a capital letter apart. The
+     chip says so on both rows; the merge lives on the store's page. */
+  const duplicateGroups = likelyDuplicates(stores);
   const directory: DirectoryStore[] = stores.map((store) => {
     const room = liveByStore.get(store.id);
     const live = room && (room.kind === "scheduled" || store.walk_in_enabled);
@@ -87,6 +91,7 @@ export default async function AdminStoresPage() {
       claimStatus: store.claim_status,
       verified: store.verified_at !== null,
       ultra: store.tier === "ultra",
+      duplicateOf: duplicatesOf(store, duplicateGroups).map((member) => member.name),
     };
   });
 

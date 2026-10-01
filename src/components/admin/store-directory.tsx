@@ -35,6 +35,8 @@ export interface DirectoryStore {
   verified: boolean;
   /** The commercial tier, separate from verification. */
   ultra: boolean;
+  /** Names of the other rows that are probably this same shop. */
+  duplicateOf: string[];
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -52,9 +54,13 @@ const KIND_LABEL: Record<string, string> = {
 export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<OperatorKindFilter>("all");
+  const [onlyDuplicates, setOnlyDuplicates] = useState(false);
   const [page, setPage] = useState(1);
 
-  const shown = filterOperators(stores, query, kind);
+  const duplicates = stores.filter((store) => store.duplicateOf.length > 0).length;
+  const shown = filterOperators(stores, query, kind).filter(
+    (store) => !onlyDuplicates || store.duplicateOf.length > 0,
+  );
   /* Clamped inside pageOf, so a filter that shortens the list while
      somebody is on page four shows page one rather than nothing. */
   const current = pageOf(shown, page);
@@ -98,6 +104,26 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
             <option value="vendor">Card-show vendors</option>
           </Select>
         </div>
+
+        {/* The audit's finding, as a filter: the rows that are probably
+            one shop twice, with the count so an empty list reads as
+            "none" rather than "broken". */}
+        <button
+          type="button"
+          aria-pressed={onlyDuplicates}
+          onClick={() => {
+            setOnlyDuplicates((was) => !was);
+            setPage(1);
+          }}
+          className={`inline-flex h-12 shrink-0 items-center gap-2 rounded-[var(--radius-control)] border px-3.5 text-sm transition-colors ${
+            onlyDuplicates
+              ? "border-accent/50 bg-accent/10 text-accent"
+              : "border-border bg-canvas text-text-secondary hover:border-border-strong"
+          }`}
+        >
+          Possible duplicates
+          <span className="tabular-nums">{duplicates}</span>
+        </button>
       </div>
 
       <p className="text-sm text-text-muted tabular-nums" role="status">
@@ -111,8 +137,9 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
           <SearchX className="size-6 text-text-muted" aria-hidden="true" />
           <p className="text-text-secondary">
-            Nobody matches that. Check the spelling, or switch the dropdown back to all
-            operators.
+            {onlyDuplicates
+              ? "No two rows look like the same shop."
+              : "Nobody matches that. Check the spelling, or switch the dropdown back to all operators."}
           </p>
         </Card>
       ) : (
@@ -152,8 +179,16 @@ export function StoreDirectory({ stores }: { stores: DirectoryStore[] }) {
   );
 }
 
+/** "Possibly the same as Castle of Games", "+1" when there are more. */
+function duplicateChip(names: string[]): string | null {
+  const [first, ...rest] = names;
+  if (!first) return null;
+  return `Possibly the same as ${first}${rest.length > 0 ? ` +${rest.length}` : ""}`;
+}
+
 function DirectoryRow({ store }: { store: DirectoryStore }) {
   const location = [store.city, store.region].filter(Boolean).join(", ");
+  const duplicate = duplicateChip(store.duplicateOf);
 
   return (
     <Card as="li" className="flex flex-wrap items-center justify-between gap-4">
@@ -179,6 +214,7 @@ function DirectoryRow({ store }: { store: DirectoryStore }) {
           on a phone that plus the status badges cannot share one line. */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="neutral">{KIND_LABEL[store.kind] ?? store.kind}</Badge>
+        {duplicate && <Badge tone="neutral">{duplicate}</Badge>}
         {store.claimStatus === "unclaimed" && <Badge tone="neutral">Unclaimed</Badge>}
         {store.ultra && <Badge tone="neutral">Ultra</Badge>}
         {/* An Ultra store that is not yet Verified is the row most

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { normalizeName } from "./domain";
+import { canonicalSetCode, stripNumberFromName } from "./set-codes";
 import {
   CARD_ART_BUCKET,
   cardArtExtension,
@@ -176,8 +177,8 @@ export async function writeImportedSet(
     game: "one-piece" as const,
     canonical_card_number: card.cardNumber,
     compact_card_number: compactNumber(card.cardNumber),
-    exact_name: card.name,
-    normalized_name: normalizeName(card.name),
+    exact_name: stripNumberFromName(card.name, card.cardNumber),
+    normalized_name: normalizeName(stripNumberFromName(card.name, card.cardNumber)),
     provider_key: manifest.provider,
     provider_external_id: card.cardNumber,
     /*
@@ -274,7 +275,7 @@ export async function writeImportedSet(
       card_id: cardId,
       provider_key: manifest.provider,
       provider_external_id: externalId,
-      set_code: manifest.setCode,
+      set_code: canonicalSetCode(manifest.setCode),
       set_name: manifest.setName,
       printing_label: isParallel ? null : (card.printingLabel ?? null),
       variant_type: isParallel ? (card.printingLabel ?? "Alternate Art") : null,

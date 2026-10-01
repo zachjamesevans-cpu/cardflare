@@ -5,6 +5,7 @@ import { chooseSpread, formatReport } from "@/lib/cards/spot-check";
 function card(overrides: Partial<Parameters<typeof chooseSpread>[0][0]> = {}) {
   return {
     id: Math.random().toString(36).slice(2),
+    game: "one-piece",
     canonical_card_number: "OP01-001",
     exact_name: "Test Card",
     card_type: "character",
