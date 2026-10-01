@@ -508,6 +508,8 @@ export interface Me {
      * original card, which is the one answer always drawable.
      */
     feedView?: string;
+    /** Joining a room posts their Flares to it. Absent on an older server: on. */
+    autoPostFlares?: boolean;
   };
   wants: {
     id: string;
@@ -1806,6 +1808,13 @@ export const getPost = (postId: string) =>
  * with the profile it is sitting on.
  */
 /** How this player wants the Feed drawn. Stored on the account. */
+/** Whether joining a room posts your Flares to it. */
+export const setAutoPost = (on: boolean) =>
+  call<{ ok: true; autoPostFlares: boolean }>("POST", "/api/v1/profile", {
+    action: "set-auto-post",
+    on,
+  });
+
 export const setFeedView = (view: string) =>
   call<{ ok: true; feedView: string }>("POST", "/api/v1/profile", {
     action: "set-feed-view",

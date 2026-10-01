@@ -7,6 +7,8 @@ import { afterResponse } from "@/lib/after-response";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
+import { autoPostFor } from "@/lib/events/auto-post";
+import { currentRoomForSession } from "@/lib/players/current-room";
 import { roomPhase } from "@/lib/events/schema";
 import { CAPTION_MAX, publishPost } from "@/lib/flares/publish";
 import { pointFromCoords } from "@/lib/geo/zip";
@@ -87,6 +89,20 @@ export async function POST(request: Request): Promise<Response> {
     eventId = resolved.room.id;
     session = { id: room.id, displayName: room.display_name ?? player.displayName };
     early = phase === "early";
+  } else if (await autoPostFor(player.playerId)) {
+    /* No room named: a post from the Feed tab. If the player is standing
+       in a live room, it lands there too, the same rule as joining
+       (src/lib/events/auto-post.ts). */
+    const room = await apiSession(request);
+    const current = room ? await currentRoomForSession(room.id) : null;
+    if (room && current) {
+      const phase = roomPhase(current.event, Date.now());
+      if (phase === "live" || phase === "early") {
+        eventId = current.event.id;
+        session = { id: room.id, displayName: room.display_name ?? player.displayName };
+        early = phase === "early";
+      }
+    }
   }
 
   const result = await publishPost({

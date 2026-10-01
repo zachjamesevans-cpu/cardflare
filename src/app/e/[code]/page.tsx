@@ -38,13 +38,12 @@ import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
+import { postFlaresOnJoin } from "@/lib/events/auto-post";
 import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { huntsFor } from "@/lib/players/hunts";
 import { collectionAvailability } from "@/lib/players/collection";
 import { listWants } from "@/lib/players/wants";
-import { RepostWants } from "@/components/players/repost-wants";
-import { WantEntries } from "@/components/players/want-entries";
 import { listRoomOffers } from "@/lib/matching/repository";
 import {
   heldByCard,
@@ -398,9 +397,10 @@ async function RoomBody({
      * the render used to write this row on every poll of every phone.
      */
     await saveLocal(accountPlayerId, event.storeId);
+    /* A guest who signs in mid-night gets their Flares on the board the
+       same as somebody who joined signed in. See auto-post.ts. */
+    await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
-
-  const savedWants = inRoom && accountPlayerId ? await listWants(accountPlayerId) : [];
 
   /*
    * The composer is the Flare tab's, given the same things: the hunts a
@@ -444,26 +444,6 @@ async function RoomBody({
   const remoteHref = organizerStores.some((store) => store.storeId === event.storeId)
     ? "/store/event-hub"
     : null;
-
-  /* Outstanding = saved but not already an open Flare of theirs here. */
-  const postedAsks = new Set(
-    flares
-      .filter((entry) => entry.playerSessionId === session?.id)
-      .map((entry) => `${entry.cardId}:${entry.printingId ?? ""}`),
-  );
-  const outstandingWants = savedWants
-    .filter((want) => !postedAsks.has(`${want.cardId}:${want.printingId ?? ""}`))
-    .map((want) => ({
-      id: want.id,
-      cardId: want.cardId,
-      cardName: want.cardName,
-      cardNumber: want.cardNumber,
-      printingLabel: want.printingLabel,
-      imageUrl: want.imageUrl,
-      quantity: want.quantity,
-      note: want.note,
-      deckLabel: want.deckLabel,
-    }));
 
   /*
    * The matching engine, such as it is: derived from the binder that was just
@@ -704,23 +684,11 @@ async function RoomBody({
             )}
 
             {/*
-             * One card for the board. The viewer's own saved wants that
-             * are not on it yet sit at its foot, folded, with the rows
-             * and the post-all button behind one tap.
+             * One card for the board. Nothing of the viewer's waits at
+             * its foot any more: joining posted their Flares to it.
              */}
             <RoomBoardCard
               empty={flares.length === 0 && openPlayers.length === 0}
-              foot={
-                outstandingWants.length > 0 ? (
-                  <RepostWants code={normalized} count={outstandingWants.length}>
-                    <WantEntries
-                      code={normalized}
-                      wants={outstandingWants}
-                      imagesEnabled={images}
-                    />
-                  </RepostWants>
-                ) : null
-              }
               guestTrades={
                 accountPlayerId ? null : (
                   <OpenToTradesToggle code={normalized} open={youAreOpen} />

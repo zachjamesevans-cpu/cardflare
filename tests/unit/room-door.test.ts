@@ -11,9 +11,10 @@ import { describe, expect, it } from "vitest";
  * have access to it. It's all just disconnected and want it to flow
  * better." These pins hold the shape he approved: the store, the
  * night's name with two small round controls on its line, and the
- * pulse line that opens the people list; one card for the Flares with
- * the repost row at its foot; "Post a Flare" alone, with the trades
- * toggle inside the composer. The words are the app's, exactly.
+ * pulse line that opens the people list; one card for the Flares, with
+ * nothing of the viewer's waiting at its foot because joining posted
+ * their Flares; "Post a Flare" alone, with the trades toggle inside the
+ * composer. The words are the app's, exactly.
  */
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -23,7 +24,6 @@ const page = read("src/app/e/[code]/page.tsx");
 const door = read("src/components/events/room-door.tsx");
 const lobby = read("src/components/events/event-lobby.tsx");
 const board = read("src/components/events/room-board-card.tsx");
-const repost = read("src/components/players/repost-wants.tsx");
 const composerDoor = read("src/components/events/room-composer-door.tsx");
 const toggle = read("src/components/events/open-to-trades-toggle.tsx");
 
@@ -152,21 +152,12 @@ describe("the board card", () => {
     expect(page).toContain("empty={flares.length === 0 && openPlayers.length === 0}");
   });
 
-  it("carries the repost foot row, which keeps its server action", () => {
-    expect(page).toMatch(/foot=\{\s*outstandingWants\.length > 0 \? \(\s*<RepostWants/);
-    expect(repost).toContain('"use client"');
-    expect(repost).toContain("useActionState(repostWantsAction, REPOST_IDLE)");
-    expect(repost).toContain('"1 card you are still after is not posted here"');
-    expect(repost).toContain("cards you are still after are not posted here");
-    expect(repost).toContain('{count === 1 ? "Post it" : "Post them"}');
-    expect(repost).toContain("bg-elevated");
-    expect(repost).toContain("aria-expanded={open}");
-    /* Open, the accent text becomes a chevron. */
-    expect(repost).toMatch(/\{open \? \(\s*<ChevronDown/);
-    expect(repost).toContain("to this room");
-    /* No longer a card of its own above the board. */
-    expect(repost).not.toContain("Still looking for these");
-    expect(repost).not.toContain('from "@/components/ui/card"');
+  it("has no repost row: joining posted the viewer's Flares already", () => {
+    expect(page).not.toContain("RepostWants");
+    expect(page).not.toContain("outstandingWants");
+    expect(page).toContain("postFlaresOnJoin(event.id, session, accountPlayerId)");
+    expect(board).not.toContain("foot?: ReactNode");
+    expect(board).not.toContain("{foot}");
   });
 
   it("gives a guest, and only a guest, the trades toggle at the foot", () => {
@@ -234,7 +225,6 @@ describe("what stays, in order", () => {
       "listMyTrades(event.id, session!.id)",
       "roomTimersForStore(event.storeId)",
       "counterAvailability(",
-      "listWants(accountPlayerId)",
       "huntsFor(accountPlayerId, accountPlayerId)",
       "hasLocal(accountPlayerId, event.storeId)",
       "collectionAvailability(",

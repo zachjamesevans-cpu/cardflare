@@ -28,6 +28,7 @@ import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
 import { huntLimitFor } from "@/lib/players/hunts";
+import { autoPostFor, setAutoPost } from "@/lib/events/auto-post";
 import { feedViewFor, setFeedView } from "@/lib/feed/view-settings";
 import { feedViewFrom } from "@/lib/feed/views";
 
@@ -119,6 +120,7 @@ export async function GET(request: Request): Promise<Response> {
       /* How they want the Feed drawn. Sent with the profile because the
          settings screen lives here and the Feed asks the same answer. */
       feedView: await feedViewFor(player.playerId),
+      autoPostFlares: await autoPostFor(player.playerId),
       equipped: worn,
       /*
        * The worn profile border and avatar effect, and the files
@@ -184,6 +186,8 @@ const actionSchema = z.discriminatedUnion("action", [
      so a client that sends a view nothing can draw stores the original
      rather than an unreadable Feed. */
   z.object({ action: z.literal("set-feed-view"), view: z.string().max(20) }),
+  /* Whether joining a room posts the player's Flares to it. */
+  z.object({ action: z.literal("set-auto-post"), on: z.boolean() }),
   /* The handle is its own action for the same reason it is its own form
      on the website: only one of the two can come back "taken". */
   z.object({ action: z.literal("set-handle"), handle: z.string() }),
@@ -249,6 +253,13 @@ export async function POST(request: Request): Promise<Response> {
   /* A name or handle change must not be answered from the two-minute
      memory of who this token is; forget it before the write. */
   if ("displayName" in body || "handle" in body) forgetApiPlayer(request);
+
+  if (body.action === "set-auto-post") {
+    const result = await setAutoPost(player.playerId, body.on);
+    return result.ok
+      ? Response.json({ ok: true, autoPostFlares: body.on })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
 
   if (body.action === "set-feed-view") {
     const result = await setFeedView(player.playerId, body.view);

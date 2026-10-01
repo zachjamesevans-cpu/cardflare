@@ -17,23 +17,20 @@ export const EMPTY_BOARD =
  * flattens its per-player cards into rows of the one card.
  *
  * Empty, the card says so in one line of its own rather than handing
- * the page a second card to say "nothing". The foot is where the
- * viewer's own unposted wants sit (RepostWants), and a guest's
- * open-to-trades row lives under that, because a guest has no composer
- * to carry it.
+ * the page a second card to say "nothing". Nothing of the viewer's
+ * waits at the foot: joining a room posts their Flares to it
+ * (src/lib/events/auto-post.ts). A guest's open-to-trades row lives at
+ * the foot, because a guest has no composer to carry it.
  */
 export function RoomBoardCard({
   empty,
   children,
-  foot = null,
   guestTrades = null,
 }: {
   /** No Flares and nobody open to trades: say so instead of drawing the board. */
   empty: boolean;
   /** The FlareBoard, when there is one to draw. */
   children?: ReactNode;
-  /** The repost foot row, when the viewer has wants not posted here. */
-  foot?: ReactNode;
   /** A guest's open-to-trades toggle; a player's rides in the composer. */
   guestTrades?: ReactNode;
 }) {
@@ -55,7 +52,6 @@ export function RoomBoardCard({
         </div>
       )}
 
-      {foot}
       {guestTrades}
     </Card>
   );

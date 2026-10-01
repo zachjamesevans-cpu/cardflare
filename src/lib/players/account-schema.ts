@@ -27,10 +27,3 @@ export type InvitePlayerState =
     };
 
 export const INVITE_PLAYER_IDLE: InvitePlayerState = { status: "idle" };
-
-export type RepostState =
-  | { status: "idle" }
-  | { status: "error"; message: string }
-  | { status: "posted"; count: number };
-
-export const REPOST_IDLE: RepostState = { status: "idle" };
