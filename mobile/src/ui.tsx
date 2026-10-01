@@ -1,6 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -212,15 +218,90 @@ export interface ZoomOffer {
 const MAX_OFFER_MESSAGE = 80;
 
 /**
- * The offer, inside the zoom.
+ * THE ACTION LIVES AT THE FOOT OF THE PANEL.
  *
- * The founder, from a phone: the handshake under a tile "is a bit
- * small", and once the card is open at full size there should be "a
- * text field to message someone, offer, etc." The same three things
- * the website's row asks: where to find you, how many, and the button.
+ * It used to be a bordered box between the title and the picture: a
+ * frame inside a frame, a text field open for a note nobody has to
+ * write, and the only button squeezed beside a sentence explaining it.
+ * The founder: "the offer thing is just kinda ugly, and really should
+ * be at the bottom if anything so it's easier to reach."
+ *
+ * So the facts stay up top, where they are read, and the one thing you
+ * press sits last, where a thumb already is: a full-width button with
+ * no box round it. The note is behind an "Add a note" link, so the
+ * common case, one tap and nothing typed, never sees a field; and the
+ * only sentence that survives is the one that changes a decision.
  * Wrapped in its own Pressable so a tap inside it does not reach the
- * backdrop, which closes the card.
+ * backdrop, which closes the card. Same bar as the website.
  */
+function ZoomActionBar({
+  caption,
+  note,
+  children,
+}: {
+  /** The one line worth saying, or nothing. */
+  caption?: string | null;
+  /** The optional note, revealed on request. */
+  note: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    maxLength: number;
+  };
+  /** The button row. */
+  children: ReactNode;
+}) {
+  const [noting, setNoting] = useState(false);
+
+  return (
+    <Pressable onPress={() => undefined} style={styles.zoomBar}>
+      {caption ? (
+        <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>
+          {caption}
+        </Text>
+      ) : null}
+      {noting ? (
+        <Input
+          value={note.value}
+          onChangeText={note.onChange}
+          placeholder={note.placeholder}
+          maxLength={note.maxLength}
+          returnKeyType="done"
+          autoFocus
+        />
+      ) : null}
+      {children}
+      {!noting ? (
+        <Tap
+          onPress={() => setNoting(true)}
+          hitSlop={8}
+          style={{
+            alignSelf: "center",
+            paddingVertical: spacing(1),
+            paddingHorizontal: spacing(2),
+          }}
+        >
+          <Text
+            style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}
+          >
+            Add a note
+          </Text>
+        </Tap>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** What the bar says once the hand is up: a tinted line, no box. */
+function ZoomSaid({ children }: { children: ReactNode }) {
+  return (
+    <Pressable onPress={() => undefined} style={styles.zoomSaid}>
+      {children}
+    </Pressable>
+  );
+}
+
+/** The offer on a room's Flare, at the foot of the zoom. */
 function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
   const [message, setMessage] = useState("");
   const [count, setCount] = useState(1);
@@ -238,8 +319,8 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
 
   if (offer.own) {
     return (
-      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+      <ZoomSaid>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             {offer.early ? "You've got them. " : "You offered. "}
           </Text>
@@ -253,22 +334,23 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
             {busy ? "Withdrawing…" : "Withdraw"}
           </Text>
         </Tap>
-      </Pressable>
+      </ZoomSaid>
     );
   }
 
   return (
-    <Pressable onPress={() => undefined} style={styles.zoomOffer}>
-      <Input
-        value={message}
-        onChangeText={setMessage}
-        placeholder="Where to find you? (optional)"
-        maxLength={MAX_OFFER_MESSAGE}
-        returnKeyType="done"
-      />
+    <ZoomActionBar
+      note={{
+        value: message,
+        onChange: setMessage,
+        placeholder: "Where to find you?",
+        maxLength: MAX_OFFER_MESSAGE,
+      }}
+    >
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
         {offer.quantity > 1 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>How many</Text>
             <Tap
               onPress={() => setCount((current) => Math.max(1, current - 1))}
               hitSlop={6}
@@ -312,72 +394,61 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
           />
         </View>
       </View>
-    </Pressable>
+    </ZoomActionBar>
   );
 }
 
-/**
- * "I have this", inside the zoom, from the Feed.
- *
- * The same block the room's offer draws, with one field and one
- * button: the note is what the thread will say ("I'll bring this to
- * Mox tonight"), and confirming raises the hand on the Flare and posts
- * the line in one go.
- */
+/** "I have this", from the Feed, at the foot of the zoom. */
 function ZoomHaveForm({ have }: { have: ZoomHave }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (have.state === "found") {
     return (
-      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+      <ZoomSaid>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>Found. </Text>
           This one already traded.
         </Text>
-      </Pressable>
+      </ZoomSaid>
     );
   }
 
   if (have.youOffered) {
     return (
-      <Pressable onPress={() => undefined} style={styles.zoomOfferOn}>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}>
+      <ZoomSaid>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             You said you have this.{" "}
           </Text>
           They can see your name in their room, so keep an eye out.
         </Text>
-      </Pressable>
+      </ZoomSaid>
     );
   }
 
   return (
-    <Pressable onPress={() => undefined} style={styles.zoomOffer}>
-      <Input
-        value={note}
-        onChangeText={setNote}
-        placeholder="Add a note, like where you'll be (optional)"
-        maxLength={280}
-        returnKeyType="done"
+    <ZoomActionBar
+      caption={
+        have.state === "offered" ? "Somebody already offered. You can too." : null
+      }
+      note={{
+        value: note,
+        onChange: setNote,
+        placeholder: "Add a note, like where you'll be",
+        maxLength: 280,
+      }}
+    >
+      <Button
+        label={busy ? "Sending…" : "I have this"}
+        busy={busy}
+        onPress={() => {
+          if (busy) return;
+          setBusy(true);
+          void have.onOffer(note.trim()).finally(() => setBusy(false));
+        }}
       />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
-          {have.state === "offered"
-            ? "Somebody already offered. You can too."
-            : "Replies on their Flare and lets them know."}
-        </Text>
-        <Button
-          label={busy ? "Sending…" : "I have this"}
-          busy={busy}
-          onPress={() => {
-            if (busy) return;
-            setBusy(true);
-            void have.onOffer(note.trim()).finally(() => setBusy(false));
-          }}
-        />
-      </View>
-    </Pressable>
+    </ZoomActionBar>
   );
 }
 
@@ -793,15 +864,6 @@ export function CardImage({
                    * that did the same job in words was a row of chrome
                    * between the title and the art.
                    */}
-
-                  {/* Keyed on the shelf position, so a half-typed note does
-                    not ride along to the next card. */}
-                  {offer ? (
-                    <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
-                  ) : null}
-                  {have ? (
-                    <ZoomHaveForm key={`have-${shelf ? at : "own"}`} have={have} />
-                  ) : null}
                 </Pressable>
                 {/*
                  * The card, with its neighbours showing at the edges.
@@ -954,6 +1016,15 @@ export function CardImage({
                     />
                   </Pressable>
                 )}
+                {/* Last, under the picture, where the thumb is. Keyed on
+                    the shelf position so a half-typed note does not ride
+                    along to the next card. */}
+                {offer ? (
+                  <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
+                ) : null}
+                {have ? (
+                  <ZoomHaveForm key={`have-${shelf ? at : "own"}`} have={have} />
+                ) : null}
                 <Tap onPress={close} hitSlop={8}>
                   <Text style={styles.muted}>Tap anywhere to close</Text>
                 </Tap>
@@ -1234,27 +1305,18 @@ const styles = StyleSheet.create({
     gap: spacing(3),
     alignItems: "center",
   },
-  zoomOffer: {
+  zoomBar: {
     alignSelf: "stretch",
     gap: spacing(2),
-    marginTop: spacing(2),
-    padding: spacing(2),
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.elevated,
   },
-  zoomOfferOn: {
+  zoomSaid: {
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     gap: spacing(2),
-    marginTop: spacing(2),
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2),
     borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.accentMuted,
     backgroundColor: colors.elevated,
   },
   zoomStep: {

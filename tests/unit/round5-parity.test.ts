@@ -243,9 +243,29 @@ describe("copy the audit sent back", () => {
     expect(web.embersStore).toContain(BORDER);
     expect(app.embersStore).toContain(BORDER);
 
-    const REPLY = "Replies on their Flare and lets them know.";
-    expect(web.zoom).toContain(REPLY);
-    expect(app.ui).toContain(REPLY);
+    /*
+     * The zoom's offer is a bar at the FOOT of the panel on both: one
+     * full-width button, the note behind "Add a note", and the one
+     * sentence that changes a decision. The founder: "the offer thing
+     * is just kinda ugly, and really should be at the bottom if
+     * anything so it's easier to reach." The explaining line
+     * ("Replies on their Flare and lets them know.") went with the box.
+     */
+    const OFFERED = "Somebody already offered. You can too.";
+    for (const zoom of [web.zoom, app.ui]) {
+      expect(zoom).toContain(OFFERED);
+      expect(zoom).toContain("Add a note");
+      expect(zoom).not.toContain("lets them know");
+    }
+    expect(web.zoom.indexOf("<ZoomHaveBlock")).toBeGreaterThan(
+      web.zoom.indexOf("aspect-[60/84]"),
+    );
+    expect(app.ui.indexOf("<ZoomHaveForm")).toBeGreaterThan(
+      app.ui.indexOf("snapToInterval={page}"),
+    );
+    expect(app.ui.indexOf("<ZoomHaveForm")).toBeLessThan(
+      app.ui.indexOf("Tap anywhere to close"),
+    );
 
     expect(web.settings).toContain("Your account, Feed and room preferences.");
   });

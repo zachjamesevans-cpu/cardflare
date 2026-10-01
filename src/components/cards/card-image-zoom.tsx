@@ -93,23 +93,94 @@ export interface ZoomOffer {
 }
 
 /**
- * The offer, inside the zoom.
+ * THE ACTION LIVES AT THE FOOT OF THE PANEL.
+ *
+ * It used to be a bordered box between the title and the picture: a
+ * frame inside a frame, a text field open for a note nobody has to
+ * write, and the only button squeezed beside a sentence explaining it.
+ * The founder: "the offer thing is just kinda ugly, and really should
+ * be at the bottom if anything so it's easier to reach."
+ *
+ * So the facts stay up top, where they are read, and the one thing you
+ * press sits last, where a thumb already is: a full-width button with
+ * no box round it. The note is behind an "Add a note" link, so the
+ * common case, one tap and nothing typed, never sees a field; and the
+ * only sentence that survives is the one that changes a decision.
  *
  * A form on a dialog that closes on any click: every press in here is
- * stopped at the block's edge, and the dialog's arrow keys ignore the
+ * stopped at the bar's edge, and the dialog's arrow keys ignore the
  * field (see the keydown handler), so typing "left" does not turn the
  * page.
  */
-function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
+function ZoomActionForm({
+  action,
+  fields,
+  caption,
+  note,
+  children,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  /** Hidden inputs the action needs. */
+  fields: Record<string, string>;
+  /** The one line worth saying, or nothing. */
+  caption?: string | null;
+  /** The optional note, revealed on request. */
+  note: { name: string; maxLength: number; placeholder: string; label: string };
+  /** The button row. */
+  children: ReactNode;
+}) {
+  const [noting, setNoting] = useState(false);
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
+  return (
+    <form action={action} onClick={stop} className="flex flex-col gap-2">
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      {caption && <p className="text-center text-xs text-text-muted">{caption}</p>}
+      {noting && (
+        <input
+          type="text"
+          name={note.name}
+          maxLength={note.maxLength}
+          placeholder={note.placeholder}
+          aria-label={note.label}
+          autoFocus
+          className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
+        />
+      )}
+      {children}
+      {!noting && (
+        <button
+          type="button"
+          onClick={() => setNoting(true)}
+          className="self-center rounded-[var(--radius-control)] px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        >
+          Add a note
+        </button>
+      )}
+    </form>
+  );
+}
+
+/** What the bar says once the hand is up: a tinted line, no box. */
+function ZoomSaid({ children }: { children: ReactNode }) {
+  return (
+    <div
+      onClick={(event) => event.stopPropagation()}
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The offer on a room's Flare, at the foot of the zoom. */
+function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
   if (offer.own) {
     return (
-      <div
-        onClick={stop}
-        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2"
-      >
-        <p className="min-w-0 flex-1 basis-40 text-sm text-text-secondary">
+      <ZoomSaid>
+        <p className="min-w-0 flex-1 basis-40">
           <span className="font-medium text-accent">
             {offer.early ? "You've got them." : "You offered."}
           </span>{" "}
@@ -128,28 +199,23 @@ function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
             size="sm"
           />
         </form>
-      </div>
+      </ZoomSaid>
     );
   }
 
   return (
-    <form
+    <ZoomActionForm
       action={offerTradeAction}
-      onClick={stop}
-      className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-2"
+      fields={{ code: offer.code, flareId: offer.flareId }}
+      note={{
+        name: "message",
+        maxLength: MAX_OFFER_MESSAGE,
+        placeholder: "Where to find you?",
+        label: "Where can they find you?",
+      }}
     >
-      <input type="hidden" name="code" value={offer.code} />
-      <input type="hidden" name="flareId" value={offer.flareId} />
-      <input
-        type="text"
-        name="message"
-        maxLength={MAX_OFFER_MESSAGE}
-        placeholder="Where to find you? (optional)"
-        aria-label="Where can they find you?"
-        className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
-      />
-      <div className="flex items-center justify-between gap-2">
-        {offer.quantity > 1 ? (
+      <div className="flex items-center gap-2">
+        {offer.quantity > 1 && (
           <label className="flex shrink-0 items-center gap-1.5 text-sm text-text-secondary">
             How many
             <input
@@ -160,88 +226,65 @@ function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
               defaultValue={1}
               inputMode="numeric"
               aria-label="How many can you bring?"
-              className="w-14 rounded-[var(--radius-control)] border border-border bg-canvas px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+              className="h-11 w-14 rounded-[var(--radius-control)] border border-border bg-canvas px-2 text-sm text-text-primary focus:border-accent focus:outline-none"
             />
           </label>
-        ) : (
-          <span />
         )}
         <SubmitButton
           label={offer.early ? "I'll bring it" : "I got it"}
           pendingLabel="Offering…"
-          size="sm"
-          className="shrink-0"
+          className="flex-1"
         />
       </div>
-    </form>
+    </ZoomActionForm>
   );
 }
 
-/**
- * "I have this", inside the zoom, from the Feed.
- *
- * The same block the room's offer draws, with one field and one button:
- * the note is what the thread will say ("I'll bring this to Mox
- * tonight"), and confirming raises the hand on the Flare and posts the
- * line in one go.
- */
+/** "I have this", from the Feed, at the foot of the zoom. */
 function ZoomHaveBlock({ have }: { have: ZoomHave }) {
-  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
-
   if (have.state === "found") {
     return (
-      <div
-        onClick={stop}
-        className="rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
-      >
-        <span className="font-medium text-accent">Found.</span> This one already traded.
-      </div>
+      <ZoomSaid>
+        <p>
+          <span className="font-medium text-accent">Found.</span> This one already
+          traded.
+        </p>
+      </ZoomSaid>
     );
   }
 
   if (have.youOffered) {
     return (
-      <div
-        onClick={stop}
-        className="rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
-      >
-        <span className="font-medium text-accent">You said you have this.</span> They
-        can see your name in their room, so keep an eye out.
-      </div>
+      <ZoomSaid>
+        <p>
+          <span className="font-medium text-accent">You said you have this.</span> They
+          can see your name in their room, so keep an eye out.
+        </p>
+      </ZoomSaid>
     );
   }
 
   return (
-    <form
+    <ZoomActionForm
       action={offerFromFeedAction}
-      onClick={stop}
-      className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-2"
+      fields={{ postId: have.postId, flareId: have.flareId }}
+      caption={
+        have.state === "offered" ? "Somebody already offered. You can too." : null
+      }
+      note={{
+        name: "note",
+        maxLength: POST_COMMENT_MAX,
+        placeholder: "Add a note, like where you'll be",
+        label: "A note with your offer",
+      }}
     >
-      <input type="hidden" name="postId" value={have.postId} />
-      <input type="hidden" name="flareId" value={have.flareId} />
-      <input
-        type="text"
-        name="note"
-        maxLength={POST_COMMENT_MAX}
-        placeholder="Add a note, like where you'll be (optional)"
-        aria-label="A note with your offer"
-        className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
+      <SubmitButton
+        label="I have this"
+        pendingLabel="Sending…"
+        icon={PackageCheck}
+        className="w-full"
       />
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-text-muted">
-          {have.state === "offered"
-            ? "Somebody already offered. You can too."
-            : "Replies on their Flare and lets them know."}
-        </p>
-        <SubmitButton
-          label="I have this"
-          pendingLabel="Sending…"
-          size="sm"
-          icon={PackageCheck}
-          className="shrink-0"
-        />
-      </div>
-    </form>
+    </ZoomActionForm>
   );
 }
 
@@ -897,18 +940,6 @@ export function CardImageZoom({
           </div>
 
           {/*
-           * Arrows and a place in the shelf.
-           *
-           * The swipe is the gesture the founder asked for and the one
-           * nobody can see; this row is what says the gesture exists, and
-           * it is also the whole feature for anyone on a mouse or a
-           * keyboard. `stopPropagation` because every other click on this
-           * dialog closes it.
-           */}
-          {offer && <ZoomOfferBlock offer={offer} />}
-          {have && <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} />}
-
-          {/*
            * Sized to the card's own proportions so nothing jumps when the
            * image arrives.
            */}
@@ -1023,6 +1054,12 @@ export function CardImageZoom({
               </>
             )}
           </div>
+
+          {/* Last, under the picture, where the thumb is. Keyed on the
+              shelf position so a half-typed note does not ride along to
+              the next card. */}
+          {offer && <ZoomOfferBlock key={`offer-${at}`} offer={offer} />}
+          {have && <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} />}
         </div>
       </dialog>
     </>
