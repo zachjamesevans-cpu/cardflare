@@ -727,3 +727,30 @@ export async function readThread(
     meet,
   };
 }
+
+/**
+ * How many messages are waiting for the player across every
+ * conversation: the number on the Messages row of the Inbox.
+ */
+export async function unreadMessages(playerId: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+
+  const admin = getSupabaseAdmin();
+  const { data: threads } = await admin
+    .from("flare_threads")
+    .select("id")
+    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
+    .is("closed_at", null);
+
+  const ids = (threads ?? []).map((row) => row.id);
+  if (ids.length === 0) return 0;
+
+  const { count } = await admin
+    .from("flare_messages")
+    .select("id", { count: "exact", head: true })
+    .in("thread_id", ids)
+    .neq("sender_player_id", playerId)
+    .is("read_at", null);
+
+  return count ?? 0;
+}

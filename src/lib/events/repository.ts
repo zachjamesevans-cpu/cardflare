@@ -684,6 +684,80 @@ export async function findStoreById(storeId: string): Promise<StoreRow | null> {
   return data ?? null;
 }
 
+/**
+ * Changes a night's name and window. The instants arrive already in
+ * the store's zone, the same way createEvent takes them.
+ */
+export async function updateEvent(
+  id: string,
+  input: { name: string; startsAt: Date; endsAt: Date; repeatWeekly: boolean },
+): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("events")
+    .update({
+      name: input.name,
+      starts_at: input.startsAt.toISOString(),
+      ends_at: input.endsAt.toISOString(),
+      repeat_weekly: input.repeatWeekly,
+    })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(`Could not update the event: ${error.message}`, { cause: error });
+  }
+}
+
+/**
+ * Cancels a night.
+ *
+ * A draft nobody has touched is simply deleted: the audit's "TEST
+ * EVENT" should leave no trace. Anything with a participant or a Flare
+ * on it is closed and stamped instead, so the store's list can say
+ * "Cancelled" and the night's history keeps its rows. Either way every
+ * public reader already skips closed events, so the night is gone from
+ * the store page and the Feed the moment this returns.
+ *
+ * Returns what happened, so the caller can say it.
+ */
+export async function cancelEvent(id: string): Promise<"deleted" | "cancelled" | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data: event } = await admin
+    .from("events")
+    .select("id, status, kind")
+    .eq("id", id)
+    .maybeSingle();
+  if (!event || event.kind !== "scheduled") return null;
+
+  const [{ count: people }, { count: flares }] = await Promise.all([
+    admin
+      .from("event_participants")
+      .select("event_id", { count: "exact", head: true })
+      .eq("event_id", id),
+    admin
+      .from("flares")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", id),
+  ]);
+
+  if (event.status === "draft" && (people ?? 0) === 0 && (flares ?? 0) === 0) {
+    const { error } = await admin.from("events").delete().eq("id", id);
+    if (error) {
+      throw new Error(`Could not delete the event: ${error.message}`, { cause: error });
+    }
+    return "deleted";
+  }
+
+  const { error } = await admin
+    .from("events")
+    .update({ status: "closed", cancelled_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    throw new Error(`Could not cancel the event: ${error.message}`, { cause: error });
+  }
+  return "cancelled";
+}
+
 export async function setEventStatus(id: string, status: EventStatus): Promise<void> {
   const { error } = await getSupabaseAdmin()
     .from("events")

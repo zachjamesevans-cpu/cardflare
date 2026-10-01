@@ -1486,9 +1486,11 @@ async function boardWithHunts(
       /* Both counts are of CARDS now, so "you can answer 3 of 8" and the
          trailing "+N more" are counting the same things the tiles are. */
       total: cards.length,
-      /* Nobody answers an offer with a copy of their own. */
+      /* Nobody answers an offer with a copy of their own, and nobody
+         answers their own post: the audit saw "You can answer 1 of 4"
+         on the poster's own Flare. */
       youCanAnswer:
-        ordered[0]?.flare.intent === "showcase"
+        ordered[0]?.flare.intent === "showcase" || key.split("::")[0] === viewerId
           ? 0
           : cards.filter(({ match }) => match).length,
       cards: cards.slice(0, CARD_RAIL_CAP).map(({ flare, match }) => ({

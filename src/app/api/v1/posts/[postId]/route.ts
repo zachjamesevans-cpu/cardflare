@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { restoreFlares, withdrawFlares } from "@/lib/flares/withdraw";
+
 import { absoluteAvatars } from "@/lib/api/absolute-avatars";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
@@ -31,6 +33,12 @@ const MINUTE = 60_000;
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("like") }),
   z.object({ action: z.literal("unlike") }),
+  /* Your own post: take every open card of it down, and put them back. */
+  z.object({ action: z.literal("take-down") }),
+  z.object({
+    action: z.literal("restore"),
+    flareIds: z.array(z.guid()).min(1).max(120),
+  }),
   z.object({
     action: z.literal("comment"),
     body: z
@@ -101,6 +109,20 @@ export async function POST(
         : await unlikePost(postId, player.playerId);
     return done
       ? Response.json({ ok: true })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "take-down") {
+    const result = await withdrawFlares(player.playerId, { postId });
+    return result.ok
+      ? Response.json({ ok: true, flareIds: result.flareIds })
+      : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "restore") {
+    const result = await restoreFlares(player.playerId, null, body.flareIds);
+    return result.ok
+      ? Response.json({ ok: true, restored: result.restored })
       : Response.json({ error: "unavailable" }, { status: 503 });
   }
 
