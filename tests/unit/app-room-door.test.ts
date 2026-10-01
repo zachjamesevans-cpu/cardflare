@@ -178,9 +178,9 @@ describe("a long section folds", () => {
   it("draws the controls in the theme's colours", () => {
     const styles = room.slice(room.indexOf("const styles = StyleSheet.create({"));
     expect(styles).toMatch(
-      /foldTile: \{[^}]*borderStyle: "dashed",[^}]*borderColor: colors\.border,/s,
+      /foldTile: \{[^}]*borderStyle: "dashed",[^}]*borderColor: colors\.border,/,
     );
-    expect(styles).toMatch(/foldText: \{[^}]*color: colors\.accent,/s);
+    expect(styles).toMatch(/foldText: \{[^}]*color: colors\.accent,/);
   });
 });
 

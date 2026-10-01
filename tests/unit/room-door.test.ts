@@ -233,3 +233,87 @@ describe("what stays, in order", () => {
     }
   });
 });
+
+describe("a long section folds", () => {
+  /*
+   * The founder asked what a hundred Flares does to the room. The answer
+   * was that one person's section became the board, so a section shows
+   * its first six cards and "and N more" at its end; tapping that shows
+   * the whole section in place, and "Show less" folds it back. The rail
+   * and the stacked list both obey it, your own section folds like
+   * everyone else's, and the zoom shelf is never folded: tapping a card
+   * still pages the whole section. The app pins the same words in
+   * tests/unit/app-room-door.test.ts.
+   */
+  const entries = read("src/components/lists/list-entries.tsx");
+  const fold = read("src/components/lists/section-fold.tsx");
+
+  it("names the number once, on the board, and nowhere in the wrapper", () => {
+    expect(entries.match(/const SECTION_FOLD = 6;/g)).toHaveLength(1);
+    expect(entries).not.toMatch(/[<>]=?\s*6\b/);
+    /* The wrapper is told how many lie past the fold; it never counts
+       to six on its own, so the number cannot drift between the two. */
+    expect(fold).not.toContain("SECTION_FOLD");
+    expect(fold).not.toMatch(/=\s*6\b/);
+    expect(fold).toContain("hidden: number;");
+    expect(entries).toContain("const hidden = group.entries.length - SECTION_FOLD;");
+  });
+
+  it("says and N more, then Show less, from one control", () => {
+    expect(fold).toContain('"use client"');
+    expect(fold).toContain('const label = open ? "Show less" : `and ${hidden} more`;');
+    expect(fold).toContain("aria-expanded={open}");
+    /* No control at all on a short section. */
+    expect(fold).toContain("{hidden > 0 &&");
+    expect(entries).not.toContain('"use client"');
+  });
+
+  it("folds by cards in drawn order, whatever folder they are in", () => {
+    expect(entries).toContain(
+      "index < SECTION_FOLD ? node : <BeyondFold key={key}>{node}</BeyondFold>;",
+    );
+    /* The rail counts along the shelf; the stacked list counts showcases
+       first, then the wants in folder order, then the loose cards. */
+    expect(entries).toContain(
+      "[...showcases, ...wantEntries].map((entry, index) => [entry.id, index])",
+    );
+    expect(entries).toContain("{shelfEntries.map((entry, index) => (");
+    expect(entries).toContain("pastFold(index, entry.id, renderTile(entry))");
+    expect(entries).toContain(
+      "pastFold(stackedAt.get(entry.id) ?? 0, entry.id, renderRow(entry));",
+    );
+    /* A folder past the fold goes whole; one straddling it keeps its
+       heading and folds row by row. */
+    expect(entries).toContain("stackedAt.get(folder.entries[0].id) ?? 0,");
+    expect(entries).toContain("{folder.entries.map(foldRow)}");
+    expect(entries).toContain("{loose.map(foldRow)}");
+    expect(entries).toContain("{showcases.map(foldRow)}");
+    /* The seam before the showcases folds with them. */
+    expect(entries).toContain(
+      'pastFold(index, "divider", <RailDivider key="divider" />)',
+    );
+  });
+
+  it("folds the rail and the stacked list alike", () => {
+    expect(entries).toContain('<SectionFold variant="rail" hidden={hidden}>');
+    expect(entries).toContain('<SectionFold variant="stacked" hidden={hidden}>');
+    /* The rail's control is a tile: the card's box, a dashed ring. */
+    expect(fold).toContain('variant === "rail" ? (');
+    expect(fold).toContain("aspect-[60/84]");
+    expect(fold).toContain("border-dashed border-border");
+    /* The stacked control is one of the board's quiet text controls. */
+    expect(fold).toContain("text-sm font-semibold text-accent");
+    /* Tokens only. */
+    expect(fold).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  });
+
+  it("builds the zoom shelf from the whole section, never the six shown", () => {
+    expect(entries).toContain(
+      "const shelfEntries = [...inTileOrder(wantEntries), ...inTileOrder(showcases)];",
+    );
+    expect(entries).toContain("const shelf = shelfEntries.map(zoomCardFor);");
+    expect(entries).toContain("siblings={shelf}");
+    expect(entries).not.toMatch(/shelf(Entries)?\.slice\(/);
+    expect(entries).not.toMatch(/\.slice\(0, SECTION_FOLD\)/);
+  });
+});

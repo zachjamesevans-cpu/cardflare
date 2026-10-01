@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Fragment, type ReactNode } from "react";
 import {
   ArrowLeftRight,
   ArrowUpRight,
@@ -33,6 +34,7 @@ import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import { Badge, Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { RemoveEntry } from "@/components/lists/remove-entry";
+import { BeyondFold, SectionFold } from "@/components/lists/section-fold";
 import type { ListEntry } from "@/lib/lists/repository";
 import {
   acceptsLabel,
@@ -304,6 +306,24 @@ function Empty({ icon: Icon, children }: { icon: typeof Flame; children: string 
  */
 const TILE_ART_WIDTH = 56;
 const TILE_ART_HEIGHT = (TILE_ART_WIDTH * 84) / 60;
+
+/**
+ * How many cards a player's section shows before it folds.
+ *
+ * The founder asked what a hundred Flares does to the room, and the
+ * answer was that one person's section became the board. So a section
+ * shows this many cards, in the order it already draws them (showcases
+ * count too), then "and N more" at its end; tapping that shows the whole
+ * section in place, and "Show less" folds it back. Deck folders count by
+ * cards, not by folders: a folder straddling the fold shows only the
+ * cards within it. Your own section folds the same way, so you see what
+ * the room sees. The one thing the fold never touches is the zoom shelf:
+ * tapping a card still pages the whole section.
+ *
+ * Named once here and once in the app; `tests/unit/room-door.test.ts`
+ * holds the two to the same number.
+ */
+const SECTION_FOLD = 6;
 
 /**
  * One Flare as the carousel view shows it: a contact sheet, not a row.
@@ -884,6 +904,32 @@ export function FlareBoard({
         const shelf = shelfEntries.map(zoomCardFor);
         const shelfAt = new Map(shelfEntries.map((entry, index) => [entry.id, index]));
 
+        /*
+         * The stacked list draws the section the other way round:
+         * showcases first, then the wants in folder order, then the
+         * loose cards. The fold counts cards in whichever order a view
+         * draws them, so each view has its own idea of where card seven
+         * begins.
+         */
+        const stackedAt = new Map(
+          [...showcases, ...wantEntries].map((entry, index) => [entry.id, index]),
+        );
+
+        /*
+         * A card (or a whole folder, or the divider) past the fold is
+         * wrapped so the section's control can show it in place. The
+         * first `SECTION_FOLD` are left exactly as they were, which is
+         * the point: a short section renders as it always did.
+         */
+        const pastFold = (index: number, key: string, node: ReactNode) =>
+          index < SECTION_FOLD ? node : <BeyondFold key={key}>{node}</BeyondFold>;
+
+        const hidden = group.entries.length - SECTION_FOLD;
+
+        /** A stacked row, folded by its place in the stacked order. */
+        const foldRow = (entry: ListEntry) =>
+          pastFold(stackedAt.get(entry.id) ?? 0, entry.id, renderRow(entry));
+
         return (
           <Card
             as="li"
@@ -999,68 +1045,101 @@ export function FlareBoard({
                  * cluttered every section that had one.
                  */
                 <Rail labelledBy={headingId}>
-                  {inTileOrder(wantEntries).map(renderTile)}
-                  {showcases.length > 0 && (
-                    <>
-                      <RailDivider />
-                      {inTileOrder(showcases).map(renderTile)}
-                    </>
-                  )}
+                  <SectionFold variant="rail" hidden={hidden}>
+                    {shelfEntries.map((entry, index) => (
+                      <Fragment key={entry.id}>
+                        {/* The seam sits before the first showcase, and
+                            folds with it: past the fold it would label
+                            cards nobody can see. */}
+                        {entry.intent === "showcase" &&
+                          index === wantEntries.length &&
+                          pastFold(index, "divider", <RailDivider key="divider" />)}
+                        {pastFold(index, entry.id, renderTile(entry))}
+                      </Fragment>
+                    ))}
+                  </SectionFold>
                 </Rail>
               }
               stacked={
                 <div className="flex flex-col gap-3 pt-1">
-                  {/*
-                   * Cards on offer, which the first cut left out of this
-                   * view entirely — unfolding a player hid the very
-                   * cards they were trying to move.
-                   */}
-                  {showcases.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      <DirectionHeading direction="showcase" count={showcases.length} />
-                      <ul
-                        aria-label="Cards this player is offering"
-                        className="flex flex-col"
-                      >
-                        {showcases.map(renderRow)}
-                      </ul>
-                    </div>
-                  )}
-
-                  {labelled && wantEntries.length > 0 && (
-                    <DirectionHeading direction="want" count={wantEntries.length} />
-                  )}
-
-                  {folders.map((folder) => (
-                    <div
-                      key={folder.label.toLowerCase()}
-                      className="flex flex-col gap-1.5"
-                    >
-                      <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-                        <Folder
-                          className="size-4 shrink-0 text-accent"
-                          aria-hidden="true"
+                  <SectionFold variant="stacked" hidden={hidden}>
+                    {/*
+                     * Cards on offer, which the first cut left out of this
+                     * view entirely — unfolding a player hid the very
+                     * cards they were trying to move.
+                     */}
+                    {showcases.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <DirectionHeading
+                          direction="showcase"
+                          count={showcases.length}
                         />
-                        <span className="min-w-0 truncate">{folder.label}</span>
-                        <span className="shrink-0 font-normal text-text-muted tabular-nums">
-                          · {folder.entries.length}{" "}
-                          {folder.entries.length === 1 ? "card" : "cards"}
-                        </span>
-                      </p>
-                      <ul
-                        aria-label={`Deck: ${folder.label}`}
-                        className="flex flex-col"
-                      >
-                        {folder.entries.map(renderRow)}
-                      </ul>
-                    </div>
-                  ))}
+                        <ul
+                          aria-label="Cards this player is offering"
+                          className="flex flex-col"
+                        >
+                          {showcases.map(foldRow)}
+                        </ul>
+                      </div>
+                    )}
 
-                  {loose.length > 0 && (
-                    <ul aria-labelledby={headingId} className="flex flex-col">
-                      {loose.map(renderRow)}
-                    </ul>
-                  )}
+                    {labelled &&
+                      wantEntries.length > 0 &&
+                      pastFold(
+                        showcases.length,
+                        "want-heading",
+                        <DirectionHeading
+                          key="want-heading"
+                          direction="want"
+                          count={wantEntries.length}
+                        />,
+                      )}
+
+                    {/* A folder past the fold goes whole, heading and all;
+                        one straddling it keeps its heading and shows the
+                        cards within the fold. */}
+                    {folders.map((folder) =>
+                      pastFold(
+                        stackedAt.get(folder.entries[0].id) ?? 0,
+                        folder.label.toLowerCase(),
+                        <div
+                          key={folder.label.toLowerCase()}
+                          className="flex flex-col gap-1.5"
+                        >
+                          <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                            <Folder
+                              className="size-4 shrink-0 text-accent"
+                              aria-hidden="true"
+                            />
+                            <span className="min-w-0 truncate">{folder.label}</span>
+                            <span className="shrink-0 font-normal text-text-muted tabular-nums">
+                              · {folder.entries.length}{" "}
+                              {folder.entries.length === 1 ? "card" : "cards"}
+                            </span>
+                          </p>
+                          <ul
+                            aria-label={`Deck: ${folder.label}`}
+                            className="flex flex-col"
+                          >
+                            {folder.entries.map(foldRow)}
+                          </ul>
+                        </div>,
+                      ),
+                    )}
+
+                    {loose.length > 0 &&
+                      pastFold(
+                        stackedAt.get(loose[0].id) ?? 0,
+                        "loose",
+                        <ul
+                          key="loose"
+                          aria-labelledby={headingId}
+                          className="flex flex-col"
+                        >
+                          {loose.map(foldRow)}
+                        </ul>,
+                      )}
+                  </SectionFold>
                 </div>
               }
             />
