@@ -69,7 +69,7 @@ export async function togglePostLikeAction(
 export async function loadPostThreadAction(postId: string): Promise<PostComment[]> {
   const player = await viewerPlayer(await getViewer());
   if (!player || !postId) return [];
-  return listComments(postId);
+  return listComments(postId, player.id);
 }
 
 /** One line under the post. Returns the line as the thread will show it. */

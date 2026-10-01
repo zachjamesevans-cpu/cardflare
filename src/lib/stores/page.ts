@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isGameSlug, type GameSlug } from "@/lib/players/games-catalog";
+import { gameShortName, isGameSlug, type GameSlug } from "@/lib/players/games-catalog";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { StoreRow, StoreUpdate } from "@/lib/supabase/types";
 import { hoursToJson, parseHours } from "@/lib/stores/hours";
@@ -186,4 +186,20 @@ export async function markStoreOnboarded(storeId: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+/**
+ * What a poster says the shop plays: the ticked games by their short
+ * names, or a line that is true of every shop. The audit found a
+ * poster saying "One Piece Card Game" for a store with nothing ticked.
+ */
+export async function storeGameLine(storeId: string | null): Promise<string> {
+  if (!storeId || !isSupabaseConfigured()) return "Trading card games";
+  const { data } = await getSupabaseAdmin()
+    .from("store_games")
+    .select("game")
+    .eq("store_id", storeId);
+  const games = storeGamesFrom(data ?? []);
+  if (games.length === 0) return "Trading card games";
+  return games.map((game) => gameShortName(game)).join(" · ");
 }

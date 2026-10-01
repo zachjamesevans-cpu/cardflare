@@ -3,6 +3,7 @@ import "server-only";
 import { listLocals } from "@/lib/players/locals";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
+import { blockedBetween, blockedSet } from "@/lib/players/safety";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 
 /**
@@ -126,6 +127,11 @@ export async function openFlareThread(
     flare.player_id ?? (await accountBehindSession(flare.player_session_id));
   if (!authorPlayerId) return { ok: false, reason: "no-account" };
   if (authorPlayerId === responderPlayerId) return { ok: false, reason: "yourself" };
+  /* A block reads as a closed door, in both directions and without
+     saying which side closed it. */
+  if (await blockedBetween(authorPlayerId, responderPlayerId)) {
+    return { ok: false, reason: "closed" };
+  }
 
   const { data: existing } = await admin
     .from("flare_threads")
@@ -202,6 +208,9 @@ export async function openWantThread(
 
   if (!want) return { ok: false, reason: "not-found" };
   if (want.player_id === responderPlayerId) return { ok: false, reason: "yourself" };
+  if (await blockedBetween(want.player_id, responderPlayerId)) {
+    return { ok: false, reason: "closed" };
+  }
 
   const { data: existing } = await admin
     .from("flare_threads")
@@ -263,6 +272,9 @@ export async function openDirectThread(
 ): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
   if (fromPlayerId === toPlayerId) return { ok: false, reason: "yourself" };
+  if (await blockedBetween(fromPlayerId, toPlayerId)) {
+    return { ok: false, reason: "closed" };
+  }
 
   const admin = getSupabaseAdmin();
 
@@ -408,6 +420,7 @@ export async function sendThreadMessage(
   if (thread.closed) return { ok: false, reason: "closed" };
 
   const recipient = thread.authorId === senderId ? thread.responderId : thread.authorId;
+  if (await blockedBetween(senderId, recipient)) return { ok: false, reason: "closed" };
 
   const sent = await appendMessage(threadId, senderId, recipient, body);
   return sent ? { ok: true } : { ok: false, reason: "unavailable" };
@@ -460,7 +473,12 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
     return [];
   }
 
-  const rows = threads ?? [];
+  /* A blocked person's conversation is not listed, either way round. */
+  const blocked = await blockedSet(playerId);
+  const rows = (threads ?? []).filter(
+    (row) =>
+      !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
+  );
   if (rows.length === 0) return [];
 
   const threadIds = rows.map((row) => row.id);

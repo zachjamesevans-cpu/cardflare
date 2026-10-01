@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { forgetFeed } from "@/lib/feed/memo";
+
 import { LIMITS } from "@/lib/api/throttle";
 import { getViewer } from "@/lib/auth/session";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
@@ -109,6 +111,7 @@ export async function publishPostAction(input: {
     );
   }
 
+  forgetFeed(playerId);
   revalidatePath("/feed");
   revalidatePath("/flare");
   revalidatePath("/profile");

@@ -67,6 +67,12 @@ export interface PosterInput {
   subtitle?: string | null;
   kind: PosterKind;
   joinCode: string;
+  /**
+   * What the shop plays, for the chip's right side: the store's games
+   * when it has ticked any, else a line true of every shop. Absent:
+   * the One Piece line every poster used to carry.
+   */
+  gameLine?: string;
 }
 
 /** A rounded rectangle via an SVG path — pdf-lib rectangles have no radius. */
@@ -362,8 +368,9 @@ export async function posterPdf(input: PosterInput): Promise<Uint8Array> {
     });
     const textY = chipY + typeLineH / 2 - 3;
     tracked(page, TYPE_LINE[input.kind], bold, 8, left + 3 * MM, textY, 0.8);
-    const gameW = helv.widthOfTextAtSize(GAME, 8);
-    page.drawText(GAME, {
+    const gameLine = input.gameLine ?? GAME;
+    const gameW = helv.widthOfTextAtSize(gameLine, 8);
+    page.drawText(gameLine, {
       x: left + frameW - 3 * MM - gameW,
       y: textY,
       size: 8,

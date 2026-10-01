@@ -27,6 +27,8 @@ import { storePostsForFollowers } from "@/lib/stores/posts";
 import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { threadsOnFlaresFor } from "@/lib/local/threads";
+import { blockedSet } from "@/lib/players/safety";
+import { dropBlockedItems } from "./blocks";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
 
 /**
@@ -2790,11 +2792,15 @@ export async function listFeed(
 
   await decorateHunts(items, playerId, origin);
 
+  /* Nothing from a blocked person, and nothing of yours to them: both
+     directions in one set, applied to every kind the same way. */
+  const blocked = await blockedSet(playerId);
+
   /*
    * Every item leaves here knowing where it goes and why it is here.
    * One place, so a new kind cannot ship without an answer to both.
    */
-  return items.map((item) => {
+  return dropBlockedItems(items, blocked).map((item) => {
     const section = sectionFor(item);
     /*
      * No "you have this" ring on your own post. The founder: "If I have
