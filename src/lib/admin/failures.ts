@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { wrongCards } from "@/lib/cards/spot-check-verdicts";
+import { openReportCount } from "@/lib/players/safety";
 
 /**
  * What went wrong lately, in one place.
@@ -19,7 +20,7 @@ import { wrongCards } from "@/lib/cards/spot-check-verdicts";
  */
 
 export interface Failure {
-  kind: "sync-failed" | "sync-stale" | "card-wrong";
+  kind: "sync-failed" | "sync-stale" | "card-wrong" | "report-open";
   /** "Riftbound", "One Piece", or the card. */
   subject: string;
   /** What happened, in a sentence. */
@@ -125,6 +126,17 @@ export async function recentFailures(now = Date.now()): Promise<{
         href: "/admin#sync-heading",
       });
     }
+  }
+
+  const openReports = await openReportCount();
+  if (openReports > 0) {
+    failures.push({
+      kind: "report-open",
+      subject: "Reports from players",
+      detail: `${openReports} waiting for a look.`,
+      when: "",
+      href: "/admin/reports#queue",
+    });
   }
 
   for (const card of await wrongCards()) {

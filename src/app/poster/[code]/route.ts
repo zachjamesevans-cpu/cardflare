@@ -8,6 +8,7 @@ import {
   findStoreByJoinCode,
 } from "@/lib/events/repository";
 import { posterPdf, type PosterInput } from "@/lib/events/poster-pdf";
+import { storeGameLine } from "@/lib/stores/page";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 
@@ -57,12 +58,18 @@ export async function GET(
         subtitle: formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone),
         kind: "event",
         joinCode: code,
+        gameLine: await storeGameLine(event.storeId),
       };
     }
   } else if (kind === "store") {
     const store = await findStoreByJoinCode(code);
     if (store) {
-      input = { title: store.name, kind: "counter", joinCode: code };
+      input = {
+        title: store.name,
+        kind: "counter",
+        joinCode: code,
+        gameLine: await storeGameLine(store.id),
+      };
     }
   } else {
     const show = await findShowByJoinCode(code);
@@ -72,6 +79,7 @@ export async function GET(
         subtitle: formatEventWindow(show.startsAt, show.endsAt, show.timeZone),
         kind: "show",
         joinCode: code,
+        gameLine: "Trading card games",
       };
     }
   }

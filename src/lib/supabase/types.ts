@@ -1467,6 +1467,51 @@ export type LoggedTradeRow = {
   note: string | null;
 };
 
+/** One player hiding another. Never announced. */
+export type PlayerBlockRow = {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+};
+
+export type PlayerBlockInsert = Omit<PlayerBlockRow, "created_at"> & {
+  created_at?: string;
+};
+
+/** A player telling the admins something is wrong. */
+export type PlayerReportRow = {
+  id: string;
+  created_at: string;
+  reporter_id: string;
+  target_kind: "post" | "player" | "thread";
+  target_id: string;
+  target_player_id: string | null;
+  reason: "spam" | "scam" | "harassment" | "other";
+  note: string | null;
+  status: "open" | "resolved";
+  resolved_at: string | null;
+  resolved_by: string | null;
+};
+
+export type PlayerReportInsert = Omit<
+  PlayerReportRow,
+  | "id"
+  | "created_at"
+  | "status"
+  | "resolved_at"
+  | "resolved_by"
+  | "note"
+  | "target_player_id"
+> & {
+  id?: string;
+  created_at?: string;
+  status?: "open" | "resolved";
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  note?: string | null;
+  target_player_id?: string | null;
+};
+
 /** An admin's verdict on one card after reading it against the real one. */
 export type CardSpotCheckRow = {
   card_id: string;
@@ -1835,6 +1880,8 @@ export type Database = {
       trades: Table<TradeRow, TradeInsert>;
       logged_trades: Table<LoggedTradeRow, LoggedTradeInsert>;
       card_spot_checks: Table<CardSpotCheckRow, CardSpotCheckInsert>;
+      player_blocks: Table<PlayerBlockRow, PlayerBlockInsert>;
+      player_reports: Table<PlayerReportRow, PlayerReportInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
       vendor_inventory: Table<VendorInventoryRow, VendorInventoryInsert>;

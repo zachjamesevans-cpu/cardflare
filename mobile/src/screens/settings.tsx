@@ -14,6 +14,8 @@ import {
   describeError,
   getMe,
   getProfile,
+  listBlockedPlayers,
+  type BlockedPlayer,
   type Me,
   previewDeckList,
   type Profile,
@@ -21,7 +23,9 @@ import {
   setAutoPost as saveAutoPost,
   setFeedView,
   signOut,
+  unblockPlayer,
 } from "../api";
+import { formatHandle } from "../handle";
 import {
   AsyncButton,
   Body,
@@ -350,6 +354,8 @@ export function SettingsScreen() {
         {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
+      <BlockedPlayers />
+
       {/* Tooling, for a development build only. A player's settings
           page is not the place for a design lab or a connection probe;
           both stay in the binary for the person holding a dev client. */}
@@ -402,6 +408,107 @@ export function SettingsScreen() {
 
       {profile && <DeleteAccount handle={profile.handle} />}
     </ScrollView>
+  );
+}
+
+/**
+ * The people you have blocked, with Unblock beside each: the website's
+ * settings card. A block is made on somebody's profile and undone
+ * either there or here. Re-read on focus, because a block made on a
+ * profile a moment ago belongs on this list the moment it opens.
+ */
+function BlockedPlayers() {
+  /* Null until the first read lands, so an empty list is the server's
+     word and not a loading gap. */
+  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async (alive: () => boolean = () => true) => {
+    try {
+      const result = await listBlockedPlayers();
+      if (alive()) setBlocked(result.blocked);
+    } catch {
+      /* An older server has no list; the card stays on its last word. */
+      if (alive()) setBlocked((current) => current ?? []);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      void load(() => live);
+      return () => {
+        live = false;
+      };
+    }, [load]),
+  );
+
+  const unblock = async (playerId: string) => {
+    if (busy) return;
+    setBusy(playerId);
+    setError(null);
+    try {
+      await unblockPlayer(playerId);
+      await load();
+    } catch {
+      setError("Could not unblock them right now. Try again in a moment.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <Title>Blocked players</Title>
+      {blocked === null ? null : blocked.length === 0 ? (
+        <Muted>Nobody. Blocking somebody on their profile puts them here.</Muted>
+      ) : (
+        <View style={{ gap: spacing(2) }}>
+          {blocked.map((person) => (
+            <View
+              key={person.playerId}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing(3),
+                borderRadius: radius.control,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.elevated,
+                padding: spacing(3),
+              }}
+            >
+              <View style={{ flexShrink: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textPrimary, fontWeight: "700" }}
+                >
+                  {person.displayName}
+                </Text>
+                {person.handle ? (
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textMuted, fontSize: 12 }}
+                  >
+                    {formatHandle(person.handle)}
+                  </Text>
+                ) : null}
+              </View>
+              <Button
+                label="Unblock"
+                variant="secondary"
+                busy={busy === person.playerId}
+                disabled={busy !== null && busy !== person.playerId}
+                onPress={() => void unblock(person.playerId)}
+              />
+            </View>
+          ))}
+        </View>
+      )}
+      <ErrorLine message={error} />
+    </Card>
   );
 }
 

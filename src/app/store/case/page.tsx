@@ -47,7 +47,7 @@ export default async function StoreCasePage({
         storeId={store.id}
         owner={store.role === "owner"}
         feature="The case"
-        pitch="Six cards from your singles, on a shelf on your store page, for every player who finds you."
+        pitch="Six cards on your store page, chosen by you, for everyone deciding whether to walk in."
       />
     );
   }

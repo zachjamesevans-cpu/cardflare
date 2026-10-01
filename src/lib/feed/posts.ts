@@ -14,6 +14,7 @@ import {
 import { offerTrade } from "@/lib/matching/repository";
 import { heldByCard, MAX_OFFER_MESSAGE, matchFor } from "@/lib/matching/schema";
 import { notifyOfferReceived, notifyPostComment } from "@/lib/notifications/notify";
+import { blockedSet } from "@/lib/players/safety";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { sessionsForPlayers } from "@/lib/players/accounts";
@@ -336,16 +337,24 @@ async function facesFor(playerIds: string[]): Promise<
 }
 
 /** The thread under a post, oldest first, the way a conversation reads. */
-export async function listComments(postId: string): Promise<PostComment[]> {
+export async function listComments(
+  postId: string,
+  /** Whose thread it is drawn for: a blocked person's lines are left out. */
+  viewerId: string | null = null,
+): Promise<PostComment[]> {
   if (!isSupabaseConfigured()) return [];
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("flare_post_comments")
-    .select("id, created_at, player_id, flare_id, kind, body")
-    .eq("post_id", postId)
-    .order("created_at")
-    .limit(200);
+  const [{ data: raw, error }, blocked] = await Promise.all([
+    admin
+      .from("flare_post_comments")
+      .select("id, created_at, player_id, flare_id, kind, body")
+      .eq("post_id", postId)
+      .order("created_at")
+      .limit(200),
+    viewerId ? blockedSet(viewerId) : Promise.resolve(new Set<string>()),
+  ]);
+  const data = (raw ?? []).filter((row) => !blocked.has(row.player_id));
 
   if (error) {
     console.error("Could not read the thread", error);
@@ -548,7 +557,7 @@ export async function postDetail(
         viewerSessionIds,
       ),
       socialForPosts([postId], viewerId),
-      listComments(postId),
+      listComments(postId, viewerId),
       context.ownerPlayerId ? facesFor([context.ownerPlayerId]) : new Map(),
       ownSession ? listBinder(ownSession) : Promise.resolve([]),
       context.eventId

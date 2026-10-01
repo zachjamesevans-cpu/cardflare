@@ -7,6 +7,7 @@ import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
+import { blockState } from "@/lib/players/safety";
 import { profileStats } from "@/lib/players/stats";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
@@ -88,6 +89,11 @@ export async function GET(
 
   return Response.json({
     follow: me && me !== playerId ? follow : null,
+    /* Both directions, so a blocked profile offers neither Follow nor
+       Message, and a profile that blocked you says nothing about it. */
+    ...(me && me !== playerId
+      ? await blockState(me, playerId)
+      : { blocked: false, blockedBy: false }),
     stats,
     playerId: profile.playerId,
     displayName: profile.displayName,

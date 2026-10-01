@@ -65,6 +65,10 @@ vi.mock("@/lib/lists/repository", () => ({
 vi.mock("@/lib/players/accounts", () => ({
   sessionsForPlayers: (...a: unknown[]) => sessionsForPlayers(...a),
 }));
+vi.mock("@/lib/players/safety", () => ({
+  blockedSet: () => Promise.resolve(new Set<string>()),
+}));
+
 vi.mock("@/lib/players/follows", () => ({
   listFollowing: (...a: unknown[]) => listFollowing(...a),
 }));

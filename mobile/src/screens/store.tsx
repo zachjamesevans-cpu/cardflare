@@ -139,8 +139,9 @@ export function StoreScreen() {
       <Card>
         <Title>cardflare packs</Title>
         <Muted>
-          Sealed packs of cosmetics, opened like the real thing. Every new account
-          starts with one on the house.
+          {
+            "Sealed packs of cosmetics, opened like the real thing. Your first one was on the house."
+          }
         </Muted>
         {packSeries.map((series) => (
           <PackShopSection

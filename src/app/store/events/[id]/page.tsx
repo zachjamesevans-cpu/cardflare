@@ -23,6 +23,7 @@ import { listRoomFlares } from "@/lib/lists/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { eventStats } from "@/lib/trades/repository";
 import { earlyBoardOpensAt, roomPhase, STATUS_LABELS } from "@/lib/events/schema";
+import { storeGameLine } from "@/lib/stores/page";
 import { instantToLocal } from "@/lib/time/zone";
 
 export const metadata: Metadata = {
@@ -297,6 +298,7 @@ export default async function EventPage({
             kind="event"
             title={event.name}
             subtitle={formatEventWindow(event.starts_at, event.ends_at, timeZone)}
+            gameLine={await storeGameLine(store.id)}
             joinCode={event.join_code}
             url={joinUrl(event.join_code)}
             qrSvg={svg}

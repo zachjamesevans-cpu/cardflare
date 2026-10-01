@@ -77,7 +77,7 @@ export default async function StorePostsPage({
         storeId={store.id}
         owner={store.role === "owner"}
         feature="Posts"
-        pitch="Post to everyone who follows your store: events, restocks, a new case. Each post lands in their Feed with a thread under it."
+        pitch="Every player who follows you sees it in their Feed the moment you post. Restocks, prereleases, a new case."
       />
     );
   }

@@ -51,6 +51,7 @@ import { feedViewFrom } from "../feed-views";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { FeedFilterTabs } from "../feed-filter-tabs";
+import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import { StorePostCard } from "../store-post-card";
@@ -395,6 +396,8 @@ export function HomeScreen() {
   >(null);
   /* Your own post, with its copies-found stepper open. */
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
+  /* "Report" behind the three dots on somebody else's post. */
+  const [report, setReport] = useState<ReportTarget | null>(null);
   /* "Taken down. Undo", for the minute the server allows. */
   const [undo, setUndo] = useState<UndoOffer | null>(null);
   const dismissUndo = useCallback(() => setUndo(null), []);
@@ -1196,6 +1199,11 @@ export function HomeScreen() {
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
                   }
                   onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+                  onReport={
+                    item.yours
+                      ? undefined
+                      : () => setReport({ kind: "post", targetId: item.postId })
+                  }
                 />
               ) : (
                 <FlareFeedCard
@@ -1230,6 +1238,11 @@ export function HomeScreen() {
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
                   }
                   onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+                  onReport={
+                    item.yours
+                      ? undefined
+                      : () => setReport({ kind: "post", targetId: item.postId })
+                  }
                   onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
                 />
               )
@@ -1633,6 +1646,7 @@ export function HomeScreen() {
           onClose={() => setProgressSheet(null)}
           onChanged={() => void load(() => true)}
         />
+        <ReportSheet target={report} onClose={() => setReport(null)} />
 
         {hydrated && feed.length < 3 && (
           <Card>

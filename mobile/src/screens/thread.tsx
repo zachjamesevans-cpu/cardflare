@@ -23,6 +23,7 @@ import {
 } from "../api";
 import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
 import { meetLine, suggestText } from "../meet";
+import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Loading, Muted } from "../ui";
@@ -51,6 +52,9 @@ export function ThreadScreen() {
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /* "Report", beside End conversation: the conversation itself, so the
+     admins can read it. The same sheet a post and a profile open. */
+  const [report, setReport] = useState<ReportTarget | null>(null);
   const list = useRef<FlatList<LocalThreadMessage>>(null);
 
   /*
@@ -297,16 +301,22 @@ export function ThreadScreen() {
               <AsyncButton label="Send" pendingLabel="Sending…" onPress={send} />
             </View>
             <ErrorLine message={error} />
-            <View style={{ alignSelf: "flex-start" }}>
+            <View style={{ flexDirection: "row", gap: spacing(2) }}>
               <Button
                 label="End conversation"
                 variant="secondary"
                 onPress={() => void end()}
               />
+              <Button
+                label="Report"
+                variant="secondary"
+                onPress={() => setReport({ kind: "thread", targetId: threadId })}
+              />
             </View>
           </>
         )}
       </View>
+      <ReportSheet target={report} onClose={() => setReport(null)} />
     </KeyboardAvoidingView>
   );
 }

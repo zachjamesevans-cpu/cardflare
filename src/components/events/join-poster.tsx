@@ -76,6 +76,7 @@ function BrandLockup() {
 export function JoinPoster({
   title,
   subtitle,
+  gameLine,
   kind,
   joinCode,
   url,
@@ -85,6 +86,8 @@ export function JoinPoster({
   title: string;
   /** Under the name. A date and time for an event; nothing for a counter. */
   subtitle?: string | null;
+  /** What the shop plays. Absent: the One Piece line every poster used to carry. */
+  gameLine?: string;
   kind: PosterKind;
   joinCode: string;
   url: string;
@@ -195,7 +198,7 @@ export function JoinPoster({
                 {TYPE_LINE[kind]}
               </p>
               <p className="truncate text-[11px] font-medium text-neutral-700 print:text-[9pt]">
-                {GAME}
+                {gameLine ?? GAME}
               </p>
             </div>
 

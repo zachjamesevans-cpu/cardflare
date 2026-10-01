@@ -16,6 +16,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser, sessionForPlayer } from "@/lib/players/accounts";
 import { listFeed } from "@/lib/feed/repository";
+import { rememberFeed } from "@/lib/feed/memo";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { listLocals } from "@/lib/players/locals";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -149,7 +150,9 @@ export default async function FeedPage({
 
   const session = await sessionForPlayer(playerId);
   const [items, locals] = await Promise.all([
-    listFeed(playerId, session?.id ?? null),
+    /* Remembered for half a minute: the three tabs are filters over
+       this one list, and a tab tap must not rebuild it. See memo.ts. */
+    rememberFeed(playerId, () => listFeed(playerId, session?.id ?? null)),
     /* For the live-room banner below. Room lost its tab to Local, so
        the Feed is where a live room announces itself now. */
     listLocals(playerId),

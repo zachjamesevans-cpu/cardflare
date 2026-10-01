@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutList, ListChecks, Trash2 } from "lucide-react";
+import { Flag, LayoutList, ListChecks, Trash2 } from "lucide-react";
 
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
 import { useTakeDown } from "@/components/feed/undo-toast";
+import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
 import type { FeedCard } from "@/lib/feed/repository";
@@ -29,6 +30,9 @@ import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
  * post had no way out that did not announce "found it" to everybody.
  * Take down withdraws the cards everywhere, tells nobody, and puts up
  * an Undo for a minute. It shows for both directions.
+ *
+ * Somebody else's post ends with "Report" instead: the same sheet a
+ * profile and a conversation open, filed against this post.
  */
 
 interface PostShape {
@@ -41,7 +45,7 @@ interface PostShape {
 }
 
 export function PostMenu({ post }: { post: PostShape }) {
-  const [sheet, setSheet] = useState<"cards" | "progress" | null>(null);
+  const [sheet, setSheet] = useState<"cards" | "progress" | "report" | null>(null);
   const { takeDown } = useTakeDown();
 
   const items: MenuItem[] = [];
@@ -73,6 +77,14 @@ export function PostMenu({ post }: { post: PostShape }) {
       onSelect: () => takeDown(() => takeDownPostAction(post.postId)),
     });
   }
+  if (!post.yours) {
+    items.push({
+      key: "report",
+      label: "Report",
+      icon: <Flag />,
+      onSelect: () => setSheet("report"),
+    });
+  }
 
   if (items.length === 0) return null;
 
@@ -94,6 +106,14 @@ export function PostMenu({ post }: { post: PostShape }) {
           open={sheet === "progress"}
           onClose={() => setSheet(null)}
           cards={post.cards}
+        />
+      )}
+      {!post.yours && (
+        <ReportSheet
+          open={sheet === "report"}
+          onClose={() => setSheet(null)}
+          kind="post"
+          targetId={post.postId}
         />
       )}
     </>

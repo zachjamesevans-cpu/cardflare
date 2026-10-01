@@ -1,15 +1,26 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 import type { StackParams } from "../../App";
+import { ActionSheet, DotsButton, SheetBackdrop } from "../action-menu";
 import {
+  blockPlayer,
   getPlayerPeople,
   openDirectThread,
   peekPlayer,
   serverMessage,
   storedAccessToken,
+  unblockPlayer,
   type FollowedPlayer,
   type PeekProfile,
 } from "../api";
@@ -19,8 +30,9 @@ import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
+import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
-import { Body, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
+import { Body, Button, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
 import { readCache, writeCache } from "../cache";
 import { colors, gutter, radius, spacing } from "../theme";
 
@@ -108,6 +120,35 @@ export function PlayerProfileScreen() {
     }
   };
 
+  /*
+   * Report and block, behind the three dots beside Share. A block is
+   * two steps (the sheet, then the confirm) and quiet: the other
+   * person is never told. Once made, Follow and Message give way to a
+   * "Blocked" chip and Unblock. When THEY blocked you, the buttons go
+   * and nothing says why. The website's profile menu does the same.
+   */
+  const [menu, setMenu] = useState(false);
+  const [report, setReport] = useState<ReportTarget | null>(null);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  /* Null until a block or unblock has been made here; the server's
+     word from `peekPlayer` stands until then. */
+  const [blockedHere, setBlockedHere] = useState<boolean | null>(null);
+  const [blockError, setBlockError] = useState<string | null>(null);
+  const setBlock = async (next: boolean) => {
+    setBlockError(null);
+    try {
+      await (next ? blockPlayer(playerId) : unblockPlayer(playerId));
+      setBlockedHere(next);
+    } catch (caught) {
+      setBlockError(
+        serverMessage(caught) ??
+          (next
+            ? "Could not block them right now."
+            : "Could not unblock them right now."),
+      );
+    }
+  };
+
   /* Cards render together once their art is warm, not one by one. */
   const [shelfReady, setShelfReady] = useState(false);
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
@@ -180,6 +221,37 @@ export function PlayerProfileScreen() {
     return <Loading />;
   }
 
+  /* Somebody else's profile, seen signed in: the only case with a
+     relationship to act on. A guest can follow (by signing up) but has
+     no account to report or block from, and your own profile has
+     nobody to report. An older server sends neither flag. */
+  const other = !guest && profile.follow !== null;
+  const blocked = blockedHere ?? profile.blocked ?? false;
+  const blockedBy = profile.blockedBy ?? false;
+  const menuItems = other
+    ? [
+        {
+          key: "report",
+          label: "Report",
+          icon: "flag-outline" as const,
+          onPress: () => setReport({ kind: "player", targetId: profile.playerId }),
+        },
+        blocked
+          ? {
+              key: "unblock",
+              label: "Unblock",
+              icon: "lock-open-outline" as const,
+              onPress: () => void setBlock(false),
+            }
+          : {
+              key: "block",
+              label: "Block",
+              icon: "ban-outline" as const,
+              onPress: () => setConfirmBlock(true),
+            },
+      ]
+    : null;
+
   /* The shelf the zoom pages along, with each card's note riding
      along. Built from the same array the rail draws. */
   const shelf: ZoomedCard[] = profile.showcase.map((entry) => ({
@@ -210,10 +282,40 @@ export function PlayerProfileScreen() {
         <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
 
         {/* Share, top right over the cover: the same corner your own
-            profile keeps its icons in. */}
-        <View style={{ position: "absolute", top: spacing(3), right: spacing(3) }}>
+            profile keeps its icons in. The three dots sit beside it
+            on somebody else's profile, with Report and Block behind. */}
+        <View
+          style={{
+            position: "absolute",
+            top: spacing(3),
+            right: spacing(3),
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(2),
+          }}
+        >
           <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+          {menuItems ? (
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.surface,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <DotsButton
+                onPress={() => setMenu(true)}
+                label="More about this profile"
+              />
+            </View>
+          ) : null}
         </View>
+        <ActionSheet items={menu ? menuItems : null} onClose={() => setMenu(false)} />
 
         {/* The same header the owner sees, with Follow where they have
             Edit profile. Share is a link anybody can open. */}
@@ -244,7 +346,38 @@ export function PlayerProfileScreen() {
             onFollowing={() => openPeople("following")}
             actions={
               <>
-                {profile.follow ? (
+                {blockedBy ? null : blocked ? (
+                  <>
+                    {/* The muted chip says what you did; Unblock is the
+                        ghost beside it. Nothing to follow or message. */}
+                    <View
+                      style={{
+                        flex: 1,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: radius.control,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        paddingHorizontal: spacing(3),
+                        paddingVertical: spacing(2),
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: colors.textMuted,
+                          fontWeight: "600",
+                          fontSize: 13,
+                        }}
+                      >
+                        Blocked
+                      </Text>
+                    </View>
+                    <HeaderButton
+                      label="Unblock"
+                      onPress={() => void setBlock(false)}
+                    />
+                  </>
+                ) : profile.follow ? (
                   <>
                     <FollowButton
                       playerId={profile.playerId}
@@ -269,6 +402,7 @@ export function PlayerProfileScreen() {
             }
           />
           <ErrorLine message={messageError} />
+          <ErrorLine message={blockError} />
         </View>
 
         {/* What they are looking for, before what they are showing off:
@@ -328,6 +462,16 @@ export function PlayerProfileScreen() {
 
       <ShowcaseZoom card={zoomed} cards={shelf} onClose={() => setZoomed(null)} />
 
+      <ReportSheet target={report} onClose={() => setReport(null)} />
+      <BlockConfirm
+        name={confirmBlock ? profile.displayName : null}
+        onKeep={() => setConfirmBlock(false)}
+        onBlock={() => {
+          setConfirmBlock(false);
+          void setBlock(true);
+        }}
+      />
+
       <PeopleSheet
         which={people}
         people={
@@ -340,5 +484,66 @@ export function PlayerProfileScreen() {
         }}
       />
     </ScrollView>
+  );
+}
+
+/**
+ * The second step of a block, in the website's words. "Keep" rather
+ * than "Cancel", because the question is whether to keep seeing them.
+ */
+function BlockConfirm({
+  name,
+  onKeep,
+  onBlock,
+}: {
+  /** Null while closed. */
+  name: string | null;
+  onKeep: () => void;
+  onBlock: () => void;
+}) {
+  if (name === null) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onKeep}>
+      <SheetBackdrop />
+      <Pressable
+        onPress={onKeep}
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing(4),
+        }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            alignSelf: "stretch",
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            padding: spacing(4),
+            gap: spacing(3),
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
+            {`Block ${name}?`}
+          </Text>
+          <Body>
+            {
+              "You will not see their posts, and neither of you can message the other. They are not told."
+            }
+          </Body>
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            <View style={{ flex: 1 }}>
+              <Button label="Block" onPress={onBlock} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="Keep" variant="secondary" onPress={onKeep} />
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }

@@ -678,12 +678,15 @@ export function ProfileScreen() {
         <Body>Earned by confirming trades, and nothing else.</Body>
 
         {/* One tile, the public number. What is left to spend is on the
-            store's door below, where spending happens. */}
+            store's door below, where spending happens. The audit read
+            "earned" beside "to spend" as one number three ways, so the
+            tile says which fact it is and what moves it: trades, and
+            nothing else. Same words on the website. */}
         <View style={{ flexDirection: "row", gap: spacing(3) }}>
           <Stat
-            label="Earned, all time"
+            label="Earned by trading, all time"
             value={profile.embersEarned}
-            note="Public. This is the number on your badge, and it never goes down."
+            note="Public. The number on your badge. Trades are the only thing that raise it, and it never goes down."
           />
         </View>
       </Card>
@@ -796,6 +799,11 @@ export function ProfileScreen() {
             Embers store
           </Text>
           <Muted>Frames, holo patterns and effects. Spend what you have earned.</Muted>
+          {/* The second line is the difference between the two numbers:
+              what feeds the balance, and that only trading feeds both. */}
+          <Muted>
+            Packs, duplicates and gifts add to what you can spend. Trading adds to both.
+          </Muted>
         </View>
         <View
           style={{

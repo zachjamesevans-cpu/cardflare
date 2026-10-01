@@ -103,8 +103,8 @@ export default async function EmberStorePage() {
             <div className="flex flex-col gap-1">
               <h2 className="font-semibold text-text-primary">cardflare packs</h2>
               <p className="text-sm text-text-secondary">
-                Sealed packs of cosmetics, opened like the real thing. Every new account
-                starts with one on the house.
+                Sealed packs of cosmetics, opened like the real thing. Your first one
+                was on the house.
               </p>
             </div>
             {Object.values(SERIES).map((series) => (

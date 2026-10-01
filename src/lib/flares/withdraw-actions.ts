@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/auth/session";
+import { forgetFeed } from "@/lib/feed/memo";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { playerForUser } from "@/lib/players/accounts";
@@ -50,6 +51,7 @@ function repaint(): void {
 export async function takeDownPostAction(postId: string): Promise<TakeDownResult> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: "Sign in first." };
+  forgetFeed(playerId);
 
   const result = await withdrawFlares(playerId, { postId });
   if (!result.ok) return { ok: false, message: "Could not take that down." };
@@ -80,6 +82,7 @@ export async function restoreFlaresAction(
   code?: string,
 ): Promise<{ ok: boolean; restored: number }> {
   const playerId = await viewerPlayerId();
+  if (playerId) forgetFeed(playerId);
   const room = code ? await requirePlayerInRoom(code) : null;
 
   const result = await restoreFlares(playerId, room?.playerSessionId ?? null, flareIds);

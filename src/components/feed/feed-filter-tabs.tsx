@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Flame, MapPin, Users } from "lucide-react";
 
-import { cn } from "@/lib/cn";
+import { FeedTabFace } from "@/components/feed/feed-tab-face";
 import { FEED_TAB_VALUES, TAB_TITLES, type FeedTab } from "@/lib/feed/repository";
 
 /**
@@ -11,6 +11,11 @@ import { FEED_TAB_VALUES, TAB_TITLES, type FeedTab } from "@/lib/feed/repository
  * border and a faint glow, the CardFlare green kept for the active
  * state; the others sit in muted grey. Same words and order as the
  * app's tabs, which read the same `tab` off every item.
+ *
+ * Each Link's face is a client child that watches `useLinkStatus`, so
+ * a tap is acknowledged the instant it lands rather than when the
+ * server answers. Prefetching stays on: a prefetched tab switches with
+ * no pending state at all, and the route's loading.tsx covers the rest.
  */
 const ICONS = { following: Users, nearby: MapPin, mine: Flame } as const;
 
@@ -27,15 +32,13 @@ export function FeedFilterTabs({ value }: { value: FeedTab }) {
             key={tab}
             href={tab === "following" ? "/feed" : `/feed?tab=${tab}`}
             aria-current={on ? "page" : undefined}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-[14px] border px-2 py-2.5 text-[13px] font-bold transition-colors",
-              on
-                ? "border-accent bg-accent/[0.08] text-accent shadow-[0_0_12px_rgba(198,238,79,0.25)]"
-                : "border-border bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
-            )}
+            className="flex flex-1"
           >
-            <Icon className="size-4" aria-hidden="true" />
-            <span className="truncate">{TAB_TITLES[tab]}</span>
+            <FeedTabFace
+              on={on}
+              title={TAB_TITLES[tab]}
+              icon={<Icon className="size-4" aria-hidden="true" />}
+            />
           </Link>
         );
       })}

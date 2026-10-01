@@ -54,6 +54,46 @@ export interface PublicStore {
   timeZone: string;
   /** Up to six cards from the synced singles, chosen by hand. */
   casePicks: CasePick[];
+  /**
+   * The next nights on the calendar, soonest first, so a player
+   * deciding whether to walk in can see when. Three at most; a night
+   * that is running now is the first of them.
+   */
+  upcoming: UpcomingNight[];
+}
+
+export interface UpcomingNight {
+  eventId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string | null;
+  joinCode: string | null;
+  /** Running right now. */
+  live: boolean;
+}
+
+async function upcomingFor(storeId: string): Promise<UpcomingNight[]> {
+  const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  const { data } = await getSupabaseAdmin()
+    .from("events")
+    .select("id, name, starts_at, ends_at, join_code, status, cancelled_at")
+    .eq("store_id", storeId)
+    .eq("kind", "scheduled")
+    .neq("status", "closed")
+    .gte("starts_at", since)
+    .order("starts_at")
+    .limit(3);
+
+  return (data ?? [])
+    .filter((row) => !row.cancelled_at)
+    .map((row) => ({
+      eventId: row.id,
+      name: row.name,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      joinCode: row.join_code,
+      live: row.status === "open",
+    }));
 }
 
 export async function publicStore(storeId: string): Promise<PublicStore | null> {
@@ -101,5 +141,6 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     games: storeGamesFrom(gameRows ?? []),
     timeZone: data.timezone ?? "UTC",
     casePicks: await caseFor(storeId),
+    upcoming: await upcomingFor(storeId),
   };
 }
