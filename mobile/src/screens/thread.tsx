@@ -28,7 +28,10 @@ import { colors, gutter, spacing } from "../theme";
 import { AsyncButton, Button, ErrorLine, Input, Loading, Muted } from "../ui";
 
 /**
- * One conversation about one Flare.
+ * One conversation: about a Flare, a saved want, or, since a profile
+ * grew a Message button, about nothing in particular. The header is
+ * the person's name; the "About <card>" strip is drawn only when the
+ * thread has a card, and a direct message never does.
  *
  * Loaded fresh on focus — reading is the receipt that marks the other
  * side's messages read and clears the inbox notice — and reloaded after
@@ -146,7 +149,9 @@ export function ThreadScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
     >
-      {cardName && (
+      {/* The card, when there is one. A direct message has none and
+          gets no strip rather than "About null". */}
+      {cardName ? (
         <View
           style={{
             paddingHorizontal: gutter,
@@ -157,7 +162,7 @@ export function ThreadScreen() {
         >
           <Muted>About {cardName}</Muted>
         </View>
-      )}
+      ) : null}
 
       <FlatList
         ref={list}

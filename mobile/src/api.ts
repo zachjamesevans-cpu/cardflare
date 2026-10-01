@@ -330,9 +330,20 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
+    /**
+     * What the server said in words, when it said any: a 409 from a
+     * thread opener or a hunt offer carries `{ ok: false, message }`
+     * written for the person, and a screen shows it as it came.
+     */
+    public detail: string | null = null,
   ) {
     super(code);
   }
+}
+
+/** The server's own words for a refusal, or null when it gave none. */
+export function serverMessage(caught: unknown): string | null {
+  return caught instanceof ApiError ? caught.detail : null;
 }
 
 /**
@@ -466,8 +477,15 @@ async function call<T>(
   }
 
   if (!response.ok) {
-    const detail = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new ApiError(response.status, detail.error ?? `http-${response.status}`);
+    const detail = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+    };
+    throw new ApiError(
+      response.status,
+      detail.error ?? `http-${response.status}`,
+      typeof detail.message === "string" ? detail.message : null,
+    );
   }
 
   /* A 200 that is not JSON is a captive portal or a CDN error page,
@@ -1038,11 +1056,10 @@ export interface HuntCard {
   /** An open Flare posted for this card, or null when none is up. */
   flareId: string | null;
   /**
-   * The post that Flare went up in, so a visitor's "I have this" can
-   * be sent through `offerItemsOnPost`. Null when nothing is posted.
-   * Optional because the server grows it in the same round as this
-   * screen and an older one never sends it; absent reads as "not
-   * posted yet", which offers nothing rather than something broken.
+   * The post that Flare went up in, or null when nothing is posted.
+   * Informational now: a visitor's "I have this" goes by request
+   * through `offerOnHunt`, posted or not, and the server decides
+   * whether each card becomes an offer on the post or a message.
    */
   postId?: string | null;
   cardId: string;
@@ -1767,9 +1784,51 @@ export const offerItemsOnPost = (
     { action: "offer-items", items, message },
   );
 
+/**
+ * "I have these", from somebody's hunt, by REQUEST rather than by
+ * post: every open card on a hunt can be answered whether or not its
+ * owner ever posted a Flare for it. The server offers on the posts
+ * where a Flare is live and sends the rest to the owner as one direct
+ * message. The website's `offerOnHuntAction` makes the same call.
+ *
+ * A refusal is a 409 whose body is the `ok: false` shape below; `call`
+ * throws it, and `serverMessage` reads the words back.
+ */
+export type HuntOfferOutcome =
+  | {
+      ok: true;
+      /** Cards offered on a post. */
+      offered: number;
+      /** Cards sent as a message instead. */
+      messaged: number;
+      /** The conversation the message went to, when one was sent. */
+      threadId: string | null;
+      /** Cards that could not be taken, by name. */
+      refused: string[];
+    }
+  | { ok: false; message: string; refused: string[] };
+
+export function offerOnHunt(
+  huntId: string,
+  lines: { requestId: string; quantity: number }[],
+  message: string,
+): Promise<HuntOfferOutcome> {
+  return call<HuntOfferOutcome>("POST", `/api/v1/hunts/${encodeURIComponent(huntId)}`, {
+    action: "offer",
+    lines,
+    message,
+  });
+}
+
 /** One trade in your history, both sides. Mirrors the server's entry. */
 export interface TradeHistoryEntry {
   id: string;
+  /**
+   * Confirmed in a room, or written down by the player. Optional
+   * because a build meets servers older than itself; absent reads as
+   * a room trade, which is the only kind an older server has.
+   */
+  source?: "room" | "logged";
   cardId: string;
   cardName: string;
   cardNumber: string;
@@ -1778,12 +1837,18 @@ export interface TradeHistoryEntry {
   /** The card came TO you. False: it left your binder. */
   got: boolean;
   partnerName: string | null;
+  /** The partner's account, when the trade names one. A profile to open. */
+  partnerPlayerId?: string | null;
+  /** For a logged trade, the place as typed. */
   storeName: string | null;
   eventName: string | null;
+  /** A room trade's instant, or a logged trade's day at noon. */
   confirmedAt: string;
-  status: "confirmed" | "pending" | "late" | "disputed" | "unnamed";
-  /** What this trade paid you, net of any reversal. */
+  status: "confirmed" | "pending" | "late" | "disputed" | "unnamed" | "logged";
+  /** What this trade paid you, net of any reversal. Always 0 when logged. */
   embers: number;
+  /** The player's own note on a logged trade. */
+  note?: string | null;
 }
 
 export interface TradeHistoryTotals {
@@ -1803,6 +1868,33 @@ export interface TradeHistory {
 /** Every trade you confirmed, newest first. Rows are Pro. */
 export const getTradeHistory = () =>
   call<{ history: TradeHistory }>("GET", "/api/v1/trades/history");
+
+/**
+ * A trade the player writes down themselves, for what happened off
+ * CardFlare. The founder: "allow me to enter my own trades." The
+ * server holds it to src/lib/trades/logged-schema.ts; a 400 carries
+ * the rule it broke as `error`, a 403 is `locked` (not Pro).
+ */
+export interface LogTradeInput {
+  cardId: string;
+  printingId?: string | null;
+  quantity?: number;
+  direction: "got" | "gave";
+  partnerPlayerId?: string | null;
+  partnerName?: string | null;
+  place?: string | null;
+  /** "YYYY-MM-DD", today or earlier. */
+  tradedOn: string;
+  note?: string | null;
+  updateHaveList?: boolean;
+}
+
+export const logTrade = (input: LogTradeInput) =>
+  call<{ ok: true; id: string }>("POST", "/api/v1/trades/history", input);
+
+/** Removes a logged trade. Only the author's own ever match. */
+export const deleteLoggedTrade = (id: string) =>
+  call<{ ok: boolean }>("DELETE", "/api/v1/trades/history", { id });
 
 export const getPost = (postId: string) =>
   call<{ post: PostDetail }>("GET", `/api/v1/posts/${encodeURIComponent(postId)}`);
@@ -2106,19 +2198,16 @@ export type FeedItem =
       entries: {
         playerSessionId: string;
         /**
-         * The account behind the session, or null for a guest.
-         *
-         * Both answers in one field: a linked session has a profile worth
-         * opening, so the row navigates; an unlinked one IS a guest and
-         * says so instead, because a tap that goes nowhere is worse than
-         * no tap at all.
-         *
-         * OPTIONAL, because the app and the server ship on different
-         * clocks. An older server never sends it, and absent must mean
-         * "we do not know" rather than "guest" — labelling a real account
-         * a guest is a worse lie than showing no label.
+         * The account behind the session. Never null any more: a
+         * guest's want is left out of the item altogether, because the
+         * one thing this row is for, messaging them that you have it,
+         * needs an inbox on the other end and a guest has none.
          */
-        playerId?: string | null;
+        playerId: string;
+        /** The Flare itself, which is what "I have this" opens a thread on. */
+        flareId: string;
+        /** The conversation you already have open on it, if any. */
+        threadId: string | null;
         displayName: string | null;
         avatarUrl: string | null;
         frame: string | null;
@@ -2591,11 +2680,18 @@ export const setLocalRadius = (radius: number) =>
 /** One conversation on the Messages list. */
 export interface LocalThread {
   threadId: string;
-  /** Null for a thread on a saved want (a nearby match). */
+  /**
+   * What it is about: a posted Flare, a saved want, or just the two
+   * people. Optional because an older server never says; the card
+   * fields tell the same story either way.
+   */
+  kind?: "flare" | "want" | "direct";
+  /** Null for a thread on a saved want (a nearby match) or a direct message. */
   flareId: string | null;
   wantId?: string | null;
-  cardName: string;
-  cardNumber: string;
+  /** The card, or null for a direct message. */
+  cardName: string | null;
+  cardNumber: string | null;
   imageUrl: string | null;
   withName: string;
   withPlayerId: string;
@@ -2622,6 +2718,19 @@ export const openLocalThread = (flareId: string, body: string) =>
     "POST",
     "/api/v1/local/threads",
     { flareId, body },
+  );
+
+/**
+ * A direct message: opens (or finds) the conversation with one person,
+ * about nothing in particular, and sends nothing. The composer is the
+ * next screen. A refusal ("That is you.", "This conversation was
+ * ended.") is a 409 whose words `serverMessage` reads back.
+ */
+export const openDirectThread = (playerId: string) =>
+  call<{ ok: boolean; threadId?: string; message?: string }>(
+    "POST",
+    "/api/v1/local/threads",
+    { playerId },
   );
 
 /** Somewhere public to suggest meeting: a store, never an address. */

@@ -9,6 +9,7 @@ import { localFeed, saveLocalRadius, type LocalFeed } from "./feed";
 import { isLocalRadius } from "./shared";
 import {
   closeThread,
+  openDirectThread,
   openFlareThread,
   openWantThread,
   readThread,
@@ -78,8 +79,19 @@ export async function openWantThreadAction(
   return openAnyThread({ wantId }, body);
 }
 
+/**
+ * "Message" on a profile: opens (or finds) the direct conversation with
+ * that person. Nothing is sent; the thread view is where the first
+ * line gets written.
+ */
+export async function openDirectThreadAction(
+  playerId: string,
+): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
+  return openAnyThread({ playerId }, "");
+}
+
 async function openAnyThread(
-  on: { flareId: string } | { wantId: string },
+  on: { flareId: string } | { wantId: string } | { playerId: string },
   body: string,
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const playerId = await viewerPlayerId();
@@ -97,14 +109,18 @@ async function openAnyThread(
   const outcome =
     "flareId" in on
       ? await openFlareThread(on.flareId, playerId, body)
-      : await openWantThread(on.wantId, playerId, body);
+      : "wantId" in on
+        ? await openWantThread(on.wantId, playerId, body)
+        : await openDirectThread(playerId, on.playerId);
   if (outcome.ok) return outcome;
 
   const message =
     outcome.reason === "no-account"
       ? "This player posted as a guest, so there is nowhere to send a message."
       : outcome.reason === "yourself"
-        ? "That one is yours."
+        ? "playerId" in on
+          ? "That is you."
+          : "That one is yours."
         : outcome.reason === "closed"
           ? "This conversation was ended."
           : GENERIC;

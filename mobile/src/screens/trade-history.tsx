@@ -1,31 +1,70 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { getTradeHistory, type TradeHistory } from "../api";
+import { ActionSheet } from "../action-menu";
+import {
+  deleteLoggedTrade,
+  describeError,
+  getTradeHistory,
+  type TradeHistory,
+  type TradeHistoryEntry,
+} from "../api";
 import { colors, gutter, spacing } from "../theme";
 import {
+  isLogged,
   LockedRows,
   monthOf,
   TradeHistoryRow,
   TradeHistoryTotalsRow,
   TradeHistoryWall,
 } from "../trade-history";
-import { Body, Card, Loading, Muted, Title } from "../ui";
+import { Body, Button, Card, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
+
+/** Which way the rows are filtered: client state, the website's chips. */
+type Filter = "all" | "got" | "gave";
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "got", label: "Got" },
+  { key: "gave", label: "Gave" },
+];
 
 /**
  * Every trade you confirmed, grouped by month, newest first: the
  * website's /profile/trades. The list is Pro; a free player gets the
  * counts, the faded stand-in and the pitch, and the server never sent
  * the rows.
+ *
+ * Two kinds of row now. A room trade is what two people confirmed; a
+ * logged one is what the player wrote down for a trade made off
+ * CardFlare (the founder: "allow me to enter my own trades"). The
+ * logged row says so, pays nothing, and is the one kind the player
+ * can remove, from the three dots at its end.
  */
 export function TradeHistoryScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const route = useRoute<RouteProp<StackParams, "TradeHistory">>();
   const [history, setHistory] = useState<TradeHistory | null>(null);
   const [failed, setFailed] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
+  /* The row whose three dots are open, and what removing it said. */
+  const [menuFor, setMenuFor] = useState<TradeHistoryEntry | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const result = await getTradeHistory();
+      setHistory(result.history);
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,6 +84,20 @@ export function TradeHistoryScreen() {
     }, []),
   );
 
+  const remove = async (trade: TradeHistoryEntry) => {
+    setError(null);
+    try {
+      const result = await deleteLoggedTrade(trade.id);
+      if (!result.ok) {
+        setError("Could not remove that trade.");
+        return;
+      }
+      await load();
+    } catch (caught) {
+      setError(`Could not remove that trade (${describeError(caught)}).`);
+    }
+  };
+
   if (failed) {
     return (
       <ScrollView
@@ -62,9 +115,13 @@ export function TradeHistoryScreen() {
     return <Loading />;
   }
 
+  const shown = history.trades.filter((trade) =>
+    filter === "all" ? true : filter === "got" ? trade.got : !trade.got,
+  );
+
   /* One card per month, so a year of Fridays reads as a calendar. */
   const months: { label: string; trades: TradeHistory["trades"] }[] = [];
-  for (const trade of history.trades) {
+  for (const trade of shown) {
     const label = monthOf(trade.confirmedAt);
     const last = months[months.length - 1];
     if (last && last.label === label) last.trades.push(trade);
@@ -72,87 +129,185 @@ export function TradeHistoryScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
-        gap: spacing(4),
-      }}
-    >
-      <View style={{ gap: spacing(1) }}>
-        <Title>Trade history</Title>
-        <Body>Only you can see this. Stores see totals, never who traded what.</Body>
-      </View>
-
-      <View
-        style={{
-          alignSelf: "flex-start",
-          flexDirection: "row",
-          alignItems: "center",
-          gap: spacing(1.5),
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.elevated,
-          paddingHorizontal: spacing(3),
-          paddingVertical: spacing(1),
+    <>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(4),
         }}
       >
-        <Ionicons name="flame" size={14} color={colors.accent} />
-        <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 14 }}>
-          {history.totals.embers.toLocaleString()}
-        </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>earned trading</Text>
-      </View>
-
-      <TradeHistoryTotalsRow totals={history.totals} />
-
-      {history.locked ? (
-        <View>
-          <Card>
-            <LockedRows count={6} />
-          </Card>
-          <TradeHistoryWall
-            count={history.totals.trades}
-            onGetPro={() => navigation.navigate("Pro")}
-          />
+        <View style={{ gap: spacing(1) }}>
+          <Title>Trade history</Title>
+          <Body>Only you can see this. Stores see totals, never who traded what.</Body>
         </View>
-      ) : months.length === 0 ? (
-        <Card>
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}>
-            Nothing traded yet
-          </Text>
-          <Muted>
-            Confirm a trade in a room and it lands here, with who it was with and what
-            it paid.
-          </Muted>
-        </Card>
-      ) : (
-        months.map((month) => (
-          <Card key={month.label}>
-            <Text
-              style={{
-                color: colors.textMuted,
-                fontSize: 11,
-                fontWeight: "600",
-                letterSpacing: 0.6,
-                textTransform: "uppercase",
-              }}
-            >
-              {month.label}
+
+        {/* The Embers pill, and the door to writing a trade down. The
+            button goes when the rows are locked: the Pro wall below
+            already makes the pitch. */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: spacing(2),
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(1.5),
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.elevated,
+              paddingHorizontal: spacing(3),
+              paddingVertical: spacing(1),
+            }}
+          >
+            <Ionicons name="flame" size={14} color={colors.accent} />
+            <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 14 }}>
+              {history.totals.embers.toLocaleString()}
             </Text>
-            <View>
-              {month.trades.map((trade, index) => (
-                <TradeHistoryRow
-                  key={trade.id}
-                  trade={trade}
-                  last={index === month.trades.length - 1}
-                />
-              ))}
-            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+              earned trading
+            </Text>
+          </View>
+          {!history.locked ? (
+            <Button
+              label="Log a trade"
+              onPress={() => {
+                /* The last "Logged." has been read; a new form starts clean. */
+                navigation.setParams({ logged: undefined });
+                navigation.navigate("LogTrade");
+              }}
+            />
+          ) : null}
+        </View>
+
+        {route.params?.logged ? <Muted>Logged.</Muted> : null}
+
+        <TradeHistoryTotalsRow totals={history.totals} />
+
+        {!history.locked ? (
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            {FILTERS.map((option) => {
+              const on = filter === option.key;
+              return (
+                <Tap
+                  key={option.key}
+                  onPress={() => setFilter(option.key)}
+                  accessibilityLabel={`Show ${option.label.toLowerCase()}`}
+                  style={{
+                    paddingHorizontal: spacing(3),
+                    paddingVertical: spacing(1.5),
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: on ? colors.accent : colors.borderStrong,
+                    backgroundColor: on ? colors.accent : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: on ? colors.accentContrast : colors.textSecondary,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Tap>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <ErrorLine message={error} />
+
+        {history.locked ? (
+          <View>
+            <Card>
+              <LockedRows count={6} />
+            </Card>
+            <TradeHistoryWall
+              count={history.totals.trades}
+              onGetPro={() => navigation.navigate("Pro")}
+            />
+          </View>
+        ) : history.trades.length === 0 ? (
+          <Card>
+            <Text
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
+            >
+              Nothing traded yet
+            </Text>
+            <Muted>
+              Confirm a trade in a room and it lands here, with who it was with and what
+              it paid.
+            </Muted>
           </Card>
-        ))
-      )}
-    </ScrollView>
+        ) : months.length === 0 ? (
+          <Card>
+            <Muted>
+              {filter === "got" ? "Nothing got yet." : "Nothing given yet."}
+            </Muted>
+          </Card>
+        ) : (
+          months.map((month) => (
+            <Card key={month.label}>
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: "600",
+                  letterSpacing: 0.6,
+                  textTransform: "uppercase",
+                }}
+              >
+                {month.label}
+              </Text>
+              <View>
+                {month.trades.map((trade, index) => (
+                  <TradeHistoryRow
+                    key={trade.id}
+                    trade={trade}
+                    last={index === month.trades.length - 1}
+                    onOpenPartner={
+                      trade.partnerPlayerId
+                        ? () =>
+                            navigation.navigate("PlayerProfile", {
+                              playerId: trade.partnerPlayerId ?? "",
+                            })
+                        : undefined
+                    }
+                    onMore={isLogged(trade) ? () => setMenuFor(trade) : undefined}
+                  />
+                ))}
+              </View>
+            </Card>
+          ))
+        )}
+      </ScrollView>
+
+      {/* A logged row's extras, behind the three dots: one item. A
+          room trade is a thing two people did and has no menu. */}
+      <ActionSheet
+        items={
+          menuFor
+            ? [
+                {
+                  key: "remove",
+                  label: "Remove",
+                  icon: "trash-outline",
+                  onPress: () => void remove(menuFor),
+                },
+              ]
+            : null
+        }
+        onClose={() => setMenuFor(null)}
+      />
+    </>
   );
 }

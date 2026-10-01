@@ -4,7 +4,12 @@ import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { MESSAGE_MAX_LENGTH } from "@/lib/local/shared";
-import { listThreads, openFlareThread, openWantThread } from "@/lib/local/threads";
+import {
+  listThreads,
+  openDirectThread,
+  openFlareThread,
+  openWantThread,
+} from "@/lib/local/threads";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
 
 export const dynamic = "force-dynamic";
@@ -19,21 +24,32 @@ export async function GET(request: Request): Promise<Response> {
   );
 }
 
-/* One of the two anchors: a posted Flare, or a saved want a nearby
-   match pointed at. */
+/*
+ * Exactly one anchor: a posted Flare or a saved want, each with a first
+ * message; or a person, with none — a direct message opens empty and
+ * the composer is the next screen.
+ */
 const openSchema = z
   .object({
     flareId: z.string().uuid().optional(),
     wantId: z.string().uuid().optional(),
-    body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
+    playerId: z.string().uuid().optional(),
+    body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH).optional(),
   })
-  .refine((value) => Boolean(value.flareId) !== Boolean(value.wantId), {
-    message: "one of flareId or wantId",
+  .refine(
+    (value) =>
+      [value.flareId, value.wantId, value.playerId].filter(Boolean).length === 1,
+    { message: "one of flareId, wantId or playerId" },
+  )
+  .refine((value) => Boolean(value.playerId) || Boolean(value.body), {
+    message: "a message is needed",
   });
 
 /**
  * "I have this": opens the thread for a Flare and sends the first
  * message. Answering the same Flare again lands in the same thread.
+ * With `playerId`, opens (or finds) the direct conversation with that
+ * person and sends nothing.
  */
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
@@ -48,12 +64,17 @@ export async function POST(request: Request): Promise<Response> {
 
   const parsed = openSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) {
-    return badRequest("flareId or wantId, and a message, are needed");
+    return badRequest(
+      "flareId, wantId or playerId, and a message for the first two, are needed",
+    );
   }
 
-  const outcome = parsed.data.flareId
-    ? await openFlareThread(parsed.data.flareId, player.playerId, parsed.data.body)
-    : await openWantThread(parsed.data.wantId!, player.playerId, parsed.data.body);
+  const { flareId, wantId, playerId, body } = parsed.data;
+  const outcome = playerId
+    ? await openDirectThread(player.playerId, playerId)
+    : flareId
+      ? await openFlareThread(flareId, player.playerId, body ?? "")
+      : await openWantThread(wantId!, player.playerId, body ?? "");
 
   if (!outcome.ok) {
     /* The reasons a client can do something about, in words it can show. */
@@ -61,7 +82,9 @@ export async function POST(request: Request): Promise<Response> {
       outcome.reason === "no-account"
         ? "This player posted as a guest, so there is nowhere to send a message."
         : outcome.reason === "yourself"
-          ? "That one is yours."
+          ? playerId
+            ? "That is you."
+            : "That one is yours."
           : outcome.reason === "closed"
             ? "This conversation was ended."
             : "Could not start the conversation.";

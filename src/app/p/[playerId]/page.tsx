@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FollowButton } from "@/components/players/follow-button";
+import { MessageButton } from "@/components/players/message-button";
 import { PeopleList } from "@/components/players/people-list";
 import { ProfileHeader } from "@/components/players/profile-header";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
@@ -174,11 +175,17 @@ export default async function PublicProfilePage({
             actions={
               <>
                 {follow ? (
-                  <FollowButton
-                    playerId={playerId}
-                    initial={follow}
-                    className="flex-1 justify-center"
-                  />
+                  <>
+                    <FollowButton
+                      playerId={playerId}
+                      initial={follow}
+                      className="flex-1 justify-center"
+                    />
+                    {/* Message, under the same condition as Follow: an
+                        account looking at somebody else's page. The two
+                        share the row. */}
+                    <MessageButton playerId={playerId} className="flex-1" />
+                  </>
                 ) : viewer.kind === "anonymous" ? (
                   <Link
                     href={`/signup?next=${encodeURIComponent(`/p/${playerId}`)}`}
@@ -195,7 +202,7 @@ export default async function PublicProfilePage({
         {/* What they are looking for, before what they are showing
                 off: somebody opening a profile is usually deciding
                 whether they can help. */}
-        <HuntsPanel hunts={profile.hunts} />
+        <HuntsPanel hunts={profile.hunts} ownerName={profile.displayName} />
 
         {/* The showcase panel, pixel-identical to the own-profile
                 page's - the founder's spec: viewing somebody must show
