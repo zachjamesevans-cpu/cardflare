@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { text } from "@/lib/form-value";
 import { getViewer } from "@/lib/auth/session";
+import { postFlaresOnJoin } from "@/lib/events/auto-post";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
 import { accountIdentity } from "@/lib/players/account-identity";
 import {
@@ -240,6 +241,9 @@ export async function joinEventAction(
        store saves it and pays nothing; the next night pays. */
     void awardAttendance(accountPlayerId, event.storeId);
     await saveLocal(accountPlayerId, event.storeId);
+    /* And the player's Flares go up on the board, which is the whole
+       point of walking in. See auto-post.ts. */
+    await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
 
   if (freshToken) await setPlayerCookie(freshToken);

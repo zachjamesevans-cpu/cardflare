@@ -28,14 +28,12 @@ import {
   type TradeRecord,
   acknowledgeTrade,
   confirmTrade,
-  dropWant,
   forgetRoom,
   getMe,
   getRoom,
   joinRoom,
   storedSessionToken,
   lastRoom,
-  nudgeWant,
   offerOnFlare,
   postFlare,
   withdrawOffer,
@@ -71,7 +69,6 @@ import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
 import { useTabBarInset } from "../glass";
 import { colors, gutter, radius, spacing } from "../theme";
-import { WantRow } from "../want-row";
 import { refreshTick } from "../refresh-tick";
 
 // The website's room ticker runs at twelve seconds now; the app keeps
@@ -374,7 +371,6 @@ function RoomScreen({
   const [refreshing, setRefreshing] = useState(false);
   /* The first-tournament guide, folded behind its link. */
   const [tournamentHelp, setTournamentHelp] = useState(false);
-  const [wants, setWants] = useState<Me["wants"]>([]);
 
   /*
    * The join resumed a seat this account already had. Kept for the visit
@@ -382,21 +378,6 @@ function RoomScreen({
    * the player is reading the board the answer has been given.
    */
   const [resumed, setResumed] = useState(false);
-
-  /*
-   * The re-post panel starts folded, and that IS the "no thanks": the
-   * founder cut the old "Never mind" button once the closed tile became
-   * a single quiet line. The wants stay saved either way.
-   */
-  const [repostOpen, setRepostOpen] = useState(false);
-
-  /*
-   * Posting a saved hunt walks the whole list one card at a time, which
-   * on a room's connection is seconds of nothing. The founder's report:
-   * "it kinda just stalls there... people don't feel they have to click
-   * it multiple times." The button counts them off as they land.
-   */
-  const [repostDone, setRepostDone] = useState<number | null>(null);
 
   /*
    * The names, behind the door card's meta line. They were a folded
@@ -492,16 +473,6 @@ function RoomScreen({
         await joinRoom(code).catch(() => {});
       }
 
-      // The account's saved wants ride along so the room can offer to
-      // re-post what is still outstanding — the whole point of signing in.
-      if (fresh.joined && (await storedAccessToken())) {
-        try {
-          setWants((await getMe()).wants);
-        } catch {
-          setWants([]);
-        }
-      }
-
       if (fresh.joined) {
         try {
           setTrades((await getTrades(code)).trades);
@@ -524,7 +495,6 @@ function RoomScreen({
 
   useEffect(() => {
     setState(null);
-    setRepostOpen(false);
     setResumed(false);
     setExpandedGroups({});
     void refresh();
@@ -825,17 +795,6 @@ function RoomScreen({
   const flares = state.flares ?? [];
   const youOpen = participants.some(
     (p) => p.playerSessionId === youId && p.openToTrades,
-  );
-
-  /* Outstanding = saved but not already my open Flare here, same rule as
-     the website's re-post panel. */
-  const myAsks = new Set(
-    flares
-      .filter((f) => f.playerSessionId === youId)
-      .map((f) => `${f.cardId}:${f.printingId ?? ""}`),
-  );
-  const outstanding = wants.filter(
-    (want) => !myAsks.has(`${want.cardId}:${want.printingId ?? ""}`),
   );
 
   /*
@@ -1493,97 +1452,6 @@ function RoomScreen({
               </View>
             );
           })}
-
-          {/*
-           * The foot row: what the account is still after that is not
-           * on this board. Closed, it is one line with "Post them" at
-           * its end; tapped, it opens in place into the saved list
-           * with its nudge and drop controls and the one button that
-           * posts the lot. The row's right end turns into a chevron
-           * while it is open. No "Never mind": the founder's call, a
-           * row that starts closed does not need a second way to be
-           * ignored, and the wants stay saved either way.
-           */}
-          {outstanding.length > 0 && (
-            <View style={styles.footRow}>
-              <Tap
-                onPress={() => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setRepostOpen((current) => !current);
-                }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: spacing(2),
-                }}
-              >
-                <Text style={styles.footText}>
-                  {`${outstanding.length} ${outstanding.length === 1 ? "card" : "cards"} you are still after ${
-                    outstanding.length === 1 ? "is" : "are"
-                  } not posted here`}
-                </Text>
-                {repostOpen ? (
-                  <MaterialCommunityIcons
-                    name="chevron-up"
-                    size={18}
-                    color={colors.textMuted}
-                  />
-                ) : (
-                  <Text style={styles.footAction}>
-                    {outstanding.length === 1 ? "Post it" : "Post them"}
-                  </Text>
-                )}
-              </Tap>
-
-              {/* Open, the panel is the stacked board in miniature: art,
-                  name, number, printing, plus the two controls the board
-                  has no business carrying: how many of a *saved* ask, and
-                  dropping it for good. */}
-              {repostOpen && (
-                <View style={{ gap: spacing(2) }}>
-                  <View>
-                    {outstanding.map((want) => (
-                      <WantRow
-                        key={want.id}
-                        want={want}
-                        onNudge={(delta) => act(() => nudgeWant(want.id, delta))}
-                        onDrop={() => act(() => dropWant(want.id))}
-                      />
-                    ))}
-                  </View>
-                  <Button
-                    busy={repostDone !== null}
-                    label={
-                      repostDone === null
-                        ? `Post ${outstanding.length === 1 ? "it" : `all ${outstanding.length}`} to this room`
-                        : outstanding.length === 1
-                          ? "Posting…"
-                          : `Posting… ${repostDone} of ${outstanding.length}`
-                    }
-                    onPress={() => {
-                      if (repostDone !== null) return;
-                      setRepostDone(0);
-                      void act(async () => {
-                        let done = 0;
-                        for (const want of outstanding) {
-                          await postFlare(code, {
-                            cardId: want.cardId,
-                            printingId: want.printingId,
-                            quantity: want.quantity,
-                            note: want.note ?? undefined,
-                            deckLabel: want.deckLabel,
-                          }).catch(() => {});
-                          done += 1;
-                          setRepostDone(done);
-                        }
-                      }).finally(() => setRepostDone(null));
-                    }}
-                  />
-                </View>
-              )}
-            </View>
-          )}
 
           {/* A guest has no composer, so the toggle that moved into the
               composer's foot would vanish for them. One quiet row here
@@ -2345,27 +2213,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     flex: 1,
-  },
-  /* The board card's foot: an elevated inline row, the mock's. */
-  footRow: {
-    backgroundColor: colors.elevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    gap: spacing(2),
-  },
-  footText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
-  footAction: {
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: "700",
   },
   flare: {
     borderTopWidth: 1,

@@ -17,6 +17,8 @@ import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FeedViewPicker } from "@/components/feed/feed-view-picker";
+import { AutoPostToggle } from "@/components/players/auto-post-toggle";
+import { autoPostFor } from "@/lib/events/auto-post";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { signOut } from "@/lib/auth/actions";
@@ -163,6 +165,13 @@ export default async function ProfileSettingsPage() {
     </Card>
   );
 
+  /* Whether joining a room posts your Flares to it. On by default. */
+  const roomsCard = !playerId ? null : (
+    <Card key="rooms">
+      <AutoPostToggle current={await autoPostFor(playerId)} />
+    </Card>
+  );
+
   const emailCard = (
     <Card key="email" className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
@@ -274,6 +283,7 @@ export default async function ProfileSettingsPage() {
   const cards = isPlayerHome
     ? [
         feedViewCard,
+        roomsCard,
         deckListCard,
         collectionCard,
         locationCard,
@@ -287,6 +297,7 @@ export default async function ProfileSettingsPage() {
         emailCard,
         locationCard,
         feedViewCard,
+        roomsCard,
         deckListCard,
         collectionCard,
         passwordCard,

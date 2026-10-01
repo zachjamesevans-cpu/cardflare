@@ -210,6 +210,9 @@ describe("GET /api/v1/me", () => {
       /* How the Feed is drawn. Falls back to the original here, which
          is also what an older account and a failed read both give. */
       feedView: "classic",
+      /* Joining a room posts their Flares to it. The default, and what
+         a read that found no column gives. */
+      autoPostFlares: true,
     });
     expect(body.wants).toHaveLength(1);
     // The deck label rides the snapshot so the app can re-post the folder.

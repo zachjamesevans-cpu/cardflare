@@ -925,6 +925,8 @@ export type PlayerRow = {
   avatar_animated: string | null;
   /** Cover banner object path in the same bucket, or null for none. */
   cover_image: string | null;
+  /** Joining a room posts their open Flares to its board. On by default. */
+  auto_post_flares: boolean;
   /** The short public line under the name, up to 150 characters. */
   bio: string | null;
   /** How to refer to them, "he/him", up to 20 characters. */
@@ -1054,6 +1056,7 @@ export type PlayerInsert = Omit<
   | "avatar_url"
   | "avatar_animated"
   | "cover_image"
+  | "auto_post_flares"
   | "bio"
   | "pronouns"
   | "tier"
@@ -1078,6 +1081,7 @@ export type PlayerInsert = Omit<
   avatar_url?: string | null;
   avatar_animated?: string | null;
   cover_image?: string | null;
+  auto_post_flares?: boolean;
   bio?: string | null;
   pronouns?: string | null;
   embers_earned?: number;

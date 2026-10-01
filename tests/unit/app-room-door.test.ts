@@ -92,17 +92,11 @@ describe("the board card", () => {
     expect(room).not.toContain("No Flares yet");
   });
 
-  it("carries the repost foot row with its panel and posting loop intact", () => {
-    expect(board).toContain("you are still after");
-    expect(board).toContain('"Post it" : "Post them"');
-    expect(board).toContain('name="chevron-up"');
+  it("has no repost row: joining posted the viewer's Flares already", () => {
+    expect(board).not.toContain("you are still after");
+    expect(board).not.toContain("<WantRow");
+    expect(board).not.toContain("repostOpen");
     expect(room).not.toContain("Still looking for these?");
-    /* The panel and the loop are the ones that were there before. */
-    expect(board).toContain("LayoutAnimation.configureNext");
-    expect(board).toContain("<WantRow");
-    expect(board).toContain("to this room`");
-    expect(board).toContain("await postFlare(code, {");
-    expect(board).toContain("setRepostDone(done)");
   });
 
   it("keeps the open-to-trades toggle for guests only", () => {

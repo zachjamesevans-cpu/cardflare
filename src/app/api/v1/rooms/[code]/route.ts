@@ -21,6 +21,7 @@ import {
 import { roomPhase } from "@/lib/events/schema";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
+import { postFlaresOnJoin } from "@/lib/events/auto-post";
 import { linkSessionToPlayer } from "@/lib/players/accounts";
 import {
   accountRoomIdentity,
@@ -359,6 +360,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   if (accountPlayerId) {
     void awardAttendance(accountPlayerId, event.storeId);
     await saveLocal(accountPlayerId, event.storeId);
+    /* The player's Flares go up on the board as they walk in; the app's
+       next read of the room shows them. See auto-post.ts. */
+    await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
 
   return Response.json({

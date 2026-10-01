@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { LIMITS } from "@/lib/api/throttle";
 import { getViewer } from "@/lib/auth/session";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
+import { autoPostFor } from "@/lib/events/auto-post";
 import { roomPhase } from "@/lib/events/schema";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
@@ -53,7 +54,10 @@ export async function publishPostAction(input: {
   let eventId: string | null = null;
   let session: { id: string; displayName: string } | null = null;
   let early = false;
-  if (input.toRoom) {
+  /* A post made from the Feed while standing in a room lands on that
+     room's board too, unless the player switched that off: the same
+     rule as joining (src/lib/events/auto-post.ts). */
+  if (input.toRoom || (await autoPostFor(playerId))) {
     const room = await getPlayerSession();
     const current = room ? await currentRoomForSession(room.id) : null;
     if (room && current) {

@@ -8,18 +8,19 @@ import type { StackParams } from "../../App";
 
 import { API_BASE } from "../config";
 import {
-  setFeedView,
   ApiError,
+  type DeckPreviewEntry,
   deleteAccount,
   describeError,
   getMe,
   getProfile,
-  previewDeckList,
-  saveDeckList,
-  signOut,
-  type DeckPreviewEntry,
   type Me,
+  previewDeckList,
   type Profile,
+  saveDeckList,
+  setAutoPost as saveAutoPost,
+  setFeedView,
+  signOut,
 } from "../api";
 import {
   AsyncButton,
@@ -165,6 +166,10 @@ export function SettingsScreen() {
    * setting that does not work rather than one that could not save.
    */
   const [viewError, setViewError] = useState<string | null>(null);
+  /* Whether joining a room posts your Flares to it. On until the
+     account says otherwise, which is also what an older server means. */
+  const [autoPost, setAutoPost] = useState(true);
+  const [autoPostError, setAutoPostError] = useState<string | null>(null);
   /* The handle, for the delete-account lock at the bottom. Name and
      handle are edited on Edit profile, not here. */
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -182,6 +187,7 @@ export function SettingsScreen() {
             setMe(result);
             setProfile(mine?.profile ?? null);
             setView(feedViewFrom(result.player.feedView));
+            setAutoPost(result.player.autoPostFlares ?? true);
           }
         } catch {
           if (live) setMe(null);
@@ -294,6 +300,54 @@ export function SettingsScreen() {
           })}
         </View>
         {viewError ? <ErrorLine message={viewError} /> : null}
+      </Card>
+
+      {/*
+       * ROOMS. The founder: "I wonder if it's best to just join a room
+       * and all the flares immediately get posted. That's kinda the
+       * whole point of cardflare." So joining does, and this is the one
+       * way to say no: for the person who wants to walk in and browse
+       * first. The website's settings draw the same switch.
+       */}
+      <Card>
+        <Title>Rooms</Title>
+        <Body>
+          When you join a room, your open Flares go up on its board. Turn this off to
+          walk in and browse first.
+        </Body>
+        <Tap
+          accessibilityLabel={`Post my Flares when I join a room, ${autoPost ? "on" : "off"}`}
+          onPress={() => {
+            const next = !autoPost;
+            setAutoPost(next);
+            setAutoPostError(null);
+            saveAutoPost(next).catch(() => {
+              setAutoPost(!next);
+              setAutoPostError("Could not save that. Try again in a moment.");
+            });
+          }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: spacing(3),
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            padding: spacing(3),
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", flexShrink: 1 }}>
+            Post my Flares when I join a room
+          </Text>
+          <Ionicons
+            name={autoPost ? "toggle" : "toggle-outline"}
+            size={32}
+            color={autoPost ? colors.accent : colors.textMuted}
+          />
+        </Tap>
+        {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
       {/* Tooling, for a development build only. A player's settings

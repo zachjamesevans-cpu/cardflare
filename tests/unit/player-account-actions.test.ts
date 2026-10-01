@@ -82,15 +82,9 @@ vi.mock("@/lib/players/repository", () => ({
   mergePlayerSessions: (...a: unknown[]) => mergePlayerSessions(...a),
 }));
 
-const {
-  invitePlayerAction,
-  nudgeWantQuantityAction,
-  removeWantAction,
-  repostWantsAction,
-  rsvpAction,
-} = await import("@/lib/players/account-actions");
-const { INVITE_PLAYER_IDLE, REPOST_IDLE } =
-  await import("@/lib/players/account-schema");
+const { invitePlayerAction, nudgeWantQuantityAction, removeWantAction, rsvpAction } =
+  await import("@/lib/players/account-actions");
+const { INVITE_PLAYER_IDLE } = await import("@/lib/players/account-schema");
 
 function form(fields: Record<string, string>) {
   const data = new FormData();
@@ -198,80 +192,6 @@ describe("invitePlayerAction", () => {
       expect(state.message).toMatch(/already/i);
     }
     expect(sendEmail).not.toHaveBeenCalled();
-  });
-});
-
-describe("repostWantsAction", () => {
-  const fields = { code: "K3M9PZ" };
-
-  it("posts every saved want into the room", async () => {
-    listWants.mockResolvedValue([want("w1", "c1", "RG Luffy"), want("w2", "c2")]);
-    addFlareBatch.mockResolvedValue({
-      batchId: "b1",
-      posted: ["c1", "c2"],
-      atCap: false,
-    });
-
-    const state = await repostWantsAction(REPOST_IDLE, form(fields));
-
-    expect(state).toEqual({ status: "posted", count: 2 });
-
-    /* ONE call, not one per want. A want list posted at a counter is a
-       single act, and this is what keeps it to a single notification
-       and a single Feed item. */
-    expect(addFlareBatch).toHaveBeenCalledTimes(1);
-    // The deck label re-posts with the want, so the folder survives the trip.
-    expect(addFlareBatch).toHaveBeenCalledWith("event-1", "sess-1", [
-      {
-        cardId: "c1",
-        printingId: null,
-        quantity: 1,
-        note: null,
-        deckLabel: "RG Luffy",
-      },
-      { cardId: "c2", printingId: null, quantity: 1, note: null, deckLabel: null },
-    ]);
-    expect(linkSessionToPlayer).toHaveBeenCalledWith("sess-1", "player-1");
-  });
-
-  it("posts nothing for a guest with no account", async () => {
-    getViewer.mockResolvedValue({ kind: "anonymous" });
-
-    const state = await repostWantsAction(REPOST_IDLE, form(fields));
-
-    expect(state.status).toBe("error");
-    expect(addFlareBatch).not.toHaveBeenCalled();
-  });
-
-  it("posts nothing without room membership", async () => {
-    findParticipation.mockResolvedValue(null);
-
-    const state = await repostWantsAction(REPOST_IDLE, form(fields));
-
-    expect(state.status).toBe("error");
-    expect(addFlareBatch).not.toHaveBeenCalled();
-  });
-
-  it("reports what the cap let through", async () => {
-    /* The cap is the batch's own business now — it stops there rather
-       than being counted out here — so what this checks is that the
-       count reaching the player is what actually posted. */
-    addFlareBatch.mockResolvedValue({ batchId: "b1", posted: ["c1"], atCap: true });
-
-    const state = await repostWantsAction(REPOST_IDLE, form(fields));
-
-    expect(state).toEqual({ status: "posted", count: 1 });
-    expect(addFlareBatch).toHaveBeenCalledTimes(1);
-  });
-
-  it("resolves the account for an admin who also plays", async () => {
-    getViewer.mockResolvedValue({ kind: "admin", user: { id: "a1" }, storeIds: [] });
-    playerForUser.mockResolvedValue({ id: "player-9" });
-
-    const state = await repostWantsAction(REPOST_IDLE, form(fields));
-
-    expect(state.status).toBe("posted");
-    expect(listWants).toHaveBeenCalledWith("player-9");
   });
 });
 

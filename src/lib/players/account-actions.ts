@@ -7,9 +7,9 @@ import { generateSetupLink } from "@/lib/auth/invite-link";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { sendEmail } from "@/lib/email/client";
 import { playerInviteEmail } from "@/lib/email/store-invite";
-import { findParticipation, joinEvent } from "@/lib/events/participants";
+import { joinEvent } from "@/lib/events/participants";
 import { postAreaFlare, postAreaFlares } from "@/lib/local/area";
-import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
+import { enterRoomByCode } from "@/lib/events/rooms";
 import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import { addFlareBatch, addToBinder } from "@/lib/lists/repository";
@@ -19,16 +19,12 @@ import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
 import { previewDeckList, type DeckPreviewEntry } from "./deck-list-preview";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
-import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
+import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { accountRoomIdentity } from "@/lib/players/room-identity";
 import { getPlayerSession, setPlayerCookie } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
-import { invitePlayer, linkSessionToPlayer, playerForUser } from "./accounts";
-import {
-  invitePlayerSchema,
-  type InvitePlayerState,
-  type RepostState,
-} from "./account-schema";
+import { invitePlayer, playerForUser } from "./accounts";
+import { invitePlayerSchema, type InvitePlayerState } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
 import { markCardFound, syncCardQuantity } from "@/lib/players/found";
 import { listOfferings, listWants, removeWant, setWantQuantity } from "./wants";
@@ -293,75 +289,6 @@ export async function nudgeWantQuantityAction(formData: FormData): Promise<void>
   /* The post follows the number on the Flare screen. */
   await syncCardQuantity(playerId, want.cardId, quantity, "want");
   revalidateWants(text(formData, "code"));
-}
-
-/**
- * Posts the player's outstanding saved wants as Flares in this room.
- *
- * One tap covers "post these again?": every want that is not already an
- * open Flare of theirs on this board goes up. Ownership is re-derived from
- * scratch — the signed-in account, the session cookie, and membership in
- * the room the code resolves to — because a Server Action trusts nothing.
- */
-export async function repostWantsAction(
-  _previous: RepostState,
-  formData: FormData,
-): Promise<RepostState> {
-  const code = text(formData, "code");
-  if (!code) return { status: "error", message: GENERIC_ERROR };
-
-  const playerId = await playerIdFor(await getViewer());
-  const session = await getPlayerSession();
-  if (!playerId || !session) {
-    return { status: "error", message: "Sign in and join the room first." };
-  }
-
-  const resolved = await resolveCode(code);
-  if (resolved.outcome !== "room") {
-    return { status: "error", message: "This room is not open any more." };
-  }
-
-  const participation = await findParticipation(resolved.room.id, session.id);
-  if (!participation) {
-    return { status: "error", message: "Join the room first." };
-  }
-
-  // A session that posts account wants belongs to that account from here on.
-  await linkSessionToPlayer(session.id, playerId);
-
-  const wants = await listWants(playerId);
-  if (wants.length === 0) return { status: "posted", count: 0 };
-
-  /*
-   * One batch, so the room hears about a want list once. This used to
-   * loop `addFlare` and tell nobody at all — quiet, but the wrong kind:
-   * a player posting twenty cards ahead of a release is exactly the
-   * event everybody else in the room wants to know about.
-   */
-  const { posted } = await addFlareBatch(
-    resolved.room.id,
-    session.id,
-    wants.map((want) => ({
-      cardId: want.cardId,
-      printingId: want.printingId,
-      quantity: want.quantity,
-      note: want.note,
-      deckLabel: want.deckLabel,
-    })),
-  );
-
-  if (posted.length > 0) {
-    void notifyRoomFlare(
-      resolved.room.id,
-      session.id,
-      session.display_name ?? "A player",
-      posted,
-      "want",
-    );
-  }
-
-  revalidatePath(`/e/${code}`);
-  return { status: "posted", count: posted.length };
 }
 
 /**

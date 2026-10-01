@@ -1,4 +1,5 @@
 import { apiPlayer, apiStaffStores, unauthorized } from "@/lib/api/auth";
+import { autoPostFor } from "@/lib/events/auto-post";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { collectionSyncFor } from "@/lib/players/collection";
 import { listLocals } from "@/lib/players/locals";
@@ -40,7 +41,7 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const [asked, offering, sync, locals, account, posted, feedView, staff] =
+  const [asked, offering, sync, locals, account, posted, feedView, autoPost, staff] =
     await Promise.all([
       listWants(player.playerId),
       /* Both directions on one list: see the Flare tab. */
@@ -65,6 +66,7 @@ export async function GET(request: Request): Promise<Response> {
        the list's two states. See postedCardStores. */
       postedCardStores(player.playerId),
       feedViewFor(player.playerId),
+      autoPostFor(player.playerId),
       /* The stores this account may RUN, for the remote: owners and
        organizers alike. Empty for nearly everybody. */
       staffedStores(player.userId),
@@ -88,6 +90,8 @@ export async function GET(request: Request): Promise<Response> {
        * so a missing column costs a setting rather than a session.
        */
       feedView,
+      /* Joining a room posts their Flares to it, unless they said no. */
+      autoPostFlares: autoPost,
     },
     wants: [...asked, ...offering].map((want) => ({
       id: want.id,
