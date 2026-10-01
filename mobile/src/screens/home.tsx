@@ -35,8 +35,10 @@ import {
   joinRoom,
   likePost,
   offerFromPost,
+  openLocalThread,
   postFlare,
   rememberRoom,
+  serverMessage,
   storedAccessToken,
   type Me,
 } from "../api";
@@ -55,6 +57,7 @@ import {
   Button,
   Card,
   CardImage,
+  ErrorLine,
   Loading,
   Muted,
   Tap,
@@ -62,7 +65,7 @@ import {
   type ZoomCard,
 } from "../ui";
 import { silentCoords } from "../location";
-import { FeedPerson, GuestChip } from "../feed-person";
+import { FeedPerson } from "../feed-person";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { onFeedStale } from "../feed-refresh";
 import { refreshTick } from "../refresh-tick";
@@ -78,7 +81,7 @@ import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
 import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
-import { colors, gutter, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 
 /**
@@ -217,6 +220,130 @@ function PullSpinner({
 }
 
 /** How long ago, in the shortest form that is still true. */
+/**
+ * One person who asked for a card you hold, and the one thing to do
+ * about it. The founder: "I should be able to DM them immediately -
+ * with pressing a green DM button on that screen and it'll say
+ * something like 'I have (insert card name here)' and it'll open a DM
+ * with that card as a convo."
+ *
+ * The CARD leads this row, not the person: it answers "which of my
+ * wants is out there", and the name is how you find them once you
+ * know. The face still opens a profile. Every entry is an account,
+ * because the button needs an inbox on the other end; the server
+ * leaves a guest's want out rather than showing a row nobody can act
+ * on.
+ */
+function WantedRow({
+  entry,
+  onOpenProfile,
+  onOpenThread,
+}: {
+  entry: Extract<FeedEntry, { kind: "wanted" }>["entries"][number];
+  onOpenProfile: () => void;
+  onOpenThread: (threadId: string) => void;
+}) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /*
+   * A second tap on the same card opens the conversation already had
+   * rather than saying "I have this" twice: the server sends the thread
+   * it knows about, and the first message goes only when there is none.
+   */
+  const message = async () => {
+    if (sending) return;
+    if (entry.threadId) {
+      onOpenThread(entry.threadId);
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const result = await openLocalThread(
+        entry.flareId,
+        `I have ${entry.card.cardName}.`,
+      );
+      if (result.ok && result.threadId) {
+        onOpenThread(result.threadId);
+        return;
+      }
+      setError(result.message ?? "Could not start the conversation.");
+    } catch (caught) {
+      setError(serverMessage(caught) ?? "Could not start the conversation.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: spacing(1.5) }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}>
+        <CardImage
+          imageUrl={entry.card.imageUrl}
+          width={44}
+          name={entry.card.cardName}
+          cardNumber={entry.card.cardNumber}
+          youHave={entry.card.match ? { kind: entry.card.match, count: 0 } : undefined}
+        />
+        {/* Whose it is. "Who do I walk over to" is half the question,
+            and a name without a face is the half of it nobody
+            recognises across a shop. */}
+        <Tap
+          accessibilityLabel={`Open ${entry.displayName ?? "this player"}'s profile`}
+          onPress={onOpenProfile}
+        >
+          <PlayerAvatar
+            displayName={entry.displayName ?? "A player"}
+            seed={entry.playerId}
+            avatarUrl={entry.avatarUrl}
+            frame={entry.frame}
+            ring={entry.ring}
+            aura={entry.aura}
+            size={28}
+          />
+        </Tap>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "600" }}
+          >
+            {entry.card.cardName}
+          </Text>
+          <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+            {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
+          </Text>
+        </View>
+        <Tap
+          accessibilityLabel={`Message ${entry.displayName ?? "this player"} about ${entry.card.cardName}`}
+          disabled={sending}
+          onPress={() => void message()}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(1.5),
+            borderRadius: radius.control,
+            backgroundColor: colors.accent,
+            paddingHorizontal: spacing(3),
+            paddingVertical: spacing(2),
+            opacity: sending ? 0.6 : 1,
+          }}
+        >
+          {sending ? (
+            <ActivityIndicator size="small" color={colors.accentContrast} />
+          ) : null}
+          <Text
+            style={{ color: colors.accentContrast, fontWeight: "700", fontSize: 13 }}
+          >
+            Message
+          </Text>
+        </Tap>
+      </View>
+      <ErrorLine message={error} />
+    </View>
+  );
+}
+
 function agoFrom(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
   if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
@@ -782,94 +909,22 @@ export function HomeScreen() {
                     item.total === 1 ? "player wants" : "players want"
                   } a card you're holding`}
                 </Title>
-                <Muted>Bring it and it&rsquo;s a trade. They already asked.</Muted>
+                <Muted>They already asked. Tell them you have it.</Muted>
 
                 <View style={{ gap: spacing(2.5) }}>
                   {item.entries.map((entry) => (
-                    <View
+                    <WantedRow
                       key={`${entry.playerSessionId}-${entry.card.cardId}`}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(2.5),
-                      }}
-                    >
-                      <CardImage
-                        imageUrl={entry.card.imageUrl}
-                        width={44}
-                        name={entry.card.cardName}
-                        cardNumber={entry.card.cardNumber}
-                        youHave={
-                          entry.card.match
-                            ? { kind: entry.card.match, count: 0 }
-                            : undefined
-                        }
-                      />
-                      {/* Whose it is. "Who do I walk over to" is half the
-                      question, and a name without a face is the half of
-                      it nobody recognises across a shop. */}
-                      {/* The CARD leads this row, not the person: it
-                      answers "which of my wants is out there", and the
-                      name is how you find them once you know. So it
-                      keeps its own layout — but the face still opens a
-                      profile, and a guest still says so on the line
-                      where the name actually appears. */}
-                      <Tap
-                        accessibilityLabel={`Open ${entry.displayName ?? "this player"}'s profile`}
-                        disabled={!entry.playerId}
-                        onPress={() =>
-                          entry.playerId &&
-                          navigation.navigate("PlayerProfile", {
-                            playerId: entry.playerId,
-                          })
-                        }
-                      >
-                        <PlayerAvatar
-                          displayName={entry.displayName ?? "A player"}
-                          seed={entry.playerId ?? entry.playerSessionId}
-                          avatarUrl={entry.avatarUrl}
-                          frame={entry.frame}
-                          ring={entry.ring}
-                          aura={entry.aura}
-                          size={28}
-                        />
-                      </Tap>
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          numberOfLines={1}
-                          style={{ color: colors.textPrimary, fontWeight: "600" }}
-                        >
-                          {entry.card.cardName}
-                        </Text>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: spacing(1.5),
-                          }}
-                        >
-                          <Text
-                            numberOfLines={1}
-                            style={{
-                              color: colors.textMuted,
-                              fontSize: 12,
-                              flexShrink: 1,
-                            }}
-                          >
-                            {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
-                          </Text>
-                          {entry.playerId === null ? <GuestChip /> : null}
-                        </View>
-                      </View>
-                      <Tap
-                        accessibilityLabel={`Go to ${entry.storeName}`}
-                        onPress={() => void enter(entry.joinCode)}
-                      >
-                        <Text style={{ color: colors.accent, fontWeight: "700" }}>
-                          Go
-                        </Text>
-                      </Tap>
-                    </View>
+                      entry={entry}
+                      onOpenProfile={() =>
+                        navigation.navigate("PlayerProfile", {
+                          playerId: entry.playerId,
+                        })
+                      }
+                      onOpenThread={(threadId) =>
+                        navigation.navigate("LocalThread", { threadId })
+                      }
+                    />
                   ))}
                 </View>
 

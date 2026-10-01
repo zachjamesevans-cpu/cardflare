@@ -1,4 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -11,10 +13,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { StackParams } from "../App";
 import {
   createHunt,
   describeError,
-  offerItemsOnPost,
+  offerOnHunt,
+  serverMessage,
   setFlareFound,
   setRequestFound,
   updateHunt,
@@ -75,6 +79,7 @@ export function HuntsPanel({
   hunts,
   limit,
   yours,
+  ownerName,
   onAdd,
   onTick,
   onChanged,
@@ -82,6 +87,8 @@ export function HuntsPanel({
   hunts: Hunt[];
   limit?: number;
   yours?: boolean;
+  /** Whose hunts these are, for "Sent to <name> in Messages". */
+  ownerName?: string;
   /** Add cards to this hunt: the composer, with the hunt preselected. */
   onAdd?: (huntId: string) => void;
   /**
@@ -181,6 +188,7 @@ export function HuntsPanel({
               open={open === keyOf(hunt)}
               onToggle={() => setOpen(open === keyOf(hunt) ? null : keyOf(hunt))}
               yours={Boolean(yours)}
+              ownerName={ownerName}
               onAdd={yours ? onAdd : undefined}
               onChanged={onChanged}
             />
@@ -264,6 +272,7 @@ export function HuntRow({
   open,
   onToggle,
   yours,
+  ownerName,
   onAdd,
   onChanged,
 }: {
@@ -271,6 +280,7 @@ export function HuntRow({
   open: boolean;
   onToggle: () => void;
   yours: boolean;
+  ownerName?: string;
   onAdd?: (huntId: string) => void;
   onChanged?: () => void;
 }) {
@@ -359,7 +369,13 @@ export function HuntRow({
 
       {open ? (
         <View style={{ paddingHorizontal: spacing(3), paddingBottom: spacing(3) }}>
-          <HuntExpanded hunt={hunt} yours={yours} onAdd={onAdd} onChanged={onChanged} />
+          <HuntExpanded
+            hunt={hunt}
+            yours={yours}
+            ownerName={ownerName}
+            onAdd={onAdd}
+            onChanged={onChanged}
+          />
         </View>
       ) : null}
     </View>
@@ -412,15 +428,20 @@ export function huntUrl(huntId: string): string {
 export function HuntExpanded({
   hunt,
   yours,
+  ownerName,
   onAdd,
   onChanged,
 }: {
-  hunt: Hunt;
+  /** The Hunt screen passes its HuntView, which already names the owner. */
+  hunt: Hunt & { ownerName?: string };
   yours: boolean;
+  ownerName?: string;
   onAdd?: (huntId: string) => void;
   onChanged?: () => void;
 }) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const cards = hunt.cards ?? [];
+  const owner = ownerName ?? hunt.ownerName ?? "them";
 
   /*
    * OPTIMISTIC COPIES. A change paints at once, keyed by request, and
@@ -475,13 +496,24 @@ export function HuntExpanded({
     youHave: null,
   }));
 
-  /* VISITOR SELECTION: which cards they have, and how many of each. */
+  /*
+   * VISITOR SELECTION: which cards they have, and how many of each,
+   * keyed by REQUEST. Every open card on a hunt can be answered, posted
+   * or not: the server offers on a post where a Flare is live and
+   * sends the rest to the owner as one message. The founder: "If
+   * they're added to a hunt, they stay there." A card with no request
+   * id (an older server) is drawn but cannot be picked.
+   */
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [reviewing, setReviewing] = useState(false);
-  const [offered, setOffered] = useState<string | null>(null);
-  const pickedCards = unfinished.filter((card) => picked[card.cardId]);
+  const [sent, setSent] = useState<{ text: string; threadId: string | null } | null>(
+    null,
+  );
+  const pickedCards = unfinished.filter(
+    (card) => card.requestId && picked[card.requestId],
+  );
   const pickedCopies = pickedCards.reduce(
-    (sum, card) => sum + (picked[card.cardId] ?? 0),
+    (sum, card) => sum + (card.requestId ? (picked[card.requestId] ?? 0) : 0),
     0,
   );
 
@@ -592,16 +624,19 @@ export function HuntExpanded({
                 : undefined
             }
             visitor={
-              !yours
+              !yours && card.requestId
                 ? {
-                    picked: picked[card.cardId] ?? 0,
-                    onPick: (quantity) =>
+                    picked: picked[card.requestId] ?? 0,
+                    onPick: (quantity) => {
+                      const key = card.requestId;
+                      if (!key) return;
                       setPicked((current) => {
                         const next = { ...current };
-                        if (quantity <= 0) delete next[card.cardId];
-                        else next[card.cardId] = quantity;
+                        if (quantity <= 0) delete next[key];
+                        else next[key] = quantity;
                         return next;
-                      }),
+                      });
+                    },
                   }
                 : undefined
             }
@@ -648,7 +683,24 @@ export function HuntExpanded({
       ) : null}
 
       <ErrorLine message={copies.error} />
-      {offered ? <Muted>{offered}</Muted> : null}
+      {sent ? (
+        <View style={{ gap: spacing(2) }}>
+          <Muted>{sent.text}</Muted>
+          {sent.threadId ? (
+            <View style={{ alignSelf: "flex-start" }}>
+              <Button
+                label="Open in Messages"
+                variant="secondary"
+                onPress={() => {
+                  if (sent.threadId) {
+                    navigation.navigate("LocalThread", { threadId: sent.threadId });
+                  }
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {yours && onAdd && hunt.id ? (
         <Button
@@ -670,15 +722,16 @@ export function HuntExpanded({
         <HuntOfferReview
           visible={reviewing}
           hunt={hunt}
+          ownerName={owner}
           items={pickedCards.map((card) => ({
             card,
-            quantity: picked[card.cardId] ?? 1,
+            quantity: card.requestId ? (picked[card.requestId] ?? 1) : 1,
           }))}
           onClose={() => setReviewing(false)}
-          onSent={(note) => {
+          onSent={(outcome) => {
             setReviewing(false);
             setPicked({});
-            setOffered(note);
+            setSent(outcome);
             onChanged?.();
           }}
         />
@@ -807,7 +860,6 @@ export function HuntCardRow({
   const needed = neededOf(card);
   const remaining = Math.max(0, needed - found);
   const done = remaining === 0;
-  const postable = Boolean(card.flareId && card.postId);
   const selected = (visitor?.picked ?? 0) > 0;
 
   return (
@@ -853,9 +905,6 @@ export function HuntCardRow({
         >
           {`${found} of ${needed} found${done ? "" : ` · ${needLabel(remaining)}`}`}
         </Text>
-        {visitor && !postable && !done ? (
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>Not posted yet</Text>
-        ) : null}
         {card.tradedAway ? (
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>Traded here</Text>
         ) : null}
@@ -909,7 +958,7 @@ export function HuntCardRow({
         </Tap>
       ) : null}
 
-      {visitor && postable && !done ? (
+      {visitor && !done ? (
         <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
           <Tap
             onPress={() => visitor.onPick(selected ? 0 : 1)}
@@ -990,23 +1039,25 @@ export function HuntOfferFooter({
 /**
  * The review before an offer goes: the list, a note, one button.
  *
- * A hunt's cards can have been posted in different Flares, and an
- * offer is made on a post. So the selection is grouped by the post
- * each card went up in and sent once per post; the note rides with
- * every group, because the person reading it is the same either way.
+ * ONE call, by request. The server sorts the picks by what it can do
+ * with each: a card with a live Flare becomes an offer on its post,
+ * the rest go to the owner as one direct message, and the note rides
+ * with both because the person reading it is the same either way.
  */
 function HuntOfferReview({
   visible,
   hunt,
+  ownerName,
   items,
   onClose,
   onSent,
 }: {
   visible: boolean;
   hunt: Hunt;
+  ownerName: string;
   items: { card: HuntCard; quantity: number }[];
   onClose: () => void;
-  onSent: (note: string) => void;
+  onSent: (outcome: { text: string; threadId: string | null }) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
@@ -1014,38 +1065,40 @@ function HuntOfferReview({
 
   const send = async () => {
     setError(null);
-    const byPost = new Map<string, { flareId: string; quantity: number }[]>();
-    for (const { card, quantity } of items) {
-      if (!card.postId || !card.flareId) continue;
-      const list = byPost.get(card.postId) ?? [];
-      list.push({ flareId: card.flareId, quantity });
-      byPost.set(card.postId, list);
-    }
-    if (byPost.size === 0) {
-      setError("None of these cards is posted yet.");
+    const lines = items.flatMap(({ card, quantity }) =>
+      card.requestId ? [{ requestId: card.requestId, quantity }] : [],
+    );
+    if (!hunt.id || lines.length === 0) {
+      setError("Pick a card first.");
       return;
     }
-    let offered = 0;
-    const refused: string[] = [];
+    let outcome;
     try {
-      for (const [postId, list] of byPost) {
-        const result = await offerItemsOnPost(postId, list, message.trim());
-        offered += result.offered ?? list.length;
-        for (const flareId of result.refused ?? []) {
-          const card = items.find((item) => item.card.flareId === flareId)?.card;
-          refused.push(card?.cardName ?? "one card");
-        }
-      }
+      outcome = await offerOnHunt(hunt.id, lines, message.trim());
     } catch (caught) {
-      setError(`That did not send (${describeError(caught)}). Try again.`);
+      /* A 409 is the server declining in words: "That one is yours.",
+         "Those cards were all found already." Anything else is a
+         failure to diagnose. */
+      setError(
+        serverMessage(caught) ??
+          `That did not send (${describeError(caught)}). Try again.`,
+      );
+      return;
+    }
+    if (!outcome.ok) {
+      setError(outcome.message);
       return;
     }
     setMessage("");
-    onSent(
-      refused.length > 0
-        ? `Offered ${cardsLabel(offered)}. Not taken: ${refused.join(", ")}.`
-        : `Offered ${cardsLabel(offered)} on ${hunt.name}.`,
-    );
+    const parts: string[] = [];
+    if (outcome.offered > 0) parts.push(`Offered ${cardsLabel(outcome.offered)}.`);
+    if (outcome.messaged > 0 && outcome.threadId) {
+      parts.push(`Sent to ${ownerName} in Messages.`);
+    }
+    if (outcome.refused.length > 0) {
+      parts.push(`Not taken: ${outcome.refused.join(", ")}.`);
+    }
+    onSent({ text: parts.join(" "), threadId: outcome.threadId });
   };
 
   return (
@@ -1084,7 +1137,7 @@ function HuntOfferReview({
             >
               {items.map(({ card, quantity }) => (
                 <View
-                  key={card.cardId}
+                  key={card.requestId ?? card.cardId}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",

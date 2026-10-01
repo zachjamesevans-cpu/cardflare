@@ -6,7 +6,9 @@ import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import {
   getPlayerPeople,
+  openDirectThread,
   peekPlayer,
+  serverMessage,
   storedAccessToken,
   type FollowedPlayer,
   type PeekProfile,
@@ -18,7 +20,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
-import { Body, Card, Loading, Muted, Tap } from "../ui";
+import { Body, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
 import { readCache, writeCache } from "../cache";
 import { colors, gutter, radius, spacing } from "../theme";
 
@@ -79,6 +81,33 @@ export function PlayerProfileScreen() {
       live = false;
     };
   }, []);
+  /*
+   * Message, beside Follow. The founder: "I should be able to go on
+   * someone's profile and message them directly about anything." The
+   * server opens (or finds) the one direct conversation between the
+   * two of you and the thread screen is the composer; a refusal comes
+   * back in the server's words and sits under the buttons.
+   */
+  const [messaging, setMessaging] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const message = async () => {
+    if (messaging) return;
+    setMessaging(true);
+    setMessageError(null);
+    try {
+      const result = await openDirectThread(playerId);
+      if (result.ok && result.threadId) {
+        navigation.navigate("LocalThread", { threadId: result.threadId });
+        return;
+      }
+      setMessageError(result.message ?? "Could not start the conversation.");
+    } catch (caught) {
+      setMessageError(serverMessage(caught) ?? "Could not start the conversation.");
+    } finally {
+      setMessaging(false);
+    }
+  };
+
   /* Cards render together once their art is warm, not one by one. */
   const [shelfReady, setShelfReady] = useState(false);
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
@@ -216,11 +245,19 @@ export function PlayerProfileScreen() {
             actions={
               <>
                 {profile.follow ? (
-                  <FollowButton
-                    playerId={profile.playerId}
-                    initial={profile.follow}
-                    fill
-                  />
+                  <>
+                    <FollowButton
+                      playerId={profile.playerId}
+                      initial={profile.follow}
+                      fill
+                    />
+                    <HeaderButton
+                      label="Message"
+                      icon="chatbubble-outline"
+                      disabled={messaging}
+                      onPress={() => void message()}
+                    />
+                  </>
                 ) : guest ? (
                   <HeaderButton
                     label="Follow"
@@ -231,12 +268,17 @@ export function PlayerProfileScreen() {
               </>
             }
           />
+          <ErrorLine message={messageError} />
         </View>
 
         {/* What they are looking for, before what they are showing off:
             somebody opening a profile is usually deciding whether they
             can help. Same order as the website. */}
-        <HuntsPanel hunts={profile.hunts ?? []} onChanged={() => void reload()} />
+        <HuntsPanel
+          hunts={profile.hunts ?? []}
+          ownerName={profile.displayName}
+          onChanged={() => void reload()}
+        />
 
         {/* The showcase panel, same as the website: its own rounded
             rectangle inside the one connected profile block. */}

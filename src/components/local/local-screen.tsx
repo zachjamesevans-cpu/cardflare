@@ -26,6 +26,7 @@ import {
   sendMessageAction,
   setLocalRadiusAction,
 } from "@/lib/local/actions";
+import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import type { LocalFeed, LocalFlare } from "@/lib/local/feed";
 import {
   LOCAL_RADII,
@@ -194,7 +195,8 @@ export function LocalScreen({
           <Card className="flex flex-col gap-1">
             <h2 className="font-semibold text-text-primary">No conversations yet</h2>
             <p className="text-sm text-text-secondary">
-              When somebody answers one of your Flares, the conversation lands here.
+              When somebody answers one of your Flares, or you message a player from
+              their profile, the conversation lands here.
             </p>
           </Card>
         )}
@@ -389,7 +391,10 @@ function ThreadRow({ thread, onOpen }: { thread: ThreadSummary; onOpen: () => vo
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold text-text-primary">
           {thread.withName}
-          <span className="font-normal text-text-muted"> · {thread.cardName}</span>
+          {/* A direct message has no card: the name stands alone. */}
+          {thread.cardName && (
+            <span className="font-normal text-text-muted"> · {thread.cardName}</span>
+          )}
         </span>
         <span className="block truncate text-sm text-text-secondary">
           {thread.closed ? "Conversation ended" : (thread.lastMessagePreview ?? "")}
@@ -603,13 +608,17 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
           className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
-          Local
+          {LOCAL_ENABLED ? "Local" : "Messages"}
         </button>
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate font-semibold text-text-primary">
             {withName ?? "Conversation"}
           </p>
-          {cardName && <p className="truncate text-xs text-text-muted">{cardName}</p>}
+          {/* The subject, when the thread has one. A direct message
+              is about whatever the two of them say it is. */}
+          {cardName && (
+            <p className="truncate text-xs text-text-muted">About {cardName}</p>
+          )}
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={load}>
           Refresh

@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
@@ -389,6 +390,7 @@ function RadiusRow({ current, onSaved }: { current: number; onSaved: () => void 
   );
 }
 
+/** The card's face, or a speech bubble for a conversation with no card. */
 function Thumb({ uri }: { uri: string | null }) {
   return (
     <View
@@ -400,13 +402,24 @@ function Thumb({ uri }: { uri: string | null }) {
         borderColor: colors.border,
         backgroundColor: colors.elevated,
         overflow: "hidden",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
-      {uri && <RemoteImage uri={uri} style={{ width: "100%", height: "100%" }} />}
+      {uri ? (
+        <RemoteImage uri={uri} style={{ width: "100%", height: "100%" }} />
+      ) : (
+        <Ionicons name="chatbubble-outline" size={20} color={colors.textMuted} />
+      )}
     </View>
   );
 }
 
+/**
+ * One conversation: who, and the card when there is one. A direct
+ * message, opened from a profile, is about nothing in particular, so
+ * its row is the name alone.
+ */
 function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void }) {
   return (
     <Tap onPress={onOpen}>
@@ -419,10 +432,12 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
               style={{ color: colors.textPrimary, fontWeight: "700" }}
             >
               {thread.withName}
-              <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
-                {"  ·  "}
-                {thread.cardName}
-              </Text>
+              {thread.cardName ? (
+                <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
+                  {"  ·  "}
+                  {thread.cardName}
+                </Text>
+              ) : null}
             </Text>
             <Text
               numberOfLines={1}

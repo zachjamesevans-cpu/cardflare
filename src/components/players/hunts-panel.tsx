@@ -33,11 +33,14 @@ export function HuntsPanel({
   hunts,
   limit,
   yours,
+  ownerName,
 }: {
   hunts: Hunt[];
   /** How many they may keep, when it is worth saying. */
   limit?: number;
   yours?: boolean;
+  /** Whose profile this is, for what a visitor's send says. */
+  ownerName?: string;
 }) {
   /* One open at a time: two open hunts are two lists and a scroll. The
      first opens itself so the panel is never a row of closed lids. */
@@ -125,6 +128,7 @@ export function HuntsPanel({
               open={open === hunt.id}
               onToggle={() => setOpen(open === hunt.id ? null : hunt.id)}
               yours={Boolean(yours)}
+              ownerName={ownerName}
             />
           ))}
         </ul>
@@ -168,11 +172,13 @@ function HuntRow({
   open,
   onToggle,
   yours,
+  ownerName,
 }: {
   hunt: Hunt;
   open: boolean;
   onToggle: () => void;
   yours: boolean;
+  ownerName?: string;
 }) {
   const previews = hunt.cards.slice(0, 3);
   const finished = hunt.cards.length > 0 && hunt.lookingCopies === 0;
@@ -231,7 +237,7 @@ function HuntRow({
 
       {open && (
         <div className="border-t border-border px-3 pt-3 pb-3">
-          <HuntDetail hunt={hunt} yours={yours} />
+          <HuntDetail hunt={hunt} yours={yours} ownerName={ownerName} />
         </div>
       )}
     </li>

@@ -1,4 +1,8 @@
+"use client";
+
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -6,12 +10,16 @@ import {
   Flame,
   HelpCircle,
   Lock,
+  PenLine,
+  Trash2,
   Undo2,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
+import { DotsMenu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
+import { deleteLoggedTradeAction } from "@/lib/trades/logged-actions";
 import type { TradeHistoryEntry, TradeHistoryTotals } from "@/lib/trades/history";
 
 /**
@@ -22,6 +30,11 @@ import type { TradeHistoryEntry, TradeHistoryTotals } from "@/lib/trades/history
  * "Gave Zoro to Tyler", the store and the day under it, and the
  * Embers it paid at the end. The founder's problem is a missing page
  * in a binder, so the row leads with the card and the direction.
+ *
+ * Two sources, one list. A trade confirmed in a room is the room's
+ * word; a trade the player logged themselves says "Logged by you",
+ * earned nothing, and is the only kind with a menu, because it is the
+ * only kind they may take back.
  */
 
 /** "Fri, Sep 12", in the reader's own clock. A day is enough. */
@@ -52,6 +65,8 @@ function statusLine(
       return { icon: Undo2, text: "Reversed. Its Embers were taken back." };
     case "unnamed":
       return { icon: HelpCircle, text: "Nobody named, so it earned nothing" };
+    case "logged":
+      return { icon: PenLine, text: "Logged by you" };
     default:
       return null;
   }
@@ -62,14 +77,50 @@ export function TradeHistoryRow({
   compact = false,
 }: {
   trade: TradeHistoryEntry;
-  /** On the profile card: no card number, one line of detail. */
+  /** On the profile card: no card number, one line of detail, no menu. */
   compact?: boolean;
 }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
   const Icon = trade.got ? ArrowDownLeft : ArrowUpRight;
   const line = statusLine(trade);
+  const logged = trade.source === "logged";
+
+  const remove = () => {
+    if (pending) return;
+    setError(null);
+    start(async () => {
+      const result = await deleteLoggedTradeAction(trade.id);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  /* The partner opens their profile when the trade names an account. */
+  const partner = trade.partnerName ? (
+    trade.partnerPlayerId ? (
+      <Link
+        href={`/p/${trade.partnerPlayerId}`}
+        className="font-semibold underline-offset-4 hover:underline"
+      >
+        {trade.partnerName}
+      </Link>
+    ) : (
+      <span className="font-semibold">{trade.partnerName}</span>
+    )
+  ) : null;
 
   return (
-    <li className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0">
+    <li
+      className={cn(
+        "flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0",
+        pending && "opacity-55",
+      )}
+    >
       <span className="block w-11 shrink-0 overflow-hidden rounded-[5px] border border-border bg-elevated">
         <span className="block aspect-[60/84] w-full">
           {trade.imageUrl && (
@@ -95,10 +146,10 @@ export function TradeHistoryRow({
             {trade.quantity > 1 && (
               <span className="text-text-muted tabular-nums"> ×{trade.quantity}</span>
             )}
-            {trade.partnerName ? (
+            {partner ? (
               <>
                 {trade.got ? " from " : " to "}
-                <span className="font-semibold">{trade.partnerName}</span>
+                {partner}
               </>
             ) : null}
           </span>
@@ -112,25 +163,143 @@ export function TradeHistoryRow({
             .filter(Boolean)
             .join(" · ")}
         </p>
-        {line && !compact && (
+        {/* A logged row says so even on the profile card: the word is
+            short, and it is the one thing that separates the player's
+            own word from the room's. */}
+        {line && (!compact || logged) && (
           <p className="flex items-center gap-1.5 text-xs text-text-muted">
             <line.icon className="size-3.5" aria-hidden="true" />
             {line.text}
           </p>
         )}
-      </div>
-      <span
-        className={cn(
-          "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
-          trade.embers > 0
-            ? "border-accent/30 bg-accent/10 text-accent"
-            : "border-border bg-elevated text-text-muted",
+        {logged && trade.note && !compact && (
+          <p className="text-xs text-text-secondary">{trade.note}</p>
         )}
-      >
-        <Flame className="size-3" aria-hidden="true" />
-        {trade.embers > 0 ? `+${trade.embers}` : trade.embers}
-      </span>
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+      {/* A logged trade never paid anything, and a pill saying "0" on
+          every one of them reads as a mark against it. Room trades keep
+          theirs, zero included: there a zero means something. */}
+      {!logged && (
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
+            trade.embers > 0
+              ? "border-accent/30 bg-accent/10 text-accent"
+              : "border-border bg-elevated text-text-muted",
+          )}
+        >
+          <Flame className="size-3" aria-hidden="true" />
+          {trade.embers > 0 ? `+${trade.embers}` : trade.embers}
+        </span>
+      )}
+      {/* Only a logged trade can be taken back: a room trade is two
+          people's word, and this page is one of them. */}
+      {logged && !compact && (
+        <DotsMenu
+          label={`More about ${trade.cardName}`}
+          items={[
+            {
+              key: "remove",
+              label: "Remove",
+              icon: <Trash2 />,
+              onSelect: remove,
+            },
+          ]}
+        />
+      )}
     </li>
+  );
+}
+
+/** Which way the trades shown went: both, to you, or from you. */
+export type HistoryFilter = "all" | "got" | "gave";
+
+const FILTERS: { key: HistoryFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "got", label: "Got" },
+  { key: "gave", label: "Gave" },
+];
+
+/**
+ * The full list: three chips over one card per month, newest first.
+ * The filter is this screen's alone; the totals above it keep saying
+ * what the whole history adds up to.
+ */
+export function TradeHistoryList({ trades }: { trades: TradeHistoryEntry[] }) {
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+
+  const shown = trades.filter(
+    (trade) => filter === "all" || (filter === "got" ? trade.got : !trade.got),
+  );
+
+  /* One card per month, so a year of Fridays reads as a calendar. */
+  const months: { label: string; trades: TradeHistoryEntry[] }[] = [];
+  for (const trade of shown) {
+    const label = monthOf(trade.confirmedAt);
+    const last = months[months.length - 1];
+    if (last && last.label === label) last.trades.push(trade);
+    else months.push({ label, trades: [trade] });
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div
+        role="radiogroup"
+        aria-label="Which trades to show"
+        className="flex flex-wrap items-center gap-2"
+      >
+        {FILTERS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            role="radio"
+            aria-checked={filter === option.key}
+            onClick={() => setFilter(option.key)}
+            className={cn(
+              "cursor-pointer rounded-full border px-3 py-1 text-sm font-semibold transition-colors",
+              filter === option.key
+                ? "border-accent bg-accent text-accent-contrast"
+                : "border-border-strong text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {months.length === 0 ? (
+        <Card className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">
+            {trades.length === 0 ? "Nothing traded yet" : "Nothing that way yet"}
+          </p>
+          <p className="text-sm text-text-secondary">
+            {trades.length === 0
+              ? "Confirm a trade in a room, or log one you made elsewhere, and it lands here."
+              : filter === "got"
+                ? "No card has come to you yet."
+                : "No card has left your binder yet."}
+          </p>
+        </Card>
+      ) : (
+        months.map((month) => (
+          <Card key={month.label} className="flex flex-col gap-3 p-4">
+            <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
+              {month.label}
+            </p>
+            <ul className="flex flex-col">
+              {month.trades.map((trade) => (
+                <TradeHistoryRow key={trade.id} trade={trade} />
+              ))}
+            </ul>
+          </Card>
+        ))
+      )}
+    </div>
   );
 }
 

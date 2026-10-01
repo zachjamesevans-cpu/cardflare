@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import { Text, View } from "react-native";
 
+import { DotsButton } from "./action-menu";
 import type { TradeHistoryEntry, TradeHistoryTotals } from "./api";
 import { RemoteImage } from "./remote-image";
 import { colors, radius, spacing } from "./theme";
@@ -30,19 +32,39 @@ export function monthOf(iso: string): string {
   );
 }
 
-function statusLine(trade: TradeHistoryEntry): string | null {
+type IconName = ComponentProps<typeof Ionicons>["name"];
+
+/**
+ * What a row says under the detail line, with the glyph the website
+ * draws beside it. A logged trade says so: it is the player's own
+ * word, which nobody else confirmed and which paid nothing.
+ */
+function statusLine(trade: TradeHistoryEntry): { icon: IconName; text: string } | null {
   switch (trade.status) {
     case "pending":
-      return "Waiting on the other side to confirm";
+      return { icon: "time-outline", text: "Waiting on the other side to confirm" };
     case "late":
-      return "Not confirmed in time";
+      return { icon: "time-outline", text: "Not confirmed in time" };
     case "disputed":
-      return "Reversed. Its Embers were taken back.";
+      return {
+        icon: "arrow-undo-outline",
+        text: "Reversed. Its Embers were taken back.",
+      };
     case "unnamed":
-      return "Nobody named, so it earned nothing";
+      return {
+        icon: "help-circle-outline",
+        text: "Nobody named, so it earned nothing",
+      };
+    case "logged":
+      return { icon: "pencil-outline", text: "Logged by you" };
     default:
       return null;
   }
+}
+
+/** Written down by the player rather than confirmed in a room. */
+export function isLogged(trade: TradeHistoryEntry): boolean {
+  return trade.source === "logged" || trade.status === "logged";
 }
 
 const THUMB = 44;
@@ -51,13 +73,24 @@ export function TradeHistoryRow({
   trade,
   compact = false,
   last = false,
+  onOpenPartner,
+  onMore,
 }: {
   trade: TradeHistoryEntry;
   /** On the profile card: no card number, one line of detail. */
   compact?: boolean;
   last?: boolean;
+  /** The partner's profile, when the trade names an account. */
+  onOpenPartner?: () => void;
+  /** The three dots: a logged row's Remove. Room rows have none. */
+  onMore?: () => void;
 }) {
   const line = statusLine(trade);
+  /* The logged line is what tells this row from a room's, so the
+     profile's compact rows keep it; the rest of the status lines are
+     the full page's business. */
+  const showLine = line && (!compact || isLogged(trade));
+  const partnerOpens = Boolean(onOpenPartner && trade.partnerPlayerId);
   const detail = [
     trade.storeName,
     dayOf(trade.confirmedAt),
@@ -99,7 +132,10 @@ export function TradeHistoryRow({
             size={14}
             color={trade.got ? colors.accent : colors.textMuted}
           />
-          <Text numberOfLines={2} style={{ color: colors.textPrimary, fontSize: 14, flex: 1 }}>
+          <Text
+            numberOfLines={2}
+            style={{ color: colors.textPrimary, fontSize: 14, flex: 1 }}
+          >
             {trade.got ? "Got " : "Gave "}
             <Text style={{ fontWeight: "700" }}>{trade.cardName}</Text>
             {trade.quantity > 1 ? (
@@ -108,7 +144,18 @@ export function TradeHistoryRow({
             {trade.partnerName ? (
               <>
                 {trade.got ? " from " : " to "}
-                <Text style={{ fontWeight: "700" }}>{trade.partnerName}</Text>
+                {/* A name with an account behind it opens the profile,
+                    the website's link. */}
+                <Text
+                  style={{
+                    fontWeight: "700",
+                    color: partnerOpens ? colors.accent : colors.textPrimary,
+                  }}
+                  onPress={partnerOpens ? onOpenPartner : undefined}
+                  accessibilityRole={partnerOpens ? "link" : undefined}
+                >
+                  {trade.partnerName}
+                </Text>
               </>
             ) : null}
           </Text>
@@ -116,38 +163,52 @@ export function TradeHistoryRow({
         <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
           {detail}
         </Text>
-        {line && !compact ? (
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>{line}</Text>
+        {showLine ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+            <Ionicons name={line.icon} size={12} color={colors.textMuted} />
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{line.text}</Text>
+          </View>
+        ) : null}
+        {trade.note && !compact ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+            {trade.note}
+          </Text>
         ) : null}
       </View>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 3,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: trade.embers > 0 ? colors.accentMuted : colors.border,
-          backgroundColor: colors.elevated,
-          paddingHorizontal: spacing(2),
-          paddingVertical: 2,
-        }}
-      >
-        <Ionicons
-          name="flame"
-          size={11}
-          color={trade.embers > 0 ? colors.accent : colors.textMuted}
-        />
-        <Text
+      {/* A logged trade never paid anything, and a pill saying "0" on
+          every one of them reads as a mark against it. Room trades keep
+          theirs, zero included: there a zero means something. */}
+      {isLogged(trade) ? null : (
+        <View
           style={{
-            color: trade.embers > 0 ? colors.accent : colors.textMuted,
-            fontSize: 12,
-            fontWeight: "700",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 3,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: trade.embers > 0 ? colors.accentMuted : colors.border,
+            backgroundColor: colors.elevated,
+            paddingHorizontal: spacing(2),
+            paddingVertical: 2,
           }}
         >
-          {trade.embers > 0 ? `+${trade.embers}` : String(trade.embers)}
-        </Text>
-      </View>
+          <Ionicons
+            name="flame"
+            size={11}
+            color={trade.embers > 0 ? colors.accent : colors.textMuted}
+          />
+          <Text
+            style={{
+              color: trade.embers > 0 ? colors.accent : colors.textMuted,
+              fontSize: 12,
+              fontWeight: "700",
+            }}
+          >
+            {trade.embers > 0 ? `+${trade.embers}` : String(trade.embers)}
+          </Text>
+        </View>
+      )}
+      {onMore ? <DotsButton onPress={onMore} label="More about this trade" /> : null}
     </View>
   );
 }
@@ -181,10 +242,31 @@ export function LockedRows({ count }: { count: number }) {
             }}
           />
           <View style={{ flex: 1, gap: spacing(1.5) }}>
-            <View style={{ height: 14, width: "75%", borderRadius: 4, backgroundColor: colors.elevated }} />
-            <View style={{ height: 12, width: "50%", borderRadius: 4, backgroundColor: colors.elevated }} />
+            <View
+              style={{
+                height: 14,
+                width: "75%",
+                borderRadius: 4,
+                backgroundColor: colors.elevated,
+              }}
+            />
+            <View
+              style={{
+                height: 12,
+                width: "50%",
+                borderRadius: 4,
+                backgroundColor: colors.elevated,
+              }}
+            />
           </View>
-          <View style={{ height: 20, width: 48, borderRadius: 999, backgroundColor: colors.elevated }} />
+          <View
+            style={{
+              height: 20,
+              width: 48,
+              borderRadius: 999,
+              backgroundColor: colors.elevated,
+            }}
+          />
         </View>
       ))}
     </View>
@@ -239,16 +321,25 @@ export function TradeHistoryWall({
         >
           <Ionicons name="lock-closed-outline" size={20} color={colors.accent} />
         </View>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16, textAlign: "center" }}>
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontWeight: "700",
+            fontSize: 16,
+            textAlign: "center",
+          }}
+        >
           {count === 0
             ? "Your trades will be saved here"
             : count === 1
               ? "Your trade is saved"
               : `Your ${count} trades are saved`}
         </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: "center" }}>
-          See every card you got and gave, who it was with, and the Embers it earned, with
-          cardflare Pro.
+        <Text
+          style={{ color: colors.textSecondary, fontSize: 14, textAlign: "center" }}
+        >
+          See every card you got and gave, who it was with, and the Embers it earned,
+          with cardflare Pro.
         </Text>
         <Button label="Get cardflare Pro" onPress={onGetPro} />
         <Text style={{ color: colors.textMuted, fontSize: 12 }}>$7.99 a month</Text>

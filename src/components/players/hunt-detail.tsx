@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, Globe, Lock, Pencil, Undo2 } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Globe,
+  Lock,
+  Pencil,
+  Undo2,
+} from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import {
@@ -19,17 +27,20 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 import { setRequestFoundAction, updateHuntAction } from "@/lib/players/hunt-actions";
 import { offerOnHuntAction } from "@/lib/players/hunt-offer-actions";
-import type { Hunt, HuntCard } from "@/lib/players/hunts";
+import type { HuntOfferOutcome } from "@/lib/players/hunt-offers";
+import type { Hunt, HuntCard, HuntView } from "@/lib/players/hunts";
 
 /**
  * A hunt, open: the description, the progress, and one row per card.
  *
  * The owner ticks copies off here, one at a time or several at once,
  * and can take the last change back for a few seconds. A visitor picks
- * the cards they have and how many, and the offer goes on the posts
- * those cards were flared in. The two never share a control: nothing
- * an owner can press is drawn for anyone else, and the server refuses
- * it anyway.
+ * the cards they have and how many, and one send answers the lot:
+ * cards with a Flare up are offered on their posts, the rest go to the
+ * owner as one direct message. A hunt is a standing list, so EVERY open
+ * card can be answered, posted or not. The two never share a control:
+ * nothing an owner can press is drawn for anyone else, and the server
+ * refuses it anyway.
  *
  * Progress is COPIES; the rows are CARDS. "5 of 10 copies collected"
  * across "3 cards" - the words never swap.
@@ -47,14 +58,19 @@ export function HuntDetail({
   yours,
   full = false,
   canOffer = true,
+  ownerName,
 }: {
-  hunt: Hunt;
+  hunt: Hunt | HuntView;
   yours: boolean;
   /** On the hunt's own page: no link back to itself. */
   full?: boolean;
   /** A signed-out visitor reads, and is sent to sign in to offer. */
   canOffer?: boolean;
+  /** Whose hunt it is, for "Sent to <name> in Messages". A page's
+      HuntView carries it; a profile panel passes the profile's name. */
+  ownerName?: string;
 }) {
+  const owner = ownerName ?? ("ownerName" in hunt ? hunt.ownerName : "them");
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [lastChange, setLastChange] = useState<{
     requestId: string;
@@ -66,6 +82,13 @@ export function HuntDetail({
   const [editing, setEditing] = useState(false);
   const [collectedOpen, setCollectedOpen] = useState(false);
   const [review, setReview] = useState(false);
+  /* What the last send did, shown under the list once the sheet is
+     closed. The sheet itself is remounted on each send so it opens
+     fresh next time. */
+  const [sent, setSent] = useState<Extract<HuntOfferOutcome, { ok: true }> | null>(
+    null,
+  );
+  const [reviewKey, setReviewKey] = useState(0);
   const [pending, start] = useTransition();
 
   useEffect(() => {
@@ -133,18 +156,20 @@ export function HuntDetail({
     if (card) write(card, lastChange.previous, false);
   };
 
-  /* A visitor's pick: keyed by the Flare, since that is what an offer
-     is made on. A card with no open Flare has no key and no box. */
-  const remainingFor = (flareId: string) =>
-    cards.find((card) => card.flareId === flareId)?.remaining ?? 0;
+  /* A visitor's pick: keyed by the REQUEST, which every card has, so
+     a card nobody has flared yet can be answered like any other. The
+     server decides whether each one is offered on a post or sent as a
+     message. */
+  const remainingFor = (requestId: string) =>
+    cards.find((card) => card.requestId === requestId)?.remaining ?? 0;
   const selection = useSelection(remainingFor);
   const lines: OfferLine[] = Object.entries(selection.selected).flatMap(
-    ([flareId, quantity]) => {
-      const card = cards.find((row) => row.flareId === flareId);
+    ([requestId, quantity]) => {
+      const card = cards.find((row) => row.requestId === requestId);
       return card
         ? [
             {
-              key: flareId,
+              key: requestId,
               name: card.cardName,
               imageUrl: card.imageUrl,
               printingLabel: card.printingLabel,
@@ -154,6 +179,34 @@ export function HuntDetail({
         : [];
     },
   );
+
+  /* The server names a refused card "Name (Number)"; the review sheet
+     keys them, so the names are turned back into keys for it. */
+  const keysFor = (names: string[]) =>
+    names.flatMap((name) => {
+      const card = cards.find(
+        (row) =>
+          `${row.cardName} (${row.cardNumber})` === name || row.cardName === name,
+      );
+      return card ? [card.requestId] : [];
+    });
+
+  const submit = async (message: string) => {
+    const outcome = await offerOnHuntAction(
+      hunt.id,
+      lines.map((line) => ({ requestId: line.key, quantity: line.quantity })),
+      message,
+    );
+    if (outcome.ok) setSent(outcome);
+    return { ...outcome, refused: keysFor(outcome.refused) };
+  };
+
+  /* Sent: the sheet closes and the summary below takes over. */
+  const onSent = () => {
+    selection.clear();
+    setReview(false);
+    setReviewKey((value) => value + 1);
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -271,8 +324,6 @@ export function HuntDetail({
                       onChange={(value) => write(card, value)}
                     />
                   </div>
-                ) : !card.flareId ? (
-                  <span className="text-xs text-text-muted">Not posted yet</span>
                 ) : !canOffer ? (
                   <Link
                     href={`/login?next=${encodeURIComponent(`/hunts/${hunt.id}`)}`}
@@ -285,20 +336,20 @@ export function HuntDetail({
                     <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-text-primary">
                       <input
                         type="checkbox"
-                        checked={selection.has(card.flareId)}
-                        onChange={() => selection.toggle(card.flareId as string)}
+                        checked={selection.has(card.requestId)}
+                        onChange={() => selection.toggle(card.requestId)}
                         className="size-5 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
                       />
                       I have this
                     </label>
-                    {selection.has(card.flareId) && (
+                    {selection.has(card.requestId) && (
                       <Stepper
-                        value={selection.quantity(card.flareId)}
+                        value={selection.quantity(card.requestId)}
                         min={1}
                         max={card.remaining}
                         label={`copies of ${card.cardName} you have`}
                         onChange={(value) =>
-                          selection.setQuantity(card.flareId as string, value)
+                          selection.setQuantity(card.requestId, value)
                         }
                       />
                     )}
@@ -368,25 +419,62 @@ export function HuntDetail({
           onContinue={() => setReview(true)}
         />
       )}
+      {!yours && sent && <HuntSentLine outcome={sent} ownerName={owner} />}
       {!yours && (
         <OfferReview
+          key={reviewKey}
           open={review}
           onClose={() => setReview(false)}
           lines={lines}
-          onSubmit={(message) =>
-            offerOnHuntAction(
-              hunt.id,
-              lines.flatMap((line) => {
-                const card = cards.find((row) => row.flareId === line.key);
-                return card
-                  ? [{ requestId: card.requestId, quantity: line.quantity }]
-                  : [];
-              }),
-              message,
-            )
-          }
-          onSent={selection.clear}
+          onSubmit={submit}
+          onSent={onSent}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * What one send did: the cards offered on posts, the ones that went
+ * to the owner as a message, and any the server could not take. Said
+ * in full, because a visitor who picked three cards and sees "sent"
+ * deserves to know where each one went.
+ */
+function HuntSentLine({
+  outcome,
+  ownerName,
+}: {
+  outcome: Extract<HuntOfferOutcome, { ok: true }>;
+  ownerName: string;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-1 rounded-[var(--radius-control)] border border-accent/40 bg-accent/5 px-3 py-2 text-sm"
+    >
+      {outcome.offered > 0 && (
+        <p className="flex items-center gap-2 font-semibold text-accent">
+          <Check className="size-4" aria-hidden="true" />
+          Offered {outcome.offered} {outcome.offered === 1 ? "card" : "cards"}.
+        </p>
+      )}
+      {outcome.messaged > 0 && outcome.threadId && (
+        <p className="flex items-center gap-2 font-semibold text-accent">
+          <Check className="size-4" aria-hidden="true" />
+          <Link
+            href={`/local?thread=${encodeURIComponent(outcome.threadId)}`}
+            className="hover:underline"
+          >
+            Sent to {ownerName} in Messages
+          </Link>
+        </p>
+      )}
+      {outcome.refused.length > 0 && (
+        <p className="text-text-secondary">
+          {outcome.refused.join(", ")} {outcome.refused.length === 1 ? "was" : "were"}{" "}
+          answered while you were writing, so{" "}
+          {outcome.refused.length === 1 ? "that one" : "those"} did not go.
+        </p>
       )}
     </div>
   );

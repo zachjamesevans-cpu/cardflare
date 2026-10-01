@@ -33,6 +33,7 @@ import { FlarePostScreen } from "./src/screens/flare-post";
 import { HuntScreen } from "./src/screens/hunt";
 import { RemoteScreen } from "./src/screens/remote";
 import { TradeHistoryScreen } from "./src/screens/trade-history";
+import { LogTradeScreen } from "./src/screens/log-trade";
 import { ProfileScreen } from "./src/screens/profile";
 import { EditProfileScreen } from "./src/screens/edit-profile";
 import { FindPlayerScreen } from "./src/screens/find-player";
@@ -144,8 +145,14 @@ export type StackParams = {
   FlarePost: { postId: string };
   /** One hunt, whole: the website's /hunts/[huntId]. */
   Hunt: { huntId: string };
-  /** Every trade you confirmed, the website's /profile/trades. Pro. */
-  TradeHistory: undefined;
+  /**
+   * Every trade you confirmed, the website's /profile/trades. Pro.
+   * `logged` is set by the Log a trade screen on its way back, so the
+   * list can say "Logged." once over the fresh rows.
+   */
+  TradeHistory: { logged?: boolean } | undefined;
+  /** Writing down a trade made off CardFlare, the website's sheet. */
+  LogTrade: undefined;
   /** Finding somebody by name, from the Feed's own header. */
   FindPlayer: undefined;
   /**
@@ -179,6 +186,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Customize: "Profile",
   Pro: "Back",
   PlayerProfile: "Back",
+  LogTrade: "History",
   Remote: "Room",
   FindPlayer: "Feed",
   PostFlare: "Room",
@@ -742,6 +750,11 @@ export default function App() {
             name="TradeHistory"
             component={TradeHistoryScreen}
             options={{ title: "Trade history", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="LogTrade"
+            component={LogTradeScreen}
+            options={{ title: "Log a trade", headerBackTitle: "History" }}
           />
           <Stack.Screen
             name="FlarePost"

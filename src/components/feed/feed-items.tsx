@@ -17,7 +17,8 @@ import { PostalAsk } from "@/components/feed/postal-ask";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
-import { FeedPerson, GuestChip, PersonLink } from "@/components/feed/feed-person";
+import { FeedPerson, PersonLink } from "@/components/feed/feed-person";
+import { WantedMessageButton } from "@/components/feed/wanted-message-button";
 import { MatchRow } from "@/components/nearby/match-card";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
@@ -344,15 +345,26 @@ export function Item({
             you&rsquo;re holding
           </p>
           <p className="text-xs text-text-muted">
-            Bring it and it&rsquo;s a trade. They already asked.
+            They already asked. Tell them you have it.
           </p>
         </div>
 
         <div className="flex flex-col gap-2.5">
           {item.entries.map((entry) => (
-            <div
+            /*
+             * The CARD leads this row, not the person: it answers
+             * "which of my wants is out there", and the name is how
+             * you find them once you know. So this keeps its own
+             * layout rather than using FeedPerson, but the face and
+             * the name still open a profile. Everybody here has one:
+             * a guest's want is left out of the item, because the
+             * button at the end needs an inbox on the other side.
+             */
+            <WantedMessageButton
               key={`${entry.playerSessionId}-${entry.card.cardId}`}
-              className="flex items-center gap-3"
+              flareId={entry.flareId}
+              threadId={entry.threadId}
+              cardName={entry.card.cardName}
             >
               <FeedTile
                 imageUrl={entry.card.imageUrl}
@@ -360,21 +372,10 @@ export function Item({
                 cardNumber={entry.card.cardNumber}
                 match={entry.card.match}
               />
-              {/* Whose it is. "Who do I walk over to" is half the
-                  question, and a name without a face is the half of it
-                  that nobody recognises across a shop. */}
-              {/*
-               * The CARD leads this row, not the person: it answers
-               * "which of my wants is out there", and the name is how
-               * you find them once you know. So this keeps its own
-               * layout rather than using FeedPerson — but the face and
-               * the name still open a profile, and a guest still says
-               * so, on the line where the name actually appears.
-               */}
               <PersonLink playerId={entry.playerId}>
                 <PlayerAvatar
                   displayName={entry.displayName ?? "A player"}
-                  seed={entry.playerId ?? entry.playerSessionId}
+                  seed={entry.playerId}
                   avatarUrl={entry.avatarUrl}
                   frame={entry.frame}
                   ring={entry.ring}
@@ -385,22 +386,13 @@ export function Item({
                   <p className="truncate text-sm font-semibold text-text-primary">
                     {entry.card.cardName}
                   </p>
-                  <p className="flex items-center gap-1.5 truncate text-xs text-text-muted">
-                    <span className="truncate">
-                      {entry.displayName ?? "A player"} · {entry.storeName} ·{" "}
-                      {agoFrom(entry.when)}
-                    </span>
-                    {!entry.playerId && <GuestChip />}
+                  <p className="truncate text-xs text-text-muted">
+                    {entry.displayName ?? "A player"} · {entry.storeName} ·{" "}
+                    {agoFrom(entry.when)}
                   </p>
                 </div>
               </PersonLink>
-              <Link
-                href={`/e/${entry.joinCode}`}
-                className={buttonStyles("secondary", "sm")}
-              >
-                Go
-              </Link>
-            </div>
+            </WantedMessageButton>
           ))}
         </div>
 
