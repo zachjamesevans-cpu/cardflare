@@ -4,7 +4,12 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
 import { forgetFeed } from "@/lib/feed/memo";
-import { blockPlayer, reportTarget, unblockPlayer } from "@/lib/players/safety";
+import {
+  blockPlayer,
+  listBlocked,
+  reportTarget,
+  unblockPlayer,
+} from "@/lib/players/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +28,14 @@ const actionSchema = z.discriminatedUnion("action", [
     note: z.string().max(500).optional(),
   }),
 ]);
+
+/** The people this player has blocked, for the settings screen. */
+export async function GET(request: Request): Promise<Response> {
+  const player = await apiPlayer(request);
+  if (!player) return unauthorized();
+
+  return Response.json({ blocked: await listBlocked(player.playerId) });
+}
 
 export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
