@@ -218,12 +218,21 @@ export default async function StoreProfilePage({
                       key={night.eventId}
                       className="flex flex-wrap items-center justify-between gap-2"
                     >
-                      <span className="min-w-0">
-                        <span className="font-medium text-text-primary">
-                          {night.name}
+                      <span className="flex min-w-0 flex-col">
+                        <span>
+                          <span className="font-medium text-text-primary">
+                            {night.name}
+                          </span>
+                          <span className="text-text-muted"> · </span>
+                          {nightLabel(night.startsAt, store.timeZone)}
                         </span>
-                        <span className="text-text-muted"> · </span>
-                        {nightLabel(night.startsAt, store.timeZone)}
+                        {/* The early board, when the store opens one: a
+                            player can post before they are in the door. */}
+                        {!night.live && night.boardOpensAt && (
+                          <span className="text-xs text-text-muted">
+                            Board opens {nightLabel(night.boardOpensAt, store.timeZone)}
+                          </span>
+                        )}
                       </span>
                       {night.live && night.joinCode && (
                         <Link

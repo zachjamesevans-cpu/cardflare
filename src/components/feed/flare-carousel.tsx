@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -32,6 +32,27 @@ export function FlareCarousel({
   const [at, setAt] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
 
+  /*
+   * ONE TAB STOP PER RAIL.
+   *
+   * Every tile holds a button that opens the zoom, and a Feed of
+   * thirty posts with four cards each was a hundred and twenty tab
+   * stops before the keyboard reached the composer (the audit counted
+   * 122). The rail itself is the stop: the arrow keys move along it,
+   * Enter opens the card in view, and only that card's button stays
+   * in the tab order. The tiles are server-rendered children, so the
+   * order is set here, after the fact, rather than on each tile.
+   */
+  useEffect(() => {
+    const slides = scroller.current?.children;
+    if (!slides) return;
+    Array.from(slides).forEach((slide, index) => {
+      slide.querySelectorAll<HTMLElement>("button, a, [tabindex]").forEach((stop) => {
+        stop.tabIndex = index === at ? 0 : -1;
+      });
+    });
+  }, [at, cards.length]);
+
   const jump = (index: number) => {
     const clamped = Math.max(0, Math.min(cards.length - 1, index));
     setAt(clamped);
@@ -59,6 +80,14 @@ export function FlareCarousel({
             } else if (event.key === "ArrowLeft") {
               event.preventDefault();
               jump(at - 1);
+            } else if (
+              (event.key === "Enter" || event.key === " ") &&
+              event.target === event.currentTarget
+            ) {
+              /* Enter on the rail opens the card in view. */
+              event.preventDefault();
+              const slide = event.currentTarget.children[at] as HTMLElement | undefined;
+              slide?.querySelector<HTMLElement>("button")?.click();
             }
           }}
           tabIndex={0}

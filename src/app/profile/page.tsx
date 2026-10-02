@@ -92,9 +92,12 @@ export default async function ProfilePage() {
    * through — a wizard nobody can fall out of is one nobody has to
    * remember to come back to.
    */
-  if (await needsSetup(playerId)) redirect("/welcome");
-
-  const profile = await ownProfile(playerId);
+  /* Both guards at once: one roundtrip, not two in a row. */
+  const [setupOwed, profile] = await Promise.all([
+    needsSetup(playerId),
+    ownProfile(playerId),
+  ]);
+  if (setupOwed) redirect("/welcome");
   if (!profile) redirect("/profile/settings");
 
   const [following, followers, stats, history] = await Promise.all([

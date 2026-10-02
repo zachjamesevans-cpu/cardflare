@@ -70,9 +70,18 @@ export interface UpcomingNight {
   joinCode: string | null;
   /** Running right now. */
   live: boolean;
+  /**
+   * When the board opens before doors, for a store that opens it
+   * early; null when the board opens with the night. The store page
+   * says so, so a player knows they can post before they arrive.
+   */
+  boardOpensAt: string | null;
 }
 
-async function upcomingFor(storeId: string): Promise<UpcomingNight[]> {
+async function upcomingFor(
+  storeId: string,
+  earlyBoardHours: number,
+): Promise<UpcomingNight[]> {
   const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
   const { data } = await getSupabaseAdmin()
     .from("events")
@@ -93,6 +102,12 @@ async function upcomingFor(storeId: string): Promise<UpcomingNight[]> {
       endsAt: row.ends_at,
       joinCode: row.join_code,
       live: row.status === "open",
+      boardOpensAt:
+        earlyBoardHours > 0
+          ? new Date(
+              new Date(row.starts_at).getTime() - earlyBoardHours * 60 * 60 * 1000,
+            ).toISOString()
+          : null,
     }));
 }
 
@@ -104,7 +119,7 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
   const { data, error } = await admin
     .from("stores")
     .select(
-      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description, logo_image, cover_image, hours, timezone",
+      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description, logo_image, cover_image, hours, timezone, early_board_hours",
     )
     .eq("id", storeId)
     .maybeSingle();
@@ -141,6 +156,6 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     games: storeGamesFrom(gameRows ?? []),
     timeZone: data.timezone ?? "UTC",
     casePicks: await caseFor(storeId),
-    upcoming: await upcomingFor(storeId),
+    upcoming: await upcomingFor(storeId, data.early_board_hours ?? 0),
   };
 }

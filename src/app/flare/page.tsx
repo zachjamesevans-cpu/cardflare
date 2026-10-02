@@ -87,22 +87,42 @@ export default async function FlarePage({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
-  const room = session ? await currentRoomForSession(session.id) : null;
   const images = cardImagesEnabled();
-  const games = await viewerGames();
-  const [asked, offering, posted, nearby, hunts, poster, foundCards] = playerId
-    ? await Promise.all([
-        listWants(playerId),
-        listOfferings(playerId),
-        postedCardStores(playerId),
-        /* Nearby matching is part of Local. With Local off there is no
-           feed for a match to land on, so the switch is not asked for
-           either: a setting nothing reads is a lie in a form field. */
-        LOCAL_ENABLED ? nearbySettingsFor(playerId) : null,
-        huntsFor(playerId, playerId),
-        composerViewer(playerId, viewer.kind === "player" ? viewer.playerName : "You"),
-      ])
-    : [null, null, new Map<string, PostedWhere[]>(), null, [], null, new Set<string>()];
+  /*
+   * Everything at once. The room, the games and the six reads below
+   * used to run one after another, and the audit timed "Loading your
+   * draft…" at four to seven seconds: most of it was this page waiting
+   * on itself. None of these needs another's answer.
+   */
+  const [room, games, [asked, offering, posted, nearby, hunts, poster, foundCards]] =
+    await Promise.all([
+      session ? currentRoomForSession(session.id) : null,
+      viewerGames(),
+      playerId
+        ? Promise.all([
+            listWants(playerId),
+            listOfferings(playerId),
+            postedCardStores(playerId),
+            /* Nearby matching is part of Local. With Local off there is no
+               feed for a match to land on, so the switch is not asked for
+               either: a setting nothing reads is a lie in a form field. */
+            LOCAL_ENABLED ? nearbySettingsFor(playerId) : null,
+            huntsFor(playerId, playerId),
+            composerViewer(
+              playerId,
+              viewer.kind === "player" ? viewer.playerName : "You",
+            ),
+          ])
+        : [
+            null,
+            null,
+            new Map<string, PostedWhere[]>(),
+            null,
+            [],
+            null,
+            new Set<string>(),
+          ],
+    ]);
   /* One list, both directions: what you are looking for and what you
      are offering, since you posted both here. */
   const wants = asked && offering ? [...asked, ...offering] : asked;

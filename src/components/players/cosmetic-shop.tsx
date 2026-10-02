@@ -41,12 +41,19 @@ export function CosmeticShop({
   items,
   balance,
   slot,
+  canWear = true,
 }: {
   title: string;
   blurb: string;
   items: CosmeticItem[];
   /** The private number. Only ever rendered on the owner's own profile. */
   balance: number;
+  /**
+   * Whether this player's tier may wear what they own. Anybody can buy;
+   * Pro wears. The tile says which, so "Tap to wear" is never a lie to
+   * a free player (the audit: the store never mentioned Pro).
+   */
+  canWear?: boolean;
   /**
    * Where a tap equips the item. Frames appear in two sections now -
    * profile borders and card borders - and the slot is what tells the
@@ -76,6 +83,7 @@ export function CosmeticShop({
               <Tile
                 slot={slot}
                 item={item}
+                canWear={canWear}
                 /*
                  * Affordability is recomputed here rather than trusted
                  * from the server's snapshot, because the balance on
@@ -115,10 +123,12 @@ function Tile({
   item,
   affordable,
   slot,
+  canWear,
 }: {
   item: CosmeticItem;
   affordable: boolean;
   slot: EquipSlot;
+  canWear: boolean;
 }) {
   const { pending } = useFormStatus();
   const locked = item.lockedUntil !== null && !item.owned;
@@ -199,7 +209,11 @@ function Tile({
         {item.equipped ? (
           <span className="text-accent">Equipped</span>
         ) : item.owned ? (
-          <span className="text-text-secondary">Tap to wear</span>
+          canWear ? (
+            <span className="text-text-secondary">Tap to wear</span>
+          ) : (
+            <span className="text-text-muted">Pro to wear</span>
+          )
         ) : locked ? (
           <span className="text-text-muted">
             Needs {item.lockedUntil?.toLocaleString()} earned
