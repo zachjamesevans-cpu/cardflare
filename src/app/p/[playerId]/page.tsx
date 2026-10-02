@@ -8,9 +8,11 @@ import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FollowButton } from "@/components/players/follow-button";
 import { MessageButton } from "@/components/players/message-button";
 import { PeopleList } from "@/components/players/people-list";
+import { HuntsPanel } from "@/components/players/hunts-panel";
 import { ProfileHeader } from "@/components/players/profile-header";
-import { ProfileIconRow } from "@/components/players/profile-icon-row";
 import { ProfileFlares } from "@/components/players/profile-flares";
+import { ProfileTabs } from "@/components/players/profile-tabs";
+import { profileTabFrom } from "@/lib/players/profile-tabs";
 import { ProfileMenu } from "@/components/players/profile-menu";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -24,6 +26,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followState, listFollowers, listFollowing } from "@/lib/players/follows";
+import { huntLimitFor } from "@/lib/players/hunts";
 import { publicProfile } from "@/lib/players/profile";
 import { blockState } from "@/lib/players/safety";
 import { profileStats } from "@/lib/players/stats";
@@ -37,6 +40,8 @@ import {
 import { cn } from "@/lib/cn";
 import { ProfileCover } from "@/components/players/profile-cover";
 import { BinderHighlights } from "@/components/binder/binder-highlights";
+import { BinderList } from "@/components/binder/binder-list";
+import { CreateBinder } from "@/components/binder/create-binder";
 
 export async function generateMetadata({
   params,
@@ -63,18 +68,18 @@ export const dynamic = "force-dynamic";
  *
  * A shelf nobody can look at is a shelf in a closed room, so a name in a
  * roster links here. What is on show is exactly the founder's public
- * half: the picture, the name, the lifetime Ember badge, the doors to
- * their hunts and their binders, the binders they chose to show, the
- * cards they are proud of wearing whatever they unlocked, and the
- * Flares they have up.
+ * half: the picture, the name, the lifetime Ember badge, the binders
+ * they chose to show, and then four tabs that slide in place: the
+ * Flares they have up, their hunts, their binders as a list, and the
+ * cards they are proud of wearing whatever they unlocked.
  *
  * What is NOT here is the spendable balance, and it is not here
- * structurally rather than by omission — `publicProfile` returns a type
+ * structurally rather than by omission: `publicProfile` returns a type
  * with no field to put it in, so this page could not render it if it
  * tried. Nor are their trades, their settings, their collection, or
  * their email: none of that is a fact about a player, it is their
- * account. The icon row draws Hunts and Binders for them and never the
- * other three.
+ * account. The strip draws Flares, Hunts, Binders and Showcase for
+ * them and never Trades or Embers.
  *
  * Anyone with the link can open it: Share profile hands the address to
  * people who may not have an account yet. A signed-out visitor sees
@@ -83,11 +88,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function PublicProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ playerId: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const viewer = await getViewer();
-  const { playerId } = await params;
+  const [{ playerId }, { tab }] = await Promise.all([params, searchParams]);
 
   /* Open to anyone with the link: Share profile hands the address to
      people who may not have an account yet, and a 404 at the other end
@@ -223,11 +230,6 @@ export default async function PublicProfilePage({
             />
           </div>
 
-          {/* The doors: Hunts and Binders on somebody else's page, all
-                five on your own, which this page is when the link is
-                yours. */}
-          <ProfileIconRow yours={yours} base={`/p/${playerId}`} />
-
           {/* Their binders, the ones they chose to show, the Trade
                 binder first. Null when there is nothing to open: then
                 there is no row. */}
@@ -237,72 +239,120 @@ export default async function PublicProfilePage({
             base={`/p/${playerId}`}
           />
 
-          {/* The showcase, light: a small heading and the shelf on its
-                worn background. The owner's page draws the same, with
-                the "?" help and the "+" tile. */}
-          <section className="relative flex w-full flex-col gap-3 text-left">
-            <h2 className="font-semibold text-text-primary">Showcase</h2>
-
-            {profile.showcase.length === 0 ? (
-              <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
-            ) : (
-              /* The board's carousel: same Rail, same card width. */
-              <div
-                className={cn(
-                  "relative",
-                  (shelfBg || dressedArt.background) &&
-                    "overflow-hidden rounded-[var(--radius-control)] p-2",
-                  shelfBg,
-                )}
-              >
-                <WornBackdrop rive={dressedArt} />
-                <Rail ariaLabel="Showcase">
-                  {profile.showcase.map((entry, index) => (
-                    <li key={entry.id} className="flex w-14 shrink-0 flex-col gap-1">
-                      <CardImageZoom
-                        imageUrl={entry.imageUrl}
-                        exactName={entry.name}
-                        cardNumber={entry.number}
-                        note={entry.note}
-                        direction="showcase"
-                        siblings={shelf}
-                        position={index}
-                        enabled={imagesEnabled}
-                        thumbClassName="w-full"
-                        thumb={
-                          <WornCardShell
-                            worn={dressed}
-                            rive={dressedArt}
-                            className="w-full"
+          {/* The four sections, as tabs that slide in place under the
+                strip: Flares, Hunts, Binders, Showcase. Never their
+                trades or their Embers. The owner, arriving by their
+                own public link, gets their hunt and binder tools. */}
+          <ProfileTabs
+            yours={false}
+            initial={profileTabFrom(tab, false)}
+            panes={{
+              /* Every Flare they have up, newest first. */
+              flares: (
+                <ProfileFlares
+                  flares={profile.flares}
+                  yours={yours}
+                  imagesEnabled={imagesEnabled}
+                  heading={false}
+                />
+              ),
+              /* Their hunts: each shut, saying what is left, opening
+                 onto the list where a visitor picks the cards they
+                 have and offers them. */
+              hunts: yours ? (
+                <HuntsPanel
+                  hunts={profile.hunts}
+                  limit={huntLimitFor(profile.tier)}
+                  yours
+                />
+              ) : (
+                <HuntsPanel hunts={profile.hunts} ownerName={profile.displayName} />
+              ),
+              /* Only the binders they chose to show; a visitor whose
+                 every door is shut reads so rather than nothing. */
+              binders: (
+                <div className="flex flex-col gap-3">
+                  {yours && (
+                    <div className="flex justify-end">
+                      <CreateBinder trigger="button" />
+                    </div>
+                  )}
+                  {profile.binders.length === 0 ? (
+                    <p className="text-sm text-text-muted">No binders to open.</p>
+                  ) : (
+                    <BinderList
+                      binders={profile.binders}
+                      ownerName={profile.displayName}
+                      yours={yours}
+                      base={`/p/${playerId}`}
+                    />
+                  )}
+                </div>
+              ),
+              /* The showcase: the shelf on its worn background. The
+                 owner's page draws the same with the "?" help and the
+                 "+" tile. */
+              showcase: (
+                <section className="relative flex w-full flex-col gap-3 text-left">
+                  {profile.showcase.length === 0 ? (
+                    <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
+                  ) : (
+                    /* The board's carousel: same Rail, same card width. */
+                    <div
+                      className={cn(
+                        "relative",
+                        (shelfBg || dressedArt.background) &&
+                          "overflow-hidden rounded-[var(--radius-control)] p-2",
+                        shelfBg,
+                      )}
+                    >
+                      <WornBackdrop rive={dressedArt} />
+                      <Rail ariaLabel="Showcase">
+                        {profile.showcase.map((entry, index) => (
+                          <li
+                            key={entry.id}
+                            className="flex w-14 shrink-0 flex-col gap-1"
                           >
-                            <CosmeticCard
+                            <CardImageZoom
                               imageUrl={entry.imageUrl}
-                              name={entry.name}
-                              number={entry.number}
-                              imagesEnabled={imagesEnabled}
-                              frame={entry.frame ?? worn.frame}
-                              holo={entry.holo ?? worn.holo}
-                              effect={worn.effect}
-                              className="w-full"
+                              exactName={entry.name}
+                              cardNumber={entry.number}
+                              note={entry.note}
+                              direction="showcase"
+                              siblings={shelf}
+                              position={index}
+                              enabled={imagesEnabled}
+                              thumbClassName="w-full"
+                              thumb={
+                                <WornCardShell
+                                  worn={dressed}
+                                  rive={dressedArt}
+                                  className="w-full"
+                                >
+                                  <CosmeticCard
+                                    imageUrl={entry.imageUrl}
+                                    name={entry.name}
+                                    number={entry.number}
+                                    imagesEnabled={imagesEnabled}
+                                    frame={entry.frame ?? worn.frame}
+                                    holo={entry.holo ?? worn.holo}
+                                    effect={worn.effect}
+                                    className="w-full"
+                                  />
+                                </WornCardShell>
+                              }
                             />
-                          </WornCardShell>
-                        }
-                      />
-                      <span className="truncate text-[11px] text-text-secondary">
-                        {entry.name}
-                      </span>
-                    </li>
-                  ))}
-                </Rail>
-              </div>
-            )}
-          </section>
-
-          {/* Every Flare they have up, newest first. Nothing below this. */}
-          <ProfileFlares
-            flares={profile.flares}
-            yours={yours}
-            imagesEnabled={imagesEnabled}
+                            <span className="truncate text-[11px] text-text-secondary">
+                              {entry.name}
+                            </span>
+                          </li>
+                        ))}
+                      </Rail>
+                    </div>
+                  )}
+                </section>
+              ),
+            }}
           />
         </Card>
       </BlockProvider>

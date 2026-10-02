@@ -217,21 +217,26 @@ describe("the Feed tab answers the tap at once, website only", () => {
 
 describe("Embers are three facts, not one number three ways", () => {
   /*
-   * The profile IA round took the Embers card and the store door off
-   * the profile: the founder, "This is me as a trader", not "my
-   * CardFlare account dashboard". The badge in the header is the
-   * public number; the balance is on the store page behind the Embers
-   * door in the icon row, and nowhere on the profile, so the two are
-   * never read side by side.
+   * The profile tabs round put the Embers tile and the store door back
+   * on the owner's profile, in the Embers pane under the strip: the
+   * founder wanted the sections sliding in place, nothing navigating.
+   * The badge in the header is the public number; the balance is on
+   * the store door, in the one pane, and never on somebody else's
+   * page, where `publicProfile` has no field to put it in.
    */
-  it("keeps the badge on the profile and the balance off it, both platforms", () => {
+  it("keeps the badge in the header and the balance in the Embers pane, both platforms", () => {
+    expect(web.ownProfile).toContain("embersEarned={profile.embersEarned}");
     for (const source of [web.ownProfile, app.ownProfile]) {
-      expect(source).not.toContain("Earned by trading, all time");
+      expect(source).toContain("Earned by trading, all time");
+      expect(source).toContain("to spend");
       expect(source).not.toContain("Earned, all time");
+    }
+    expect(web.ownProfile).toMatch(/>\s*Embers store\s*</);
+    for (const source of [web.profile, app.profile]) {
+      expect(source).not.toContain("Earned by trading, all time");
       expect(source).not.toContain("to spend");
       expect(source).not.toMatch(/>\s*Embers store\s*</);
     }
-    expect(web.ownProfile).toContain("embersEarned={profile.embersEarned}");
   });
 
   it("says to spend on the store page, both platforms", () => {

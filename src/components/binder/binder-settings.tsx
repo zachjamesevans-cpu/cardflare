@@ -109,7 +109,7 @@ export function BinderSettings({
         setConfirming(false);
         return;
       }
-      router.push("/profile/binders");
+      router.push("/profile?tab=binders");
       router.refresh();
     });
   };

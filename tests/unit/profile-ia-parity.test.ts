@@ -27,16 +27,18 @@ const read = (path: string) => {
  *
  * Read off the source, because parity is the same sections in the
  * same order with the same words on the website and in the app: the
- * header without its boxed tiles, the row of round doors, the binder
- * highlights, a lighter showcase, the Flares grid, and every feature
- * that left the page still reachable one tap in.
+ * header without its boxed tiles, the binder highlights, and the
+ * sections as tabs that slide in place (the profile tabs round turned
+ * the row of round doors into a strip; tests/unit/profile-tabs-parity
+ * pins the strip and the slide themselves), with every feature still
+ * reachable from the profile.
  */
 
 const web = {
   ownProfile: read("src/app/profile/page.tsx"),
   playerProfile: read("src/app/p/[playerId]/page.tsx"),
   header: read("src/components/players/profile-header.tsx"),
-  iconRow: read("src/components/players/profile-icon-row.tsx"),
+  tabs: read("src/components/players/profile-tabs.tsx"),
   highlights: read("src/components/binder/binder-highlights.tsx"),
   list: read("src/components/binder/binder-list.tsx"),
   create: read("src/components/binder/create-binder.tsx"),
@@ -62,7 +64,7 @@ const app = {
   ownProfile: read("mobile/src/screens/profile.tsx"),
   playerProfile: read("mobile/src/screens/player-profile.tsx"),
   header: read("mobile/src/profile-header.tsx"),
-  iconRow: read("mobile/src/profile-icon-row.tsx"),
+  tabs: read("mobile/src/profile-tabs.tsx"),
   highlights: read("mobile/src/binder-highlights.tsx"),
   list: read("mobile/src/binder-list.tsx"),
   create: read("mobile/src/create-binder-sheet.tsx"),
@@ -110,17 +112,18 @@ describe("the header: three numbers, no boxed tiles", () => {
   });
 });
 
-describe("the icon row: round doors under the header", () => {
-  it("has the five doors in the same order with the same words on both", () => {
+describe("the tab strip: the sections as tabs under the highlights", () => {
+  it("has the six tabs in the same order with the same words on both", () => {
     for (const [name, source] of platforms) {
-      const row = source.iconRow;
-      expect(row.length, `${name}: the row exists`).toBeGreaterThan(0);
-      const at = order(row, [
+      const strip = source.tabs;
+      expect(strip.length, `${name}: the strip exists`).toBeGreaterThan(0);
+      const at = order(strip, [
+        '"Flares"',
         '"Hunts"',
         '"Binders"',
+        '"Showcase"',
         '"Trades"',
         '"Embers"',
-        '"Settings"',
       ]);
       for (const index of at) expect(index, name).toBeGreaterThan(-1);
       expect(
@@ -130,57 +133,34 @@ describe("the icon row: round doors under the header", () => {
     }
   });
 
-  it("is a 44px circle with an 11px label, no box, no border", () => {
-    expect(web.iconRow).toContain("size-11");
-    expect(web.iconRow).toContain("rounded-full bg-elevated");
-    expect(web.iconRow).not.toContain("border-border");
-    expect(web.iconRow).toContain("text-[11px]");
-    expect(app.iconRow).toMatch(/CIRCLE = 44|width: 44/);
-    expect(app.iconRow).toContain("fontSize: 11");
-    expect(app.iconRow).not.toContain("borderWidth");
-  });
-
-  it("opens Hunts and Binders for anyone, and the other three for the owner alone", () => {
-    expect(web.iconRow).toContain("if (!yours) return shared;");
-    const shared = web.iconRow.slice(
-      web.iconRow.indexOf("const shared"),
-      web.iconRow.indexOf("if (!yours) return shared;"),
-    );
-    expect(shared).toContain('"Hunts"');
-    expect(shared).toContain('"Binders"');
-    expect(shared).not.toContain('"Trades"');
-    expect(shared).not.toContain('"Embers"');
-    expect(shared).not.toContain('"Settings"');
-    for (const href of [
-      "/hunts",
-      "/binders",
-      '"/profile/trades"',
-      '"/profile/store"',
-      '"/profile/settings"',
-    ]) {
-      expect(web.iconRow).toContain(href);
-    }
+  it("opens Flares, Hunts, Binders and Showcase for anyone, Trades and Embers for the owner alone", () => {
     /* The public page never draws their trades, Embers or settings. */
     expect(web.playerProfile).not.toContain("/profile/trades");
     expect(web.playerProfile).not.toContain("/profile/store");
     expect(web.playerProfile).not.toContain("/profile/settings");
-    /* The app's five screens behind the same five doors. */
-    for (const screen of [
-      '"Hunts"',
-      '"Binders"',
-      '"TradeHistory"',
-      '"Store"',
-      '"Settings"',
-    ]) {
+    expect(web.playerProfile).not.toContain("trades:");
+    expect(web.playerProfile).not.toContain("embers:");
+    /* The owner's panes still reach the three screens: See all to the
+       trade history, the store door, and the cog to Settings. */
+    for (const screen of ['"TradeHistory"', '"Store"', '"Settings"']) {
       expect(app.ownProfile, `app own profile: ${screen}`).toContain(screen);
     }
     expect(app.playerProfile).not.toContain('"TradeHistory"');
     expect(app.playerProfile).not.toContain('"Store"');
   });
+
+  it("has replaced the row of round doors on both platforms", () => {
+    for (const [name, source] of platforms) {
+      for (const profile of [source.ownProfile, source.playerProfile]) {
+        expect(profile, name).not.toContain("<ProfileIconRow");
+        expect(profile, name).not.toContain("profile-icon-row");
+      }
+    }
+  });
 });
 
 describe("the profile page, top to bottom, on both platforms", () => {
-  it("is header, doors, highlights, showcase, Flares, own and theirs", () => {
+  it("is header, highlights, then the tabs, own and theirs", () => {
     for (const [name, source] of platforms) {
       for (const [page, profile] of [
         ["own", source.ownProfile],
@@ -188,10 +168,8 @@ describe("the profile page, top to bottom, on both platforms", () => {
       ] as const) {
         const at = order(profile, [
           "<ProfileHeader",
-          "<ProfileIconRow",
           "<BinderHighlights",
-          SHOWCASE_HEADING,
-          "<ProfileFlares",
+          "<ProfileTabs",
         ]);
         for (const index of at) expect(index, `${name} ${page}`).toBeGreaterThan(-1);
         expect(
@@ -202,25 +180,23 @@ describe("the profile page, top to bottom, on both platforms", () => {
     }
   });
 
-  it("has lost the panels, the cards and the cog", () => {
+  it("has lost the panels and the cards as blocks of their own", () => {
     for (const [name, source] of platforms) {
       for (const profile of [source.ownProfile, source.playerProfile]) {
-        expect(profile, name).not.toContain("<HuntsPanel");
+        /* The sections live in the panes under the strip; the binder
+           panel and the trade history card are gone as cards. */
         expect(profile, name).not.toContain("<BinderPanel");
-        /* As drawn, not as a comment that remembers them. */
-        expect(profile, name).not.toMatch(/>\s*Trade history\s*</);
-        expect(profile, name).not.toMatch(/>\s*Embers store\s*</);
         expect(profile, name).not.toContain("<TradeHistoryCard");
-        expect(profile, name).not.toContain("<TradeHistoryRow");
-        expect(profile, name).not.toContain("Earned by trading");
+        /* As drawn, not as a comment that remembers it. */
+        expect(profile, name).not.toMatch(/>\s*Trade history\s*</);
       }
     }
-    /* The cog that sat top right is the Settings door in the row now;
-       Share and the wand stay. */
-    expect(web.ownProfile).not.toContain('title="Settings"');
+    /* The cog is back top right beside Share and the wand: Settings is
+       a screen, not a section, so it is not a tab. */
+    expect(web.ownProfile).toContain('title="Settings"');
     expect(web.ownProfile).toContain("<ShareProfileButton");
     expect(web.ownProfile).toContain("<Wand2");
-    expect(app.ownProfile).not.toContain('"settings-outline"');
+    expect(app.ownProfile).toContain('"settings-outline"');
   });
 
   it("keeps Edit profile, or Follow and Message under the block rule", () => {
@@ -302,15 +278,14 @@ describe("the create binder dialog", () => {
     expect(app.create).toContain("onCreated(");
   });
 
-  it("is the same dialog from the highlights + and the Binders page button", () => {
-    expect(web.ownBinders).toContain('<CreateBinder trigger="button" />');
-    expect(web.playerBinders).toContain('<CreateBinder trigger="button" />');
-    expect(app.binders).toContain("<CreateBinderSheet");
+  it("is the same dialog from the highlights + and the Binders tab's button", () => {
+    expect(web.ownProfile).toContain('<CreateBinder trigger="button" />');
+    expect(web.playerProfile).toContain('<CreateBinder trigger="button" />');
     expect(app.ownProfile).toContain("<CreateBinderSheet");
   });
 });
 
-describe("the Binders page", () => {
+describe("the Binders tab", () => {
   it("lists every binder as a row: cover, name, count, a Trade chip, a chevron", () => {
     for (const [name, source] of platforms) {
       expect(source.list.length, `${name}: the list exists`).toBeGreaterThan(0);
@@ -325,17 +300,20 @@ describe("the Binders page", () => {
     expect(app.list).toContain('"chevron-forward"');
   });
 
-  it("is reached from /profile/binders and /p/<id>/binders, and the app's Binders screen", () => {
-    expect(web.ownBinders).toContain("listBinders(playerId, playerId)");
-    expect(web.ownBinders).toContain('title="Your binders"');
-    expect(web.ownBinders).toContain("Back to your profile");
-    expect(web.playerBinders).toContain("publicProfile(playerId, me)");
-    expect(web.playerBinders).toContain("binders={profile.binders}");
-    expect(web.playerBinders).toContain("No binders to open.");
+  it("is the Binders tab on the profile, with the old pages redirecting to it", () => {
+    for (const [name, source] of platforms) {
+      expect(source.ownProfile, name).toContain("<BinderList");
+      expect(source.playerProfile, name).toContain("<BinderList");
+    }
+    expect(web.ownProfile).toContain("binders={profile.binders}");
+    expect(web.playerProfile).toContain("No binders to open.");
+    expect(web.ownBinders).toContain('redirect("/profile?tab=binders")');
+    expect(web.playerBinders).toContain("redirect(`/p/${playerId}?tab=binders`)");
+    /* The app's Binders screen stays registered for other screens to
+       open; the profile slides to the tab instead. */
     expect(app.stack).toMatch(/name="Binders"/);
     expect(app.stack).toContain("<BindersScreen");
     expect(app.binders).toContain("<BinderList");
-    expect(app.binders).toContain("New binder");
   });
 });
 
@@ -396,30 +374,32 @@ describe("the binder page, by id", () => {
   });
 });
 
-describe("the Hunts page", () => {
-  it("is the hunts panel on a page of its own, every row drawn", () => {
-    expect(web.ownHunts).toContain("<HuntsPanel");
-    expect(web.ownHunts).toContain("limit={huntLimitFor(profile.tier)}");
-    expect(web.ownHunts).toContain("Back to your profile");
-    expect(web.playerHunts).toContain("ownerName={profile.displayName}");
+describe("the Hunts tab", () => {
+  it("is the hunts panel in a pane, every row drawn, with the old pages redirecting", () => {
+    expect(web.ownProfile).toContain("<HuntsPanel");
+    expect(web.ownProfile).toContain("limit={huntLimitFor(profile.tier)}");
+    expect(web.playerProfile).toContain("ownerName={profile.displayName}");
+    expect(web.ownHunts).toContain('redirect("/profile?tab=hunts")');
+    expect(web.playerHunts).toContain("redirect(`/p/${playerId}?tab=hunts`)");
     expect(web.huntsPanel).not.toContain("const SHOWN");
     expect(web.huntsPanel).not.toContain("setShowAll");
     expect(web.huntsPanel).toContain("hunts.map((hunt) =>");
+    expect(app.ownProfile).toContain("<HuntsPanel");
+    expect(app.playerProfile).toContain("<HuntsPanel");
     expect(app.hunts).toContain("<HuntsPanel");
   });
 });
 
 describe("the showcase, lighter", () => {
-  it("is a small heading and the shelf, with the help behind a ? on the own page only", () => {
+  it("is the shelf under the Showcase tab, no heading, with the help behind a ? on the own page only", () => {
     expect(web.ownProfile).toContain("What is a showcase?");
     expect(web.ownProfile).toContain("nothing to offer on here");
     expect(web.playerProfile).not.toContain("nothing to offer on here");
-    expect(web.playerProfile).toContain(
-      '<h2 className="font-semibold text-text-primary">Showcase</h2>',
-    );
-    /* No bordered panel round the shelf any more. */
+    /* No bordered panel round the shelf, and no heading: the tab is
+       the heading now. */
     for (const profile of [web.ownProfile, web.playerProfile]) {
       expect(profile).not.toContain("border border-border bg-elevated/40 p-4");
+      expect(profile).not.toMatch(SHOWCASE_HEADING);
       expect(profile).toContain("<WornBackdrop");
       expect(profile).toContain("<Rail");
     }
@@ -427,7 +407,7 @@ describe("the showcase, lighter", () => {
     expect(web.playerProfile).not.toContain("What is a showcase?");
     expect(app.ownProfile).toContain('accessibilityLabel="What is a showcase?"');
     expect(app.playerProfile).not.toContain("What is a showcase?");
-    expect(app.playerProfile).toMatch(SHOWCASE_HEADING);
+    expect(app.playerProfile).not.toMatch(SHOWCASE_HEADING);
   });
 
   it("folds the owner's Add behind a + tile at the end of the shelf", () => {
@@ -481,7 +461,7 @@ describe("copy and colour rules", () => {
       ["web list", web.list],
       ["web create", web.create],
       ["web flares", web.flares],
-      ["web icon row", web.iconRow],
+      ["web tabs", web.tabs],
       ["web own hunts", web.ownHunts],
       ["web player hunts", web.playerHunts],
       ["web own binders", web.ownBinders],
@@ -492,7 +472,7 @@ describe("copy and colour rules", () => {
       ["app list", app.list],
       ["app create", app.create],
       ["app flares", app.flares],
-      ["app icon row", app.iconRow],
+      ["app tabs", app.tabs],
     ] as const) {
       expect(source, name).not.toContain("—");
       expect(source, name).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
