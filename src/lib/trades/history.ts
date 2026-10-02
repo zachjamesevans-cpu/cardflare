@@ -29,8 +29,8 @@ import type { TradeRecord } from "./schema";
 
 export interface TradeHistoryEntry {
   id: string;
-  /** Confirmed in a room, or written down by the player. */
-  source: "room" | "logged";
+  /** Confirmed in a room, confirmed in a conversation, or written down by the player. */
+  source: "room" | "conversation" | "logged";
   cardId: string;
   cardName: string;
   cardNumber: string;
@@ -166,15 +166,22 @@ export async function listTradeHistory(
     return { locked: false, totals, trades: newestFirst([...room.trades, ...logged]) };
   };
 
-  if (sessions.length === 0) return withLogged({ ...EMPTY, locked });
-
+  /* Room trades name the player's sessions; conversation trades name
+     the account. Both sides of both. */
   const list = sessions.map((id) => `"${id}"`).join(",");
+  const sides = [
+    `requester_player_id.eq.${playerId}`,
+    `holder_player_id.eq.${playerId}`,
+    ...(sessions.length > 0
+      ? [`requester_session_id.in.(${list})`, `holder_session_id.in.(${list})`]
+      : []),
+  ];
   const { data, error } = await admin
     .from("trades")
     .select(
-      "id, event_id, flare_id, requester_session_id, holder_session_id, card_id, printing_id, quantity, confirmed_at, acknowledged_at, paid_at, disputed_at",
+      "id, event_id, thread_id, flare_id, requester_session_id, holder_session_id, requester_player_id, holder_player_id, card_id, printing_id, quantity, confirmed_at, acknowledged_at, paid_at, disputed_at",
     )
-    .or(`requester_session_id.in.(${list}),holder_session_id.in.(${list})`)
+    .or(sides.join(","))
     .order("confirmed_at", { ascending: false })
     .limit(HISTORY_LIMIT);
 
@@ -216,24 +223,34 @@ export async function listTradeHistory(
   }
 
   const shaped = rows.map((row) => {
-    const requester = row.requester_session_id
-      ? mine.has(row.requester_session_id)
-      : false;
+    const requester =
+      row.requester_player_id === playerId ||
+      (row.requester_session_id ? mine.has(row.requester_session_id) : false);
     const showcase = row.flare_id
       ? intentByFlare.get(row.flare_id) === "showcase"
       : false;
     const got = cardCameToYou(requester, showcase);
+    const named = Boolean(row.holder_session_id || row.holder_player_id);
     const status: TradeRecord["status"] = row.disputed_at
       ? "disputed"
-      : !row.holder_session_id
+      : !named
         ? "unnamed"
         : row.acknowledged_at
           ? "confirmed"
           : row.paid_at
             ? "late"
             : "pending";
+    /* The other chair: a session in a room, an account in a conversation. */
     const partnerId = requester ? row.holder_session_id : row.requester_session_id;
-    return { row, got, status, partnerId, embers: embersByTrade.get(row.id) ?? 0 };
+    const partnerPlayerId = requester ? row.holder_player_id : row.requester_player_id;
+    return {
+      row,
+      got,
+      status,
+      partnerId,
+      partnerPlayerId,
+      embers: embersByTrade.get(row.id) ?? 0,
+    };
   });
 
   const totals: TradeHistoryTotals = {
@@ -249,9 +266,16 @@ export async function listTradeHistory(
   const partnerIds = [
     ...new Set(shaped.flatMap((trade) => (trade.partnerId ? [trade.partnerId] : []))),
   ];
-  const eventIds = [...new Set(rows.map((row) => row.event_id))];
+  const partnerPlayerIds = [
+    ...new Set(
+      shaped.flatMap((trade) => (trade.partnerPlayerId ? [trade.partnerPlayerId] : [])),
+    ),
+  ];
+  const eventIds = [
+    ...new Set(rows.flatMap((row) => (row.event_id ? [row.event_id] : []))),
+  ];
 
-  const [cards, printings, partners, events] = await Promise.all([
+  const [cards, printings, partners, accounts, events] = await Promise.all([
     admin
       .from("cards")
       .select("id, exact_name, canonical_card_number")
@@ -269,7 +293,14 @@ export async function listTradeHistory(
           data: [] as { id: string; display_name: string; player_id: string | null }[],
           error: null,
         }),
-    admin.from("events").select("id, name, store_id").in("id", eventIds),
+    partnerPlayerIds.length > 0
+      ? admin.from("players").select("id, display_name").in("id", partnerPlayerIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
+    eventIds.length > 0
+      ? admin.from("events").select("id, name, store_id").in("id", eventIds)
+      : Promise.resolve({
+          data: [] as { id: string; name: string; store_id: string }[],
+        }),
   ]);
 
   const storeIds = [...new Set((events.data ?? []).map((event) => event.store_id))];
@@ -290,18 +321,21 @@ export async function listTradeHistory(
   const accountOf = new Map(
     (partners.data ?? []).map((row) => [row.id, row.player_id]),
   );
+  const accountNames = new Map(
+    (accounts.data ?? []).map((row) => [row.id, row.display_name]),
+  );
   const eventById = new Map((events.data ?? []).map((row) => [row.id, row]));
   const storeById = new Map((stores.data ?? []).map((row) => [row.id, row.name]));
 
   return withLogged({
     locked,
     totals,
-    trades: shaped.map(({ row, got, status, partnerId, embers }) => {
+    trades: shaped.map(({ row, got, status, partnerId, partnerPlayerId, embers }) => {
       const card = cardById.get(row.card_id);
-      const event = eventById.get(row.event_id);
+      const event = row.event_id ? eventById.get(row.event_id) : undefined;
       return {
         id: row.id,
-        source: "room" as const,
+        source: row.thread_id ? ("conversation" as const) : ("room" as const),
         cardId: row.card_id,
         cardName: card?.exact_name ?? "Unknown card",
         cardNumber: card?.canonical_card_number ?? "",
@@ -311,8 +345,13 @@ export async function listTradeHistory(
           null,
         quantity: row.quantity,
         got,
-        partnerName: partnerId ? (names.get(partnerId) ?? null) : null,
-        partnerPlayerId: partnerId ? (accountOf.get(partnerId) ?? null) : null,
+        partnerName: partnerPlayerId
+          ? (accountNames.get(partnerPlayerId) ?? null)
+          : partnerId
+            ? (names.get(partnerId) ?? null)
+            : null,
+        partnerPlayerId:
+          partnerPlayerId ?? (partnerId ? (accountOf.get(partnerId) ?? null) : null),
         storeName: event ? (storeById.get(event.store_id) ?? null) : null,
         eventName: event?.name ?? null,
         confirmedAt: row.confirmed_at,

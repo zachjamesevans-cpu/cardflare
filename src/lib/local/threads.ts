@@ -4,6 +4,7 @@ import { listLocals } from "@/lib/players/locals";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
 import { blockedBetween, blockedSet } from "@/lib/players/safety";
+import { latestThreadTrade, type ThreadTrade } from "@/lib/trades/thread-trades";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 
 /**
@@ -653,11 +654,19 @@ async function meetSuggestion(
 export interface ThreadRead {
   ok: boolean;
   closed: boolean;
+  /** What it is about: a posted Flare, a saved want, or the two people. */
+  kind: "flare" | "want" | "direct";
   cardName: string | null;
   withName: string | null;
+  withPlayerId: string | null;
   messages: ThreadMessage[];
   /** A public place to suggest meeting, or null when neither side has a local. */
   meet: MeetSuggestion | null;
+  /**
+   * The newest "We traded" said in this conversation, as the viewer
+   * sees it, or null. See `src/lib/trades/thread-trades.ts`.
+   */
+  trade: ThreadTrade | null;
 }
 
 export async function readThread(
@@ -667,10 +676,13 @@ export async function readThread(
   const empty: ThreadRead = {
     ok: false,
     closed: false,
+    kind: "direct",
     cardName: null,
     withName: null,
+    withPlayerId: null,
     messages: [],
     meet: null,
+    trade: null,
   };
   if (!isSupabaseConfigured()) return empty;
 
@@ -680,7 +692,7 @@ export async function readThread(
   const admin = getSupabaseAdmin();
   const otherId = thread.authorId === viewerId ? thread.responderId : thread.authorId;
 
-  const [{ data: messages }, { data: other }, anchor, meet] = await Promise.all([
+  const [{ data: messages }, { data: other }, anchor, meet, trade] = await Promise.all([
     admin
       .from("flare_messages")
       .select("id, sender_player_id, body, created_at")
@@ -704,6 +716,7 @@ export async function readThread(
             .then((result) => result.data)
         : Promise.resolve(null),
     meetSuggestion(viewerId, otherId).catch(() => null),
+    latestThreadTrade(threadId, viewerId).catch(() => null),
   ]);
 
   const { data: card } = anchor?.card_id
@@ -734,8 +747,10 @@ export async function readThread(
   return {
     ok: true,
     closed: thread.closed,
+    kind: thread.flareId ? "flare" : thread.wantId ? "want" : "direct",
     cardName: card?.exact_name ?? null,
     withName: other?.display_name ?? null,
+    withPlayerId: otherId,
     messages: (messages ?? []).map((message) => ({
       id: message.id,
       body: message.body,
@@ -743,6 +758,7 @@ export async function readThread(
       yours: message.sender_player_id === viewerId,
     })),
     meet,
+    trade,
   };
 }
 

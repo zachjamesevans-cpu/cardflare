@@ -105,7 +105,7 @@ describe("the logged half of the history", () => {
   const migration = read("supabase/migrations/20261019100000_logged_trades.sql");
 
   it("marks every row with its source and pays nothing for a logged one", () => {
-    expect(history).toContain('source: "room" | "logged"');
+    expect(history).toContain('source: "room" | "conversation" | "logged"');
     expect(history).toContain('source: "logged" as const');
     expect(history).toContain("embers: 0,");
   });

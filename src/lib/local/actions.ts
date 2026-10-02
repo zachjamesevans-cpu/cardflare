@@ -16,6 +16,12 @@ import {
   sendThreadMessage,
   type ThreadRead,
 } from "./threads";
+import { tradeFailureMessage } from "@/lib/trades/thread-trade-copy";
+import {
+  answerThreadTrade,
+  proposeThreadTrade,
+  type ProposeInput,
+} from "@/lib/trades/thread-trades";
 import { LIMITS } from "@/lib/api/throttle";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -168,14 +174,51 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
     return {
       ok: false,
       closed: false,
+      kind: "direct",
       cardName: null,
       withName: null,
+      withPlayerId: null,
       messages: [],
       meet: null,
+      trade: null,
     };
   }
 
   return readThread(threadId, playerId);
+}
+
+/** "We traded": one side's word, waiting on the other's. */
+export async function proposeTradeAction(
+  threadId: string,
+  input: ProposeInput,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+  if (
+    !checkRateLimit(`trade:${playerId}`, LIMITS.message.limit, LIMITS.message.windowMs)
+      .allowed
+  ) {
+    return { ok: false, message: TOO_MANY };
+  }
+
+  const outcome = await proposeThreadTrade(threadId, playerId, input);
+  return outcome.ok
+    ? { ok: true }
+    : { ok: false, message: tradeFailureMessage(outcome.reason) };
+}
+
+/** The other side's answer: yes pays both, no takes the claim back. */
+export async function answerTradeAction(
+  tradeId: string,
+  yes: boolean,
+): Promise<LocalActionResult> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+
+  const outcome = await answerThreadTrade(tradeId, playerId, yes);
+  return outcome.ok
+    ? { ok: true }
+    : { ok: false, message: tradeFailureMessage(outcome.reason) };
 }
 
 /**

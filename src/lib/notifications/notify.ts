@@ -1074,6 +1074,69 @@ export async function notifyTradeAcknowledged(
 }
 
 /**
+ * "We traded", said in a conversation, and the answer to it.
+ *
+ * Three moments, one voice. The person on the other end is asked, not
+ * told ("did you?"); the one who said it hears whether the other side
+ * agreed. Push and inbox, no email, at chat speed like the messages
+ * around it. Recorded under the trade kind the room's notices use.
+ */
+export async function notifyThreadTrade(
+  threadId: string,
+  tradeId: string,
+  actorId: string,
+  recipientId: string,
+  moment: "proposed" | "confirmed" | "declined",
+): Promise<void> {
+  if (!isSupabaseConfigured() || actorId === recipientId) return;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const [{ data: actor }, { data: trade }] = await Promise.all([
+      admin.from("players").select("display_name").eq("id", actorId).maybeSingle(),
+      admin.from("trades").select("card_id").eq("id", tradeId).maybeSingle(),
+    ]);
+    const { data: card } = trade
+      ? await admin
+          .from("cards")
+          .select("exact_name")
+          .eq("id", trade.card_id)
+          .maybeSingle()
+      : { data: null };
+
+    const name = actor?.display_name ?? "A player";
+    const cardName = card?.exact_name ?? "a card";
+    const title =
+      moment === "proposed"
+        ? `${name} says you traded ${cardName}. Did you?`
+        : moment === "confirmed"
+          ? `Trade confirmed: ${cardName}`
+          : `${name} said that trade did not happen`;
+    const body =
+      moment === "proposed"
+        ? "Tap Yes in the conversation and you both earn Embers."
+        : moment === "confirmed"
+          ? `${name} confirmed it. You both earned Embers.`
+          : "It will not count. Talk it over in the conversation.";
+    const path = "/local";
+
+    const id = await record({
+      playerId: recipientId,
+      kind: "trade-confirmed",
+      title,
+      body,
+      url: path,
+      dedupeKey: `thread-trade:${tradeId}:${moment}:${recipientId}`,
+      actorId,
+    });
+
+    if (id) await deliverByPush(recipientId, title, body, path);
+  } catch (error) {
+    console.error("Could not announce the conversation's trade", error);
+  }
+}
+
+/**
  * A store you follow posted an update.
  *
  * The founder: "a store announcing 'OP-12 prerelease Saturday, 20

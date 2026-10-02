@@ -188,57 +188,69 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * is a question about the union of both sets.
  */
 async function pairTradesThisSeason(
-  aSessions: string[],
-  bSessions: string[],
+  a: { id: string; sessions: string[] },
+  b: { id: string; sessions: string[] },
   exceptTradeId: string,
 ): Promise<number> {
-  if (aSessions.length === 0 || bSessions.length === 0) return 0;
-
   const admin = getSupabaseAdmin();
   const since = new Date(Date.now() - SEASON_DAYS * DAY_MS).toISOString();
 
-  const [oneWay, otherWay] = await Promise.all([
+  const bySessions = (from: string[], to: string[]) =>
+    from.length === 0 || to.length === 0
+      ? Promise.resolve({ count: 0, error: null })
+      : admin
+          .from("trades")
+          .select("id", { count: "exact", head: true })
+          .in("requester_session_id", from)
+          .in("holder_session_id", to)
+          .not("paid_at", "is", null)
+          .is("disputed_at", null)
+          .gt("confirmed_at", since)
+          .neq("id", exceptTradeId);
+
+  /* Conversation trades name accounts, not sessions, and count the
+     same: the ladder is about how often two PEOPLE have met. */
+  const byAccounts = (from: string, to: string) =>
     admin
       .from("trades")
       .select("id", { count: "exact", head: true })
-      .in("requester_session_id", aSessions)
-      .in("holder_session_id", bSessions)
+      .eq("requester_player_id", from)
+      .eq("holder_player_id", to)
       .not("paid_at", "is", null)
       .is("disputed_at", null)
       .gt("confirmed_at", since)
-      .neq("id", exceptTradeId),
-    admin
-      .from("trades")
-      .select("id", { count: "exact", head: true })
-      .in("requester_session_id", bSessions)
-      .in("holder_session_id", aSessions)
-      .not("paid_at", "is", null)
-      .is("disputed_at", null)
-      .gt("confirmed_at", since)
-      .neq("id", exceptTradeId),
+      .neq("id", exceptTradeId);
+
+  const results = await Promise.all([
+    bySessions(a.sessions, b.sessions),
+    bySessions(b.sessions, a.sessions),
+    byAccounts(a.id, b.id),
+    byAccounts(b.id, a.id),
   ]);
 
-  if (oneWay.error || otherWay.error) {
+  const failed = results.find((result) => result.error);
+  if (failed) {
     /*
      * Fail toward the smaller award. Paying the new-partner rate on a
      * failed lookup would make "make the history query fail" the way to
      * farm the badge; paying as if the ladder were spent costs an honest
      * player one night's Embers on a database blip, the cheaper mistake.
      */
-    console.error("Could not count a pair's trades", oneWay.error ?? otherWay.error);
+    console.error("Could not count a pair's trades", failed.error);
     return 99;
   }
 
-  return (oneWay.count ?? 0) + (otherWay.count ?? 0);
+  return results.reduce((sum, result) => sum + (result.count ?? 0), 0);
 }
 
 /** This player's paid trades in one room, before the one being paid now. */
 async function roomPaidTrades(
   sessions: string[],
-  eventId: string,
+  eventId: string | null,
   exceptTradeId: string,
 ): Promise<number> {
-  if (sessions.length === 0) return 0;
+  /* A conversation is not a room: no room ceiling applies. */
+  if (!eventId || sessions.length === 0) return 0;
   const list = sessions.join(",");
 
   const { count, error } = await getSupabaseAdmin()
@@ -311,32 +323,41 @@ export async function awardTradeEmbers(
     const { data: trade } = await admin
       .from("trades")
       .select(
-        "id, event_id, requester_session_id, holder_session_id, paid_at, disputed_at",
+        "id, event_id, requester_session_id, holder_session_id, requester_player_id, holder_player_id, proposed_by, paid_at, disputed_at",
       )
       .eq("id", tradeId)
       .maybeSingle();
     if (!trade || trade.paid_at || trade.disputed_at) return;
 
+    /* A conversation trade names its accounts outright; a room trade
+       names sessions, and the account behind each is looked up. */
     const [requester, holder] = await Promise.all([
-      trade.requester_session_id
-        ? playerBehindSession(trade.requester_session_id)
-        : Promise.resolve(null),
-      trade.holder_session_id
-        ? playerBehindSession(trade.holder_session_id)
-        : Promise.resolve(null),
+      trade.requester_player_id
+        ? Promise.resolve(trade.requester_player_id)
+        : trade.requester_session_id
+          ? playerBehindSession(trade.requester_session_id)
+          : Promise.resolve(null),
+      trade.holder_player_id
+        ? Promise.resolve(trade.holder_player_id)
+        : trade.holder_session_id
+          ? playerBehindSession(trade.holder_session_id)
+          : Promise.resolve(null),
     ]);
 
     const now = new Date().toISOString();
     const partnerKnown = Boolean(requester && holder && requester !== holder);
 
     if (mode === "late") {
-      if (requester && partnerKnown) {
-        const amount = embersForLateTrade(await weekEarned(requester));
+      /* The one whose word went unanswered: the author in a room, and
+         whichever side said "We traded" in a conversation. */
+      const claimant = trade.proposed_by ?? requester;
+      if (claimant && partnerKnown) {
+        const amount = embersForLateTrade(await weekEarned(claimant));
         await awardEmbers(
-          requester,
+          claimant,
           amount,
           "trade",
-          tradeAwardRef(tradeId, requester),
+          tradeAwardRef(tradeId, claimant),
           "Trade, partner did not confirm",
         );
       }
@@ -357,7 +378,11 @@ export async function awardTradeEmbers(
       accountAge(requester),
       accountAge(holder),
     ]);
-    const pair = await pairTradesThisSeason(rSessions, hSessions, tradeId);
+    const pair = await pairTradesThisSeason(
+      { id: requester, sessions: rSessions },
+      { id: holder, sessions: hSessions },
+      tradeId,
+    );
 
     const sides = [
       { id: requester, sessions: rSessions, age: rAge, partnerAge: hAge },

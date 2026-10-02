@@ -326,17 +326,25 @@ async function reverseRecentTrades(
       .select("id")
       .eq("player_id", playerId);
     const ids = (sessions ?? []).map((row) => row.id);
-    if (ids.length === 0) return;
 
     const list = ids.join(",");
     const since = new Date(
       Date.now() - REVERSAL_WINDOW_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();
 
+    /* Room trades by session, conversation trades by account. */
+    const sides = [
+      `requester_player_id.eq.${playerId}`,
+      `holder_player_id.eq.${playerId}`,
+      ...(ids.length > 0
+        ? [`requester_session_id.in.(${list})`, `holder_session_id.in.(${list})`]
+        : []),
+    ];
+
     const { data: trades } = await admin
       .from("trades")
       .select("id")
-      .or(`requester_session_id.in.(${list}),holder_session_id.in.(${list})`)
+      .or(sides.join(","))
       .not("paid_at", "is", null)
       .is("disputed_at", null)
       .gt("confirmed_at", since)
