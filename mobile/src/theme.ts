@@ -35,8 +35,11 @@ export const colors = {
   galaxy: "#6d4aff",
   galaxyDeep: "#1a0b3d",
   frost: "#6ec3ff",
+  frostDeep: "#1d6fa8",
   rose: "#ff6fb5",
+  roseDeep: "#b8367d",
   gold: "#f0c24b",
+  goldDeep: "#a8781d",
 } as const;
 
 /** Six hues for initials avatars, matching --color-avatar-N. */

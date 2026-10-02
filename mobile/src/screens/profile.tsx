@@ -68,6 +68,7 @@ import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
 import { HuntsPanel } from "../hunts-panel";
+import { BinderPanel } from "../binder-panel";
 
 /** How far the cover reaches: past the name and the Embers badge. */
 const COVER_HEIGHT = 144;
@@ -557,6 +558,15 @@ export function ProfileScreen() {
              for the truth, so the counts on the row move with the
              stepper rather than going stale until the next open. */
           onChanged={() => void load()}
+        />
+
+        {/* Your binder, closed, between the hunts and the shelf: the
+            cards you would trade. Same place as the website. */}
+        <BinderPanel
+          summary={profile.binder}
+          ownerName={profile.displayName}
+          yours
+          onOpen={() => navigation.navigate("Binder")}
         />
 
         {/* The one showcase, editable in place: tap a card to dress
