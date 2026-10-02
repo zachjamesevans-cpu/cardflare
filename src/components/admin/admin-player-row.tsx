@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Flame,
+  History,
   KeyRound,
   Loader2,
   Sparkles,
@@ -186,6 +187,16 @@ export function AdminPlayerRow({
             }`}
           />
         </button>
+
+        {/* Everything they did, for a support question or a dispute. */}
+        <Link
+          href={`/admin/players/${playerId}`}
+          aria-label="Activity"
+          title="Activity"
+          className="shrink-0 rounded-[var(--radius-control)] p-2 text-text-muted transition-colors hover:bg-elevated/60 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        >
+          <History className="size-4" aria-hidden="true" />
+        </Link>
 
         <Link
           href={`/p/${playerId}`}

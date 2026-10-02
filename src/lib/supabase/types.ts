@@ -805,10 +805,21 @@ export type FlarePostCommentInsert = Omit<
  */
 export type TradeRow = {
   id: string;
-  event_id: string;
+  /** The room, or null for a trade confirmed in a conversation. */
+  event_id: string | null;
+  /** The conversation, or null for a room trade. One of the two is set. */
+  thread_id: string | null;
   flare_id: string | null;
   requester_session_id: string | null;
   holder_session_id: string | null;
+  /**
+   * The two accounts of a conversation trade. A room trade names
+   * sessions instead; the account behind one is looked up when it pays.
+   */
+  requester_player_id: string | null;
+  holder_player_id: string | null;
+  /** Whose word it is. The other account is asked to confirm. */
+  proposed_by: string | null;
   card_id: string;
   printing_id: string | null;
   quantity: number;
@@ -825,6 +836,11 @@ export type TradeRow = {
 export type TradeInsert = Omit<
   TradeRow,
   | "id"
+  | "event_id"
+  | "thread_id"
+  | "requester_player_id"
+  | "holder_player_id"
+  | "proposed_by"
   | "confirmed_at"
   | "quantity"
   | "acknowledged_at"
@@ -834,6 +850,11 @@ export type TradeInsert = Omit<
   | "dispute_note"
 > & {
   id?: string;
+  event_id?: string | null;
+  thread_id?: string | null;
+  requester_player_id?: string | null;
+  holder_player_id?: string | null;
+  proposed_by?: string | null;
   confirmed_at?: string;
   quantity?: number;
   acknowledged_at?: string | null;

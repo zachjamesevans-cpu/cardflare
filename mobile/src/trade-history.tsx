@@ -91,11 +91,10 @@ export function TradeHistoryRow({
      the full page's business. */
   const showLine = line && (!compact || isLogged(trade));
   const partnerOpens = Boolean(onOpenPartner && trade.partnerPlayerId);
-  const detail = [
-    trade.storeName,
-    dayOf(trade.confirmedAt),
-    compact ? null : trade.cardNumber,
-  ]
+  /* Where: the store, or, for a trade both sides confirmed inside a
+     conversation, the conversation. A conversation trade has no store. */
+  const where = trade.source === "conversation" ? "In a conversation" : trade.storeName;
+  const detail = [where, dayOf(trade.confirmedAt), compact ? null : trade.cardNumber]
     .filter(Boolean)
     .join(" · ");
 

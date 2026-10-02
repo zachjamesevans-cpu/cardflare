@@ -15,18 +15,30 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
+  answerThreadTrade,
   closeLocalThread,
+  proposeThreadTrade,
   readLocalThread,
   sendLocalMessage,
+  THREAD_TRADE_QUANTITY_MAX,
+  threadTradeFailureMessage,
   type LocalThreadMessage,
   type MeetSuggestion,
+  type ThreadTrade,
 } from "../api";
+import {
+  CardPicker,
+  DirectionToggle,
+  PickedCardRow,
+  type PickedCard,
+} from "../card-picker";
 import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
 import { meetLine, suggestText } from "../meet";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
+import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, spacing } from "../theme";
-import { AsyncButton, Button, ErrorLine, Input, Loading, Muted } from "../ui";
+import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
 
 /**
  * One conversation: about a Flare, a saved want, or, since a profile
@@ -39,7 +51,31 @@ import { AsyncButton, Button, ErrorLine, Input, Loading, Muted } from "../ui";
  * every send. No live socket in v1: a conversation about meeting at a
  * store moves at minutes, not milliseconds, and pull-to-refresh is the
  * honest version of realtime until there is one.
+ *
+ * "We traded" lives here too, since round 8. Either side says it, the
+ * other side is asked, and the second tap pays both Embers under the
+ * room's rules. The website's ThreadView draws the same three states
+ * in the same words: the button and its form, "You said you traded",
+ * and "<name> says you traded" with Yes and No.
  */
+type ThreadKind = "flare" | "want" | "direct";
+
+/** What a settled trade reads as, in one muted line, or null while open. */
+function settledTradeLine(trade: ThreadTrade, withName: string): string | null {
+  switch (trade.status) {
+    case "confirmed":
+      return `Traded ${trade.cardName}. Both confirmed.`;
+    case "late":
+      return `Traded ${trade.cardName}. ${withName} never confirmed.`;
+    case "declined":
+      return trade.saidByYou
+        ? `${withName} said that trade did not happen.`
+        : "You said that trade did not happen.";
+    default:
+      return null;
+  }
+}
+
 export function ThreadScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const route = useRoute<RouteProp<StackParams, "LocalThread">>();
@@ -50,8 +86,19 @@ export function ThreadScreen() {
   const [cardName, setCardName] = useState<string | null>(null);
   const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [closed, setClosed] = useState(false);
+  const [kind, setKind] = useState<ThreadKind>("direct");
+  const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  /* "We traded": the form, open or not, and what it holds. The card
+     and the direction only matter on a direct message; a Flare or a
+     want names its own card. */
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const [tradeCard, setTradeCard] = useState<PickedCard | null>(null);
+  const [tradeDirection, setTradeDirection] = useState<"got" | "gave">("got");
+  const [tradeQuantity, setTradeQuantity] = useState(1);
+  const [tradeError, setTradeError] = useState<string | null>(null);
   /* "Report", beside End conversation: the conversation itself, so the
      admins can read it. The same sheet a post and a profile open. */
   const [report, setReport] = useState<ReportTarget | null>(null);
@@ -102,6 +149,10 @@ export function ThreadScreen() {
         setCardName(thread.cardName);
         setMeet(thread.meet ?? null);
         setClosed(thread.closed);
+        /* An older server does not say what the thread is about; one
+           with a card name is read as a thread about that card. */
+        setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
+        setTrade(thread.trade ?? null);
         navigation.setOptions({ title: thread.withName ?? "Conversation" });
       } catch {
         if (isCurrent()) setError("Could not load the conversation.");
@@ -146,6 +197,59 @@ export function ThreadScreen() {
       setError("Could not end the conversation.");
     }
   };
+
+  const closeTradeForm = () => {
+    setTradeOpen(false);
+    setTradeCard(null);
+    setTradeDirection("got");
+    setTradeQuantity(1);
+    setTradeError(null);
+  };
+
+  /* "Mark as traded": one side's word, waiting for the other's. */
+  const markTraded = async () => {
+    setTradeError(null);
+    if (kind === "direct" && !tradeCard) {
+      setTradeError("Pick a card from the list.");
+      return;
+    }
+    try {
+      await proposeThreadTrade(
+        threadId,
+        kind === "direct" && tradeCard
+          ? {
+              cardId: tradeCard.hit.id,
+              printingId: tradeCard.printingId,
+              quantity: tradeQuantity,
+              got: tradeDirection === "got",
+            }
+          : { quantity: tradeQuantity },
+      );
+    } catch (caught) {
+      setTradeError(threadTradeFailureMessage(caught));
+      return;
+    }
+    closeTradeForm();
+    await load();
+  };
+
+  /* The other side's answer. Yes is the second hand on the trade. */
+  const answerTrade = async (yes: boolean) => {
+    if (!trade) return;
+    setTradeError(null);
+    try {
+      await answerThreadTrade(threadId, trade.id, yes ? "yes" : "no");
+    } catch (caught) {
+      setTradeError(threadTradeFailureMessage(caught));
+      return;
+    }
+    await load();
+  };
+
+  const otherName = withName ?? "They";
+  const tradePending = trade?.status === "pending";
+  const settledLine =
+    trade && !tradePending ? settledTradeLine(trade, otherName) : null;
 
   return (
     <KeyboardAvoidingView
@@ -286,6 +390,71 @@ export function ThreadScreen() {
                 </View>
               </View>
             ) : null}
+            {/* The trade, when one is open: what you said, waiting on
+                them, or what they said, waiting on you. The website's
+                Handshake card. */}
+            {trade && tradePending ? (
+              <View
+                style={{
+                  gap: spacing(2),
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.accentMuted,
+                  backgroundColor: colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                  }}
+                >
+                  <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: colors.textPrimary,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    {trade.saidByYou
+                      ? `You said you traded ${trade.cardName}.`
+                      : `${otherName} says you traded ${trade.cardName}.`}
+                  </Text>
+                </View>
+                {trade.saidByYou ? (
+                  <Muted>
+                    Waiting for {otherName} to confirm. Then you both earn Embers.
+                  </Muted>
+                ) : (
+                  <>
+                    {trade.quantity > 1 ? (
+                      <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                        {trade.quantity} copies
+                      </Text>
+                    ) : null}
+                    <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                      <AsyncButton
+                        label="Yes, we did"
+                        pendingLabel="Confirming…"
+                        onPress={() => answerTrade(true)}
+                      />
+                      <AsyncButton
+                        label="No"
+                        pendingLabel="No"
+                        variant="secondary"
+                        onPress={() => answerTrade(false)}
+                      />
+                    </View>
+                    <Muted>Yes pays you both Embers.</Muted>
+                  </>
+                )}
+                <ErrorLine message={tradeError} />
+              </View>
+            ) : null}
             <View
               style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing(2) }}
             >
@@ -301,7 +470,112 @@ export function ThreadScreen() {
               <AsyncButton label="Send" pendingLabel="Sending…" onPress={send} />
             </View>
             <ErrorLine message={error} />
+            {/* The last trade this conversation settled, in one line. */}
+            {settledLine ? <Muted>{settledLine}</Muted> : null}
+            {/* "We traded", opened: the form sits where the button was.
+                A Flare or a want names its card; a direct message asks
+                for one, and which way it went. */}
+            {tradeOpen ? (
+              <View
+                style={{
+                  gap: spacing(3),
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                {kind === "direct" ? (
+                  <>
+                    {tradeCard ? (
+                      <PickedCardRow
+                        card={tradeCard}
+                        onChange={() => setTradeCard(null)}
+                      />
+                    ) : (
+                      <CardPicker
+                        onPick={(hit, printingId) => setTradeCard({ hit, printingId })}
+                      />
+                    )}
+                    <DirectionToggle
+                      value={tradeDirection}
+                      onChange={setTradeDirection}
+                      labels={{ got: "I got it", gave: "I gave it" }}
+                    />
+                  </>
+                ) : (
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: "600",
+                      fontSize: 14,
+                    }}
+                  >
+                    Traded: {cardName}
+                  </Text>
+                )}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontWeight: "700",
+                      fontSize: 13,
+                    }}
+                  >
+                    Copies
+                  </Text>
+                  <Stepper
+                    value={tradeQuantity}
+                    min={1}
+                    max={THREAD_TRADE_QUANTITY_MAX}
+                    onChange={setTradeQuantity}
+                    label="copies"
+                  />
+                </View>
+                <Muted>They confirm on their side and you both earn Embers.</Muted>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(3),
+                  }}
+                >
+                  <AsyncButton
+                    label="Mark as traded"
+                    pendingLabel="Marking…"
+                    onPress={markTraded}
+                  />
+                  <Tap onPress={closeTradeForm} hitSlop={6} accessibilityLabel="Cancel">
+                    <Text
+                      style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}
+                    >
+                      Cancel
+                    </Text>
+                  </Tap>
+                </View>
+                <ErrorLine message={tradeError} />
+              </View>
+            ) : null}
             <View style={{ flexDirection: "row", gap: spacing(2) }}>
+              {/* "We traded" leads the row, unless a trade is already
+                  waiting on an answer or the form is open above. */}
+              {!tradePending && !tradeOpen ? (
+                <Button
+                  label="We traded"
+                  variant="secondary"
+                  onPress={() => {
+                    setTradeError(null);
+                    setTradeOpen(true);
+                  }}
+                />
+              ) : null}
               <Button
                 label="End conversation"
                 variant="secondary"

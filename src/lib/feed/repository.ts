@@ -1144,7 +1144,9 @@ async function tradedItems(storeIds: string[]): Promise<TradedItem[]> {
   const storeName = new Map((stores ?? []).map((row) => [row.id, row.name]));
 
   return trades.flatMap((row) => {
-    const event = byEvent.get(row.event_id);
+    /* Filtered to these rooms above, so the id is there; the column
+       is nullable now for trades confirmed in a conversation. */
+    const event = row.event_id ? byEvent.get(row.event_id) : undefined;
     const card = facts.get(row.card_id);
     const requester = row.requester_session_id
       ? nameOf.get(row.requester_session_id)
