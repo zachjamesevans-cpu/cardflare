@@ -16,38 +16,47 @@ import { addBinderCardAction } from "@/lib/binder/actions";
  * binder and the page refreshes with it in the first pocket. The
  * sheet stays open so a second card is one more tap, which is how
  * somebody loads a binder: in a run, not one visit per card.
+ *
+ * The page owns whether the sheet is open, because the button under
+ * the page is not the only way in: every empty pocket on the owner's
+ * binder is a "+" that opens this same sheet.
  */
 export function AddBinderCard({
   imagesEnabled,
   playerGames,
+  open,
+  onOpenChange,
 }: {
   imagesEnabled: boolean;
   /** The reader's sign-up games, for the search's default chip. */
   playerGames: readonly string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  /* A fresh sheet each time it opens: no stale "X is in your binder". */
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) {
+      setError(null);
+      setAdded(null);
+    }
+  }
 
   return (
     <>
-      <Button
-        type="button"
-        onClick={() => {
-          setError(null);
-          setAdded(null);
-          setOpen(true);
-        }}
-      >
+      <Button type="button" onClick={() => onOpenChange(true)}>
         <Plus className="size-4" aria-hidden="true" />
         Add cards
       </Button>
 
       <Sheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => onOpenChange(false)}
         title="Add cards"
         footer={
           <div className="flex min-h-5 items-center gap-2 text-sm">

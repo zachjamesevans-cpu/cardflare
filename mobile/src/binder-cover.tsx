@@ -6,22 +6,31 @@ import { RemoteImage } from "./remote-image";
 import { colors } from "./theme";
 
 /**
- * A closed binder, seen from the front: the spine on the left, the
- * front card in a window, a label along the bottom.
+ * A closed zip binder, seen from the front: the kind of binder people
+ * actually carry to a trade night.
  *
  * The one place a cover is drawn in the app, the website's
  * `src/components/binder/binder-cover.tsx` matched piece for piece.
  * The profile panel, the binder screen and the cover swatches all
- * come here, so a cover looks the same wherever it sits. The founder,
- * starting the binder: "I'm down for the front being a card... a few
- * simple color change options, no animated stuff yet." So a cover is
- * two brand colours, dark at the spine and bright at the edge, and
- * nothing moves.
+ * come here, so a cover looks the same wherever it sits.
  *
- * Geometry, the same on both platforms: rounded 4 on the left and 12
- * on the right; a spine strip 9% wide, black at 45%; three ring dots
- * on the spine's edge at 18%, 49% and 80%; the window at left 22%,
- * top 11%, 56% wide and 58% tall; the label at bottom 8%.
+ * The founder, on the first version: "the binder shouldn't be modeled
+ * after a 3 ring binder. I'm attaching a picture of a VaultX binder,
+ * which is the most common binder and will be most recognizable." So
+ * this is that binder: a matte body in the cover's bright colour, a
+ * thin padded spine down the left with straight edges, large rounded
+ * corners on the right and small ones on the left, a zipper running
+ * along the top, the right side and the bottom with its pull at the
+ * top-left where the zip starts, the front card slipped into a clear
+ * sleeve on the cover, and the owner's name embossed low on the left.
+ * No rings, no window, nothing shiny.
+ *
+ * Geometry, the same on both platforms: rounded 2 on the left and 10%
+ * of the width on the right; the spine 5% wide; the zipper track inset
+ * 4% from the top, right and bottom, 2 thick, dashed in the spine
+ * colour at 70%; the pull 10% wide and 4% tall in the accent, on the
+ * track just right of the spine; the card centred, top at 16%, 50%
+ * wide, at a card's 63/88; the label at bottom 9%, left 8%.
  */
 
 export type BinderCoverSize = "lg" | "sm" | "xs";
@@ -34,13 +43,11 @@ const BOX: Record<BinderCoverSize, { width: number; height: number }> = {
   xs: { width: 58, height: 76 },
 };
 
-const DOT: Record<BinderCoverSize, number> = { lg: 10, sm: 8, xs: 6 };
+const LABEL: Record<BinderCoverSize, number> = { lg: 12, sm: 7, xs: 5 };
 
-const LABEL: Record<BinderCoverSize, { fontSize: number; paddingVertical: number }> = {
-  lg: { fontSize: 11, paddingVertical: 6 },
-  sm: { fontSize: 7, paddingVertical: 2 },
-  xs: { fontSize: 5, paddingVertical: 1 },
-};
+/** The zipper's track and its pull, drawn in the spine colour at 70%
+    and the accent. */
+const TRACK = 2;
 
 export function BinderCover({
   cover,
@@ -50,48 +57,62 @@ export function BinderCover({
   plain = false,
 }: {
   cover: BinderCoverId;
-  /** The front card's picture, or null for an empty window. */
+  /** The front card's picture, or null for an empty sleeve. */
   frontImageUrl: string | null;
-  /** "CHUNC's binder", "Your binder", or nothing on a swatch. */
+  /** The owner's name, or nothing on a swatch. */
   label?: string | null;
   size?: BinderCoverSize;
-  /** A swatch: the colours and the rings, no window and no label. */
+  /** A swatch: the body, the spine and the zipper, no card and no label. */
   plain?: boolean;
 }) {
   const { edge, spine } = binderCover(cover);
   const box = BOX[size];
-  const dot = DOT[size];
+  const rightRadius = Math.round(box.width * 0.1);
+  const inset = Math.round(box.width * 0.04);
+  const pull = {
+    width: Math.round(box.width * 0.1),
+    height: Math.max(3, Math.round(box.height * 0.04)),
+  };
+  const card = {
+    width: Math.round(box.width * 0.5),
+    height: Math.round((box.width * 0.5 * 88) / 63),
+  };
+  const track = {
+    position: "absolute" as const,
+    borderWidth: 1,
+    borderStyle: "dashed" as const,
+    borderColor: colors[spine],
+    opacity: 0.7,
+  };
 
   return (
     <View
       style={{
         width: box.width,
         height: box.height,
-        borderTopLeftRadius: 4,
-        borderBottomLeftRadius: 4,
-        borderTopRightRadius: 12,
-        borderBottomRightRadius: 12,
+        borderTopLeftRadius: 2,
+        borderBottomLeftRadius: 2,
+        borderTopRightRadius: rightRadius,
+        borderBottomRightRadius: rightRadius,
         overflow: "hidden",
-        backgroundColor: colors[spine],
+        backgroundColor: colors[edge],
       }}
     >
-      <LinearGradient
-        colors={[colors[spine], colors[edge]]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
-      />
-      {/* A soft sheen, so a flat colour still reads as a cover. */}
-      <LinearGradient
-        colors={["rgba(255,255,255,0.18)", "transparent", "rgba(0,0,0,0.25)"]}
-        locations={[0, 0.4, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+      {/* The matte: a fine weave on the website, a 6% darkening here,
+          so a flat colour still reads as fabric rather than paint. */}
+      <View
         pointerEvents="none"
-        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          backgroundColor: "rgba(0,0,0,0.06)",
+        }}
       />
 
-      {/* The spine: darker, with the three rings showing at its edge. */}
+      {/* The spine: a thin padded strip, straight edges. */}
       <View
         pointerEvents="none"
         style={{
@@ -99,41 +120,55 @@ export function BinderCover({
           top: 0,
           bottom: 0,
           left: 0,
-          width: "9%",
-          backgroundColor: "rgba(0,0,0,0.45)",
+          width: "5%",
+          backgroundColor: colors[spine],
         }}
-      >
-        {(["18%", "49%", "80%"] as const).map((top) => (
-          <View
-            key={top}
-            style={{
-              position: "absolute",
-              top,
-              right: -(dot / 4),
-              width: dot,
-              height: dot,
-              borderRadius: dot / 2,
-              backgroundColor: colors.elevated,
-              borderWidth: 1,
-              borderColor: colors.borderStrong,
-            }}
-          />
-        ))}
-      </View>
+      />
 
-      {/* The window: the front card, or an empty pane. */}
+      {/* The zipper: a dashed track along the top, the right side and
+          the bottom. Three strips rather than one three-sided border,
+          because iOS draws a dashed border only when every side has
+          the same width. */}
+      <View
+        pointerEvents="none"
+        style={{ ...track, top: inset, left: "5%", right: inset, height: TRACK }}
+      />
+      <View
+        pointerEvents="none"
+        style={{ ...track, top: inset, right: inset, bottom: inset, width: TRACK }}
+      />
+      <View
+        pointerEvents="none"
+        style={{ ...track, bottom: inset, left: "5%", right: inset, height: TRACK }}
+      />
+      {/* The pull, where the zip starts: on the track, just right of
+          the spine. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: inset + TRACK / 2 - pull.height / 2,
+          left: "7%",
+          width: pull.width,
+          height: pull.height,
+          borderRadius: pull.height / 2,
+          backgroundColor: colors.accent,
+        }}
+      />
+
+      {/* The front card in a clear sleeve, or the empty sleeve. */}
       {plain ? null : (
         <View
           style={{
             position: "absolute",
-            top: "11%",
-            left: "22%",
-            width: "56%",
-            height: "58%",
-            borderRadius: 6,
-            borderWidth: 2,
-            borderColor: "rgba(0,0,0,0.5)",
-            backgroundColor: "rgba(0,0,0,0.7)",
+            top: "16%",
+            left: (box.width - card.width) / 2,
+            width: card.width,
+            height: card.height,
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.25)",
+            backgroundColor: "rgba(0,0,0,0.6)",
             overflow: "hidden",
           }}
         >
@@ -144,37 +179,39 @@ export function BinderCover({
               style={{ width: "100%", height: "100%" }}
             />
           ) : null}
+          {/* The sleeve's gloss: a soft white sweep across the top-left. */}
+          <LinearGradient
+            colors={["rgba(255,255,255,0.18)", "rgba(255,255,255,0)"]}
+            locations={[0, 0.45]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+          />
         </View>
       )}
 
+      {/* The name, embossed: tone on tone, a hair of light beneath. */}
       {label && !plain ? (
-        <View
-          pointerEvents="none"
+        <Text
+          numberOfLines={1}
           style={{
             position: "absolute",
-            bottom: "8%",
-            left: "22%",
+            bottom: "9%",
+            left: "8%",
             right: "8%",
-            borderRadius: 4,
-            backgroundColor: "rgba(0,0,0,0.8)",
-            paddingHorizontal: 3,
-            paddingVertical: LABEL[size].paddingVertical,
+            color: colors[spine],
+            opacity: 0.85,
+            fontSize: LABEL[size],
+            fontWeight: "700",
+            letterSpacing: 0.3,
+            textShadowColor: "rgba(255,255,255,0.12)",
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 0,
           }}
         >
-          <Text
-            numberOfLines={1}
-            style={{
-              color: colors.textPrimary,
-              fontSize: LABEL[size].fontSize,
-              fontWeight: "700",
-              letterSpacing: 0.5,
-              textAlign: "center",
-              textTransform: "uppercase",
-            }}
-          >
-            {label}
-          </Text>
-        </View>
+          {label}
+        </Text>
       ) : null}
     </View>
   );

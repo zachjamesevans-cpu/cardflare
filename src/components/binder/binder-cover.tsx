@@ -2,43 +2,51 @@ import { binderCover, type BinderCoverId } from "@/lib/binder/covers";
 import { cn } from "@/lib/cn";
 
 /**
- * A closed binder, seen from the front: the spine on the left, the
- * front card in a window, a label along the bottom.
+ * A closed binder, seen from the front: a zip binder, the kind on
+ * every trade table.
  *
  * The one place a cover is drawn on the website. The profile panel,
  * the binder page and the cover swatches all come here, so a cover
  * looks the same wherever it sits and the app's `binder-cover.tsx`
- * has one drawing to match. The founder, starting the binder: "I'm
- * down for the front being a card... a few simple color change
- * options, no animated stuff yet." So a cover is two brand colours,
- * dark at the spine and bright at the edge, and nothing moves.
+ * has one drawing to match. The founder, on the first version: "the
+ * binder shouldn't be modeled after a 3 ring binder", and sent a
+ * photo of the zip binder most players carry. So: no rings, no
+ * window, nothing shiny. A matte body in the cover's bright colour
+ * with a fine weave, a thin padded spine on the left, big rounded
+ * corners on the right, a zipper along the top, right and bottom with
+ * its pull at the top-left, the front card slipped into a clear
+ * sleeve, and the owner's name embossed low on the cover, tone on
+ * tone.
  *
- * Geometry, the same on both platforms: rounded 4px on the left and
- * 12px on the right; a spine strip 9% wide; three ring dots on the
- * spine's edge at 18%, 49% and 80%; the window at left 22%, top 11%,
- * 56% wide and 58% tall; the label at bottom 8%.
+ * Geometry, the same on both platforms: rounded 2px on the left and
+ * 10% of the width on the right; a spine 5% wide; the zipper inset
+ * 4% from the top, right and bottom; the pull 10% wide and 4% tall;
+ * the card centred, top at 16%, 50% wide, aspect 63/88; the label at
+ * bottom 9%, left 8%.
  */
 
 export type BinderCoverSize = "lg" | "sm" | "xs";
 
 /* lg 232x300: the binder page. sm 100x130: the profile panel.
-   xs 58x76: lists and swatches. */
+   xs 58x76: lists and swatches. The right corners are 10% of the
+   width, so each size carries its own radius. */
 const BOX: Record<BinderCoverSize, string> = {
-  lg: "h-[300px] w-[232px]",
-  sm: "h-[130px] w-[100px]",
-  xs: "h-[76px] w-[58px]",
+  lg: "h-[300px] w-[232px] rounded-r-[23px]",
+  sm: "h-[130px] w-[100px] rounded-r-[10px]",
+  xs: "h-[76px] w-[58px] rounded-r-[6px]",
 };
 
-const DOT: Record<BinderCoverSize, string> = {
-  lg: "size-2.5 right-[-3px]",
-  sm: "size-2 right-[-2px]",
-  xs: "size-1.5 right-[-2px]",
+/* The zipper's track follows the body's corner, a little inside it. */
+const TRACK: Record<BinderCoverSize, string> = {
+  lg: "rounded-r-[18px]",
+  sm: "rounded-r-[8px]",
+  xs: "rounded-r-[4px]",
 };
 
 const LABEL: Record<BinderCoverSize, string> = {
-  lg: "py-1.5 text-[11px]",
-  sm: "py-0.5 text-[7px]",
-  xs: "py-px text-[5px]",
+  lg: "text-[12px]",
+  sm: "text-[8px]",
+  xs: "text-[5px]",
 };
 
 export function BinderCover({
@@ -46,14 +54,17 @@ export function BinderCover({
   frontImageUrl,
   label,
   size = "sm",
+  plain = false,
   className,
 }: {
   cover: BinderCoverId;
-  /** The front card's picture, or null for an empty window. */
+  /** The front card's picture, or null for an empty sleeve. */
   frontImageUrl: string | null;
-  /** "CHUNC's binder", "Your binder", or nothing on a swatch. */
+  /** "CHUNC", "Yours", or nothing on a swatch. */
   label?: string | null;
   size?: BinderCoverSize;
+  /** A swatch: the body, spine and zipper only, no card and no label. */
+  plain?: boolean;
   className?: string;
 }) {
   const { edge, spine } = binderCover(cover);
@@ -61,46 +72,71 @@ export function BinderCover({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-l-[4px] rounded-r-[12px] shadow-[var(--shadow-card)]",
+        "relative shrink-0 overflow-hidden rounded-l-[2px] shadow-[var(--shadow-card)]",
         BOX[size],
         className,
       )}
-      style={{ background: `linear-gradient(90deg, ${spine}, ${edge})` }}
+      style={{ background: edge }}
     >
-      {/* A soft sheen, so a flat colour still reads as a cover. */}
+      {/* The weave: a very fine diagonal, so the matte fabric reads
+          as fabric and not as a flat fill. */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(135deg,rgb(255_255_255/0.18),transparent_40%,rgb(0_0_0/0.25))]"
+        className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgb(0_0_0/0.06)_0_1px,transparent_1px_3px)]"
       />
 
-      {/* The spine: darker, with the three rings showing at its edge. */}
-      <div aria-hidden="true" className="absolute inset-y-0 left-0 w-[9%] bg-black/45">
-        {["18%", "49%", "80%"].map((top) => (
-          <span
-            key={top}
-            style={{ top }}
-            className={cn(
-              "absolute rounded-full bg-elevated ring-1 ring-border-strong",
-              DOT[size],
-            )}
-          />
-        ))}
-      </div>
+      {/* The spine: the padded edge, straight, in the dark colour. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-[5%]"
+        style={{ background: spine }}
+      />
 
-      {/* The window: the front card, or an empty pane. */}
-      <div className="absolute top-[11%] left-[22%] h-[58%] w-[56%] overflow-hidden rounded-[6px] bg-canvas/70 ring-2 ring-black/50">
-        {frontImageUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={frontImageUrl} alt="" className="size-full object-cover" />
+      {/* The zipper: a dashed track along the top, the right and the
+          bottom, starting where the spine ends. */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute top-[4%] right-[4%] bottom-[4%] left-[5%] border-y-2 border-r-2 border-dashed opacity-70",
+          TRACK[size],
         )}
-      </div>
+        style={{ borderColor: spine }}
+      />
 
-      {label && (
+      {/* The pull, where the zipper starts: the one accent on the cover. */}
+      <div
+        aria-hidden="true"
+        className="absolute top-[2%] left-[7%] h-[4%] w-[10%] rounded-[2px] bg-accent"
+      />
+
+      {/* The front card in its clear sleeve, or the empty sleeve. */}
+      {!plain && (
+        <div className="absolute top-[16%] left-1/2 aspect-[63/88] w-1/2 -translate-x-1/2 overflow-hidden rounded-[4px] bg-black/60 ring-1 ring-white/25">
+          {frontImageUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={frontImageUrl} alt="" className="size-full object-cover" />
+          )}
+          {/* The sleeve's gloss. */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgb(255_255_255/0.18),transparent_45%)]"
+          />
+        </div>
+      )}
+
+      {/* The name, embossed: the dark colour on the bright one, with
+          a hairline of light under each letter. Names are names, so
+          the letters stay as the owner wrote them. */}
+      {!plain && label && (
         <div
           className={cn(
-            "absolute right-[8%] bottom-[8%] left-[22%] truncate rounded-[4px] bg-canvas/80 px-1 text-center font-bold tracking-wide text-text-primary uppercase",
+            "absolute right-[8%] bottom-[9%] left-[8%] truncate font-bold",
             LABEL[size],
           )}
+          style={{
+            color: `color-mix(in oklab, ${spine} 85%, transparent)`,
+            textShadow: "0 1px 0 rgb(255 255 255/0.12)",
+          }}
         >
           {label}
         </div>

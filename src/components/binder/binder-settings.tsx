@@ -20,11 +20,17 @@ const LAYOUT_LABEL: Record<BinderLayout, string> = { 2: "2 × 2", 3: "3 × 3" };
 /**
  * The binder's settings strip, under the page, for its owner.
  *
- * Public or not, two by two or three by three, and the cover. Every
+ * Private or not, two by two or three by three, and the cover. Every
  * change saves at once and paints at once: the parent holds the live
  * values and repaints the page from them, the action lands behind,
  * and the refresh confirms it. Nothing here has a Save button because
  * nothing here is worth a second tap.
+ *
+ * The switch says "Private" and on means private. The founder, on the
+ * first version: "the toggle for public is kinda weird. should be a
+ * toggle for 'private' if anything. so if the toggle is on, it is a
+ * private binder." The server still stores `isPublic`, so the switch
+ * writes its opposite.
  */
 export function BinderSettings({
   isPublic,
@@ -61,18 +67,18 @@ export function BinderSettings({
 
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
         <span className="flex min-w-0 flex-col">
-          <span className="text-sm font-semibold text-text-primary">Public</span>
+          <span className="text-sm font-semibold text-text-primary">Private</span>
           <span className="text-xs text-text-muted">
-            {isPublic ? "Anyone on cardflare can open it" : "Only you"}
+            {isPublic ? "Anyone on cardflare can open it" : "Only you can open it"}
           </span>
         </span>
         <input
           type="checkbox"
           role="switch"
-          checked={isPublic}
-          aria-checked={isPublic}
+          checked={!isPublic}
+          aria-checked={!isPublic}
           disabled={pending}
-          onChange={(event) => save({ isPublic: event.target.checked })}
+          onChange={(event) => save({ isPublic: !event.target.checked })}
           className="size-5 shrink-0 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
         />
       </label>
@@ -127,6 +133,7 @@ export function BinderSettings({
                   cover={option.id}
                   frontImageUrl={null}
                   size="xs"
+                  plain
                   className={cn(
                     on
                       ? "ring-2 ring-accent ring-offset-2 ring-offset-canvas"

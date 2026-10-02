@@ -603,11 +603,18 @@ export function CardImage({
   state = "open",
   siblings,
   position = 0,
+  onLongPress,
 }: {
   imageUrl: string | null;
   width: number;
   name: string;
   cardNumber: string;
+  /**
+   * Held rather than tapped: how the binder picks a pocket up to move
+   * it. A tap still opens the viewer; a hold hands the touch to the
+   * screen and opens nothing.
+   */
+  onLongPress?: () => void;
   /** "I have this card" in the large view, when the viewer can say so. */
   have?: ZoomHave | null;
   /**
@@ -820,6 +827,7 @@ export function CardImage({
           setAt(position);
           setOpen(true);
         }}
+        onLongPress={onLongPress}
       >
         <View
           style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.6 : 1 }}
