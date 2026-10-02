@@ -479,11 +479,14 @@ async function call<T>(
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as {
       error?: string;
+      /* A lib's named refusal (`{ ok: false, reason }`): a thread's
+         "closed", a trade's "pending". The code, when there is no error. */
+      reason?: string;
       message?: string;
     };
     throw new ApiError(
       response.status,
-      detail.error ?? `http-${response.status}`,
+      detail.error ?? detail.reason ?? `http-${response.status}`,
       typeof detail.message === "string" ? detail.message : null,
     );
   }
@@ -1938,11 +1941,12 @@ export function offerOnHunt(
 export interface TradeHistoryEntry {
   id: string;
   /**
-   * Confirmed in a room, or written down by the player. Optional
-   * because a build meets servers older than itself; absent reads as
-   * a room trade, which is the only kind an older server has.
+   * Confirmed in a room, confirmed inside a conversation, or written
+   * down by the player. Optional because a build meets servers older
+   * than itself; absent reads as a room trade, which is the only kind
+   * an older server has.
    */
-  source?: "room" | "logged";
+  source?: "room" | "conversation" | "logged";
   cardId: string;
   cardName: string;
   cardNumber: string;
@@ -2902,17 +2906,109 @@ export interface MeetSuggestion {
   shared: boolean;
 }
 
+export type ThreadTradeStatus = "pending" | "confirmed" | "late" | "declined";
+
+/**
+ * "We traded", said inside a conversation. Mirrors the server's
+ * src/lib/trades/thread-trades.ts: the newest trade in the thread, as
+ * the viewer sees it.
+ */
+export interface ThreadTrade {
+  id: string;
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  quantity: number;
+  /** The card came TO the viewer. */
+  got: boolean;
+  /** The viewer is the one who said it. */
+  saidByYou: boolean;
+  status: ThreadTradeStatus;
+  /** Pending, and the viewer is the one asked. */
+  awaitingYou: boolean;
+  proposedAt: string;
+}
+
+/** The limit the form and the server share. */
+export const THREAD_TRADE_QUANTITY_MAX = 99;
+
 /** Reading a thread is what marks it read. */
 export const readLocalThread = (threadId: string) =>
   call<{
     ok: boolean;
     closed: boolean;
+    /**
+     * What it is about: a posted Flare, a saved want, or the two
+     * people. Optional: an older server does not say, and a thread
+     * with a card name is then read as one about that card.
+     */
+    kind?: "flare" | "want" | "direct";
     cardName: string | null;
     withName: string | null;
+    withPlayerId?: string | null;
     messages: LocalThreadMessage[];
     /** Optional: an older server does not send one. */
     meet?: MeetSuggestion | null;
+    /** The newest "We traded" in this conversation. Optional, as above. */
+    trade?: ThreadTrade | null;
   }>("GET", `/api/v1/local/threads/${encodeURIComponent(threadId)}`);
+
+/**
+ * "We traded": one side's word, written as a trade that waits for the
+ * other side's. The card is the conversation's own on a Flare or a
+ * want; a direct message names it here, and which way it went.
+ */
+export interface ProposeThreadTradeInput {
+  cardId?: string | null;
+  printingId?: string | null;
+  quantity: number;
+  /** On a direct message: the card came to the person saying it. */
+  got?: boolean;
+}
+
+export const proposeThreadTrade = (threadId: string, input: ProposeThreadTradeInput) =>
+  call<{ ok: true; trade: ThreadTrade }>(
+    "POST",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}/trade`,
+    input,
+  );
+
+/** The other side's answer. Yes pays both; no takes the claim back. */
+export const answerThreadTrade = (
+  threadId: string,
+  tradeId: string,
+  answer: "yes" | "no",
+) =>
+  call<{ ok: true }>(
+    "PATCH",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}/trade`,
+    { tradeId, answer },
+  );
+
+/**
+ * What a refused "We traded" says, in the website's words
+ * (src/lib/trades/thread-trade-copy.ts), keyed by the reason the
+ * server named. Anything else is the plain failure line.
+ */
+export function threadTradeFailureMessage(caught: unknown): string {
+  const reason = caught instanceof ApiError ? caught.code : "";
+  switch (reason) {
+    case "closed":
+      return "This conversation was ended.";
+    case "pending":
+      return "One trade at a time. Wait for their answer first.";
+    case "already-traded":
+      return "That Flare already traded.";
+    case "no-card":
+      return "Pick a card from the list.";
+    case "answered":
+      return "That one was already answered.";
+    case "not-found":
+      return "That trade is not here any more.";
+    default:
+      return "Something went wrong. Please try again in a moment.";
+  }
+}
 
 export const sendLocalMessage = (threadId: string, body: string) =>
   call<{ ok: boolean }>(
