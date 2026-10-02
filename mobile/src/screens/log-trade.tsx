@@ -198,6 +198,12 @@ export function LogTradeScreen() {
         {/* 4. Who with: a typed name, or an account found by name. */}
         <Card>
           <FieldLabel text="Who with" />
+          {/* Two fields used to sit here with nothing saying which to
+              use. One line says it: a name is enough, an account is
+              better. */}
+          <Muted>
+            Type their name, or find their account so the trade opens their profile.
+          </Muted>
           <Input
             value={partnerName}
             onChangeText={setPartnerName}

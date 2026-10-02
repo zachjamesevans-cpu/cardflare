@@ -49,9 +49,12 @@ export default async function TradeHistoryPage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
-  if (await needsSetup(playerId)) redirect("/welcome");
-
-  const profile = await ownProfile(playerId);
+  /* Both guards at once: one roundtrip, not two in a row. */
+  const [setupOwed, profile] = await Promise.all([
+    needsSetup(playerId),
+    ownProfile(playerId),
+  ]);
+  if (setupOwed) redirect("/welcome");
   if (!profile) redirect("/profile/settings");
 
   const [history, areas, locals, games] = await Promise.all([

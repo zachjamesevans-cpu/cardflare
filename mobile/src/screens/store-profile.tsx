@@ -361,6 +361,11 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
                     </Text>
                     {` · ${whenAt(night.startsAt)}`}
                   </Text>
+                  {/* The early board, when the store opens one: a player
+                      can post before they are in the door. */}
+                  {!night.live && night.boardOpensAt ? (
+                    <Muted>{`Board opens ${whenAt(night.boardOpensAt)}`}</Muted>
+                  ) : null}
                   {night.live && night.joinCode ? (
                     <Button
                       label="Join the room"

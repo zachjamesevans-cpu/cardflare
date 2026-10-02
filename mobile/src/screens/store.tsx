@@ -167,6 +167,7 @@ export function StoreScreen() {
           slot="avatarFrame"
           balance={profile.embersBalance}
           busy={busy}
+          canWear={profile.pro !== false}
           onBuy={buy}
         />
         <Shelf
@@ -176,6 +177,7 @@ export function StoreScreen() {
           slot="cardFrame"
           balance={profile.embersBalance}
           busy={busy}
+          canWear={profile.pro !== false}
           onBuy={buy}
         />
         <Shelf
@@ -185,6 +187,7 @@ export function StoreScreen() {
           slot="holo"
           balance={profile.embersBalance}
           busy={busy}
+          canWear={profile.pro !== false}
           onBuy={buy}
         />
         <Shelf
@@ -194,6 +197,7 @@ export function StoreScreen() {
           slot="effect"
           balance={profile.embersBalance}
           busy={busy}
+          canWear={profile.pro !== false}
           onBuy={buy}
         />
       </Card>
@@ -213,6 +217,7 @@ function Shelf({
   slot,
   balance,
   busy,
+  canWear,
   onBuy,
 }: {
   title: string;
@@ -221,6 +226,8 @@ function Shelf({
   slot: EquipSlot;
   balance: number;
   busy: string | null;
+  /** Anybody can buy; Pro wears. The tile says which. */
+  canWear: boolean;
   onBuy: (item: CosmeticItem, slot: EquipSlot) => void;
 }) {
   return (
@@ -351,9 +358,15 @@ function Shelf({
                   Equipped
                 </Text>
               ) : item.owned ? (
-                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
-                  Tap to wear
-                </Text>
+                !canWear ? (
+                  <Text style={{ color: colors.textMuted, fontSize: 10 }}>
+                    Pro to wear
+                  </Text>
+                ) : (
+                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+                    Tap to wear
+                  </Text>
+                )
               ) : locked ? (
                 <Text style={{ color: colors.textMuted, fontSize: 10 }}>
                   {`Needs ${item.lockedUntil?.toLocaleString()} earned`}

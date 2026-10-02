@@ -269,6 +269,12 @@ export function LogTradeSheet({
         {/* 4. Who with: a name, or an account found by name. */}
         <div className="flex flex-col gap-2">
           <p className={LABEL}>Who with</p>
+          {/* Two fields used to sit here with nothing saying which to
+              use. One line says it: a name is enough, an account is
+              better. */}
+          <p className="text-xs text-text-muted">
+            Type their name, or find their account so the trade opens their profile.
+          </p>
           {partner ? (
             <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-2.5">
               <PlayerAvatar

@@ -16,6 +16,7 @@ import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { wardrobeFor } from "@/lib/players/cosmetics";
 import { needsSetup, ownProfile } from "@/lib/players/profile";
+import { tierAllows } from "@/lib/tiers";
 
 export const metadata: Metadata = {
   title: "Embers store",
@@ -47,9 +48,14 @@ export default async function EmberStorePage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
-  if (await needsSetup(playerId)) redirect("/welcome");
-
-  const profile = await ownProfile(playerId);
+  /* Both guards at once: one roundtrip, not two in a row. */
+  const [setupOwed, profile] = await Promise.all([
+    needsSetup(playerId),
+    ownProfile(playerId),
+  ]);
+  if (setupOwed) redirect("/welcome");
+  /* Anybody can buy; Pro wears. The tiles say which. */
+  const canWear = profile ? tierAllows(profile.tier, "cosmetics") : false;
   const sealed = await listSealedPacks(playerId);
   if (!profile) redirect("/profile/settings");
 
@@ -136,6 +142,7 @@ export default async function EmberStorePage() {
               blurb="The ring around your profile picture, in every room you join. Buying a border unlocks it for your profile and your cards."
               items={wardrobe.avatarFrames}
               balance={profile.embersBalance}
+              canWear={canWear}
               slot="avatarFrame"
             />
             <CosmeticShop
@@ -143,6 +150,7 @@ export default async function EmberStorePage() {
               blurb="The border your showcase cards wear unless you dress one differently. Tap a card on your profile to dress it on its own."
               items={wardrobe.cardFrames}
               balance={profile.embersBalance}
+              canWear={canWear}
               slot="cardFrame"
             />
             <CosmeticShop
@@ -150,6 +158,7 @@ export default async function EmberStorePage() {
               blurb="How the light sits on the artwork. This is the default; each card can wear its own."
               items={wardrobe.holos}
               balance={profile.embersBalance}
+              canWear={canWear}
               slot="holo"
             />
             <CosmeticShop
@@ -157,6 +166,7 @@ export default async function EmberStorePage() {
               blurb="What moves, and how often. Worn by every card on your shelf."
               items={wardrobe.effects}
               balance={profile.embersBalance}
+              canWear={canWear}
               slot="effect"
             />
           </Card>

@@ -2715,6 +2715,8 @@ export interface UpcomingNight {
   joinCode: string | null;
   /** Running right now. */
   live: boolean;
+  /** When the board opens before doors, or null. Optional: older servers. */
+  boardOpensAt?: string | null;
 }
 
 export const getStore = (storeId: string) =>

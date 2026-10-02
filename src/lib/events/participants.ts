@@ -260,7 +260,27 @@ export async function listParticipants(eventId: string): Promise<Participant[]> 
 
   const now = Date.now();
 
-  return rows
+  /*
+   * ONE PERSON, ONE ROW.
+   *
+   * An account that scanned the code on a phone and then opened the
+   * room on a laptop holds two sessions, and the roster drew them as
+   * two people (the audit: "Admin's room view lists CHUNC twice").
+   * The newest-seen session speaks for the account; a guest has no
+   * account, so each guest session stays its own row.
+   */
+  const seen = new Set<string>();
+  const onePerAccount = [...rows]
+    .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
+    .filter((row) => {
+      const account = accountBySession.get(row.player_session_id) ?? null;
+      if (!account) return true;
+      if (seen.has(account)) return false;
+      seen.add(account);
+      return true;
+    });
+
+  return onePerAccount
     .map((row) => {
       const account = accountBySession.get(row.player_session_id) ?? null;
       return {
