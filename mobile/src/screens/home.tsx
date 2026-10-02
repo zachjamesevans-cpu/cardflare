@@ -651,15 +651,26 @@ export function HomeScreen() {
   /**
    * The post behind a hunt, with the one call "Offer" makes: one send
    * for one card or for every pick, so the poster gets one notice.
-   * After it lands the Feed reloads, so the card reads OFFERED and the
-   * count under it moves without a pull.
+   *
+   * The server's answer comes back FIRST and the Feed reloads behind
+   * it. It used to await the reload, and the reload is the four to
+   * seven seconds the founder felt: "the tap still takes over five
+   * seconds". The review's "Sending…" now settles when the server
+   * answers; the viewer marks its cards from the result, and the
+   * reload only repaints the carousel later so the card reads OFFERED
+   * and the count under it moves without a pull.
    */
-  const postRef = (item: { postId: string; yours: boolean }): PostRef => ({
+  const postRef = (item: {
+    postId: string;
+    yours: boolean;
+    displayName: string;
+  }): PostRef => ({
     postId: item.postId,
     yours: item.yours,
+    posterName: item.displayName,
     offer: async (items, message) => {
       const result = await offerItemsOnPost(item.postId, items, message);
-      await load(() => true);
+      void load(() => true);
       return result;
     },
   });

@@ -173,7 +173,10 @@ describe("swiping a zoomed card", () => {
   it("centres the card's own two lines over the card", () => {
     /* "center the text. so, for example, fire first and op15-020 should
        be centered on that screen." */
-    expect(zoom).toMatch(/styles\.title, \{ textAlign: "center" \}/);
+    /* The title is also padded clear of the close in the corner. */
+    expect(zoom).toMatch(
+      /styles\.title,\s*\{ textAlign: "center", paddingHorizontal: spacing\(9\) \}/,
+    );
     expect(zoom).toMatch(/styles\.muted, \{ textAlign: "center" \}/);
   });
 
@@ -194,8 +197,13 @@ describe("swiping a zoomed card", () => {
      * `delaysContentTouches` has to be off for the card to hear the tap
      * at all - iOS holds a touch back to decide whether it is a scroll,
      * and a quick tap ended inside that window and reached nothing.
+     *
+     * Round 13 took the "Tap anywhere to close" line away and put a
+     * quiet X in the panel's corner instead; the tap-to-close stays.
      */
-    expect(zoom).toContain("Tap anywhere to close");
+    expect(zoom).toContain('accessibilityLabel="Close"');
+    expect(zoom).toContain('<Ionicons name="close"');
+    expect(zoom).not.toContain("Tap anywhere to close");
     expect(zoom).toContain("delaysContentTouches: false");
     expect(zoom).toContain("{...IMMEDIATE_TOUCHES}");
     expect(zoom).toMatch(/onScrollBeginDrag=\{\(\) => \{\s*scrolled\.current = true;/);

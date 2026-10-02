@@ -263,8 +263,11 @@ describe("copy the audit sent back", () => {
     expect(app.ui.indexOf("<ZoomHaveForm")).toBeGreaterThan(
       app.ui.indexOf("snapToInterval={page}"),
     );
+    /* ...and before the close in the panel's corner, which is drawn last
+       so it sits over the title (round 13's X, in place of the old
+       "tap anywhere" line). */
     expect(app.ui.indexOf("<ZoomHaveForm")).toBeLessThan(
-      app.ui.indexOf("Tap anywhere to close"),
+      app.ui.indexOf('accessibilityLabel="Close"'),
     );
 
     expect(web.settings).toContain("Your account, Feed and room preferences.");
