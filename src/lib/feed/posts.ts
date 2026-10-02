@@ -739,25 +739,28 @@ export async function offerItems(
   if (!session) return { ok: false, reason: "unavailable" };
   if (session.id === context.ownerSessionId) return { ok: false, reason: "own-flare" };
 
-  const remaining = await remainingByFlare(context);
   const note = cleanBody(message, MAX_OFFER_MESSAGE) || null;
   const batch = randomUUID();
   const admin = getSupabaseAdmin();
 
+  /*
+   * A hand can always go up on an open card. It used to be refused once
+   * the copies were all found or spoken for, and the founder's phone
+   * showed four cards "answered while you were writing" on a Flare he
+   * was looking at: "ppl should still be able to make offers or say
+   * they have something even if someone already did." The only card
+   * that takes no offer is one that is no longer up at all. Copies are
+   * capped at what the Flare asked for.
+   */
   let offered = 0;
   const refused: string[] = [];
   for (const item of items) {
     const flare = context.flares.find((row) => row.id === item.flareId);
-    const left = remaining.get(item.flareId) ?? 0;
-    if (!flare || flare.status !== "open" || left === 0) {
+    if (!flare || flare.status !== "open") {
       refused.push(item.flareId);
       continue;
     }
-    const quantity = Math.max(1, Math.min(left, Math.round(item.quantity)));
-    if (quantity > left) {
-      refused.push(item.flareId);
-      continue;
-    }
+    const quantity = Math.max(1, Math.min(flare.quantity, Math.round(item.quantity)));
 
     if (context.eventId) {
       const outcome = await offerTrade(
@@ -819,10 +822,9 @@ export async function offerItems(
   const nameOf = new Map((cards ?? []).map((row) => [row.id, row.exact_name]));
   const named = sent.map((item) => {
     const flare = context.flares.find((row) => row.id === item.flareId);
-    const left = remaining.get(item.flareId) ?? 1;
     return {
       name: (flare && nameOf.get(flare.cardId)) ?? "a card",
-      quantity: Math.max(1, Math.min(left, Math.round(item.quantity))),
+      quantity: Math.max(1, Math.min(flare?.quantity ?? 1, Math.round(item.quantity))),
     };
   });
 

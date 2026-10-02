@@ -59,9 +59,20 @@ describe("one notice that counts the cards", () => {
   });
 });
 
+describe("a hand can always go up on an open card", () => {
+  it("refuses only a card that is no longer up", () => {
+    const posts = read("src/lib/feed/posts.ts");
+    expect(posts).toMatch(
+      /if \(!flare \|\| flare\.status !== "open"\) \{\s*refused\.push/,
+    );
+    expect(posts).not.toContain("left === 0");
+    expect(posts).toContain("Math.min(flare.quantity, Math.round(item.quantity))");
+  });
+});
+
 describe("a refusal is said in words", () => {
   it("has a sentence for every reason", () => {
-    expect(offerFailureMessage("not-found")).toBe("That card was answered already.");
+    expect(offerFailureMessage("not-found")).toBe("That card is not up any more.");
     expect(offerFailureMessage("own-flare")).toBe("That one is yours.");
     expect(offerFailureMessage("at-cap")).toContain("the most cards this room allows");
     expect(offerFailureMessage("unavailable")).toContain("Try again");

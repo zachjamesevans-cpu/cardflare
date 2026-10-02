@@ -53,7 +53,7 @@ const app = {
 
 describe("the offer's sentences are one set on both platforms", () => {
   const SENTENCES = [
-    "That card was answered already.",
+    "That card is not up any more.",
     "That one is yours.",
     "You have offers on the most cards this room allows.",
     "That is a lot of offers. Give it a minute.",

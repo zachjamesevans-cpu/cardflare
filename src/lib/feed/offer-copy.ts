@@ -12,7 +12,7 @@ export function offerFailureMessage(reason: OfferFailure | string): string {
   switch (reason) {
     case "not-found":
     case "nothing-left":
-      return "That card was answered already.";
+      return "That card is not up any more.";
     case "own-flare":
       return "That one is yours.";
     case "at-cap":
