@@ -110,7 +110,14 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
 /** One declaration's value, from the first rule whose selector matches. */
 function decl(selector, property) {
   for (const rule of rules) {
-    if (rule.selector !== selector) continue;
+    /* A rule written for two selectors at once (ripple's ::before and
+       ::after share one) answers for either of them. */
+    if (
+      rule.selector !== selector &&
+      !rule.selector.split(",").some((part) => part.trim() === selector)
+    ) {
+      continue;
+    }
     const found = new RegExp(`(?:^|;)\\s*${property}:\\s*([^;]+)`, "m").exec(rule.body);
     if (found) return found[1].trim().replace(/\s+/g, " ");
   }
@@ -924,13 +931,26 @@ function paintLayer(layer, ruleSize) {
 function paintStack(selector) {
   const value = decl(selector, "background") ?? decl(selector, "background-image");
   if (!value) throw new Error(`${selector} has no background`);
-  const sizes = decl(selector, "background-size");
-  const sizeList = sizes ? splitTop(sizes) : [];
+  const listOf = (property) => {
+    const found = decl(selector, property);
+    return found ? splitTop(found) : [];
+  };
+  const sizeList = listOf("background-size");
+  const positionList = listOf("background-position");
+  const repeatList = listOf("background-repeat");
+  const pick = (list, index) => (list.length === 1 ? list[0] : (list[index] ?? null));
   const layers = splitTop(value);
   return layers
     .map((layer, index) => {
-      const ruleSize = sizeList.length === 1 ? sizeList[0] : (sizeList[index] ?? null);
-      const paint = paintLayer(layer.trim(), ruleSize);
+      /* Longhand position / size / repeat, written beside the stack,
+         folded into the layer as if the shorthand had carried them. */
+      const position = pick(positionList, index);
+      const repeat = pick(repeatList, index);
+      const trailing = [position, repeat].filter(Boolean).join(" ");
+      const paint = paintLayer(
+        trailing ? `${layer.trim()} ${trailing}` : layer.trim(),
+        pick(sizeList, index),
+      );
       if (!paint) throw new Error(`${selector}: cannot read layer "${layer}"`);
       return paint;
     })
@@ -1083,7 +1103,265 @@ function textures() {
   return out;
 }
 
+/* ---------------------------------------------------------------- */
+/* Motion: the keyframes, as tracks                                   */
+/* ---------------------------------------------------------------- */
+
+/** `cfa-sheen 3.4s ease-in-out infinite` and friends, fully. */
+function timingOf(value) {
+  if (!value) return null;
+  const found = /cfa-([a-z-]+)\s+([0-9.]+)s(?:\s+([a-z-]+(?:\([^)]*\))?))?/.exec(value);
+  if (!found) return null;
+  const easing = found[3] ?? "ease";
+  const steps = /steps\((\d+)/.exec(easing);
+  return {
+    kind: found[1],
+    seconds: Number(found[2]),
+    alternate: /\balternate\b/.test(value),
+    easing: steps ? "steps" : easing.replace(/\(.*$/, ""),
+    steps: steps ? Number(steps[1]) : null,
+    delaySeconds: 0,
+  };
+}
+
+/** Every animation in a shorthand, which can list several. */
+function timingsOf(value) {
+  if (!value) return [];
+  return splitTop(value).map(timingOf).filter(Boolean);
+}
+
+/** `translate(-3px, 1px)` / `scale(0.35)` / `rotate3d(1, 1, 0, 7deg)` as fields. */
+function transformFields(value) {
+  const out = {};
+  for (const fn of value.matchAll(/([a-zA-Z0-9]+)\(([^)]*)\)/g)) {
+    const args = fn[2].split(",").map((part) => part.trim());
+    switch (fn[1]) {
+      case "translate":
+        out.tx = length(args[0]) ?? { px: 0 };
+        out.ty = length(args[1] ?? "0") ?? { px: 0 };
+        break;
+      case "translateX":
+        out.tx = length(args[0]) ?? { px: 0 };
+        break;
+      case "translateY":
+        out.ty = length(args[0]) ?? { px: 0 };
+        break;
+      case "scale":
+        out.scale = Number(args[0]);
+        break;
+      case "rotate":
+        out.rotate = Number(args[0].replace("deg", ""));
+        break;
+      case "skewX":
+        out.skewX = Number(args[0].replace("deg", ""));
+        break;
+      case "rotate3d":
+        out.tilt = {
+          x: Number(args[0]),
+          y: Number(args[1]),
+          deg: Number(args[3].replace("deg", "")),
+        };
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+/**
+ * The transform and opacity keyframes, as tracks of stops the app
+ * interpolates. Background-position keyframes (pan, rise, fall, drift,
+ * wander) are not here: those move paint, and the paint renderer
+ * handles them by kind.
+ */
+function motions() {
+  const out = {};
+  for (const match of css.matchAll(
+    /@keyframes (cfa-[a-z0-9-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g,
+  )) {
+    const name = match[1].slice(4);
+    const stops = [];
+    let usable = false;
+    for (const frame of match[2].matchAll(/([0-9.%,\s a-z]+)\{([^}]*)\}/g)) {
+      const body = frame[2];
+      const fields = {};
+      const opacity = /opacity:\s*([0-9.]+)/.exec(body);
+      if (opacity) fields.opacity = Number(opacity[1]);
+      const transform = /transform:\s*([^;]+)/.exec(body);
+      if (transform) Object.assign(fields, transformFields(transform[1]));
+      if (Object.keys(fields).length === 0) continue;
+      usable = true;
+      for (const at of frame[1].split(",")) {
+        const token = at.trim();
+        const fraction =
+          token === "from"
+            ? 0
+            : token === "to"
+              ? 1
+              : Number(token.replace("%", "")) / 100;
+        stops.push({ at: round(fraction), ...fields });
+      }
+    }
+    if (!usable) continue;
+    stops.sort((a, b) => a.at - b.at);
+    /* A track that only says where it ends (spin's lone `to`) starts
+       from rest; said outright so the app never has to guess. */
+    if (stops[0].at > 0) stops.unshift({ at: 0 });
+    out[name] = stops;
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------- */
+/* Card animations and profile scenes                                 */
+/* ---------------------------------------------------------------- */
+
+/** `inset: -20% -35%` / `inset: 0 0 auto 0` plus width/height, as a box. */
+function spriteBox(selector) {
+  const inset = decl(selector, "inset");
+  const sides = inset ? inset.split(/\s+/) : [];
+  const [t, r = t, b = t, l = r] = sides;
+  const top = length(decl(selector, "top") ?? t ?? "0") ?? { frac: 0 };
+  const left = length(decl(selector, "left") ?? l ?? "0") ?? { frac: 0 };
+  const widthDecl = decl(selector, "width");
+  const heightDecl = decl(selector, "height");
+  const span = (from, to) =>
+    from && to && "frac" in from && "frac" in to
+      ? { frac: round(1 - from.frac - to.frac) }
+      : { frac: 1 };
+  const width = widthDecl ? length(widthDecl) : span(left, length(r ?? "0"));
+  const height = heightDecl ? length(heightDecl) : span(top, length(b ?? "0"));
+  return { top, left, width, height };
+}
+
+/** A `::before` / `::after` on the fx layer: a sprite with its own paint and motion. */
+function sprite(selector) {
+  const background = decl(selector, "background");
+  const borderDecl = decl(selector, "border");
+  const border = borderDecl
+    ? (() => {
+        const width = /([0-9.]+)px/.exec(borderDecl);
+        const color = /(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(borderDecl);
+        return width && color ? { width: Number(width[1]), color: color[1] } : null;
+      })()
+    : null;
+  const { glow } = shadows(decl(selector, "box-shadow"));
+  const radiusDecl = decl(selector, "border-radius");
+  const timing = timingOf(decl(selector, "animation"));
+  const delay = /animation-delay:\s*([0-9.]+)s/.exec(
+    rules.find((rule) => rule.selector === selector)?.body ?? "",
+  );
+  if (timing && delay) timing.delaySeconds = Number(delay[1]);
+  return {
+    box: spriteBox(selector),
+    round: radiusDecl === "9999px" || radiusDecl === "inherit",
+    layers: background ? paintStack(selector) : [],
+    border,
+    glow,
+    filters: filtersOf(decl(selector, "filter")),
+    timing,
+  };
+}
+
+/** The pseudo-element rules under one selector, each as a sprite. */
+function spritesUnder(prefix) {
+  const out = [];
+  const seen = new Set();
+  for (const rule of rules) {
+    for (const part of rule.selector.split(",").map((s) => s.trim())) {
+      if (!part.startsWith(prefix) || !/::(before|after)$/.test(part)) continue;
+      if (seen.has(part)) continue;
+      seen.add(part);
+      out.push(sprite(part));
+    }
+  }
+  /* Ripple's ::after shares the ::before's rule and adds a delay; the
+     shared rule lists both selectors, so `decl` on the ::after finds
+     its own delay rule first and the shared body for everything else.
+     Nothing to do here but keep the order the sheet wrote. */
+  return out;
+}
+
+function fxLayer(selector) {
+  const value = decl(selector, "background") ?? decl(selector, "background-image");
+  if (!value) return null;
+  const heightDecl = decl(selector, "height");
+  const padding = decl(selector, "padding");
+  return {
+    layers: paintStack(selector),
+    opacity: Number(decl(selector, "opacity") ?? 1),
+    timing: timingOf(decl(selector, "animation")),
+    filters: filtersOf(decl(selector, "filter")),
+    height: heightDecl ? length(heightDecl) : null,
+    /* A masked fx (`mask-composite: exclude` with a padding) shows
+       only a band at the edge, `insetPx` wide. */
+    maskInsetPx:
+      decl(selector, "mask") && padding ? Number(padding.replace("px", "")) : null,
+  };
+}
+
+function animations() {
+  const out = {};
+  for (const slug of slugsOf("anim")) {
+    const card = `.cfa-${slug}`;
+    const edge = decl(card, "--cfa-edge");
+    const edgePaint =
+      edge && edge.includes("gradient(") ? paintLayer(edge, null) : null;
+    const spreadDecl = decl(card, "background-size");
+    const spread = spreadDecl
+      ? (() => {
+          const percents = [...spreadDecl.matchAll(/([0-9.]+)%/g)].map(
+            (m) => Number(m[1]) / 100,
+          );
+          return percents.length >= 2 ? { x: percents[0], y: percents[1] } : null;
+        })()
+      : null;
+    const glows = [];
+    const shadow = decl(card, "box-shadow");
+    if (shadow) {
+      for (const layer of splitTop(shadow)) {
+        const { glow } = shadows(layer);
+        if (glow) glows.push(glow);
+      }
+    }
+    out[slug] = {
+      card: {
+        timings: timingsOf(decl(card, "animation")),
+        glows,
+        edge: edgePaint,
+        edgeSpread: spread,
+      },
+      fx: fxLayer(`${card} .cfx-card-fx`),
+      sprites: spritesUnder(`${card} .cfx-card-fx`),
+    };
+  }
+  return out;
+}
+
+function scenes() {
+  const out = {};
+  for (const slug of slugsOf("scene")) {
+    const panel = `.cfa-${slug} .cfx-panel-fx`;
+    const fx = fxLayer(panel);
+    /* A scene that only animates the preview's mini avatar (the web's
+       `.cfx-panel-profile::before`) draws nothing on a real profile. */
+    const avatar = timingOf(
+      decl(`.cfa-${slug} .cfx-panel-profile::before`, "animation"),
+    );
+    out[slug] = {
+      fx,
+      sprites: spritesUnder(panel),
+      avatarTiming: avatar,
+    };
+  }
+  return out;
+}
+
 const RING = rings();
+const MOTION = motions();
+const ANIMATION = animations();
+const SCENE = scenes();
 const PATTERN = patterns();
 const BACKGROUND = backgrounds();
 const TEXTURE = textures();
@@ -1382,6 +1660,80 @@ export const BACKGROUND_ART: Record<string, BackgroundArt> = ${literal(BACKGROUN
 
 export const TEXTURE_ART: Record<string, TextureArt> = ${literal(TEXTURE)};
 
+/** One stop of a transform / opacity keyframe track. */
+export interface MotionStop {
+  at: number;
+  opacity?: number;
+  tx?: Len;
+  ty?: Len;
+  scale?: number;
+  rotate?: number;
+  skewX?: number;
+  /** CSS rotate3d: the axis and the angle. */
+  tilt?: { x: number; y: number; deg: number };
+}
+
+/** An animation shorthand, fully: what, how long, how it eases. */
+export interface Timing {
+  kind: string;
+  seconds: number;
+  alternate: boolean;
+  easing: string;
+  steps: number | null;
+  delaySeconds: number;
+}
+
+/** A \`::before\` / \`::after\` drawn over a card or a panel. */
+export interface SpriteArt {
+  box: { top: Len; left: Len; width: Len; height: Len };
+  /** A circle (or the card's own corners) rather than a rectangle. */
+  round: boolean;
+  layers: PaintLayer[];
+  border: { width: number; color: string } | null;
+  glow: { color: string; radius: number } | null;
+  filters: string[];
+  timing: Timing | null;
+}
+
+/** The fx layer over a card face or a profile panel. */
+export interface FxArt {
+  layers: PaintLayer[];
+  opacity: number;
+  timing: Timing | null;
+  filters: string[];
+  /** The layer covers only this much of the panel's height (the aurora). */
+  height: Len | null;
+  /** Only a band this wide at the edge shows (electric arcs). */
+  maskInsetPx: number | null;
+}
+
+export interface AnimationArt {
+  card: {
+    /** Motion of the whole card: float, tilt, breathe, pulse, glitch. */
+    timings: Timing[];
+    glows: { color: string; radius: number }[];
+    /** A moving edge in place of the border's (flame edge). */
+    edge: PaintLayer | null;
+    edgeSpread: { x: number; y: number } | null;
+  };
+  fx: FxArt | null;
+  sprites: SpriteArt[];
+}
+
+export interface SceneArt {
+  fx: FxArt | null;
+  sprites: SpriteArt[];
+  /** Plays on the Customize preview's mini avatar only; nothing on a real profile. */
+  avatarTiming: Timing | null;
+}
+
+/** The transform and opacity keyframes, by name without the \`cfa-\` prefix. */
+export const MOTION_ART: Record<string, MotionStop[]> = ${literal(MOTION)};
+
+export const ANIMATION_ART: Record<string, AnimationArt> = ${literal(ANIMATION)};
+
+export const SCENE_ART: Record<string, SceneArt> = ${literal(SCENE)};
+
 /** Whether a phone can draw this slug rather than approximating it. */
 export function hasRingArt(slug: string | null): boolean {
   return Boolean(slug && slug in RING_ART);
@@ -1427,6 +1779,26 @@ export function hasBackgroundArt(slug: string | null): boolean {
     slug && slug in BACKGROUND_ART && paintable(BACKGROUND_ART[slug].layers),
   );
 }
+
+/** An animation draws when anything about it moves or paints. "Still" is still. */
+export function hasAnimationArt(slug: string | null): boolean {
+  if (!slug || !(slug in ANIMATION_ART)) return false;
+  const art = ANIMATION_ART[slug];
+  return (
+    art.card.timings.length > 0 ||
+    art.card.glows.length > 0 ||
+    art.card.edge !== null ||
+    (art.fx !== null && paintable(art.fx.layers)) ||
+    art.sprites.length > 0
+  );
+}
+
+/** A scene draws on a real profile when its panel layer or a sprite paints. */
+export function hasSceneArt(slug: string | null): boolean {
+  if (!slug || !(slug in SCENE_ART)) return false;
+  const art = SCENE_ART[slug];
+  return (art.fx !== null && paintable(art.fx.layers)) || art.sprites.length > 0;
+}
 `;
 
 writeFileSync(OUT_PATH, body);
@@ -1435,6 +1807,7 @@ console.log(
     `${Object.keys(AURA).length} auras, ${Object.keys(BORDER).length} borders, ` +
     `${Object.keys(NAME).length} names, ${Object.keys(BADGE).length} badges, ` +
     `${Object.keys(TITLE).length} titles, ${Object.keys(PATTERN).length} patterns, ` +
-    `${Object.keys(BACKGROUND).length} backgrounds, ${Object.keys(TEXTURE).length} textures ` +
-    `-> mobile/src/cosmetic-art-data.ts`,
+    `${Object.keys(BACKGROUND).length} backgrounds, ${Object.keys(TEXTURE).length} textures, ` +
+    `${Object.keys(ANIMATION).length} animations, ${Object.keys(SCENE).length} scenes, ` +
+    `${Object.keys(MOTION).length} motions -> mobile/src/cosmetic-art-data.ts`,
 );

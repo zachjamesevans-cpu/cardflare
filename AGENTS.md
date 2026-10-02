@@ -93,8 +93,9 @@ pic... please don't ever do that again with these." One rule, used by
   fails if the fallback comes back.
 - `@rive-app/canvas` is imported lazily inside `RiveArt`, so a page
   that draws no Rive cosmetic never downloads 1.8 MB of WASM.
-- The app carries Rive files through its API but cannot play them yet:
-  that needs the native runtime, which lands in its own round.
+- The app carries Rive files through its API and does not play them.
+  It will not: the founder (2026-10-02), "We don't use rive stuff anymore."
+  Catalogue art is CSS on the web and Skia in the app, below.
 
 **A catalogue cosmetic is CSS on the web and Skia in the app.** There is
 no conic gradient and no keyframe in React Native, so the app cannot
