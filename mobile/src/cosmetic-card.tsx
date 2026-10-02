@@ -12,6 +12,7 @@ import {
   borderStyle,
   drawsBorder,
 } from "./cosmetic-border";
+import { WornPattern } from "./cosmetic-paint";
 import { getFoilKit, travellingFrame } from "./foil";
 import { colors } from "./theme";
 
@@ -92,6 +93,7 @@ export function CosmeticCard({
   holo,
   effect,
   border = null,
+  pattern = null,
 }: {
   imageUrl: string | null;
   width: number;
@@ -106,6 +108,14 @@ export function CosmeticCard({
    * card is clutter, and the newer choice is the one they made last.
    */
   border?: string | null;
+  /**
+   * A catalogue holo pattern, when one is worn.
+   *
+   * Drawn over the face - over the art and the legacy foil, under any
+   * effect - exactly where the website's `.cfx-card-fx` sits. Only the
+   * showcase passes it: the web dresses showcase cards and no others.
+   */
+  pattern?: string | null;
 }) {
   /* The same 60:84 the website's thumbnails use, so a card is a card. */
   const height = Math.round((width * 84) / 60);
@@ -171,7 +181,7 @@ export function CosmeticCard({
    * rather than the card's. Getting that wrong puts a shimmer under the
    * border where nobody can see it.
    */
-  const face = (w: number, h: number) => (
+  const face = (w: number, h: number, faceRadius: number) => (
     <>
       {imageUrl && !foilDrawsArt ? (
         <RemoteImage uri={imageUrl} style={{ width: "100%", height: "100%" }} />
@@ -196,6 +206,10 @@ export function CosmeticCard({
           />
         )
       )}
+
+      {/* The worn holo pattern, over the art and the foil. It draws on
+          an empty face too, as the website does. */}
+      <WornPattern pattern={pattern} width={w} height={h} radius={faceRadius} />
 
       {/* The travelling frames move exactly as on the web; the static
           border underneath stays as the Skia-less fallback. */}
@@ -244,7 +258,7 @@ export function CosmeticCard({
             backgroundColor: colors.canvas,
           }}
         >
-          {face(width - EDGE * 2, height - EDGE * 2)}
+          {face(width - EDGE * 2, height - EDGE * 2, FACE_RADIUS)}
         </View>
       </View>
     );
@@ -262,7 +276,7 @@ export function CosmeticCard({
         borderColor: frameColor ?? colors.border,
       }}
     >
-      {face(width, height)}
+      {face(width, height, 6)}
     </View>
   );
 }

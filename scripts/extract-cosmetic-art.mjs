@@ -724,7 +724,369 @@ function titles() {
   return out;
 }
 
+/* ---------------------------------------------------------------- */
+/* Stacked paints: holo patterns and showcase backgrounds            */
+/* ---------------------------------------------------------------- */
+
+/*
+ * A pattern or a background is a CSS `background` stack: gradients,
+ * tiled particle textures and the brand mark, each with a position
+ * and a size, blended and animated as one. The app gets the stack as
+ * LAYERS, bottom first, each one a shape Skia can paint, with every
+ * length kept in the unit the stylesheet wrote it in: the app knows
+ * the box it is painting and resolves them there.
+ */
+
+/** `14px` / `42%` / `auto` as a length the app resolves against its box. */
+function length(token) {
+  if (token === undefined || token === null) return null;
+  if (token === "auto") return "auto";
+  const found = /^(-?[0-9.]+)(px|%)?$/.exec(token);
+  if (!found) return null;
+  const value = Number(found[1]);
+  return found[2] === "%" ? { frac: round(value / 100) } : { px: value };
+}
+
+/**
+ * The position / size / repeat that follow an image in one layer.
+ *
+ * `0 0 / 14px 14px`, `4% 8% / 42% 38% no-repeat`, `50% 50% / 34px auto
+ * repeat`. Nothing at all means the layer fills the box once.
+ */
+function placement(rest, ruleSize) {
+  const repeat = !/\bno-repeat\b/.test(rest);
+  const cleaned = rest.replace(/\b(no-repeat|repeat)\b/g, " ").trim();
+  const [positionPart, sizePart] = cleaned.split("/").map((part) => part.trim());
+  const position = positionPart ? positionPart.split(/\s+/) : [];
+  const size = sizePart ? sizePart.split(/\s+/) : ruleSize ? ruleSize.split(/\s+/) : [];
+
+  const x = length(position[0]) ?? { frac: 0 };
+  const y = length(position[1]) ?? { frac: 0 };
+  const w = length(size[0]);
+  const h = length(size[1]) ?? (size[0] ? "auto" : null);
+
+  if (w === null && h === null && repeat && x.frac === 0 && y.frac === 0) return null;
+  return { x, y, w, h, repeat };
+}
+
+/** `circle 2px at 12% 18%` / `45% 40% at 30% 25%` / `circle 1.3px`. */
+function radialShape(token) {
+  const at = /at\s+([0-9.]+)%\s+([0-9.]+)%/.exec(token);
+  const cx = at ? Number(at[1]) / 100 : 0.5;
+  const cy = at ? Number(at[2]) / 100 : 0.5;
+  const circlePx = /circle\s+([0-9.]+)px/.exec(token);
+  if (circlePx) return { kind: "circle", cx, cy, radiusPx: Number(circlePx[1]) };
+  const sizes = [...token.replace(/at\s+[^)]*$/, "").matchAll(/([0-9.]+)%/g)].map(
+    (m) => Number(m[1]) / 100,
+  );
+  return {
+    kind: "ellipse",
+    cx,
+    cy,
+    rx: sizes[0] ?? 0.7,
+    ry: sizes[1] ?? sizes[0] ?? 0.7,
+  };
+}
+
+/** One layer of a `background` stack, or null when it is not paint. */
+function paintLayer(layer, ruleSize) {
+  const texture = /var\(\s*--cfa-p-([a-z0-9-]+)\s*\)/.exec(layer);
+  if (texture) {
+    const rest = layer.slice(texture.index + texture[0].length);
+    return { type: "texture", name: texture[1], place: placement(rest, ruleSize) };
+  }
+
+  const image = /url\(\s*"?([^")]+)"?\s*\)/.exec(layer);
+  if (image) {
+    const rest = layer.slice(image.index + image[0].length);
+    const name = image[1]
+      .split("/")
+      .pop()
+      .replace(/\.[a-z]+$/, "");
+    return { type: "image", name, place: placement(rest, ruleSize) };
+  }
+
+  const kinds = [
+    "repeating-linear-gradient",
+    "repeating-conic-gradient",
+    "repeating-radial-gradient",
+    "linear-gradient",
+    "conic-gradient",
+    "radial-gradient",
+  ];
+  const kind = kinds.find((name) => layer.startsWith(name));
+  if (!kind) {
+    const flat = /^(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})\s*$/.exec(layer.trim());
+    return flat ? { type: "solid", color: flat[1] } : null;
+  }
+
+  const body = inside(layer, kind);
+  const rest = layer.slice(layer.indexOf(`${kind}(`) + kind.length + body.length + 2);
+  const place = placement(rest, ruleSize);
+  const tokens = splitTop(body);
+  const repeating = kind.startsWith("repeating-");
+
+  if (kind.endsWith("linear-gradient")) {
+    const angle = angleOf(tokens[0]);
+    if (angle !== null) tokens.shift();
+    const pxStops = /\d+px/.test(body);
+    const stops = colorStops(tokens, pxStops ? "px" : "%", { extend: !repeating });
+    if (repeating) {
+      return {
+        type: "repeat",
+        angle: angle ?? 180,
+        colors: stops.colors,
+        positions: stops.positions,
+        periodPx: stops.period ?? 16,
+        place,
+      };
+    }
+    /*
+     * A plain gradient with pixel stops (`#0b0d11 4px, transparent 4px`)
+     * is a hairline across a tile whose size the app resolves, so the
+     * stops stay in pixels and are marked as such.
+     */
+    if (pxStops) {
+      return {
+        type: "linear",
+        angle: angle ?? 180,
+        colors: stops.colors,
+        positions: stops.positions.map((at) => round(at * (stops.period ?? 1))),
+        positionsPx: true,
+        place,
+      };
+    }
+    return {
+      type: "linear",
+      angle: angle ?? 180,
+      colors: stops.colors,
+      positions: stops.positions,
+      place,
+    };
+  }
+
+  if (kind.endsWith("conic-gradient")) {
+    let from = 0;
+    let cx = 0.5;
+    let cy = 0.5;
+    if (/^from\b|^at\b/.test(tokens[0])) {
+      const head = tokens.shift();
+      const deg = /from\s+(-?[0-9.]+)deg/.exec(head);
+      if (deg) from = Number(deg[1]);
+      const at = /at\s+([0-9.]+)%\s+([0-9.]+)%/.exec(head);
+      if (at) {
+        cx = Number(at[1]) / 100;
+        cy = Number(at[2]) / 100;
+      }
+    }
+    const stops = colorStops(tokens, "deg", { extend: !repeating });
+    const sweep = repeating ? tile(stops) : stops;
+    return {
+      type: "sweep",
+      cx,
+      cy,
+      fromDeg: from,
+      colors: sweep.colors,
+      positions: sweep.positions,
+      place,
+    };
+  }
+
+  /* Radial: an ellipse that fills, or a pixel-sized speck that tiles. */
+  const shape = radialShape(tokens[0]);
+  if (/^(circle|ellipse|[0-9.]+%)/.test(tokens[0]) || /^at\b/.test(tokens[0])) {
+    tokens.shift();
+  }
+  const stops = colorStops(tokens, "%");
+  if (shape.kind === "circle") {
+    return {
+      type: "speck",
+      cx: shape.cx,
+      cy: shape.cy,
+      radiusPx: shape.radiusPx,
+      color: stops.colors[0],
+      place,
+    };
+  }
+  return {
+    type: "radial",
+    cx: shape.cx,
+    cy: shape.cy,
+    rx: shape.rx,
+    ry: shape.ry,
+    colors: stops.colors,
+    positions: stops.positions,
+    place,
+  };
+}
+
+/** The stack as the app paints it: bottom layer first. */
+function paintStack(selector) {
+  const value = decl(selector, "background") ?? decl(selector, "background-image");
+  if (!value) throw new Error(`${selector} has no background`);
+  const sizes = decl(selector, "background-size");
+  const sizeList = sizes ? splitTop(sizes) : [];
+  const layers = splitTop(value);
+  return layers
+    .map((layer, index) => {
+      const ruleSize = sizeList.length === 1 ? sizeList[0] : (sizeList[index] ?? null);
+      const paint = paintLayer(layer.trim(), ruleSize);
+      if (!paint) throw new Error(`${selector}: cannot read layer "${layer}"`);
+      return paint;
+    })
+    .reverse();
+}
+
+function blendOf(value) {
+  switch (value) {
+    case "screen":
+    case "overlay":
+    case "multiply":
+    case "luminosity":
+      return value;
+    case "color-dodge":
+      return "colorDodge";
+    default:
+      return "normal";
+  }
+}
+
+function filtersOf(value) {
+  return value ? value.split(/\s+(?=[a-z-]+\()/) : [];
+}
+
+function patterns() {
+  const out = {};
+  for (const slug of slugsOf("pattern")) {
+    const fx = `.cfa-${slug} .cfx-card-fx`;
+    out[slug] = {
+      layers: paintStack(fx),
+      blend: blendOf(decl(fx, "mix-blend-mode")),
+      opacity: Number(decl(fx, "opacity") ?? 1),
+      motion: motionOf(decl(fx, "animation")),
+      filters: filtersOf(decl(fx, "filter")),
+    };
+  }
+  return out;
+}
+
+function backgrounds() {
+  const out = {};
+  for (const slug of slugsOf("bg")) {
+    const selector = `.cfa-${slug}`;
+    const { hairline } = shadows(decl(selector, "box-shadow"));
+    const blends = decl(selector, "background-blend-mode");
+    const flashRule = rules.find((rule) => rule.selector === `${selector}::after`);
+    const flash = flashRule
+      ? (() => {
+          const color = /background:\s*(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})/.exec(
+            flashRule.body,
+          );
+          const motion = motionOf(
+            /animation:\s*([^;]+)/.exec(flashRule.body)?.[1] ?? null,
+          );
+          return color && motion ? { color: color[1], seconds: motion.seconds } : null;
+        })()
+      : null;
+    out[slug] = {
+      layers: paintStack(selector),
+      opacity: Number(decl(selector, "opacity") ?? 1),
+      motion: motionOf(decl(selector, "animation")),
+      filters: filtersOf(decl(selector, "filter")),
+      inset: hairline,
+      blends: blends ? splitTop(blends).map(blendOf) : null,
+      flash,
+    };
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------- */
+/* Textures: the --cfa-p-* marks, as paths                           */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Every `--cfa-p-*` is a tiny SVG in a data URI. The app cannot tile an
+ * SVG, so each is read back into its marks: a path per element, with
+ * its own fill and stroke, in the icon's viewBox. Text glyphs (the
+ * matrix rain) have no path and are left out, which the data says.
+ */
+function textures() {
+  const out = {};
+  const found = css.matchAll(
+    /--cfa-p-([a-z0-9-]+):\s*url\("data:image\/svg\+xml,([^"]+)"\)/g,
+  );
+  for (const match of found) {
+    const name = match[1];
+    const svg = decodeURIComponent(match[2]);
+    const viewBox = /viewBox='([0-9.\s-]+)'/.exec(svg);
+    const [, , vw, vh] = (viewBox?.[1] ?? "0 0 64 64").split(/\s+/).map(Number);
+
+    const attr = (tag, key) => new RegExp(`\\b${key}='([^']*)'`).exec(tag)?.[1] ?? null;
+    const marks = [];
+    let group = {};
+    for (const tag of svg.matchAll(/<(g|path|circle|rect|polygon|text)\b([^>]*)>/g)) {
+      const [, element, attrs] = tag;
+      if (element === "g") {
+        group = {
+          fill: attr(attrs, "fill"),
+          fillOpacity: attr(attrs, "fill-opacity"),
+          stroke: attr(attrs, "stroke"),
+          strokeOpacity: attr(attrs, "stroke-opacity"),
+          strokeWidth: attr(attrs, "stroke-width"),
+        };
+        continue;
+      }
+      if (element === "text") continue;
+
+      let d = null;
+      if (element === "path") d = attr(attrs, "d");
+      if (element === "circle") {
+        const cx = Number(attr(attrs, "cx"));
+        const cy = Number(attr(attrs, "cy"));
+        const r = Number(attr(attrs, "r"));
+        d = `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0z`;
+      }
+      if (element === "rect") {
+        const x = Number(attr(attrs, "x"));
+        const y = Number(attr(attrs, "y"));
+        const w = Number(attr(attrs, "width"));
+        const h = Number(attr(attrs, "height"));
+        d = `M${x} ${y}h${w}v${h}h${-w}z`;
+      }
+      if (element === "polygon") {
+        const points = attr(attrs, "points")
+          .trim()
+          .split(/\s+/)
+          .map((pair) => pair.split(",").join(" "));
+        d = `M${points.join("L")}Z`;
+      }
+      if (!d) continue;
+
+      const fillAttr = attr(attrs, "fill") ?? group.fill ?? null;
+      const stroke = attr(attrs, "stroke") ?? group.stroke ?? null;
+      const rotate = /rotate\(\s*(-?[0-9.]+)/.exec(attr(attrs, "transform") ?? "");
+      marks.push({
+        d,
+        fill: fillAttr === "none" ? null : (fillAttr ?? (stroke ? null : "#000000")),
+        fillOpacity: Number(attr(attrs, "fill-opacity") ?? group.fillOpacity ?? 1),
+        stroke,
+        strokeOpacity: Number(
+          attr(attrs, "stroke-opacity") ?? group.strokeOpacity ?? 1,
+        ),
+        strokeWidth: Number(attr(attrs, "stroke-width") ?? group.strokeWidth ?? 1),
+        rotate: rotate ? Number(rotate[1]) : null,
+      });
+    }
+    out[name] = { viewBox: { w: vw, h: vh }, marks };
+  }
+  return out;
+}
+
 const RING = rings();
+const PATTERN = patterns();
+const BACKGROUND = backgrounds();
+const TEXTURE = textures();
 const AURA = auras();
 const BORDER = borders();
 const NAME = names();
@@ -904,6 +1266,122 @@ export const BADGE_ART: Record<string, BadgeArt> = ${literal(BADGE)};
 
 export const TITLE_ART: Record<string, TitleArt> = ${literal(TITLE)};
 
+/** A length the app resolves against the box it paints. */
+export type Len = { px: number } | { frac: number } | "auto";
+
+/**
+ * Where one layer of a stack sits, from the CSS position / size /
+ * repeat. Null means the layer fills the box once. Percent positions
+ * follow CSS: the layer's p% point meets the box's p% point.
+ */
+export interface Placement {
+  x: Len;
+  y: Len;
+  w: Len | null;
+  h: Len | null;
+  repeat: boolean;
+}
+
+/** One layer of a holo pattern or a showcase background. */
+export type PaintLayer =
+  | { type: "solid"; color: string }
+  | {
+      type: "linear";
+      angle: number;
+      colors: string[];
+      positions: number[];
+      /** Positions are pixels along the gradient line, not fractions. */
+      positionsPx?: true;
+      place: Placement | null;
+    }
+  | {
+      type: "repeat";
+      angle: number;
+      colors: string[];
+      positions: number[];
+      periodPx: number;
+      place: Placement | null;
+    }
+  | {
+      type: "radial";
+      cx: number;
+      cy: number;
+      /** Ellipse radii as fractions of the box's width and height. */
+      rx: number;
+      ry: number;
+      colors: string[];
+      positions: number[];
+      place: Placement | null;
+    }
+  | {
+      /** A hard-edged pixel-sized circle, usually tiled: confetti, flecks. */
+      type: "speck";
+      cx: number;
+      cy: number;
+      radiusPx: number;
+      color: string;
+      place: Placement | null;
+    }
+  | {
+      type: "sweep";
+      cx: number;
+      cy: number;
+      fromDeg: number;
+      colors: string[];
+      positions: number[];
+      place: Placement | null;
+    }
+  | { type: "texture"; name: string; place: Placement | null }
+  /** The brand mark, which the stylesheet tiles as a picture. */
+  | { type: "image"; name: string; place: Placement | null };
+
+export type PaintBlend = "normal" | "screen" | "overlay" | "colorDodge" | "multiply" | "luminosity";
+
+export interface PatternArt {
+  /** Bottom first. */
+  layers: PaintLayer[];
+  blend: PaintBlend;
+  opacity: number;
+  motion: BorderMotion | null;
+  /** CSS filters the app does not apply, named so the gap is a fact. */
+  filters: string[];
+}
+
+export interface BackgroundArt {
+  layers: PaintLayer[];
+  opacity: number;
+  motion: BorderMotion | null;
+  filters: string[];
+  /** An inset box-shadow: a hairline inside the panel's edge. */
+  inset: { color: string; width: number } | null;
+  /** \`background-blend-mode\` per layer, top first, when the web sets one. */
+  blends: PaintBlend[] | null;
+  /** A whole-panel flash on a timer: the lightning storm. */
+  flash: { color: string; seconds: number } | null;
+}
+
+/** One mark of a texture, in the icon's own viewBox. */
+export interface TextureMark {
+  d: string;
+  fill: string | null;
+  fillOpacity: number;
+  stroke: string | null;
+  strokeOpacity: number;
+  strokeWidth: number;
+  rotate: number | null;
+}
+
+export interface TextureArt {
+  viewBox: { w: number; h: number };
+  marks: TextureMark[];
+}
+
+export const PATTERN_ART: Record<string, PatternArt> = ${literal(PATTERN)};
+
+export const BACKGROUND_ART: Record<string, BackgroundArt> = ${literal(BACKGROUND)};
+
+export const TEXTURE_ART: Record<string, TextureArt> = ${literal(TEXTURE)};
+
 /** Whether a phone can draw this slug rather than approximating it. */
 export function hasRingArt(slug: string | null): boolean {
   return Boolean(slug && slug in RING_ART);
@@ -928,6 +1406,27 @@ export function hasBadgeArt(slug: string | null): boolean {
 export function hasTitleArt(slug: string | null): boolean {
   return Boolean(slug && slug in TITLE_ART);
 }
+
+/**
+ * Whether a stack has anything Skia can paint. A texture whose marks
+ * could not be read (the matrix rain's text glyphs) paints nothing, so
+ * a pattern made only of it is approximated rather than drawn blank.
+ */
+function paintable(layers: PaintLayer[]): boolean {
+  return layers.some((layer) =>
+    layer.type === "texture" ? (TEXTURE_ART[layer.name]?.marks.length ?? 0) > 0 : true,
+  );
+}
+
+export function hasPatternArt(slug: string | null): boolean {
+  return Boolean(slug && slug in PATTERN_ART && paintable(PATTERN_ART[slug].layers));
+}
+
+export function hasBackgroundArt(slug: string | null): boolean {
+  return Boolean(
+    slug && slug in BACKGROUND_ART && paintable(BACKGROUND_ART[slug].layers),
+  );
+}
 `;
 
 writeFileSync(OUT_PATH, body);
@@ -935,5 +1434,7 @@ console.log(
   `cosmetic art: ${Object.keys(RING).length} rings, ` +
     `${Object.keys(AURA).length} auras, ${Object.keys(BORDER).length} borders, ` +
     `${Object.keys(NAME).length} names, ${Object.keys(BADGE).length} badges, ` +
-    `${Object.keys(TITLE).length} titles -> mobile/src/cosmetic-art-data.ts`,
+    `${Object.keys(TITLE).length} titles, ${Object.keys(PATTERN).length} patterns, ` +
+    `${Object.keys(BACKGROUND).length} backgrounds, ${Object.keys(TEXTURE).length} textures ` +
+    `-> mobile/src/cosmetic-art-data.ts`,
 );

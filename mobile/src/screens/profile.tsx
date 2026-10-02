@@ -44,6 +44,7 @@ import {
   type Wardrobe,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { WornBackground } from "../cosmetic-paint";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
@@ -139,6 +140,9 @@ export function ProfileScreen() {
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
+
+  /* The showcase panel's inside, measured, for the worn background. */
+  const [panel, setPanel] = useState({ w: 0, h: 0 });
 
   const load = useCallback(async () => {
     const token = await storedAccessToken();
@@ -539,8 +543,14 @@ export function ProfileScreen() {
         {/* The one showcase, editable in place: tap a card to dress
             it, remove below it, add at the end. The header's wand is
             the one wand; Customize switches between its two menus. Its
-            own rounded panel inside the block, same as the website. */}
+            own rounded panel inside the block, same as the website. The
+            worn background paints it edge to edge, measured off the
+            panel; its own colour stays underneath as the fallback. */}
         <View
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setPanel({ w: width - 2, h: height - 2 });
+          }}
           style={{
             gap: spacing(2),
             borderRadius: radius.control,
@@ -548,8 +558,15 @@ export function ProfileScreen() {
             borderColor: colors.border,
             backgroundColor: colors.elevated,
             padding: spacing(3),
+            overflow: "hidden",
           }}
         >
+          <WornBackground
+            background={profile.equips?.background ?? null}
+            width={panel.w}
+            height={panel.h}
+            radius={radius.control - 1}
+          />
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
@@ -617,6 +634,7 @@ export function ProfileScreen() {
                       holo={entry.holo ?? profile.equipped.holo}
                       effect={profile.equipped.effect}
                       border={profile.equips?.border ?? null}
+                      pattern={profile.equips?.pattern ?? null}
                     />
                   </Tap>
                   <Text
@@ -659,6 +677,7 @@ export function ProfileScreen() {
               defaultHolo={profile.equipped.holo}
               effect={profile.equipped.effect}
               border={profile.equips?.border ?? null}
+              pattern={profile.equips?.pattern ?? null}
               onPick={(cardId, printingId, picks) =>
                 void act(
                   "showcase-add",
@@ -834,6 +853,7 @@ export function ProfileScreen() {
         shelf={profile.showcase}
         onSwitch={setDressing}
         border={profile.equips?.border ?? null}
+        pattern={profile.equips?.pattern ?? null}
         defaults={profile.equipped}
         frames={ownedFrames}
         holos={ownedHolos}
@@ -974,6 +994,7 @@ function AddToShowcase({
   defaultHolo,
   effect,
   border,
+  pattern,
   onPick,
 }: {
   busy: boolean;
@@ -984,6 +1005,8 @@ function AddToShowcase({
   effect: string | null;
   /** The worn catalogue border, so the preview is the card they get. */
   border: string | null;
+  /** The worn catalogue holo pattern, for the same reason. */
+  pattern: string | null;
   onPick: (
     cardId: string,
     printingId: string | null,
@@ -1079,6 +1102,7 @@ function AddToShowcase({
             holo={picked.holo}
             effect={effect}
             border={border}
+            pattern={pattern}
           />
         </View>
 
@@ -1180,6 +1204,7 @@ function DressModal({
   holos,
   effect,
   border,
+  pattern,
   onClose,
   onDress,
   onDressAll,
@@ -1195,6 +1220,8 @@ function DressModal({
   effect: string | null;
   /** The worn catalogue border, so the preview is the card they get. */
   border: string | null;
+  /** The worn catalogue holo pattern, for the same reason. */
+  pattern: string | null;
   onClose: () => void;
   onDress: (entryId: string, frame: string | null, holo: string | null) => void;
   /** Resolves true when the write landed, so the button can say so. */
@@ -1326,6 +1353,7 @@ function DressModal({
                   holo={picked.holo}
                   effect={effect}
                   border={border}
+                  pattern={pattern}
                 />
                 <Tap
                   disabled={!next}

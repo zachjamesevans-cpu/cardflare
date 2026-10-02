@@ -25,6 +25,7 @@ import {
   type PeekProfile,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { WornBackground } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
@@ -152,6 +153,8 @@ export function PlayerProfileScreen() {
   /* Cards render together once their art is warm, not one by one. */
   const [shelfReady, setShelfReady] = useState(false);
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
+  /* The showcase panel's inside, measured, for the worn background. */
+  const [panel, setPanel] = useState({ w: 0, h: 0 });
 
   /* Re-read after a write inside the page, an offer on a hunt say,
      without the warm-up: the shelf is already drawn. */
@@ -263,6 +266,7 @@ export function PlayerProfileScreen() {
     holo: entry.holo,
     effect: profile.effect,
     border: profile.equips?.border ?? null,
+    pattern: profile.equips?.pattern ?? null,
     note: entry.note ?? null,
   }));
 
@@ -415,8 +419,14 @@ export function PlayerProfileScreen() {
         />
 
         {/* The showcase panel, same as the website: its own rounded
-            rectangle inside the one connected profile block. */}
+            rectangle inside the one connected profile block. The worn
+            background paints it edge to edge, measured off the panel;
+            its own colour stays underneath as the fallback. */}
         <View
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setPanel({ w: width - 2, h: height - 2 });
+          }}
           style={{
             gap: spacing(2),
             borderRadius: radius.control,
@@ -424,8 +434,15 @@ export function PlayerProfileScreen() {
             borderColor: colors.border,
             backgroundColor: colors.elevated,
             padding: spacing(3),
+            overflow: "hidden",
           }}
         >
+          <WornBackground
+            background={profile.equips?.background ?? null}
+            width={panel.w}
+            height={panel.h}
+            radius={radius.control - 1}
+          />
           <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
             Showcase
           </Text>
@@ -451,6 +468,7 @@ export function PlayerProfileScreen() {
                       holo={entry.holo}
                       effect={profile.effect}
                       border={profile.equips?.border ?? null}
+                      pattern={profile.equips?.pattern ?? null}
                     />
                   </Tap>
                 ))}
