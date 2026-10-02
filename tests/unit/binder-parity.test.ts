@@ -26,14 +26,19 @@ const read = (path: string) => {
  * a "+" on every open pocket; and a Private switch, on for private.
  *
  * Read off the source, because parity is the same words, the same
- * controls and the same place on the website and in the app: a panel
- * between the hunts and the showcase, a page of pockets, and one cover
- * drawing per platform.
+ * controls and the same place on the website and in the app: a page
+ * of pockets, and one cover drawing per platform.
+ *
+ * The profile panel this round built is gone: the profile IA round
+ * turned it into the highlights row and the Binders list (pinned in
+ * profile-ia-parity.test.ts), and the binder page moved to
+ * /binders/<id>, the Trade binder being "trade".
  */
 
 const web = {
   cover: read("src/components/binder/binder-cover.tsx"),
-  panel: read("src/components/binder/binder-panel.tsx"),
+  list: read("src/components/binder/binder-list.tsx"),
+  highlights: read("src/components/binder/binder-highlights.tsx"),
   /* The page is three client pieces; together they are the screen. */
   page:
     read("src/components/binder/binder-page.tsx") +
@@ -41,8 +46,8 @@ const web = {
     read("src/components/binder/add-binder-card.tsx"),
   view: read("src/components/binder/binder-page.tsx"),
   settings: read("src/components/binder/binder-settings.tsx"),
-  ownPage: read("src/app/profile/binder/page.tsx"),
-  playerPage: read("src/app/p/[playerId]/binder/page.tsx"),
+  ownPage: read("src/app/profile/binders/[binderId]/page.tsx"),
+  playerPage: read("src/app/p/[playerId]/binders/[binderId]/page.tsx"),
   ownProfile: read("src/app/profile/page.tsx"),
   playerProfile: read("src/app/p/[playerId]/page.tsx"),
   covers: read("src/lib/binder/covers.ts"),
@@ -50,62 +55,13 @@ const web = {
 
 const app = {
   cover: read("mobile/src/binder-cover.tsx"),
-  panel: read("mobile/src/binder-panel.tsx"),
+  list: read("mobile/src/binder-list.tsx"),
+  highlights: read("mobile/src/binder-highlights.tsx"),
   page: read("mobile/src/screens/binder.tsx"),
   ownProfile: read("mobile/src/screens/profile.tsx"),
   playerProfile: read("mobile/src/screens/player-profile.tsx"),
   covers: read("mobile/src/binder-covers.ts"),
 };
-
-describe("the binder panel on a profile", () => {
-  it("opens the binder, or starts it with Add cards, on both platforms", () => {
-    for (const [name, panel] of [
-      ["web", web.panel],
-      ["app", app.panel],
-    ] as const) {
-      expect(panel.length, `${name}: the panel exists`).toBeGreaterThan(0);
-      expect(panel, name).toContain("Open binder");
-      expect(panel, name).toContain("Add cards");
-      /* The small cover carries the name alone: "'s binder" truncated. */
-      expect(panel, name).toContain('yours ? "Yours" : ownerName');
-      expect(panel, name).not.toContain("'s binder");
-      expect(panel, name).toContain("Private, only you");
-      expect(panel, name).toContain("binderCountLine(");
-      expect(panel, name).toContain("binderMatchLine(");
-    }
-  });
-
-  it("sits between the hunts and the showcase on all four profile pages", () => {
-    for (const [name, source, showcase] of [
-      ["web own profile", web.ownProfile, "Your showcase"],
-      ["web player profile", web.playerProfile, ">Showcase<"],
-      ["app own profile", app.ownProfile, "Your showcase"],
-      ["app player profile", app.playerProfile, /\bShowcase\b/],
-    ] as const) {
-      const hunts = source.indexOf("<HuntsPanel");
-      const binder = source.indexOf("<BinderPanel");
-      const rest = source.slice(hunts);
-      const shelf =
-        typeof showcase === "string" ? rest.indexOf(showcase) : rest.search(showcase);
-      expect(hunts, `${name}: the hunts panel`).toBeGreaterThan(-1);
-      expect(binder, `${name}: the binder panel`).toBeGreaterThan(hunts);
-      expect(shelf, `${name}: the showcase`).toBeGreaterThan(-1);
-      expect(binder - hunts, `${name}: binder before showcase`).toBeLessThan(shelf);
-    }
-  });
-
-  it("is drawn only when the server hands over a summary", () => {
-    for (const page of [web.ownProfile, web.playerProfile]) {
-      expect(page).toContain("{profile.binder && (");
-    }
-    /* The viewer's id goes into the profile read on the public page,
-       so the summary respects the Public switch and counts hunts. */
-    expect(web.playerProfile).toContain("publicProfile(playerId, me)");
-    expect(web.playerProfile).toContain("yours={me === playerId}");
-    expect(web.ownProfile).toContain('href="/profile/binder"');
-    expect(web.playerProfile).toContain("href={`/p/${playerId}/binder`}");
-  });
-});
 
 describe("the binder page", () => {
   it("has the owner's tools and the visitor's words on both platforms", () => {
@@ -216,34 +172,44 @@ describe("the binder page", () => {
     expect(web.settings).toContain("router.refresh()");
   });
 
-  it("is reached from /profile/binder and /p/<id>/binder", () => {
-    expect(web.ownPage).toContain("readBinder(playerId, playerId)");
-    expect(web.ownPage).toContain('title="Your binder"');
-    expect(web.playerPage).toContain("readBinder(playerId, me)");
+  it("is reached from /profile/binders/<id> and /p/<id>/binders/<id>", () => {
+    expect(web.ownPage).toContain("readBinder(playerId, playerId, binderId)");
+    expect(web.ownPage).toContain("title={binder.name}");
+    expect(web.playerPage).toContain("readBinder(playerId, me, binderId)");
     expect(web.playerPage).toContain("if (!binder) notFound();");
+    /* The old addresses still open the Trade binder. */
+    expect(read("src/app/profile/binder/page.tsx")).toContain("/profile/binders/");
+    expect(read("src/app/p/[playerId]/binder/page.tsx")).toContain("/binders/");
   });
 });
 
 describe("one cover drawing per platform", () => {
   it("draws the spine in the cover component and nowhere else", () => {
     const webElsewhere = [
-      web.panel,
+      web.list,
+      web.highlights,
       web.page,
       web.ownPage,
       web.playerPage,
       web.ownProfile,
       web.playerProfile,
     ];
-    const appElsewhere = [app.panel, app.page, app.ownProfile, app.playerProfile];
+    const appElsewhere = [
+      app.list,
+      app.highlights,
+      app.page,
+      app.ownProfile,
+      app.playerProfile,
+    ];
     expect(web.cover).toContain("spine");
     expect(app.cover).toContain("spine");
     for (const source of [...webElsewhere, ...appElsewhere]) {
       expect(source).not.toContain("spine");
     }
     /* Everyone draws through the one component. */
-    expect(web.panel).toContain("<BinderCover");
+    expect(web.list).toContain("<BinderCover");
     expect(web.settings).toContain("<BinderCover");
-    expect(app.panel).toContain("<BinderCover");
+    expect(app.list).toContain("<BinderCover");
   });
 
   it("is a zip binder on both platforms, not a three-ring one", () => {

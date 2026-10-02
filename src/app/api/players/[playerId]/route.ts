@@ -144,6 +144,8 @@ export async function GET(
     hunts: profile.hunts,
     /* The binder's panel: null for a private binder that is not yours. */
     binder: absoluteImageUrls(profile.binder),
+    binders: absoluteImageUrls(profile.binders),
+    flares: absoluteImageUrls(profile.flares),
     showcase: profile.showcase.map((entry) => ({
       id: entry.id,
       name: entry.name,

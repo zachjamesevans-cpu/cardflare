@@ -10,6 +10,7 @@ import {
   type DressingOption,
 } from "@/components/players/dressing-picker";
 import { Button } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
 import { addShowcaseAction } from "@/lib/players/profile-actions";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
 
@@ -31,6 +32,13 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * Closed by default. Nine cards fit on this shelf and most visits change
  * none of them, so a permanently open search would be the loudest thing
  * on a page that is mostly for looking at.
+ *
+ * On the profile it is folded behind a "+" tile at the end of the
+ * shelf itself (`tile`), the profile IA round's call: "fewer giant
+ * bordered boxes". The tile opens the same two steps in a sheet over
+ * the page, since a form cannot unfold inside a shelf that scrolls
+ * sideways. Without `tile` it is the button and the inline form it
+ * always was.
  */
 export function AddShowcaseForm({
   imagesEnabled,
@@ -40,6 +48,7 @@ export function AddShowcaseForm({
   defaultFrame,
   defaultHolo,
   effect,
+  tile = false,
 }: {
   imagesEnabled: boolean;
   /** The reader's sign-up games, for the search's default chip. */
@@ -52,6 +61,8 @@ export function AddShowcaseForm({
   defaultHolo: string | null;
   /** Profile-wide, worn in previews so they stay honest. */
   effect: string | null;
+  /** A "+" tile on the shelf that opens the form in a sheet. */
+  tile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -70,7 +81,12 @@ export function AddShowcaseForm({
     setPicked({ frame: defaultFrame, holo: defaultHolo });
   };
 
-  if (!open) {
+  const close = () => {
+    reset();
+    setOpen(false);
+  };
+
+  if (!open && !tile) {
     return (
       <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
         <Plus className="size-4" aria-hidden="true" />
@@ -79,24 +95,18 @@ export function AddShowcaseForm({
     );
   }
 
-  return (
+  const body = (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-text-secondary">
           {chosen ? "Dress it before it goes up" : "Search for a card to show off"}
         </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            reset();
-            setOpen(false);
-          }}
-        >
-          <X className="size-4" aria-hidden="true" />
-          <span className="sr-only">Close</span>
-        </Button>
+        {!tile && (
+          <Button type="button" variant="ghost" size="sm" onClick={close}>
+            <X className="size-4" aria-hidden="true" />
+            <span className="sr-only">Close</span>
+          </Button>
+        )}
       </div>
 
       {/*
@@ -175,5 +185,26 @@ export function AddShowcaseForm({
         </div>
       )}
     </div>
+  );
+
+  if (!tile) return body;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Add a card"
+        className="flex aspect-[63/88] w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[6px] border-2 border-dashed border-border-strong bg-elevated/40 text-text-secondary transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
+      >
+        <span aria-hidden="true" className="text-2xl leading-none font-light">
+          +
+        </span>
+        <span className="text-[10px] font-semibold">Add</span>
+      </button>
+      <Sheet open={open} onClose={close} title="Add to showcase">
+        {body}
+      </Sheet>
+    </>
   );
 }

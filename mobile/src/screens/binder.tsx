@@ -38,7 +38,10 @@ import type { StackParams } from "../../App";
 import { SheetBackdrop } from "../action-menu";
 import {
   ApiError,
+  BINDER_NAME_MAX,
+  TRADE_BINDER_ID,
   addBinderCard,
+  deleteBinder,
   describeError,
   getBinder,
   openDirectThread,
@@ -61,9 +64,11 @@ import { CardPicker } from "../card-picker";
 import { RemoteImage } from "../remote-image";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
+  Body,
   Button,
   CardImage,
   ErrorLine,
+  Input,
   Loading,
   Muted,
   Tap,
@@ -71,23 +76,28 @@ import {
 } from "../ui";
 
 /**
- * The trade binder, open: the website's /profile/binder and
- * /p/[playerId]/binder on one screen. No id means yours.
+ * One binder, open: the website's /profile/binders/[binderId] and
+ * /p/[playerId]/binders/[binderId] on one screen. No playerId means
+ * yours; no binderId means the Trade binder.
  *
- * The Have list, drawn like the thing it stands in for: pages of
- * pockets, two by two or three by three, turned with a swipe, dots
- * under them. A tap on a pocket is the card large, in the one viewer
- * every shelf uses, with nothing to offer: the binder is not
- * answerable yet, that is a later round.
+ * Two kinds come through here and draw the same. The Trade binder is
+ * the Have list: the cards the owner will trade, the ones nearby
+ * matching and the room hear about. A custom binder is a folder the
+ * owner named ("One Piece", "Grails") whose cards take no part in
+ * matching. Pages of pockets, two by two or three by three, turned
+ * with a swipe, dots under them. A tap on a pocket is the card large,
+ * in the one viewer every shelf uses, with nothing to offer: the
+ * binder is not answerable yet, that is a later round.
  *
  * The owner adds cards through the card picker (the button under the
  * page, or the "+" in any empty pocket), takes one out or names the
  * front card with Edit on, holds a card to move it, and sets the
  * binder up in the strip at the foot: private or not, the layout, the
- * cover. Every write paints at once from what the server sends back
- * and then asks for the truth again behind it. A visitor gets the
- * chips when any of the cards are on their hunts, and one button,
- * Message.
+ * cover, and on a custom binder its name and, at the bottom, Delete
+ * binder. The Trade binder cannot be renamed or deleted. Every write
+ * paints at once from what the server sends back and then asks for
+ * the truth again behind it. A visitor gets the chips when any of the
+ * cards are on their hunts, and one button, Message.
  *
  * HOLD TO MOVE is the card tray's gesture (mobile/src/card-tray.tsx),
  * the founder's ask: "similar animations to how people can adjust
@@ -172,9 +182,17 @@ function moved<T>(list: T[], from: number, to: number): T[] {
   return next;
 }
 
-export function BinderScreen({ playerId }: { playerId?: string }) {
+export function BinderScreen({
+  playerId,
+  binderId,
+}: {
+  playerId?: string;
+  /** "trade" or a custom binder's uuid; missing means the Trade binder. */
+  binderId?: string;
+}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const window = useWindowDimensions();
+  const id = binderId ?? TRADE_BINDER_ID;
   const [binder, setBinder] = useState<Binder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -182,11 +200,13 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  /* The delete confirm, over the page; custom binders only. */
+  const [deleting, setDeleting] = useState(false);
   const pager = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
     try {
-      const { binder: fresh } = await getBinder(playerId);
+      const { binder: fresh } = await getBinder(playerId, id);
       setBinder(fresh);
       setError(null);
     } catch (caught) {
@@ -196,7 +216,7 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
           : describeError(caught),
       );
     }
-  }, [playerId]);
+  }, [id, playerId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -204,12 +224,12 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
     }, [load]),
   );
 
-  /* The header names whose binder this is, once that is known. */
+  /* The header is the binder's name, once that is known: "Trade
+     binder", the custom name, or "<Name>'s Trade binder" on somebody
+     else's. The website's page title says the same. */
   useEffect(() => {
     if (!binder) return;
-    navigation.setOptions({
-      title: binder.yours ? "Your binder" : `${binder.ownerName}'s binder`,
-    });
+    navigation.setOptions({ title: binderTitle(binder) });
   }, [binder, navigation]);
 
   /*
@@ -237,7 +257,24 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
     /* The setting paints before the server answers; a refusal paints
        the truth back through the reload. */
     setBinder((current) => (current ? { ...current, ...patch } : current));
-    void write(() => saveBinder(patch));
+    void write(() => saveBinder(patch, id));
+  };
+
+  /* A custom binder, gone with its cards. Back to wherever it was
+     opened from: the list or the profile, both of which re-read on
+     focus, so the circle and the row are gone by the time Back lands. */
+  const remove = async () => {
+    setWriteError(null);
+    try {
+      await deleteBinder(id);
+      setDeleting(false);
+      navigation.goBack();
+    } catch (caught) {
+      setDeleting(false);
+      setWriteError(
+        serverMessage(caught) ?? `Could not delete it (${describeError(caught)}).`,
+      );
+    }
   };
 
   const yours = binder?.yours ?? false;
@@ -291,7 +328,12 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
     onMove: (from, to) => {
       const next = moved(allCards, from, to);
       setBinder((current) => (current ? { ...current, cards: next } : current));
-      void write(() => reorderBinder(next.map((card) => card.entryId)));
+      void write(() =>
+        reorderBinder(
+          next.map((card) => card.entryId),
+          id,
+        ),
+      );
     },
   });
 
@@ -343,6 +385,16 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
           gap: spacing(3),
         }}
       >
+        {/* What the Trade binder is for, in one line under the title.
+            A custom binder is just what its owner called it. */}
+        {binder.kind === "trade" ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+            {yours
+              ? "Cards you will trade. Somebody nearby hunting one of them hears about it."
+              : `Cards ${binder.ownerName} will trade.`}
+          </Text>
+        ) : null}
+
         <Text style={{ color: colors.textMuted, fontSize: 12 }}>
           {`${binder.count} ${binder.count === 1 ? "card" : "cards"} · Page ${at + 1} of ${pageCount}`}
         </Text>
@@ -414,7 +466,7 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
                         }
                       : current,
                   );
-                  void write(() => removeBinderCard(entryId));
+                  void write(() => removeBinderCard(entryId, id));
                 }}
                 onFront={(entryId) => save({ frontEntryId: entryId })}
               />
@@ -451,7 +503,11 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
               onPress={() => setEditing((on) => !on)}
             />
             <ErrorLine message={writeError} />
-            <BinderSettings binder={binder} onSave={save} />
+            <BinderSettings
+              binder={binder}
+              onSave={save}
+              onDelete={() => setDeleting(true)}
+            />
           </View>
         ) : (
           <MessageOwner playerId={binder.ownerId} name={binder.ownerName} />
@@ -466,12 +522,29 @@ export function BinderScreen({ playerId }: { playerId?: string }) {
             setAdding(false);
             setFilter("all");
             turnTo(0);
-            void write(() => addBinderCard(cardId, printingId, 1));
+            void write(() => addBinderCard(cardId, printingId, 1, id));
           }}
+        />
+      ) : null}
+
+      {yours && binder.kind === "custom" ? (
+        <DeleteBinderConfirm
+          binder={deleting ? binder : null}
+          onKeep={() => setDeleting(false)}
+          onDelete={() => void remove()}
         />
       ) : null}
     </>
   );
+}
+
+/**
+ * "Trade binder" or the custom name for the owner; "<Name>'s Trade
+ * binder" (or "<Name>'s Grails") for anyone else. The website's page
+ * title, word for word.
+ */
+function binderTitle(binder: Binder): string {
+  return binder.yours ? binder.name : `${binder.ownerName}'s ${binder.name}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1360,8 +1433,12 @@ function Chip({
 }
 
 /**
- * The strip at the foot of your own binder: private or not, the
- * layout, the cover. Every change saves at once and paints at once.
+ * The strip at the foot of your own binder: on a custom binder its
+ * name, then private or not, the layout, the cover, and on a custom
+ * binder Delete binder at the bottom. Every change saves at once and
+ * paints at once; the name saves when the field is left or Return is
+ * pressed. The Trade binder has no name field and no delete: it is
+ * the one binder every player has.
  *
  * The switch says Private, and on means private. The founder: "the
  * toggle for public is kinda weird. should be a toggle for 'private'
@@ -1371,10 +1448,28 @@ function Chip({
 function BinderSettings({
   binder,
   onSave,
+  onDelete,
 }: {
   binder: Binder;
   onSave: (patch: BinderSettingsPatch) => void;
+  /** The delete confirm; custom binders only. */
+  onDelete: () => void;
 }) {
+  const custom = binder.kind === "custom";
+  /* The name as typed; what is saved is the trimmed, non-empty one. */
+  const [name, setName] = useState(binder.name);
+  useEffect(() => {
+    setName(binder.name);
+  }, [binder.name]);
+  const saveName = () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setName(binder.name);
+      return;
+    }
+    if (trimmed !== binder.name) onSave({ name: trimmed });
+  };
+
   return (
     <View
       style={{
@@ -1389,6 +1484,24 @@ function BinderSettings({
       <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
         Binder
       </Text>
+
+      {custom ? (
+        <View style={{ gap: spacing(2) }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
+            Name
+          </Text>
+          <Input
+            value={name}
+            onChangeText={(text) => setName(text.slice(0, BINDER_NAME_MAX))}
+            onBlur={saveName}
+            onSubmitEditing={saveName}
+            returnKeyType="done"
+            maxLength={BINDER_NAME_MAX}
+            autoCapitalize="words"
+            accessibilityLabel="Binder name"
+          />
+        </View>
+      ) : null}
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -1475,7 +1588,79 @@ function BinderSettings({
           </View>
         </ScrollView>
       </View>
+
+      {custom ? (
+        <Tap
+          onPress={onDelete}
+          accessibilityLabel="Delete binder"
+          style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
+        >
+          <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 14 }}>
+            Delete binder
+          </Text>
+        </Tap>
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * The second step of a delete, in the website's words: the name, how
+ * many cards go with it, Delete and Keep.
+ */
+function DeleteBinderConfirm({
+  binder,
+  onKeep,
+  onDelete,
+}: {
+  /** Null while closed. */
+  binder: Binder | null;
+  onKeep: () => void;
+  onDelete: () => void;
+}) {
+  if (!binder) return null;
+  const line = `Delete ${binder.name}? Its ${binder.count} ${
+    binder.count === 1 ? "card leaves" : "cards leave"
+  } with it.`;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onKeep}>
+      <SheetBackdrop />
+      <Pressable
+        onPress={onKeep}
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing(4),
+        }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            alignSelf: "stretch",
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            padding: spacing(4),
+            gap: spacing(3),
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
+            Delete binder
+          </Text>
+          <Body>{line}</Body>
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            <View style={{ flex: 1 }}>
+              <Button label="Delete" onPress={onDelete} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="Keep" variant="secondary" onPress={onKeep} />
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

@@ -29,11 +29,15 @@ import { WornBadge, WornName, WornTitle } from "./worn-name";
  * of buttons the full width of the block. The same header for your own
  * profile and for anybody else's; only the buttons differ.
  *
- * Second pass, the founder again: the numbers want "blocks or
- * separation... so they're not just floating", and the name, badge
- * and title were "sporadic". So each number is a tile, and the name
- * block is three ruled lines: name with its badge, the handle, then
- * the title chip and the Embers pill together on one row.
+ * Second pass, the founder again: the name, badge and title were
+ * "sporadic". So the name block is three ruled lines: name with its
+ * badge, the handle, then the title chip and the Embers pill together
+ * on one row.
+ *
+ * Third pass, the profile redesign: the numbers lose their boxes. The
+ * founder: "Keep this section visually clean and compact", "fewer
+ * giant bordered boxes". Each is a plain number over its label, still
+ * a tap when there is a list behind it.
  */
 export function ProfileHeader({
   avatar,
@@ -152,7 +156,7 @@ export function ProfileHeader({
   );
 }
 
-/** One number over its label in its own tile, tappable when there is a list behind it. */
+/** One number over its label, no box, tappable when there is a list behind it. */
 function Stat({
   value,
   label,
@@ -175,10 +179,6 @@ function Stat({
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.elevated,
     paddingVertical: spacing(2),
     paddingHorizontal: spacing(1),
   };

@@ -53,6 +53,11 @@ import { cn } from "@/lib/cn";
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the
  * refresh and wins, which is also what keeps two tabs honest.
+ *
+ * Two kinds of binder open here, the Trade binder and a custom one,
+ * and the pockets do not care which: every write carries the binder's
+ * id, and the settings strip is the only part that knows a custom
+ * binder has a name to edit and can be deleted.
  */
 
 type Settings = {
@@ -60,6 +65,7 @@ type Settings = {
   cover: BinderCoverId;
   isPublic: boolean;
   frontEntryId: string | null;
+  name: string;
 };
 
 const settingsOf = (binder: Binder): Settings => ({
@@ -67,6 +73,7 @@ const settingsOf = (binder: Binder): Settings => ({
   cover: binder.cover,
   isPublic: binder.isPublic,
   frontEntryId: binder.frontEntryId,
+  name: binder.name,
 });
 
 /** Where a dragged pocket is hovering: a slot, or an arrow. */
@@ -77,6 +84,7 @@ export function BinderView({
   imagesEnabled,
   playerGames = [],
   title,
+  subtitle = null,
   footer = null,
 }: {
   binder: Binder;
@@ -85,6 +93,13 @@ export function BinderView({
   playerGames?: readonly string[];
   /** The visible heading, or null when the shell already names the page. */
   title: string | null;
+  /**
+   * One line under the title, on the Trade binder: what its cards
+   * mean. "Cards you will trade. Somebody nearby hunting one of them
+   * hears about it." for the owner, "Cards <Name> will trade." for a
+   * visitor. Null on a custom binder.
+   */
+  subtitle?: string | null;
   /** A visitor's one control under the page: the message door. */
   footer?: ReactNode;
 }) {
@@ -168,7 +183,12 @@ export function BinderView({
     if (moved) next.splice(slot, 0, moved);
     setCards(next);
     setAt(Math.floor(slot / perPage));
-    act(() => reorderBinderAction(next.map((card) => card.entryId)));
+    act(() =>
+      reorderBinderAction(
+        next.map((card) => card.entryId),
+        binder.id,
+      ),
+    );
   };
 
   const dropAt = (spot: DropSpot) => (event: DragEvent) => {
@@ -205,6 +225,7 @@ export function BinderView({
         {title && (
           <h2 className="truncate text-lg font-extrabold text-text-primary">{title}</h2>
         )}
+        {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
         <p className="text-xs text-text-muted tabular-nums">
           {countLine} · Page {page + 1} of {pages}
         </p>
@@ -343,7 +364,7 @@ export function BinderView({
                           disabled={pending}
                           aria-label={`Remove ${card.name}`}
                           onClick={() =>
-                            act(() => removeBinderCardAction(card.entryId))
+                            act(() => removeBinderCardAction(card.entryId, binder.id))
                           }
                           className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
                         >
@@ -356,7 +377,7 @@ export function BinderView({
                           onClick={() => {
                             const patch = { frontEntryId: card.entryId };
                             paint(patch);
-                            act(() => saveBinderSettingsAction(patch));
+                            act(() => saveBinderSettingsAction(patch, binder.id));
                           }}
                           className={cn(
                             "absolute bottom-1 left-1 z-10 cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ring-1 transition-colors",
@@ -455,6 +476,7 @@ export function BinderView({
         <>
           <div className="flex flex-wrap items-center gap-2">
             <AddBinderCard
+              binderId={binder.id}
               imagesEnabled={imagesEnabled}
               playerGames={playerGames}
               open={adding}
@@ -473,6 +495,10 @@ export function BinderView({
             )}
           </div>
           <BinderSettings
+            binderId={binder.id}
+            kind={binder.kind}
+            name={settings.name}
+            count={binder.count}
             isPublic={settings.isPublic}
             layout={settings.layout}
             cover={settings.cover}

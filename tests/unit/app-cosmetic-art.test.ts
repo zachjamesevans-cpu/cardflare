@@ -366,9 +366,12 @@ describe("holo patterns and showcase backgrounds, in the app", () => {
     }
   });
 
-  it("paints the background first in a clipped, measured panel", () => {
+  it("paints the background first in a clipped, measured block", () => {
+    /* No bordered panel since the profile IA round, but still one
+       measured, clipped view with the background painted first and
+       the "Showcase" heading over it, on both screens. */
     for (const [source, heading] of [
-      [own, "Your showcase"],
+      [own, "Showcase\n"],
       [theirs, "Showcase\n"],
     ] as const) {
       const panel = source.slice(

@@ -7,7 +7,8 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
-import { binderSummary, type BinderSummary } from "@/lib/binder/binder";
+import { binderSummary, listBinders, type BinderSummary } from "@/lib/binder/binder";
+import { listOfferings, listWants } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
@@ -109,7 +110,30 @@ export interface PublicProfile {
    * panel is simply absent. The owner always gets one, cards or not.
    */
   binder: BinderSummary | null;
+  /**
+   * Every binder the viewer may open, the Trade binder first: the
+   * highlights row under the header. A visitor sees only public ones.
+   */
+  binders: BinderSummary[];
+  /**
+   * Their Flares, newest first: what the profile shows below the
+   * binders, and what the Flares number counts.
+   */
+  flares: ProfileFlare[];
   joinedAt: string;
+}
+
+/** One of a player's Flares, as the profile draws it: a card and which way it points. */
+export interface ProfileFlare {
+  id: string;
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  printingLabel: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  direction: "want" | "offering";
+  deckLabel: string | null;
 }
 
 export interface OwnProfile extends PublicProfile {
@@ -145,20 +169,36 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt, binder] = await Promise.all([
-    huntsFor(playerId, viewerId),
-    /*
-     * Resolved to a src here rather than at every render point, and
-     * VERIFIED against storage — see `verifiedAvatar`. This is the page
-     * where a row pointing at a missing object turns into "your picture
-     * saved but could not be loaded", which is the worst state the
-     * profile has: a message with nothing anybody can do about it.
-     */
-    verifiedAvatar(playerId, avatarPathFor(player)),
-    listShowcase(playerId),
-    organizerStoresFor(playerId),
-    binderSummary(playerId, viewerId),
-  ]);
+  const [hunts, avatarUrl, showcase, organizerAt, binder, binders, wants, offerings] =
+    await Promise.all([
+      huntsFor(playerId, viewerId),
+      /*
+       * Resolved to a src here rather than at every render point, and
+       * VERIFIED against storage — see `verifiedAvatar`. This is the page
+       * where a row pointing at a missing object turns into "your picture
+       * saved but could not be loaded", which is the worst state the
+       * profile has: a message with nothing anybody can do about it.
+       */
+      verifiedAvatar(playerId, avatarPathFor(player)),
+      listShowcase(playerId),
+      organizerStoresFor(playerId),
+      binderSummary(playerId, viewerId),
+      listBinders(playerId, viewerId),
+      listWants(playerId),
+      listOfferings(playerId),
+    ]);
+
+  const flares: ProfileFlare[] = [...wants, ...offerings].map((row) => ({
+    id: row.id,
+    cardId: row.cardId,
+    cardName: row.cardName,
+    cardNumber: row.cardNumber,
+    printingLabel: row.printingLabel,
+    imageUrl: row.imageUrl,
+    quantity: row.quantity,
+    direction: row.direction ?? "want",
+    deckLabel: row.deckLabel,
+  }));
 
   return {
     playerId: player.id,
@@ -185,6 +225,8 @@ async function loadProfile(
     showcase,
     organizerAt,
     binder,
+    binders,
+    flares,
     joinedAt: player.created_at,
   };
 }

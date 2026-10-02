@@ -1,6 +1,6 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -24,14 +24,15 @@ import {
   type FollowedPlayer,
   type PeekProfile,
 } from "../api";
+import { BinderHighlights } from "../binder-highlights";
 import { CosmeticCard } from "../cosmetic-card";
 import { WornBackground, WornScene } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
+import { ProfileFlares } from "../profile-flares";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { HuntsPanel } from "../hunts-panel";
-import { BinderPanel } from "../binder-panel";
+import { ProfileIconRow } from "../profile-icon-row";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Button, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
@@ -47,13 +48,20 @@ const HEADER_TOP = 60;
 
 /**
  * Somebody else's profile, the full page — where the popup's "View full
- * profile" lands. One block, the Instagram layout the website uses:
- * their cover as a strip with the picture overlapping it, the three
- * numbers beside the picture, the name and handle under, Follow and
- * Share profile, and the whole shelf as a carousel-sized rail inside
- * the same block. Tapping a card opens the standard full view. The
- * server builds this from a type with no balance field, so this screen
- * could not leak one.
+ * profile" lands. One block, the layout the website uses and your own
+ * profile shares: their cover as a strip with the picture overlapping
+ * it, the three numbers beside the picture, the name and handle under,
+ * Follow and Message, then two round stops (their hunts, their
+ * binders), their binders as a row of circles, the shelf as a
+ * carousel-sized rail, and every Flare they have up as a grid. Tapping
+ * a card opens the standard full view. The server builds this from a
+ * type with no balance field, so this screen could not leak one.
+ *
+ * The profile IA round took the hunts panel and the binder panel off
+ * the page and put them behind the stops; the founder wanted "important
+ * features represented as clear destinations/icons" with the deeper
+ * information one tap in. What you see of them is what they see of
+ * you, minus the controls only an owner gets.
  */
 /* How long the shelf waits for its art before showing what it has. */
 const WARM_MS = 700;
@@ -158,16 +166,6 @@ export function PlayerProfileScreen() {
   const [panel, setPanel] = useState({ w: 0, h: 0 });
   /* The profile block's inside, measured, for the worn scene. */
   const [blockBox, setBlockBox] = useState({ w: 0, h: 0 });
-
-  /* Re-read after a write inside the page, an offer on a hunt say,
-     without the warm-up: the shelf is already drawn. */
-  const reload = useCallback(async () => {
-    try {
-      setProfile(await peekPlayer(playerId));
-    } catch {
-      /* What is on screen stays; the next open retries. */
-    }
-  }, [playerId]);
 
   useEffect(() => {
     let live = true;
@@ -284,7 +282,7 @@ export function PlayerProfileScreen() {
     >
       {/* The profile block: cover, picture, name, badge, shelf. */}
       <Card
-        style={{ paddingTop: spacing(6), overflow: "hidden" }}
+        style={{ paddingTop: spacing(6), gap: spacing(4), overflow: "hidden" }}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           setBlockBox({ w: width - 2, h: height - 2 });
@@ -429,40 +427,36 @@ export function PlayerProfileScreen() {
           <ErrorLine message={blockError} />
         </View>
 
-        {/* What they are looking for, before what they are showing off:
-            somebody opening a profile is usually deciding whether they
-            can help. Same order as the website. */}
-        <HuntsPanel
-          hunts={profile.hunts ?? []}
-          ownerName={profile.displayName}
-          onChanged={() => void reload()}
+        {/* The two stops a visitor gets: their hunts and their binders.
+            Never their settings, their trades or their Embers. */}
+        <ProfileIconRow
+          yours={false}
+          onOpen={(stop) => {
+            if (stop === "hunts") navigation.navigate("Hunts", { playerId });
+            if (stop === "binders") navigation.navigate("Binders", { playerId });
+          }}
         />
 
-        {/* Their binder, closed, between the hunts and the shelf. A
-            private one sends no summary and draws nothing. Same place
-            as the website. */}
-        <BinderPanel
-          summary={profile.binder}
-          ownerName={profile.displayName}
-          onOpen={() => navigation.navigate("Binder", { playerId })}
+        {/* Their binders you may open, the Trade binder first with its
+            lime ring. Every one private: no row at all. */}
+        <BinderHighlights
+          binders={profile.binders ?? []}
+          yours={false}
+          onOpen={(binderId) => navigation.navigate("Binder", { playerId, binderId })}
         />
 
-        {/* The showcase panel, same as the website: its own rounded
-            rectangle inside the one connected profile block. The worn
-            background paints it edge to edge, measured off the panel;
-            its own colour stays underneath as the fallback. */}
+        {/* The showcase, same as the website: a small heading and the
+            rail, no box. The worn background paints behind them edge
+            to edge, measured off this view. */}
         <View
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
-            setPanel({ w: width - 2, h: height - 2 });
+            setPanel({ w: width, h: height });
           }}
           style={{
             gap: spacing(2),
             borderRadius: radius.control,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.elevated,
-            padding: spacing(3),
+            padding: spacing(2),
             overflow: "hidden",
           }}
         >
@@ -470,7 +464,7 @@ export function PlayerProfileScreen() {
             background={profile.equips?.background ?? null}
             width={panel.w}
             height={panel.h}
-            radius={radius.control - 1}
+            radius={radius.control}
           />
           <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
             Showcase
@@ -506,6 +500,10 @@ export function PlayerProfileScreen() {
             </ScrollView>
           )}
         </View>
+
+        {/* Every Flare they have up, newest first, three across. The
+            last thing on the page. */}
+        <ProfileFlares flares={profile.flares ?? []} yours={false} />
       </Card>
 
       <ShowcaseZoom card={zoomed} cards={shelf} onClose={() => setZoomed(null)} />

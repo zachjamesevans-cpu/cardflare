@@ -216,22 +216,26 @@ describe("the Feed tab answers the tap at once, website only", () => {
 });
 
 describe("Embers are three facts, not one number three ways", () => {
-  it("on the profile tile, both platforms", () => {
+  /*
+   * The profile IA round took the Embers card and the store door off
+   * the profile: the founder, "This is me as a trader", not "my
+   * CardFlare account dashboard". The badge in the header is the
+   * public number; the balance is on the store page behind the Embers
+   * door in the icon row, and nowhere on the profile, so the two are
+   * never read side by side.
+   */
+  it("keeps the badge on the profile and the balance off it, both platforms", () => {
     for (const source of [web.ownProfile, app.ownProfile]) {
-      expect(source).toContain("Earned by trading, all time");
-      expect(source).toContain("Public. The number on your badge.");
-      expect(source).toContain("Trades are the only thing that raise");
-      expect(source).toContain("it never goes down.");
+      expect(source).not.toContain("Earned by trading, all time");
       expect(source).not.toContain("Earned, all time");
+      expect(source).not.toContain("to spend");
+      expect(source).not.toMatch(/>\s*Embers store\s*</);
     }
+    expect(web.ownProfile).toContain("embersEarned={profile.embersEarned}");
   });
 
-  it("under the store door, both platforms", () => {
-    for (const source of [web.ownProfile, app.ownProfile]) {
-      expect(source).toContain(
-        "Packs, duplicates and gifts add to what you can spend.",
-      );
-      expect(source).toContain("Trading adds to");
+  it("says to spend on the store page, both platforms", () => {
+    for (const source of [web.embersStore, app.embersStore]) {
       expect(source).toContain("to spend");
     }
   });

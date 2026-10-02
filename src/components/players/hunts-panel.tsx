@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { ChevronDown, Layers, ListChecks, Plus } from "lucide-react";
 
 import { HuntDetail } from "@/components/players/hunt-detail";
-import { Button, buttonStyles } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { cn } from "@/lib/cn";
 import { remainingLabel } from "@/lib/flares/draft-rules";
@@ -17,17 +17,19 @@ import type { Hunt } from "@/lib/players/hunts";
  * A hunt is a persistent named list: "Green Zoro", "Wishlist upgrades".
  * Each row is closed by default and says the one thing worth reading
  * shut - what is left - and opens onto the full list with its progress.
- * Three rows at most, so a profile with a dozen hunts is still a
- * profile; the rest are one press away, and every hunt has a page of
- * its own at /hunts/<id> for sharing.
+ * Every hunt has a page of its own at /hunts/<id> for sharing.
+ *
+ * The panel used to sit on the profile, capped at three rows with a
+ * "See all" under them. The profile IA round moved it behind the Hunts
+ * door in the profile's icon row, onto a page of its own
+ * (/profile/hunts, /p/<id>/hunts, the app's Hunts screen), and a page
+ * that is nothing but the hunts has no reason to hide any: every row
+ * is drawn.
  *
  * The owner starts a hunt here, edits it here and ticks copies off
  * here. A visitor picks the cards they have and offers them, on the
  * posts those cards were flared in. Neither sees the other's controls.
  */
-
-/** How many rows the profile shows before "See all". */
-const SHOWN = 3;
 
 export function HuntsPanel({
   hunts,
@@ -58,12 +60,9 @@ export function HuntsPanel({
    * whoever is looking.
    */
   const [open, setOpen] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const atLimit = limit !== undefined && hunts.length >= limit;
-  const shown = showAll ? hunts : hunts.slice(0, SHOWN);
-  const hidden = hunts.length - shown.length;
 
   return (
     <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface p-4">
@@ -121,7 +120,7 @@ export function HuntsPanel({
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {shown.map((hunt) => (
+          {hunts.map((hunt) => (
             <HuntRow
               key={hunt.id}
               hunt={hunt}
@@ -132,25 +131,6 @@ export function HuntsPanel({
             />
           ))}
         </ul>
-      )}
-
-      {hidden > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          className={buttonStyles("ghost", "sm")}
-        >
-          See all {hunts.length} hunts
-        </button>
-      )}
-      {showAll && hunts.length > SHOWN && (
-        <button
-          type="button"
-          onClick={() => setShowAll(false)}
-          className={buttonStyles("ghost", "sm")}
-        >
-          Show fewer
-        </button>
       )}
     </section>
   );

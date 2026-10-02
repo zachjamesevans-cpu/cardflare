@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 import { BinderCover } from "@/components/binder/binder-cover";
-import { saveBinderSettingsAction } from "@/lib/binder/actions";
-import type { BinderSettingsPatch } from "@/lib/binder/binder";
+import { BINDER_NAME_MAX } from "@/components/binder/create-binder";
+import { Button } from "@/components/ui/button";
+import { TextInput } from "@/components/ui/controls";
+import { Sheet } from "@/components/ui/sheet";
+import { deleteBinderAction, saveBinderSettingsAction } from "@/lib/binder/actions";
+import type { BinderKind, BinderSettingsPatch } from "@/lib/binder/binder";
 import {
   BINDER_COVERS,
   BINDER_LAYOUTS,
@@ -31,13 +36,30 @@ const LAYOUT_LABEL: Record<BinderLayout, string> = { 2: "2 × 2", 3: "3 × 3" };
  * toggle for 'private' if anything. so if the toggle is on, it is a
  * private binder." The server still stores `isPublic`, so the switch
  * writes its opposite.
+ *
+ * A custom binder is named, so its strip starts with a Name field
+ * (saved when the field is left, or on Enter) and ends with Delete
+ * binder, behind a confirm that says how many cards go with it. The
+ * Trade binder has neither: there is one, it is called the Trade
+ * binder, and it stays.
  */
 export function BinderSettings({
+  binderId,
+  kind,
+  name,
+  count,
   isPublic,
   layout,
   cover,
   onChange,
 }: {
+  /** "trade", or a custom binder's uuid. */
+  binderId: string;
+  kind: BinderKind;
+  /** The custom binder's name, as the page holds it. */
+  name: string;
+  /** How many cards would leave with it. */
+  count: number;
   isPublic: boolean;
   layout: BinderLayout;
   cover: BinderCoverId;
@@ -47,12 +69,15 @@ export function BinderSettings({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [draftName, setDraftName] = useState(name);
+  const [confirming, setConfirming] = useState(false);
+  const custom = kind === "custom";
 
   const save = (patch: BinderSettingsPatch) => {
     setError(null);
     onChange(patch);
     start(async () => {
-      const result = await saveBinderSettingsAction(patch);
+      const result = await saveBinderSettingsAction(patch, binderId);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -61,9 +86,59 @@ export function BinderSettings({
     });
   };
 
+  /* The name goes when the field is left or Enter is pressed, and only
+     when it changed; an empty one falls back to what it was. */
+  const commitName = () => {
+    const trimmed = draftName.trim().slice(0, BINDER_NAME_MAX);
+    if (trimmed.length === 0) {
+      setDraftName(name);
+      return;
+    }
+    if (trimmed === name) return;
+    setDraftName(trimmed);
+    save({ name: trimmed });
+  };
+
+  const remove = () => {
+    if (pending) return;
+    setError(null);
+    start(async () => {
+      const result = await deleteBinderAction(binderId);
+      if (!result.ok) {
+        setError(result.message);
+        setConfirming(false);
+        return;
+      }
+      router.push("/profile/binders");
+      router.refresh();
+    });
+  };
+
   return (
     <section className="flex flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4">
       <p className="font-semibold text-text-primary">Binder</p>
+
+      {custom && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold text-text-primary">Name</span>
+          <TextInput
+            value={draftName}
+            onChange={(event) =>
+              setDraftName(event.target.value.slice(0, BINDER_NAME_MAX))
+            }
+            onBlur={commitName}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitName();
+              }
+            }}
+            maxLength={BINDER_NAME_MAX}
+            disabled={pending}
+            aria-label="Binder name"
+          />
+        </label>
+      )}
 
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
         <span className="flex min-w-0 flex-col">
@@ -158,6 +233,55 @@ export function BinderSettings({
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
+      )}
+
+      {custom && (
+        <>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            className="w-fit"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            Delete binder
+          </Button>
+
+          <Sheet
+            open={confirming}
+            onClose={() => setConfirming(false)}
+            title="Delete binder"
+            footer={
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={pending}
+                  onClick={remove}
+                >
+                  Delete
+                </Button>
+              </div>
+            }
+          >
+            <p className="text-sm text-text-primary">
+              Delete {name}? Its {count} {count === 1 ? "card leaves" : "cards leave"}{" "}
+              with it.
+            </p>
+          </Sheet>
+        </>
       )}
     </section>
   );

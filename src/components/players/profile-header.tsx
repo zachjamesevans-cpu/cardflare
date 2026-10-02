@@ -19,15 +19,21 @@ import type { ProfileStats } from "@/lib/players/stats";
  * of buttons the full width of the card. The same block for your own
  * profile and for anybody else's; only the buttons differ.
  *
- * Second pass, the founder again: the numbers want "blocks or
- * separation... so they're not just floating", and the name, badge
- * and title were "sporadic". So each number is a tile, and the name
- * block is three ruled lines: name with its badge, the handle, then
- * the title chip and the Embers pill together on one row.
+ * Second pass, the founder again: the name, badge and title were
+ * "sporadic". So the name block is three ruled lines: name with its
+ * badge, the handle, then the title chip and the Embers pill together
+ * on one row.
+ *
+ * Third pass, the profile IA round: the three numbers lose their
+ * boxed tiles and sit as plain number-over-label stacks. The founder:
+ * "Keep this section visually clean and compact", "fewer giant
+ * bordered boxes". The tap targets stay: followers and following
+ * still open the people lists, and the stack is as tall as the tile
+ * was. The app's ProfileHeader draws the same.
  */
 
-const TILE =
-  "flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-control)] border border-border bg-elevated/60 px-1 py-2";
+const STACK =
+  "flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-control)] px-1 py-2";
 
 export function ProfileHeader({
   avatar,
@@ -67,7 +73,7 @@ export function ProfileHeader({
   actions: ReactNode;
 }) {
   const tile = (value: number, label: string) => (
-    <span className={TILE}>
+    <span className={STACK}>
       <span className="text-lg font-bold text-text-primary tabular-nums">
         {value.toLocaleString()}
       </span>
@@ -86,7 +92,7 @@ export function ProfileHeader({
               value={stats.followers}
               label={stats.followers === 1 ? "follower" : "followers"}
               title="Followers"
-              className={cn(TILE, "cursor-pointer hover:border-border-strong")}
+              className={cn(STACK, "cursor-pointer hover:bg-elevated/60")}
             >
               {people.followers}
             </PeopleDialog>
@@ -98,7 +104,7 @@ export function ProfileHeader({
               value={stats.following}
               label="following"
               title="Following"
-              className={cn(TILE, "cursor-pointer hover:border-border-strong")}
+              className={cn(STACK, "cursor-pointer hover:bg-elevated/60")}
             >
               {people.following}
             </PeopleDialog>

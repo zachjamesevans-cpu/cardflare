@@ -120,6 +120,8 @@ export async function GET(request: Request): Promise<Response> {
       organizerAt: profile.organizerAt,
       /* The binder's panel, always present for the owner. */
       binder: absoluteImageUrls(profile.binder),
+      binders: absoluteImageUrls(profile.binders),
+      flares: absoluteImageUrls(profile.flares),
       /* How they want the Feed drawn. Sent with the profile because the
          settings screen lives here and the Feed asks the same answer. */
       feedView: await feedViewFor(player.playerId),

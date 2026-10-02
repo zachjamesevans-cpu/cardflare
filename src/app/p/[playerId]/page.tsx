@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Sparkles } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { BlockControls, BlockProvider } from "@/components/players/block-controls";
@@ -10,6 +9,8 @@ import { FollowButton } from "@/components/players/follow-button";
 import { MessageButton } from "@/components/players/message-button";
 import { PeopleList } from "@/components/players/people-list";
 import { ProfileHeader } from "@/components/players/profile-header";
+import { ProfileIconRow } from "@/components/players/profile-icon-row";
+import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileMenu } from "@/components/players/profile-menu";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -35,8 +36,7 @@ import {
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
 import { ProfileCover } from "@/components/players/profile-cover";
-import { HuntsPanel } from "@/components/players/hunts-panel";
-import { BinderPanel } from "@/components/binder/binder-panel";
+import { BinderHighlights } from "@/components/binder/binder-highlights";
 
 export async function generateMetadata({
   params,
@@ -63,14 +63,18 @@ export const dynamic = "force-dynamic";
  *
  * A shelf nobody can look at is a shelf in a closed room, so a name in a
  * roster links here. What is on show is exactly the founder's public
- * half: the picture, the name, the lifetime Ember badge, and the cards
- * they are proud of wearing whatever they unlocked.
+ * half: the picture, the name, the lifetime Ember badge, the doors to
+ * their hunts and their binders, the binders they chose to show, the
+ * cards they are proud of wearing whatever they unlocked, and the
+ * Flares they have up.
  *
  * What is NOT here is the spendable balance, and it is not here
  * structurally rather than by omission — `publicProfile` returns a type
  * with no field to put it in, so this page could not render it if it
- * tried. Nor are their wants, their collection, or their email: none of
- * that is a fact about a player, it is their account.
+ * tried. Nor are their trades, their settings, their collection, or
+ * their email: none of that is a fact about a player, it is their
+ * account. The icon row draws Hunts and Binders for them and never the
+ * other three.
  *
  * Anyone with the link can open it: Share profile hands the address to
  * people who may not have an account yet. A signed-out visitor sees
@@ -91,8 +95,8 @@ export default async function PublicProfilePage({
      room already shows. */
   /* The viewer's side of the follow relationship. Null hides the
      button: operators without a player account, and your own page.
-     Read first, because the profile's binder summary is theirs to
-     see or not, and says how many of its cards are on their hunts. */
+     Read first, because the profile's binders are theirs to see or
+     not, and say how many of their cards are on the viewer's hunts. */
   const me =
     viewer.kind === "player"
       ? viewer.playerId
@@ -126,6 +130,7 @@ export default async function PublicProfilePage({
   /* Somebody else's page, seen by an account: the only case with a
      Follow, a Message, a Report and a Block. */
   const other = Boolean(me && me !== playerId);
+  const yours = me === playerId;
   const [follow, stats, followers, following, block] = await Promise.all([
     other ? followState(me as string, playerId) : null,
     profileStats(playerId),
@@ -142,7 +147,7 @@ export default async function PublicProfilePage({
   return (
     <TabPageShell title={profile.displayName}>
       <BlockProvider initial={block}>
-        <Card className="relative flex flex-col gap-4 overflow-hidden">
+        <Card className="relative flex flex-col gap-5 overflow-hidden">
           <ProfileCover coverUrl={profile.coverUrl} short />
           <WornSceneLayer worn={dressed} rive={dressedArt} />
 
@@ -218,40 +223,25 @@ export default async function PublicProfilePage({
             />
           </div>
 
-          {/* What they are looking for, before what they are showing
-                off: somebody opening a profile is usually deciding
-                whether they can help. */}
-          <HuntsPanel hunts={profile.hunts} ownerName={profile.displayName} />
+          {/* The doors: Hunts and Binders on somebody else's page, all
+                five on your own, which this page is when the link is
+                yours. */}
+          <ProfileIconRow yours={yours} base={`/p/${playerId}`} />
 
-          {/* Their binder, between the hunts and the shelf, in the
-                same place the owner's page keeps it. Null when it is
-                private and this is not them: then there is no panel. */}
-          {profile.binder && (
-            <BinderPanel
-              summary={profile.binder}
-              ownerName={profile.displayName}
-              yours={me === playerId}
-              href={`/p/${playerId}/binder`}
-            />
-          )}
+          {/* Their binders, the ones they chose to show, the Trade
+                binder first. Null when there is nothing to open: then
+                there is no row. */}
+          <BinderHighlights
+            binders={profile.binders}
+            yours={yours}
+            base={`/p/${playerId}`}
+          />
 
-          {/* The showcase panel, pixel-identical to the own-profile
-                page's - the founder's spec: viewing somebody must show
-                the same block their owner sees. */}
-          <div className="relative flex w-full flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4 text-left">
-            <div className="flex items-start gap-3">
-              <Sparkles
-                className="mt-0.5 size-5 shrink-0 text-accent"
-                aria-hidden="true"
-              />
-              <div className="flex flex-col gap-1">
-                <p className="font-semibold text-text-primary">Showcase</p>
-                <p className="text-sm text-text-secondary">
-                  Cards this player is proud of. Not a trade list, so there is nothing
-                  to offer on here.
-                </p>
-              </div>
-            </div>
+          {/* The showcase, light: a small heading and the shelf on its
+                worn background. The owner's page draws the same, with
+                the "?" help and the "+" tile. */}
+          <section className="relative flex w-full flex-col gap-3 text-left">
+            <h2 className="font-semibold text-text-primary">Showcase</h2>
 
             {profile.showcase.length === 0 ? (
               <p className="text-sm text-text-muted">Nothing on the shelf yet.</p>
@@ -306,7 +296,14 @@ export default async function PublicProfilePage({
                 </Rail>
               </div>
             )}
-          </div>
+          </section>
+
+          {/* Every Flare they have up, newest first. Nothing below this. */}
+          <ProfileFlares
+            flares={profile.flares}
+            yours={yours}
+            imagesEnabled={imagesEnabled}
+          />
         </Card>
       </BlockProvider>
     </TabPageShell>
