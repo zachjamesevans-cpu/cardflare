@@ -20,10 +20,13 @@ import { openDirectThreadAction } from "@/lib/local/actions";
 export function MessageButton({
   playerId,
   className,
+  label = "Message",
 }: {
   playerId: string;
   /** Goes on the wrapper, so "flex-1" shares the row with Follow. */
   className?: string;
+  /** "Message" beside Follow; "Message CHUNC" where the name is not already on screen. */
+  label?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +58,7 @@ export function MessageButton({
         ) : (
           <MessageCircle className="size-4" aria-hidden="true" />
         )}
-        Message
+        {label}
       </button>
       {error && (
         <span role="alert" className="text-xs text-danger">

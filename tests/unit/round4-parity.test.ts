@@ -59,7 +59,9 @@ describe("a profile has Message beside Follow", () => {
     expect(web.messageButton).toContain(
       "router.push(`/local?thread=${encodeURIComponent(result.threadId)}`)",
     );
-    expect(web.messageButton).toMatch(/\n\s+Message\n/);
+    /* "Message" by default; the binder page hands it the owner's name. */
+    expect(web.messageButton).toContain('label = "Message"');
+    expect(web.messageButton).toMatch(/\n\s+\{label\}\n/);
   });
 
   it("in the app, with the same label and the same door", () => {

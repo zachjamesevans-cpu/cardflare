@@ -72,7 +72,8 @@ export function BinderPanel({
         <BinderCover
           cover={summary.cover}
           frontImageUrl={summary.frontImageUrl}
-          label={yours ? "Your binder" : `${ownerName}'s binder`}
+          /* The name alone: the panel's small cover has no room for more. */
+          label={yours ? "Yours" : ownerName}
           size="sm"
         />
         <View

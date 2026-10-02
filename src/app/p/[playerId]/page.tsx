@@ -36,6 +36,7 @@ import {
 import { cn } from "@/lib/cn";
 import { ProfileCover } from "@/components/players/profile-cover";
 import { HuntsPanel } from "@/components/players/hunts-panel";
+import { BinderPanel } from "@/components/binder/binder-panel";
 
 export async function generateMetadata({
   params,
@@ -88,7 +89,18 @@ export default async function PublicProfilePage({
      people who may not have an account yet, and a 404 at the other end
      would be the wrong first impression. Nothing here is more than a
      room already shows. */
-  const profile = await publicProfile(playerId);
+  /* The viewer's side of the follow relationship. Null hides the
+     button: operators without a player account, and your own page.
+     Read first, because the profile's binder summary is theirs to
+     see or not, and says how many of its cards are on their hunts. */
+  const me =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind === "anonymous"
+        ? null
+        : ((await playerForUser(viewer.user.id))?.id ?? null);
+
+  const profile = await publicProfile(playerId, me);
   if (!profile) notFound();
 
   const [worn, dressed] = await Promise.all([
@@ -111,14 +123,6 @@ export default async function PublicProfilePage({
     direction: "showcase",
   }));
 
-  /* The viewer's side of the follow relationship. Null hides the
-     button: operators without a player account, and your own page. */
-  const me =
-    viewer.kind === "player"
-      ? viewer.playerId
-      : viewer.kind === "anonymous"
-        ? null
-        : ((await playerForUser(viewer.user.id))?.id ?? null);
   /* Somebody else's page, seen by an account: the only case with a
      Follow, a Message, a Report and a Block. */
   const other = Boolean(me && me !== playerId);
@@ -218,6 +222,18 @@ export default async function PublicProfilePage({
                 off: somebody opening a profile is usually deciding
                 whether they can help. */}
           <HuntsPanel hunts={profile.hunts} ownerName={profile.displayName} />
+
+          {/* Their binder, between the hunts and the shelf, in the
+                same place the owner's page keeps it. Null when it is
+                private and this is not them: then there is no panel. */}
+          {profile.binder && (
+            <BinderPanel
+              summary={profile.binder}
+              ownerName={profile.displayName}
+              yours={me === playerId}
+              href={`/p/${playerId}/binder`}
+            />
+          )}
 
           {/* The showcase panel, pixel-identical to the own-profile
                 page's - the founder's spec: viewing somebody must show
