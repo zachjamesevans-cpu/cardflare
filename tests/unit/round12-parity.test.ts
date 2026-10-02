@@ -42,6 +42,8 @@ const app = {
   copy: read("mobile/src/offer-copy.ts"),
   zoom: read("mobile/src/ui.tsx"),
   sheet: read("mobile/src/flare-cards-sheet.tsx"),
+  /* Round 13 moved the send out of the zoom into the one review sheet. */
+  review: read("mobile/src/offer-review-sheet.tsx"),
   hunt: read("mobile/src/hunts-panel.tsx"),
   thread: read("mobile/src/screens/flare-post.tsx"),
   pager: read("mobile/src/flare-deck-pager.tsx"),
@@ -73,10 +75,11 @@ describe("the offer's sentences are one set on both platforms", () => {
 });
 
 describe("the verb is Offer wherever a hand goes up on a post", () => {
-  it("labels the zoom's button by the count, and says Offering while it goes", () => {
+  it("says the strip in the same words on both zooms", () => {
+    /* Round 13 took the send out of the zoom (the viewer builds an
+       offer; the review sends it), so the button by count and
+       "Offering…" live on the review now. The strip is the zoom's. */
     for (const zoom of [web.zoom, app.zoom]) {
-      expect(zoom).toContain("offerButtonLabel(");
-      expect(zoom).toContain("Offering…");
       expect(zoom).toContain("You offered this.");
       expect(zoom).toContain("They can see your name, so keep an eye out.");
       expect(zoom).toContain("Somebody already offered. You can too.");
@@ -127,7 +130,9 @@ describe("the verb is Offer wherever a hand goes up on a post", () => {
       app.hunt,
       app.thread,
     ]) {
-      expect(source).not.toContain("I have this");
+      /* Round 13's toggle is "I have this card", the one deliberate
+         exception: it adds to an offer and sends nothing. */
+      expect(source).not.toMatch(/I have this(?! card)/);
       expect(source).not.toContain("I have ${");
       expect(source).not.toContain("You said you have this");
     }
@@ -139,47 +144,53 @@ describe("one send, one notice, through the door that answers", () => {
     expect(web.zoom).toContain("offerItemsAction(");
     expect(web.zoom).not.toContain("offerFromFeedAction");
     expect(web.zoom).toContain("quantity: 1");
-    expect(web.zoom).toContain("useTransition");
     /* Lands on the shelf's bar, under the picture, as round 9 put it. */
     expect(web.zoom.indexOf("<ZoomHaveBlock")).toBeGreaterThan(
       web.zoom.indexOf("aspect-[60/84]"),
     );
 
-    /* The app's zoom builds the lines and hands them to a `send` the
-       screen wires to offer-items, so one send is one notice there too. */
+    /* The app's zoom builds the lines and hands them to the review,
+       which the screen wires to offer-items, so one send is one notice
+       there too. The refusal is read through offer-copy wherever the
+       send lives now. */
     expect(app.zoom).toContain("quantity: 1");
-    expect(app.zoom).toContain("offerFailureMessage(");
+    expect(app.zoom + app.review + app.sheet).toContain("offerFailureMessage(");
     expect(app.zoom).not.toMatch(/action: "offer"[^-]/);
     for (const screen of [app.home, app.thread]) {
       expect(screen).toContain("offerItemsOnPost(");
     }
   });
 
-  it("picks more cards along the shelf, and can stop", () => {
+  it("builds one offer across the shelf, keyed by Flare", () => {
+    /* Round 13: the picks persist between swipes and go as one send
+       from "Review offer · N cards". The zoom never sends on its own. */
     for (const zoom of [web.zoom, app.zoom]) {
-      expect(zoom).toContain("Pick more cards");
-      expect(zoom).toContain("Pick this card");
-      expect(zoom).toContain("Picked");
-      expect(zoom).toContain("Cancel");
-      expect(zoom).toContain("Add a note");
+      expect(zoom).toContain("Review offer ·");
+      expect(zoom).not.toContain("Pick more cards");
+      expect(zoom).not.toContain("Pick this card");
     }
+    expect(web.zoom).toContain("picks.has(");
   });
 
   it("says why when the server refuses, and which cards were not taken", () => {
-    expect(web.zoom).toContain("setFailure(result.message)");
-    expect(web.zoom).toContain("text-danger");
+    /* The sentence is the review's now; the strip still names the
+       cards the server would not take. */
+    const review = read("src/components/flares/offer-review.tsx");
+    expect(review).toContain("outcome.message");
+    expect(review).toContain("text-danger");
     for (const zoom of [web.zoom, app.zoom]) {
       expect(zoom).toContain("Not taken: ");
     }
   });
 
   it("keeps the zoom up after a send", () => {
-    /* The confirmation strip takes the bar's place; nothing closes the dialog. */
+    /* The confirmation strip takes the block's place; nothing closes the dialog. */
     const sendBlock = web.zoom.slice(
-      web.zoom.indexOf("send: (postId, flareIds) => {"),
-      web.zoom.indexOf("router.refresh();"),
+      web.zoom.indexOf("const submitOffer = async (message: string) => {"),
+      web.zoom.indexOf("A swipe ends in a click"),
     );
     expect(sendBlock.length).toBeGreaterThan(0);
     expect(sendBlock).not.toContain("close()");
+    expect(web.zoom).toContain("onSent={() => setPicks(new Set())}");
   });
 });
