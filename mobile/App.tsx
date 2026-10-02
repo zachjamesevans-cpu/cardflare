@@ -36,6 +36,7 @@ import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { LogTradeScreen } from "./src/screens/log-trade";
 import { ProfileScreen } from "./src/screens/profile";
 import { EditProfileScreen } from "./src/screens/edit-profile";
+import { BinderScreen } from "./src/screens/binder";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
@@ -123,6 +124,12 @@ export type StackParams = {
   /** Instagram's Edit profile: picture, effects, name, username,
       pronouns, bio. The website's /profile/edit. */
   EditProfile: undefined;
+  /**
+   * The trade binder, open: the website's /profile/binder with no id,
+   * /p/[playerId]/binder with one. Reached from the Binder panel on
+   * either profile.
+   */
+  Binder: { playerId?: string } | undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
@@ -182,6 +189,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Scan: "Back",
   Settings: "Profile",
   EditProfile: "Profile",
+  Binder: "Profile",
   Store: "Profile",
   Customize: "Profile",
   Pro: "Back",
@@ -725,6 +733,12 @@ export default function App() {
             component={EditProfileScreen}
             options={{ title: "Edit profile", headerBackTitle: "Profile" }}
           />
+          <Stack.Screen
+            name="Binder"
+            options={{ title: "Binder", headerBackTitle: "Profile" }}
+          >
+            {({ route }) => <BinderScreen playerId={route.params?.playerId} />}
+          </Stack.Screen>
           <Stack.Screen
             name="Store"
             component={StoreScreen}

@@ -31,6 +31,7 @@ import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
+import { BinderPanel } from "../binder-panel";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Button, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
@@ -435,6 +436,15 @@ export function PlayerProfileScreen() {
           hunts={profile.hunts ?? []}
           ownerName={profile.displayName}
           onChanged={() => void reload()}
+        />
+
+        {/* Their binder, closed, between the hunts and the shelf. A
+            private one sends no summary and draws nothing. Same place
+            as the website. */}
+        <BinderPanel
+          summary={profile.binder}
+          ownerName={profile.displayName}
+          onOpen={() => navigation.navigate("Binder", { playerId })}
         />
 
         {/* The showcase panel, same as the website: its own rounded

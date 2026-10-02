@@ -38,6 +38,7 @@ import {
 } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
 import { HuntsPanel } from "@/components/players/hunts-panel";
+import { BinderPanel } from "@/components/binder/binder-panel";
 import { huntLimitFor } from "@/lib/players/hunts";
 
 export const metadata: Metadata = {
@@ -253,6 +254,18 @@ export default async function ProfilePage() {
               limit={huntLimitFor(profile.tier)}
               yours
             />
+
+            {/* Your binder, between the hunts and the shelf: what you
+                would trade, after what you are looking for. The public
+                page shows the same panel in the same place. */}
+            {profile.binder && (
+              <BinderPanel
+                summary={profile.binder}
+                ownerName={profile.displayName}
+                yours
+                href="/profile/binder"
+              />
+            )}
 
             {/* The showcase in its own rounded panel - the founder's
                 call: one connected profile block, with the shelf

@@ -5,6 +5,7 @@ import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
+import type { BinderCoverId, BinderLayout } from "./binder-covers";
 import { offerFailureMessage } from "./offer-copy";
 
 /**
@@ -1275,6 +1276,11 @@ export interface Profile {
   huntLimit?: number;
   /** The three numbers under the picture; absent from an older server. */
   stats?: ProfileStats;
+  /**
+   * Your binder, closed: count, cover, front card, public or not. The
+   * owner always gets one, even empty. Absent from an older server.
+   */
+  binder?: BinderSummary | null;
 }
 
 /** The Instagram row: Flares where posts would be, then followers, following. */
@@ -1433,6 +1439,12 @@ export interface PeekProfile {
   equips?: Partial<Record<CustomizeKind, string | null>> | null;
   /** Their named hunts. Absent from an older server. */
   hunts?: Hunt[];
+  /**
+   * Their binder, closed, with how many of its cards are on your
+   * hunts. Null when it is private, or they have no account behind
+   * the name; absent from an older server.
+   */
+  binder?: BinderSummary | null;
   showcase: {
     id: string;
     name: string;
@@ -1635,6 +1647,96 @@ export const openPack = (packId: string) =>
 
 export const peekPlayer = (playerId: string) =>
   call<PeekProfile>("GET", `/api/players/${encodeURIComponent(playerId)}`);
+
+/* ------------------------------------------------------------------ */
+/* The binder                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The trade binder: the Have list, made public by choice and drawn as
+ * a binder. Nothing new is stored about a card; what is new is one
+ * row of settings per player (public or not, the layout, the cover,
+ * the front card) and these screens. The types are the server's
+ * `src/lib/binder/binder.ts`, same names, same shapes.
+ */
+
+export type { BinderCoverId, BinderLayout };
+
+export interface BinderCard {
+  entryId: string;
+  cardId: string;
+  name: string;
+  number: string;
+  imageUrl: string | null;
+  printingLabel: string | null;
+  quantity: number;
+  note: string | null;
+  /** The viewer wants this card (an open want or hunt line). Always false for the owner. */
+  onYourHunt: boolean;
+}
+
+export interface Binder {
+  ownerId: string;
+  ownerName: string;
+  yours: boolean;
+  isPublic: boolean;
+  layout: BinderLayout;
+  cover: BinderCoverId;
+  frontEntryId: string | null;
+  /** Newest first. */
+  cards: BinderCard[];
+  count: number;
+  onYourHunts: number;
+}
+
+/** The binder closed, for the profile panel. */
+export interface BinderSummary {
+  isPublic: boolean;
+  count: number;
+  layout: BinderLayout;
+  cover: BinderCoverId;
+  frontImageUrl: string | null;
+  onYourHunts: number;
+}
+
+export type BinderSettingsPatch = {
+  isPublic?: boolean;
+  layout?: BinderLayout;
+  cover?: BinderCoverId;
+  frontEntryId?: string | null;
+};
+
+/**
+ * Yours with no id (always, even empty); somebody else's with theirs.
+ * A private binder, or a name with no account behind it, is a 404
+ * whose code is "private".
+ */
+export const getBinder = (playerId?: string) =>
+  playerId
+    ? call<{ binder: Binder }>(
+        "GET",
+        `/api/players/${encodeURIComponent(playerId)}/binder`,
+      )
+    : call<{ binder: Binder }>("GET", "/api/v1/binder");
+
+/** One setting at a time or several; the binder comes back whole. */
+export const saveBinder = (patch: BinderSettingsPatch) =>
+  call<{ binder: Binder }>("PATCH", "/api/v1/binder", patch);
+
+/** A 409 whose code is "at-cap" when the binder holds 200 already. */
+export const addBinderCard = (
+  cardId: string,
+  printingId: string | null,
+  quantity = 1,
+) =>
+  call<{ binder: Binder }>("POST", "/api/v1/binder/cards", {
+    cardId,
+    printingId,
+    quantity,
+  });
+
+export const removeBinderCard = (entryId: string) =>
+  call<{ binder: Binder }>("DELETE", "/api/v1/binder/cards", { entryId });
 
 /**
  * A new profile picture, sent the only way this network allows.

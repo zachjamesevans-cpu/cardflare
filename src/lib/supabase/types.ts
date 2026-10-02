@@ -1488,6 +1488,24 @@ export type LoggedTradeRow = {
   note: string | null;
 };
 
+/**
+ * How a player shows their Have list as a binder. The cards are
+ * player_cards; this is the cover, the pockets per page, the front
+ * card, and whether anyone may open it. Private by default.
+ */
+export type PlayerBinderRow = {
+  player_id: string;
+  is_public: boolean;
+  layout: number;
+  cover: string;
+  front_entry_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlayerBinderInsert = Pick<PlayerBinderRow, "player_id"> &
+  Partial<Omit<PlayerBinderRow, "player_id">>;
+
 /** One player hiding another. Never announced. */
 export type PlayerBlockRow = {
   blocker_id: string;
@@ -1902,6 +1920,7 @@ export type Database = {
       logged_trades: Table<LoggedTradeRow, LoggedTradeInsert>;
       card_spot_checks: Table<CardSpotCheckRow, CardSpotCheckInsert>;
       player_blocks: Table<PlayerBlockRow, PlayerBlockInsert>;
+      player_binders: Table<PlayerBinderRow, PlayerBinderInsert>;
       player_reports: Table<PlayerReportRow, PlayerReportInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;

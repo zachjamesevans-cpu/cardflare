@@ -1,3 +1,4 @@
+import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
@@ -64,12 +65,14 @@ export async function GET(
    * another, with the bearer token verified twice, and a profile took
    * the sum of nine round trips to open. Now it takes the longest one.
    */
-  const [allowed, me, profile, dressed] = await Promise.all([
+  const [allowed, me, dressed] = await Promise.all([
     mayLook(request),
     viewerPlayerId(request),
-    publicProfile(playerId),
     dressedEquipsFor(playerId),
   ]);
+  /* After the viewer, because the binder's panel depends on who asks:
+     a private binder is absent for everyone but its owner. */
+  const profile = await publicProfile(playerId, me);
   if (!allowed) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
@@ -139,6 +142,8 @@ export async function GET(
     /* Their hunts, so the app's profile screen draws the same panel the
        website does rather than an empty one. */
     hunts: profile.hunts,
+    /* The binder's panel: null for a private binder that is not yours. */
+    binder: absoluteImageUrls(profile.binder),
     showcase: profile.showcase.map((entry) => ({
       id: entry.id,
       name: entry.name,
