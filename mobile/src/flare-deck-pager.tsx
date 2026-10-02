@@ -23,7 +23,7 @@ import { CardImage, Tap, type ZoomCard } from "./ui";
  * the post concise and its extras "only visible when you need it".
  *
  * Every card is the same CardImage the rest of the Feed draws, so a
- * tap still opens the zoom with "I have this" inside it.
+ * tap still opens the zoom with "Offer this card" inside it.
  */
 
 const GAP = spacing(2);
@@ -147,7 +147,7 @@ export function FlareCardSlide({
         ) : null}
         {card.youOffered ? (
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-            You said you have this
+            You offered this
           </Text>
         ) : card.state === "offered" ? (
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>

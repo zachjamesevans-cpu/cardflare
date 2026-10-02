@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SheetBackdrop } from "./action-menu";
-import { describeError, offerItemsOnPost, type FeedCard } from "./api";
+import { offerErrorMessage, offerItemsOnPost, type FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
 import {
   availableLabel,
@@ -117,7 +117,7 @@ export function FlareCardsSheet({
       setStage("sent");
       onChanged?.();
     } catch (caught) {
-      setError(`That did not send (${describeError(caught)}). Try again.`);
+      setError(offerErrorMessage(caught));
     }
   };
 
@@ -303,7 +303,7 @@ export function FlareCardsSheet({
                           </Text>
                           {card.youOffered ? (
                             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                              You said you have this
+                              You offered this
                             </Text>
                           ) : null}
                         </View>
@@ -321,7 +321,7 @@ export function FlareCardsSheet({
                               accessibilityLabel={
                                 count > 0
                                   ? `Unselect ${card.cardName}`
-                                  : `I have ${card.cardName}`
+                                  : `Offer ${card.cardName}`
                               }
                               style={{
                                 width: 28,

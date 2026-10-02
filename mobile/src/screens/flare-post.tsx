@@ -12,7 +12,7 @@ import {
   describeError,
   getPost,
   likePost,
-  offerFromPost,
+  offerItemsOnPost,
   POST_COMMENT_MAX,
   rememberRoom,
   restorePost,
@@ -40,8 +40,8 @@ import { UndoToast, type UndoOffer } from "../undo-toast";
  *
  * The website draws the thread inline under the post; the app's Feed
  * cards are native, so the thread is a screen of its own with the same
- * three things in the same order: the cards (tap one for "I have
- * this"), the heart and the count, then the comments and a composer.
+ * three things in the same order: the cards (tap one for "Offer this
+ * card"), the heart and the count, then the comments and a composer.
  * The OFFER lines in the thread are the point - who is bringing what,
  * in one place.
  */
@@ -183,9 +183,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const ref: PostRef = {
     postId: post.postId,
     yours: post.yours,
-    offer: async (flareId, note) => {
-      await offerFromPost(post.postId, flareId, note);
+    offer: async (items, message) => {
+      const result = await offerItemsOnPost(post.postId, items, message);
       await load();
+      return result;
     },
   };
 
@@ -282,7 +283,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             <ReportSheet target={report} onClose={() => setReport(null)} />
 
             {/* The cards, the way the Feed draws them: one row, or the
-                same row swiped. Tap one to open it big and say you have it. */}
+                same row swiped. Tap one to open it big and offer it. */}
             {total === 1 && lead ? (
               <FlareCardSlide
                 card={lead}
@@ -332,7 +333,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
             />
             {!post.yours && direction === "want" && !post.completed ? (
-              <Muted>Tap a card to say you have it, or offer several at once.</Muted>
+              <Muted>Tap a card to offer it, or offer several at once.</Muted>
             ) : null}
           </>
         )}
@@ -420,8 +421,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                           }}
                         >
                           {(comment.cardName
-                            ? `HAS ${comment.cardName}`
-                            : "HAS IT"
+                            ? `Offered ${comment.cardName}`
+                            : "Offered it"
                           ).toUpperCase()}
                         </Text>
                       </View>

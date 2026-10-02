@@ -22,7 +22,7 @@ import { Button, Tap } from "./ui";
  * costs half a screen per post.
  *
  * Every piece of behaviour is the one the Feed already had: the tap on
- * the card opens the same zoom with "I have this" inside it, the heart
+ * the card opens the same zoom with "Offer this card" inside it, the heart
  * and the bubble are the post's own, and the paper plane opens the same
  * conversation Local opens. New here: "Offer cards" for several at
  * once, "Update progress" on your own, and the hunt a post belongs to.
