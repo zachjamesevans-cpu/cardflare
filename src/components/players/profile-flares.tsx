@@ -82,11 +82,18 @@ export function ProfileFlares({
           )}
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-2">
+        /*
+         * A grid the way a social profile draws one: three across,
+         * edge to edge, a hairline between tiles, nothing under them.
+         * The founder: "more of a grid like instagram instead of these
+         * random blurry cards." The direction rides the foot of the art
+         * as a small chip, so the tile is the picture and nothing else.
+         */
+        <ul className="grid grid-cols-3 gap-0.5">
           {flares.map((flare, index) => {
             const want = flare.direction === "want";
             return (
-              <li key={flare.id} className="flex min-w-0 flex-col gap-1">
+              <li key={flare.id} className="relative min-w-0">
                 <CardImageZoom
                   imageUrl={flare.imageUrl}
                   exactName={flare.cardName}
@@ -98,13 +105,17 @@ export function ProfileFlares({
                   position={index}
                   enabled={imagesEnabled}
                   thumbClassName="w-full"
+                  /* A third of the column, not the 56px every shelf asks
+                     for: at 56px the optimiser's picture is stretched
+                     to twice its size and reads as a blur. */
+                  thumbSizes="(max-width: 672px) 33vw, 220px"
                 />
                 <span
                   className={cn(
-                    "w-fit rounded-full border px-1.5 py-px text-[9px] font-bold",
+                    "pointer-events-none absolute bottom-1 left-1 rounded-[4px] px-1 py-px text-[9px] font-bold",
                     want
-                      ? "border-accent bg-accent text-accent-contrast"
-                      : "border-border bg-elevated text-text-secondary",
+                      ? "bg-accent text-accent-contrast"
+                      : "bg-canvas/80 text-text-secondary",
                   )}
                 >
                   {want ? "Looking for" : "Offering"}
