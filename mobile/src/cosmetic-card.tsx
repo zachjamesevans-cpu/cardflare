@@ -12,7 +12,12 @@ import {
   borderStyle,
   drawsBorder,
 } from "./cosmetic-border";
-import { WornPattern } from "./cosmetic-paint";
+import {
+  AnimationEdge,
+  WornAnimation,
+  WornPattern,
+  drawsAnimationEdge,
+} from "./cosmetic-paint";
 import { getFoilKit, travellingFrame } from "./foil";
 import { colors } from "./theme";
 
@@ -94,6 +99,7 @@ export function CosmeticCard({
   effect,
   border = null,
   pattern = null,
+  animation = null,
 }: {
   imageUrl: string | null;
   width: number;
@@ -116,6 +122,14 @@ export function CosmeticCard({
    * showcase passes it: the web dresses showcase cards and no others.
    */
   pattern?: string | null;
+  /**
+   * A catalogue card animation, when one is worn.
+   *
+   * Moves the whole card (float, tilt, breathe), paints over the face
+   * (sparks, sheens, ripples) and, for the flame, brings an edge of
+   * its own. Only the showcase passes it, like the pattern.
+   */
+  animation?: string | null;
 }) {
   /* The same 60:84 the website's thumbnails use, so a card is a card. */
   const height = Math.round((width * 84) / 60);
@@ -123,6 +137,10 @@ export function CosmeticCard({
   const frameColor = frame ? FRAME_COLOR[frame] : null;
   /* Skia and a slug we have art for, or the legacy frame keeps the card. */
   const edge = drawsBorder(border) ? border : null;
+  /* An animation's own edge (the flame) stands in for a border's when
+     none is worn; a worn border outranks it, as the website's
+     `--cfa-edge` is the border's whenever a border sets one. */
+  const flame = edge === null && drawsAnimationEdge(animation);
   const stops = holo ? (HOLO_STOPS[holo] ?? []) : [];
   /* Skia is loaded on the first card that wants it, never at app
      launch - see foil.tsx for why that ordering is load-bearing. */
@@ -229,42 +247,48 @@ export function CosmeticCard({
   );
 
   /*
-   * A worn catalogue border, drawn as the card's edge.
+   * A worn catalogue border, drawn as the card's edge - or an
+   * animation's own edge when no border is worn, in the same four
+   * points with the same corners, so a card wearing the flame reads as
+   * a bordered card.
    *
-   * The legacy frame's coloured hairline is dropped when one is worn -
-   * a 2px line inside a 4px gradient is a smudge, not a second border.
+   * The legacy frame's coloured hairline is dropped either way: a 2px
+   * line inside a 4px gradient is a smudge, not a second border. A
+   * border's glow comes with the border; an animation's comes with the
+   * animation, around the whole card below.
    */
-  if (edge) {
-    return (
+  const framed = edge !== null || flame;
+  const body = framed ? (
+    <View
+      style={{
+        width,
+        height,
+        borderRadius: EDGE_RADIUS,
+        backgroundColor: colors.elevated,
+        ...(edge ? (borderStyle(edge) ?? {}) : {}),
+      }}
+    >
+      {edge ? (
+        <CardEdge border={edge} width={width} height={height} />
+      ) : (
+        <AnimationEdge animation={animation} width={width} height={height} />
+      )}
       <View
         style={{
-          width,
-          height,
-          borderRadius: EDGE_RADIUS,
-          backgroundColor: colors.elevated,
-          ...(borderStyle(edge) ?? {}),
+          position: "absolute",
+          left: EDGE,
+          top: EDGE,
+          width: width - EDGE * 2,
+          height: height - EDGE * 2,
+          borderRadius: FACE_RADIUS,
+          overflow: "hidden",
+          backgroundColor: colors.canvas,
         }}
       >
-        <CardEdge border={edge} width={width} height={height} />
-        <View
-          style={{
-            position: "absolute",
-            left: EDGE,
-            top: EDGE,
-            width: width - EDGE * 2,
-            height: height - EDGE * 2,
-            borderRadius: FACE_RADIUS,
-            overflow: "hidden",
-            backgroundColor: colors.canvas,
-          }}
-        >
-          {face(width - EDGE * 2, height - EDGE * 2, FACE_RADIUS)}
-        </View>
+        {face(width - EDGE * 2, height - EDGE * 2, FACE_RADIUS)}
       </View>
-    );
-  }
-
-  return (
+    </View>
+  ) : (
     <View
       style={{
         width,
@@ -278,6 +302,30 @@ export function CosmeticCard({
     >
       {face(width, height, 6)}
     </View>
+  );
+
+  /* The bare card's hairline is its edge: the animation's overlay sits
+     inside it, as the pattern does. */
+  const hairline = frameColor ? 2 : 1;
+
+  /*
+   * The worn animation wraps the OUTER view, so float, tilt and
+   * breathe move the whole card, border and all, as the website's
+   * keyframes on `.cfx-card` do; its fx and sprites are drawn over the
+   * face inside the edge, where the pattern is. Hands the card back
+   * untouched when nothing is worn.
+   */
+  return (
+    <WornAnimation
+      animation={animation}
+      width={width}
+      height={height}
+      radius={framed ? EDGE_RADIUS : 6}
+      inset={framed ? EDGE : hairline}
+      faceRadius={framed ? FACE_RADIUS : 6 - hairline}
+    >
+      {body}
+    </WornAnimation>
   );
 }
 

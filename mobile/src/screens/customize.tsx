@@ -15,10 +15,19 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
-import { WornBackground, drawsBackground, drawsPattern } from "../cosmetic-paint";
+import {
+  TrackedView,
+  WornBackground,
+  WornScene,
+  drawsAnimation,
+  drawsBackground,
+  drawsPattern,
+  drawsScene,
+} from "../cosmetic-paint";
 import { WornAura, WornRing } from "../cosmetic-worn";
 import { WornBadge, WornName, WornTitle } from "../worn-name";
 import {
+  SCENE_ART,
   hasAuraArt,
   hasBadgeArt,
   hasNameArt,
@@ -34,13 +43,12 @@ import { colors, gutter, radius, spacing } from "../theme";
  * it, tap again to take it off. Same sections, same wording, same
  * badges, per the parity rule.
  *
- * One honest difference, said on screen rather than papered over: most
- * of the new categories' art is drawn on the web profile today. Wearing
- * something here equips it everywhere — the tile just cannot show the
- * animation yet. The per-category native art pass is working through
- * them, and profile borders and avatar effects are through it.
+ * Every catalogue family draws here now, and every tile carries a
+ * preview of the real thing: the same components the profile and the
+ * showcase use, so a tile and a profile cannot show different things.
+ * Wearing something here equips it everywhere.
  *
- * WHICH IS WHY THOSE TWO NOW CARRY A PREVIEW. A picker that lists
+ * WHY EVERY TILE CARRIES A PREVIEW. A picker that lists
  * twenty-five profile borders as twenty-five lines of text is a picker
  * where nobody can tell Inferno from Aurora, and it is most of why the
  * founder reported "animated profile borders still aren't working on
@@ -150,6 +158,28 @@ function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) 
     );
   }
 
+  /* A card animation previews on an empty card, which it moves, paints
+     over or edges, exactly as it would a showcase card. */
+  if (kind === "animation" && drawsAnimation(slug)) {
+    return (
+      <CosmeticCard
+        imageUrl={null}
+        width={PREVIEW - 8}
+        frame={null}
+        holo={null}
+        effect={null}
+        animation={slug}
+      />
+    );
+  }
+
+  /* A profile effect previews over a mini profile, as the website's
+     `.cfx-panel-profile` swatch does. The avatar entrance plays only
+     on that mini avatar, so it is previewed by its own rule. */
+  if (kind === "scene" && (drawsScene(slug) || SCENE_ART[slug]?.avatarTiming)) {
+    return <ScenePreview slug={slug} />;
+  }
+
   /* A showcase background previews as the panel it paints: the
      website's 16:10 swatch, at the tile's height. */
   if (kind === "background" && drawsBackground(slug)) {
@@ -207,11 +237,115 @@ function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) 
   );
 }
 
+/**
+ * The website's `.cfx-panel-profile`, under a scene: a block near the
+ * bottom of the panel with a round avatar straddling its top edge and
+ * two muted lines where the name and the handle go. The scene plays
+ * over it, so the preview shows snow falling past a face rather than
+ * snow on nothing. `scene-avatar-entrance` is the one scene with no
+ * panel art at all: it pops the avatar in, so the avatar is a
+ * `TrackedView` playing its track.
+ */
+function ScenePreview({ slug }: { slug: string }) {
+  const avatarTiming = SCENE_ART[slug]?.avatarTiming ?? null;
+  const inner = { w: SCENE_SWATCH.w - 2, h: SCENE_SWATCH.h - 2 };
+  /* `inset: auto 12% 14% 12%; height: 46%`, as the stylesheet has it. */
+  const block = {
+    left: inner.w * 0.12,
+    width: inner.w * 0.76,
+    top: inner.h * (1 - 0.14 - 0.46),
+    height: inner.h * 0.46,
+  };
+
+  return (
+    <View
+      style={{
+        width: SCENE_SWATCH.w,
+        height: SCENE_SWATCH.h,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.canvas,
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          left: block.left,
+          top: block.top,
+          width: block.width,
+          height: block.height,
+          borderRadius: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+        }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            left: "22%",
+            right: "22%",
+            top: "58%",
+            height: 2,
+            backgroundColor: colors.border,
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: "30%",
+            right: "30%",
+            top: "58%",
+            marginTop: 8,
+            height: 2,
+            backgroundColor: colors.border,
+            opacity: 0.7,
+          }}
+        />
+      </View>
+      <View
+        style={{
+          position: "absolute",
+          left: inner.w / 2 - MINI_AVATAR / 2,
+          top: block.top - MINI_AVATAR / 2,
+        }}
+      >
+        <TrackedView
+          timings={avatarTiming ? [avatarTiming] : []}
+          width={MINI_AVATAR}
+          height={MINI_AVATAR}
+        >
+          <View
+            style={{
+              width: MINI_AVATAR,
+              height: MINI_AVATAR,
+              borderRadius: MINI_AVATAR / 2,
+              backgroundColor: colors.elevated,
+              borderWidth: 2,
+              borderColor: colors.border,
+            }}
+          />
+        </TrackedView>
+      </View>
+      <WornScene scene={slug} width={inner.w} height={inner.h} radius={7} />
+    </View>
+  );
+}
+
 /** Big enough to read a gradient off, small enough for a list row. */
 const PREVIEW = 36;
 
 /** The background swatch: 16:10 like the website's panel, a row tall. */
 const SWATCH = { w: Math.round(PREVIEW * 1.6), h: PREVIEW };
+
+/** The scene swatch: the same 16:10, two rows tall, so a 32-point
+    avatar and the block under it fit the way the website draws them. */
+const SCENE_SWATCH = { w: SWATCH.w * 2, h: SWATCH.h * 2 };
+
+/** The mini profile's avatar: the website's 32px circle. */
+const MINI_AVATAR = 32;
 
 function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
   return (
@@ -431,7 +565,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         </Tap>
       )}
 
-      {/* The honest note. No fake previews. */}
+      {/* The honest note: what a tile shows is what a profile draws. */}
       <View
         style={{
           flexDirection: "row",
@@ -446,9 +580,8 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       >
         <Ionicons name="information-circle" size={16} color={colors.textMuted} />
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
-          {area === "profile"
-            ? "Profile borders, avatar effects, name styles, titles and badges are drawn here now. Profile effects, and any Rive file dropped in, still draw in full only on your web profile. Wearing one here equips it everywhere."
-            : "Card borders, holo patterns and showcase backgrounds are drawn here now. Card animations and any Rive file dropped in still draw in full only on your web profile. Wearing one here equips it everywhere."}
+          Everything in the catalogue draws here now. Wearing something here equips it
+          everywhere.
         </Text>
       </View>
 

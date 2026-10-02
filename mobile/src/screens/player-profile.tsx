@@ -25,7 +25,7 @@ import {
   type PeekProfile,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
-import { WornBackground } from "../cosmetic-paint";
+import { WornBackground, WornScene } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
@@ -155,6 +155,8 @@ export function PlayerProfileScreen() {
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
   /* The showcase panel's inside, measured, for the worn background. */
   const [panel, setPanel] = useState({ w: 0, h: 0 });
+  /* The profile block's inside, measured, for the worn scene. */
+  const [blockBox, setBlockBox] = useState({ w: 0, h: 0 });
 
   /* Re-read after a write inside the page, an offer on a hunt say,
      without the warm-up: the shelf is already drawn. */
@@ -267,6 +269,7 @@ export function PlayerProfileScreen() {
     effect: profile.effect,
     border: profile.equips?.border ?? null,
     pattern: profile.equips?.pattern ?? null,
+    animation: profile.equips?.animation ?? null,
     note: entry.note ?? null,
   }));
 
@@ -279,11 +282,27 @@ export function PlayerProfileScreen() {
       }}
     >
       {/* The profile block: cover, picture, name, badge, shelf. */}
-      <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
+      <Card
+        style={{ paddingTop: spacing(6), overflow: "hidden" }}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setBlockBox({ w: width - 2, h: height - 2 });
+        }}
+      >
         {/* The cover carries down behind the picture, the name and the
             badge, then fades into the card. The same block your own
             profile shows: what you see is what they see. */}
         <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
+
+        {/* Their worn profile effect, over the whole block: above the
+            cover, below everything that can be tapped, where the
+            website's WornSceneLayer sits. Takes no touch. */}
+        <WornScene
+          scene={profile.equips?.scene ?? null}
+          width={blockBox.w}
+          height={blockBox.h}
+          radius={radius.card - 1}
+        />
 
         {/* Share, top right over the cover: the same corner your own
             profile keeps its icons in. The three dots sit beside it
@@ -469,6 +488,7 @@ export function PlayerProfileScreen() {
                       effect={profile.effect}
                       border={profile.equips?.border ?? null}
                       pattern={profile.equips?.pattern ?? null}
+                      animation={profile.equips?.animation ?? null}
                     />
                   </Tap>
                 ))}

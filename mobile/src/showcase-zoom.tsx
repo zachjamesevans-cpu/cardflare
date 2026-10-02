@@ -25,6 +25,8 @@ export type ZoomedCard = {
   border?: string | null;
   /** The catalogue holo pattern worn across the owner's cards. */
   pattern?: string | null;
+  /** The catalogue card animation worn across the owner's cards. */
+  animation?: string | null;
   name: string;
   number?: string;
   imageUrl: string | null;
@@ -166,6 +168,7 @@ export function ShowcaseZoom({
                           effect={entry.effect}
                           border={entry.border ?? null}
                           pattern={entry.pattern ?? null}
+                          animation={entry.animation ?? null}
                         />
                       </Pressable>
                     ))}
@@ -181,6 +184,7 @@ export function ShowcaseZoom({
                     effect={shown.effect}
                     border={shown.border ?? null}
                     pattern={shown.pattern ?? null}
+                    animation={shown.animation ?? null}
                   />
                 </Pressable>
               )}

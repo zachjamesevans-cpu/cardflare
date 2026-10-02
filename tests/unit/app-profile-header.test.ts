@@ -95,7 +95,7 @@ describe("the profile header", () => {
     /* The picture's distance from the top of the card is the whole of
        what went wrong, and it is this padding plus nothing else. */
     const padding = (source: string) =>
-      /<Card style=\{\{ paddingTop: spacing\((\d+)\)/.exec(source)?.[1];
+      /<Card\s+style=\{\{ paddingTop: spacing\((\d+)\)/.exec(source)?.[1];
 
     expect(padding(own)).toBeDefined();
     expect(padding(theirs)).toBe(padding(own));

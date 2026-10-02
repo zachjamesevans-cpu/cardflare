@@ -21,6 +21,7 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
@@ -1040,8 +1041,17 @@ export function CardImage({
 export function Card({
   children,
   style,
-}: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  onLayout,
+}: PropsWithChildren<{
+  style?: StyleProp<ViewStyle>;
+  /** Measured, for a layer that has to be sized to the block: a worn scene. */
+  onLayout?: (event: LayoutChangeEvent) => void;
+}>) {
+  return (
+    <View style={[styles.card, style]} onLayout={onLayout}>
+      {children}
+    </View>
+  );
 }
 
 export function Title({ children }: PropsWithChildren) {

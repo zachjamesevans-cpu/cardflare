@@ -1,43 +1,70 @@
-import { useEffect, useMemo } from "react";
-import {
-  Easing,
-  cancelAnimation,
+import { useMemo, type ReactNode } from "react";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import Animated, {
+  useAnimatedStyle,
   useDerivedValue,
-  useSharedValue,
-  withRepeat,
-  withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 
 import {
+  ANIMATION_ART,
   BACKGROUND_ART,
   PATTERN_ART,
+  SCENE_ART,
   TEXTURE_ART,
+  hasAnimationArt,
   hasBackgroundArt,
   hasPatternArt,
+  hasSceneArt,
+  type AnimationArt,
   type BorderMotion,
+  type FxArt,
   type Len,
+  type MotionStop,
   type PaintBlend,
   type PaintLayer,
   type Placement,
+  type SceneArt,
+  type SpriteArt,
   type TextureMark,
+  type Timing,
 } from "./cosmetic-art-data";
+import { EDGE_RADIUS } from "./cosmetic-border";
+import {
+  LINEAR,
+  TILT_PERSPECTIVE,
+  curveFor,
+  ease,
+  fades,
+  trackFor,
+  useClock,
+  usePose,
+  useTrack,
+  type Curve,
+} from "./cosmetic-motion";
 
 /**
- * Holo patterns and showcase backgrounds, drawn on a phone.
+ * Holo patterns, showcase backgrounds, card animations and profile
+ * scenes, drawn on a phone.
  *
- * The web paints both as CSS background stacks: a list of gradients,
- * tiled SVG marks and the brand mark, each at its own position and
- * size, moved by keyframes and blended over the card. React Native has
- * none of that, so `cosmetic-art-data.ts` carries the stacks as data
- * and this file paints them with Skia - the same bargain the foil, the
- * worn ring and the card border make, and the same guarded, deferred
- * require, so a binary without Skia keeps the plain card and the plain
- * panel instead of failing to launch.
+ * The web paints all four as CSS: a stack of gradients, tiled SVG
+ * marks and the brand mark, each at its own position and size, moved
+ * by keyframes and blended over the card; and for the animations and
+ * scenes, pseudo-elements that sweep, spin, ripple and streak over
+ * the face, plus keyframes that lean and float the whole card. React
+ * Native has none of that, so `cosmetic-art-data.ts` carries it all as
+ * data and this file paints it with Skia - the same bargain the foil,
+ * the worn ring and the card border make, and the same guarded,
+ * deferred require, so a binary without Skia keeps the plain card and
+ * the plain panel instead of failing to launch.
  *
- * One renderer for both families. A pattern is a stack over a card
+ * One renderer for every family. A pattern is a stack over a card
  * face with a blend mode; a background is a stack behind a shelf with
- * a hairline and sometimes a flash. Nothing in here knows which it is
- * drawing beyond those props.
+ * a hairline and sometimes a flash; an animation's fx is a stack over
+ * the face with sprites on top and a track on the card; a scene is
+ * the same over a profile block. Nothing in here knows which it is
+ * drawing beyond those props. The keyframes themselves are played by
+ * `cosmetic-motion.ts`.
  */
 
 type Skia = typeof import("@shopify/react-native-skia");
@@ -60,8 +87,18 @@ const CELL_CAP = 900;
 const FALL_DISTANCE = 220;
 const DRIFT_DISTANCE = { x: 140, y: 160 };
 
-/** The kinds that move the layers; everything else changes opacity or holds. */
+/** The kinds that slide the layers a fixed way; everything else changes opacity or holds. */
 const TRAVELS = new Set(["pan", "pan-y", "fall", "rise", "drift"]);
+
+/**
+ * `cfa-wander`: where the spotlight's layer sits through its cycle, as
+ * CSS background positions, 18%/30% -> 78%/40% -> 45%/75% and home.
+ */
+const WANDER_AT = [0, 0.33, 0.66, 1];
+const WANDER_X = [0.18, 0.78, 0.45, 0.18];
+const WANDER_Y = [0.3, 0.4, 0.75, 0.3];
+
+const RAD = Math.PI / 180;
 
 interface Box {
   w: number;
@@ -254,9 +291,78 @@ function texturePaths(S: Skia) {
   return out;
 }
 
+/** The four corners of a sprite's box, resolved against the face it sits on. */
+function spriteBox(sprite: SpriteArt, width: number, height: number) {
+  return {
+    left: length(sprite.box.left, width) ?? 0,
+    top: length(sprite.box.top, height) ?? 0,
+    w: length(sprite.box.width, width) ?? width,
+    h: length(sprite.box.height, height) ?? height,
+  };
+}
+
+/**
+ * A view that plays keyframe tracks on whatever it holds.
+ *
+ * The website puts `cfa-float`, `cfa-tilt`, `cfa-breathe`, `cfa-pulse`
+ * and `cfa-glitch` on the card element itself, so the whole card moves
+ * - border, face and all. React Native can do that natively: a
+ * Reanimated transform with `perspective` for the lean, no Skia
+ * needed. One wrapper per timing, nested, so a card with two tracks
+ * plays both; an empty list is a plain box, which the animation uses
+ * to carry its glow and its overlay.
+ */
+export function TrackedView({
+  timings,
+  width,
+  height,
+  style,
+  children,
+}: {
+  timings: Timing[];
+  width: number;
+  height: number;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const [first, ...rest] = timings;
+  const { pose, track } = useTrack(first ?? null, { w: width, h: height });
+  const tracked = fades(track);
+
+  const animated = useAnimatedStyle(() => {
+    const p = pose.value;
+    return {
+      opacity: tracked ? p.opacity : 1,
+      transform: [
+        { perspective: TILT_PERSPECTIVE },
+        { translateX: p.tx },
+        { translateY: p.ty },
+        { rotateX: `${p.tiltX}deg` },
+        { rotateY: `${p.tiltY}deg` },
+        { rotate: `${p.rotate}deg` },
+        { skewX: `${p.skewX}deg` },
+        { scale: p.scale },
+      ],
+    };
+  });
+
+  return (
+    <Animated.View style={[{ width, height }, style, animated]}>
+      {rest.length > 0 ? (
+        <TrackedView timings={rest} width={width} height={height}>
+          {children}
+        </TrackedView>
+      ) : (
+        children
+      )}
+    </Animated.View>
+  );
+}
+
 function makeKit(S: Skia) {
   const {
     BlendMode,
+    BlurMask,
     Canvas,
     Circle,
     Group,
@@ -365,19 +471,26 @@ function makeKit(S: Skia) {
    *
    * Only a tiled layer travels: the website moves `background-position`
    * and a layer that fills its box once has nowhere to go. Each layer
-   * works out its own distance because each has its own tile.
+   * works out its own distance because each has its own tile. The
+   * clock is linear and the easing is applied here, per cycle, so a
+   * `steps(14)` rise climbs in fourteen jumps as the pixel particles
+   * do on the web. `wander` is the one kind with keyframes of its own:
+   * the layer's position walks between four points, eased between
+   * each pair.
    */
   function Layer({
     layer,
     box,
-    motion,
+    kind,
     clock,
+    curve,
     mark,
   }: {
     layer: PaintLayer;
     box: Box;
-    motion: BorderMotion | null;
-    clock: ReturnType<typeof useSharedValue<number>>;
+    kind: string;
+    clock: SharedValue<number>;
+    curve: Curve;
     mark: ReturnType<typeof useImage>;
   }) {
     const aspect =
@@ -392,26 +505,41 @@ function makeKit(S: Skia) {
     const place = "place" in layer ? layer.place : null;
     const placed = resolvePlace(place, box, aspect);
 
-    const kind = motion?.kind ?? "";
     const moves = placed.repeat && TRAVELS.has(kind);
+    const wanders = kind === "wander";
     const pad = kind === "jitter" ? 2 : 0;
 
     /* The cap is judged against a nominal cover and the exact travel
        is then read off the capped tile, so the snap below is to the
-       tile that is actually drawn. */
-    const nominal = coverFor(
-      box,
-      moves ? travelFor(kind, placed, box) : { x: 0, y: 0 },
-      pad,
-    );
+       tile that is actually drawn. A wandering layer can land anywhere
+       within a tile of home, so its cover is a tile wider all round. */
+    const nominal = wanders
+      ? { x0: -placed.w, y0: -placed.h, x1: box.w + placed.w, y1: box.h + placed.h }
+      : coverFor(box, moves ? travelFor(kind, placed, box) : { x: 0, y: 0 }, pad);
     const tile = capTile(placed, nominal);
     const travel = moves ? travelFor(kind, tile, box) : { x: 0, y: 0 };
-    const cover = coverFor(box, travel, pad);
+    const cover = wanders
+      ? { x0: -tile.w, y0: -tile.h, x1: box.w + tile.w, y1: box.h + tile.h }
+      : coverFor(box, travel, pad);
 
-    const slide = useDerivedValue(() => [
-      { translateX: travel.x * clock.value },
-      { translateY: travel.y * clock.value },
-    ]);
+    const slide = useDerivedValue(() => {
+      const t = Math.max(0, clock.value);
+      if (wanders) {
+        let i = 0;
+        for (let k = 0; k < 3; k += 1) {
+          if (t >= WANDER_AT[k]) i = k;
+        }
+        const p = ease(curve, (t - WANDER_AT[i]) / (WANDER_AT[i + 1] - WANDER_AT[i]));
+        const fx = WANDER_X[i] + (WANDER_X[i + 1] - WANDER_X[i]) * p;
+        const fy = WANDER_Y[i] + (WANDER_Y[i + 1] - WANDER_Y[i]) * p;
+        return [
+          { translateX: (box.w - tile.w) * fx - tile.x },
+          { translateY: (box.h - tile.h) * fy - tile.y },
+        ];
+      }
+      const e = ease(curve, t);
+      return [{ translateX: travel.x * e }, { translateY: travel.y * e }];
+    });
 
     const body = (() => {
       switch (layer.type) {
@@ -597,9 +725,18 @@ function makeKit(S: Skia) {
    *
    * Bottom layer first, as the data is ordered. The motion is one
    * clock shared by every layer: a sliding one reads its distance off
-   * it, and the opacity kinds (pulse, twinkle, flicker) read the group
-   * opacity off it. `hue` cannot be done without a colour matrix per
-   * frame, so it holds still.
+   * it, and the group reads its fade and its shake off it. A motion
+   * that names a keyframe track (flicker, twinkle, pulse, flash,
+   * jitter, dealin) plays the track's own stops, from the stylesheet,
+   * and the track's opacity replaces the stack's as a CSS animation
+   * would; the hand-read curves below stay as the fallback for a kind
+   * no track describes. `hue` cannot be done without a colour matrix
+   * per frame, so it holds still.
+   *
+   * `maskInsetPx` shows only a band that wide at the edge (the
+   * electric arcs), and `clipHeight` lets a layer shorter than its
+   * panel (the aurora's top 44%) keep the panel's corners rather than
+   * growing its own.
    */
   function Stack({
     layers,
@@ -611,55 +748,47 @@ function makeKit(S: Skia) {
     blend,
     flash,
     inset,
+    track: trackOverride = null,
+    maskInsetPx = null,
+    clipHeight,
   }: {
     layers: PaintLayer[];
     width: number;
     height: number;
     radius: number;
-    motion: BorderMotion | null;
+    motion: BorderMotion | Timing | null;
     opacity: number;
     blend: PaintBlend;
     flash: { color: string; seconds: number } | null;
     inset: { color: string; width: number } | null;
+    track?: MotionStop[] | null;
+    maskInsetPx?: number | null;
+    clipHeight?: number;
   }) {
-    const clock = useSharedValue(0);
-    const storm = useSharedValue(0);
     const kind = motion?.kind ?? "";
+    const clock = useClock(kind === "hue" ? null : motion);
+    const track = trackOverride ?? trackFor(motion);
+    const tracked = fades(track);
+    const curve = curveFor(motion);
+    const pose = usePose(clock, motion, track, { w: width, h: height });
 
-    useEffect(() => {
-      if (!motion || kind === "hue") return;
-
-      clock.value = 0;
-      clock.value = withRepeat(
-        withTiming(1, { duration: motion.seconds * 1000, easing: Easing.linear }),
-        -1,
-        motion.alternate,
-      );
-
-      return () => cancelAnimation(clock);
-    }, [motion, kind, clock]);
-
-    useEffect(() => {
-      if (!flash) return;
-
-      storm.value = 0;
-      storm.value = withRepeat(
-        withTiming(1, { duration: flash.seconds * 1000, easing: Easing.linear }),
-        -1,
-        false,
-      );
-
-      return () => cancelAnimation(storm);
-    }, [flash, storm]);
+    const stormMotion = useMemo<BorderMotion | null>(
+      () =>
+        flash ? { kind: "flash", seconds: flash.seconds, alternate: false } : null,
+      [flash],
+    );
+    const storm = useClock(stormMotion);
 
     /* The brand mark, only when a layer tiles it. */
     const wantsMark = layers.some((layer) => layer.type === "image");
     const mark = useImage(wantsMark ? MARK : null);
 
-    /* `cfa-pulse` 0.55 -> 1 -> 0.55, `cfa-twinkle` 0.25 -> 0.9 -> 0.25,
-       and `cfa-flicker`'s stepped dips, read off the stylesheet. */
+    /* The track's own opacity when it has one; else `cfa-pulse`
+       0.55 -> 1 -> 0.55, `cfa-twinkle` 0.25 -> 0.9 -> 0.25, and
+       `cfa-flicker`'s stepped dips, read off the stylesheet. */
     const fade = useDerivedValue(() => {
-      const t = clock.value;
+      if (tracked) return pose.value.opacity;
+      const t = Math.max(0, clock.value);
       let level = 1;
       if (kind === "pulse") level = 0.55 + 0.45 * Math.sin(Math.PI * t);
       else if (kind === "twinkle") level = 0.25 + 0.65 * Math.sin(Math.PI * t);
@@ -671,8 +800,19 @@ function makeKit(S: Skia) {
       return opacity * level;
     });
 
-    /* `cfa-jitter`: a couple of points of shake in the last 8%. */
+    /* The track's transform about the box's centre; else `cfa-jitter`,
+       a couple of points of shake in the last 8%. */
     const shake = useDerivedValue(() => {
+      if (track) {
+        const p = pose.value;
+        return [
+          { translateX: p.tx },
+          { translateY: p.ty },
+          { rotate: p.rotate * RAD },
+          { skewX: p.skewX * RAD },
+          { scale: p.scale },
+        ];
+      }
       if (kind !== "jitter") return [{ translateX: 0 }, { translateY: 0 }];
       const t = clock.value;
       if (t < 0.92 || t >= 1) return [{ translateX: 0 }, { translateY: 0 }];
@@ -710,26 +850,48 @@ function makeKit(S: Skia) {
     if (width <= 0 || height <= 0) return null;
 
     const box = { w: width, h: height };
+    const clipTo = clipHeight ?? height;
+
+    const painted = (
+      <Group opacity={fade} transform={shake} origin={vec(width / 2, height / 2)}>
+        {layers.map((layer, index) => (
+          <Layer
+            key={index}
+            layer={layer}
+            box={box}
+            kind={kind}
+            clock={clock}
+            curve={curve}
+            mark={mark}
+          />
+        ))}
+      </Group>
+    );
 
     return (
       <Canvas
         style={{ position: "absolute", top: 0, left: 0, width, height }}
         pointerEvents="none"
       >
-        <Group clip={rrect(rect(0, 0, width, height), radius, radius)}>
+        <Group clip={rrect(rect(0, 0, width, clipTo), radius, radius)}>
           <Group layer={film}>
-            <Group opacity={fade} transform={shake}>
-              {layers.map((layer, index) => (
-                <Layer
-                  key={index}
-                  layer={layer}
-                  box={box}
-                  motion={motion}
-                  clock={clock}
-                  mark={mark}
-                />
-              ))}
-            </Group>
+            {maskInsetPx !== null && maskInsetPx > 0 ? (
+              /* The website masks the middle out with `mask-composite:
+                 exclude`; an inverted clip is the same hole. */
+              <Group
+                clip={rect(
+                  maskInsetPx,
+                  maskInsetPx,
+                  width - maskInsetPx * 2,
+                  height - maskInsetPx * 2,
+                )}
+                invertClip
+              >
+                {painted}
+              </Group>
+            ) : (
+              painted
+            )}
           </Group>
           {flash ? (
             <Rect
@@ -763,7 +925,343 @@ function makeKit(S: Skia) {
     );
   }
 
-  return { Stack };
+  /** The fx layer of an animation or a scene, over a face or a panel. */
+  function Fx({
+    fx,
+    width,
+    height,
+    radius,
+  }: {
+    fx: FxArt;
+    width: number;
+    height: number;
+    radius: number;
+  }) {
+    /* `height` is how much of the panel the layer covers, from the
+       top: the aurora's band. The clip stays the panel's. */
+    const covered = fx.height ? (length(fx.height, height) ?? height) : height;
+    return (
+      <Stack
+        layers={fx.layers}
+        width={width}
+        height={covered}
+        clipHeight={height}
+        radius={radius}
+        motion={fx.timing}
+        opacity={fx.opacity}
+        blend="normal"
+        flash={null}
+        inset={null}
+        maskInsetPx={fx.maskInsetPx}
+      />
+    );
+  }
+
+  /**
+   * A sprite: the stylesheet's `::before` / `::after` over a face or a
+   * panel, in one canvas sized to the face and clipped to it.
+   *
+   * Its box is resolved against the face (the sheen's is bigger than
+   * the face and the face clips it), its layers paint inside the box,
+   * its border strokes the box, its glow is the box blurred behind,
+   * and its track moves the lot about the box's centre, as a CSS
+   * transform does. `round` is an ellipse, or the face's own corners
+   * when the box is the whole face.
+   */
+  function Sprite({
+    sprite,
+    width,
+    height,
+    radius,
+  }: {
+    sprite: SpriteArt;
+    width: number;
+    height: number;
+    radius: number;
+  }) {
+    const { left, top, w, h } = spriteBox(sprite, width, height);
+    const box = useMemo(() => ({ w, h }), [w, h]);
+    const { clock, pose, track } = useTrack(sprite.timing, box);
+    const tracked = fades(track);
+
+    const transform = useDerivedValue(() => {
+      const p = pose.value;
+      return [
+        { translateX: p.tx },
+        { translateY: p.ty },
+        { rotate: p.rotate * RAD },
+        { skewX: p.skewX * RAD },
+        { scale: p.scale },
+      ];
+    });
+    const opacity = useDerivedValue(() => (tracked ? pose.value.opacity : 1));
+
+    if (width <= 0 || height <= 0 || w <= 0 || h <= 0) return null;
+
+    const whole = left <= 0 && top <= 0 && left + w >= width && top + h >= height;
+    const rx = sprite.round ? (whole ? radius : w / 2) : 0;
+    const ry = sprite.round ? (whole ? radius : h / 2) : 0;
+    const shape = rrect(rect(left, top, w, h), rx, ry);
+    const bw = sprite.border?.width ?? 0;
+    /* A CSS border sits inside the box; a stroke is centred on its
+       path, so the path steps in by half the width. */
+    const edge = rrect(
+      rect(left + bw / 2, top + bw / 2, w - bw, h - bw),
+      Math.max(0, rx - bw / 2),
+      Math.max(0, ry - bw / 2),
+    );
+
+    return (
+      <Canvas
+        style={{ position: "absolute", top: 0, left: 0, width, height }}
+        pointerEvents="none"
+      >
+        <Group clip={rrect(rect(0, 0, width, height), radius, radius)}>
+          <Group
+            opacity={opacity}
+            transform={transform}
+            origin={vec(left + w / 2, top + h / 2)}
+          >
+            {sprite.glow ? (
+              <RoundedRect rect={shape} color={paintColor(sprite.glow.color)}>
+                <BlurMask blur={sprite.glow.radius / 2} style="normal" />
+              </RoundedRect>
+            ) : null}
+            <Group clip={shape}>
+              <Group transform={[{ translateX: left }, { translateY: top }]}>
+                {sprite.layers.map((layer, index) => (
+                  <Layer
+                    key={index}
+                    layer={layer}
+                    box={box}
+                    kind=""
+                    clock={clock}
+                    curve={LINEAR}
+                    mark={null}
+                  />
+                ))}
+              </Group>
+            </Group>
+            {sprite.border ? (
+              <RoundedRect
+                rect={edge}
+                style="stroke"
+                strokeWidth={bw}
+                color={paintColor(sprite.border.color)}
+              />
+            ) : null}
+          </Group>
+        </Group>
+      </Canvas>
+    );
+  }
+
+  /**
+   * An animation's moving edge, drawn where a worn border's would be.
+   *
+   * The flame edge: the website sets `--cfa-edge` to a gradient and
+   * spreads it to 220% of the card, then pans it up and down and
+   * flickers it. The same four points as `CardEdge`, with the same
+   * corners, so a card wearing it reads as a bordered card; the face
+   * covers the middle. The pan is CSS's own distance (position 50% to
+   * -200% of the box less the layer) rather than a snapped tile, since
+   * `alternate` means it never has to meet itself.
+   */
+  function Edge({
+    art,
+    width,
+    height,
+  }: {
+    art: AnimationArt;
+    width: number;
+    height: number;
+  }) {
+    const edge = art.card.edge;
+    const timings = art.card.timings;
+    const sliding =
+      timings.find((timing) => timing.kind === "pan" || timing.kind === "pan-y") ??
+      null;
+    const fading = timings.find((timing) => fades(trackFor(timing))) ?? null;
+
+    const slideClock = useClock(sliding);
+    const slideCurve = curveFor(sliding);
+    const { pose, track } = useTrack(fading, { w: width, h: height });
+    const tracked = fades(track);
+
+    const angle = edge && edge.type === "linear" ? edge.angle : 0;
+    const { dx, dy } = direction(angle);
+    const spread = art.card.edgeSpread ?? { x: 1, y: 1 };
+    const span = Math.abs(width * spread.x * dx) + Math.abs(height * spread.y * dy);
+    const centre = { x: width / 2, y: height / 2 };
+
+    /* How far the layer moves per cycle, projected onto the line. */
+    const travel =
+      sliding?.kind === "pan"
+        ? 2 * (width - width * spread.x) * dx
+        : sliding?.kind === "pan-y"
+          ? -2.5 * (height - height * spread.y) * dy
+          : 0;
+
+    const slide = useDerivedValue(
+      () => travel * ease(slideCurve, Math.max(0, slideClock.value)),
+    );
+    const start = useDerivedValue(() =>
+      vec(
+        centre.x - (dx * span) / 2 + dx * slide.value,
+        centre.y - (dy * span) / 2 + dy * slide.value,
+      ),
+    );
+    const end = useDerivedValue(() =>
+      vec(
+        centre.x + (dx * span) / 2 + dx * slide.value,
+        centre.y + (dy * span) / 2 + dy * slide.value,
+      ),
+    );
+    const opacity = useDerivedValue(() => (tracked ? pose.value.opacity : 1));
+
+    if (!edge || edge.type !== "linear" || width <= 0 || height <= 0) return null;
+
+    return (
+      <Canvas style={{ position: "absolute", width, height }} pointerEvents="none">
+        <Group opacity={opacity}>
+          <RoundedRect
+            rect={rrect(rect(0, 0, width, height), EDGE_RADIUS, EDGE_RADIUS)}
+          >
+            <LinearGradient
+              start={start}
+              end={end}
+              colors={edge.colors.map(paintColor)}
+              positions={edge.positions}
+              mode="repeat"
+              flags={PREMUL}
+            />
+          </RoundedRect>
+        </Group>
+      </Canvas>
+    );
+  }
+
+  /**
+   * A card animation around a card.
+   *
+   * The card's own tracks (float, tilt, breathe, pulse, glitch) move
+   * the whole card, border and all, through `TrackedView`; the glows
+   * ride on the same view so they move with it, as a box-shadow does.
+   * The fx and the sprites are drawn over the face only, in a view
+   * inset by the edge and clipped to the face's corners. An animation
+   * with an edge of its own (the flame) gives its tracks to the edge
+   * instead, which `Edge` plays.
+   */
+  function Animation({
+    art,
+    width,
+    height,
+    radius,
+    inset,
+    faceRadius,
+    children,
+  }: {
+    art: AnimationArt;
+    width: number;
+    height: number;
+    radius: number;
+    inset: number;
+    faceRadius: number;
+    children: ReactNode;
+  }) {
+    const timings = art.card.edge
+      ? []
+      : art.card.timings.filter((timing) => trackFor(timing) !== null);
+    const faceWidth = width - inset * 2;
+    const faceHeight = height - inset * 2;
+
+    const glow: ViewStyle | undefined =
+      art.card.glows.length > 0
+        ? {
+            borderRadius: radius,
+            boxShadow: art.card.glows.map((g) => ({
+              offsetX: 0,
+              offsetY: 0,
+              blurRadius: g.radius,
+              color: g.color,
+            })),
+          }
+        : undefined;
+
+    return (
+      <TrackedView timings={timings} width={width} height={height} style={glow}>
+        {children}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: inset,
+            top: inset,
+            width: faceWidth,
+            height: faceHeight,
+            borderRadius: faceRadius,
+            overflow: "hidden",
+          }}
+        >
+          {art.fx ? (
+            <Fx fx={art.fx} width={faceWidth} height={faceHeight} radius={faceRadius} />
+          ) : null}
+          {art.sprites.map((sprite, index) => (
+            <Sprite
+              key={index}
+              sprite={sprite}
+              width={faceWidth}
+              height={faceHeight}
+              radius={faceRadius}
+            />
+          ))}
+        </View>
+      </TrackedView>
+    );
+  }
+
+  /** A profile scene over a profile block: the fx layer and the sprites. */
+  function Scene({
+    art,
+    width,
+    height,
+    radius,
+  }: {
+    art: SceneArt;
+    width: number;
+    height: number;
+    radius: number;
+  }) {
+    return (
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width,
+          height,
+          borderRadius: radius,
+          overflow: "hidden",
+        }}
+      >
+        {art.fx ? (
+          <Fx fx={art.fx} width={width} height={height} radius={radius} />
+        ) : null}
+        {art.sprites.map((sprite, index) => (
+          <Sprite
+            key={index}
+            sprite={sprite}
+            width={width}
+            height={height}
+            radius={radius}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  return { Stack, Sprite, Edge, Animation, Scene };
 }
 
 export type PaintKit = ReturnType<typeof makeKit>;
@@ -792,6 +1290,26 @@ export function drawsBackground(slug: string | null): boolean {
   return hasBackgroundArt(slug) && getPaintKit() !== null;
 }
 
+/** Whether a card animation is one the app plays. */
+export function drawsAnimation(slug: string | null): boolean {
+  return hasAnimationArt(slug) && getPaintKit() !== null;
+}
+
+/** Whether an animation brings an edge of its own, in place of a border's. */
+export function drawsAnimationEdge(slug: string | null): boolean {
+  return Boolean(
+    slug &&
+    slug in ANIMATION_ART &&
+    ANIMATION_ART[slug].card.edge?.type === "linear" &&
+    getPaintKit() !== null,
+  );
+}
+
+/** Whether a profile scene is one the app plays. */
+export function drawsScene(slug: string | null): boolean {
+  return hasSceneArt(slug) && getPaintKit() !== null;
+}
+
 /**
  * A stack of paint layers in a canvas the caller places.
  *
@@ -803,16 +1321,38 @@ export function PaintStack(props: {
   width: number;
   height: number;
   radius: number;
-  motion: BorderMotion | null;
+  motion: BorderMotion | Timing | null;
   opacity: number;
   blend: PaintBlend;
   flash: { color: string; seconds: number } | null;
   inset: { color: string; width: number } | null;
+  /** A keyframe track to play over the layers, in place of the motion's own. */
+  track?: MotionStop[] | null;
+  /** Show only a band this wide at the edge. */
+  maskInsetPx?: number | null;
+  /** Clip to this height rather than the layers' own. */
+  clipHeight?: number;
 }) {
   const kit = getPaintKit();
   if (!kit) return null;
 
   return <kit.Stack {...props} />;
+}
+
+/**
+ * One sprite of an animation or a scene, in a canvas sized to the
+ * face or panel it sits on. Renders nothing on a device without Skia.
+ */
+export function Sprite(props: {
+  sprite: SpriteArt;
+  width: number;
+  height: number;
+  radius: number;
+}) {
+  const kit = getPaintKit();
+  if (!kit) return null;
+
+  return <kit.Sprite {...props} />;
 }
 
 /**
@@ -887,4 +1427,98 @@ export function WornBackground({
       inset={art.inset}
     />
   );
+}
+
+/**
+ * The worn card animation, around a card.
+ *
+ * Wraps the card's OUTER view, so float, tilt and breathe move the
+ * whole card including its border, while the fx and the sprites are
+ * drawn over the face only: `inset` is the edge's width and
+ * `faceRadius` the face's corners, exactly the face the card itself
+ * drew. Hands `children` back unchanged for a slug with no art and on
+ * any device without Skia, so nothing about a card changes when it
+ * wears something unported.
+ */
+export function WornAnimation({
+  animation,
+  width,
+  height,
+  radius,
+  inset,
+  faceRadius,
+  children,
+}: {
+  animation: string | null;
+  width: number;
+  height: number;
+  radius: number;
+  inset: number;
+  faceRadius: number;
+  children: ReactNode;
+}) {
+  const kit = getPaintKit();
+  const art =
+    animation && hasAnimationArt(animation) ? ANIMATION_ART[animation] : undefined;
+  if (!kit || !art) return <>{children}</>;
+
+  return (
+    <kit.Animation
+      art={art}
+      width={width}
+      height={height}
+      radius={radius}
+      inset={inset}
+      faceRadius={faceRadius}
+    >
+      {children}
+    </kit.Animation>
+  );
+}
+
+/**
+ * An animation's own edge, drawn as the card's edge when no border is
+ * worn. Null unless the animation brings one and Skia is present.
+ */
+export function AnimationEdge({
+  animation,
+  width,
+  height,
+}: {
+  animation: string | null;
+  width: number;
+  height: number;
+}) {
+  const kit = getPaintKit();
+  const art =
+    animation && drawsAnimationEdge(animation) ? ANIMATION_ART[animation] : null;
+  if (!kit || !art) return null;
+
+  return <kit.Edge art={art} width={width} height={height} />;
+}
+
+/**
+ * The worn profile scene, over a whole profile block.
+ *
+ * Absolutely filled and clipped to the block's corners, above the
+ * cover and below the controls, as the website's `WornSceneLayer`
+ * sits. Nothing in it takes a touch. Null for a slug with no art and
+ * on any device without Skia.
+ */
+export function WornScene({
+  scene,
+  width,
+  height,
+  radius,
+}: {
+  scene: string | null;
+  width: number;
+  height: number;
+  radius: number;
+}) {
+  const kit = getPaintKit();
+  const art = scene && hasSceneArt(scene) ? SCENE_ART[scene] : undefined;
+  if (!kit || !art || width <= 0 || height <= 0) return null;
+
+  return <kit.Scene art={art} width={width} height={height} radius={radius} />;
 }
