@@ -100,14 +100,9 @@ describe("the verb is Offer wherever a hand goes up on a post", () => {
 
   it("says You offered this once the hand is up", () => {
     /* The app's feed card draws its cards through the pager, which
-       carries the line; the website's single-card face carries its own. */
-    for (const source of [
-      web.sheet,
-      web.carousel,
-      web.feedCard,
-      app.sheet,
-      app.pager,
-    ]) {
+       carries the line; the website's single-card face is SingleFlare in
+       the carousel file since round 14, so it flips at once too. */
+    for (const source of [web.sheet, web.carousel, app.sheet, app.pager]) {
       expect(source).toContain("You offered this");
     }
   });

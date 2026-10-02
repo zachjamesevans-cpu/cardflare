@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CheckCircle2, Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
-import { FlareCarousel } from "@/components/feed/flare-carousel";
+import { FlareCarousel, SingleFlare } from "@/components/feed/flare-carousel";
 import { OfferCardsButton, PostMenu } from "@/components/feed/post-actions";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
@@ -272,31 +272,23 @@ export function FlareFeedCard({
 
       {/* The cards: one beside its details, or slides. */}
       {single ? (
-        <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5">
-          {tiles[0]}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <p className="line-clamp-2 text-base leading-tight font-extrabold text-text-primary">
-              {lead.cardName}
+        <SingleFlare card={lead} tile={tiles[0]}>
+          <p className="line-clamp-2 text-base leading-tight font-extrabold text-text-primary">
+            {lead.cardName}
+          </p>
+          <p className="text-xs text-text-secondary">{lead.cardNumber}</p>
+          <p className="mt-0.5 text-sm font-semibold text-accent tabular-nums">
+            {cardCountLabel(lead, direction)}
+          </p>
+          <p className="truncate text-xs text-text-muted">
+            {lead.printingLabel ?? "Any printing"}
+          </p>
+          {lead.match && (
+            <p className="text-xs font-semibold text-accent">
+              {lead.match === "exact" ? "You have this" : "You have another printing"}
             </p>
-            <p className="text-xs text-text-secondary">{lead.cardNumber}</p>
-            <p className="mt-0.5 text-sm font-semibold text-accent tabular-nums">
-              {cardCountLabel(lead, direction)}
-            </p>
-            <p className="truncate text-xs text-text-muted">
-              {lead.printingLabel ?? "Any printing"}
-            </p>
-            {lead.match && (
-              <p className="text-xs font-semibold text-accent">
-                {lead.match === "exact" ? "You have this" : "You have another printing"}
-              </p>
-            )}
-            {lead.youOffered ? (
-              <p className="text-xs text-text-secondary">You offered this</p>
-            ) : lead.state === "offered" ? (
-              <p className="text-xs text-text-secondary">Somebody offered</p>
-            ) : null}
-          </div>
-        </div>
+          )}
+        </SingleFlare>
       ) : (
         <FlareCarousel cards={item.cards} direction={direction} tiles={tiles} />
       )}

@@ -159,13 +159,14 @@ describe("what is still wanted", () => {
 });
 
 describe("offering several cards from a post", () => {
-  it("is one offer batch, capped at what is still wanted, and never collects anything", async () => {
+  it("is one offer batch, capped at the Flare's quantity, and never collects anything", async () => {
     const posts = await readFile("src/lib/feed/posts.ts", "utf8");
     expect(posts).toContain("export async function offerItems");
     expect(posts).toContain("const batch = randomUUID()");
-    /* Each line is capped at the moment of the offer, and a card answered
-       meanwhile is refused by name. */
-    expect(posts).toContain("Math.min(left, Math.round(item.quantity))");
+    /* Each line is capped at the Flare's quantity, never at what is left to
+       find: the founder (2026-10-02) wants a hand to go up even after
+       somebody else's. Only a card that is no longer up is refused by name. */
+    expect(posts).toContain("Math.min(flare.quantity, Math.round(item.quantity))");
     expect(posts).toContain("refused.push(item.flareId)");
     /* Nothing here touches quantity_found or found_quantity. */
     const offer = posts.slice(posts.indexOf("export async function offerItems"));

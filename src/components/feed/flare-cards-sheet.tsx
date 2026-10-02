@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   OfferReview,
   selectionSummary,
@@ -50,6 +50,25 @@ export function FlareCardsSheet({
   completed: boolean;
 }) {
   const [review, setReview] = useState(false);
+
+  /*
+   * OFFERED AT ONCE. An offer sent from the zoom, or from this very
+   * sheet, says so under the card before the refresh brings the
+   * server's word: the founder, "immediately visually show that I've
+   * made an offer on it without having to refresh the feed."
+   */
+  const [offered, setOffered] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    const onOffered = (event: Event) => {
+      const { flareIds } = (event as CustomEvent<{ flareIds: string[] }>).detail;
+      setOffered((current) => new Set([...current, ...flareIds]));
+    };
+    window.addEventListener("cardflare:offered", onOffered);
+    return () => window.removeEventListener("cardflare:offered", onOffered);
+  }, []);
+  const rows = cards.map((card) =>
+    card.flareId && offered.has(card.flareId) ? { ...card, youOffered: true } : card,
+  );
 
   const offerable = direction === "want" && !yours && !completed;
   const canPick = (card: FeedCard) =>
@@ -112,7 +131,7 @@ export function FlareCardsSheet({
         }
       >
         <ul className="flex flex-col gap-2">
-          {cards.map((card) => {
+          {rows.map((card) => {
             const pickable = canPick(card);
             const flareId = card.flareId ?? "";
             const picked = pickable && selection.has(flareId);
@@ -184,13 +203,29 @@ export function FlareCardsSheet({
           open={review}
           onClose={() => setReview(false)}
           lines={lines}
-          onSubmit={(message) =>
-            offerItemsAction(
+          onSubmit={async (message) => {
+            const result = await offerItemsAction(
               postId,
               lines.map((line) => ({ flareId: line.key, quantity: line.quantity })),
               message,
-            )
-          }
+            );
+            if (result.ok) {
+              /* The same word the zoom sends, so the carousel behind
+                 this sheet reads OFFERED on the same paint. */
+              const refused = new Set(result.refused);
+              window.dispatchEvent(
+                new CustomEvent("cardflare:offered", {
+                  detail: {
+                    postId,
+                    flareIds: lines
+                      .map((line) => line.key)
+                      .filter((flareId) => !refused.has(flareId)),
+                  },
+                }),
+              );
+            }
+            return result;
+          }}
           onSent={() => {
             selection.clear();
             onClose();

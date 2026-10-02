@@ -169,7 +169,7 @@ function ZoomActionForm({
   );
 }
 
-/** A small link under a bar's button: "Add a note", "+ Add another card". */
+/** A small link under a bar's button: "Add a note". */
 function ZoomLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -286,16 +286,12 @@ interface ZoomSend {
 interface ZoomOffers {
   /** Cards added to the offer, across the shelf. */
   picks: ReadonlySet<string>;
-  /** Whether a card not yet added is further along the shelf. */
-  more: boolean;
   /** What has gone this session, by the Flare it covered. */
   sends: Readonly<Record<string, ZoomSend>>;
   /** Add this card to the offer, or take it back out. */
   toggle: (flareId: string) => void;
   /** Open the review, where the note is written and the offer goes. */
   review: () => void;
-  /** Move the viewer to the next card on the shelf not yet added. */
-  next: () => void;
 }
 
 /** "Review offer · 1 card" / "Review offer · 3 cards". */
@@ -304,10 +300,14 @@ function reviewLabel(count: number): string {
 }
 
 /**
- * The offer on a Feed post, at the foot of the zoom: two quiet lines,
- * the one toggle, the tray once anything is in it, and the link along
- * the shelf. No borders between them, and nothing that competes with
- * the picture: "the card image should remain the visual focus."
+ * The offer on a Feed post, at the foot of the zoom: the one toggle
+ * and the tray once anything is in it. Nothing else. The founder, on
+ * the two lines that used to explain the toggle: "It doesn't need to
+ * be explained"; and on the link along the shelf: "It doesn't do
+ * anything." The one sentence that survives is a fact
+ * about the card, that somebody else already offered, and an offer
+ * is never gated on it: "ppl should still be able to make offers or
+ * say they have something even if someone already did."
  */
 function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers }) {
   const sent = offers.sends[have.flareId];
@@ -340,7 +340,6 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers })
       </ZoomSaid>
     ) : null;
 
-  const offerable = said === null;
   const added = offers.picks.has(have.flareId);
   const count = offers.picks.size;
 
@@ -348,13 +347,11 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers })
     <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-2">
       {said ?? (
         <>
-          <p className="text-center text-xs leading-5 text-text-muted">
-            {have.state === "offered"
-              ? "Somebody already offered. You can too."
-              : "Have this card?"}
-            <br />
-            Add it to your offer.
-          </p>
+          {have.state === "offered" && (
+            <p className="text-center text-xs leading-5 text-text-muted">
+              Somebody already offered. You can too.
+            </p>
+          )}
           <Button
             type="button"
             variant={added ? "secondary" : "primary"}
@@ -376,11 +373,6 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers })
         >
           {reviewLabel(count)}
         </Button>
-      )}
-      {offers.more && (offerable || count > 0) && (
-        <div className="flex justify-center">
-          <ZoomLink onClick={offers.next}>+ Add another card</ZoomLink>
-        </div>
       )}
     </div>
   );
@@ -609,35 +601,9 @@ export function CardImageZoom({
     },
   ];
 
-  /** A card a hand can still go up on, this session included. */
-  const addable = (card: ZoomCard) =>
-    Boolean(
-      card.have &&
-      card.have.state !== "found" &&
-      !card.have.youOffered &&
-      !sends[card.have.flareId],
-    );
-
   /** The server refuses by Flare id; the viewer reads names. */
   const nameOf = (flareId: string) =>
     cards.find((card) => card.have?.flareId === flareId)?.exactName ?? flareId;
-
-  /**
-   * The next card along the shelf that could be added and is not,
-   * wrapping round, or null when there is none: "+ Add another card"
-   * moves the viewer there.
-   */
-  const nextToAdd = (() => {
-    if (!shelf) return null;
-    for (let step = 1; step < shelf.length; step += 1) {
-      const index = (at + step) % shelf.length;
-      const card = shelf[index];
-      if (card && addable(card) && card.have && !picks.has(card.have.flareId)) {
-        return index;
-      }
-    }
-    return null;
-  })();
 
   /* What the review lists: the picks, named and pictured from the shelf. */
   const lines: OfferLine[] = cards.flatMap((card) =>
@@ -657,7 +623,6 @@ export function CardImageZoom({
 
   const offers: ZoomOffers = {
     picks,
-    more: nextToAdd !== null,
     sends,
     toggle: (flareId) =>
       setPicks((current) => {
@@ -667,11 +632,6 @@ export function CardImageZoom({
         return next;
       }),
     review: () => setReviewOpen(true),
-    next: () => {
-      if (nextToAdd === null) return;
-      setSharp(false);
-      setAt(nextToAdd);
-    },
   };
 
   /** One send, one notice, however many lines: the review's "Send offer". */
@@ -687,6 +647,7 @@ export function CardImageZoom({
     );
     if (!result.ok) return result;
     const refused = new Set(result.refused);
+    const taken = flareIds.filter((flareId) => !refused.has(flareId));
     const record: ZoomSend = {
       count: result.offered,
       notTaken: result.refused.map(nameOf),
@@ -695,11 +656,22 @@ export function CardImageZoom({
        on whichever of them the viewer swipes back to. */
     setSends((current) => {
       const next = { ...current };
-      for (const flareId of flareIds) {
-        if (!refused.has(flareId)) next[flareId] = record;
-      }
+      for (const flareId of taken) next[flareId] = record;
       return next;
     });
+    /*
+     * OFFERED AT ONCE. The founder: "when an offer is made, immediately
+     * visually show that I've made an offer on it without having to
+     * refresh the feed." The post's carousel and its full list are
+     * other components on the same page, so the zoom tells the window
+     * which cards the server took, and they mark those cards before
+     * the refresh above brings the real thing.
+     */
+    window.dispatchEvent(
+      new CustomEvent("cardflare:offered", {
+        detail: { postId: feedPostId, flareIds: taken },
+      }),
+    );
     return result;
   };
 
