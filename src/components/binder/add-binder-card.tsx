@@ -19,14 +19,18 @@ import { addBinderCardAction } from "@/lib/binder/actions";
  *
  * The page owns whether the sheet is open, because the button under
  * the page is not the only way in: every empty pocket on the owner's
- * binder is a "+" that opens this same sheet.
+ * binder is a "+" that opens this same sheet. The binder's id says
+ * which binder the card lands in: the Trade binder, or a custom one.
  */
 export function AddBinderCard({
+  binderId,
   imagesEnabled,
   playerGames,
   open,
   onOpenChange,
 }: {
+  /** "trade", or a custom binder's uuid. */
+  binderId: string;
   imagesEnabled: boolean;
   /** The reader's sign-up games, for the search's default chip. */
   playerGames: readonly string[];
@@ -88,11 +92,14 @@ export function AddBinderCard({
             setError(null);
             setAdded(null);
             start(async () => {
-              const result = await addBinderCardAction({
-                cardId: card.id,
-                printingId: printing?.id ?? null,
-                quantity: 1,
-              });
+              const result = await addBinderCardAction(
+                {
+                  cardId: card.id,
+                  printingId: printing?.id ?? null,
+                  quantity: 1,
+                },
+                binderId,
+              );
               if (!result.ok) {
                 setError(result.message);
                 return;
