@@ -340,7 +340,7 @@ export function HuntDetail({
                         onChange={() => selection.toggle(card.requestId)}
                         className="size-5 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
                       />
-                      I have this
+                      Offer this card
                     </label>
                     {selection.has(card.requestId) && (
                       <Stepper

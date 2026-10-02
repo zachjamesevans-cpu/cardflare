@@ -22,7 +22,7 @@ import { POST_COMMENT_MAX, type PostComment } from "@/lib/feed/post-schema";
  *
  * Instagram's shape, on purpose, and no more of it: no likes on
  * comments, no replies to replies. The thread is about one hunt, and
- * the OFFER lines in it are the point - "I have this" from a card
+ * the OFFER lines in it are the point - an offer from a card
  * lands here with its note, so the author reads who is bringing what
  * in one place.
  *
@@ -170,7 +170,9 @@ export function PostSocial({
                         /* The OFFER line: a hand up on a named card. */
                         <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 align-middle text-[11px] font-semibold text-accent uppercase">
                           <PackageCheck className="size-3" aria-hidden="true" />
-                          {comment.cardName ? `Has ${comment.cardName}` : "Has it"}
+                          {comment.cardName
+                            ? `Offered ${comment.cardName}`
+                            : "Offered it"}
                         </span>
                       )}
                     </p>

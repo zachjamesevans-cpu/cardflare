@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import Image from "next/image";
 import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Layers,
@@ -11,11 +20,13 @@ import {
   X,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
-import { offerFromFeedAction } from "@/lib/feed/post-actions";
+import { listOf, offerButtonLabel } from "@/lib/feed/offer-copy";
+import { offerItemsAction } from "@/lib/feed/post-actions";
 import { POST_COMMENT_MAX, type CardState } from "@/lib/feed/post-schema";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 import { MAX_OFFER_MESSAGE, youHaveLabel, type MatchKind } from "@/lib/matching/schema";
@@ -66,9 +77,9 @@ export interface ZoomCard {
    */
   offer?: ZoomOffer | null;
   /**
-   * "I have this", from a Flare post in the Feed. The founder: "tap a
-   * specific requested card and choose I have this", with a note. Null
-   * on your own post and on a card that already traded.
+   * The offer on a Flare post in the Feed. The founder: "tap a specific
+   * requested card" and offer it, with a note. Null on your own post
+   * and on a card that already traded.
    */
   have?: ZoomHave | null;
 }
@@ -114,26 +125,54 @@ export interface ZoomOffer {
  */
 function ZoomActionForm({
   action,
-  fields,
+  onSubmit,
+  fields = {},
   caption,
   note,
+  noteState,
+  links,
   children,
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  /** A form action, for a bar whose page repaints behind it. */
+  action?: (formData: FormData) => void | Promise<void>;
+  /** Or a handler, for a bar that waits on the server's answer in words. */
+  onSubmit?: () => void;
   /** Hidden inputs the action needs. */
-  fields: Record<string, string>;
+  fields?: Record<string, string>;
   /** The one line worth saying, or nothing. */
   caption?: string | null;
   /** The optional note, revealed on request. */
   note: { name: string; maxLength: number; placeholder: string; label: string };
+  /**
+   * The note's state, when it has to outlive this bar: picking cards
+   * along a shelf swaps the bar on every swipe, and the note is one
+   * note for the whole offer. Kept here otherwise.
+   */
+  noteState?: ZoomNoteState;
+  /** More small links in the row with "Add a note". */
+  links?: ReactNode;
   /** The button row. */
   children: ReactNode;
 }) {
-  const [noting, setNoting] = useState(false);
+  const [notingHere, setNotingHere] = useState(false);
+  const noting = noteState ? noteState.open : notingHere;
+  const openNote = () => (noteState ? noteState.onOpen() : setNotingHere(true));
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   return (
-    <form action={action} onClick={stop} className="flex flex-col gap-2">
+    <form
+      action={action}
+      onSubmit={
+        onSubmit
+          ? (event) => {
+              event.preventDefault();
+              onSubmit();
+            }
+          : undefined
+      }
+      onClick={stop}
+      className="flex flex-col gap-2"
+    >
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
@@ -146,20 +185,71 @@ function ZoomActionForm({
           placeholder={note.placeholder}
           aria-label={note.label}
           autoFocus
+          value={noteState?.value}
+          onChange={
+            noteState ? (event) => noteState.onChange(event.target.value) : undefined
+          }
           className="w-full rounded-[var(--radius-control)] border border-border bg-canvas px-3 py-2 text-sm text-text-primary placeholder:text-text-muted hover:border-border-strong focus:border-accent focus:outline-none"
         />
       )}
       {children}
-      {!noting && (
-        <button
-          type="button"
-          onClick={() => setNoting(true)}
-          className="self-center rounded-[var(--radius-control)] px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-        >
-          Add a note
-        </button>
+      {(!noting || links) && (
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          {!noting && <ZoomLink onClick={openNote}>Add a note</ZoomLink>}
+          {links}
+        </div>
       )}
     </form>
+  );
+}
+
+/** A small link under the bar's button: "Add a note", "Pick more cards", "Cancel". */
+function ZoomLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-[var(--radius-control)] px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** The note behind "Add a note", when the zoom keeps it rather than the bar. */
+interface ZoomNoteState {
+  open: boolean;
+  value: string;
+  onOpen: () => void;
+  onChange: (value: string) => void;
+}
+
+/** The bar's one primary button, saying it is working. */
+function ZoomPrimary({
+  label,
+  pendingLabel,
+  pending,
+  disabled = false,
+}: {
+  label: string;
+  pendingLabel: string;
+  pending: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      type="submit"
+      disabled={pending || disabled}
+      aria-label={label}
+      className="w-full"
+    >
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <PackageCheck className="size-4" aria-hidden="true" />
+      )}
+      {pending ? pendingLabel : label}
+    </Button>
   );
 }
 
@@ -240,51 +330,158 @@ function ZoomOfferBlock({ offer }: { offer: ZoomOffer }) {
   );
 }
 
-/** "I have this", from the Feed, at the foot of the zoom. */
-function ZoomHaveBlock({ have }: { have: ZoomHave }) {
-  if (have.state === "found") {
-    return (
+/**
+ * What one send did, remembered against every card it covered, so the
+ * bar can say so on whichever of them the viewer swipes back to.
+ */
+interface ZoomSend {
+  /** Cards the server took. */
+  count: number;
+  /** Cards it could not take, by name. */
+  notTaken: string[];
+}
+
+/**
+ * THE OFFER'S STATE LIVES IN THE ZOOM, NOT IN THE BAR.
+ *
+ * The bar is swapped on every swipe along the shelf, and the founder's
+ * ask is one offer for several cards: "if someone has multiple of
+ * someone else's flares, they have to send multiple different
+ * notifications... Ideally it would say 'CHUNC has 4 of the cards
+ * you're looking for' as one message." So the picks, the note and
+ * what the server answered are the zoom's, keyed by Flare, and the bar
+ * reads them for the card it is on.
+ */
+interface ZoomOffers {
+  /** Picks across the shelf, or null outside pick mode. */
+  picks: ReadonlySet<string> | null;
+  /** Whether any other card on the shelf could be picked too. */
+  more: boolean;
+  note: ZoomNoteState;
+  pending: boolean;
+  /** The server's refusal, in words, or null. */
+  failure: string | null;
+  /** What has gone this session, by the Flare it covered. */
+  sends: Readonly<Record<string, ZoomSend>>;
+  /** Enter pick mode with this card picked. */
+  pickMore: (flareId: string) => void;
+  togglePick: (flareId: string) => void;
+  /** Leave pick mode and clear the picks. */
+  cancelPicks: () => void;
+  /** One send, one notice, however many lines. */
+  send: (postId: string, flareIds: string[]) => void;
+}
+
+/** The offer on a Feed post, at the foot of the zoom. */
+function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers }) {
+  const sent = offers.sends[have.flareId];
+
+  /* The strip: what is already true of this card, if anything. */
+  const said =
+    have.state === "found" ? (
       <ZoomSaid>
         <p>
           <span className="font-medium text-accent">Found.</span> This one already
           traded.
         </p>
       </ZoomSaid>
-    );
-  }
-
-  if (have.youOffered) {
-    return (
+    ) : sent ? (
       <ZoomSaid>
         <p>
-          <span className="font-medium text-accent">You said you have this.</span> They
-          can see your name in their room, so keep an eye out.
+          <span className="font-medium text-accent">
+            {sent.count > 1 ? `You offered ${sent.count} cards.` : "You offered this."}
+          </span>{" "}
+          They can see your name, so keep an eye out.
+          {sent.notTaken.length > 0 && ` Not taken: ${listOf(sent.notTaken)}.`}
         </p>
       </ZoomSaid>
+    ) : have.youOffered ? (
+      <ZoomSaid>
+        <p>
+          <span className="font-medium text-accent">You offered this.</span> They can
+          see your name, so keep an eye out.
+        </p>
+      </ZoomSaid>
+    ) : null;
+
+  const offerable = said === null;
+  const caption =
+    offerable && have.state === "offered"
+      ? "Somebody already offered. You can too."
+      : null;
+  const note = {
+    name: "note",
+    maxLength: POST_COMMENT_MAX,
+    placeholder: "Add a note, like where you'll be",
+    label: "A note with your offer",
+  };
+  const failure = offers.failure && (
+    <p role="alert" className="text-center text-xs font-medium text-danger">
+      {offers.failure}
+    </p>
+  );
+
+  if (offers.picks === null) {
+    if (said) return said;
+    /* One tap, one send: this card, with the note if one was written. */
+    return (
+      <ZoomActionForm
+        onSubmit={() => offers.send(have.postId, [have.flareId])}
+        caption={caption}
+        note={note}
+        noteState={offers.note}
+        links={
+          offers.more && (
+            <ZoomLink onClick={() => offers.pickMore(have.flareId)}>
+              Pick more cards
+            </ZoomLink>
+          )
+        }
+      >
+        <ZoomPrimary
+          label={offerButtonLabel(1)}
+          pendingLabel="Offering…"
+          pending={offers.pending}
+        />
+        {failure}
+      </ZoomActionForm>
     );
   }
 
+  /* Pick mode: the toggle for this card, and the one button for all the picks. */
+  const picks = offers.picks;
+  const picked = picks.has(have.flareId);
   return (
-    <ZoomActionForm
-      action={offerFromFeedAction}
-      fields={{ postId: have.postId, flareId: have.flareId }}
-      caption={
-        have.state === "offered" ? "Somebody already offered. You can too." : null
-      }
-      note={{
-        name: "note",
-        maxLength: POST_COMMENT_MAX,
-        placeholder: "Add a note, like where you'll be",
-        label: "A note with your offer",
-      }}
-    >
-      <SubmitButton
-        label="I have this"
-        pendingLabel="Sending…"
-        icon={PackageCheck}
-        className="w-full"
-      />
-    </ZoomActionForm>
+    <>
+      {said}
+      <ZoomActionForm
+        onSubmit={() => offers.send(have.postId, [...picks])}
+        caption={caption}
+        note={note}
+        noteState={offers.note}
+        links={<ZoomLink onClick={offers.cancelPicks}>Cancel</ZoomLink>}
+      >
+        {offerable && (
+          <Button
+            type="button"
+            variant="secondary"
+            aria-pressed={picked}
+            onClick={() => offers.togglePick(have.flareId)}
+            className="w-full"
+          >
+            {picked && <Check className="size-4 text-accent" aria-hidden="true" />}
+            {picked ? "Picked" : "Pick this card"}
+          </Button>
+        )}
+        <ZoomPrimary
+          label={offerButtonLabel(picks.size)}
+          pendingLabel="Offering…"
+          pending={offers.pending}
+          disabled={picks.size === 0}
+        />
+        {failure}
+      </ZoomActionForm>
+    </>
   );
 }
 
@@ -391,7 +588,7 @@ export function CardImageZoom({
   youHave?: { kind: MatchKind; count: number } | null;
   /** The offer form, for another player's want. See `ZoomCard.offer`. */
   offer?: ZoomOffer | null;
-  /** "I have this" from the Feed. See `ZoomCard.have`. */
+  /** The offer on a Feed post. See `ZoomCard.have`. */
   have?: ZoomHave | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
@@ -466,6 +663,103 @@ export function CardImageZoom({
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
+
+  /*
+   * The offer on a Feed post: picks along the shelf, the one note, and
+   * what the server said. See `ZoomOffers`. Cleared when the dialog
+   * closes, with everything else the viewer typed or chose.
+   */
+  const [picks, setPicks] = useState<ReadonlySet<string> | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [failure, setFailure] = useState<string | null>(null);
+  const [sends, setSends] = useState<Readonly<Record<string, ZoomSend>>>({});
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const resetOffers = useCallback(() => {
+    setPicks(null);
+    setNoteOpen(false);
+    setNoteText("");
+    setFailure(null);
+    setSends({});
+  }, []);
+
+  /** A card a hand can still go up on, this session included. */
+  const pickable = useCallback(
+    (card: ZoomCard) =>
+      Boolean(
+        card.have &&
+        card.have.state !== "found" &&
+        !card.have.youOffered &&
+        !sends[card.have.flareId],
+      ),
+    [sends],
+  );
+
+  /** The server refuses by Flare id; the viewer reads names. */
+  const nameOf = useCallback(
+    (flareId: string) =>
+      shelf?.find((card) => card.have?.flareId === flareId)?.exactName ??
+      (ownHave?.flareId === flareId ? ownExactName : flareId),
+    [ownExactName, ownHave, shelf],
+  );
+
+  const offers: ZoomOffers = {
+    picks,
+    more: shelf ? shelf.some((card, index) => index !== at && pickable(card)) : false,
+    note: {
+      open: noteOpen,
+      value: noteText,
+      onOpen: () => setNoteOpen(true),
+      onChange: setNoteText,
+    },
+    pending,
+    failure,
+    sends,
+    pickMore: (flareId) => setPicks(new Set([flareId])),
+    togglePick: (flareId) =>
+      setPicks((current) => {
+        const next = new Set(current ?? []);
+        if (next.has(flareId)) next.delete(flareId);
+        else next.add(flareId);
+        return next;
+      }),
+    cancelPicks: () => setPicks(null),
+    send: (postId, flareIds) => {
+      setFailure(null);
+      startTransition(async () => {
+        const result = await offerItemsAction(
+          postId,
+          flareIds.map((flareId) => ({ flareId, quantity: 1 })),
+          noteText.trim(),
+        );
+        if (!result.ok) {
+          /* Said under the bar, and the button stays: the founder's tap
+             "stopped going through with no word why". */
+          setFailure(result.message);
+          return;
+        }
+        const refused = new Set(result.refused);
+        const record: ZoomSend = {
+          count: result.offered,
+          notTaken: result.refused.map(nameOf),
+        };
+        setSends((current) => {
+          const next = { ...current };
+          for (const flareId of flareIds) {
+            if (!refused.has(flareId)) next[flareId] = record;
+          }
+          return next;
+        });
+        setPicks(null);
+        setNoteOpen(false);
+        setNoteText("");
+        /* The post's cards read OFFERED on the next paint; the zoom stays up. */
+        router.refresh();
+      });
+    },
+  };
 
   /*
    * A swipe ends in a click, and a click anywhere on this dialog closes
@@ -597,11 +891,12 @@ export function CardImageZoom({
       setWarm(false);
       setSharp(false);
       setAt(position);
+      resetOffers();
     };
 
     element.addEventListener("close", onClose);
     return () => element.removeEventListener("close", onClose);
-  }, [position]);
+  }, [position, resetOffers]);
 
   /*
    * Wraps, deliberately. A shelf is a loop of five or six cards, not a
@@ -1059,7 +1354,9 @@ export function CardImageZoom({
               shelf position so a half-typed note does not ride along to
               the next card. */}
           {offer && <ZoomOfferBlock key={`offer-${at}`} offer={offer} />}
-          {have && <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} />}
+          {have && (
+            <ZoomHaveBlock key={`${have.flareId}-${at}`} have={have} offers={offers} />
+          )}
         </div>
       </dialog>
     </>
