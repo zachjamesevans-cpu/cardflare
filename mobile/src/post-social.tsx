@@ -17,6 +17,8 @@ export interface PostRef {
   postId: string;
   /** The viewer's own post: nothing to offer on. */
   yours: boolean;
+  /** Who posted it, for the review's "<name> can see your name." */
+  posterName?: string;
   /**
    * ONE offer, for one card or several: a line per card. Resolves with
    * what the server took, and throws an ApiError whose code is the
@@ -27,7 +29,7 @@ export interface PostRef {
 }
 
 /**
- * "Offer this card" for one card, or null where it makes no sense:
+ * "I have this card" for one card, or null where it makes no sense:
  * your own post, a card that already traded, an item that is not a
  * post.
  */
@@ -38,6 +40,8 @@ export function haveFor(
   if (!post || post.yours || !card.flareId || card.state === "found") return null;
   const flareId = card.flareId;
   return {
+    postId: post.postId,
+    posterName: post.posterName ?? "They",
     flareId,
     name: card.cardName,
     state: card.state ?? "open",

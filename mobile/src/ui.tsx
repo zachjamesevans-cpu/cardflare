@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
   useEffect,
@@ -27,9 +27,13 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { offerErrorMessage } from "./api";
+import type { OfferItem, OfferOutcome } from "./api";
 import { getFoilKit } from "./foil";
-import { offerButtonLabel, offerFailureMessage, listOf } from "./offer-copy";
+import { listOf } from "./offer-copy";
+/* A cycle, knowingly: the review sheet is built from these primitives
+   and the viewer opens it. Both only touch the other inside a render,
+   never while the modules load, which is what makes a cycle safe. */
+import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
 
 import { youHaveLabel } from "./held-label";
@@ -192,21 +196,17 @@ export interface ZoomCard {
    */
   offer?: ZoomOffer | null;
   /**
-   * "Offer this card", from a Flare post in the Feed. The founder: tap
-   * a specific requested card and say you have it, with a note; the
-   * verb is "Offer" now. Null on your own post and on a card that
-   * already traded.
+   * "I have this card", from a Flare post in the Feed: the card can go
+   * into an offer built in the viewer and sent from the review. Null
+   * on your own post and on a card that already traded.
    */
   have?: ZoomHave | null;
 }
 
-/** One line of an offer: a card on the post, and how many of it. */
-export interface ZoomOfferItem {
-  flareId: string;
-  quantity: number;
-}
-
 export interface ZoomHave {
+  /** The post the card is on, and who posted it: what the review needs. */
+  postId: string;
+  posterName: string;
   /** The Flare behind the card: what a pick is keyed by. */
   flareId: string;
   /** The card's name, so a refusal can say "Not taken: Ace." */
@@ -220,27 +220,18 @@ export interface ZoomHave {
    * with what the server took; throws an ApiError whose code is the
    * server's reason when it refused.
    */
-  onOffer: (
-    items: ZoomOfferItem[],
-    note: string,
-  ) => Promise<{ offered: number; refused: string[] }>;
+  onOffer: (items: OfferItem[], note: string) => Promise<OfferOutcome>;
 }
 
 /**
- * PICK MODE LIVES WITH THE ZOOM, NOT WITH THE BAR.
+ * THE OFFER BEING BUILT LIVES WITH THE ZOOM, NOT WITH THE BAR.
  *
- * "Pick more cards" turns the whole shelf into a pick list: every card
- * swiped to shows a toggle, and the one button at the foot counts what
- * is picked. The bar is drawn fresh for each card (so a half-typed
- * note for one card does not ride along to the next), which is why
- * the picks and the note that goes with them are held by the zoom,
- * keyed by flareId, and let go when it closes. Null means not picking.
+ * "I have this card" on any card of the shelf adds it; the bar is
+ * drawn fresh for each card, so what has been added is held by the
+ * zoom, keyed by flareId, outlives a swipe, and is let go when the
+ * zoom closes. flareId -> card name, so a refusal can be named.
  */
-export interface ZoomPicks {
-  /** flareId -> card name, so a refusal can be named. */
-  cards: Record<string, string>;
-  note: string;
-}
+export type ZoomPicks = Record<string, string>;
 
 /** What one send came back with, kept so the strip can count it. */
 interface ZoomSent {
@@ -284,7 +275,6 @@ const MAX_OFFER_MESSAGE = 80;
 function ZoomActionBar({
   caption,
   note,
-  aside,
   children,
 }: {
   /** The one line worth saying, or nothing. */
@@ -296,13 +286,11 @@ function ZoomActionBar({
     placeholder: string;
     maxLength: number;
   };
-  /** A second small link beside "Add a note": "Pick more cards", "Cancel". */
-  aside?: ReactNode;
   /** The button row. */
   children: ReactNode;
 }) {
   /* A note already written stays in view: the bar is drawn fresh per
-     card, and pick mode carries its note from one card to the next. */
+     card. */
   const [noting, setNoting] = useState(note.value.length > 0);
 
   return (
@@ -323,21 +311,12 @@ function ZoomActionBar({
         />
       ) : null}
       {children}
-      {!noting || aside ? (
-        <View
-          style={{ flexDirection: "row", justifyContent: "center", gap: spacing(4) }}
-        >
-          {!noting ? (
-            <ZoomLink label="Add a note" onPress={() => setNoting(true)} />
-          ) : null}
-          {aside}
-        </View>
-      ) : null}
+      {!noting ? <ZoomLink label="Add a note" onPress={() => setNoting(true)} /> : null}
     </Pressable>
   );
 }
 
-/** A small link under the zoom's button: "Add a note", "Pick more cards", "Cancel". */
+/** A small link under the zoom's button: the room's "Add a note", "+ Add another card". */
 function ZoomLink({
   label,
   onPress,
@@ -352,7 +331,11 @@ function ZoomLink({
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      style={{ paddingVertical: spacing(1), paddingHorizontal: spacing(2) }}
+      style={{
+        alignSelf: "center",
+        paddingVertical: spacing(1),
+        paddingHorizontal: spacing(2),
+      }}
     >
       <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
         {label}
@@ -473,47 +456,58 @@ function offeredStrip(count: number): string {
 }
 
 /**
- * "Offer", from the Feed, at the foot of the zoom.
+ * THE VIEWER BUILDS AN OFFER; IT DOES NOT SEND ONE.
  *
- * Nothing picked: the one button sends THIS card at once, one tap and
- * one send. "Pick more cards" turns the shelf into a pick list (this
- * card picked first), the button counts the picks and sends them all
- * as one offer with one note, so the poster gets one notice that
- * counts the cards rather than one per tap. A refusal is said under
- * the bar in the server's words and the button stays usable; a send
- * turns the bar into the strip and leaves the zoom open.
+ * The founder: the button here "actually means 'I own this card and
+ * want to include it in my offer'", and "the actual commitment should
+ * happen later when the user presses 'Send Offer' from the review
+ * screen." Round 12's bar sent on the spot, with a note field and a
+ * pick mode beside it, and read as a checkout.
+ *
+ * So the foot of the panel is, at most: two short muted lines, one
+ * button that adds this card (and reads "Added to your offer" with a
+ * check once it has; tapping again takes it out), "Review offer · N
+ * cards" once anything is added, and "+ Add another card", which walks
+ * the shelf to the next card not yet added. No box, no dividers, no
+ * note: the note lives on the review, and so does the only pending
+ * state. A card that is found, already offered or sent this session
+ * keeps its strip in place of the lines and the button.
  */
 function ZoomHaveForm({
   have,
   picks,
   onPicks,
   sent,
-  onSent,
-  send,
+  next,
+  onNext,
+  onReview,
 }: {
   /** The card on screen, or null when it has nothing to offer. */
   have: ZoomHave | null;
-  /** Pick mode across the shelf, or null when not picking. */
-  picks: ZoomPicks | null;
-  onPicks: (picks: ZoomPicks | null) => void;
+  /** What has been added to the offer, across the shelf. */
+  picks: ZoomPicks;
+  onPicks: (picks: ZoomPicks) => void;
   /** The last send from this zoom, so its cards read as offered now. */
   sent: ZoomSent | null;
-  onSent: (sent: ZoomSent) => void;
-  /** The post's one door, carried by any card on the shelf that has it. */
-  send: ZoomHave["onOffer"] | null;
+  /** The next card on the shelf not yet added, or null when none. */
+  next: number | null;
+  onNext: (index: number) => void;
+  /** Opens the review, where the offer is sent. */
+  onReview: () => void;
 }) {
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const count = Object.keys(picks).length;
+  /* "Review offer · 1 card" / "Review offer · 3 cards". The dot is U+00B7. */
+  const tray = `Review offer · ${count} ${count === 1 ? "card" : "cards"}`;
+  const added = Boolean(have && picks[have.flareId]);
+  const sentHere = Boolean(have && sent?.flareIds.includes(have.flareId));
+  /* A card with nothing left to add: found, already yours, or just sent. */
+  const addable = Boolean(
+    have && !have.youOffered && have.state !== "found" && !sentHere,
+  );
 
-  const picking = picks !== null;
-  const pickedIds = picks ? Object.keys(picks.cards) : [];
-  const pickedHere = Boolean(have && picks?.cards[have.flareId]);
-  /* A card with no offer in it shows no toggle: found, or already yours. */
-  const offerable = Boolean(have && !have.youOffered && have.state !== "found");
-
-  if (!picking && have?.state === "found") {
-    return (
+  let strip: ReactNode = null;
+  if (have?.state === "found") {
+    strip = (
       <ZoomSaid>
         <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>Found. </Text>
@@ -521,11 +515,9 @@ function ZoomHaveForm({
         </Text>
       </ZoomSaid>
     );
-  }
-
-  /* This card went in the last send: say so, and count the cards. */
-  if (!picking && have && sent && sent.flareIds.includes(have.flareId)) {
-    return (
+  } else if (have && sent && sentHere) {
+    /* This card went in the last send: say so, and count the cards. */
+    strip = (
       <ZoomSaid>
         <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
@@ -536,10 +528,8 @@ function ZoomHaveForm({
         </Text>
       </ZoomSaid>
     );
-  }
-
-  if (!picking && have?.youOffered) {
-    return (
+  } else if (have?.youOffered) {
+    strip = (
       <ZoomSaid>
         <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
@@ -551,97 +541,56 @@ function ZoomHaveForm({
     );
   }
 
-  if (!picking && !have) return null;
+  if (!strip && !addable && count === 0 && next === null) return null;
 
-  /* What the button sends: every pick, or this card alone. */
-  const items: ZoomOfferItem[] =
-    picking && pickedIds.length > 0
-      ? pickedIds.map((flareId) => ({ flareId, quantity: 1 }))
-      : have && offerable
-        ? [{ flareId: have.flareId, quantity: 1 }]
-        : [];
-  const nameOf = (flareId: string): string =>
-    picks?.cards[flareId] ?? (have?.flareId === flareId ? have.name : "one card");
-
-  const offer = async () => {
-    if (busy || items.length === 0 || !send) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await send(items, (picks ? picks.note : note).trim());
-      const refused = result.refused ?? [];
-      const taken = items
-        .map((item) => item.flareId)
-        .filter((id) => !refused.includes(id));
-      if (taken.length === 0) {
-        setError(offerFailureMessage("nothing-left"));
-        return;
-      }
-      onSent({ flareIds: taken, refused: refused.map(nameOf) });
-      onPicks(null);
-    } catch (caught) {
-      setError(offerErrorMessage(caught));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const togglePick = () => {
-    if (!have || !picks) return;
-    const cards = { ...picks.cards };
+  const toggle = () => {
+    if (!have) return;
+    const cards = { ...picks };
     if (cards[have.flareId]) delete cards[have.flareId];
     else cards[have.flareId] = have.name;
-    onPicks({ ...picks, cards });
+    onPicks(cards);
   };
 
+  /* Wrapped in its own Pressable so a tap inside it does not reach the
+     backdrop, which closes the card. */
   return (
-    <ZoomActionBar
-      caption={
-        have?.state === "offered" && offerable
-          ? "Somebody already offered. You can too."
-          : null
-      }
-      note={{
-        value: picks ? picks.note : note,
-        onChange: picks ? (value) => onPicks({ ...picks, note: value }) : setNote,
-        placeholder: "Add a note, like where you'll be",
-        maxLength: 280,
-      }}
-      aside={
-        picking ? (
-          <ZoomLink label="Cancel" onPress={() => onPicks(null)} disabled={busy} />
-        ) : have ? (
-          <ZoomLink
-            label="Pick more cards"
-            disabled={busy}
-            onPress={() => onPicks({ cards: { [have.flareId]: have.name }, note })}
-          />
-        ) : null
-      }
-    >
-      {picking && have && offerable ? (
-        <Tap
-          onPress={togglePick}
-          disabled={busy}
-          accessibilityLabel={pickedHere ? `Unpick ${have.name}` : `Pick ${have.name}`}
-          style={[styles.button, styles.buttonSecondary]}
-        >
-          {pickedHere ? (
-            <MaterialCommunityIcons name="check" size={18} color={colors.accent} />
-          ) : null}
-          <Text style={[styles.buttonLabel, { color: colors.textPrimary }]}>
-            {pickedHere ? "Picked" : "Pick this card"}
-          </Text>
-        </Tap>
+    <Pressable onPress={() => undefined} style={styles.zoomBar}>
+      {strip}
+      {addable && have ? (
+        <>
+          <View style={{ alignItems: "center" }}>
+            <Text style={styles.zoomAsk}>
+              {have.state === "offered"
+                ? "Somebody already offered. You can too."
+                : "Have this card?"}
+            </Text>
+            <Text style={styles.zoomAsk}>Add it to your offer.</Text>
+          </View>
+          <Tap
+            onPress={toggle}
+            accessibilityLabel={
+              added
+                ? `Remove ${have.name} from your offer`
+                : `Add ${have.name} to your offer`
+            }
+            style={[styles.button, added && styles.buttonSecondary]}
+          >
+            {added ? (
+              <Ionicons name="checkmark" size={18} color={colors.accent} />
+            ) : null}
+            <Text style={[styles.buttonLabel, added && { color: colors.textPrimary }]}>
+              {added ? "Added to your offer" : "I have this card"}
+            </Text>
+          </Tap>
+        </>
       ) : null}
-      <Button
-        label={busy ? "Offering…" : offerButtonLabel(picking ? pickedIds.length : 0)}
-        busy={busy}
-        disabled={items.length === 0 || !send}
-        onPress={() => void offer()}
-      />
-      <ErrorLine message={error} />
-    </ZoomActionBar>
+      {count > 0 ? (
+        <Button label={tray} variant="secondary" onPress={onReview} />
+      ) : null}
+      {next !== null ? (
+        <ZoomLink label="+ Add another card" onPress={() => onNext(next)} />
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -668,7 +617,7 @@ export function CardImage({
   width: number;
   name: string;
   cardNumber: string;
-  /** "Offer this card" in the large view, when the viewer can say so. */
+  /** "I have this card" in the large view, when the viewer can say so. */
   have?: ZoomHave | null;
   /**
    * OFFERED or FOUND, drawn on the thumbnail. Only this card dims - the
@@ -747,10 +696,13 @@ export function CardImage({
   const settleTouch = useRef<{ x: number; y: number } | null>(null);
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
 
-  /* Pick mode across the shelf, and the last send, both the zoom's own:
-     they outlive a swipe and die with the close. See `ZoomPicks`. */
-  const [picks, setPicks] = useState<ZoomPicks | null>(null);
+  /* The offer being built across the shelf, whether its review is up,
+     and the last send: all the zoom's own, so they outlive a swipe and
+     die with the close. See `ZoomPicks`. */
+  const [picks, setPicks] = useState<ZoomPicks>({});
+  const [reviewing, setReviewing] = useState(false);
   const [sent, setSent] = useState<ZoomSent | null>(null);
+  const rail = useRef<ScrollView>(null);
 
   /* Everything below reads these, so the panel draws whichever card the
      shelf is on; the thumbnail keeps its own. */
@@ -768,9 +720,33 @@ export function CardImage({
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
   /* Every card of a post carries the same door, so a card with nothing
-     to offer (found, already yours) can still send the shelf's picks. */
-  const offerDoor =
-    have?.onOffer ?? shelf?.find((card) => card.have)?.have?.onOffer ?? null;
+     to offer (found, already yours) can still open the review for the
+     cards added elsewhere on the shelf. */
+  const door = have ?? shelf?.find((card) => card.have)?.have ?? null;
+
+  /* Can this card still go into the offer? */
+  const addable = (card: ZoomCard | null | undefined): boolean => {
+    const h = card?.have;
+    return Boolean(
+      h &&
+      !h.youOffered &&
+      h.state !== "found" &&
+      !picks[h.flareId] &&
+      !sent?.flareIds.includes(h.flareId),
+    );
+  };
+  /* "+ Add another card": the next card along the shelf not yet added,
+     wrapping round, or null when there is none (or no shelf). */
+  let next: number | null = null;
+  if (shelf) {
+    for (let step = 1; step < shelf.length; step += 1) {
+      const index = (at + step) % shelf.length;
+      if (addable(shelf[index])) {
+        next = index;
+        break;
+      }
+    }
+  }
 
   const window = useWindowDimensions();
 
@@ -802,7 +778,8 @@ export function CardImage({
       useNativeDriver: true,
     }).start(() => {
       setOpen(false);
-      setPicks(null);
+      setPicks({});
+      setReviewing(false);
       setSent(null);
     });
   };
@@ -819,7 +796,7 @@ export function CardImage({
   if (!ownImageUrl) return <View style={frame} />;
   const greyKit = state === "found" ? getFoilKit() : null;
 
-  const large = Math.min(window.width - spacing(14), 380);
+  const widthLarge = Math.min(window.width - spacing(14), 380);
 
   /*
    * With neighbours showing, the hero gives up the width they occupy.
@@ -830,7 +807,25 @@ export function CardImage({
    * PEEK is deliberately small: enough card to recognise as a card,
    * little enough that the one being read still dominates.
    */
-  const hero = shelf ? large - 2 * (PEEK_WIDTH + PEEK_GAP) : large;
+  const widthHero = shelf ? widthLarge - 2 * (PEEK_WIDTH + PEEK_GAP) : widthLarge;
+
+  /*
+   * AND CAPPED BY HEIGHT, for the small phones.
+   *
+   * The width alone sized the hero, and on an iPhone SE the title
+   * block, the picture, the two lines, the button, the tray and the
+   * link under it added up to more screen than there is: the title
+   * went under the notch. 300pt is what everything but the picture
+   * needs at its tallest (title block, the offer block with every
+   * piece showing, the panel's padding and the screen's margins), so
+   * the picture may be at most the rest, in card proportions, and the
+   * neighbours on the rail scale with it since they are drawn at the
+   * hero's size. On a 375x667 window that is a 251pt hero on a shelf
+   * (the width wins) and 262pt alone (the height wins).
+   */
+  const heightHero = Math.floor(((window.height - 300) * 63) / 88);
+  const hero = Math.min(widthHero, heightHero);
+  const large = shelf ? hero + 2 * (PEEK_WIDTH + PEEK_GAP) : hero;
 
   /*
    * THE SHELF IS A PAGER, not a slideshow.
@@ -850,6 +845,12 @@ export function CardImage({
    */
   const page = hero + PEEK_GAP;
   const sidePad = (large - hero) / 2;
+
+  /* "+ Add another card": slide the rail to that card and retitle. */
+  const goTo = (index: number) => {
+    rail.current?.scrollTo({ x: index * page, animated: true });
+    setAt(index);
+  };
 
   return (
     <>
@@ -969,8 +970,12 @@ export function CardImage({
                     should be centered on that screen." Only these two -
                     a note runs to several lines and centred prose is
                     harder to read than the tidiness is worth. */}
+                  {/* Padded clear of the close in the corner. */}
                   <Text
-                    style={[styles.title, { textAlign: "center" }]}
+                    style={[
+                      styles.title,
+                      { textAlign: "center", paddingHorizontal: spacing(9) },
+                    ]}
                     numberOfLines={1}
                   >
                     {name}
@@ -1109,6 +1114,7 @@ export function CardImage({
                     }}
                   >
                     <ScrollView
+                      ref={rail}
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       /* Snap to a CARD, not to a screen: the viewport is
@@ -1228,24 +1234,66 @@ export function CardImage({
                 {offer ? (
                   <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
                 ) : null}
-                {have || picks ? (
+                {have || Object.keys(picks).length > 0 || next !== null ? (
                   <ZoomHaveForm
                     key={`have-${shelf ? at : "own"}`}
                     have={have}
                     picks={picks}
                     onPicks={setPicks}
                     sent={sent}
-                    onSent={setSent}
-                    send={offerDoor}
+                    next={next}
+                    onNext={goTo}
+                    onReview={() => setReviewing(true)}
                   />
                 ) : null}
-                <Tap onPress={close} hitSlop={8}>
-                  <Text style={styles.muted}>Tap anywhere to close</Text>
+                {/*
+                 * A quiet X in the corner, last so it sits over the title.
+                 * The sentence that used to sit under the bar and say a
+                 * tap closes went with round 13: a tap off the panel or
+                 * on the card still closes, and the corner says so
+                 * without a line of text.
+                 */}
+                <Tap
+                  onPress={close}
+                  accessibilityLabel="Close"
+                  style={styles.zoomClose}
+                >
+                  <Ionicons name="close" size={22} color={colors.textSecondary} />
                 </Tap>
               </Animated.View>
             </KeyboardAvoidingView>
           </View>
         </Animated.View>
+        {/*
+         * The review, over the viewer: the one place the offer is sent.
+         * The screen's door reloads the Feed behind the result, and the
+         * viewer marks its cards from the result at once, so "Sending…"
+         * settles when the server answers. The viewer stays open; its
+         * strip is the confirmation.
+         */}
+        {reviewing && door ? (
+          <OfferReviewSheet
+            postId={door.postId}
+            posterName={door.posterName}
+            lines={Object.entries(picks).map(([flareId, cardName]) => ({
+              flareId,
+              name: cardName,
+              quantity: 1,
+            }))}
+            send={door.onOffer}
+            onSent={(outcome) => {
+              const refused = outcome.refused ?? [];
+              const taken = Object.keys(picks).filter((id) => !refused.includes(id));
+              setSent((previous) => ({
+                flareIds: [...(previous?.flareIds ?? []), ...taken],
+                refused: refused.map((id) => picks[id] ?? "one card"),
+              }));
+              setPicks({});
+              setReviewing(false);
+            }}
+            onClose={() => setReviewing(false)}
+          />
+        ) : null}
       </Modal>
     </>
   );
@@ -1531,6 +1579,17 @@ const styles = StyleSheet.create({
   zoomBar: {
     alignSelf: "stretch",
     gap: spacing(2),
+  },
+  /* The two lines over the button: small and muted, under the card. */
+  zoomAsk: { color: colors.textMuted, fontSize: 12, textAlign: "center" },
+  zoomClose: {
+    position: "absolute",
+    top: spacing(1),
+    right: spacing(1),
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   zoomSaid: {
     alignSelf: "stretch",

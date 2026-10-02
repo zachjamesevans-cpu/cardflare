@@ -180,12 +180,15 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     );
   }
 
+  /* The server's answer first, the re-read behind it: the review's
+     "Sending…" follows the server, not the rebuild of this screen. */
   const ref: PostRef = {
     postId: post.postId,
     yours: post.yours,
+    posterName: post.author.displayName,
     offer: async (items, message) => {
       const result = await offerItemsOnPost(post.postId, items, message);
-      await load();
+      void load();
       return result;
     },
   };
