@@ -80,10 +80,12 @@ describe("the binder is the Have list with a switch", () => {
     expect(lib).toContain("removeFromBinder(entryId, session.id)");
   });
 
-  it("is private unless the owner says otherwise", () => {
+  it("opens only when public, or to its owner", () => {
     expect(lib).toContain("if (!yours && !settings.isPublic) return null;");
-    /* The migration default and the lib default agree. */
-    expect(lib).toContain("isPublic: false");
+    /* Public by default since the profile redesign: the founder, "Be
+       public to users in the relevant CardFlare Room / local trading
+       context". The migration default and the lib default agree. */
+    expect(lib).toMatch(/isPublic: true,\s*layout: DEFAULT_BINDER_LAYOUT/);
   });
 
   it("never asks the owner whether they want their own cards", () => {

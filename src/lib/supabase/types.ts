@@ -1515,6 +1515,42 @@ export type PlayerBinderRow = {
 export type PlayerBinderInsert = Pick<PlayerBinderRow, "player_id"> &
   Partial<Omit<PlayerBinderRow, "player_id">>;
 
+/**
+ * A custom binder: a folder or showcase the player named. Never the
+ * Trade binder, which is player_cards; these cards take no part in
+ * matching.
+ */
+export type BinderRow = {
+  id: string;
+  player_id: string;
+  name: string;
+  cover: string;
+  layout: number;
+  is_public: boolean;
+  position: number;
+  front_card_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BinderInsert = Pick<BinderRow, "player_id" | "name"> &
+  Partial<Omit<BinderRow, "player_id" | "name">>;
+
+/** One card in a custom binder. */
+export type BinderCardRow = {
+  id: string;
+  binder_id: string;
+  card_id: string;
+  printing_id: string | null;
+  quantity: number;
+  note: string | null;
+  position: number | null;
+  created_at: string;
+};
+
+export type BinderCardInsert = Pick<BinderCardRow, "binder_id" | "card_id"> &
+  Partial<Omit<BinderCardRow, "binder_id" | "card_id">>;
+
 /** One player hiding another. Never announced. */
 export type PlayerBlockRow = {
   blocker_id: string;
@@ -1930,6 +1966,8 @@ export type Database = {
       card_spot_checks: Table<CardSpotCheckRow, CardSpotCheckInsert>;
       player_blocks: Table<PlayerBlockRow, PlayerBlockInsert>;
       player_binders: Table<PlayerBinderRow, PlayerBinderInsert>;
+      binders: Table<BinderRow, BinderInsert>;
+      binder_cards: Table<BinderCardRow, BinderCardInsert>;
       player_reports: Table<PlayerReportRow, PlayerReportInsert>;
       shows: Table<ShowRow, ShowInsert>;
       show_vendors: Table<ShowVendorRow, ShowVendorInsert>;
