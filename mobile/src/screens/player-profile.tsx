@@ -25,14 +25,16 @@ import {
   type PeekProfile,
 } from "../api";
 import { BinderHighlights } from "../binder-highlights";
+import { BinderList } from "../binder-list";
 import { CosmeticCard } from "../cosmetic-card";
 import { WornBackground, WornScene } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
+import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { ProfileFlares } from "../profile-flares";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { ProfileIconRow } from "../profile-icon-row";
+import { ProfileTabs, THEIR_TABS, type ProfilePane } from "../profile-tabs";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Button, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
@@ -51,17 +53,18 @@ const HEADER_TOP = 60;
  * profile" lands. One block, the layout the website uses and your own
  * profile shares: their cover as a strip with the picture overlapping
  * it, the three numbers beside the picture, the name and handle under,
- * Follow and Message, then two round stops (their hunts, their
- * binders), their binders as a row of circles, the shelf as a
- * carousel-sized rail, and every Flare they have up as a grid. Tapping
- * a card opens the standard full view. The server builds this from a
- * type with no balance field, so this screen could not leak one.
+ * Follow and Message, their binders as a row of circles, then a strip
+ * of four icon tabs, Flares, Hunts, Binders, Showcase, with the
+ * section under it sliding in place when a tab is tapped or the pane
+ * is swiped. Tapping a card opens the standard full view. The server
+ * builds this from a type with no balance field, so this screen could
+ * not leak one.
  *
  * The profile IA round took the hunts panel and the binder panel off
- * the page and put them behind the stops; the founder wanted "important
- * features represented as clear destinations/icons" with the deeper
- * information one tap in. What you see of them is what they see of
- * you, minus the controls only an owner gets.
+ * the page; the tabs round brought them back as panes under the strip,
+ * the way Instagram's profile keeps its header while the grid slides.
+ * Never their trades, their Embers or their settings. What you see of
+ * them is what they see of you, minus the controls only an owner gets.
  */
 /* How long the shelf waits for its art before showing what it has. */
 const WARM_MS = 700;
@@ -272,6 +275,95 @@ export function PlayerProfileScreen() {
     note: entry.note ?? null,
   }));
 
+  /* The showcase, same as the website: the rail with the worn
+     background painted behind it edge to edge, measured off this
+     view. No box and no heading. */
+  const showcasePane = (
+    <View
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setPanel({ w: width, h: height });
+      }}
+      style={{
+        gap: spacing(2),
+        borderRadius: radius.control,
+        padding: spacing(2),
+        overflow: "hidden",
+      }}
+    >
+      <WornBackground
+        background={profile.equips?.background ?? null}
+        width={panel.w}
+        height={panel.h}
+        radius={radius.control}
+      />
+      {/* No "Showcase" heading: the tab above is the heading, and
+          the "?" help is the owner's alone. */}
+      {profile.showcase.length === 0 ? (
+        <Muted>Nothing on the shelf yet.</Muted>
+      ) : !shelfReady ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Muted>Loading showcase…</Muted>
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            {profile.showcase.map((entry, index) => (
+              <Tap key={entry.id} onPress={() => setZoomed(shelf[index] ?? null)}>
+                <CosmeticCard
+                  imageUrl={entry.imageUrl}
+                  width={SHELF_TILE}
+                  frame={entry.frame}
+                  holo={entry.holo}
+                  effect={profile.effect}
+                  border={profile.equips?.border ?? null}
+                  pattern={profile.equips?.pattern ?? null}
+                  animation={profile.equips?.animation ?? null}
+                />
+              </Tap>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+
+  /* The four panes, in the strip's order, all drawn from the profile
+     already on screen. */
+  const panes: ProfilePane[] = THEIR_TABS.map((tab) => ({
+    key: tab,
+    content: (() => {
+      switch (tab) {
+        case "flares":
+          /* Every Flare they have up, newest first, three across. */
+          return <ProfileFlares flares={profile.flares ?? []} yours={false} />;
+        case "hunts":
+          /* The panel the Hunts screen draws for a visitor, with the
+             owner's name for "Sent to <name> in Messages". */
+          return (
+            <HuntsPanel hunts={profile.hunts ?? []} ownerName={profile.displayName} />
+          );
+        case "binders":
+          /* The Binders screen's rows: only the ones you may open. */
+          return (profile.binders ?? []).length === 0 ? (
+            <Muted>No binders to open.</Muted>
+          ) : (
+            <BinderList
+              binders={profile.binders ?? []}
+              ownerName={profile.displayName}
+              yours={false}
+              onOpen={(binderId) =>
+                navigation.navigate("Binder", { playerId, binderId })
+              }
+            />
+          );
+        default:
+          return showcasePane;
+      }
+    })(),
+  }));
+
   return (
     <ScrollView
       contentContainerStyle={{
@@ -427,16 +519,6 @@ export function PlayerProfileScreen() {
           <ErrorLine message={blockError} />
         </View>
 
-        {/* The two stops a visitor gets: their hunts and their binders.
-            Never their settings, their trades or their Embers. */}
-        <ProfileIconRow
-          yours={false}
-          onOpen={(stop) => {
-            if (stop === "hunts") navigation.navigate("Hunts", { playerId });
-            if (stop === "binders") navigation.navigate("Binders", { playerId });
-          }}
-        />
-
         {/* Their binders you may open, the Trade binder first with its
             lime ring. Every one private: no row at all. */}
         <BinderHighlights
@@ -445,65 +527,9 @@ export function PlayerProfileScreen() {
           onOpen={(binderId) => navigation.navigate("Binder", { playerId, binderId })}
         />
 
-        {/* The showcase, same as the website: a small heading and the
-            rail, no box. The worn background paints behind them edge
-            to edge, measured off this view. */}
-        <View
-          onLayout={(event) => {
-            const { width, height } = event.nativeEvent.layout;
-            setPanel({ w: width, h: height });
-          }}
-          style={{
-            gap: spacing(2),
-            borderRadius: radius.control,
-            padding: spacing(2),
-            overflow: "hidden",
-          }}
-        >
-          <WornBackground
-            background={profile.equips?.background ?? null}
-            width={panel.w}
-            height={panel.h}
-            radius={radius.control}
-          />
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
-            Showcase
-          </Text>
-
-          {profile.showcase.length === 0 ? (
-            <Muted>Nothing on the shelf yet.</Muted>
-          ) : !shelfReady ? (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-            >
-              <ActivityIndicator color={colors.accent} size="small" />
-              <Muted>Loading showcase…</Muted>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                {profile.showcase.map((entry, index) => (
-                  <Tap key={entry.id} onPress={() => setZoomed(shelf[index] ?? null)}>
-                    <CosmeticCard
-                      imageUrl={entry.imageUrl}
-                      width={SHELF_TILE}
-                      frame={entry.frame}
-                      holo={entry.holo}
-                      effect={profile.effect}
-                      border={profile.equips?.border ?? null}
-                      pattern={profile.equips?.pattern ?? null}
-                      animation={profile.equips?.animation ?? null}
-                    />
-                  </Tap>
-                ))}
-              </View>
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Every Flare they have up, newest first, three across. The
-            last thing on the page. */}
-        <ProfileFlares flares={profile.flares ?? []} yours={false} />
+        {/* The strip and the panes under it: Flares, Hunts, Binders,
+            Showcase. The four anybody may see, sliding in place. */}
+        <ProfileTabs panes={panes} />
       </Card>
 
       <ShowcaseZoom card={zoomed} cards={shelf} onClose={() => setZoomed(null)} />

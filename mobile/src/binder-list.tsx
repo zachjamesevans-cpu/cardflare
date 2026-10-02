@@ -51,19 +51,18 @@ export function BinderList({
             size="sm"
           />
           <View style={{ flex: 1, minWidth: 0, gap: spacing(1) }}>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
+            >
+              {binder.name}
+            </Text>
+            {/* The chip rides the count line, so the name keeps the row's width. */}
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              <Text
-                numberOfLines={1}
-                style={{
-                  color: colors.textPrimary,
-                  fontWeight: "700",
-                  fontSize: 15,
-                  flexShrink: 1,
-                }}
-              >
-                {binder.name}
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                {binderCountLine(binder.count)}
               </Text>
               {binder.kind === "trade" ? (
                 <View
@@ -86,9 +85,6 @@ export function BinderList({
                 </View>
               ) : null}
             </View>
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              {binderCountLine(binder.count)}
-            </Text>
             {yours ? (
               <Text style={{ color: colors.textMuted, fontSize: 12 }}>
                 {binder.isPublic ? "Public" : "Private, only you"}

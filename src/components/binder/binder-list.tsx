@@ -43,18 +43,17 @@ export function BinderList({
               size="sm"
             />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="flex items-center gap-2">
-                <span className="truncate font-bold text-text-primary">
-                  {binder.name}
-                </span>
+              <span className="truncate font-bold text-text-primary">
+                {binder.name}
+              </span>
+              {/* The chip rides the count line, so the name keeps the row's width. */}
+              <span className="flex items-center gap-2 text-sm text-text-secondary">
+                {binderCountLine(binder.count)}
                 {binder.kind === "trade" && (
                   <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-contrast">
                     Trade
                   </span>
                 )}
-              </span>
-              <span className="text-sm text-text-secondary">
-                {binderCountLine(binder.count)}
               </span>
               {yours && (
                 <span className="text-xs text-text-muted">

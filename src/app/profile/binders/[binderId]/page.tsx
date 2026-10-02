@@ -68,7 +68,7 @@ export default async function OwnBinderPage({
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           <Link
-            href="/profile/binders"
+            href="/profile?tab=binders"
             className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
