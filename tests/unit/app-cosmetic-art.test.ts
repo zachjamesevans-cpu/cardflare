@@ -4,9 +4,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   AURA_ART,
+  BACKGROUND_ART,
   hasAuraArt,
+  hasBackgroundArt,
+  hasPatternArt,
   hasRingArt,
+  PATTERN_ART,
   RING_ART,
+  TEXTURE_ART,
+  type PaintLayer,
 } from "../../mobile/src/cosmetic-art-data";
 
 /**
@@ -33,7 +39,7 @@ const css = readFileSync(
 );
 
 /** Every slug of one family the stylesheet actually styles. */
-function slugsIn(family: "ring" | "aura"): string[] {
+function slugsIn(family: "ring" | "aura" | "pattern" | "bg"): string[] {
   const found = css.matchAll(new RegExp(`\\.cfa-(${family}-[a-z0-9-]+)`, "g"));
   return [...new Set([...found].map((match) => match[1]))].sort();
 }
@@ -148,16 +154,143 @@ describe("the aura table", () => {
   });
 });
 
+/**
+ * Holo patterns and showcase backgrounds: CSS background stacks, read
+ * back as layers Skia can paint. The website lists a stack top first;
+ * the app paints bottom first, so the table is reversed and the
+ * stylesheet's LAST layer is the table's FIRST.
+ */
+const BLENDS = ["normal", "screen", "overlay", "colorDodge", "multiply", "luminosity"];
+const MOTIONS = [
+  "pan",
+  "pan-y",
+  "rise",
+  "fall",
+  "drift",
+  "twinkle",
+  "pulse",
+  "flicker",
+  "jitter",
+  "hue",
+];
+
+function layersSound(layers: PaintLayer[]) {
+  expect(layers.length).toBeGreaterThan(0);
+  for (const layer of layers) {
+    if ("colors" in layer) {
+      expect(layer.colors.length).toBe(layer.positions.length);
+      for (let i = 1; i < layer.positions.length; i += 1) {
+        expect(layer.positions[i]).toBeGreaterThanOrEqual(layer.positions[i - 1]);
+      }
+    }
+    if (layer.type === "texture") expect(TEXTURE_ART[layer.name]).toBeDefined();
+    if ("place" in layer && layer.place) {
+      for (const len of [layer.place.x, layer.place.y]) {
+        expect(len === "auto" || "px" in len || "frac" in len).toBe(true);
+      }
+    }
+  }
+}
+
+describe("the pattern table", () => {
+  const slugs = slugsIn("pattern");
+
+  it("covers every holo pattern the website styles", () => {
+    expect(slugs.length).toBeGreaterThan(30);
+    expect(Object.keys(PATTERN_ART).sort()).toEqual(slugs);
+  });
+
+  it.each(slugsIn("pattern"))("%s blends and moves as the website does", (slug) => {
+    const art = PATTERN_ART[slug];
+    layersSound(art.layers);
+    expect(BLENDS).toContain(art.blend);
+    expect(art.opacity).toBeGreaterThan(0);
+    expect(art.opacity).toBeLessThanOrEqual(1);
+
+    const rule = new RegExp(
+      `\\.cfa-${slug}\\s+\\.cfx-card-fx\\s*\\{[^}]*animation:\\s*cfa-([a-z-]+)\\s+([0-9.]+)s`,
+      "m",
+    ).exec(css);
+    if (rule) {
+      expect(art.motion?.kind).toBe(rule[1]);
+      expect(art.motion?.seconds).toBe(Number(rule[2]));
+      expect(MOTIONS).toContain(rule[1]);
+    } else {
+      expect(art.motion).toBeNull();
+    }
+  });
+
+  it("keeps the stylesheet's bottom layer first", () => {
+    /* Galaxy: dots on top in CSS, three nebulae beneath. */
+    const galaxy = PATTERN_ART["pattern-galaxy"].layers;
+    expect(galaxy[galaxy.length - 1].type).toBe("texture");
+    expect(galaxy[0].type).toBe("radial");
+  });
+
+  it("knows which patterns a phone can paint", () => {
+    expect(hasPatternArt("pattern-classic-rainbow")).toBe(true);
+    expect(hasPatternArt("pattern-hearts")).toBe(true);
+    /* Text glyphs have no path to read back. */
+    expect(hasPatternArt("pattern-matrix-rain")).toBe(false);
+    expect(hasPatternArt(null)).toBe(false);
+  });
+});
+
+describe("the background table", () => {
+  const slugs = slugsIn("bg");
+
+  it("covers every showcase background the website styles", () => {
+    expect(slugs.length).toBeGreaterThan(25);
+    expect(Object.keys(BACKGROUND_ART).sort()).toEqual(slugs);
+  });
+
+  it.each(slugsIn("bg"))("%s is a stack Skia can paint", (slug) => {
+    const art = BACKGROUND_ART[slug];
+    layersSound(art.layers);
+    if (art.motion) expect(MOTIONS).toContain(art.motion.kind);
+  });
+
+  it("reads a flat colour as its own layer, and the storm's flash", () => {
+    expect(BACKGROUND_ART["bg-black-void"].layers).toEqual([
+      { type: "solid", color: "#05060a" },
+    ]);
+    expect(BACKGROUND_ART["bg-lightning-storm"].flash?.seconds).toBe(5);
+    expect(hasBackgroundArt("bg-sunset")).toBe(true);
+  });
+});
+
+describe("the textures", () => {
+  it("read every --cfa-p-* mark back as a path, bar the text glyphs", () => {
+    const names = [...css.matchAll(/--cfa-p-([a-z0-9-]+):/g)].map((m) => m[1]);
+    expect(Object.keys(TEXTURE_ART).sort()).toEqual([...new Set(names)].sort());
+    for (const name of names) {
+      const texture = TEXTURE_ART[name];
+      expect(texture.viewBox.w).toBeGreaterThan(0);
+      if (name === "glyph") {
+        expect(texture.marks).toEqual([]);
+        continue;
+      }
+      expect(texture.marks.length).toBeGreaterThan(0);
+      for (const mark of texture.marks) {
+        expect(mark.d).toMatch(/^M/);
+        expect(mark.fill !== null || mark.stroke !== null).toBe(true);
+      }
+    }
+  });
+});
+
 describe("what the app still approximates", () => {
   it("says so, rather than guessing", () => {
-    /* The two hundred cosmetics that are not rings or auras keep their
-       flat-colour stand-in, and these are what the avatar checks to
-       decide. A slug with no art must answer false, not throw. */
+    /* Card animations and profile scenes keep their stand-in, and
+       these are what the screens check to decide. A slug with no art
+       must answer false, not throw. */
     expect(hasRingArt("ring-inferno")).toBe(true);
     expect(hasAuraArt("aura-sparks")).toBe(true);
 
     expect(hasRingArt("border-neon")).toBe(false);
     expect(hasAuraArt("pattern-holo")).toBe(false);
+    expect(hasPatternArt("anim-sparkle")).toBe(false);
+    expect(hasBackgroundArt("scene-rain")).toBe(false);
     expect(hasRingArt(null)).toBe(false);
     expect(hasAuraArt(null)).toBe(false);
   });
