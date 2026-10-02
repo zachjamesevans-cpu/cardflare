@@ -291,7 +291,7 @@ export function FlareFeedCard({
               </p>
             )}
             {lead.youOffered ? (
-              <p className="text-xs text-text-secondary">You said you have this</p>
+              <p className="text-xs text-text-secondary">You offered this</p>
             ) : lead.state === "offered" ? (
               <p className="text-xs text-text-secondary">Somebody offered</p>
             ) : null}

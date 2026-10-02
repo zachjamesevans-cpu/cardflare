@@ -130,7 +130,7 @@ export function FlareCarousel({
                   </p>
                 )}
                 {card.youOffered ? (
-                  <p className="text-xs text-text-secondary">You said you have this</p>
+                  <p className="text-xs text-text-secondary">You offered this</p>
                 ) : card.state === "offered" ? (
                   <p className="text-xs text-text-secondary">Somebody offered</p>
                 ) : null}

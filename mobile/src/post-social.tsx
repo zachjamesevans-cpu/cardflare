@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import type { FeedCard, PostCard } from "./api";
+import type { FeedCard, OfferItem, OfferOutcome, PostCard } from "./api";
 import { colors, spacing } from "./theme";
 import { Tap, type ZoomHave } from "./ui";
 
@@ -12,17 +12,24 @@ import { Tap, type ZoomHave } from "./ui";
  * screen so the two never disagree.
  */
 
-/** The post a rail of cards belongs to, with the call "I have this" makes. */
+/** The post a rail of cards belongs to, with the call "Offer" makes. */
 export interface PostRef {
   postId: string;
   /** The viewer's own post: nothing to offer on. */
   yours: boolean;
-  offer: (flareId: string, note: string) => Promise<void>;
+  /**
+   * ONE offer, for one card or several: a line per card. Resolves with
+   * what the server took, and throws an ApiError whose code is the
+   * server's reason when it refused. A preview's post (the composer,
+   * the lab) never sends and resolves with nothing.
+   */
+  offer: (items: OfferItem[], message: string) => Promise<OfferOutcome | void>;
 }
 
 /**
- * "I have this" for one card, or null where it makes no sense: your own
- * post, a card that already traded, an item that is not a post.
+ * "Offer this card" for one card, or null where it makes no sense:
+ * your own post, a card that already traded, an item that is not a
+ * post.
  */
 export function haveFor(
   card: FeedCard | PostCard,
@@ -31,9 +38,12 @@ export function haveFor(
   if (!post || post.yours || !card.flareId || card.state === "found") return null;
   const flareId = card.flareId;
   return {
+    flareId,
+    name: card.cardName,
     state: card.state ?? "open",
     youOffered: card.youOffered ?? false,
-    onOffer: (note) => post.offer(flareId, note),
+    onOffer: async (items, note) =>
+      (await post.offer(items, note)) ?? { offered: items.length, refused: [] },
   };
 }
 

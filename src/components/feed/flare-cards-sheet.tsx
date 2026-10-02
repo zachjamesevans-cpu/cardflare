@@ -147,9 +147,7 @@ export function FlareCardsSheet({
                       {cardCountLabel(card, direction)}
                     </p>
                     {card.youOffered && (
-                      <p className="text-xs text-text-secondary">
-                        You said you have this
-                      </p>
+                      <p className="text-xs text-text-secondary">You offered this</p>
                     )}
                   </div>
                 </div>
@@ -162,7 +160,7 @@ export function FlareCardsSheet({
                         onChange={() => selection.toggle(flareId)}
                         className="size-5 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
                       />
-                      I have this
+                      Offer this card
                     </label>
                     {picked && (
                       <Stepper

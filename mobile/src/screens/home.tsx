@@ -34,7 +34,7 @@ import {
   getMe,
   joinRoom,
   likePost,
-  offerFromPost,
+  offerItemsOnPost,
   openLocalThread,
   postFlare,
   rememberRoom,
@@ -649,16 +649,18 @@ export function HomeScreen() {
   };
 
   /**
-   * The post behind a hunt, with the one call "I have this" makes.
+   * The post behind a hunt, with the one call "Offer" makes: one send
+   * for one card or for every pick, so the poster gets one notice.
    * After it lands the Feed reloads, so the card reads OFFERED and the
    * count under it moves without a pull.
    */
   const postRef = (item: { postId: string; yours: boolean }): PostRef => ({
     postId: item.postId,
     yours: item.yours,
-    offer: async (flareId, note) => {
-      await offerFromPost(item.postId, flareId, note);
+    offer: async (items, message) => {
+      const result = await offerItemsOnPost(item.postId, items, message);
       await load(() => true);
+      return result;
     },
   });
 

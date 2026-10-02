@@ -839,8 +839,8 @@ export function HuntProgress({ found, needed }: { found: number; needed: number 
 
 /**
  * One card on a hunt: thumbnail, name, the printing asked for, and the
- * count. Owners get "+1 found" and a stepper; visitors get "I have
- * this" and, once selected, how many.
+ * count. Owners get "+1 found" and a stepper; visitors get "Offer this
+ * card" and, once selected, how many.
  */
 export function HuntCardRow({
   card,
@@ -963,7 +963,7 @@ export function HuntCardRow({
           <Tap
             onPress={() => visitor.onPick(selected ? 0 : 1)}
             accessibilityLabel={
-              selected ? `Unselect ${card.cardName}` : `I have ${card.cardName}`
+              selected ? `Unselect ${card.cardName}` : `Offer ${card.cardName}`
             }
             style={{
               flexDirection: "row",
@@ -989,7 +989,7 @@ export function HuntCardRow({
                 fontWeight: "700",
               }}
             >
-              I have this
+              Offer this card
             </Text>
           </Tap>
           {selected ? (

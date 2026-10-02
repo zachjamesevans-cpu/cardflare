@@ -41,7 +41,7 @@ export const TILE_CLASS = {
  * hid some" and becomes "the rest are on the board".
  */
 /**
- * "I have this" for one card of a post, or null where it makes no sense:
+ * The offer on one card of a post, or null where it makes no sense:
  * your own post, a card that already traded, an item that is not a post.
  */
 export function haveFor(
@@ -144,7 +144,7 @@ export function FeedTile({
   state?: "open" | "offered" | "found";
   /** Which way the post points: a found card on an offer reads GONE. */
   direction?: "want" | "showcase";
-  /** "I have this" in the large view, when the viewer can say so. */
+  /** The offer in the large view, when the viewer can make one. */
   have?: ZoomHave | null;
   /**
    * What the viewer's binder says, or null for nothing.

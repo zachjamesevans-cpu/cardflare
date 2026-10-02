@@ -5,6 +5,7 @@ import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
+import { offerFailureMessage } from "./offer-copy";
 
 /**
  * The whole client for cardflare.gg's `/api/v1`.
@@ -1889,17 +1890,59 @@ export const publishFlare = (input: {
     message?: string;
   }>("POST", "/api/v1/flares/publish", input);
 
-/** "I have these": several cards from one post, each with how many. */
-export const offerItemsOnPost = (
-  postId: string,
-  items: { flareId: string; quantity: number }[],
-  message: string,
-) =>
-  call<{ ok: true; offered: number; refused: string[] }>(
+/** One line of an offer: a card on the post, and how many of it. */
+export interface OfferItem {
+  flareId: string;
+  quantity: number;
+}
+
+/** What the server took: how many cards, and the flareIds it would not. */
+export interface OfferOutcome {
+  offered: number;
+  refused: string[];
+}
+
+/**
+ * "Offer": one card or several from one post, in ONE call, so the
+ * poster gets one notice that counts them and one line in the thread.
+ * The zoom sends this card alone as a single line; pick mode and the
+ * full-list sheet send every pick. A refusal is an ApiError whose code
+ * is the server's reason; `offerErrorMessage` says it in words.
+ */
+export const offerItemsOnPost = (postId: string, items: OfferItem[], message: string) =>
+  call<{ ok: true } & OfferOutcome>(
     "POST",
     `/api/v1/posts/${encodeURIComponent(postId)}`,
     { action: "offer-items", items, message },
   );
+
+/** The reasons the website has a sentence for. */
+const OFFER_REASONS = new Set([
+  "not-found",
+  "nothing-left",
+  "own-flare",
+  "at-cap",
+  "too-many",
+]);
+
+/**
+ * A refused offer, in the website's words (src/lib/feed/offer-copy.ts),
+ * keyed by the reason the server named in its 409. A 429 is the
+ * throttle, which the website reads as "too-many". Anything else gets
+ * the plain line with the diagnosis in brackets, so a screenshot of
+ * the failure still says which failure it was.
+ */
+export function offerErrorMessage(caught: unknown): string {
+  const reason =
+    caught instanceof ApiError
+      ? caught.status === 429
+        ? "too-many"
+        : caught.code
+      : "";
+  return OFFER_REASONS.has(reason)
+    ? offerFailureMessage(reason)
+    : `${offerFailureMessage(reason)} (${describeError(caught)})`;
+}
 
 /**
  * "I have these", from somebody's hunt, by REQUEST rather than by

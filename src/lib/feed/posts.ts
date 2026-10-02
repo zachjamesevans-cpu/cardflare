@@ -13,6 +13,8 @@ import {
 } from "@/lib/lists/repository";
 import { offerTrade } from "@/lib/matching/repository";
 import { heldByCard, MAX_OFFER_MESSAGE, matchFor } from "@/lib/matching/schema";
+import { afterResponse } from "@/lib/after-response";
+import { offeredLine } from "@/lib/feed/offer-copy";
 import { notifyOfferReceived, notifyPostComment } from "@/lib/notifications/notify";
 import { blockedSet } from "@/lib/players/safety";
 import { avatarWearFor } from "@/lib/players/equips";
@@ -418,11 +420,44 @@ export async function addComment(
 ): Promise<PostComment | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const clean = cleanBody(body, POST_COMMENT_MAX);
-  if (clean.length === 0) return null;
-
   const context = await postContext(postId);
   if (!context) return null;
+
+  const id = await writeComment(postId, playerId, body, answer);
+  if (!id) return null;
+
+  /* An offer already tells the author through the room's own notice;
+     a second buzz for the same tap would be noise. */
+  if (!answer && context.ownerPlayerId && context.ownerPlayerId !== playerId) {
+    await notifyPostComment(
+      postId,
+      context.ownerPlayerId,
+      playerId,
+      displayName,
+      cleanBody(body, POST_COMMENT_MAX),
+    );
+  }
+
+  const [comment] = await listComments(postId).then((thread) =>
+    thread.filter((row) => row.id === id),
+  );
+  return comment ?? null;
+}
+
+/**
+ * The row alone. An offer writes its thread line through this and
+ * never re-reads the thread: the tap that used to take five seconds
+ * spent part of them fetching every comment to hand back the one it
+ * had just written, which nobody read.
+ */
+async function writeComment(
+  postId: string,
+  playerId: string,
+  body: string,
+  answer: { kind: "offer"; flareId: string } | null,
+): Promise<string | null> {
+  const clean = cleanBody(body, POST_COMMENT_MAX);
+  if (clean.length === 0) return null;
 
   const { data, error } = await getSupabaseAdmin()
     .from("flare_post_comments")
@@ -433,30 +468,14 @@ export async function addComment(
       kind: answer ? "offer" : "comment",
       flare_id: answer?.flareId ?? null,
     })
-    .select("id, created_at")
+    .select("id")
     .single();
 
   if (error || !data) {
     console.error("Could not add the comment", error);
     return null;
   }
-
-  /* An offer already tells the author through the room's own notice;
-     a second buzz for the same tap would be noise. */
-  if (!answer && context.ownerPlayerId && context.ownerPlayerId !== playerId) {
-    await notifyPostComment(
-      postId,
-      context.ownerPlayerId,
-      playerId,
-      displayName,
-      clean,
-    );
-  }
-
-  const [comment] = await listComments(postId).then((thread) =>
-    thread.filter((row) => row.id === data.id),
-  );
-  return comment ?? null;
+  return data.id;
 }
 
 export type FeedOfferOutcome =
@@ -464,13 +483,9 @@ export type FeedOfferOutcome =
   | { ok: false; reason: "not-found" | "own-flare" | "at-cap" | "unavailable" };
 
 /**
- * "I have this", from the Feed.
- *
- * Raises a hand on the Flare exactly as the room does - through
- * `offerTrade`, with its own-Flare and cap checks - under the account's
- * one room identity, minted here if they have never joined anything.
- * Then the thread gets an OFFER line carrying the note, and the card
- * reads OFFERED to everyone on the next load.
+ * "Offer this card", from the Feed: one card, through the same door
+ * several cards go through, so the author hears about it the same way
+ * and there is one path to keep fast.
  */
 export async function offerFromFeed(
   postId: string,
@@ -479,48 +494,22 @@ export async function offerFromFeed(
   displayName: string,
   note: string,
 ): Promise<FeedOfferOutcome> {
-  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-
-  const context = await postContext(postId);
-  const flare = context?.flares.find((row) => row.id === flareId);
-  if (!context || !flare || flare.status !== "open") {
-    return { ok: false, reason: "not-found" };
+  const outcome = await offerItems(
+    postId,
+    playerId,
+    displayName,
+    [{ flareId, quantity: 1 }],
+    note,
+  );
+  if (outcome.ok) return { ok: true };
+  switch (outcome.reason) {
+    case "own-flare":
+    case "at-cap":
+    case "unavailable":
+      return { ok: false, reason: outcome.reason };
+    default:
+      return { ok: false, reason: "not-found" };
   }
-  if ((await remainingByFlare(context)).get(flareId) === 0) {
-    return { ok: false, reason: "not-found" };
-  }
-
-  const session = await binderSessionFor(playerId, displayName, true);
-  if (!session) return { ok: false, reason: "unavailable" };
-  if (session.id === context.ownerSessionId) return { ok: false, reason: "own-flare" };
-
-  const message = cleanBody(note, MAX_OFFER_MESSAGE) || null;
-
-  if (context.eventId) {
-    const outcome = await offerTrade(flareId, context.eventId, session.id, message, 1);
-    if (!outcome.ok) return outcome;
-  } else {
-    /* A Flare with no room: the hand still goes up on the Flare, so
-       the author's "who offered" reads the same everywhere. */
-    const { error } = await getSupabaseAdmin()
-      .from("flare_responses")
-      .upsert(
-        { flare_id: flareId, responder_session_id: session.id, message, quantity: 1 },
-        { onConflict: "flare_id,responder_session_id" },
-      );
-    if (error) {
-      console.error("Could not record the offer", error);
-      return { ok: false, reason: "unavailable" };
-    }
-  }
-
-  await addComment(postId, playerId, displayName, note.trim() || "I have this.", {
-    kind: "offer",
-    flareId,
-  });
-  await notifyOfferReceived(flareId, session.id, displayName, message);
-
-  return { ok: true };
 }
 
 /**
@@ -807,17 +796,50 @@ export async function offerItems(
 
   if (offered === 0) return { ok: false, reason: "nothing-left", refused };
 
-  const first = items.find((item) => !refused.includes(item.flareId));
-  const names = context.flares.length;
-  await addComment(
+  /*
+   * The thread line names the cards: "Offered Ace, Luffy ×2 and Sabo."
+   * One read for the names, one write for the line, and the author's
+   * notice goes out AFTER the response. Push and email used to be
+   * awaited inside the tap, eight seconds allowed for the push alone,
+   * which is where "I have this" spent most of its five seconds.
+   */
+  const sent = items.filter((item) => !refused.includes(item.flareId));
+  const cardIds = [
+    ...new Set(
+      sent.flatMap((item) => {
+        const flare = context.flares.find((row) => row.id === item.flareId);
+        return flare ? [flare.cardId] : [];
+      }),
+    ),
+  ];
+  const { data: cards } = await admin
+    .from("cards")
+    .select("id, exact_name")
+    .in("id", cardIds);
+  const nameOf = new Map((cards ?? []).map((row) => [row.id, row.exact_name]));
+  const named = sent.map((item) => {
+    const flare = context.flares.find((row) => row.id === item.flareId);
+    const left = remaining.get(item.flareId) ?? 1;
+    return {
+      name: (flare && nameOf.get(flare.cardId)) ?? "a card",
+      quantity: Math.max(1, Math.min(left, Math.round(item.quantity))),
+    };
+  });
+
+  const first = sent[0];
+  await writeComment(
     postId,
     playerId,
-    displayName,
-    message.trim() || (offered === 1 ? "I have this." : `I have ${offered} of these.`),
+    message.trim() || offeredLine(named),
     first ? { kind: "offer", flareId: first.flareId } : null,
   );
-  if (first) await notifyOfferReceived(first.flareId, session.id, displayName, note);
-  void names;
+  if (first) {
+    afterResponse(() =>
+      notifyOfferReceived(first.flareId, session.id, displayName, note, {
+        count: offered,
+      }),
+    );
+  }
 
   return { ok: true, offered, refused };
 }

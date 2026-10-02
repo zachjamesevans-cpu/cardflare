@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { LIMITS } from "@/lib/api/throttle";
+import { offerFailureMessage } from "@/lib/feed/offer-copy";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -161,11 +162,7 @@ export async function offerItemsAction(
       LIMITS.offer.windowMs,
     ).allowed
   ) {
-    return {
-      ok: false,
-      message: "That is a lot of offers. Give it a minute.",
-      refused: [],
-    };
+    return { ok: false, message: offerFailureMessage("too-many"), refused: [] };
   }
 
   const outcome = await offerItems(
@@ -177,15 +174,11 @@ export async function offerItemsAction(
   );
   revalidatePath("/feed");
   if (!outcome.ok) {
-    const message =
-      outcome.reason === "own-flare"
-        ? "That one is yours."
-        : outcome.reason === "nothing-left"
-          ? "Those cards were all found already."
-          : outcome.reason === "at-cap"
-            ? "You have offers on the most cards this room allows."
-            : "Could not send the offer.";
-    return { ok: false, message, refused: outcome.refused ?? [] };
+    return {
+      ok: false,
+      message: offerFailureMessage(outcome.reason),
+      refused: outcome.refused ?? [],
+    };
   }
   return { ok: true, offered: outcome.offered, refused: outcome.refused ?? [] };
 }
