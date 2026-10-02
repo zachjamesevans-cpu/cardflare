@@ -367,19 +367,20 @@ describe("holo patterns and showcase backgrounds, in the app", () => {
   });
 
   it("paints the background first in a clipped, measured block", () => {
-    /* No bordered panel since the profile IA round, but still one
-       measured, clipped view with the background painted first and
-       the "Showcase" heading over it, on both screens. */
-    for (const [source, heading] of [
-      [own, "Showcase\n"],
-      [theirs, "Showcase\n"],
+    /* No bordered panel since the profile IA round and no "Showcase"
+       heading since the tabs round (the Showcase tab is the heading),
+       but still one measured, clipped view with the background
+       painted first and the shelf over it, on both screens. */
+    for (const [source, shelf] of [
+      [own, "profile.showcase.length === 0"],
+      [theirs, "profile.showcase.length === 0"],
     ] as const) {
       const panel = source.slice(
         source.lastIndexOf("<View", source.indexOf("<WornBackground")),
       );
       const background = panel.indexOf("<WornBackground");
       expect(background).toBeGreaterThan(-1);
-      expect(background).toBeLessThan(panel.indexOf(heading));
+      expect(background).toBeLessThan(panel.indexOf(shelf));
       expect(panel.slice(0, background)).toContain('overflow: "hidden"');
       expect(panel.slice(0, background)).toContain("onLayout=");
       expect(panel).toContain("background={profile.equips?.background ?? null}");

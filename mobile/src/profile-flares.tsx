@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 
 import type { ProfileFlare } from "./api";
@@ -6,20 +7,27 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
 
 /**
  * A profile's Flares as a grid: the app's half of
- * src/components/players/profile-flares.tsx, same heading, same
+ * src/components/players/profile-flares.tsx, same count line, same
  * tiles, same words.
  *
- * The heading carries the count, the same number the header's Flares
- * stat shows, and the grid under it is the whole list, three across,
- * newest first: a profile with sixty Flares scrolls. Each tile is the
- * one card viewer every shelf uses, with a tiny chip at the foot
- * saying which way the Flare points. Nothing to offer on from here;
- * the Feed and the room are where a Flare is answered.
+ * No heading of its own: the Flares tab in the strip above is the
+ * heading. A small count line sits at the top, the same number the
+ * header's Flares stat shows, and the grid under it is the whole
+ * list, three across, newest first: a profile with sixty Flares
+ * scrolls. Each tile is the one card viewer every shelf uses, with a
+ * tiny chip at the foot saying which way the Flare points. Nothing
+ * to offer on from here; the Feed and the room are where a Flare is
+ * answered.
  */
 
 /** The space between tiles, and how many sit across. */
 const GAP = spacing(2);
 const ACROSS = 3;
+
+/** "7 Flares", "1 Flare". */
+export function flaresCountLine(count: number): string {
+  return `${count} ${count === 1 ? "Flare" : "Flares"}`;
+}
 
 export function ProfileFlares({
   flares,
@@ -32,8 +40,11 @@ export function ProfileFlares({
   onPost?: () => void;
 }) {
   const window = useWindowDimensions();
-  /* The grid runs the width of the page, inside its gutters. */
-  const width = Math.floor((window.width - 2 * gutter - (ACROSS - 1) * GAP) / ACROSS);
+  /* The grid is as wide as the pane it sits in, measured; until the
+     measurement lands, the page's width inside its gutters. */
+  const [measured, setMeasured] = useState(0);
+  const across = measured > 0 ? measured : window.width - 2 * gutter;
+  const width = Math.floor((across - (ACROSS - 1) * GAP) / ACROSS);
 
   const shelf: ZoomCard[] = flares.map((flare) => ({
     imageUrl: flare.imageUrl,
@@ -45,13 +56,13 @@ export function ProfileFlares({
   }));
 
   return (
-    <View style={{ gap: spacing(3) }}>
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing(2) }}>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}>
-          Flares
-        </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{flares.length}</Text>
-      </View>
+    <View
+      style={{ gap: spacing(3) }}
+      onLayout={(event) => setMeasured(Math.floor(event.nativeEvent.layout.width))}
+    >
+      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+        {flaresCountLine(flares.length)}
+      </Text>
 
       {flares.length === 0 ? (
         yours ? (
