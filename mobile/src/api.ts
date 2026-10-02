@@ -1683,7 +1683,11 @@ export interface Binder {
   layout: BinderLayout;
   cover: BinderCoverId;
   frontEntryId: string | null;
-  /** Newest first. */
+  /**
+   * In the owner's order. A card the owner has never placed has no
+   * position and arrives first, so a new card lands in pocket 1 and
+   * everything else keeps its place.
+   */
   cards: BinderCard[];
   count: number;
   onYourHunts: number;
@@ -1737,6 +1741,15 @@ export const addBinderCard = (
 
 export const removeBinderCard = (entryId: string) =>
   call<{ binder: Binder }>("DELETE", "/api/v1/binder/cards", { entryId });
+
+/**
+ * The whole binder's entry ids in their new order, after a card is
+ * held and moved. Ids that are not the owner's are ignored and cards
+ * left out keep a place after the ones listed, so sending every id is
+ * the only way to be sure of the order.
+ */
+export const reorderBinder = (entryIds: string[]) =>
+  call<{ binder: Binder }>("PUT", "/api/v1/binder/order", { entryIds });
 
 /**
  * A new profile picture, sent the only way this network allows.

@@ -61,6 +61,12 @@ export interface ListEntry {
   huntRequestId: string | null;
   /** Copies found of a card posted outside any hunt. */
   foundQuantity: number;
+  /**
+   * Binder entries only: the pocket the owner dragged the card to.
+   * Null until the owner has arranged the binder, which puts a new
+   * card first.
+   */
+  position: number | null;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -77,7 +83,7 @@ const UNIQUE_VIOLATION = "23505";
 const FLARE_COLUMNS =
   "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id, hunt_request_id, found_quantity";
 const BINDER_COLUMNS =
-  "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at, local_trade";
+  "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at, local_trade, position";
 
 interface EntryRow {
   id: string;
@@ -97,6 +103,8 @@ interface EntryRow {
   player_session_id: string;
   confirmed_at?: string;
   local_trade?: boolean;
+  /** Binder entries only: where the owner put the card. Null = not placed yet. */
+  position?: number | null;
 }
 
 interface Lookups {
@@ -251,6 +259,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     displayName: lookups.names.get(row.player_session_id) ?? null,
     confirmedAt: row.confirmed_at ?? null,
     localTrade: row.local_trade ?? false,
+    position: row.position ?? null,
     /* Binder rows never carry one, and a binder entry is a thing you
        have rather than a thing pointing anywhere. */
     intent: row.intent ?? "want",

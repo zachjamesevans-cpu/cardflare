@@ -128,3 +128,36 @@ describe("the binder is the Have list with a switch", () => {
     expect(read("src/lib/api/absolute.ts")).toContain('key === "frontImageUrl"');
   });
 });
+
+describe("the binder's order is the owner's", () => {
+  const lib = read("src/lib/binder/binder.ts");
+
+  it("keeps a pocket per card on the Have list row itself", () => {
+    const migration = read("supabase/migrations/20261025090000_binder_order.sql");
+    expect(migration).toContain("alter table public.player_cards");
+    expect(migration).toContain("add column if not exists position integer");
+    expect(read("src/lib/lists/repository.ts")).toContain(
+      "position: row.position ?? null",
+    );
+  });
+
+  it("puts a card that has no pocket yet first, newest first", () => {
+    expect(lib).toContain("if (a.position === null) return -1;");
+    expect(lib).toContain("return b.createdAt.localeCompare(a.createdAt);");
+  });
+
+  it("never loses a card a stale screen left out of the order", () => {
+    expect(lib).toContain("export async function saveBinderOrder(");
+    expect(lib).toContain("const order = [...placed, ...rest];");
+    expect(lib).toContain('.eq("player_session_id", session.id)');
+  });
+
+  it("is written from the website and the app alike", () => {
+    expect(read("src/lib/binder/actions.ts")).toContain(
+      "export async function reorderBinderAction(",
+    );
+    const route = read("src/app/api/v1/binder/order/route.ts");
+    expect(route).toContain("export async function PUT");
+    expect(route).toContain("saveBinderOrder(player.playerId, parsed.data.entryIds)");
+  });
+});

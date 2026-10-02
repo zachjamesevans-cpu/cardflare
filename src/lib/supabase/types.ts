@@ -883,17 +883,26 @@ export type PlayerCardRow = {
   confirmed_at: string;
   /** The owner will trade this one with people nearby. */
   local_trade: boolean;
+  /** The binder pocket the owner put it in. Null until arranged. */
+  position: number | null;
 };
 
 export type PlayerCardInsert = Omit<
   PlayerCardRow,
-  "id" | "created_at" | "updated_at" | "quantity" | "confirmed_at" | "local_trade"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "quantity"
+  | "confirmed_at"
+  | "local_trade"
+  | "position"
 > & {
   id?: string;
   created_at?: string;
   updated_at?: string;
   quantity?: number;
   confirmed_at?: string;
+  position?: number | null;
   local_trade?: boolean;
 };
 

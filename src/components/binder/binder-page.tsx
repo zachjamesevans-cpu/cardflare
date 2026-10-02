@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Pencil, X } from "lucide-react";
 
@@ -8,7 +8,11 @@ import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { Button } from "@/components/ui/button";
-import { removeBinderCardAction, saveBinderSettingsAction } from "@/lib/binder/actions";
+import {
+  removeBinderCardAction,
+  reorderBinderAction,
+  saveBinderSettingsAction,
+} from "@/lib/binder/actions";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import {
   pocketsPerPage,
@@ -32,9 +36,23 @@ import { cn } from "@/lib/cn";
  * and the settings strip. A visitor gets the "On your hunts" chip
  * when any card is one they are hunting, and the message door.
  *
- * The page's settings are held here as live values so a change paints
- * at once; the server's copy arrives behind it with the refresh and
- * wins, which is also what keeps two tabs honest.
+ * The order of the pockets is the owner's. The founder: "I think we
+ * should have a 'hold to move' thing, similar animations to how
+ * people can adjust which order their flares are in when they post."
+ * So every filled pocket drags, the way the composer's tray drags: a
+ * pocket dropped on another pocket moves there and the rest shift to
+ * make room, never a swap; dropped on an arrow it goes to the far end
+ * of the page beyond. Alt and the arrow keys do the same from a
+ * keyboard. The new order paints at once and the server keeps it.
+ *
+ * Every empty pocket on the owner's binder is a "+" that opens Add
+ * cards, and once the last page is full the owner sees one more page
+ * of them, so there is always somewhere to put the next card. A
+ * visitor's empty pockets stay empty.
+ *
+ * The page's settings and order are held here as live values so a
+ * change paints at once; the server's copy arrives behind it with the
+ * refresh and wins, which is also what keeps two tabs honest.
  */
 
 type Settings = {
@@ -50,6 +68,9 @@ const settingsOf = (binder: Binder): Settings => ({
   isPublic: binder.isPublic,
   frontEntryId: binder.frontEntryId,
 });
+
+/** Where a dragged pocket is hovering: a slot, or an arrow. */
+type DropSpot = number | "prev" | "next";
 
 export function BinderView({
   binder,
@@ -69,36 +90,44 @@ export function BinderView({
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
+  const [cards, setCards] = useState(binder.cards);
   /* The server's copy, when a refresh brings a new one, replaces the
      live values: the documented way to derive state from a prop. */
   const [seen, setSeen] = useState(binder);
   if (seen !== binder) {
     setSeen(binder);
     setSettings(settingsOf(binder));
+    setCards(binder.cards);
   }
 
   const [at, setAt] = useState(0);
   const [onHuntsOnly, setOnHuntsOnly] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  /** The entry id in the air, while a pocket is being dragged. */
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<DropSpot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const cards =
-    !binder.yours && onHuntsOnly
-      ? binder.cards.filter((card) => card.onYourHunt)
-      : binder.cards;
+  const list =
+    !binder.yours && onHuntsOnly ? cards.filter((card) => card.onYourHunt) : cards;
   const perPage = pocketsPerPage(settings.layout);
-  const pages = Math.max(1, Math.ceil(cards.length / perPage));
+  /* The owner always has an empty pocket in reach: when the last page
+     is full (or there are no cards), one more page of "+" pockets. */
+  const pages = binder.yours
+    ? Math.floor(list.length / perPage) + 1
+    : Math.max(1, Math.ceil(list.length / perPage));
   /* Never off the end: removing the last card on the last page, or
      widening the layout, folds back onto a page that exists. */
   const page = Math.min(at, pages - 1);
-  const shown = cards.slice(page * perPage, page * perPage + perPage);
+  const shown = list.slice(page * perPage, page * perPage + perPage);
   const pockets: (BinderCard | null)[] = [
     ...shown,
     ...Array.from({ length: perPage - shown.length }, () => null),
   ];
 
-  const zoomCards: ZoomCard[] = cards.map((card) => ({
+  const zoomCards: ZoomCard[] = list.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.name,
     cardNumber: card.number,
@@ -122,6 +151,51 @@ export function BinderView({
 
   const paint = (patch: BinderSettingsPatch) =>
     setSettings((current) => ({ ...current, ...patch }));
+
+  /**
+   * Put the card into slot `to`, shifting the others: the composer's
+   * splice, over the whole binder rather than one page. A slot past
+   * the end (an empty pocket, the trailing page) means last. The page
+   * follows the card, so a move onto the next page is seen landing.
+   */
+  const move = (entryId: string, to: number) => {
+    if (pending) return;
+    const from = cards.findIndex((card) => card.entryId === entryId);
+    const slot = Math.max(0, Math.min(to, cards.length - 1));
+    if (from < 0 || from === slot) return;
+    const next = [...cards];
+    const [moved] = next.splice(from, 1);
+    if (moved) next.splice(slot, 0, moved);
+    setCards(next);
+    setAt(Math.floor(slot / perPage));
+    act(() => reorderBinderAction(next.map((card) => card.entryId)));
+  };
+
+  const dropAt = (spot: DropSpot) => (event: DragEvent) => {
+    event.preventDefault();
+    if (!dragging) return;
+    const to =
+      spot === "prev"
+        ? page * perPage - 1
+        : spot === "next"
+          ? (page + 1) * perPage
+          : spot;
+    move(dragging, to);
+    setDragging(null);
+    setOver(null);
+  };
+
+  /* Preventing the default is what marks a valid drop target; without
+     it the browser refuses the drop. */
+  const dragOver = (spot: DropSpot, own: boolean) => (event: DragEvent) => {
+    if (!dragging || own) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (over !== spot) setOver(spot);
+  };
+
+  const dragLeave = (spot: DropSpot) => () =>
+    setOver((current) => (current === spot ? null : current));
 
   const countLine = `${binder.count} ${binder.count === 1 ? "card" : "cards"}`;
 
@@ -168,69 +242,145 @@ export function BinderView({
           )}
           aria-label={`Page ${page + 1} of ${pages}`}
         >
-          {pockets.map((card, index) => (
-            <li
-              key={card ? card.entryId : `empty-${page}-${index}`}
-              className="relative"
-            >
-              {card ? (
-                <>
-                  <CardImageZoom
-                    imageUrl={card.imageUrl}
-                    exactName={card.name}
-                    cardNumber={card.number}
-                    caption={card.printingLabel}
-                    note={card.note}
-                    direction="showcase"
-                    enabled={imagesEnabled}
-                    siblings={zoomCards}
-                    position={page * perPage + index}
-                    thumbClassName="w-full"
-                    thumb={
-                      <PocketTile
-                        card={card}
-                        imagesEnabled={imagesEnabled}
-                        big={settings.layout === 2}
-                      />
+          {pockets.map((card, index) => {
+            const slot = page * perPage + index;
+            const own = card?.entryId === dragging;
+            return (
+              <li
+                key={card ? card.entryId : `empty-${page}-${index}`}
+                /*
+                 * DRAGGED INTO PLACE, the website's half of the app's
+                 * hold-and-wiggle. A mouse needs no long press to say
+                 * it means to drag, so a filled pocket is draggable
+                 * outright, and every pocket, filled or not, takes the
+                 * drop.
+                 */
+                draggable={binder.yours && card !== null}
+                onDragStart={
+                  binder.yours && card
+                    ? (event) => {
+                        setDragging(card.entryId);
+                        event.dataTransfer.effectAllowed = "move";
+                        /* Firefox will not start a drag without payload. */
+                        event.dataTransfer.setData("text/plain", card.entryId);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  binder.yours
+                    ? () => {
+                        setDragging(null);
+                        setOver(null);
+                      }
+                    : undefined
+                }
+                onDragOver={binder.yours ? dragOver(slot, own) : undefined}
+                onDragLeave={binder.yours ? dragLeave(slot) : undefined}
+                onDrop={binder.yours ? dropAt(slot) : undefined}
+                className={cn(
+                  "relative rounded-[5px] transition-opacity",
+                  own && "opacity-40",
+                  over === slot && !own && "ring-2 ring-accent",
+                )}
+              >
+                {card ? (
+                  <div
+                    role="group"
+                    aria-label={
+                      binder.yours
+                        ? `${card.name}, pocket ${slot + 1} of ${cards.length}. Drag to move it, or hold Alt and use the arrow keys.`
+                        : undefined
                     }
+                    /* A pocket whose card has no picture to open has
+                       no button inside, so the group itself takes the
+                       focus and the keys. */
+                    tabIndex={
+                      binder.yours &&
+                      !(imagesEnabled && isRenderableImageUrl(card.imageUrl))
+                        ? 0
+                        : undefined
+                    }
+                    onKeyDown={
+                      binder.yours
+                        ? (event) => {
+                            if (!event.altKey) return;
+                            if ((event.target as HTMLElement).closest("dialog")) return;
+                            const step = ARROW_STEP(event.key, settings.layout);
+                            if (step === null) return;
+                            event.preventDefault();
+                            move(card.entryId, slot + step);
+                          }
+                        : undefined
+                    }
+                    className={cn(
+                      "rounded-[5px]",
+                      binder.yours && "cursor-grab active:cursor-grabbing",
+                    )}
+                  >
+                    <CardImageZoom
+                      imageUrl={card.imageUrl}
+                      exactName={card.name}
+                      cardNumber={card.number}
+                      caption={card.printingLabel}
+                      note={card.note}
+                      direction="showcase"
+                      enabled={imagesEnabled}
+                      siblings={zoomCards}
+                      position={list.indexOf(card)}
+                      thumbClassName="w-full"
+                      thumb={
+                        <PocketTile
+                          card={card}
+                          imagesEnabled={imagesEnabled}
+                          big={settings.layout === 2}
+                        />
+                      }
+                    />
+                    {binder.yours && editing && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          aria-label={`Remove ${card.name}`}
+                          onClick={() =>
+                            act(() => removeBinderCardAction(card.entryId))
+                          }
+                          className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
+                        >
+                          <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          aria-pressed={settings.frontEntryId === card.entryId}
+                          onClick={() => {
+                            const patch = { frontEntryId: card.entryId };
+                            paint(patch);
+                            act(() => saveBinderSettingsAction(patch));
+                          }}
+                          className={cn(
+                            "absolute bottom-1 left-1 z-10 cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ring-1 transition-colors",
+                            settings.frontEntryId === card.entryId
+                              ? "bg-accent text-accent-contrast ring-accent"
+                              : "bg-canvas/85 text-text-secondary ring-border-strong hover:text-text-primary",
+                          )}
+                        >
+                          Front
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : binder.yours ? (
+                  <AddPocket
+                    onClick={() => setAdding(true)}
+                    big={settings.layout === 2}
                   />
-                  {binder.yours && editing && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        aria-label={`Remove ${card.name}`}
-                        onClick={() => act(() => removeBinderCardAction(card.entryId))}
-                        className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
-                      >
-                        <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        aria-pressed={settings.frontEntryId === card.entryId}
-                        onClick={() => {
-                          const patch = { frontEntryId: card.entryId };
-                          paint(patch);
-                          act(() => saveBinderSettingsAction(patch));
-                        }}
-                        className={cn(
-                          "absolute bottom-1 left-1 z-10 cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ring-1 transition-colors",
-                          settings.frontEntryId === card.entryId
-                            ? "bg-accent text-accent-contrast ring-accent"
-                            : "bg-canvas/85 text-text-secondary ring-border-strong hover:text-text-primary",
-                        )}
-                      >
-                        Front
-                      </button>
-                    </>
-                  )}
-                </>
-              ) : (
-                <EmptyPocket />
-              )}
-            </li>
-          ))}
+                ) : (
+                  <EmptyPocket />
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         {pages > 1 && (
@@ -240,7 +390,13 @@ export function BinderView({
               aria-label="Previous page"
               disabled={page === 0}
               onClick={() => setAt(page - 1)}
-              className="absolute top-1/2 left-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+              onDragOver={binder.yours ? dragOver("prev", false) : undefined}
+              onDragLeave={binder.yours ? dragLeave("prev") : undefined}
+              onDrop={binder.yours ? dropAt("prev") : undefined}
+              className={cn(
+                "absolute top-1/2 left-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
+                over === "prev" && "ring-2 ring-accent",
+              )}
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
             </button>
@@ -249,7 +405,13 @@ export function BinderView({
               aria-label="Next page"
               disabled={page === pages - 1}
               onClick={() => setAt(page + 1)}
-              className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+              onDragOver={binder.yours ? dragOver("next", false) : undefined}
+              onDragLeave={binder.yours ? dragLeave("next") : undefined}
+              onDrop={binder.yours ? dropAt("next") : undefined}
+              className={cn(
+                "absolute top-1/2 right-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
+                over === "next" && "ring-2 ring-accent",
+              )}
             >
               <ChevronRight className="size-4" aria-hidden="true" />
             </button>
@@ -292,7 +454,12 @@ export function BinderView({
       {binder.yours ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <AddBinderCard imagesEnabled={imagesEnabled} playerGames={playerGames} />
+            <AddBinderCard
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              open={adding}
+              onOpenChange={setAdding}
+            />
             {binder.count > 0 && (
               <Button
                 type="button"
@@ -317,6 +484,22 @@ export function BinderView({
       )}
     </div>
   );
+}
+
+/** One slot sideways, one row up or down, or nothing for any other key. */
+function ARROW_STEP(key: string, layout: BinderLayout): number | null {
+  switch (key) {
+    case "ArrowLeft":
+      return -1;
+    case "ArrowRight":
+      return 1;
+    case "ArrowUp":
+      return -layout;
+    case "ArrowDown":
+      return layout;
+    default:
+      return null;
+  }
 }
 
 /** "All", "On your hunts 3": the two ways to look at somebody's binder. */
@@ -369,8 +552,15 @@ function PocketTile({
   return (
     <div className={POCKET}>
       {art ? (
+        /* The picture is not its own drag source: the pocket is, so
+           the whole tile travels, not the image out of it. */
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={card.imageUrl ?? ""} alt="" className="size-full object-cover" />
+        <img
+          src={card.imageUrl ?? ""}
+          alt=""
+          draggable={false}
+          className="size-full object-cover"
+        />
       ) : (
         <span className="flex size-full flex-col items-center justify-center gap-0.5 bg-elevated px-1 text-center">
           <span
@@ -408,6 +598,31 @@ function PocketTile({
   );
 }
 
+/** A visitor's empty pocket: black, and nothing to press. */
 function EmptyPocket() {
   return <div aria-hidden="true" className={POCKET} />;
+}
+
+/**
+ * The owner's empty pocket: a "+" that opens Add cards. The founder:
+ * "there should be a + on the open card areas in the binder to add a
+ * card that way."
+ */
+function AddPocket({ onClick, big }: { onClick: () => void; big: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Add a card"
+      className="flex aspect-[63/88] w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[5px] border-2 border-dashed border-border-strong bg-black/60 text-text-secondary transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
+    >
+      <span
+        aria-hidden="true"
+        className={cn("leading-none font-light", big ? "text-4xl" : "text-3xl")}
+      >
+        +
+      </span>
+      <span className={cn("font-semibold", big ? "text-xs" : "text-[10px]")}>Add</span>
+    </button>
+  );
 }
