@@ -1,5 +1,9 @@
 import type { ThreadTradeFailure } from "./thread-trades";
 
+/** The limit the forms and the server share. Here, not in the lib, so a
+    client bundle can read it without dragging the server in. */
+export const THREAD_TRADE_QUANTITY_MAX = 99;
+
 /**
  * What a refused "We traded" says, in words for the person. Free of
  * server-only imports (a type import carries nothing), so the website's

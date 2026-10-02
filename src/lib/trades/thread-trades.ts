@@ -6,6 +6,7 @@ import { recordTradeFound } from "@/lib/players/hunts";
 import { blockedBetween } from "@/lib/players/safety";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { disputeTrade } from "./repository";
+import { THREAD_TRADE_QUANTITY_MAX } from "./thread-trade-copy";
 
 /**
  * "We traded", inside a conversation.
@@ -58,8 +59,7 @@ export type ThreadTradeFailure =
   | "no-card"
   | "answered";
 
-/** The limits the form and the server share. */
-export const THREAD_TRADE_QUANTITY_MAX = 99;
+export { THREAD_TRADE_QUANTITY_MAX } from "./thread-trade-copy";
 
 interface ThreadRow {
   id: string;

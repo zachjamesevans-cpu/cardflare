@@ -7,11 +7,13 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
+import { cardImagesEnabled } from "@/lib/cards/images";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { localFeed } from "@/lib/local/feed";
 import { listThreads } from "@/lib/local/threads";
 import { playerForUser } from "@/lib/players/accounts";
 import { postalCodeForPlayer } from "@/lib/players/location";
+import { viewerGames } from "@/lib/players/viewer-games";
 
 export const metadata: Metadata = {
   title: LOCAL_ENABLED ? "Local" : "Messages",
@@ -68,10 +70,11 @@ export default async function LocalPage({
 
   /* With Local off this page is the Messages page: the conversations
      people already had, and nothing near-you at all. */
-  const [feed, threads, postalCode] = await Promise.all([
+  const [feed, threads, postalCode, games] = await Promise.all([
     LOCAL_ENABLED ? localFeed(playerId, null) : null,
     listThreads(playerId),
     postalCodeForPlayer(playerId),
+    viewerGames(),
   ]);
 
   return (
@@ -97,6 +100,8 @@ export default async function LocalPage({
         threads={threads}
         postalCode={postalCode}
         initialThreadId={(await searchParams).thread ?? null}
+        imagesEnabled={cardImagesEnabled()}
+        playerGames={games}
       />
     </Shell>
   );

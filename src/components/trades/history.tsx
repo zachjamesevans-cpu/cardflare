@@ -161,13 +161,22 @@ export function TradeHistoryRow({
           </span>
         </p>
         {/* The place and the day, in the reader's clock. The card number
-            only where there is room: on a phone it ate the day. */}
+            only where there is room: on a phone it ate the day. A trade
+            confirmed in a conversation has no store, so it says where it
+            was confirmed instead. */}
         <p className="truncate text-xs text-text-muted">
-          {trade.storeName && (
+          {trade.source === "conversation" ? (
             <>
-              {trade.storeName}
+              In a conversation
               <span aria-hidden="true"> · </span>
             </>
+          ) : (
+            trade.storeName && (
+              <>
+                {trade.storeName}
+                <span aria-hidden="true"> · </span>
+              </>
+            )
           )}
           <LocalDate iso={trade.confirmedAt} format="day" />
           {!compact && trade.cardNumber && (

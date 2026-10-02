@@ -14,15 +14,18 @@ import {
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
+import { ThreadTradeBlock, TradeTrigger } from "@/components/local/thread-trade-block";
 import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  answerTradeAction,
   closeThreadAction,
   localFeedAtAction,
   openThreadAction,
+  proposeTradeAction,
   readThreadAction,
   sendMessageAction,
   setLocalRadiusAction,
@@ -35,8 +38,14 @@ import {
   agoLabel,
   milesLabel,
 } from "@/lib/local/shared";
-import type { MeetSuggestion, ThreadMessage, ThreadSummary } from "@/lib/local/threads";
+import type {
+  MeetSuggestion,
+  ThreadMessage,
+  ThreadRead,
+  ThreadSummary,
+} from "@/lib/local/threads";
 import { meetLine, suggestText } from "@/lib/nearby/meet";
+import type { ProposeInput, ThreadTrade } from "@/lib/trades/thread-trades";
 import { cn } from "@/lib/cn";
 
 /** One bit in the browser: "they chose device location here before". */
@@ -63,6 +72,8 @@ export function LocalScreen({
   threads,
   postalCode,
   initialThreadId = null,
+  imagesEnabled = false,
+  playerGames = [],
 }: {
   /** Null with Local switched off: then this is the Messages list only. */
   feed: LocalFeed | null;
@@ -70,6 +81,9 @@ export function LocalScreen({
   postalCode: string | null;
   /** A thread to open straight away: the Feed's "I have this" lands here. */
   initialThreadId?: string | null;
+  /** For the card picker a direct message's "We traded" needs. */
+  imagesEnabled?: boolean;
+  playerGames?: readonly string[];
 }) {
   const [openThreadId, setOpenThreadId] = useState<string | null>(
     initialThreadId ?? null,
@@ -169,7 +183,14 @@ export function LocalScreen({
   }, [locate]);
 
   if (openThreadId) {
-    return <ThreadView threadId={openThreadId} onBack={() => setOpenThreadId(null)} />;
+    return (
+      <ThreadView
+        threadId={openThreadId}
+        onBack={() => setOpenThreadId(null)}
+        imagesEnabled={imagesEnabled}
+        playerGames={playerGames}
+      />
+    );
   }
 
   /*
@@ -545,16 +566,35 @@ function OpenThreadComposer({
  * and refreshed after every send. No live socket in v1; the Refresh
  * button is the honest version of one.
  */
-function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void }) {
+function ThreadView({
+  threadId,
+  onBack,
+  imagesEnabled,
+  playerGames,
+}: {
+  threadId: string;
+  onBack: () => void;
+  imagesEnabled: boolean;
+  playerGames: readonly string[];
+}) {
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
   const [withName, setWithName] = useState<string | null>(null);
+  const [kind, setKind] = useState<ThreadRead["kind"]>("direct");
+  const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  /* "We traded": the form's open state, the call in flight, and what a
+     refusal said. Its own transition, so marking a trade never greys
+     out the Send button beside it. */
+  const [composingTrade, setComposingTrade] = useState(false);
+  const [tradeError, setTradeError] = useState<string | null>(null);
+  const [tradePending, startTrade] = useTransition();
 
   const load = useCallback(() => {
     startTransition(async () => {
@@ -566,6 +606,8 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
       setMessages(thread.messages);
       setCardName(thread.cardName);
       setWithName(thread.withName);
+      setKind(thread.kind);
+      setTrade(thread.trade);
       setMeet(thread.meet);
       setClosed(thread.closed);
     });
@@ -573,6 +615,31 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
        identity would reload the thread on every parent render. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
+
+  function propose(input: ProposeInput) {
+    setTradeError(null);
+    startTrade(async () => {
+      const result = await proposeTradeAction(threadId, input);
+      if (!result.ok) {
+        setTradeError(result.message);
+        return;
+      }
+      setComposingTrade(false);
+      load();
+    });
+  }
+
+  function answer(tradeId: string, yes: boolean) {
+    setTradeError(null);
+    startTrade(async () => {
+      const result = await answerTradeAction(tradeId, yes);
+      if (!result.ok) {
+        setTradeError(result.message);
+        return;
+      }
+      load();
+    });
+  }
 
   useEffect(() => {
     load();
@@ -688,6 +755,28 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
               </Button>
             </div>
           )}
+          {/* The trade, between the messages and the composer: what was
+              settled last, a claim waiting on one side, or the form.
+              Hidden with the rest once the conversation is ended. */}
+          {messages !== null && (
+            <ThreadTradeBlock
+              trade={trade}
+              kind={kind}
+              cardName={cardName}
+              withName={withName}
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              onPropose={propose}
+              onAnswer={answer}
+              pending={tradePending}
+              error={tradeError}
+              composing={composingTrade}
+              onComposingChange={(open) => {
+                setTradeError(null);
+                setComposingTrade(open);
+              }}
+            />
+          )}
           <div className="flex items-end gap-2">
             <Textarea
               rows={2}
@@ -707,6 +796,13 @@ function ThreadView({ threadId, onBack }: { threadId: string; onBack: () => void
               Report files the conversation, not the person, so the
               admin opens the thread the reporter was actually in. */}
           <div className="flex items-center gap-4">
+            {/* "We traded" leads the row, and only while there is no
+                claim waiting: one trade at a time per conversation. */}
+            {messages !== null &&
+              !composingTrade &&
+              (trade === null || trade.status !== "pending") && (
+                <TradeTrigger onClick={() => setComposingTrade(true)} />
+              )}
             <button
               type="button"
               onClick={end}
