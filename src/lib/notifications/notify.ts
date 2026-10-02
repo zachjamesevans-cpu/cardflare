@@ -275,6 +275,8 @@ export async function notifyOfferReceived(
   responderSessionId: string,
   responderName: string,
   message: string | null,
+  /** Several cards in one offer: the notice counts them, once. */
+  batch: { count: number } = { count: 1 },
 ): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
@@ -295,10 +297,19 @@ export async function notifyOfferReceived(
      * "Kaito has your Perona" sent to the person holding Perona reads
      * as nonsense.
      */
+    /*
+     * Several cards, one sentence. The founder: "CHUNC has 4 of the
+     * cards you're looking for", as one message, not four. The same
+     * problem posting several cards in one Flare solved on the way in.
+     */
     const title =
-      context.intent === "showcase"
-        ? `${responderName} wants your ${context.cardName}`
-        : `${responderName} has your ${context.cardName}`;
+      batch.count > 1
+        ? context.intent === "showcase"
+          ? `${responderName} wants ${batch.count} of your cards`
+          : `${responderName} has ${batch.count} of the cards you're looking for`
+        : context.intent === "showcase"
+          ? `${responderName} wants your ${context.cardName}`
+          : `${responderName} has your ${context.cardName}`;
     const body = message
       ? `They said: “${message}”`
       : context.intent === "showcase"
