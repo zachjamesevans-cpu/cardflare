@@ -37,6 +37,8 @@ import { LogTradeScreen } from "./src/screens/log-trade";
 import { ProfileScreen } from "./src/screens/profile";
 import { EditProfileScreen } from "./src/screens/edit-profile";
 import { BinderScreen } from "./src/screens/binder";
+import { BindersScreen } from "./src/screens/binders";
+import { HuntsScreen } from "./src/screens/hunts";
 import { FindPlayerScreen } from "./src/screens/find-player";
 import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
@@ -125,11 +127,24 @@ export type StackParams = {
       pronouns, bio. The website's /profile/edit. */
   EditProfile: undefined;
   /**
-   * The trade binder, open: the website's /profile/binder with no id,
-   * /p/[playerId]/binder with one. Reached from the Binder panel on
-   * either profile.
+   * Somebody's hunts on their own screen: the website's /profile/hunts
+   * with no id, /p/[playerId]/hunts with one. The Hunts stop in the
+   * icon row on either profile.
    */
-  Binder: { playerId?: string } | undefined;
+  Hunts: { playerId?: string } | undefined;
+  /**
+   * Every binder somebody has, as a list: the website's
+   * /profile/binders with no id, /p/[playerId]/binders with one. The
+   * Binders stop in the icon row on either profile.
+   */
+  Binders: { playerId?: string } | undefined;
+  /**
+   * One binder, open: the website's /profile/binders/[binderId] with
+   * no playerId, /p/[playerId]/binders/[binderId] with one. No
+   * binderId means the Trade binder. Reached from the highlights row
+   * on either profile and from the Binders list.
+   */
+  Binder: { playerId?: string; binderId?: string } | undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
@@ -189,7 +204,11 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Scan: "Back",
   Settings: "Profile",
   EditProfile: "Profile",
-  Binder: "Profile",
+  Hunts: "Profile",
+  Binders: "Profile",
+  /* Opened from a profile's highlights row or from the Binders list,
+     so the label names neither. */
+  Binder: "Back",
   Store: "Profile",
   Customize: "Profile",
   Pro: "Back",
@@ -734,10 +753,27 @@ export default function App() {
             options={{ title: "Edit profile", headerBackTitle: "Profile" }}
           />
           <Stack.Screen
-            name="Binder"
-            options={{ title: "Binder", headerBackTitle: "Profile" }}
+            name="Hunts"
+            options={{ title: "Hunts", headerBackTitle: "Profile" }}
           >
-            {({ route }) => <BinderScreen playerId={route.params?.playerId} />}
+            {({ route }) => <HuntsScreen playerId={route.params?.playerId} />}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Binders"
+            options={{ title: "Binders", headerBackTitle: "Profile" }}
+          >
+            {({ route }) => <BindersScreen playerId={route.params?.playerId} />}
+          </Stack.Screen>
+          <Stack.Screen
+            name="Binder"
+            options={{ title: "Binder", headerBackTitle: "Back" }}
+          >
+            {({ route }) => (
+              <BinderScreen
+                playerId={route.params?.playerId}
+                binderId={route.params?.binderId}
+              />
+            )}
           </Stack.Screen>
           <Stack.Screen
             name="Store"

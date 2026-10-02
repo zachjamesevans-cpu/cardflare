@@ -26,7 +26,6 @@ import {
   getFollowing,
   getGames,
   getProfile,
-  getTradeHistory,
   lastSearchGame,
   rememberSearchGame,
   removeFromShowcase,
@@ -40,17 +39,19 @@ import {
   type FollowedPlayer,
   type Profile,
   type ShowcaseCard,
-  type TradeHistory,
   type Wardrobe,
 } from "../api";
+import { BinderHighlights } from "../binder-highlights";
 import { CosmeticCard } from "../cosmetic-card";
 import { WornBackground, WornScene } from "../cosmetic-paint";
+import { CreateBinderSheet } from "../create-binder-sheet";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
+import { ProfileFlares } from "../profile-flares";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { ProfileIconRow, type ProfileStop } from "../profile-icon-row";
 import { CoverBanner } from "../showcase-zoom";
-import { LockedRows, TradeHistoryRow, TradeHistoryWall } from "../trade-history";
 import {
   AsyncButton,
   Body,
@@ -67,27 +68,37 @@ import { colors, gutter, radius, spacing } from "../theme";
 import { GameSearchField } from "../game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "../game-scope";
 import type { GameSlug } from "../games";
-import { HuntsPanel } from "../hunts-panel";
-import { BinderPanel } from "../binder-panel";
 
 /** How far the cover reaches: past the name and the Embers badge. */
 const COVER_HEIGHT = 144;
 /** How far the header sits down the card, so the picture straddles the cover's edge. */
 const HEADER_TOP = 60;
+/** The showcase rail's tile, the trade-room carousel's width. */
+const SHELF_TILE = 56;
 
 /**
  * The Profile tab, which used to be Account.
  *
  * The founder's call, and it holds up: an account page is housekeeping,
  * and housekeeping is not somewhere anybody visits twice. This is who
- * you are, what you have earned, and what you are showing off, with the
- * old account screen one tap away behind the cog.
+ * you are as a trader, and what you are showing off.
  *
- * The two Ember numbers are laid out exactly as on the website. Lifetime
- * earned is the badge and it is public; the balance sits beside the shop
- * and nowhere else. The endpoint behind this screen only ever answers
- * for the signed-in player, which is what makes showing the balance here
- * safe: there is no way to point it at somebody else.
+ * The profile IA round took the dashboard out of it. The founder: it
+ * "feels cluttered and more like a management dashboard than a social
+ * profile"; the fix is "a more Instagram-like information architecture
+ * where important features are represented as clear destinations/icons
+ * and users only see deeper information after tapping into them." So
+ * the hunts panel, the binder panel, the Embers card, the trade history
+ * card, the store door and the cog are gone from this screen, and the
+ * same features sit behind a row of five round stops under the header:
+ * Hunts, Binders, Trades, Embers, Settings. Under the row: the binders
+ * as a row of circles, the showcase without its box, and every Flare
+ * up right now as a grid. Nothing else below. The website's /profile
+ * is laid out the same, top to bottom.
+ *
+ * The balance is not on this screen any more: the store, behind the
+ * Embers stop, is where spending happens and where the number lives.
+ * Lifetime earned stays on the badge, which is public.
  *
  * Guests see the honest pitch rather than a wall: the whole room loop
  * works without any of this, and always will.
@@ -133,14 +144,16 @@ export function ProfileScreen() {
      shown as People. */
   const [following, setFollowing] = useState<FollowedPlayer[]>([]);
   const [followers, setFollowers] = useState<FollowedPlayer[]>([]);
-  /* The trade history's counts and, for Pro, its three newest rows. */
-  const [history, setHistory] = useState<TradeHistory | null>(null);
 
-  /* The list open over the page: the followers or following tile. */
+  /* The list open over the page: the followers or following number. */
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
+  /* The add-a-card form, folded behind the "+" tile at the rail's end. */
+  const [addingShowcase, setAddingShowcase] = useState(false);
+  /* The new-binder sheet, behind the "+" at the highlights row's end. */
+  const [creatingBinder, setCreatingBinder] = useState(false);
 
   /* The showcase panel's inside, measured, for the worn background. */
   const [panel, setPanel] = useState({ w: 0, h: 0 });
@@ -175,9 +188,6 @@ export function ProfileScreen() {
         .catch(() => {});
       getFollowers()
         .then((people) => setFollowers(people.followers))
-        .catch(() => {});
-      getTradeHistory()
-        .then((result) => setHistory(result.history))
         .catch(() => {});
     } catch (caught) {
       /*
@@ -407,11 +417,12 @@ export function ProfileScreen() {
     >
       {/* Your own profile block, laid out exactly as View full profile
           shows anyone else - same cover, same picture, same numbers,
-          same name and handle, same shelf, with Edit profile where
-          they see Follow. The founder's rule: what you see is what
-          they see. */}
+          same name and handle, same stops, same shelf, with Edit
+          profile where they see Follow. The founder's rule: what you
+          see is what they see. One block, no panels inside it: the
+          founder, "fewer giant bordered boxes". */}
       <Card
-        style={{ paddingTop: spacing(6), overflow: "hidden" }}
+        style={{ paddingTop: spacing(6), gap: spacing(4), overflow: "hidden" }}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           setBlockBox({ w: width - 2, h: height - 2 });
@@ -434,9 +445,10 @@ export function ProfileScreen() {
         />
 
         {/*
-         * The block's two controls, riding its corner: the wand
-         * dresses the profile, the cog is everything the Account tab
-         * used to be. Same spots as the website.
+         * The block's two controls, riding its corner: Share, and the
+         * wand that dresses the profile. Same spots as the website.
+         * The cog used to sit here too; Settings is a stop in the row
+         * under the header now.
          */}
         <View
           style={{
@@ -463,22 +475,6 @@ export function ProfileScreen() {
             }}
           >
             <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
-          </Tap>
-          <Tap
-            onPress={() => navigation.navigate("Settings")}
-            accessibilityLabel="Settings"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
           </Tap>
         </View>
 
@@ -539,54 +535,37 @@ export function ProfileScreen() {
         {/* No Pro row here: the website's profile has none. The pitch
             lives in Customize and behind the animated-picture door. */}
 
-        {/* Your hunts, above the shelf. What you are looking for is the
-            live thing; the showcase is what you are done with. */}
-        <HuntsPanel
-          hunts={profile.hunts ?? []}
-          limit={profile.huntLimit}
-          yours
-          /* Into the composer with the hunt already chosen, by id, so
-             "Add cards" adds to THIS hunt rather than starting a
-             fresh one that happens to share a name. */
-          onAdd={(huntId) =>
-            navigation.navigate("Tabs", {
-              screen: "Flare",
-              params: { hunt: huntId },
-            })
-          }
-          /* Every write inside the panel paints first and then asks
-             for the truth, so the counts on the row move with the
-             stepper rather than going stale until the next open. */
-          onChanged={() => void load()}
-        />
+        {/* The five stops. Everything that used to stack down this
+            screen is one tap in: your hunts with their add flow, every
+            binder, the trade history, the Embers store, and the
+            settings the cog used to open. */}
+        <ProfileIconRow yours onOpen={(stop) => navigation.navigate(OWN_STOPS[stop])} />
 
-        {/* Your binder, closed, between the hunts and the shelf: the
-            cards you would trade. Same place as the website. */}
-        <BinderPanel
-          summary={profile.binder}
-          ownerName={profile.displayName}
+        {/* Your binders as a row of circles, the Trade binder first
+            with its lime ring, and a dashed "+" at the end that starts
+            a new one. Tap one and it opens. */}
+        <BinderHighlights
+          binders={profile.binders ?? []}
           yours
-          onOpen={() => navigation.navigate("Binder")}
+          onOpen={(binderId) => navigation.navigate("Binder", { binderId })}
+          onNew={() => setCreatingBinder(true)}
         />
 
         {/* The one showcase, editable in place: tap a card to dress
-            it, remove below it, add at the end. The header's wand is
-            the one wand; Customize switches between its two menus. Its
-            own rounded panel inside the block, same as the website. The
-            worn background paints it edge to edge, measured off the
-            panel; its own colour stays underneath as the fallback. */}
+            it, remove below it, add from the "+" tile at the rail's
+            end. The header's wand is the one wand; Customize switches
+            between its two menus. No box round it any more: a small
+            heading, the rail, and the worn background painted behind
+            them edge to edge, measured off this view. */}
         <View
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
-            setPanel({ w: width - 2, h: height - 2 });
+            setPanel({ w: width, h: height });
           }}
           style={{
             gap: spacing(2),
             borderRadius: radius.control,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.elevated,
-            padding: spacing(3),
+            padding: spacing(2),
             overflow: "hidden",
           }}
         >
@@ -594,7 +573,7 @@ export function ProfileScreen() {
             background={profile.equips?.background ?? null}
             width={panel.w}
             height={panel.h}
-            radius={radius.control - 1}
+            radius={radius.control}
           />
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
             <View
@@ -603,7 +582,7 @@ export function ProfileScreen() {
               <Text
                 style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}
               >
-                Your showcase
+                Showcase
               </Text>
               <Tap
                 onPress={() => setShowcaseHelp((open) => !open)}
@@ -643,62 +622,80 @@ export function ProfileScreen() {
           )}
 
           {profile.showcase.length === 0 ? (
-            <Muted>
-              Nothing on the shelf yet. Search for a card below and it stays here
-              between events.
-            </Muted>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
-            >
-              {profile.showcase.map((entry) => (
-                <View key={entry.id} style={{ gap: spacing(1), width: 56 }}>
-                  <Tap onPress={() => setDressing(entry)}>
-                    <CosmeticCard
-                      imageUrl={entry.imageUrl}
-                      width={56}
-                      frame={entry.frame ?? profile.equipped.frame}
-                      holo={entry.holo ?? profile.equipped.holo}
-                      effect={profile.equipped.effect}
-                      border={profile.equips?.border ?? null}
-                      pattern={profile.equips?.pattern ?? null}
-                      animation={profile.equips?.animation ?? null}
-                    />
-                  </Tap>
-                  <Text
-                    numberOfLines={1}
-                    style={{ color: colors.textSecondary, fontSize: 11 }}
-                  >
-                    {entry.name}
-                  </Text>
-                  <Tap
-                    disabled={busy === entry.id}
-                    onPress={() =>
-                      void act(
-                        entry.id,
-                        () => removeFromShowcase(entry.id),
-                        "Taken off the shelf.",
-                      )
-                    }
-                  >
-                    <Text
-                      style={{
-                        color: colors.textMuted,
-                        fontSize: 11,
-                        textDecorationLine: "underline",
-                      }}
-                    >
-                      Remove
-                    </Text>
-                  </Tap>
-                </View>
-              ))}
-            </ScrollView>
-          )}
+            <Muted>Nothing on the shelf yet.</Muted>
+          ) : null}
 
-          {profile.showcase.length < profile.showcaseLimit ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
+          >
+            {profile.showcase.map((entry) => (
+              <View key={entry.id} style={{ gap: spacing(1), width: SHELF_TILE }}>
+                <Tap onPress={() => setDressing(entry)}>
+                  <CosmeticCard
+                    imageUrl={entry.imageUrl}
+                    width={SHELF_TILE}
+                    frame={entry.frame ?? profile.equipped.frame}
+                    holo={entry.holo ?? profile.equipped.holo}
+                    effect={profile.equipped.effect}
+                    border={profile.equips?.border ?? null}
+                    pattern={profile.equips?.pattern ?? null}
+                    animation={profile.equips?.animation ?? null}
+                  />
+                </Tap>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textSecondary, fontSize: 11 }}
+                >
+                  {entry.name}
+                </Text>
+                <Tap
+                  disabled={busy === entry.id}
+                  onPress={() =>
+                    void act(
+                      entry.id,
+                      () => removeFromShowcase(entry.id),
+                      "Taken off the shelf.",
+                    )
+                  }
+                >
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      textDecorationLine: "underline",
+                    }}
+                  >
+                    Remove
+                  </Text>
+                </Tap>
+              </View>
+            ))}
+            {/* The way in, at the end of the rail: a "+" tile the size
+                of a card. The form it opens sits under the rail. Gone
+                when the shelf is full; the website folds the same. */}
+            {profile.showcase.length < profile.showcaseLimit ? (
+              <Tap
+                onPress={() => setAddingShowcase(true)}
+                accessibilityLabel="Add a card"
+                style={{
+                  width: SHELF_TILE,
+                  height: Math.round((SHELF_TILE * 88) / 63),
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: colors.borderStrong,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="add" size={22} color={colors.textSecondary} />
+              </Tap>
+            ) : null}
+          </ScrollView>
+
+          {addingShowcase && profile.showcase.length < profile.showcaseLimit ? (
             <AddToShowcase
               busy={busy === "showcase-add"}
               frames={ownedFrames}
@@ -709,109 +706,30 @@ export function ProfileScreen() {
               border={profile.equips?.border ?? null}
               pattern={profile.equips?.pattern ?? null}
               animation={profile.equips?.animation ?? null}
-              onPick={(cardId, printingId, picks) =>
+              onClose={() => setAddingShowcase(false)}
+              onPick={(cardId, printingId, picks) => {
+                setAddingShowcase(false);
                 void act(
                   "showcase-add",
                   () => addToShowcase(cardId, printingId, picks),
                   "On the shelf.",
-                )
-              }
-            />
-          ) : (
-            <Muted>Your shelf is full. Remove one to make room.</Muted>
-          )}
-        </View>
-      </Card>
-
-      <Card>
-        <Title>Embers</Title>
-        <Body>Earned by confirming trades, and nothing else.</Body>
-
-        {/* One tile, the public number. What is left to spend is on the
-            store's door below, where spending happens. The audit read
-            "earned" beside "to spend" as one number three ways, so the
-            tile says which fact it is and what moves it: trades, and
-            nothing else. Same words on the website. */}
-        <View style={{ flexDirection: "row", gap: spacing(3) }}>
-          <Stat
-            label="Earned by trading, all time"
-            value={profile.embersEarned}
-            note="Public. The number on your badge. Trades are the only thing that raise it, and it never goes down."
-          />
-        </View>
-      </Card>
-
-      {/* Under Embers, because the trades are where they came from:
-          the website's card, natively. Three recent rows and the door
-          to the rest; locked, the card is the Pro pitch. */}
-      <Card>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: spacing(2),
-          }}
-        >
-          <View style={{ flex: 1, gap: spacing(1) }}>
-            <Title>Trade history</Title>
-            <Body>Every card you got and gave, so the binder never surprises you.</Body>
-          </View>
-          {history?.locked ? (
-            <View
-              style={{
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: colors.accentMuted,
-                backgroundColor: colors.elevated,
-                paddingHorizontal: spacing(2.5),
-                paddingVertical: spacing(1),
+                );
               }}
-            >
-              <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
-                Pro
-              </Text>
-            </View>
+            />
           ) : null}
         </View>
-        {!history ? (
-          <Loading />
-        ) : history.locked ? (
-          <View>
-            <LockedRows count={3} />
-            <TradeHistoryWall
-              count={history.totals.trades}
-              onGetPro={() => navigation.navigate("Pro")}
-            />
-          </View>
-        ) : history.trades.length === 0 ? (
-          <Muted>
-            Nothing traded yet. Confirm a trade in a room and it lands here.
-          </Muted>
-        ) : (
-          <>
-            <View>
-              {history.trades.slice(0, 3).map((trade, index, all) => (
-                <TradeHistoryRow
-                  key={trade.id}
-                  trade={trade}
-                  compact
-                  last={index === all.length - 1}
-                />
-              ))}
-            </View>
-            <Button
-              label={
-                history.totals.trades > 3
-                  ? `See all ${history.totals.trades} trades`
-                  : "See your trade history"
-              }
-              variant="secondary"
-              onPress={() => navigation.navigate("TradeHistory")}
-            />
-          </>
-        )}
+
+        {/* Every Flare up right now, newest first, three across: the
+            same list the Flares number counts. The last thing on the
+            page. */}
+        <ProfileFlares
+          flares={profile.flares ?? []}
+          yours
+          onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+        />
       </Card>
+
+      {message && <Muted>{message}</Muted>}
 
       {/* The list behind a tapped number, over the page - the founder:
           "a separate pop up", not a section at the bottom. */}
@@ -825,59 +743,17 @@ export function ProfileScreen() {
         }}
       />
 
-      {/*
-       * The store lives on its own screen now, same as the website:
-       * this card is the door, wearing the one number a shopper
-       * decides with.
-       */}
-      <Tap
-        onPress={() => navigation.navigate("Store")}
-        style={{
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderWidth: 1,
-          borderRadius: radius.card,
-          padding: spacing(4),
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: spacing(2),
+      {/* A new binder: name it, pick a cover, and it opens. The row
+          re-reads on the way back, so the circle is there by then. */}
+      <CreateBinderSheet
+        visible={creatingBinder}
+        onClose={() => setCreatingBinder(false)}
+        onCreated={(binderId) => {
+          setCreatingBinder(false);
+          void load();
+          navigation.navigate("Binder", { binderId });
         }}
-      >
-        <View style={{ flex: 1, gap: spacing(1) }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-            Embers store
-          </Text>
-          <Muted>Frames, holo patterns and effects. Spend what you have earned.</Muted>
-          {/* The second line is the difference between the two numbers:
-              what feeds the balance, and that only trading feeds both. */}
-          <Muted>
-            Packs, duplicates and gifts add to what you can spend. Trading adds to both.
-          </Muted>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing(1.5),
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.elevated,
-            paddingHorizontal: spacing(3),
-            paddingVertical: spacing(1),
-          }}
-        >
-          <Ionicons name="flame" size={13} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontWeight: "700", fontSize: 13 }}>
-            {profile.embersBalance.toLocaleString()}
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>to spend</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      </Tap>
-
-      {message && <Muted>{message}</Muted>}
+      />
 
       <DressModal
         entry={dressing}
@@ -901,79 +777,25 @@ export function ProfileScreen() {
         }
         effect={profile.equipped.effect}
       />
-
-      <AsyncButton
-        label="Sign out"
-        pendingLabel="Signing out…"
-        variant="secondary"
-        onPress={() => {
-          return signOut().then(() => {
-            setProfile(null);
-            setWardrobe(null);
-          });
-        }}
-      />
     </ScrollView>
   );
 }
 
-/** Up to two initials, the same fallback the website draws. */
-function initials(displayName: string): string {
-  const words = displayName.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  const picked = words.length === 1 ? [words[0]] : [words[0], words[words.length - 1]];
-  return picked
-    .map((word) => [...word][0] ?? "")
-    .join("")
-    .toUpperCase();
-}
-
-function Stat({
-  label,
-  value,
-  note,
-  accent = false,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  accent?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: spacing(3),
-        gap: spacing(1),
-      }}
-    >
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 11,
-          fontWeight: "600",
-          letterSpacing: 0.6,
-        }}
-      >
-        {label.toUpperCase()}
-      </Text>
-      <Text
-        style={{
-          color: accent ? colors.accent : colors.textPrimary,
-          fontSize: 22,
-          fontWeight: "700",
-        }}
-      >
-        {value.toLocaleString()}
-      </Text>
-      <Text style={{ color: colors.textMuted, fontSize: 11 }}>{note}</Text>
-    </View>
-  );
-}
+/**
+ * Where each of your own stops goes. The website's five links, as
+ * screens: /profile/hunts, /profile/binders, /profile/trades,
+ * /profile/store, /profile/settings. Sign out lives in Settings.
+ */
+const OWN_STOPS: Record<
+  ProfileStop,
+  "Hunts" | "Binders" | "TradeHistory" | "Store" | "Settings"
+> = {
+  hunts: "Hunts",
+  binders: "Binders",
+  trades: "TradeHistory",
+  embers: "Store",
+  settings: "Settings",
+};
 
 export function NameField({
   current,
@@ -1014,9 +836,11 @@ export function NameField({
  * let this go". Nothing here creates a Flare and nobody can pledge on
  * the result.
  *
- * Closed by default. Nine cards fit and most visits change none of them,
- * so a permanently open search would be the loudest thing on a screen
- * that is mostly for looking at.
+ * Folded behind the "+" tile at the end of the rail. Nine cards fit
+ * and most visits change none of them, so a permanently open search
+ * would be the loudest thing on a screen that is mostly for looking
+ * at. The screen opens this when the tile is tapped and closes it on
+ * Cancel or once a card has gone up.
  */
 function AddToShowcase({
   busy,
@@ -1029,6 +853,7 @@ function AddToShowcase({
   pattern,
   animation,
   onPick,
+  onClose,
 }: {
   busy: boolean;
   frames: DressingOption[];
@@ -1047,8 +872,9 @@ function AddToShowcase({
     printingId: string | null,
     dressing: { frame: string | null; holo: string | null },
   ) => void;
+  /** Cancel: fold the form back behind the tile. */
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
 
@@ -1067,7 +893,6 @@ function AddToShowcase({
   const [playerGames, setPlayerGames] = useState<string[]>([]);
   const [remembered, setRemembered] = useState<string | null>(null);
   useEffect(() => {
-    if (!open) return;
     let current = true;
     void lastSearchGame().then((value) => {
       if (current) setRemembered(value);
@@ -1080,7 +905,7 @@ function AddToShowcase({
     return () => {
       current = false;
     };
-  }, [open]);
+  }, []);
 
   const scope = resolveGameScope({ playerGames, remembered });
   const scopedGame = scope.selected;
@@ -1114,12 +939,6 @@ function AddToShowcase({
 
     return () => clearTimeout(timer);
   }, [query, scopedGame, scope.locked, remembered]);
-
-  if (!open) {
-    return (
-      <Button label="Add a card" variant="secondary" onPress={() => setOpen(true)} />
-    );
-  }
 
   if (pending) {
     return (
@@ -1158,7 +977,6 @@ function AddToShowcase({
           onPress={() => {
             onPick(pending.cardId, pending.printingId, picked);
             setPending(null);
-            setOpen(false);
             setQuery("");
             setHits([]);
           }}
@@ -1218,7 +1036,7 @@ function AddToShowcase({
         </Tap>
       ))}
 
-      <Button label="Cancel" variant="secondary" onPress={() => setOpen(false)} />
+      <Button label="Cancel" variant="secondary" onPress={onClose} />
     </View>
   );
 }
