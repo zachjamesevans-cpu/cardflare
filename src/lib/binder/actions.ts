@@ -5,7 +5,12 @@ import { z } from "zod";
 
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { addBinderCard, removeBinderCard, saveBinderSettings } from "./binder";
+import {
+  addBinderCard,
+  removeBinderCard,
+  saveBinderOrder,
+  saveBinderSettings,
+} from "./binder";
 import { isBinderCover, isBinderLayout } from "./covers";
 
 /**
@@ -90,6 +95,22 @@ export async function removeBinderCardAction(entryId: string): Promise<Outcome> 
   }
   const result = await removeBinderCard(player.id, entryId);
   if (!result.ok) return { ok: false, message: "That card is not in your binder." };
+  repaint(player.id);
+  return { ok: true };
+}
+
+const orderSchema = z.array(z.guid()).max(400);
+
+/** The whole binder's entry ids in the order the owner dragged them into. */
+export async function reorderBinderAction(entryIds: unknown): Promise<Outcome> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to keep a binder." };
+  const parsed = orderSchema.safeParse(entryIds);
+  if (!parsed.success)
+    return { ok: false, message: "That order is not one the binder can keep." };
+  const result = await saveBinderOrder(player.id, parsed.data);
+  if (!result.ok)
+    return { ok: false, message: "Could not save the order. Try again in a moment." };
   repaint(player.id);
   return { ok: true };
 }

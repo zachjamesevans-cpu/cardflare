@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { binderSessionFor, listHaves } from "@/lib/lists/haves";
-import { addToBinder, removeFromBinder } from "@/lib/lists/repository";
+import { addToBinder, listBinder, removeFromBinder } from "@/lib/lists/repository";
 import type { AddEntryInput } from "@/lib/lists/schema";
 import type { PlayerBinderRow } from "@/lib/supabase/types";
 import {
@@ -171,7 +171,18 @@ export async function readBinder(
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
   ]);
 
-  const cards: BinderCard[] = entries.map((entry) => ({
+  /* The owner's order: placed cards by pocket, and anything not placed
+     yet FIRST, newest first, so a card just added lands in pocket one. */
+  const ordered = [...entries].sort((a, b) => {
+    if (a.position === null && b.position === null) {
+      return b.createdAt.localeCompare(a.createdAt);
+    }
+    if (a.position === null) return -1;
+    if (b.position === null) return 1;
+    return a.position - b.position;
+  });
+
+  const cards: BinderCard[] = ordered.map((entry) => ({
     entryId: entry.id,
     cardId: entry.cardId,
     name: entry.cardName,
@@ -272,4 +283,44 @@ export async function removeBinderCard(
   if (!session) return { ok: false, reason: "not-yours" };
   const removed = await removeFromBinder(entryId, session.id);
   return removed ? { ok: true } : { ok: false, reason: "not-yours" };
+}
+
+/**
+ * The owner's new order, pocket by pocket: position 0 for the first id
+ * and so on. Ids that are not the owner's are ignored, and a card the
+ * list left out keeps a place after the listed ones, so a reorder sent
+ * from a stale screen cannot lose a card.
+ */
+export async function saveBinderOrder(
+  playerId: string,
+  entryIds: string[],
+): Promise<BinderWriteResult> {
+  const session = await binderSessionFor(playerId, "", false);
+  if (!session) return { ok: false, reason: "not-yours" };
+  const entries = await listBinder(session.id);
+  const own = new Set(entries.map((entry) => entry.id));
+  const placed = entryIds.filter(
+    (id, index) => own.has(id) && entryIds.indexOf(id) === index,
+  );
+  const rest = entries
+    .filter((entry) => !placed.includes(entry.id))
+    .sort((a, b) => (a.position ?? -1) - (b.position ?? -1))
+    .map((entry) => entry.id);
+  const order = [...placed, ...rest];
+  const admin = getSupabaseAdmin();
+  const results = await Promise.all(
+    order.map((id, position) =>
+      admin
+        .from("player_cards")
+        .update({ position })
+        .eq("id", id)
+        .eq("player_session_id", session.id),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) {
+    console.error("Could not save the binder order", failed.error);
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: true };
 }
