@@ -106,12 +106,14 @@ holo. The art is extracted from the stylesheet into
 hand), and `tests/unit/app-cosmetic-art.test.ts` reads the stylesheet
 independently and fails if the two drift, so adding a cosmetic to the
 web without giving the app its art is caught rather than shipping as a
-flat band nobody notices. Drawn on a phone today: rings, auras, the
-card borders, name styles, badges, titles, holo patterns, showcase
-backgrounds, and the `--cfa-p-*` textures as paths. Still approximated
-(a stand-in, honestly): card animations (`anim-*`) and profile scenes
-(`scene-*`), and the texture layers on borders. `hasPatternArt` and its
-siblings are what a screen asks before drawing.
+flat band nobody notices. Every catalogue family draws on a phone:
+rings, auras, card borders, name styles, badges, titles, holo patterns,
+showcase backgrounds, card animations, profile scenes, and the
+`--cfa-p-*` textures as paths, with the keyframes read back as tracks.
+What is still approximated, honestly: CSS filters (blur, hue rotation)
+are not applied, the texture layers on borders are named but not
+drawn, and the matrix-rain pattern's text glyphs have no path.
+`hasPatternArt` and its siblings are what a screen asks before drawing.
 
 ## Pushing and merging
 

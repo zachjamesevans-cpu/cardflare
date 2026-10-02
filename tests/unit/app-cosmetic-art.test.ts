@@ -330,7 +330,7 @@ describe("holo patterns and showcase backgrounds, in the app", () => {
   it("draws the pattern over the art and the foil, under the effects", () => {
     const face = card.slice(
       card.indexOf("const face = ("),
-      card.indexOf("if (edge) {"),
+      card.indexOf("const framed ="),
     );
     const pattern = face.indexOf("<WornPattern pattern={pattern}");
     expect(pattern).toBeGreaterThan(-1);
@@ -395,6 +395,139 @@ describe("holo patterns and showcase backgrounds, in the app", () => {
     expect(customize).toContain(
       "const SWATCH = { w: Math.round(PREVIEW * 1.6), h: PREVIEW };",
     );
+  });
+});
+
+/**
+ * Card animations and profile scenes, drawn in the app.
+ *
+ * Read off the source, as above: this proves the animation wraps the
+ * whole card and its overlay sits on the face, the scene sits between
+ * the cover and the controls, and the screens pass the slugs. The
+ * keyframe arithmetic itself is tested in app-cosmetic-motion.test.ts.
+ */
+describe("card animations and profile scenes, in the app", () => {
+  const app = (path: string) =>
+    readFileSync(resolve(import.meta.dirname, "../../mobile/src", path), "utf8");
+  const paint = app("cosmetic-paint.tsx");
+  const motion = app("cosmetic-motion.ts");
+  const keyframes = app("cosmetic-keyframes.ts");
+  const card = app("cosmetic-card.tsx");
+  const zoom = app("showcase-zoom.tsx");
+  const own = app("screens/profile.tsx");
+  const theirs = app("screens/player-profile.tsx");
+  const customize = app("screens/customize.tsx");
+
+  it("plays the tracks on one Reanimated clock per thing, never a timer", () => {
+    /* The arithmetic runs on the UI thread; the clock is Reanimated's. */
+    expect(keyframes).toContain('"worklet"');
+    expect(keyframes).not.toMatch(/from "react/);
+    expect(motion).toContain('from "./cosmetic-keyframes"');
+    expect(motion).toMatch(/withRepeat\(/);
+    /* A delay runs the clock up from below zero: at rest, as CSS's
+       fill-mode none shows, then the loop. */
+    expect(motion).toMatch(/withSequence\(/);
+    expect(motion).toContain("clock.value = -delay / seconds;");
+    expect(motion).not.toContain("setInterval");
+    expect(motion).not.toContain("setTimeout");
+    expect(keyframes).toContain("export const TILT_PERSPECTIVE = 600;");
+    expect(paint).toContain('from "./cosmetic-motion"');
+  });
+
+  it("extends the round-10 renderer rather than starting another", () => {
+    expect(paint).toContain("const CELL_CAP = 900;");
+    expect(paint).toContain("const TEXTURE = texturePaths(S);");
+    expect(paint).toMatch(/export function WornAnimation\(/);
+    expect(paint).toMatch(/export function WornScene\(/);
+    expect(paint).toMatch(/export function Sprite\(/);
+    expect(paint).toMatch(/export function AnimationEdge\(/);
+    expect(paint).toMatch(/export function TrackedView\(/);
+    /* The new paint behaviours: the spotlight's wander, the arcs' edge
+       band, the aurora's top band. */
+    expect(paint).toContain("const WANDER_X = [0.18, 0.78, 0.45, 0.18];");
+    expect(paint).toContain("const WANDER_Y = [0.3, 0.4, 0.75, 0.3];");
+    expect(paint).toMatch(/invertClip/);
+    expect(paint).toMatch(/clipHeight=\{height\}/);
+    /* A sprite's glow is a blur behind it; a card's glows ride the
+       card as box-shadows do. */
+    expect(paint).toContain("<BlurMask");
+    expect(paint).toMatch(/boxShadow: art\.card\.glows\.map/);
+    expect(paint).toContain("{ perspective: TILT_PERSPECTIVE }");
+  });
+
+  it("wraps the whole card, draws over the face, and edges the flame", () => {
+    /* The animation wraps the OUTER view, so float and tilt move the
+       border too; the overlay is inset to the face. */
+    const body = card.indexOf("const body = framed ?");
+    const worn = card.indexOf("<WornAnimation", body);
+    expect(body).toBeGreaterThan(-1);
+    expect(worn).toBeGreaterThan(body);
+    expect(card.slice(worn)).toContain("{body}");
+    expect(card).toContain("inset={framed ? EDGE : hairline}");
+    expect(card).toContain("faceRadius={framed ? FACE_RADIUS : 6 - hairline}");
+    /* The flame's edge stands in for a border's, never over one. */
+    expect(card).toContain(
+      "const flame = edge === null && drawsAnimationEdge(animation);",
+    );
+    expect(card).toContain("<AnimationEdge animation={animation}");
+    expect(card).toMatch(/edge \? \(\s*<CardEdge border=\{edge\}/);
+  });
+
+  it("dresses every showcase card, and only showcase cards", () => {
+    expect(
+      own.match(/animation=\{profile\.equips\?\.animation \?\? null\}/g)?.length,
+    ).toBe(3);
+    expect(own.match(/animation=\{animation\}/g)?.length).toBe(2);
+    expect(theirs).toContain("animation={profile.equips?.animation ?? null}");
+    expect(theirs).toContain("animation: profile.equips?.animation ?? null,");
+    expect(zoom).toContain("animation={entry.animation ?? null}");
+    expect(zoom).toContain("animation={shown.animation ?? null}");
+
+    for (const file of [
+      "screens/store.tsx",
+      "player-peek.tsx",
+      "dressing-picker.tsx",
+    ]) {
+      expect(app(file), `${file} animates a card outside the showcase`).not.toContain(
+        "animation=",
+      );
+    }
+  });
+
+  it("lays the scene over the cover and under the controls of a measured block", () => {
+    for (const source of [own, theirs]) {
+      const scene = source.indexOf("<WornScene");
+      expect(scene).toBeGreaterThan(-1);
+      const block = source.slice(source.lastIndexOf("<Card", scene), scene);
+      expect(block).toContain('overflow: "hidden"');
+      expect(block).toContain("onLayout=");
+      expect(block).toContain("<CoverBanner");
+      /* The share icon is the first thing in the block that can be
+         tapped; the scene must be beneath it. */
+      expect(scene).toBeLessThan(source.indexOf("<ShareProfileIcon"));
+      expect(source).toContain("scene={profile.equips?.scene ?? null}");
+    }
+  });
+
+  it("previews an animation on a card and a scene over a mini profile", () => {
+    const preview = customize.slice(
+      customize.indexOf("function CosmeticPreview"),
+      customize.indexOf("function ScenePreview"),
+    );
+    expect(preview).toMatch(/kind === "animation" && drawsAnimation\(slug\)/);
+    expect(preview).toContain("animation={slug}");
+    expect(preview).toMatch(
+      /kind === "scene" && \(drawsScene\(slug\) \|\| SCENE_ART\[slug\]\?\.avatarTiming\)/,
+    );
+    expect(customize).toContain("<ScenePreview slug={slug} />");
+    expect(customize).toContain("<WornScene scene={slug}");
+    /* The avatar entrance pops the mini avatar, as the website's
+       preview does, and the avatar is the website's 32px. */
+    expect(customize).toContain("timings={avatarTiming ? [avatarTiming] : []}");
+    expect(customize).toContain("const MINI_AVATAR = 32;");
+    /* The honest note says what is true now, and nothing about Rive. */
+    expect(customize).toContain("Everything in the catalogue draws here now.");
+    expect(customize).not.toContain("Rive");
   });
 });
 

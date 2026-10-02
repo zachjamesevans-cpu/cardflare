@@ -44,7 +44,7 @@ import {
   type Wardrobe,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
-import { WornBackground } from "../cosmetic-paint";
+import { WornBackground, WornScene } from "../cosmetic-paint";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
@@ -143,6 +143,8 @@ export function ProfileScreen() {
 
   /* The showcase panel's inside, measured, for the worn background. */
   const [panel, setPanel] = useState({ w: 0, h: 0 });
+  /* The profile block's inside, measured, for the worn scene. */
+  const [blockBox, setBlockBox] = useState({ w: 0, h: 0 });
 
   const load = useCallback(async () => {
     const token = await storedAccessToken();
@@ -407,11 +409,28 @@ export function ProfileScreen() {
           same name and handle, same shelf, with Edit profile where
           they see Follow. The founder's rule: what you see is what
           they see. */}
-      <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
+      <Card
+        style={{ paddingTop: spacing(6), overflow: "hidden" }}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setBlockBox({ w: width - 2, h: height - 2 });
+        }}
+      >
         {/* The cover carries down behind the picture, the name and the
             badge, then fades into the card. No seam: the founder's
             mockup, and the same shape the website draws. */}
         <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
+
+        {/* The worn profile effect, over the whole block: above the
+            cover, below everything that can be tapped, exactly where
+            the website's WornSceneLayer sits. Measured off the block;
+            takes no touch. */}
+        <WornScene
+          scene={profile.equips?.scene ?? null}
+          width={blockBox.w}
+          height={blockBox.h}
+          radius={radius.card - 1}
+        />
 
         {/*
          * The block's two controls, riding its corner: the wand
@@ -635,6 +654,7 @@ export function ProfileScreen() {
                       effect={profile.equipped.effect}
                       border={profile.equips?.border ?? null}
                       pattern={profile.equips?.pattern ?? null}
+                      animation={profile.equips?.animation ?? null}
                     />
                   </Tap>
                   <Text
@@ -678,6 +698,7 @@ export function ProfileScreen() {
               effect={profile.equipped.effect}
               border={profile.equips?.border ?? null}
               pattern={profile.equips?.pattern ?? null}
+              animation={profile.equips?.animation ?? null}
               onPick={(cardId, printingId, picks) =>
                 void act(
                   "showcase-add",
@@ -854,6 +875,7 @@ export function ProfileScreen() {
         onSwitch={setDressing}
         border={profile.equips?.border ?? null}
         pattern={profile.equips?.pattern ?? null}
+        animation={profile.equips?.animation ?? null}
         defaults={profile.equipped}
         frames={ownedFrames}
         holos={ownedHolos}
@@ -995,6 +1017,7 @@ function AddToShowcase({
   effect,
   border,
   pattern,
+  animation,
   onPick,
 }: {
   busy: boolean;
@@ -1007,6 +1030,8 @@ function AddToShowcase({
   border: string | null;
   /** The worn catalogue holo pattern, for the same reason. */
   pattern: string | null;
+  /** The worn catalogue card animation, for the same reason. */
+  animation: string | null;
   onPick: (
     cardId: string,
     printingId: string | null,
@@ -1103,6 +1128,7 @@ function AddToShowcase({
             effect={effect}
             border={border}
             pattern={pattern}
+            animation={animation}
           />
         </View>
 
@@ -1205,6 +1231,7 @@ function DressModal({
   effect,
   border,
   pattern,
+  animation,
   onClose,
   onDress,
   onDressAll,
@@ -1222,6 +1249,8 @@ function DressModal({
   border: string | null;
   /** The worn catalogue holo pattern, for the same reason. */
   pattern: string | null;
+  /** The worn catalogue card animation, for the same reason. */
+  animation: string | null;
   onClose: () => void;
   onDress: (entryId: string, frame: string | null, holo: string | null) => void;
   /** Resolves true when the write landed, so the button can say so. */
@@ -1354,6 +1383,7 @@ function DressModal({
                   effect={effect}
                   border={border}
                   pattern={pattern}
+                  animation={animation}
                 />
                 <Tap
                   disabled={!next}
