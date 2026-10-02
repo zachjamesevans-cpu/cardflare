@@ -7,6 +7,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
+import { binderSummary, type BinderSummary } from "@/lib/binder/binder";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
@@ -102,6 +103,12 @@ export interface PublicProfile {
    * everybody. Public because the badge is the point of it.
    */
   organizerAt: OrganizerStore[];
+  /**
+   * The trade binder's panel facts, for whoever is looking: null when
+   * the binder is private and the viewer is not its owner, so the
+   * panel is simply absent. The owner always gets one, cards or not.
+   */
+  binder: BinderSummary | null;
   joinedAt: string;
 }
 
@@ -138,7 +145,7 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt] = await Promise.all([
+  const [hunts, avatarUrl, showcase, organizerAt, binder] = await Promise.all([
     huntsFor(playerId, viewerId),
     /*
      * Resolved to a src here rather than at every render point, and
@@ -150,6 +157,7 @@ async function loadProfile(
     verifiedAvatar(playerId, avatarPathFor(player)),
     listShowcase(playerId),
     organizerStoresFor(playerId),
+    binderSummary(playerId, viewerId),
   ]);
 
   return {
@@ -176,6 +184,7 @@ async function loadProfile(
     },
     showcase,
     organizerAt,
+    binder,
     joinedAt: player.created_at,
   };
 }
@@ -250,8 +259,12 @@ async function verifiedAvatar(
  * forgetting to strip it is impossible: the return type has no field to
  * put it in.
  */
-export async function publicProfile(playerId: string): Promise<PublicProfile | null> {
-  const full = await loadProfile(playerId, null);
+export async function publicProfile(
+  playerId: string,
+  /* Who is looking, for the binder: whether it opens, and "N on your hunts". */
+  viewerId: string | null = null,
+): Promise<PublicProfile | null> {
+  const full = await loadProfile(playerId, viewerId);
   if (!full) return null;
 
   /*

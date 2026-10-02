@@ -1,3 +1,4 @@
+import { absoluteImageUrls } from "@/lib/api/absolute";
 import { z } from "zod";
 
 import { apiPlayer, badRequest, forgetApiPlayer, unauthorized } from "@/lib/api/auth";
@@ -117,6 +118,8 @@ export async function GET(request: Request): Promise<Response> {
       pro: tierAllows(profile.tier, "cosmetics"),
       /* The stores that named them an organizer: the TO chip. */
       organizerAt: profile.organizerAt,
+      /* The binder's panel, always present for the owner. */
+      binder: absoluteImageUrls(profile.binder),
       /* How they want the Feed drawn. Sent with the profile because the
          settings screen lives here and the Feed asks the same answer. */
       feedView: await feedViewFor(player.playerId),
