@@ -434,6 +434,7 @@ export function CardImageZoom({
   siblings,
   position = 0,
   thumbClassName,
+  thumbSizes,
   thumb,
 }: {
   imageUrl: string | null;
@@ -485,6 +486,8 @@ export function CardImageZoom({
   have?: ZoomHave | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
+  /** The thumbnail's drawn width for the image optimiser, when it is not the 56px default. */
+  thumbSizes?: string;
   /**
    * A ready-made thumbnail to open from, replacing the default
    * CardThumbnail. The showcase renders its cards through CosmeticCard
@@ -923,6 +926,7 @@ export function CardImageZoom({
       enabled={enabled}
       anyPrinting={anyPrinting}
       className={thumbClassName}
+      sizes={thumbSizes}
     />
   );
 

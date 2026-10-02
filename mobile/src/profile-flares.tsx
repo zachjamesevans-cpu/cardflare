@@ -21,7 +21,8 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
  */
 
 /** The space between tiles, and how many sit across. */
-const GAP = spacing(2);
+/* A hairline between tiles, the way a social grid draws them. */
+const GAP = 2;
 const ACROSS = 3;
 
 /** "7 Flares", "1 Flare". */
@@ -80,9 +81,12 @@ export function ProfileFlares({
           <Muted>No Flares up.</Muted>
         )
       ) : (
+        /* A grid the way a social profile draws one: three across, a
+           hairline between tiles, nothing under them. The direction
+           rides the foot of the art as a small chip. */
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
           {flares.map((flare, index) => (
-            <View key={flare.id} style={{ width, gap: spacing(1) }}>
+            <View key={flare.id} style={{ width }}>
               <CardImage
                 imageUrl={flare.imageUrl}
                 width={width}
@@ -97,15 +101,15 @@ export function ProfileFlares({
               {/* Which way it points, in the two words the whole product
                   uses for a Flare's direction. */}
               <View
+                pointerEvents="none"
                 style={{
-                  alignSelf: "flex-start",
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor:
-                    flare.direction === "want" ? colors.accent : colors.border,
+                  position: "absolute",
+                  left: 4,
+                  bottom: 4,
+                  borderRadius: 4,
                   backgroundColor:
-                    flare.direction === "want" ? colors.accent : colors.elevated,
-                  paddingHorizontal: spacing(1.5),
+                    flare.direction === "want" ? colors.accent : "rgba(0,0,0,0.8)",
+                  paddingHorizontal: 4,
                   paddingVertical: 1,
                 }}
               >

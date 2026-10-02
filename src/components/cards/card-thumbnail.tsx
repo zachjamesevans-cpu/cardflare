@@ -65,11 +65,13 @@ function Art({
   imageUrl,
   exactName,
   cardNumber,
+  sizes,
   onFail,
 }: {
   imageUrl: string;
   exactName: string;
   cardNumber: string;
+  sizes: string;
   onFail: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -79,7 +81,7 @@ function Art({
       src={imageUrl}
       alt={cardImageAlt(exactName, cardNumber)}
       fill
-      sizes="56px"
+      sizes={sizes}
       className={cn(
         "object-cover transition-opacity duration-[var(--duration-base)]",
         loaded ? "opacity-100" : "opacity-0",
@@ -97,12 +99,21 @@ export function CardThumbnail({
   enabled,
   anyPrinting = false,
   className,
+  sizes = "56px",
 }: {
   imageUrl: string | null;
   exactName: string;
   cardNumber: string;
   /** Resolved on the server from NEXT_PUBLIC_ENABLE_CARD_IMAGES. */
   enabled: boolean;
+  /**
+   * How wide the picture is drawn, for the image optimiser. The default
+   * is the 56px every shelf and row uses. A tile that fills a grid
+   * column MUST say so, or the optimiser hands back a 56px picture and
+   * the browser stretches it: the founder saw a profile of "white
+   * blurry" cards that "take forever to load".
+   */
+  sizes?: string;
   /**
    * The artwork is a stand-in for whichever version turns up.
    *
@@ -140,6 +151,7 @@ export function CardThumbnail({
           imageUrl={imageUrl}
           exactName={exactName}
           cardNumber={cardNumber}
+          sizes={sizes}
           onFail={() => setFailed(true)}
         />
       )}
