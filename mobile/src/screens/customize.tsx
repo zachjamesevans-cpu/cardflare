@@ -15,6 +15,7 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
+import { WornBackground, drawsBackground, drawsPattern } from "../cosmetic-paint";
 import { WornAura, WornRing } from "../cosmetic-worn";
 import { WornBadge, WornName, WornTitle } from "../worn-name";
 import {
@@ -121,7 +122,8 @@ function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) 
     return <WornTitle title={slug} />;
   }
 
-  /* A card border previews on a card, because that is where it goes. */
+  /* A card border previews on a card, because that is where it goes;
+     a holo pattern the same, on an empty face. */
   if (kind === "border" && drawsBorder(slug)) {
     return (
       <CosmeticCard
@@ -132,6 +134,44 @@ function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) 
         effect={null}
         border={slug}
       />
+    );
+  }
+
+  if (kind === "pattern" && drawsPattern(slug)) {
+    return (
+      <CosmeticCard
+        imageUrl={null}
+        width={PREVIEW - 8}
+        frame={null}
+        holo={null}
+        effect={null}
+        pattern={slug}
+      />
+    );
+  }
+
+  /* A showcase background previews as the panel it paints: the
+     website's 16:10 swatch, at the tile's height. */
+  if (kind === "background" && drawsBackground(slug)) {
+    return (
+      <View
+        style={{
+          width: SWATCH.w,
+          height: SWATCH.h,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.canvas,
+          overflow: "hidden",
+        }}
+      >
+        <WornBackground
+          background={slug}
+          width={SWATCH.w - 2}
+          height={SWATCH.h - 2}
+          radius={7}
+        />
+      </View>
     );
   }
 
@@ -169,6 +209,9 @@ function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) 
 
 /** Big enough to read a gradient off, small enough for a list row. */
 const PREVIEW = 36;
+
+/** The background swatch: 16:10 like the website's panel, a row tall. */
+const SWATCH = { w: Math.round(PREVIEW * 1.6), h: PREVIEW };
 
 function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
   return (
@@ -405,7 +448,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
           {area === "profile"
             ? "Profile borders, avatar effects, name styles, titles and badges are drawn here now. Profile effects, and any Rive file dropped in, still draw in full only on your web profile. Wearing one here equips it everywhere."
-            : "Card borders are drawn here now. Holo patterns, card animations, showcase backgrounds and any Rive file dropped in still draw in full only on your web profile. Wearing one here equips it everywhere."}
+            : "Card borders, holo patterns and showcase backgrounds are drawn here now. Card animations and any Rive file dropped in still draw in full only on your web profile. Wearing one here equips it everywhere."}
         </Text>
       </View>
 

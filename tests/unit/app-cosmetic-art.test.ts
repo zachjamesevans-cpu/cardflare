@@ -279,6 +279,116 @@ describe("the textures", () => {
   });
 });
 
+/**
+ * The drawing and the wiring, read off the app's source.
+ *
+ * Node has no renderer, so this proves the pattern is written over the
+ * face and the background under the shelf, not that a phone drew them;
+ * the visual pass is mobile/TESTING.md. What it does catch is the two
+ * ways this has gone wrong before: a layer rendered on the wrong side
+ * of an opaque face, and a screen that quietly stopped passing a slug.
+ */
+describe("holo patterns and showcase backgrounds, in the app", () => {
+  const app = (path: string) =>
+    readFileSync(resolve(import.meta.dirname, "../../mobile/src", path), "utf8");
+  const paint = app("cosmetic-paint.tsx");
+  const card = app("cosmetic-card.tsx");
+  const zoom = app("showcase-zoom.tsx");
+  const own = app("screens/profile.tsx");
+  const theirs = app("screens/player-profile.tsx");
+  const customize = app("screens/customize.tsx");
+
+  it("loads Skia guarded and deferred, like every other kit", () => {
+    expect(paint).toMatch(
+      /try \{\s*cached = makeKit\(require\("@shopify\/react-native-skia"\)\);/,
+    );
+    expect(paint).not.toMatch(/^import .* from "@shopify\/react-native-skia"/m);
+  });
+
+  it("caps a tiled layer so a zoomed screentone cannot drop frames", () => {
+    expect(paint).toContain("const CELL_CAP = 900;");
+    expect(paint).toMatch(/if \(cells <= CELL_CAP\) return tile;/);
+  });
+
+  it("builds texture paths once per kit, not per frame", () => {
+    expect(paint).toMatch(/const TEXTURE = texturePaths\(S\);/);
+    for (const name of Object.keys(TEXTURE_ART)) {
+      /* Every mark the data names is reachable by the renderer. */
+      expect(TEXTURE_ART[name].viewBox.w).toBeGreaterThan(0);
+    }
+  });
+
+  it("draws the pattern over the art and the foil, under the effects", () => {
+    const face = card.slice(
+      card.indexOf("const face = ("),
+      card.indexOf("if (edge) {"),
+    );
+    const pattern = face.indexOf("<WornPattern pattern={pattern}");
+    expect(pattern).toBeGreaterThan(-1);
+    expect(pattern).toBeGreaterThan(face.indexOf("<kit.Foil"));
+    expect(pattern).toBeGreaterThan(face.indexOf("<RemoteImage"));
+    expect(pattern).toBeLessThan(face.indexOf('effect === "shimmer"'));
+    /* Sized to the face, inside the border, at the face's own radius. */
+    expect(card).toContain("face(width - EDGE * 2, height - EDGE * 2, FACE_RADIUS)");
+    expect(card).toContain("face(width, height, 6)");
+  });
+
+  it("dresses every showcase card, and only showcase cards", () => {
+    /* The shelf, the add tile and the dressing sheet on your own
+       profile; the shelf and the zoom on somebody else's. */
+    expect(own.match(/pattern=\{profile\.equips\?\.pattern \?\? null\}/g)?.length).toBe(
+      3,
+    );
+    expect(own.match(/pattern=\{pattern\}/g)?.length).toBe(2);
+    expect(theirs).toContain("pattern={profile.equips?.pattern ?? null}");
+    expect(theirs).toContain("pattern: profile.equips?.pattern ?? null,");
+    expect(zoom).toContain("pattern={entry.pattern ?? null}");
+    expect(zoom).toContain("pattern={shown.pattern ?? null}");
+
+    /* The website dresses showcase cards and no others. */
+    for (const file of [
+      "screens/store.tsx",
+      "player-peek.tsx",
+      "dressing-picker.tsx",
+    ]) {
+      expect(app(file), `${file} dresses a card outside the showcase`).not.toContain(
+        "pattern=",
+      );
+    }
+  });
+
+  it("paints the background first in a clipped, measured panel", () => {
+    for (const [source, heading] of [
+      [own, "Your showcase"],
+      [theirs, "Showcase\n"],
+    ] as const) {
+      const panel = source.slice(
+        source.lastIndexOf("<View", source.indexOf("<WornBackground")),
+      );
+      const background = panel.indexOf("<WornBackground");
+      expect(background).toBeGreaterThan(-1);
+      expect(background).toBeLessThan(panel.indexOf(heading));
+      expect(panel.slice(0, background)).toContain('overflow: "hidden"');
+      expect(panel.slice(0, background)).toContain("onLayout=");
+      expect(panel).toContain("background={profile.equips?.background ?? null}");
+    }
+  });
+
+  it("previews a pattern on a card and a background as a panel", () => {
+    const preview = customize.slice(
+      customize.indexOf("function CosmeticPreview"),
+      customize.indexOf("const PREVIEW ="),
+    );
+    expect(preview).toMatch(/kind === "pattern" && drawsPattern\(slug\)/);
+    expect(preview).toContain("pattern={slug}");
+    expect(preview).toMatch(/kind === "background" && drawsBackground\(slug\)/);
+    expect(preview).toContain("<WornBackground");
+    expect(customize).toContain(
+      "const SWATCH = { w: Math.round(PREVIEW * 1.6), h: PREVIEW };",
+    );
+  });
+});
+
 describe("what the app still approximates", () => {
   it("says so, rather than guessing", () => {
     /* Card animations and profile scenes keep their stand-in, and

@@ -23,6 +23,8 @@ export type ZoomedCard = {
   id?: string;
   /** The catalogue border worn on the owner's cards, when one is. */
   border?: string | null;
+  /** The catalogue holo pattern worn across the owner's cards. */
+  pattern?: string | null;
   name: string;
   number?: string;
   imageUrl: string | null;
@@ -69,7 +71,13 @@ export function ShowcaseZoom({
   const large = Math.min(window.width - spacing(12), 340);
 
   const shelf = cards && cards.length > 1 ? cards : null;
-  const opened = shelf && card ? Math.max(0, shelf.findIndex((c) => c.id === card.id)) : 0;
+  const opened =
+    shelf && card
+      ? Math.max(
+          0,
+          shelf.findIndex((c) => c.id === card.id),
+        )
+      : 0;
   const [at, setAt] = useState(opened);
   useEffect(() => {
     if (card) setAt(opened);
@@ -135,7 +143,9 @@ export function ShowcaseZoom({
                       alignItems: "center",
                     }}
                     onMomentumScrollEnd={(event) => {
-                      const landed = Math.round(event.nativeEvent.contentOffset.x / page);
+                      const landed = Math.round(
+                        event.nativeEvent.contentOffset.x / page,
+                      );
                       if (landed >= 0 && landed < shelf.length) setAt(landed);
                       scrolled.current = false;
                     }}
@@ -155,6 +165,7 @@ export function ShowcaseZoom({
                           holo={entry.holo}
                           effect={entry.effect}
                           border={entry.border ?? null}
+                          pattern={entry.pattern ?? null}
                         />
                       </Pressable>
                     ))}
@@ -169,15 +180,23 @@ export function ShowcaseZoom({
                     holo={shown.holo}
                     effect={shown.effect}
                     border={shown.border ?? null}
+                    pattern={shown.pattern ?? null}
                   />
                 </Pressable>
               )}
-              <Pressable onPress={onClose} style={{ alignItems: "center", gap: spacing(1) }}>
-                <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+              <Pressable
+                onPress={onClose}
+                style={{ alignItems: "center", gap: spacing(1) }}
+              >
+                <Text
+                  style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}
+                >
                   {shown.name}
                 </Text>
                 {shown.number ? (
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>{shown.number}</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {shown.number}
+                  </Text>
                 ) : null}
                 {/* The note travels with the card: the tile has no room
                     for it, so under the big card is where it gets read. */}
@@ -197,7 +216,13 @@ export function ShowcaseZoom({
                     {shown.note}
                   </Text>
                 ) : null}
-                <Text style={{ color: colors.textMuted, fontSize: 12, paddingTop: spacing(1) }}>
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 12,
+                    paddingTop: spacing(1),
+                  }}
+                >
                   Tap anywhere to close
                 </Text>
               </Pressable>
