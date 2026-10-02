@@ -316,7 +316,7 @@ function ZoomActionBar({
   );
 }
 
-/** A small link under the zoom's button: the room's "Add a note", "+ Add another card". */
+/** A small link under the zoom's button: the room's "Add a note". */
 function ZoomLink({
   label,
   onPress,
@@ -464,22 +464,24 @@ function offeredStrip(count: number): string {
  * screen." Round 12's bar sent on the spot, with a note field and a
  * pick mode beside it, and read as a checkout.
  *
- * So the foot of the panel is, at most: two short muted lines, one
- * button that adds this card (and reads "Added to your offer" with a
- * check once it has; tapping again takes it out), "Review offer · N
- * cards" once anything is added, and "+ Add another card", which walks
- * the shelf to the next card not yet added. No box, no dividers, no
- * note: the note lives on the review, and so does the only pending
- * state. A card that is found, already offered or sent this session
- * keeps its strip in place of the lines and the button.
+ * So the foot of the panel is, at most: one button that adds this
+ * card (and reads "Added to your offer" with a check once it has;
+ * tapping again takes it out), and "Review offer · N cards" once
+ * anything is added. Round 14 took out the two lines that explained
+ * the button and the link that walked the shelf: the founder, "It
+ * doesn't need to be explained" and "It doesn't do anything." What
+ * remains above the button is one fact, "Somebody already offered. You
+ * can too.", on a card somebody else already answered; an offer is
+ * never gated on that. No box, no dividers, no note: the note lives
+ * on the review, and so does the only pending state. A card that is
+ * found, already offered or sent this session keeps its strip in place
+ * of the button.
  */
 function ZoomHaveForm({
   have,
   picks,
   onPicks,
   sent,
-  next,
-  onNext,
   onReview,
 }: {
   /** The card on screen, or null when it has nothing to offer. */
@@ -489,9 +491,6 @@ function ZoomHaveForm({
   onPicks: (picks: ZoomPicks) => void;
   /** The last send from this zoom, so its cards read as offered now. */
   sent: ZoomSent | null;
-  /** The next card on the shelf not yet added, or null when none. */
-  next: number | null;
-  onNext: (index: number) => void;
   /** Opens the review, where the offer is sent. */
   onReview: () => void;
 }) {
@@ -541,7 +540,7 @@ function ZoomHaveForm({
     );
   }
 
-  if (!strip && !addable && count === 0 && next === null) return null;
+  if (!strip && !addable && count === 0) return null;
 
   const toggle = () => {
     if (!have) return;
@@ -558,14 +557,9 @@ function ZoomHaveForm({
       {strip}
       {addable && have ? (
         <>
-          <View style={{ alignItems: "center" }}>
-            <Text style={styles.zoomAsk}>
-              {have.state === "offered"
-                ? "Somebody already offered. You can too."
-                : "Have this card?"}
-            </Text>
-            <Text style={styles.zoomAsk}>Add it to your offer.</Text>
-          </View>
+          {have.state === "offered" ? (
+            <Text style={styles.zoomAsk}>Somebody already offered. You can too.</Text>
+          ) : null}
           <Tap
             onPress={toggle}
             accessibilityLabel={
@@ -586,9 +580,6 @@ function ZoomHaveForm({
       ) : null}
       {count > 0 ? (
         <Button label={tray} variant="secondary" onPress={onReview} />
-      ) : null}
-      {next !== null ? (
-        <ZoomLink label="+ Add another card" onPress={() => onNext(next)} />
       ) : null}
     </Pressable>
   );
@@ -724,30 +715,6 @@ export function CardImage({
      cards added elsewhere on the shelf. */
   const door = have ?? shelf?.find((card) => card.have)?.have ?? null;
 
-  /* Can this card still go into the offer? */
-  const addable = (card: ZoomCard | null | undefined): boolean => {
-    const h = card?.have;
-    return Boolean(
-      h &&
-      !h.youOffered &&
-      h.state !== "found" &&
-      !picks[h.flareId] &&
-      !sent?.flareIds.includes(h.flareId),
-    );
-  };
-  /* "+ Add another card": the next card along the shelf not yet added,
-     wrapping round, or null when there is none (or no shelf). */
-  let next: number | null = null;
-  if (shelf) {
-    for (let step = 1; step < shelf.length; step += 1) {
-      const index = (at + step) % shelf.length;
-      if (addable(shelf[index])) {
-        next = index;
-        break;
-      }
-    }
-  }
-
   const window = useWindowDimensions();
 
   /*
@@ -845,12 +812,6 @@ export function CardImage({
    */
   const page = hero + PEEK_GAP;
   const sidePad = (large - hero) / 2;
-
-  /* "+ Add another card": slide the rail to that card and retitle. */
-  const goTo = (index: number) => {
-    rail.current?.scrollTo({ x: index * page, animated: true });
-    setAt(index);
-  };
 
   return (
     <>
@@ -1234,15 +1195,13 @@ export function CardImage({
                 {offer ? (
                   <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
                 ) : null}
-                {have || Object.keys(picks).length > 0 || next !== null ? (
+                {have || Object.keys(picks).length > 0 ? (
                   <ZoomHaveForm
                     key={`have-${shelf ? at : "own"}`}
                     have={have}
                     picks={picks}
                     onPicks={setPicks}
                     sent={sent}
-                    next={next}
-                    onNext={goTo}
                     onReview={() => setReviewing(true)}
                   />
                 ) : null}

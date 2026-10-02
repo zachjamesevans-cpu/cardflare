@@ -62,25 +62,29 @@ const appHave = between(
   "export function CardImage(",
 );
 
-const LINES = ["Have this card?", "Add it to your offer."];
+/*
+ * Round 14 trimmed the viewer on both platforms. The founder: "delete
+ * the text that says 'Have this card? Add it to your offer.' It doesn't
+ * need to be explained", and "delete the '+ Add another card' button
+ * that's always present. It doesn't do anything."
+ */
+const GONE = ["Have this card?", "Add it to your offer.", "+ Add another card"];
 const CTA = ["I have this card", "Added to your offer"];
 const TRAY = "Review offer ·";
-const LINK = "+ Add another card";
 
 describe("the viewer builds an offer in the same words on both platforms", () => {
-  it("has the two lines, the toggle, the tray and the link", () => {
+  it("has the toggle and the tray, and no lines or link to explain them", () => {
     expect(webHave.length, "web: the have block is where it was").toBeGreaterThan(0);
     expect(appHave.length, "app: the have form is where it was").toBeGreaterThan(0);
     for (const [name, zoom] of [
       ["web", web.zoom],
       ["app", app.zoom],
     ] as const) {
-      for (const line of LINES) expect(zoom, name).toContain(line);
+      for (const line of GONE) expect(zoom, name).not.toContain(line);
       for (const label of CTA) expect(zoom, name).toContain(label);
       expect(zoom, name).toContain(TRAY);
-      expect(zoom, name).toContain(LINK);
-      /* "Somebody already offered. You can too." replaces the first line
-         on a card somebody else already answered. */
+      /* "Somebody already offered. You can too." stays as a fact about
+         the card, on the one card somebody else already answered. */
       expect(zoom, name).toContain("Somebody already offered. You can too.");
     }
   });

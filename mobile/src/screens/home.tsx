@@ -670,6 +670,30 @@ export function HomeScreen() {
     posterName: item.displayName,
     offer: async (items, message) => {
       const result = await offerItemsOnPost(item.postId, items, message);
+      /* OFFERED at once. The founder: "immediately visually show that
+         I've made an offer on it without having to refresh the feed."
+         The cards the server took are patched on this post here, so the
+         carousel's badge, the line under the card and the viewer's strip
+         all read offered before the reload confirms it. */
+      const taken = new Set(
+        items.map((line) => line.flareId).filter((id) => !result.refused.includes(id)),
+      );
+      if (taken.size > 0) {
+        setFeed((current) =>
+          current.map((entry) =>
+            entry.kind === "hunt" && entry.postId === item.postId
+              ? {
+                  ...entry,
+                  cards: entry.cards.map((card) =>
+                    card.flareId && taken.has(card.flareId)
+                      ? { ...card, state: "offered", youOffered: true }
+                      : card,
+                  ),
+                }
+              : entry,
+          ),
+        );
+      }
       void load(() => true);
       return result;
     },

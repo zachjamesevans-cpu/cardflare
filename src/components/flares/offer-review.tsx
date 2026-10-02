@@ -14,8 +14,10 @@ import { MAX_OFFER_MESSAGE } from "@/lib/matching/schema";
  * One sheet for both places an offer starts, a hunt on a profile and a
  * post in the Feed. The caller owns the selection and the server call;
  * this lists what was picked, takes the one optional message, and says
- * what happened - including which cards were answered while the offer
- * was being written, by name, so nobody wonders why two of three went.
+ * what happened - including which cards could not be taken, by name,
+ * so nobody wonders why two of three went. The server refuses a card
+ * only when it is no longer up; somebody else's offer never gates
+ * yours.
  */
 
 export interface OfferLine {
@@ -114,9 +116,7 @@ export function OfferReview({
         const names = refusedNames(outcome.refused);
         setError(
           names.length > 0
-            ? `${outcome.message ?? "Could not send the offer."} ${names.join(", ")} ${
-                names.length === 1 ? "was" : "were"
-              } answered while you were writing.`
+            ? `${outcome.message ?? "Could not send the offer."} ${names.join(", ")} could not be taken.`
             : (outcome.message ?? "Could not send the offer."),
         );
         return;
@@ -163,9 +163,8 @@ export function OfferReview({
           </p>
           {sent.refused.length > 0 && (
             <p className="text-sm text-text-secondary">
-              {refusedNames(sent.refused).join(", ")}{" "}
-              {sent.refused.length === 1 ? "was" : "were"} answered while you were
-              writing, so {sent.refused.length === 1 ? "that one" : "those"} did not go.
+              {refusedNames(sent.refused).join(", ")} could not be taken, so{" "}
+              {sent.refused.length === 1 ? "that one" : "those"} did not go.
             </p>
           )}
           <p className="text-sm text-text-secondary">

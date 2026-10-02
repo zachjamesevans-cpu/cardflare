@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -31,6 +31,7 @@ export function FlareCarousel({
 }) {
   const [at, setAt] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
+  const offered = useOfferedHere(cards);
 
   /*
    * ONE TAB STOP PER RAIL.
@@ -99,44 +100,50 @@ export function FlareCarousel({
              margin gives the room back so the cards sit where they did. */
           className="-mx-3 -my-2.5 flex snap-x snap-mandatory [scrollbar-width:none] gap-2.5 overflow-x-auto rounded-[var(--radius-control)] px-3 py-3 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
         >
-          {cards.map((card, index) => (
-            <div
-              key={card.cardId}
-              role="group"
-              aria-roledescription="slide"
-              aria-label={`${index + 1} of ${cards.length}: ${card.cardName}`}
-              className={cn(
-                "flex w-[86%] shrink-0 snap-start items-center gap-3 rounded-[var(--radius-control)] border bg-elevated/60 p-2.5 transition-colors sm:w-[70%]",
-                index === at ? "border-border-strong" : "border-border",
-              )}
-            >
-              {tiles[index]}
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <p className="line-clamp-2 text-base leading-tight font-extrabold text-text-primary">
-                  {card.cardName}
-                </p>
-                <p className="text-xs text-text-secondary">{card.cardNumber}</p>
-                <p className="mt-0.5 text-sm font-semibold text-accent tabular-nums">
-                  {cardCountLabel(card, direction)}
-                </p>
-                <p className="truncate text-xs text-text-muted">
-                  {card.printingLabel ?? "Any printing"}
-                </p>
-                {card.match && (
-                  <p className="text-xs font-semibold text-accent">
-                    {card.match === "exact"
-                      ? "You have this"
-                      : "You have another printing"}
-                  </p>
+          {cards.map((card, index) => {
+            const justOffered = Boolean(card.flareId && offered.has(card.flareId));
+            const youOffered = Boolean(card.youOffered) || justOffered;
+            /* The server's tile already wears a badge once it knows. */
+            const badge = justOffered && (card.state ?? "open") === "open";
+            return (
+              <div
+                key={card.cardId}
+                role="group"
+                aria-roledescription="slide"
+                aria-label={`${index + 1} of ${cards.length}: ${card.cardName}`}
+                className={cn(
+                  "flex w-[86%] shrink-0 snap-start items-center gap-3 rounded-[var(--radius-control)] border bg-elevated/60 p-2.5 transition-colors sm:w-[70%]",
+                  index === at ? "border-border-strong" : "border-border",
                 )}
-                {card.youOffered ? (
-                  <p className="text-xs text-text-secondary">You offered this</p>
-                ) : card.state === "offered" ? (
-                  <p className="text-xs text-text-secondary">Somebody offered</p>
-                ) : null}
+              >
+                <OfferedOverlay badge={badge}>{tiles[index]}</OfferedOverlay>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="line-clamp-2 text-base leading-tight font-extrabold text-text-primary">
+                    {card.cardName}
+                  </p>
+                  <p className="text-xs text-text-secondary">{card.cardNumber}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-accent tabular-nums">
+                    {cardCountLabel(card, direction)}
+                  </p>
+                  <p className="truncate text-xs text-text-muted">
+                    {card.printingLabel ?? "Any printing"}
+                  </p>
+                  {card.match && (
+                    <p className="text-xs font-semibold text-accent">
+                      {card.match === "exact"
+                        ? "You have this"
+                        : "You have another printing"}
+                    </p>
+                  )}
+                  {youOffered ? (
+                    <p className="text-xs text-text-secondary">You offered this</p>
+                  ) : card.state === "offered" ? (
+                    <p className="text-xs text-text-secondary">Somebody offered</p>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* The arrows, for a pointer and a keyboard. A thumb swipes. */}
@@ -179,5 +186,92 @@ export function FlareCarousel({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * OFFERED AT ONCE.
+ *
+ * The founder: "when an offer is made, immediately visually show that
+ * I've made an offer on it without having to refresh the feed...
+ * ideally, it would immediately visually update, even if it takes a
+ * second or two for it to actually update on the server." The zoom
+ * sends the offer and tells the window which cards the server took;
+ * this rail keeps the ones that are its own, so the line under the
+ * card and the badge over it change on the same paint, and the
+ * refresh that follows only confirms them.
+ */
+function useOfferedHere(cards: FeedCard[]): ReadonlySet<string> {
+  const [offered, setOffered] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    const onOffered = (event: Event) => {
+      const { flareIds } = (event as CustomEvent<{ flareIds: string[] }>).detail;
+      const mine = flareIds.filter((id) => cards.some((card) => card.flareId === id));
+      if (mine.length === 0) return;
+      setOffered((current) => new Set([...current, ...mine]));
+    };
+    window.addEventListener("cardflare:offered", onOffered);
+    return () => window.removeEventListener("cardflare:offered", onOffered);
+  }, [cards]);
+  return offered;
+}
+
+/**
+ * A one-card post has no rail: the tile sits beside its details. This
+ * is that face, on the client only so far as the carousel's slides are:
+ * it hears the same "cardflare:offered" and flips the badge and the
+ * line under the card on the same paint. The details are the server's
+ * children; only the offered line is decided here.
+ */
+export function SingleFlare({
+  card,
+  tile,
+  children,
+}: {
+  card: FeedCard;
+  tile: ReactNode;
+  children: ReactNode;
+}) {
+  const cards = useMemo(() => [card], [card]);
+  const offered = useOfferedHere(cards);
+  const justOffered = Boolean(card.flareId && offered.has(card.flareId));
+  const youOffered = Boolean(card.youOffered) || justOffered;
+  const badge = justOffered && (card.state ?? "open") === "open";
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5">
+      <OfferedOverlay badge={badge}>{tile}</OfferedOverlay>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {children}
+        {youOffered ? (
+          <p className="text-xs text-text-secondary">You offered this</p>
+        ) : card.state === "offered" ? (
+          <p className="text-xs text-text-secondary">Somebody offered</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The OFFERED badge the server's tile wears (FeedTile), drawn over a
+ * tile the server has not redrawn yet: the same word at the same foot
+ * in the same type, and the same dimming of the art, so the refresh
+ * changes nothing the eye can see.
+ */
+function OfferedOverlay({ badge, children }: { badge: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0",
+        badge && "[&_img]:opacity-50 [&_img]:grayscale",
+      )}
+    >
+      {children}
+      {badge && (
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-[6px] bg-surface/90 py-0.5 text-center text-[9px] font-bold tracking-wider text-text-secondary uppercase">
+          offered
+        </span>
+      )}
+    </span>
   );
 }
