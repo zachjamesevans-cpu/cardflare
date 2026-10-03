@@ -202,49 +202,51 @@ export function OfferReview({
             {lines.map((line) => (
               <li
                 key={line.key}
-                className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5"
+                className="flex items-stretch gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3"
               >
-                <div className="flex items-center gap-3">
-                  <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
-                    {line.imageUrl && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={line.imageUrl}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    )}
+                {/* The same row as the full list: art down the left,
+                    one aligned column beside it. */}
+                <span className="block h-[7.75rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
+                  {line.imageUrl && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={line.imageUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  )}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="truncate text-sm font-semibold text-text-primary">
+                    {line.name}
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-semibold text-text-primary">
-                      {line.name}
-                    </span>
-                    <span className="truncate text-xs text-text-muted">
-                      {line.printingLabel ?? "Any printing"}
-                    </span>
+                  <span className="truncate text-xs text-text-muted">
+                    {line.printingLabel ?? "Any printing"}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Remove ${line.name}`}
-                    onClick={() => remove(line.key)}
-                    className="shrink-0"
-                  >
-                    <X className="size-4" aria-hidden="true" />
-                    Remove
-                  </Button>
-                </div>
-                {/* How many, capped at what the line allows: the card's
-                    remaining, or its quantity before anything is found. */}
-                <div className="pl-[3.25rem]">
-                  <Stepper
-                    value={line.quantity}
-                    min={1}
-                    max={line.max}
-                    label={`copies of ${line.name}`}
-                    onChange={(value) => onQuantity(line.key, value)}
-                  />
+                  {/* How many, capped at what the line allows: the card's
+                      remaining, or its quantity before anything is found.
+                      Remove sits under the stepper, on the same left
+                      edge: beside it, it ran off a phone's width. */}
+                  <div className="mt-auto flex flex-col items-start gap-1">
+                    <Stepper
+                      value={line.quantity}
+                      min={1}
+                      max={line.max}
+                      label={`copies of ${line.name}`}
+                      onChange={(value) => onQuantity(line.key, value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove ${line.name}`}
+                      onClick={() => remove(line.key)}
+                      className="-ml-3 shrink-0"
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               </li>
             ))}

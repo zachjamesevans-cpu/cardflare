@@ -18,8 +18,9 @@ import {
   type OfferItem,
   type OfferOutcome,
 } from "./api";
-import { cardsLabel } from "./flare-copy";
+import { cardsLabel, printingLabel } from "./flare-copy";
 import { offerFailureMessage, selectionSummary } from "./offer-copy";
+import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
 import { AsyncButton, Button, ErrorLine, Input, Muted, Tap, Title } from "./ui";
@@ -28,6 +29,10 @@ import { AsyncButton, Button, ErrorLine, Input, Muted, Tap, Title } from "./ui";
 export interface OfferReviewLine {
   flareId: string;
   name: string;
+  /** The art down the left of the line; the empty frame without it. */
+  imageUrl?: string | null;
+  /** The printing asked for; "Any printing" without one. */
+  printingLabel?: string | null;
   quantity: number;
   /** The most the line allows: what the post still wants of the card. */
   max: number;
@@ -177,43 +182,93 @@ export function OfferReviewSheet({
                   contentContainerStyle={{ gap: spacing(2) }}
                 >
                   {lines.map((line) => (
+                    /* The same row as the full list: art down the left,
+                       one aligned column beside it, the stepper and
+                       Remove on one row at its foot. */
                     <View
                       key={line.flareId}
                       style={{
                         flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(2),
+                        alignItems: "stretch",
+                        gap: spacing(3),
+                        borderRadius: radius.control,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        backgroundColor: colors.elevated,
+                        padding: spacing(3),
                       }}
                     >
-                      <Text
-                        numberOfLines={1}
-                        style={{ color: colors.textPrimary, fontSize: 14, flex: 1 }}
+                      <View
+                        style={{
+                          width: 88,
+                          height: 123,
+                          flexShrink: 0,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          overflow: "hidden",
+                          backgroundColor: colors.surface,
+                        }}
                       >
-                        {line.name}
-                      </Text>
-                      <Stepper
-                        value={line.quantity}
-                        min={1}
-                        max={Math.max(1, line.max)}
-                        onChange={(value) => onChange(line.flareId, value)}
-                        label={`copies of ${line.name} you have`}
-                      />
-                      <Tap
-                        onPress={() => remove(line.flareId)}
-                        hitSlop={8}
-                        accessibilityLabel={`Remove ${line.name}`}
-                        style={{ paddingVertical: spacing(1), paddingLeft: spacing(1) }}
-                      >
+                        <RemoteImage
+                          uri={line.imageUrl}
+                          style={{ width: "100%", height: "100%" }}
+                        />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
                         <Text
+                          numberOfLines={1}
                           style={{
-                            color: colors.textSecondary,
-                            fontSize: 13,
+                            color: colors.textPrimary,
+                            fontSize: 14,
                             fontWeight: "600",
                           }}
                         >
-                          Remove
+                          {line.name}
                         </Text>
-                      </Tap>
+                        <Text
+                          numberOfLines={1}
+                          style={{ color: colors.textMuted, fontSize: 12 }}
+                        >
+                          {printingLabel(line.printingLabel)}
+                        </Text>
+                        <View
+                          style={{
+                            marginTop: "auto",
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: spacing(2),
+                          }}
+                        >
+                          <Stepper
+                            value={line.quantity}
+                            min={1}
+                            max={Math.max(1, line.max)}
+                            onChange={(value) => onChange(line.flareId, value)}
+                            label={`copies of ${line.name} you have`}
+                          />
+                          <Tap
+                            onPress={() => remove(line.flareId)}
+                            hitSlop={8}
+                            accessibilityLabel={`Remove ${line.name}`}
+                            style={{
+                              paddingVertical: spacing(1),
+                              paddingLeft: spacing(1),
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: colors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: "600",
+                              }}
+                            >
+                              Remove
+                            </Text>
+                          </Tap>
+                        </View>
+                      </View>
                     </View>
                   ))}
                 </ScrollView>

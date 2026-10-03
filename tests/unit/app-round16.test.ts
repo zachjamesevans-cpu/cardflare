@@ -339,3 +339,135 @@ describe("take down leaves the list at once", () => {
     );
   });
 });
+
+/**
+ * Round 16b: every row that lists a card with a control is one shape.
+ *
+ * The founder, on the full list after round 16 (2026-10-03): "There's
+ * a card in top left, then it like stair steps down until there's the
+ * quantity amount listed bottom right. Ideally, the card would be
+ * larger in view, and take up the whole left side of the panel. No
+ * text below it, and only text to the right and everything aligned."
+ * So: the art 88 x 123 down the left, one left-aligned column beside
+ * it, in a fixed order, and nothing stacked on the right.
+ */
+describe("the offer rows are one shape: art left, one column right", () => {
+  const sheetRow = between(src.sheet, "{open.cards.map((card) => {", "</ScrollView>");
+  const reviewLine = between(src.review, "{lines.map((line) => (", "</ScrollView>");
+  const huntRow = between(
+    src.hunt,
+    "export function HuntCardRow(",
+    "export function HuntOfferFooter(",
+  );
+
+  /** Each marker's position, in the order given; every one must exist. */
+  const order = (source: string, markers: string[]) =>
+    markers.map((marker) => {
+      const at = source.indexOf(marker);
+      expect(at, marker).toBeGreaterThan(-1);
+      return at;
+    });
+  const ascending = (positions: number[]) =>
+    positions.every((at, index) => index === 0 || at > positions[index - 1]);
+
+  it("draws the art 88 x 123 on the left of every row", () => {
+    for (const [name, source] of [
+      ["sheet", sheetRow],
+      ["review", reviewLine],
+    ] as const) {
+      expect(source, name).toContain("width: 88,");
+      expect(source, name).toContain("height: 123,");
+      expect(source, name).toContain("<RemoteImage");
+      /* The art is the first thing in the row, before the column. */
+      expect(source.indexOf("width: 88,"), name).toBeLessThan(
+        source.indexOf("flex: 1, minWidth: 0"),
+      );
+    }
+    /* The hunt page keeps the viewer on tap: CardImage, at 88 wide,
+       draws the same 88 x 123 frame (round(88 * 88 / 63) = 123). */
+    expect(huntRow).toContain("<CardImage");
+    expect(huntRow).toContain("width={88}");
+    expect(huntRow).not.toContain("width={44}");
+    expect(src.zoom).toContain("height: Math.round((width * 88) / 63),");
+    expect(huntRow.indexOf("width={88}")).toBeLessThan(
+      huntRow.indexOf("flex: 1, minWidth: 0"),
+    );
+  });
+
+  it("the full list's column reads name, meta, toggle, stepper", () => {
+    expect(
+      ascending(
+        order(sheetRow, [
+          "{card.cardName}",
+          "printingLabel(card.printingLabel)",
+          '{" · "}',
+          "wantsLine(copiesOf(card), remaining)",
+          "You offered this",
+          "I have this card",
+          '<View style={{ alignSelf: "flex-start" }}>',
+          "<Stepper",
+        ]),
+      ),
+    ).toBe(true);
+    /* The toggle spans the column; nothing stacks on the right. */
+    expect(sheetRow).toContain('alignSelf: "stretch"');
+    expect(sheetRow).not.toContain('alignItems: "flex-end"');
+    /* The art and the column are side by side, top and bottom aligned. */
+    expect(sheetRow).toContain('alignItems: "stretch"');
+    expect(sheetRow).toContain("gap: spacing(3)");
+    expect(sheetRow).toContain("gap: spacing(1.5)");
+  });
+
+  it("the review's line is the same row, stepper and Remove together", () => {
+    expect(src.review).toContain("imageUrl?: string | null;");
+    expect(src.review).toContain("printingLabel?: string | null;");
+    expect(src.sheet).toContain("imageUrl: card.imageUrl,");
+    expect(src.sheet).toContain("printingLabel: card.printingLabel,");
+    expect(
+      ascending(
+        order(reviewLine, [
+          "width: 88,",
+          "{line.name}",
+          "printingLabel(line.printingLabel)",
+          'marginTop: "auto"',
+          'justifyContent: "space-between"',
+          "<Stepper",
+          "Remove ${line.name}",
+        ]),
+      ),
+    ).toBe(true);
+    expect(reviewLine).toContain('alignItems: "stretch"');
+    expect(reviewLine).toContain("gap: spacing(1.5)");
+  });
+
+  it("the hunt page's rows, owner's and visitor's, share the shape", () => {
+    expect(
+      ascending(
+        order(huntRow, [
+          "width={88}",
+          "{card.cardName}",
+          "printingLabel(card.printingLabel)",
+          '{" · "}',
+          "wantsLine(needed, remaining)",
+          "+1 found",
+          "I have this card",
+          '<View style={{ alignSelf: "flex-start" }}>',
+          "disabled={!selected}",
+        ]),
+      ),
+    ).toBe(true);
+    /* Both controls live in the column: nothing stacks on the right. */
+    expect(huntRow).not.toContain('alignItems: "flex-end"');
+    expect(huntRow).toContain('alignSelf: "stretch"');
+    expect(huntRow).toContain('alignItems: "stretch"');
+    expect(huntRow).toContain("gap: spacing(1.5)");
+    /* The owner's +1 found and stepper sit on one row. */
+    const owner = between(
+      huntRow,
+      "{owner?.onSet && !done ? (",
+      "{owner?.onReopen ? (",
+    );
+    expect(owner).toContain('flexDirection: "row"');
+    expect(owner).toContain("<Stepper");
+  });
+});
