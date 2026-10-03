@@ -858,22 +858,28 @@ export function HuntCardRow({
   const selected = (visitor?.picked ?? 0) > 0;
 
   return (
+    /* The art down the left, one aligned column beside it: the
+       full-list sheet's row, so the two read the same. The founder:
+       "the card would be larger in view, and take up the whole left
+       side of the panel. No text below it, and only text to the right
+       and everything aligned." */
     <View
       style={{
         flexDirection: "row",
-        alignItems: "center",
-        gap: spacing(2.5),
+        alignItems: "stretch",
+        gap: spacing(3),
         borderRadius: radius.control,
         borderWidth: 1,
         borderColor: selected ? colors.accent : colors.border,
         backgroundColor: colors.surface,
-        padding: spacing(2),
+        padding: spacing(3),
         opacity: done && !owner?.onReopen ? 0.7 : 1,
       }}
     >
+      {/* 88 wide draws the 88 x 123 frame; a tap still opens the viewer. */}
       <CardImage
         imageUrl={card.imageUrl}
-        width={44}
+        width={88}
         name={card.cardName}
         cardNumber={card.cardNumber}
         caption={card.printingLabel ?? null}
@@ -881,126 +887,147 @@ export function HuntCardRow({
         siblings={shelf}
         position={position}
       />
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
         <Text
           numberOfLines={1}
-          style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}
+          style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 14 }}
         >
           {card.cardName}
         </Text>
+        {/* One meta line: the printing, the count, the want line. */}
         <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
           {printingLabel(card.printingLabel)}
-        </Text>
-        <Text
-          style={{
-            color: done ? colors.textMuted : colors.accent,
-            fontSize: 12,
-            fontWeight: "600",
-          }}
-        >
-          {`${found} of ${needed} found${done ? "" : ` · ${wantsLine(needed, remaining)}`}`}
+          {" · "}
+          <Text style={{ color: colors.textSecondary }}>
+            {`${found} of ${needed} found`}
+          </Text>
+          {" · "}
+          <Text
+            style={{
+              color: done ? colors.textMuted : colors.accent,
+              fontWeight: "600",
+            }}
+          >
+            {wantsLine(needed, remaining)}
+          </Text>
         </Text>
         {card.tradedAway ? (
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>Traded here</Text>
         ) : null}
-      </View>
 
-      {owner?.onSet && !done ? (
-        <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
-          <Tap
-            onPress={() => owner.onSet?.(found + 1)}
-            accessibilityLabel={`One more ${card.cardName} found`}
-            style={{
-              borderRadius: 999,
-              backgroundColor: colors.accent,
-              paddingHorizontal: spacing(2.5),
-              paddingVertical: 4,
-            }}
-          >
-            <Text
-              style={{ color: colors.accentContrast, fontSize: 12, fontWeight: "700" }}
-            >
-              +1 found
-            </Text>
-          </Tap>
-          <Stepper
-            value={found}
-            min={0}
-            max={needed}
-            onChange={(value) => owner.onSet?.(value)}
-            label={`copies of ${card.cardName} found`}
-          />
-        </View>
-      ) : null}
-
-      {owner?.onReopen ? (
-        <Tap
-          onPress={owner.onReopen}
-          accessibilityLabel={`Reopen ${card.cardName}`}
-          style={{
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingHorizontal: spacing(2.5),
-            paddingVertical: 4,
-          }}
-        >
-          <Text
-            style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "700" }}
-          >
-            Reopen
-          </Text>
-        </Tap>
-      ) : null}
-
-      {/* The viewer's words, the full list's words: "I have this card",
-          then "Added to your offer" with the check. The stepper is
-          always drawn, disabled until the row is ticked, so a tick
-          moves nothing below it. */}
-      {visitor && !done ? (
-        <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
-          <Tap
-            onPress={() => visitor.onPick(selected ? 0 : 1)}
-            accessibilityLabel={
-              selected
-                ? `Remove ${card.cardName} from your offer`
-                : `Add ${card.cardName} to your offer`
-            }
+        {owner?.onSet && !done ? (
+          <View
             style={{
               flexDirection: "row",
+              flexWrap: "wrap",
               alignItems: "center",
-              gap: 4,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: selected ? colors.accent : colors.borderStrong,
-              backgroundColor: selected ? colors.accent : "transparent",
-              paddingHorizontal: spacing(2.5),
-              paddingVertical: 4,
+              gap: spacing(2),
             }}
           >
-            {selected ? (
-              <Ionicons name="checkmark" size={12} color={colors.accentContrast} />
-            ) : null}
-            <Text
+            <Tap
+              onPress={() => owner.onSet?.(found + 1)}
+              accessibilityLabel={`One more ${card.cardName} found`}
               style={{
-                color: selected ? colors.accentContrast : colors.textSecondary,
-                fontSize: 12,
-                fontWeight: "700",
+                borderRadius: 999,
+                backgroundColor: colors.accent,
+                paddingHorizontal: spacing(2.5),
+                paddingVertical: 6,
               }}
             >
-              {selected ? "Added to your offer" : "I have this card"}
+              <Text
+                style={{
+                  color: colors.accentContrast,
+                  fontSize: 12,
+                  fontWeight: "700",
+                }}
+              >
+                +1 found
+              </Text>
+            </Tap>
+            <Stepper
+              value={found}
+              min={0}
+              max={needed}
+              onChange={(value) => owner.onSet?.(value)}
+              label={`copies of ${card.cardName} found`}
+            />
+          </View>
+        ) : null}
+
+        {owner?.onReopen ? (
+          <Tap
+            onPress={owner.onReopen}
+            accessibilityLabel={`Reopen ${card.cardName}`}
+            style={{
+              alignSelf: "flex-start",
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingHorizontal: spacing(2.5),
+              paddingVertical: 6,
+            }}
+          >
+            <Text
+              style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "700" }}
+            >
+              Reopen
             </Text>
           </Tap>
-          <Stepper
-            value={selected ? visitor.picked : 1}
-            min={1}
-            max={remaining}
-            disabled={!selected}
-            onChange={visitor.onPick}
-            label={`copies of ${card.cardName} you have`}
-          />
-        </View>
-      ) : null}
+        ) : null}
+
+        {/* The viewer's words, the full list's words: "I have this card",
+            then "Added to your offer" with the check, across the column.
+            The stepper under it is always drawn, disabled until the row
+            is ticked, so a tick moves nothing below it. */}
+        {visitor && !done ? (
+          <>
+            <Tap
+              onPress={() => visitor.onPick(selected ? 0 : 1)}
+              accessibilityLabel={
+                selected
+                  ? `Remove ${card.cardName} from your offer`
+                  : `Add ${card.cardName} to your offer`
+              }
+              style={{
+                alignSelf: "stretch",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: selected ? colors.accent : colors.borderStrong,
+                backgroundColor: selected ? colors.accent : "transparent",
+                paddingHorizontal: spacing(2.5),
+                paddingVertical: 6,
+              }}
+            >
+              {selected ? (
+                <Ionicons name="checkmark" size={12} color={colors.accentContrast} />
+              ) : null}
+              <Text
+                style={{
+                  color: selected ? colors.accentContrast : colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: "700",
+                }}
+              >
+                {selected ? "Added to your offer" : "I have this card"}
+              </Text>
+            </Tap>
+            <View style={{ alignSelf: "flex-start" }}>
+              <Stepper
+                value={selected ? visitor.picked : 1}
+                min={1}
+                max={remaining}
+                disabled={!selected}
+                onChange={visitor.onPick}
+                label={`copies of ${card.cardName} you have`}
+              />
+            </View>
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }

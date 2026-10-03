@@ -508,6 +508,8 @@ export function FlareFeedCard({
             return {
               flareId,
               name: card?.cardName ?? "one card",
+              imageUrl: card?.imageUrl ?? null,
+              printingLabel: card?.printingLabel ?? null,
               quantity,
               max: card ? remainingOf(card) : 1,
             };

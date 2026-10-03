@@ -106,6 +106,8 @@ export function FlareCardsSheet({
         lines={chosen.map((card) => ({
           flareId: card.flareId ?? "",
           name: card.cardName,
+          imageUrl: card.imageUrl,
+          printingLabel: card.printingLabel,
           quantity: picked[card.flareId ?? ""] ?? 1,
           max: remainingOf(card),
         }))}
@@ -176,25 +178,34 @@ export function FlareCardsSheet({
                   const remaining = remainingOf(card);
                   const can = selecting && offerable(card);
                   return (
+                    /* The art fills the left of the row, top to bottom;
+                       everything else is one left-aligned column beside
+                       it. The founder, on the first cut: "the card would
+                       be larger in view, and take up the whole left side
+                       of the panel. No text below it, and only text to
+                       the right and everything aligned." */
                     <View
                       key={card.cardId}
                       style={{
                         flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(2.5),
+                        alignItems: "stretch",
+                        gap: spacing(3),
                         borderRadius: radius.control,
                         borderWidth: 1,
                         borderColor: count > 0 ? colors.accent : colors.border,
                         backgroundColor: colors.elevated,
-                        padding: spacing(2),
+                        padding: spacing(3),
                         opacity: selecting && !can ? 0.6 : 1,
                       }}
                     >
                       <View
                         style={{
-                          width: 40,
-                          height: 56,
-                          borderRadius: 4,
+                          width: 88,
+                          height: 123,
+                          flexShrink: 0,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: colors.border,
                           overflow: "hidden",
                           backgroundColor: colors.surface,
                         }}
@@ -204,109 +215,120 @@ export function FlareCardsSheet({
                           style={{ width: "100%", height: "100%" }}
                         />
                       </View>
-                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
                         <Text
                           numberOfLines={1}
                           style={{
                             color: colors.textPrimary,
-                            fontWeight: "700",
+                            fontWeight: "600",
                             fontSize: 14,
                           }}
                         >
                           {card.cardName}
                         </Text>
+                        {/* One meta line: the printing, a middle dot, the
+                            want line in the accent. */}
                         <Text
                           numberOfLines={1}
                           style={{ color: colors.textMuted, fontSize: 12 }}
                         >
                           {printingLabel(card.printingLabel)}
-                        </Text>
-                        <Text
-                          style={{
-                            color:
-                              remaining === 0 && open.direction === "want"
-                                ? colors.textMuted
-                                : colors.accent,
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {open.direction === "showcase"
-                            ? card.state === "found"
-                              ? GONE_LABEL
-                              : availableLabel(copiesOf(card))
-                            : wantsLine(copiesOf(card), remaining)}
+                          {" · "}
+                          <Text
+                            style={{
+                              color:
+                                remaining === 0 && open.direction === "want"
+                                  ? colors.textMuted
+                                  : colors.accent,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {open.direction === "showcase"
+                              ? card.state === "found"
+                                ? GONE_LABEL
+                                : availableLabel(copiesOf(card))
+                              : wantsLine(copiesOf(card), remaining)}
+                          </Text>
                         </Text>
                         {card.youOffered ? (
                           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
                             You offered this
                           </Text>
                         ) : null}
-                      </View>
-                      {can ? (
-                        <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
-                          <Tap
-                            onPress={() =>
-                              setPicked((current) => {
-                                const next = { ...current };
-                                if (count > 0) delete next[key];
-                                else next[key] = 1;
-                                return next;
-                              })
-                            }
-                            accessibilityLabel={
-                              count > 0
-                                ? `Remove ${card.cardName} from your offer`
-                                : `Add ${card.cardName} to your offer`
-                            }
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 4,
-                              borderRadius: 999,
-                              borderWidth: 1,
-                              borderColor:
-                                count > 0 ? colors.accent : colors.borderStrong,
-                              backgroundColor:
-                                count > 0 ? colors.accent : "transparent",
-                              paddingHorizontal: spacing(2.5),
-                              paddingVertical: 4,
-                            }}
-                          >
-                            {count > 0 ? (
-                              <Ionicons
-                                name="checkmark"
-                                size={12}
-                                color={colors.accentContrast}
-                              />
-                            ) : null}
-                            <Text
+                        {can ? (
+                          <>
+                            {/* The toggle fills the column's width. */}
+                            <Tap
+                              onPress={() =>
+                                setPicked((current) => {
+                                  const next = { ...current };
+                                  if (count > 0) delete next[key];
+                                  else next[key] = 1;
+                                  return next;
+                                })
+                              }
+                              accessibilityLabel={
+                                count > 0
+                                  ? `Remove ${card.cardName} from your offer`
+                                  : `Add ${card.cardName} to your offer`
+                              }
                               style={{
-                                color:
-                                  count > 0
-                                    ? colors.accentContrast
-                                    : colors.textSecondary,
-                                fontSize: 12,
-                                fontWeight: "700",
+                                alignSelf: "stretch",
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 4,
+                                borderRadius: 999,
+                                borderWidth: 1,
+                                borderColor:
+                                  count > 0 ? colors.accent : colors.borderStrong,
+                                backgroundColor:
+                                  count > 0 ? colors.accent : "transparent",
+                                paddingHorizontal: spacing(2.5),
+                                paddingVertical: 6,
                               }}
                             >
-                              {count > 0 ? "Added to your offer" : "I have this card"}
-                            </Text>
-                          </Tap>
-                          {/* Always here, disabled until the row is ticked,
-                              so the rows below never move. */}
-                          <Stepper
-                            value={count > 0 ? count : 1}
-                            min={1}
-                            max={remaining}
-                            disabled={count === 0}
-                            onChange={(value) =>
-                              setPicked((current) => ({ ...current, [key]: value }))
-                            }
-                            label={`copies of ${card.cardName} you have`}
-                          />
-                        </View>
-                      ) : null}
+                              {count > 0 ? (
+                                <Ionicons
+                                  name="checkmark"
+                                  size={12}
+                                  color={colors.accentContrast}
+                                />
+                              ) : null}
+                              <Text
+                                style={{
+                                  color:
+                                    count > 0
+                                      ? colors.accentContrast
+                                      : colors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                {count > 0 ? "Added to your offer" : "I have this card"}
+                              </Text>
+                            </Tap>
+                            {/* Under it, left-aligned. Always here, disabled
+                                until the row is ticked, so the rows below
+                                never move. */}
+                            <View style={{ alignSelf: "flex-start" }}>
+                              <Stepper
+                                value={count > 0 ? count : 1}
+                                min={1}
+                                max={remaining}
+                                disabled={count === 0}
+                                onChange={(value) =>
+                                  setPicked((current) => ({
+                                    ...current,
+                                    [key]: value,
+                                  }))
+                                }
+                                label={`copies of ${card.cardName} you have`}
+                              />
+                            </View>
+                          </>
+                        ) : null}
+                      </View>
                     </View>
                   );
                 })}

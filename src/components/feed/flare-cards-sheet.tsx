@@ -151,68 +151,70 @@ export function FlareCardsSheet({
               <li
                 key={card.cardId}
                 className={cn(
-                  "flex flex-col gap-2 rounded-[var(--radius-control)] border bg-elevated/60 p-2.5",
+                  "flex items-stretch gap-3 rounded-[var(--radius-control)] border bg-elevated/60 p-3",
                   picked ? "border-accent" : "border-border",
                   card.state === "found" && "opacity-70",
                 )}
               >
-                <div className="flex items-start gap-3">
-                  <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
-                    {card.imageUrl && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={card.imageUrl}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    )}
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-sm font-semibold text-text-primary">
-                      {card.cardName}
-                    </p>
-                    <p className="truncate text-xs text-text-muted">
-                      {card.printingLabel ?? "Any printing"}
-                    </p>
-                    <p className="text-xs font-semibold text-accent tabular-nums">
-                      {cardCountLabel(card, direction)}
-                    </p>
-                    {card.youOffered && (
-                      <p className="text-xs text-text-secondary">You offered this</p>
-                    )}
-                  </div>
-                </div>
-                {/* Two lines, always: the toggle across the row and the
-                    stepper under it. Side by side, the added state's
-                    words spilled out of the pill at a phone's width. */}
-                {pickable && (
-                  <div className="flex flex-col gap-2 pl-[3.25rem]">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      aria-pressed={picked}
-                      onClick={() => selection.toggle(flareId)}
-                      className="w-full"
-                    >
-                      {picked && (
-                        <Check className="size-4 text-accent" aria-hidden="true" />
-                      )}
-                      {picked ? "Added to your offer" : "I have this card"}
-                    </Button>
-                    {/* Reserved from the start: disabled and dimmed
-                        until the card is added, never absent. */}
-                    <Stepper
-                      value={picked ? selection.quantity(flareId) : 1}
-                      min={1}
-                      max={remainingFor(flareId)}
-                      disabled={!picked}
-                      label={`copies of ${card.cardName} you have`}
-                      onChange={(value) => selection.setQuantity(flareId, value)}
-                      className={cn("shrink-0 self-end", !picked && "opacity-50")}
+                {/* The art fills the left of the row, top to bottom;
+                    everything else is one left-aligned column beside
+                    it. The founder, on the first cut: "the card would
+                    be larger in view, and take up the whole left side
+                    of the panel. No text below it, and only text to
+                    the right and everything aligned." */}
+                <span className="block h-[7.75rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
+                  {card.imageUrl && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={card.imageUrl}
+                      alt=""
+                      className="size-full object-cover"
                     />
-                  </div>
-                )}
+                  )}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <p className="truncate text-sm font-semibold text-text-primary">
+                    {card.cardName}
+                  </p>
+                  <p className="truncate text-xs text-text-muted">
+                    {card.printingLabel ?? "Any printing"}
+                    <span aria-hidden="true"> · </span>
+                    <span className="font-semibold text-accent tabular-nums">
+                      {cardCountLabel(card, direction)}
+                    </span>
+                  </p>
+                  {card.youOffered && (
+                    <p className="text-xs text-text-secondary">You offered this</p>
+                  )}
+                  {pickable && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        aria-pressed={picked}
+                        onClick={() => selection.toggle(flareId)}
+                        className="w-full"
+                      >
+                        {picked && (
+                          <Check className="size-4 text-accent" aria-hidden="true" />
+                        )}
+                        {picked ? "Added to your offer" : "I have this card"}
+                      </Button>
+                      {/* Reserved from the start: disabled and dimmed
+                          until the card is added, never absent. */}
+                      <Stepper
+                        value={picked ? selection.quantity(flareId) : 1}
+                        min={1}
+                        max={remainingFor(flareId)}
+                        disabled={!picked}
+                        label={`copies of ${card.cardName} you have`}
+                        onChange={(value) => selection.setQuantity(flareId, value)}
+                        className={cn("self-start", !picked && "opacity-50")}
+                      />
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

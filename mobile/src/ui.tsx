@@ -766,6 +766,18 @@ export function CardImage({
       ? have
       : (shelf?.find((card) => card.have?.flareId === flareId)?.have ?? null);
 
+  /* The picture and the printing behind a pick, for the review's
+     row: the viewer's own card, or the shelf card that carries the
+     Flare. */
+  const artOf = (
+    flareId: string,
+  ): { imageUrl: string | null; caption: string | null } => {
+    if (have?.flareId === flareId)
+      return { imageUrl: ownImageUrl, caption: ownCaption ?? null };
+    const card = shelf?.find((entry) => entry.have?.flareId === flareId);
+    return { imageUrl: card?.imageUrl ?? null, caption: card?.caption ?? null };
+  };
+
   const window = useWindowDimensions();
 
   /*
@@ -1290,6 +1302,8 @@ export function CardImage({
             lines={Object.entries(picks).map(([flareId, quantity]) => ({
               flareId,
               name: haveOf(flareId)?.name ?? "one card",
+              imageUrl: artOf(flareId).imageUrl,
+              printingLabel: artOf(flareId).caption,
               quantity,
               max: haveOf(flareId)?.remaining ?? 1,
             }))}

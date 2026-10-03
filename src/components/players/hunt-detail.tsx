@@ -363,7 +363,7 @@ export function HuntDetail({
                       label={`copies of ${card.cardName} you have`}
                       onChange={(value) => selection.setQuantity(card.requestId, value)}
                       className={cn(
-                        "shrink-0 self-end",
+                        "shrink-0 self-start",
                         !selection.has(card.requestId) && "opacity-50",
                       )}
                     />
@@ -550,49 +550,50 @@ export function HuntCardRow({
   return (
     <li
       className={cn(
-        "flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5",
+        "flex items-stretch gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3",
         card.found && "opacity-80",
       )}
     >
-      <div className="flex items-start gap-3">
-        <CardImageZoom
-          imageUrl={card.imageUrl}
-          exactName={card.cardName}
-          cardNumber={card.cardNumber}
-          enabled={cardImagesEnabled()}
-          caption={card.printingLabel}
-          anyPrinting={!card.printingId}
-          lookingFor={card.needed}
-          stillNeeds={card.remaining}
-          siblings={shelf}
-          position={position}
-          thumb={
-            <span className="block h-14 w-10 overflow-hidden rounded-[6px] border border-border bg-elevated">
-              {card.imageUrl && (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={card.imageUrl} alt="" className="size-full object-cover" />
-              )}
-            </span>
-          }
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="truncate text-sm font-semibold text-text-primary">
-            {card.cardName}
-          </p>
-          <p className="truncate text-xs text-text-muted">
-            {card.printingLabel ?? "Any printing"}
-          </p>
-          <p className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums">
-            <span className="text-text-secondary">
-              {card.foundCopies} of {card.needed} found
-            </span>
-            <span className="font-semibold text-accent">
-              {card.found ? "Found" : wantsLine(card.needed, card.remaining)}
-            </span>
-          </p>
-        </div>
+      {/* The art down the left, one aligned column beside it: the
+          full-list sheet's row, so the two read the same. */}
+      <CardImageZoom
+        imageUrl={card.imageUrl}
+        exactName={card.cardName}
+        cardNumber={card.cardNumber}
+        enabled={cardImagesEnabled()}
+        caption={card.printingLabel}
+        anyPrinting={!card.printingId}
+        lookingFor={card.needed}
+        stillNeeds={card.remaining}
+        siblings={shelf}
+        position={position}
+        thumbClassName="shrink-0"
+        thumb={
+          <span className="block h-[7.75rem] w-[5.5rem] overflow-hidden rounded-[8px] border border-border bg-elevated">
+            {card.imageUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={card.imageUrl} alt="" className="size-full object-cover" />
+            )}
+          </span>
+        }
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <p className="truncate text-sm font-semibold text-text-primary">
+          {card.cardName}
+        </p>
+        <p className="truncate text-xs text-text-muted">
+          {card.printingLabel ?? "Any printing"}
+          <span aria-hidden="true"> · </span>
+          <span className="text-text-secondary tabular-nums">
+            {card.foundCopies} of {card.needed} found
+          </span>
+          <span aria-hidden="true"> · </span>
+          <span className="font-semibold text-accent tabular-nums">
+            {card.found ? "Found" : wantsLine(card.needed, card.remaining)}
+          </span>
+        </p>
+        {control}
       </div>
-      {control && <div className="pl-[3.25rem]">{control}</div>}
     </li>
   );
 }
