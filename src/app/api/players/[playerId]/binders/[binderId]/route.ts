@@ -1,11 +1,10 @@
 import { absoluteImageUrls } from "@/lib/api/absolute";
-import { readBinder, TRADE_BINDER_ID } from "@/lib/binder/binder";
+import { readBinder } from "@/lib/binder/binder";
+import { forOldBuild } from "@/app/api/v1/binders/_shared";
 import { z } from "zod";
 import { mayLook, viewerPlayerId } from "../../look";
 
 export const dynamic = "force-dynamic";
-
-const binderIdSchema = z.union([z.literal(TRADE_BINDER_ID), z.guid()]);
 
 /**
  * One of somebody's binders. Who may ask is the profile route's rule:
@@ -17,11 +16,11 @@ export async function GET(
   { params }: { params: Promise<{ playerId: string; binderId: string }> },
 ): Promise<Response> {
   const { playerId, binderId } = await params;
-  const id = binderIdSchema.safeParse(binderId);
+  const id = z.guid().safeParse(binderId);
   if (!id.success) return Response.json({ error: "private" }, { status: 404 });
   const [allowed, me] = await Promise.all([mayLook(request), viewerPlayerId(request)]);
   if (!allowed) return Response.json({ error: "Join a room first." }, { status: 401 });
   const binder = await readBinder(playerId, me, id.data);
   if (!binder) return Response.json({ error: "private" }, { status: 404 });
-  return Response.json(absoluteImageUrls({ binder }));
+  return Response.json(absoluteImageUrls({ binder: forOldBuild(binder) }));
 }

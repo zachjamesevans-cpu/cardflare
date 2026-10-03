@@ -1,3 +1,4 @@
+import { forOldBuild } from "@/app/api/v1/binders/_shared";
 import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
@@ -142,9 +143,7 @@ export async function GET(
     /* Their hunts, so the app's profile screen draws the same panel the
        website does rather than an empty one. */
     hunts: profile.hunts,
-    /* The binder's panel: null for a private binder that is not yours. */
-    binder: absoluteImageUrls(profile.binder),
-    binders: absoluteImageUrls(profile.binders),
+    binders: absoluteImageUrls(profile.binders.map(forOldBuild)),
     flares: absoluteImageUrls(profile.flares),
     showcase: profile.showcase.map((entry) => ({
       id: entry.id,

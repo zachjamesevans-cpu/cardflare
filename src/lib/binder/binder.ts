@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { binderSessionFor, listHaves } from "@/lib/lists/haves";
+import { binderSessionFor } from "@/lib/lists/haves";
 import {
   addToBinder,
   listBinder,
@@ -11,12 +11,11 @@ import {
 import type { AddEntryInput } from "@/lib/lists/schema";
 import { afterHolderChanged } from "@/lib/nearby/matching";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
-import type { BinderCardRow, BinderRow, PlayerBinderRow } from "@/lib/supabase/types";
+import type { BinderCardRow, BinderRow } from "@/lib/supabase/types";
 import {
   DEFAULT_BINDER_COVER,
   DEFAULT_BINDER_LAYOUT,
   isBinderCover,
-  isBinderLayout,
   type BinderCoverId,
   type BinderLayout,
 } from "./covers";
@@ -24,32 +23,30 @@ import {
 /**
  * Binders.
  *
- * Two kinds, deliberately apart in the data:
+ * Every binder is one of the player's own, named by them, with ONE
+ * switch: up for trade. On, it is public to signed-in players and its
+ * cards are available to trade; off, it is private and its cards take
+ * no part in anything. The founder (2026-10-03): "a toggle to enable it
+ * as a public / trade binder. Anything that's public is up for trade.
+ * IRL people will have a trade binder of bigger cards, and sometimes a
+ * separate binder for things such as lower dollar 'playables'."
  *
- * - The TRADE binder is the Have list: `player_cards`, read through
- *   `listHaves` exactly as the room and Nearby read it, with its
- *   settings in `player_binders`. Cards in it are cards the owner will
- *   trade, so it feeds nearby matching. One per player, always first,
- *   always there for its owner. The founder: "Cards inside the Trade
- *   Binder represent cards the user is actively willing to trade."
- * - CUSTOM binders are folders and showcases ("Grails", "Deck pieces"):
- *   `binders` and `binder_cards`, their own rows, so nothing in them
- *   can reach matching, a room or an offer by sharing a row with the
- *   Have list. The founder: "These should NOT automatically participate
- *   in nearby trade matching."
+ * The cards live in `binder_cards`. The Have list (`player_cards`) is
+ * what nearby matching, the room and offers have always read, and it
+ * is DERIVED now: the union of the cards in every binder up for trade,
+ * kept in step here on every write that could change it. Nothing else
+ * in the product had to learn about binders for a card to be matched.
  *
- * Every screen asks the same two questions of either kind: "may I open
- * this one" and "which of these cards do I want". Private binders are
- * null for everyone but their owner.
+ * Every screen asks the same two questions of a binder: "may I open
+ * this one" and "which of these cards do I want". A private binder is
+ * null for everyone but its owner.
  */
 
-export type BinderKind = "trade" | "custom";
-
-export const TRADE_BINDER_ID = "trade";
-export const TRADE_BINDER_NAME = "Trade binder";
 export const BINDER_NAME_MAX = 40;
-export const MAX_CUSTOM_BINDERS = 20;
-export const MAX_CUSTOM_BINDER_CARDS = 200;
+export const MAX_BINDERS = 20;
+export const MAX_BINDER_CARDS = 200;
+/** What the migration named the binder that holds an existing Have list. */
+export const FIRST_BINDER_NAME = "Trade binder";
 
 export interface BinderCard {
   entryId: string;
@@ -65,19 +62,19 @@ export interface BinderCard {
 }
 
 export interface Binder {
-  /** "trade", or a custom binder's uuid. */
   id: string;
-  kind: BinderKind;
-  /** "Trade binder", or the name the owner gave a custom one. */
   name: string;
+  /** Up for trade: public, and its cards are on the Have list. */
+  forTrade: boolean;
+  /** The same fact as forTrade, in the word the screens have used. */
+  isPublic: boolean;
   ownerId: string;
   ownerName: string;
   /** The viewer is the owner. */
   yours: boolean;
-  isPublic: boolean;
+  /** Always 3: pages are three by three. */
   layout: BinderLayout;
   cover: BinderCoverId;
-  frontEntryId: string | null;
   /** In the owner's order: placed cards by pocket, unplaced ones first. */
   cards: BinderCard[];
   count: number;
@@ -87,23 +84,19 @@ export interface Binder {
 /** What a profile needs about a binder, without the cards. */
 export interface BinderSummary {
   id: string;
-  kind: BinderKind;
   name: string;
+  forTrade: boolean;
   isPublic: boolean;
   count: number;
   layout: BinderLayout;
   cover: BinderCoverId;
-  frontImageUrl: string | null;
   onYourHunts: number;
 }
 
 export type BinderSettingsPatch = {
-  isPublic?: boolean;
-  layout?: BinderLayout;
-  cover?: BinderCoverId;
-  frontEntryId?: string | null;
-  /** Custom binders only; ignored on the Trade binder. */
   name?: string;
+  cover?: BinderCoverId;
+  forTrade?: boolean;
 };
 
 export type BinderWriteResult =
@@ -111,39 +104,8 @@ export type BinderWriteResult =
   | { ok: false; reason: "at-cap" | "unavailable" | "not-yours" | "invalid" };
 
 /* ------------------------------------------------------------------ */
-/* Shared                                                              */
+/* Reads                                                               */
 /* ------------------------------------------------------------------ */
-
-interface Settings {
-  isPublic: boolean;
-  layout: BinderLayout;
-  cover: BinderCoverId;
-  frontEntryId: string | null;
-}
-
-/* Public by default: the founder, on the Trade binder, "Be public to
-   users in the relevant CardFlare Room / local trading context". The
-   migration's column default agrees. */
-const DEFAULT_SETTINGS: Settings = {
-  isPublic: true,
-  layout: DEFAULT_BINDER_LAYOUT,
-  cover: DEFAULT_BINDER_COVER,
-  frontEntryId: null,
-};
-
-function settingsOf(row: {
-  is_public: boolean;
-  layout: number;
-  cover: string;
-  front: string | null;
-}): Settings {
-  return {
-    isPublic: row.is_public,
-    layout: isBinderLayout(row.layout) ? row.layout : DEFAULT_BINDER_LAYOUT,
-    cover: isBinderCover(row.cover) ? row.cover : DEFAULT_BINDER_COVER,
-    frontEntryId: row.front,
-  };
-}
 
 /**
  * The cards the viewer is after: every open want on their list and
@@ -183,126 +145,18 @@ async function ownerName(playerId: string): Promise<string | null> {
 }
 
 /** Placed cards by pocket, and anything not placed yet FIRST, newest first. */
-function inOwnerOrder<T extends { position: number | null; createdAt: string }>(
+function inOwnerOrder<T extends { position: number | null; created_at: string }>(
   rows: T[],
 ): T[] {
   return [...rows].sort((a, b) => {
     if (a.position === null && b.position === null) {
-      return b.createdAt.localeCompare(a.createdAt);
+      return b.created_at.localeCompare(a.created_at);
     }
     if (a.position === null) return -1;
     if (b.position === null) return 1;
     return a.position - b.position;
   });
 }
-
-function assemble(
-  base: Pick<Binder, "id" | "kind" | "name" | "ownerId" | "ownerName" | "yours">,
-  settings: Settings,
-  cards: BinderCard[],
-): Binder {
-  /* A front card that was removed falls back to the newest one. */
-  const frontEntryId = cards.some((card) => card.entryId === settings.frontEntryId)
-    ? settings.frontEntryId
-    : (cards[0]?.entryId ?? null);
-  return {
-    ...base,
-    isPublic: settings.isPublic,
-    layout: settings.layout,
-    cover: settings.cover,
-    frontEntryId,
-    cards,
-    count: cards.length,
-    onYourHunts: cards.filter((card) => card.onYourHunt).length,
-  };
-}
-
-function summarize(binder: Binder): BinderSummary {
-  const front =
-    binder.cards.find((card) => card.entryId === binder.frontEntryId) ??
-    binder.cards[0];
-  return {
-    id: binder.id,
-    kind: binder.kind,
-    name: binder.name,
-    isPublic: binder.isPublic,
-    count: binder.count,
-    layout: binder.layout,
-    cover: binder.cover,
-    frontImageUrl: front?.imageUrl ?? null,
-    onYourHunts: binder.onYourHunts,
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* The Trade binder                                                    */
-/* ------------------------------------------------------------------ */
-
-async function readTradeSettings(playerId: string): Promise<Settings> {
-  if (!isSupabaseConfigured()) return DEFAULT_SETTINGS;
-  const { data, error } = await getSupabaseAdmin()
-    .from("player_binders")
-    .select("*")
-    .eq("player_id", playerId)
-    .maybeSingle();
-  if (error) {
-    console.error("Could not read the binder settings", error);
-    return DEFAULT_SETTINGS;
-  }
-  const row = data as PlayerBinderRow | null;
-  return row
-    ? settingsOf({
-        is_public: row.is_public,
-        layout: row.layout,
-        cover: row.cover,
-        front: row.front_entry_id,
-      })
-    : DEFAULT_SETTINGS;
-}
-
-async function readTradeBinder(
-  ownerId: string,
-  name: string,
-  viewerId: string | null,
-): Promise<Binder | null> {
-  const yours = viewerId === ownerId;
-  const settings = await readTradeSettings(ownerId);
-  if (!yours && !settings.isPublic) return null;
-
-  const [entries, wanted] = await Promise.all([
-    listHaves(ownerId),
-    yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
-  ]);
-
-  const cards: BinderCard[] = inOwnerOrder(entries).map((entry) => ({
-    entryId: entry.id,
-    cardId: entry.cardId,
-    name: entry.cardName,
-    number: entry.cardNumber,
-    imageUrl: entry.imageUrl,
-    printingLabel: entry.printingLabel,
-    quantity: entry.quantity,
-    note: entry.note,
-    onYourHunt: wanted.has(entry.cardId),
-  }));
-
-  return assemble(
-    {
-      id: TRADE_BINDER_ID,
-      kind: "trade",
-      name: TRADE_BINDER_NAME,
-      ownerId,
-      ownerName: name,
-      yours,
-    },
-    settings,
-    cards,
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Custom binders                                                      */
-/* ------------------------------------------------------------------ */
 
 interface Facts {
   name: string;
@@ -312,7 +166,7 @@ interface Facts {
 }
 
 /**
- * Names, numbers, labels and art for a custom binder's rows: the named
+ * Names, numbers, labels and art for a binder's rows: the named
  * printing's picture, or the plainest printing of the card when the
  * row names none, the same way a Flare resolves its picture.
  */
@@ -379,7 +233,7 @@ async function factsFor(rows: BinderCardRow[]): Promise<Map<string, Facts>> {
   return facts;
 }
 
-async function customRow(ownerId: string, binderId: string): Promise<BinderRow | null> {
+async function binderRow(ownerId: string, binderId: string): Promise<BinderRow | null> {
   if (!isSupabaseConfigured()) return null;
   const { data, error } = await getSupabaseAdmin()
     .from("binders")
@@ -394,7 +248,22 @@ async function customRow(ownerId: string, binderId: string): Promise<BinderRow |
   return data as BinderRow | null;
 }
 
-async function customCards(binderId: string): Promise<BinderCardRow[]> {
+async function binderRows(ownerId: string): Promise<BinderRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("binders")
+    .select("*")
+    .eq("player_id", ownerId)
+    .order("position")
+    .order("created_at");
+  if (error) {
+    console.error("Could not list the binders", error);
+    return [];
+  }
+  return (data ?? []) as BinderRow[];
+}
+
+async function cardRows(binderId: string): Promise<BinderCardRow[]> {
   const { data, error } = await getSupabaseAdmin()
     .from("binder_cards")
     .select("*")
@@ -406,22 +275,23 @@ async function customCards(binderId: string): Promise<BinderCardRow[]> {
   return (data ?? []) as BinderCardRow[];
 }
 
-async function readCustomBinder(
+function coverOf(row: BinderRow): BinderCoverId {
+  return isBinderCover(row.cover) ? row.cover : DEFAULT_BINDER_COVER;
+}
+
+async function assemble(
   row: BinderRow,
   name: string,
   viewerId: string | null,
 ): Promise<Binder | null> {
   const yours = viewerId === row.player_id;
-  if (!yours && !row.is_public) return null;
+  if (!yours && !row.for_trade) return null;
   const [rows, wanted] = await Promise.all([
-    customCards(row.id),
+    cardRows(row.id),
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
   ]);
   const facts = await factsFor(rows);
-  const ordered = inOwnerOrder(
-    rows.map((card) => ({ ...card, createdAt: card.created_at })),
-  );
-  const cards: BinderCard[] = ordered.map((card) => {
+  const cards: BinderCard[] = inOwnerOrder(rows).map((card) => {
     const fact = facts.get(card.id);
     return {
       entryId: card.id,
@@ -435,86 +305,160 @@ async function readCustomBinder(
       onYourHunt: wanted.has(card.card_id),
     };
   });
-  return assemble(
-    {
-      id: row.id,
-      kind: "custom",
-      name: row.name,
-      ownerId: row.player_id,
-      ownerName: name,
-      yours,
-    },
-    settingsOf({
-      is_public: row.is_public,
-      layout: row.layout,
-      cover: row.cover,
-      front: row.front_card_id,
-    }),
+  return {
+    id: row.id,
+    name: row.name,
+    forTrade: row.for_trade,
+    isPublic: row.for_trade,
+    ownerId: row.player_id,
+    ownerName: name,
+    yours,
+    layout: DEFAULT_BINDER_LAYOUT,
+    cover: coverOf(row),
     cards,
-  );
+    count: cards.length,
+    onYourHunts: cards.filter((card) => card.onYourHunt).length,
+  };
 }
 
-/* ------------------------------------------------------------------ */
-/* Reads                                                               */
-/* ------------------------------------------------------------------ */
+function summarize(binder: Binder): BinderSummary {
+  return {
+    id: binder.id,
+    name: binder.name,
+    forTrade: binder.forTrade,
+    isPublic: binder.isPublic,
+    count: binder.count,
+    layout: binder.layout,
+    cover: binder.cover,
+    onYourHunts: binder.onYourHunts,
+  };
+}
 
 /**
- * A binder, for whoever is looking.
- *
- * Null when the owner has no account, the binder does not exist, or it
- * is private and the viewer is not the owner. The owner always gets
- * their own Trade binder, cards or not, so the page they edit on exists
- * before the first card.
+ * A binder, for whoever is looking. Null when the owner has no
+ * account, the binder does not exist, or it is private and the viewer
+ * is not the owner.
  */
 export async function readBinder(
   ownerId: string,
   viewerId: string | null,
-  binderId: string = TRADE_BINDER_ID,
+  binderId: string,
 ): Promise<Binder | null> {
-  const name = await ownerName(ownerId);
-  if (!name) return null;
-  if (binderId === TRADE_BINDER_ID) return readTradeBinder(ownerId, name, viewerId);
-  const row = await customRow(ownerId, binderId);
-  if (!row) return null;
-  return readCustomBinder(row, name, viewerId);
+  const [name, row] = await Promise.all([
+    ownerName(ownerId),
+    binderRow(ownerId, binderId),
+  ]);
+  if (!name || !row) return null;
+  return assemble(row, name, viewerId);
 }
 
 /**
- * Every binder the viewer may open: the Trade binder first, then the
- * custom ones in the owner's order. A visitor sees only the public
- * ones; the owner sees all of theirs.
+ * Every binder the viewer may open, in the owner's order. A visitor
+ * sees only the ones up for trade; the owner sees all of theirs.
  */
 export async function listBinders(
   ownerId: string,
   viewerId: string | null,
 ): Promise<BinderSummary[]> {
-  const name = await ownerName(ownerId);
+  const [name, rows] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
   if (!name) return [];
-  const [trade, rows] = await Promise.all([
-    readTradeBinder(ownerId, name, viewerId),
-    isSupabaseConfigured()
-      ? getSupabaseAdmin()
-          .from("binders")
-          .select("*")
-          .eq("player_id", ownerId)
-          .order("position")
-          .order("created_at")
-          .then(({ data }) => (data ?? []) as BinderRow[])
-      : Promise.resolve([] as BinderRow[]),
-  ]);
-  const customs = await Promise.all(
-    rows.map((row) => readCustomBinder(row, name, viewerId)),
-  );
-  return [trade, ...customs].flatMap((binder) => (binder ? [summarize(binder)] : []));
+  const binders = await Promise.all(rows.map((row) => assemble(row, name, viewerId)));
+  return binders.flatMap((binder) => (binder ? [summarize(binder)] : []));
 }
 
-/** The Trade binder's panel facts. Same null rule as `readBinder`. */
-export async function binderSummary(
-  ownerId: string,
-  viewerId: string | null,
-): Promise<BinderSummary | null> {
-  const binder = await readBinder(ownerId, viewerId, TRADE_BINDER_ID);
-  return binder ? summarize(binder) : null;
+/**
+ * The owner's first binder up for trade, for the app build that still
+ * asks for "the" trade binder. Null when none is up.
+ */
+export async function firstTradeBinderId(ownerId: string): Promise<string | null> {
+  const rows = await binderRows(ownerId);
+  return rows.find((row) => row.for_trade)?.id ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/* The Have list, derived                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Brings one card's Have list row in step with the binders: on the
+ * list, marked available, when any binder up for trade holds it; off
+ * the list otherwise. Called after every write that could change the
+ * answer, for exactly the cards it could change.
+ */
+async function syncTradeCard(
+  playerId: string,
+  displayName: string,
+  cardId: string,
+  printingId: string | null,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const admin = getSupabaseAdmin();
+  /* Two reads rather than an embed: the hand-kept types declare no
+     relationships, so an embed would type as never. */
+  const { data: up } = await admin
+    .from("binders")
+    .select("id")
+    .eq("player_id", playerId)
+    .eq("for_trade", true);
+  const upIds = (up ?? []).map((row) => row.id);
+  let quantity = 0;
+  if (upIds.length > 0) {
+    let held = admin
+      .from("binder_cards")
+      .select("quantity")
+      .in("binder_id", upIds)
+      .eq("card_id", cardId);
+    held = printingId
+      ? held.eq("printing_id", printingId)
+      : held.is("printing_id", null);
+    const { data } = await held;
+    quantity = Math.max(0, ...(data ?? []).map((row) => row.quantity));
+  }
+
+  if (quantity > 0) {
+    const session = await binderSessionFor(playerId, displayName, true);
+    if (!session) return;
+    await addToBinder(session.id, {
+      cardId,
+      printingId,
+      quantity,
+      note: null,
+      deckLabel: null,
+    });
+    let mark = admin
+      .from("player_cards")
+      .update({ local_trade: true, quantity })
+      .eq("player_session_id", session.id)
+      .eq("card_id", cardId);
+    mark = printingId
+      ? mark.eq("printing_id", printingId)
+      : mark.is("printing_id", null);
+    await mark;
+    void afterHolderChanged(playerId, cardId);
+    return;
+  }
+
+  const session = await binderSessionFor(playerId, displayName, false);
+  if (!session) return;
+  const entries = (await listBinder(session.id)).filter(
+    (entry) => entry.cardId === cardId && entry.printingId === printingId,
+  );
+  for (const entry of entries) await removeFromBinder(entry.id, session.id);
+}
+
+/** Every card of one binder, brought in step: after a toggle or a delete. */
+async function syncTradeBinderCards(
+  playerId: string,
+  displayName: string,
+  rows: Pick<BinderCardRow, "card_id" | "printing_id">[],
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = `${row.card_id}:${row.printing_id ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    await syncTradeCard(playerId, displayName, row.card_id, row.printing_id);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -527,10 +471,10 @@ function cleanName(name: string): string | null {
   return trimmed;
 }
 
-/** A new custom binder, last in the row. */
+/** A new binder, last in the row. Private unless asked for. */
 export async function createBinder(
   playerId: string,
-  input: { name: string; cover?: BinderCoverId },
+  input: { name: string; cover?: BinderCoverId; forTrade?: boolean },
 ): Promise<
   { ok: true; id: string } | { ok: false; reason: "at-cap" | "invalid" | "unavailable" }
 > {
@@ -542,7 +486,8 @@ export async function createBinder(
     .from("binders")
     .select("id", { count: "exact", head: true })
     .eq("player_id", playerId);
-  if ((count ?? 0) >= MAX_CUSTOM_BINDERS) return { ok: false, reason: "at-cap" };
+  if ((count ?? 0) >= MAX_BINDERS) return { ok: false, reason: "at-cap" };
+  const forTrade = input.forTrade === true;
   const { data, error } = await admin
     .from("binders")
     .insert({
@@ -550,6 +495,9 @@ export async function createBinder(
       name,
       cover:
         input.cover && isBinderCover(input.cover) ? input.cover : DEFAULT_BINDER_COVER,
+      layout: DEFAULT_BINDER_LAYOUT,
+      is_public: forTrade,
+      for_trade: forTrade,
       position: count ?? 0,
     })
     .select("id")
@@ -561,107 +509,81 @@ export async function createBinder(
   return { ok: true, id: data.id };
 }
 
-/** A custom binder and its cards, gone. The Trade binder cannot be deleted. */
+/** A binder and its cards, gone; its cards leave the Have list with it. */
 export async function deleteBinder(
   playerId: string,
+  displayName: string,
   binderId: string,
 ): Promise<BinderWriteResult> {
-  if (binderId === TRADE_BINDER_ID) return { ok: false, reason: "invalid" };
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-  const { error, count } = await getSupabaseAdmin()
+  const row = await binderRow(playerId, binderId);
+  if (!row) return { ok: false, reason: "not-yours" };
+  const cards = row.for_trade ? await cardRows(binderId) : [];
+  const { error } = await getSupabaseAdmin()
     .from("binders")
-    .delete({ count: "exact" })
+    .delete()
     .eq("id", binderId)
     .eq("player_id", playerId);
   if (error) {
     console.error("Could not delete the binder", error);
     return { ok: false, reason: "unavailable" };
   }
-  return count ? { ok: true } : { ok: false, reason: "not-yours" };
+  await syncTradeBinderCards(playerId, displayName, cards);
+  return { ok: true };
 }
 
 /** Writes the settings the owner changed, and nothing else. */
 export async function saveBinderSettings(
   playerId: string,
+  displayName: string,
   patch: BinderSettingsPatch,
-  binderId: string = TRADE_BINDER_ID,
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
-  const admin = getSupabaseAdmin();
-  const now = new Date().toISOString();
-  if (binderId === TRADE_BINDER_ID) {
-    const row: Record<string, unknown> = { player_id: playerId, updated_at: now };
-    if (patch.isPublic !== undefined) row.is_public = patch.isPublic;
-    if (patch.layout !== undefined) row.layout = patch.layout;
-    if (patch.cover !== undefined) row.cover = patch.cover;
-    if (patch.frontEntryId !== undefined) row.front_entry_id = patch.frontEntryId;
-    const { error } = await admin
-      .from("player_binders")
-      .upsert(row as never, { onConflict: "player_id" });
-    if (error) console.error("Could not save the binder settings", error);
-    return;
-  }
-  const row: Record<string, unknown> = { updated_at: now };
-  if (patch.isPublic !== undefined) row.is_public = patch.isPublic;
-  if (patch.layout !== undefined) row.layout = patch.layout;
-  if (patch.cover !== undefined) row.cover = patch.cover;
-  if (patch.frontEntryId !== undefined) row.front_card_id = patch.frontEntryId;
+  binderId: string,
+): Promise<BinderWriteResult> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const before = await binderRow(playerId, binderId);
+  if (!before) return { ok: false, reason: "not-yours" };
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.name !== undefined) {
     const name = cleanName(patch.name);
-    if (name) row.name = name;
+    if (!name) return { ok: false, reason: "invalid" };
+    row.name = name;
   }
-  const { error } = await admin
+  if (patch.cover !== undefined && isBinderCover(patch.cover)) row.cover = patch.cover;
+  if (patch.forTrade !== undefined) {
+    row.for_trade = patch.forTrade;
+    row.is_public = patch.forTrade;
+  }
+  const { error } = await getSupabaseAdmin()
     .from("binders")
     .update(row as never)
     .eq("id", binderId)
     .eq("player_id", playerId);
-  if (error) console.error("Could not save the binder settings", error);
+  if (error) {
+    console.error("Could not save the binder settings", error);
+    return { ok: false, reason: "unavailable" };
+  }
+  if (patch.forTrade !== undefined && patch.forTrade !== before.for_trade) {
+    await syncTradeBinderCards(playerId, displayName, await cardRows(binderId));
+  }
+  return { ok: true };
 }
 
-/**
- * Adds a card. To the Trade binder: the Have list's own writer, and the
- * card is marked available to trade, which is what being in that binder
- * means, so nearby matching looks at once. To a custom binder: its own
- * row, which matching never reads.
- */
+/** Adds a card. In a binder up for trade, the Have list follows at once. */
 export async function addBinderCard(
   playerId: string,
   displayName: string,
   input: Pick<AddEntryInput, "cardId" | "printingId" | "quantity">,
-  binderId: string = TRADE_BINDER_ID,
+  binderId: string,
 ): Promise<BinderWriteResult> {
-  if (binderId === TRADE_BINDER_ID) {
-    const session = await binderSessionFor(playerId, displayName, true);
-    if (!session) return { ok: false, reason: "unavailable" };
-    const result = await addToBinder(session.id, {
-      cardId: input.cardId,
-      printingId: input.printingId,
-      quantity: input.quantity,
-      note: null,
-      deckLabel: null,
-    });
-    if (!result.ok) return { ok: false, reason: result.reason };
-    let mark = getSupabaseAdmin()
-      .from("player_cards")
-      .update({ local_trade: true })
-      .eq("player_session_id", session.id)
-      .eq("card_id", input.cardId);
-    mark = input.printingId
-      ? mark.eq("printing_id", input.printingId)
-      : mark.is("printing_id", null);
-    await mark;
-    void afterHolderChanged(playerId, input.cardId);
-    return { ok: true };
-  }
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-  const row = await customRow(playerId, binderId);
+  const row = await binderRow(playerId, binderId);
   if (!row) return { ok: false, reason: "not-yours" };
   const admin = getSupabaseAdmin();
   const { count } = await admin
     .from("binder_cards")
     .select("id", { count: "exact", head: true })
     .eq("binder_id", binderId);
-  if ((count ?? 0) >= MAX_CUSTOM_BINDER_CARDS) return { ok: false, reason: "at-cap" };
+  if ((count ?? 0) >= MAX_BINDER_CARDS) return { ok: false, reason: "at-cap" };
   const { error } = await admin.from("binder_cards").insert({
     binder_id: binderId,
     card_id: input.cardId,
@@ -673,25 +595,30 @@ export async function addBinderCard(
     console.error("Could not add to the binder", error);
     return { ok: false, reason: "unavailable" };
   }
+  if (row.for_trade)
+    await syncTradeCard(playerId, displayName, input.cardId, input.printingId);
   return { ok: true };
 }
 
 /** Removes one of the owner's own cards. Somebody else's id is refused. */
 export async function removeBinderCard(
   playerId: string,
+  displayName: string,
   entryId: string,
-  binderId: string = TRADE_BINDER_ID,
+  binderId: string,
 ): Promise<BinderWriteResult> {
-  if (binderId === TRADE_BINDER_ID) {
-    const session = await binderSessionFor(playerId, "", false);
-    if (!session) return { ok: false, reason: "not-yours" };
-    const removed = await removeFromBinder(entryId, session.id);
-    return removed ? { ok: true } : { ok: false, reason: "not-yours" };
-  }
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-  const row = await customRow(playerId, binderId);
+  const row = await binderRow(playerId, binderId);
   if (!row) return { ok: false, reason: "not-yours" };
-  const { error } = await getSupabaseAdmin()
+  const admin = getSupabaseAdmin();
+  const { data: entry } = await admin
+    .from("binder_cards")
+    .select("card_id, printing_id")
+    .eq("id", entryId)
+    .eq("binder_id", binderId)
+    .maybeSingle();
+  if (!entry) return { ok: false, reason: "not-yours" };
+  const { error } = await admin
     .from("binder_cards")
     .delete()
     .eq("id", entryId)
@@ -700,6 +627,8 @@ export async function removeBinderCard(
     console.error("Could not remove a card from the binder", error);
     return { ok: false, reason: "unavailable" };
   }
+  if (row.for_trade)
+    await syncTradeCard(playerId, displayName, entry.card_id, entry.printing_id);
   return { ok: true };
 }
 
@@ -712,28 +641,15 @@ export async function removeBinderCard(
 export async function saveBinderOrder(
   playerId: string,
   entryIds: string[],
-  binderId: string = TRADE_BINDER_ID,
+  binderId: string,
 ): Promise<BinderWriteResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-  const admin = getSupabaseAdmin();
-
-  let own: { id: string; position: number | null }[];
-  if (binderId === TRADE_BINDER_ID) {
-    const session = await binderSessionFor(playerId, "", false);
-    if (!session) return { ok: false, reason: "not-yours" };
-    own = (await listBinder(session.id)).map((entry) => ({
-      id: entry.id,
-      position: entry.position,
-    }));
-  } else {
-    const row = await customRow(playerId, binderId);
-    if (!row) return { ok: false, reason: "not-yours" };
-    own = (await customCards(binderId)).map((card) => ({
-      id: card.id,
-      position: card.position,
-    }));
-  }
-
+  const row = await binderRow(playerId, binderId);
+  if (!row) return { ok: false, reason: "not-yours" };
+  const own = (await cardRows(binderId)).map((card) => ({
+    id: card.id,
+    position: card.position,
+  }));
   const ownIds = new Set(own.map((entry) => entry.id));
   const placed = entryIds.filter(
     (id, index) => ownIds.has(id) && entryIds.indexOf(id) === index,
@@ -743,16 +659,14 @@ export async function saveBinderOrder(
     .sort((a, b) => (a.position ?? -1) - (b.position ?? -1))
     .map((entry) => entry.id);
   const order = [...placed, ...rest];
-
+  const admin = getSupabaseAdmin();
   const results = await Promise.all(
     order.map((id, position) =>
-      binderId === TRADE_BINDER_ID
-        ? admin.from("player_cards").update({ position }).eq("id", id)
-        : admin
-            .from("binder_cards")
-            .update({ position })
-            .eq("id", id)
-            .eq("binder_id", binderId),
+      admin
+        .from("binder_cards")
+        .update({ position })
+        .eq("id", id)
+        .eq("binder_id", binderId),
     ),
   );
   const failed = results.find((result) => result.error);
