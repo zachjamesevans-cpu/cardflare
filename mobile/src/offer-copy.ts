@@ -3,8 +3,8 @@
  *
  * A copy of `src/lib/feed/offer-copy.ts`, by hand, because the app
  * cannot import across the workspace boundary. The website's
- * `tests/unit/round12-parity.test.ts` reads both and fails if the
- * sentences drift.
+ * `tests/unit/round12-parity.test.ts` and `round16-parity.test.ts`
+ * read both and fail if the sentences drift.
  */
 
 export type OfferFailure =
@@ -41,7 +41,44 @@ export function offeredLine(cards: { name: string; quantity: number }[]): string
   return `Offered ${listOf(names)}.`;
 }
 
-/** The button, by how many cards are picked. */
-export function offerButtonLabel(count: number): string {
-  return count <= 1 ? "Offer this card" : `Offer ${count} cards`;
+/** "Review offer · 1 card" / "Review offer · 3 cards". The dot is U+00B7. */
+export function reviewLabel(count: number): string {
+  return `Review offer · ${count} ${count === 1 ? "card" : "cards"}`;
+}
+
+/**
+ * "1 in your offer" / "3 in your offer": under a post while the viewer
+ * is closed, so the picks it holds are never out of sight. "Review"
+ * sits beside it.
+ */
+export function inYourOfferLine(count: number): string {
+  return `${count} in your offer`;
+}
+
+/** "See all 4 cards", on the carousel's dots row. */
+export function seeAllLabel(count: number): string {
+  return `See all ${count} ${count === 1 ? "card" : "cards"}`;
+}
+
+/**
+ * "2 cards · 3 copies" ("1 card · 1 copy"). Cards and copies stay two
+ * numbers, and nothing else: "selected" wrapped the line at phone
+ * width.
+ */
+export function selectionSummary(cards: number, copies: number): string {
+  return `${cards} ${cards === 1 ? "card" : "cards"} · ${copies} ${
+    copies === 1 ? "copy" : "copies"
+  }`;
+}
+
+/**
+ * The one line under a wanted card: "Wants 2" until something is
+ * found, "Need 1 more" once the owner has marked progress, "Found"
+ * when nothing is left. The founder: "Need 2 more" reads wrong before
+ * anything is found.
+ */
+export function wantsLine(quantity: number, remaining: number): string {
+  if (remaining <= 0) return "Found";
+  if (remaining === quantity) return `Wants ${quantity}`;
+  return `Need ${remaining} more`;
 }

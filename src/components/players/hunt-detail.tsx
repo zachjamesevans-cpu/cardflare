@@ -15,7 +15,6 @@ import {
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import {
   OfferReview,
-  selectionSummary,
   useSelection,
   type OfferLine,
 } from "@/components/flares/offer-review";
@@ -25,6 +24,7 @@ import { Select, TextInput, Textarea } from "@/components/ui/controls";
 import { Stepper } from "@/components/ui/stepper";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
+import { reviewLabel, selectionSummary, wantsLine } from "@/lib/feed/offer-copy";
 import { setRequestFoundAction, updateHuntAction } from "@/lib/players/hunt-actions";
 import { offerOnHuntAction } from "@/lib/players/hunt-offer-actions";
 import type { HuntOfferOutcome } from "@/lib/players/hunt-offers";
@@ -174,6 +174,7 @@ export function HuntDetail({
               imageUrl: card.imageUrl,
               printingLabel: card.printingLabel,
               quantity,
+              max: card.remaining,
             },
           ]
         : [];
@@ -332,27 +333,40 @@ export function HuntDetail({
                     Sign in to offer
                   </Link>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={selection.has(card.requestId)}
-                        onChange={() => selection.toggle(card.requestId)}
-                        className="size-5 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
-                      />
-                      Offer this card
-                    </label>
-                    {selection.has(card.requestId) && (
-                      <Stepper
-                        value={selection.quantity(card.requestId)}
-                        min={1}
-                        max={card.remaining}
-                        label={`copies of ${card.cardName} you have`}
-                        onChange={(value) =>
-                          selection.setQuantity(card.requestId, value)
-                        }
-                      />
-                    )}
+                  /* The viewer's words, and the stepper's room kept
+                     from the start: see flare-cards-sheet. */
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      aria-pressed={selection.has(card.requestId)}
+                      onClick={() => selection.toggle(card.requestId)}
+                      className="w-full"
+                    >
+                      {selection.has(card.requestId) && (
+                        <Check className="size-4 text-accent" aria-hidden="true" />
+                      )}
+                      {selection.has(card.requestId)
+                        ? "Added to your offer"
+                        : "I have this card"}
+                    </Button>
+                    <Stepper
+                      value={
+                        selection.has(card.requestId)
+                          ? selection.quantity(card.requestId)
+                          : 1
+                      }
+                      min={1}
+                      max={card.remaining}
+                      disabled={!selection.has(card.requestId)}
+                      label={`copies of ${card.cardName} you have`}
+                      onChange={(value) => selection.setQuantity(card.requestId, value)}
+                      className={cn(
+                        "shrink-0 self-end",
+                        !selection.has(card.requestId) && "opacity-50",
+                      )}
+                    />
                   </div>
                 )
               }
@@ -426,6 +440,8 @@ export function HuntDetail({
           open={review}
           onClose={() => setReview(false)}
           lines={lines}
+          onQuantity={selection.setQuantity}
+          onRemove={selection.remove}
           onSubmit={submit}
           onSent={onSent}
         />
@@ -570,13 +586,9 @@ export function HuntCardRow({
             <span className="text-text-secondary">
               {card.foundCopies} of {card.needed} found
             </span>
-            {card.found ? (
-              <span className="font-semibold text-accent">Found</span>
-            ) : (
-              <span className="font-semibold text-accent">
-                Need {card.remaining} more
-              </span>
-            )}
+            <span className="font-semibold text-accent">
+              {card.found ? "Found" : wantsLine(card.needed, card.remaining)}
+            </span>
           </p>
         </div>
       </div>
@@ -601,7 +613,7 @@ export function HuntOfferFooter({
         {selectionSummary(cards, copies)}
       </p>
       <Button type="button" size="sm" onClick={onContinue} className="shrink-0">
-        Continue to offer
+        {reviewLabel(cards)}
       </Button>
     </div>
   );

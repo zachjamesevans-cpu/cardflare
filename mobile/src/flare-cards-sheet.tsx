@@ -14,14 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SheetBackdrop } from "./action-menu";
 import type { FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
-import {
-  availableLabel,
-  cardsLabel,
-  GONE_LABEL,
-  needLabel,
-  printingLabel,
-  selectionLabel,
-} from "./flare-copy";
+import { availableLabel, cardsLabel, GONE_LABEL, printingLabel } from "./flare-copy";
+import { reviewLabel, selectionSummary, wantsLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
@@ -45,13 +39,22 @@ export interface FlareSheetPost {
 /**
  * Every card on a Flare, in a sheet from the bottom.
  *
- * "View all 3" opens it to read; "Offer cards" opens it to pick. The
- * two are one sheet because the second is the first with boxes: what
- * you have, how many, then "Continue to offer" into the review
+ * "View all 3" (and "See all 3 cards" on the carousel) opens it to
+ * read; "Offer cards" opens it to pick. The two are one sheet because
+ * the second is the first with a toggle on every row, reading
+ * "I have this card" and then "Added to your offer" with the check,
+ * how many, then "Review offer · N cards" into the review
  * (`OfferReviewSheet`, the same one the card viewer opens), where the
- * note and the one "Send offer" live. The offer goes as ONE call with
- * every card in it, so the poster gets one line in the thread and not
- * three.
+ * note and the one "Send offer" live. The same words as the viewer and
+ * the hunt page, on purpose: the audit found "two wordings for one
+ * action". The offer goes as ONE call with every card in it, so the
+ * poster gets one line in the thread and not three.
+ *
+ * THE ROWS DO NOT JUMP. Every row reserves its stepper's space, drawn
+ * disabled and dimmed until the row is ticked, so ticking one changes
+ * nothing below it: the audit, "ticking a card expands a stepper and
+ * pushes the rows down, so my next tap missed." The review button is
+ * drawn from the start too, disabled until something is in.
  *
  * Owners, showcase posts and finished hunts get the list and nothing
  * to press: there is nothing to offer on any of them.
@@ -104,7 +107,16 @@ export function FlareCardsSheet({
           flareId: card.flareId ?? "",
           name: card.cardName,
           quantity: picked[card.flareId ?? ""] ?? 1,
+          max: remainingOf(card),
         }))}
+        onChange={(flareId, quantity) =>
+          setPicked((current) => {
+            const next = { ...current };
+            if (quantity <= 0) delete next[flareId];
+            else next[flareId] = quantity;
+            return next;
+          })
+        }
         onSent={() => onChanged?.()}
         onBack={() => setReviewing(false)}
         onClose={onClose}
@@ -223,9 +235,7 @@ export function FlareCardsSheet({
                             ? card.state === "found"
                               ? GONE_LABEL
                               : availableLabel(copiesOf(card))
-                            : card.state === "found"
-                              ? "Found"
-                              : needLabel(remaining)}
+                            : wantsLine(copiesOf(card), remaining)}
                         </Text>
                         {card.youOffered ? (
                           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
@@ -246,41 +256,55 @@ export function FlareCardsSheet({
                             }
                             accessibilityLabel={
                               count > 0
-                                ? `Unselect ${card.cardName}`
-                                : `Offer ${card.cardName}`
+                                ? `Remove ${card.cardName} from your offer`
+                                : `Add ${card.cardName} to your offer`
                             }
                             style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 14,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              borderRadius: 999,
                               borderWidth: 1,
                               borderColor:
                                 count > 0 ? colors.accent : colors.borderStrong,
                               backgroundColor:
                                 count > 0 ? colors.accent : "transparent",
-                              alignItems: "center",
-                              justifyContent: "center",
+                              paddingHorizontal: spacing(2.5),
+                              paddingVertical: 4,
                             }}
                           >
                             {count > 0 ? (
                               <Ionicons
                                 name="checkmark"
-                                size={16}
+                                size={12}
                                 color={colors.accentContrast}
                               />
                             ) : null}
+                            <Text
+                              style={{
+                                color:
+                                  count > 0
+                                    ? colors.accentContrast
+                                    : colors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: "700",
+                              }}
+                            >
+                              {count > 0 ? "Added to your offer" : "I have this card"}
+                            </Text>
                           </Tap>
-                          {count > 0 ? (
-                            <Stepper
-                              value={count}
-                              min={1}
-                              max={remaining}
-                              onChange={(value) =>
-                                setPicked((current) => ({ ...current, [key]: value }))
-                              }
-                              label={`copies of ${card.cardName} you have`}
-                            />
-                          ) : null}
+                          {/* Always here, disabled until the row is ticked,
+                              so the rows below never move. */}
+                          <Stepper
+                            value={count > 0 ? count : 1}
+                            min={1}
+                            max={remaining}
+                            disabled={count === 0}
+                            onChange={(value) =>
+                              setPicked((current) => ({ ...current, [key]: value }))
+                            }
+                            label={`copies of ${card.cardName} you have`}
+                          />
                         </View>
                       ) : null}
                     </View>
@@ -298,14 +322,18 @@ export function FlareCardsSheet({
                     }}
                   >
                     {chosen.length > 0
-                      ? selectionLabel(chosen.length, copies)
+                      ? selectionSummary(chosen.length, copies)
                       : "Pick the cards you have."}
                   </Text>
-                  <Button
-                    label="Continue to offer"
-                    disabled={chosen.length === 0}
-                    onPress={() => setReviewing(true)}
-                  />
+                  {/* The accent as soon as one card is in; drawn disabled
+                      and dimmed before that, so its space is reserved. */}
+                  <View style={{ opacity: chosen.length > 0 ? 1 : 0.45 }}>
+                    <Button
+                      label={reviewLabel(chosen.length)}
+                      disabled={chosen.length === 0}
+                      onPress={() => setReviewing(true)}
+                    />
+                  </View>
                 </View>
               ) : canOffer ? (
                 <Button label="Offer cards" onPress={() => setSelecting(true)} />

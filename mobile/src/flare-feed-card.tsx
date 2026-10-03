@@ -5,12 +5,19 @@ import { Text, View } from "react-native";
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import type { FeedEntry } from "./api";
 import { cardsLabel } from "./flare-copy";
-import { FlareCardSlide, FlareCarousel, shelfFor } from "./flare-deck-pager";
+import {
+  FlareCardSlide,
+  FlareCarousel,
+  remainingOf,
+  shelfFor,
+} from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
+import { inYourOfferLine } from "./offer-copy";
+import { OfferReviewSheet } from "./offer-review-sheet";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
-import { Button, Tap } from "./ui";
+import { Button, Tap, type ZoomPicks } from "./ui";
 
 /**
  * One Flare on the Feed, drawn as a post.
@@ -22,10 +29,21 @@ import { Button, Tap } from "./ui";
  * costs half a screen per post.
  *
  * Every piece of behaviour is the one the Feed already had: the tap on
- * the card opens the same zoom with "Offer this card" inside it, the heart
- * and the bubble are the post's own, and the paper plane opens the same
- * conversation Local opens. New here: "Offer cards" for several at
- * once, "Update progress" on your own, and the hunt a post belongs to.
+ * the card opens the same zoom with "I have this card" inside it, the
+ * heart and the bubble are the post's own, and the paper plane opens
+ * the same conversation Local opens. New here: "Offer cards" for
+ * several at once, "Update progress" on your own, and the hunt a post
+ * belongs to.
+ *
+ * THE PICKS LIVE ON THE POST, NOT IN THE VIEWER. The audit of
+ * 2026-10-02: "Closing the viewer silently drops every picked card."
+ * So the post holds what has been added, flareId -> copies, hands it
+ * to the viewer and to the review, and keeps it when the viewer closes.
+ * While the viewer is closed and something is in, one line under the
+ * cards says "2 in your offer · Review", and Review opens the review
+ * directly. Sending, or taking everything out, clears the line. The
+ * founder's call: for the page's life, no warning dialog, nothing
+ * stored, so a reload starts clean.
  */
 
 type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
@@ -274,6 +292,11 @@ export function FlareFeedCard({
   const shelf = shelfFor(item.cards, post);
   const completed = item.completed ?? false;
   const [menu, setMenu] = useState(false);
+  /* The offer in progress on this post, and whether its review is up
+     over the Feed (the viewer draws its own while it is open). */
+  const [picks, setPicks] = useState<ZoomPicks>({});
+  const [reviewing, setReviewing] = useState(false);
+  const inOffer = Object.keys(picks).length;
   const actions = postActions({
     total: item.total,
     yours: item.yours,
@@ -438,10 +461,74 @@ export function FlareFeedCard({
           post={post}
           siblings={shelf}
           position={0}
+          picks={picks}
+          onPicks={setPicks}
         />
       ) : (
-        <FlareCarousel cards={item.cards} direction={direction} post={post} />
+        <FlareCarousel
+          cards={item.cards}
+          direction={direction}
+          post={post}
+          picks={picks}
+          onPicks={setPicks}
+          onSeeAll={onViewAll}
+        />
       )}
+
+      {/* "2 in your offer · Review": the picks stay in sight while the
+          viewer is closed, and Review is the door straight to them. */}
+      {inOffer > 0 ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+          <Ionicons name="checkmark-circle" size={15} color={colors.accent} />
+          <Text
+            style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}
+          >
+            {inYourOfferLine(inOffer)}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
+          <Tap
+            onPress={() => setReviewing(true)}
+            hitSlop={8}
+            accessibilityLabel="Review your offer"
+          >
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              Review
+            </Text>
+          </Tap>
+        </View>
+      ) : null}
+      {/* Stays up after the send, with the picks cleared, so "Sent" is
+          read; taking the last line out closes it from inside. */}
+      {reviewing ? (
+        <OfferReviewSheet
+          postId={post.postId}
+          posterName={post.posterName ?? item.displayName}
+          lines={Object.entries(picks).map(([flareId, quantity]) => {
+            const card = item.cards.find((entry) => entry.flareId === flareId);
+            return {
+              flareId,
+              name: card?.cardName ?? "one card",
+              quantity,
+              max: card ? remainingOf(card) : 1,
+            };
+          })}
+          onChange={(flareId, quantity) =>
+            setPicks((current) => {
+              const next = { ...current };
+              if (quantity <= 0) delete next[flareId];
+              else next[flareId] = quantity;
+              return next;
+            })
+          }
+          /* The same door the viewer sends through: the post's, which
+             marks the cards offered at once and reloads behind it. */
+          send={async (items, note) =>
+            (await post.offer(items, note)) ?? { offered: items.length, refused: [] }
+          }
+          onSent={() => setPicks({})}
+          onClose={() => setReviewing(false)}
+        />
+      ) : null}
 
       {/* No "All found" or "All gone" row: a finished post says it in
           its status line, where the crosshair became a check. */}

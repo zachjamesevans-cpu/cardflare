@@ -53,7 +53,8 @@ const app = {
 };
 
 /* The Feed-offer block alone, as round 13 scoped it. */
-const webHave = between(web.zoom, "interface ZoomOffers", "const OPEN_MS");
+/* Round 16 moved the picks into useOfferBuild above the block. */
+const webHave = between(web.zoom, "function ZoomHaveBlock(", "const OPEN_MS");
 const appHave = between(
   app.zoom,
   "function ZoomHaveForm(",
@@ -74,7 +75,8 @@ describe("the viewer is trimmed to the toggle and the tray on both platforms", (
       expect(have, name).not.toContain("Have this card?");
       expect(have, name).not.toContain("Add it to your offer.");
       expect(have, name).not.toContain("+ Add another card");
-      expect(have, name).toContain("Review offer ·");
+      /* Round 16: the tray's words come from reviewLabel in offer-copy. */
+      expect(have, name).toContain("reviewLabel(");
       const fact = have.indexOf("Somebody already offered. You can too.");
       const toggle = have.indexOf("I have this card");
       const tray = have.indexOf(drawsTray);
@@ -103,14 +105,15 @@ describe("the viewer is trimmed to the toggle and the tray on both platforms", (
 
 describe("the website says OFFERED at once, then the refresh confirms it", () => {
   it("dispatches the cards the server took from the zoom, by the one name", () => {
+    /* Round 16: the send is useOfferBuild's, in the same file. */
     const sendBlock = between(
       web.zoom,
-      "const submitOffer = async (message: string) => {",
-      "A swipe ends in a click",
+      "const submit = async (message: string): Promise<OfferOutcome> => {",
+      "const closeReview = useCallback",
     );
     expect(sendBlock.length).toBeGreaterThan(0);
     expect(sendBlock).toContain(`new CustomEvent("${EVENT}"`);
-    expect(sendBlock).toContain("detail: { postId: feedPostId, flareIds: taken }");
+    expect(sendBlock).toContain("detail: { postId, flareIds: taken }");
     /* Taken, not refused: the server answers { ok, offered, refused }. */
     expect(sendBlock).toContain("flareIds.filter((flareId) => !refused.has(flareId))");
     expect(sendBlock.indexOf("if (!result.ok) return result;")).toBeLessThan(

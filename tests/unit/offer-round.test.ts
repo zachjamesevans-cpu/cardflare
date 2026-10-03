@@ -2,11 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-  offerButtonLabel,
-  offerFailureMessage,
-  offeredLine,
-} from "@/lib/feed/offer-copy";
+import { offerFailureMessage, offeredLine, reviewLabel } from "@/lib/feed/offer-copy";
 
 const read = (path: string) =>
   readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
@@ -81,9 +77,11 @@ describe("a refusal is said in words", () => {
     );
   });
 
-  it("labels the button by the count", () => {
-    expect(offerButtonLabel(0)).toBe("Offer this card");
-    expect(offerButtonLabel(1)).toBe("Offer this card");
-    expect(offerButtonLabel(3)).toBe("Offer 3 cards");
+  it("labels the way on by the count", () => {
+    /* Round 16: one set of words wherever a card can be offered. The
+       button that follows the picks is the review's, and "Offer this
+       card" / "Offer N cards" are gone from both platforms. */
+    expect(reviewLabel(1)).toBe("Review offer · 1 card");
+    expect(reviewLabel(3)).toBe("Review offer · 3 cards");
   });
 });

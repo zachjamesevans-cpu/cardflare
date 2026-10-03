@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -13,13 +21,17 @@ import {
   X,
 } from "lucide-react";
 
-import { OfferReview, type OfferLine } from "@/components/flares/offer-review";
+import {
+  OfferReview,
+  type OfferLine,
+  type OfferOutcome,
+} from "@/components/flares/offer-review";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
-import { listOf, offerFailureMessage } from "@/lib/feed/offer-copy";
+import { listOf, offerFailureMessage, reviewLabel } from "@/lib/feed/offer-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { CardState } from "@/lib/feed/post-schema";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
@@ -271,6 +283,19 @@ interface ZoomSend {
 }
 
 /**
+ * One card an offer can be built from: what the review lists, and the
+ * cap its stepper stops at.
+ */
+export interface OfferableCard {
+  flareId: string;
+  name: string;
+  imageUrl: string | null;
+  printingLabel: string | null;
+  /** The most the line allows: the card's remaining, or its quantity. */
+  max: number;
+}
+
+/**
  * THE VIEWER BUILDS AN OFFER; IT DOES NOT SEND ONE.
  *
  * The founder: "The current screen... makes it feel like pressing
@@ -278,38 +303,186 @@ interface ZoomSend {
  * this action actually means 'I own this card and want to include it
  * in my offer.'" So "I have this card" is a low-commitment toggle, the
  * commitment is the review's "Send offer", and nothing under the
- * picture spins or posts. The picks are the zoom's, keyed by Flare
- * across the shelf, so a swipe shows whether THAT card is added and
- * the tray's count moves live. The block reads them for the card it
- * is on.
+ * picture spins or posts.
+ *
+ * THE PICKS LIVE ON THE POST, NOT IN THE VIEWER. The audit of
+ * 2026-10-02: "Closing the viewer silently drops every picked card.
+ * Picked 3 cards, closed with X, reopened. All three were gone." The
+ * founder's call: keep the picks for the page's life, no warning
+ * dialog, and say under the post how many are in the offer. So the
+ * state is this hook, and a Feed post runs it once and hands it down
+ * through `OfferPicksContext` to every tile's viewer, which reads and
+ * writes the same picks whichever card it was opened from and however
+ * many times it is closed. Nothing is stored: a reload starts clean.
+ * The picks are quantities, keyed by Flare: the viewer adds one copy,
+ * and the review is where the number is raised.
+ *
+ * A viewer with no post around it (a compact card, a rail on a board)
+ * runs the hook itself and keeps its picks for as long as it is
+ * mounted, which is the same rule at the smaller scope.
  */
-interface ZoomOffers {
-  /** Cards added to the offer, across the shelf. */
-  picks: ReadonlySet<string>;
+export interface OfferBuild {
+  /** Cards added to the offer, by Flare, and how many copies of each. */
+  picks: Readonly<Record<string, number>>;
+  /** How many cards are in the offer. */
+  count: number;
   /** What has gone this session, by the Flare it covered. */
   sends: Readonly<Record<string, ZoomSend>>;
-  /** Add this card to the offer, or take it back out. */
+  /** Add this card to the offer with one copy, or take it back out. */
   toggle: (flareId: string) => void;
+  /** Raise or lower a line, clamped to what it allows. */
+  setQuantity: (flareId: string, value: number) => void;
+  /** Take a line out. */
+  remove: (flareId: string) => void;
+  /** Empty the offer: a send landed. */
+  clear: () => void;
+  reviewOpen: boolean;
   /** Open the review, where the note is written and the offer goes. */
-  review: () => void;
+  openReview: () => void;
+  closeReview: () => void;
+  /** What the review lists: the picks, named and pictured. */
+  lines: OfferLine[];
+  /** One send, one notice, however many lines: the review's "Send offer". */
+  submit: (message: string) => Promise<OfferOutcome>;
 }
 
-/** "Review offer · 1 card" / "Review offer · 3 cards". */
-function reviewLabel(count: number): string {
-  return `Review offer · ${count} ${count === 1 ? "card" : "cards"}`;
+/** The post's offer, when a viewer is drawn inside one. */
+export const OfferPicksContext = createContext<OfferBuild | null>(null);
+
+export function useOfferBuild(
+  postId: string | null,
+  cards: OfferableCard[],
+): OfferBuild {
+  const [picks, setPicks] = useState<Readonly<Record<string, number>>>({});
+  const [sends, setSends] = useState<Readonly<Record<string, ZoomSend>>>({});
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const router = useRouter();
+
+  /*
+   * The post's cards read OFFERED on the next paint. Refreshed from an
+   * effect once a send has landed in state, which is after the review's
+   * transition has settled, so its "Sending…" follows the server's
+   * answer and not the page rebuild: the founder's tap took five
+   * seconds, and the server answers at once. An empty record refreshes
+   * nothing.
+   */
+  useEffect(() => {
+    if (Object.keys(sends).length === 0) return;
+    router.refresh();
+  }, [sends, router]);
+
+  const capFor = (flareId: string) =>
+    Math.max(1, cards.find((card) => card.flareId === flareId)?.max ?? 1);
+
+  /** The server refuses by Flare id; the viewer reads names. */
+  const nameOf = (flareId: string) =>
+    cards.find((card) => card.flareId === flareId)?.name ?? flareId;
+
+  const lines: OfferLine[] = cards.flatMap((card) => {
+    const quantity = picks[card.flareId];
+    return quantity
+      ? [
+          {
+            key: card.flareId,
+            name: card.name,
+            imageUrl: card.imageUrl,
+            printingLabel: card.printingLabel,
+            quantity,
+            max: Math.max(1, card.max),
+          },
+        ]
+      : [];
+  });
+
+  const remove = (flareId: string) =>
+    setPicks((current) => {
+      if (!(flareId in current)) return current;
+      const next = { ...current };
+      delete next[flareId];
+      return next;
+    });
+
+  const submit = async (message: string): Promise<OfferOutcome> => {
+    if (!postId) {
+      return { ok: false, message: offerFailureMessage("unknown"), refused: [] };
+    }
+    const flareIds = lines.map((line) => line.key);
+    const result = await offerItemsAction(
+      postId,
+      lines.map((line) => ({ flareId: line.key, quantity: line.quantity })),
+      message,
+    );
+    if (!result.ok) return result;
+    const refused = new Set(result.refused);
+    const taken = flareIds.filter((flareId) => !refused.has(flareId));
+    const record: ZoomSend = {
+      count: result.offered,
+      notTaken: result.refused.map(nameOf),
+    };
+    /* Remembered against every card it covered, so the strip says so
+       on whichever of them the viewer swipes back to. */
+    setSends((current) => {
+      const next = { ...current };
+      for (const flareId of taken) next[flareId] = record;
+      return next;
+    });
+    /*
+     * OFFERED AT ONCE. The founder: "when an offer is made, immediately
+     * visually show that I've made an offer on it without having to
+     * refresh the feed." The post's carousel and its full list are
+     * other components on the same page, so the send tells the window
+     * which cards the server took, and they mark those cards before
+     * the refresh above brings the real thing.
+     */
+    window.dispatchEvent(
+      new CustomEvent("cardflare:offered", {
+        detail: { postId, flareIds: taken },
+      }),
+    );
+    return result;
+  };
+
+  const closeReview = useCallback(() => setReviewOpen(false), []);
+
+  return {
+    picks,
+    count: Object.keys(picks).length,
+    sends,
+    toggle: (flareId) =>
+      setPicks((current) => {
+        if (flareId in current) {
+          const next = { ...current };
+          delete next[flareId];
+          return next;
+        }
+        return { ...current, [flareId]: 1 };
+      }),
+    setQuantity: (flareId, value) =>
+      setPicks((current) => ({
+        ...current,
+        [flareId]: Math.max(1, Math.min(capFor(flareId), Math.round(value))),
+      })),
+    remove,
+    clear: () => setPicks({}),
+    reviewOpen,
+    openReview: () => setReviewOpen(true),
+    closeReview,
+    lines,
+    submit,
+  };
 }
 
 /**
  * The offer on a Feed post, at the foot of the zoom: the one toggle
- * and the tray once anything is in it. Nothing else. The founder, on
- * the two lines that used to explain the toggle: "It doesn't need to
- * be explained"; and on the link along the shelf: "It doesn't do
- * anything." The one sentence that survives is a fact
- * about the card, that somebody else already offered, and an offer
- * is never gated on it: "ppl should still be able to make offers or
- * say they have something even if someone already did."
+ * and the tray. Nothing else. The founder, on the two lines that used
+ * to explain the toggle: "It doesn't need to be explained"; and on
+ * the link along the shelf: "It doesn't do anything." The one
+ * sentence that survives is a fact about the card, that somebody else
+ * already offered, and an offer is never gated on it: "ppl should
+ * still be able to make offers or say they have something even if
+ * someone already did."
  */
-function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers }) {
+function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: OfferBuild }) {
   const sent = offers.sends[have.flareId];
 
   /* The strip: what is already true of this card, if anything. */
@@ -340,8 +513,8 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers })
       </ZoomSaid>
     ) : null;
 
-  const added = offers.picks.has(have.flareId);
-  const count = offers.picks.size;
+  const added = Boolean(offers.picks[have.flareId]);
+  const count = offers.count;
 
   return (
     <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-2">
@@ -364,15 +537,27 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: ZoomOffers })
           </Button>
         </>
       )}
-      {count > 0 && (
+      {/*
+       * THE NEXT STEP STANDS OUT, AND ITS ROOM IS KEPT. The audit:
+       * "'Added to your offer' and 'Review offer' are both dark grey,
+       * so the next step doesn't stand out. The panel also jumps about
+       * 25px when the review button appears." So the tray wears the
+       * accent the moment a card is in the offer, "Added to your
+       * offer" stays secondary, and before anything is picked a blank
+       * of the same height holds the tray's place, so nothing below
+       * the picture moves when it arrives.
+       */}
+      {count > 0 ? (
         <Button
           type="button"
-          variant="secondary"
-          onClick={offers.review}
+          variant="primary"
+          onClick={offers.openReview}
           className="w-full"
         >
           {reviewLabel(count)}
         </Button>
+      ) : (
+        <span aria-hidden="true" className="block h-11" />
       )}
     </div>
   );
@@ -563,36 +748,6 @@ export function CardImageZoom({
   const [warm, setWarm] = useState(false);
   const [sharp, setSharp] = useState(false);
 
-  /*
-   * The offer on a Feed post: the picks along the shelf, what the
-   * server said, and whether the review is up. See `ZoomOffers`.
-   * Cleared when the dialog closes, with everything else the viewer
-   * chose.
-   */
-  const [picks, setPicks] = useState<ReadonlySet<string>>(() => new Set());
-  const [sends, setSends] = useState<Readonly<Record<string, ZoomSend>>>({});
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const router = useRouter();
-
-  const resetOffers = useCallback(() => {
-    setPicks(new Set());
-    setSends({});
-    setReviewOpen(false);
-  }, []);
-
-  /*
-   * The post's cards read OFFERED on the next paint. Refreshed from an
-   * effect once a send has landed in state, which is after the review's
-   * transition has settled, so its "Sending…" follows the server's
-   * answer and not the page rebuild: the founder's tap took five
-   * seconds, and the server answers at once. Closing empties the
-   * record, and an empty record refreshes nothing.
-   */
-  useEffect(() => {
-    if (Object.keys(sends).length === 0) return;
-    router.refresh();
-  }, [sends, router]);
-
   /** The shelf, or the one card this tile is, for everything the offer reads. */
   const cards: ZoomCard[] = shelf ?? [
     {
@@ -600,83 +755,37 @@ export function CardImageZoom({
       exactName: ownExactName,
       cardNumber: ownCardNumber,
       caption: ownCaption,
+      lookingFor: ownLookingFor,
+      stillNeeds: ownStillNeeds,
       have: ownHave,
     },
   ];
-
-  /** The server refuses by Flare id; the viewer reads names. */
-  const nameOf = (flareId: string) =>
-    cards.find((card) => card.have?.flareId === flareId)?.exactName ?? flareId;
-
-  /* What the review lists: the picks, named and pictured from the shelf. */
-  const lines: OfferLine[] = cards.flatMap((card) =>
-    card.have && picks.has(card.have.flareId)
-      ? [
-          {
-            key: card.have.flareId,
-            name: card.exactName,
-            imageUrl: card.imageUrl,
-            printingLabel: card.caption ?? null,
-            quantity: 1,
-          },
-        ]
-      : [],
-  );
   const feedPostId = cards.find((card) => card.have)?.have?.postId ?? null;
 
-  const offers: ZoomOffers = {
-    picks,
-    sends,
-    toggle: (flareId) =>
-      setPicks((current) => {
-        const next = new Set(current);
-        if (next.has(flareId)) next.delete(flareId);
-        else next.add(flareId);
-        return next;
-      }),
-    review: () => setReviewOpen(true),
-  };
-
-  /** One send, one notice, however many lines: the review's "Send offer". */
-  const submitOffer = async (message: string) => {
-    if (!feedPostId) {
-      return { ok: false, message: offerFailureMessage("unknown"), refused: [] };
-    }
-    const flareIds = lines.map((line) => line.key);
-    const result = await offerItemsAction(
-      feedPostId,
-      lines.map((line) => ({ flareId: line.key, quantity: line.quantity })),
-      message,
-    );
-    if (!result.ok) return result;
-    const refused = new Set(result.refused);
-    const taken = flareIds.filter((flareId) => !refused.has(flareId));
-    const record: ZoomSend = {
-      count: result.offered,
-      notTaken: result.refused.map(nameOf),
-    };
-    /* Remembered against every card it covered, so the strip says so
-       on whichever of them the viewer swipes back to. */
-    setSends((current) => {
-      const next = { ...current };
-      for (const flareId of taken) next[flareId] = record;
-      return next;
-    });
-    /*
-     * OFFERED AT ONCE. The founder: "when an offer is made, immediately
-     * visually show that I've made an offer on it without having to
-     * refresh the feed." The post's carousel and its full list are
-     * other components on the same page, so the zoom tells the window
-     * which cards the server took, and they mark those cards before
-     * the refresh above brings the real thing.
-     */
-    window.dispatchEvent(
-      new CustomEvent("cardflare:offered", {
-        detail: { postId: feedPostId, flareIds: taken },
-      }),
-    );
-    return result;
-  };
+  /*
+   * The offer on a Feed post: the post's, when there is one around this
+   * viewer, so the picks outlive the dialog and every tile's viewer
+   * reads the same ones; otherwise this viewer's own. The hook is
+   * always run, so the fallback is inert rather than conditional.
+   */
+  const shared = useContext(OfferPicksContext);
+  const offerable: OfferableCard[] = shared
+    ? []
+    : cards.flatMap((card) =>
+        card.have
+          ? [
+              {
+                flareId: card.have.flareId,
+                name: card.exactName,
+                imageUrl: card.imageUrl,
+                printingLabel: card.caption ?? null,
+                max: card.stillNeeds ?? card.lookingFor ?? 1,
+              },
+            ]
+          : [],
+      );
+  const local = useOfferBuild(shared ? null : feedPostId, offerable);
+  const offers = shared ?? local;
 
   /*
    * A swipe ends in a click, and a click anywhere on this dialog closes
@@ -804,12 +913,12 @@ export function CardImageZoom({
       setWarm(false);
       setSharp(false);
       setAt(position);
-      resetOffers();
+      /* The picks are the post's and stay: see `useOfferBuild`. */
     };
 
     element.addEventListener("close", onClose);
     return () => element.removeEventListener("close", onClose);
-  }, [position, resetOffers]);
+  }, [position]);
 
   /*
    * Wraps, deliberately. A shelf is a loop of five or six cards, not a
@@ -1021,12 +1130,16 @@ export function CardImageZoom({
           ) {
             return;
           }
+          /* Stopped here: the dialog is a DOM descendant of the Feed's
+             carousel, whose arrows would otherwise page it too. */
           if (event.key === "ArrowRight") {
             event.preventDefault();
+            event.stopPropagation();
             go(1);
           }
           if (event.key === "ArrowLeft") {
             event.preventDefault();
+            event.stopPropagation();
             go(-1);
           }
         }}
@@ -1284,15 +1397,19 @@ export function CardImageZoom({
        * same sheet the full list and the hunt use. Its own modal, so it
        * stacks over the viewer and a press in it never reaches the
        * dialog whose every click closes it. On a send the viewer marks
-       * the cards, drops the picks and stays open behind "Done".
+       * the cards, drops the picks and stays open behind "Done". A post
+       * draws the review once for all its tiles (see `PostOffer`), so
+       * this one is only for a viewer with no post around it.
        */}
-      {feedPostId && (
+      {!shared && feedPostId && (
         <OfferReview
-          open={reviewOpen}
-          onClose={() => setReviewOpen(false)}
-          lines={lines}
-          onSubmit={submitOffer}
-          onSent={() => setPicks(new Set())}
+          open={local.reviewOpen}
+          onClose={local.closeReview}
+          lines={local.lines}
+          onQuantity={local.setQuantity}
+          onRemove={local.remove}
+          onSubmit={local.submit}
+          onSent={local.clear}
         />
       )}
     </>

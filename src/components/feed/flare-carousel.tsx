@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { cn } from "@/lib/cn";
 import { cardCountLabel } from "@/lib/feed/card-copy";
+import { seeAllLabel } from "@/lib/feed/offer-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
@@ -23,13 +25,26 @@ export function FlareCarousel({
   cards,
   direction,
   tiles,
+  post = null,
 }: {
   cards: FeedCard[];
   direction: "want" | "showcase";
   /** One FeedTile per card, in the same order. */
   tiles: ReactNode[];
+  /**
+   * The post these cards are on, for "See all N cards": the same full
+   * list the menu opens, one tap from the dots. Null in the composer's
+   * preview, where there is no post to list yet.
+   */
+  post?: {
+    postId: string;
+    total: number;
+    yours: boolean;
+    completed: boolean;
+  } | null;
 }) {
   const [at, setAt] = useState(0);
+  const [listOpen, setListOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const offered = useOfferedHere(cards);
 
@@ -43,16 +58,37 @@ export function FlareCarousel({
    * Enter opens the card in view, and only that card's button stays
    * in the tab order. The tiles are server-rendered children, so the
    * order is set here, after the fact, rather than on each tile.
+   *
+   * AFTER EVERY RENDER, AND AFTER EVERY REPLACED TILE. The second
+   * audit found every card a stop again. Reproduced in a browser: the
+   * rule held on first paint and broke the moment a re-render replaced
+   * the tiles (a refresh, a tab switch), because the fresh buttons
+   * mount with the default tab index and an effect keyed on `at` and
+   * the count never ran again. So the pass runs on every render, which
+   * is a handful of nodes, and a MutationObserver on the rail runs it
+   * again for any child that arrives between renders.
    */
+  const current = useRef(at);
   useEffect(() => {
+    current.current = at;
+  });
+  const setTabStops = () => {
     const slides = scroller.current?.children;
     if (!slides) return;
     Array.from(slides).forEach((slide, index) => {
       slide.querySelectorAll<HTMLElement>("button, a, [tabindex]").forEach((stop) => {
-        stop.tabIndex = index === at ? 0 : -1;
+        stop.tabIndex = index === current.current ? 0 : -1;
       });
     });
-  }, [at, cards.length]);
+  };
+  useEffect(setTabStops);
+  useEffect(() => {
+    const rail = scroller.current;
+    if (!rail) return;
+    const observer = new MutationObserver(setTabStops);
+    observer.observe(rail, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   const jump = (index: number) => {
     const clamped = Math.max(0, Math.min(cards.length - 1, index));
@@ -168,8 +204,10 @@ export function FlareCarousel({
       </div>
 
       {/* The dots alone say where you are; the "1 / 2" that sat beside
-          them said it twice. */}
-      <div className="flex items-center gap-3 px-1">
+          them said it twice. "See all N cards" sits at the other end
+          of the row: the audit found the full list "hidden: it's only
+          in the ⋯ menu". The menu entry stays. */}
+      <div className="flex items-center justify-between gap-3 px-1">
         <div className="flex gap-1.5" aria-hidden="true">
           {cards.map((card, index) => (
             <button
@@ -184,7 +222,29 @@ export function FlareCarousel({
             />
           ))}
         </div>
+        {post && cards.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setListOpen(true)}
+            className="cursor-pointer rounded-[var(--radius-control)] text-xs font-semibold text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            {seeAllLabel(cards.length)}
+          </button>
+        )}
       </div>
+
+      {post && cards.length > 1 && (
+        <FlareCardsSheet
+          open={listOpen}
+          onClose={() => setListOpen(false)}
+          postId={post.postId}
+          cards={cards}
+          total={post.total}
+          direction={direction}
+          yours={post.yours}
+          completed={post.completed}
+        />
+      )}
     </div>
   );
 }

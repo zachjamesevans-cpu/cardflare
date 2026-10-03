@@ -385,9 +385,20 @@ export function HomeScreen() {
      recognise reads as the original card - see feedViewFrom. */
   const view = feedViewFrom(me?.player.feedView);
 
+  /*
+   * Posts taken down this session, by id. The one the server has just
+   * withdrawn leaves the list the moment it says ok, and STAYS gone
+   * through the reload behind it, which may still read the old rows:
+   * the audit of 2026-10-02 saw the toast at 0.6s and the post for 3
+   * to 5s more. Undo takes the id back out before it restores.
+   */
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
-  const shown = feed.filter((item) => belongsToTab(item, tab));
+  const shown = feed.filter(
+    (item) =>
+      belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
+  );
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
@@ -718,14 +729,16 @@ export function HomeScreen() {
   /**
    * "Take down" on your own post: the cards withdrawn everywhere and
    * nothing announced. The post leaves the list the moment the server
-   * says yes, the Feed is marked stale so the next read agrees, and the
-   * toast holds the undo for a minute. Undo puts the same rows back and
-   * reloads.
+   * says yes (hidden by id, so a reload that still carries it cannot
+   * bring it back), the Feed is marked stale so the next read agrees,
+   * and the toast holds the undo for a minute. Undo unhides, puts the
+   * same rows back and reloads.
    */
   const takeDown = async (postId: string) => {
     try {
       const result = await takeDownPost(postId);
       if (!result.ok) return;
+      setHidden((current) => new Set(current).add(postId));
       setFeed((current) =>
         current.filter((entry) => !(entry.kind === "hunt" && entry.postId === postId)),
       );
@@ -735,6 +748,11 @@ export function HomeScreen() {
         key: `${postId}:${Date.now()}`,
         message: "Taken down.",
         onUndo: async () => {
+          setHidden((current) => {
+            const next = new Set(current);
+            next.delete(postId);
+            return next;
+          });
           await restorePost(postId, result.flareIds).catch(() => undefined);
           await load(() => true);
         },

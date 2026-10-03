@@ -3,7 +3,13 @@ import { CheckCircle2, Crosshair, Heart, MessageCircle } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareCarousel, SingleFlare } from "@/components/feed/flare-carousel";
-import { OfferCardsButton, PostMenu } from "@/components/feed/post-actions";
+import {
+  InYourOffer,
+  OfferCardsButton,
+  PostMenu,
+  PostOffer,
+  UnlessHidden,
+} from "@/components/feed/post-actions";
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -21,9 +27,17 @@ import type { HuntItem } from "@/lib/feed/repository";
  * cards; the caption is theirs; a hunt the post belongs to is one line
  * with a door to it. The cards are slides - the picture beside what
  * matters about it - and the whole list is one press away with the
- * boxes to say which you have. The heart and the thread belong to the
- * post. The app draws the same card natively
+ * toggles to say which you have. The heart and the thread belong to
+ * the post. The app draws the same card natively
  * (mobile/src/flare-feed-card.tsx).
+ *
+ * THE POST OWNS THE OFFER. The picks a viewer makes along the cards
+ * are the post's (`PostOffer`), so closing the viewer keeps them and
+ * "2 in your offer · Review" says so under the cards until they are
+ * sent. And a post that was just taken down leaves the list on the
+ * same paint as its toast (`UnlessHidden`). Both are client wrappers
+ * around this server-rendered card: the state is theirs, the markup
+ * stays here.
  */
 
 /**
@@ -126,10 +140,20 @@ export function FlareFeedCard({
    */
   preview?: boolean;
 }) {
-  const direction = item.direction === "showcase" ? "showcase" : "want";
+  const direction: "want" | "showcase" =
+    item.direction === "showcase" ? "showcase" : "want";
   const lead = item.cards[0];
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours || preview };
+  /* What the menu, the offer button and the offer itself read. */
+  const shape = {
+    postId: item.postId,
+    cards: item.cards,
+    total: item.total,
+    direction,
+    yours: item.yours,
+    completed: item.completed,
+  };
 
   /* The zoom pages along the whole deck from any card. */
   const shelf: ZoomCard[] = item.cards.map((card) => ({
@@ -161,7 +185,7 @@ export function FlareFeedCard({
     />
   ));
 
-  return (
+  const article = (
     <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
       {/* The header: face, name, the status line; time and distance on
           the right. "Your Flare" is a small label inside this row, never
@@ -226,18 +250,7 @@ export function FlareFeedCard({
           {/* The three dots: the full list and, on your own post, the
               progress ticks. Nothing renders when there is nothing to
               offer. */}
-          {!preview && (
-            <PostMenu
-              post={{
-                postId: item.postId,
-                cards: item.cards,
-                total: item.total,
-                direction,
-                yours: item.yours,
-                completed: item.completed,
-              }}
-            />
-          )}
+          {!preview && <PostMenu post={shape} />}
         </div>
       </div>
 
@@ -290,8 +303,17 @@ export function FlareFeedCard({
           )}
         </SingleFlare>
       ) : (
-        <FlareCarousel cards={item.cards} direction={direction} tiles={tiles} />
+        <FlareCarousel
+          cards={item.cards}
+          direction={direction}
+          tiles={tiles}
+          post={preview ? null : shape}
+        />
       )}
+
+      {/* "2 in your offer · Review": the picks, while the viewer is
+          closed. Nothing until something is picked. */}
+      {!preview && <InYourOffer />}
 
       {/* No row of chips under the cards. The status line in the header
           already says which way the post points, in the accent, and the
@@ -311,16 +333,7 @@ export function FlareFeedCard({
       {/* The one button a post is for: somebody else's want, still open. */}
       {!preview && direction === "want" && !item.yours && !item.completed && (
         <div>
-          <OfferCardsButton
-            post={{
-              postId: item.postId,
-              cards: item.cards,
-              total: item.total,
-              direction,
-              yours: item.yours,
-              completed: item.completed,
-            }}
-          />
+          <OfferCardsButton post={shape} />
         </div>
       )}
 
@@ -359,5 +372,13 @@ export function FlareFeedCard({
         </Link>
       ) : null}
     </article>
+  );
+
+  if (preview) return article;
+
+  return (
+    <UnlessHidden postId={item.postId}>
+      <PostOffer post={shape}>{article}</PostOffer>
+    </UnlessHidden>
   );
 }

@@ -29,7 +29,7 @@ import {
 
 import type { OfferItem, OfferOutcome } from "./api";
 import { getFoilKit } from "./foil";
-import { listOf } from "./offer-copy";
+import { listOf, reviewLabel } from "./offer-copy";
 /* A cycle, knowingly: the review sheet is built from these primitives
    and the viewer opens it. Both only touch the other inside a render,
    never while the modules load, which is what makes a cycle safe. */
@@ -215,6 +215,12 @@ export interface ZoomHave {
   /** The viewer already raised a hand on it. */
   youOffered: boolean;
   /**
+   * Copies the post still wants of it: the most the review lets a pick
+   * rise to. Unknown on an older shelf, where a pick stays at one and
+   * the server caps the send anyway.
+   */
+  remaining?: number;
+  /**
    * ONE send for every line given: this card alone, or every pick on
    * the shelf. Every card of a post carries the same door. Resolves
    * with what the server took; throws an ApiError whose code is the
@@ -224,14 +230,19 @@ export interface ZoomHave {
 }
 
 /**
- * THE OFFER BEING BUILT LIVES WITH THE ZOOM, NOT WITH THE BAR.
+ * THE OFFER BEING BUILT LIVES WITH THE POST, NOT WITH THE BAR.
  *
- * "I have this card" on any card of the shelf adds it; the bar is
- * drawn fresh for each card, so what has been added is held by the
- * zoom, keyed by flareId, outlives a swipe, and is let go when the
- * zoom closes. flareId -> card name, so a refusal can be named.
+ * "I have this card" on any card of the shelf adds it at one copy; the
+ * bar is drawn fresh for each card, so what has been added is held
+ * above it, keyed by flareId, and outlives a swipe. The Feed card hands
+ * its picks in (`picks` and `onPicks` on CardImage) so closing the
+ * viewer keeps them for the page's life: the audit of 2026-10-02,
+ * "Closing the viewer silently drops every picked card... Expected:
+ * keep picks until sent." A viewer opened without them keeps its own
+ * and lets them go when it closes. flareId -> copies; the name a
+ * refusal needs is read off the shelf.
  */
-export type ZoomPicks = Record<string, string>;
+export type ZoomPicks = Record<string, number>;
 
 /** What one send came back with, kept so the strip can count it. */
 interface ZoomSent {
@@ -496,7 +507,7 @@ function ZoomHaveForm({
 }) {
   const count = Object.keys(picks).length;
   /* "Review offer · 1 card" / "Review offer · 3 cards". The dot is U+00B7. */
-  const tray = `Review offer · ${count} ${count === 1 ? "card" : "cards"}`;
+  const tray = reviewLabel(count);
   const added = Boolean(have && picks[have.flareId]);
   const sentHere = Boolean(have && sent?.flareIds.includes(have.flareId));
   /* A card with nothing left to add: found, already yours, or just sent. */
@@ -542,11 +553,12 @@ function ZoomHaveForm({
 
   if (!strip && !addable && count === 0) return null;
 
+  /* In at one copy; the review is where the number is raised. */
   const toggle = () => {
     if (!have) return;
     const cards = { ...picks };
     if (cards[have.flareId]) delete cards[have.flareId];
-    else cards[have.flareId] = have.name;
+    else cards[have.flareId] = 1;
     onPicks(cards);
   };
 
@@ -578,9 +590,20 @@ function ZoomHaveForm({
           </Tap>
         </>
       ) : null}
-      {count > 0 ? (
-        <Button label={tray} variant="secondary" onPress={onReview} />
-      ) : null}
+      {/*
+       * THE NEXT STEP STANDS OUT, AND ITS SPACE IS THERE FROM THE START.
+       *
+       * The audit: "'Added to your offer' and 'Review offer' are both
+       * dark grey, so the next step doesn't stand out. The panel also
+       * jumps about 25px when the review button appears." So the tray
+       * is the accent the moment one card is in, "Added to your offer"
+       * stays secondary, and the tray is drawn disabled and dimmed
+       * before that rather than not at all, so nothing under the
+       * picture moves when the first card goes in.
+       */}
+      <View style={{ opacity: count > 0 ? 1 : 0.45 }}>
+        <Button label={tray} disabled={count === 0} onPress={onReview} />
+      </View>
     </Pressable>
   );
 }
@@ -604,6 +627,8 @@ export function CardImage({
   siblings,
   position = 0,
   onLongPress,
+  picks: givenPicks,
+  onPicks,
 }: {
   imageUrl: string | null;
   width: number;
@@ -617,6 +642,13 @@ export function CardImage({
   onLongPress?: () => void;
   /** "I have this card" in the large view, when the viewer can say so. */
   have?: ZoomHave | null;
+  /**
+   * The offer being built on the post, flareId -> copies, when the
+   * post owns it (the Feed card does, so a close keeps the picks).
+   * Both or neither: without them the viewer keeps its own.
+   */
+  picks?: ZoomPicks;
+  onPicks?: (picks: ZoomPicks) => void;
   /**
    * OFFERED or FOUND, drawn on the thumbnail. Only this card dims - the
    * founder: "do not gray out the whole Flare". The band says which.
@@ -695,9 +727,16 @@ export function CardImage({
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
 
   /* The offer being built across the shelf, whether its review is up,
-     and the last send: all the zoom's own, so they outlive a swipe and
-     die with the close. See `ZoomPicks`. */
-  const [picks, setPicks] = useState<ZoomPicks>({});
+     and the last send. The picks are the post's when it hands them in
+     and the zoom's own otherwise; the review and the send are always
+     the zoom's. See `ZoomPicks`. */
+  const [ownPicks, setOwnPicks] = useState<ZoomPicks>({});
+  const owned = Boolean(givenPicks && onPicks);
+  const picks = owned ? (givenPicks ?? {}) : ownPicks;
+  const setPicks = (next: ZoomPicks) => {
+    if (owned) onPicks?.(next);
+    else setOwnPicks(next);
+  };
   const [reviewing, setReviewing] = useState(false);
   const [sent, setSent] = useState<ZoomSent | null>(null);
   const rail = useRef<ScrollView>(null);
@@ -721,6 +760,11 @@ export function CardImage({
      to offer (found, already yours) can still open the review for the
      cards added elsewhere on the shelf. */
   const door = have ?? shelf?.find((card) => card.have)?.have ?? null;
+  /* A pick's card, by Flare: this one, or one along the shelf. */
+  const haveOf = (flareId: string): ZoomHave | null =>
+    have?.flareId === flareId
+      ? have
+      : (shelf?.find((card) => card.have?.flareId === flareId)?.have ?? null);
 
   const window = useWindowDimensions();
 
@@ -752,7 +796,8 @@ export function CardImage({
       useNativeDriver: true,
     }).start(() => {
       setOpen(false);
-      setPicks({});
+      /* The post's picks outlive the viewer; only the zoom's own go. */
+      if (!owned) setOwnPicks({});
       setReviewing(false);
       setSent(null);
     });
@@ -1242,18 +1287,25 @@ export function CardImage({
           <OfferReviewSheet
             postId={door.postId}
             posterName={door.posterName}
-            lines={Object.entries(picks).map(([flareId, cardName]) => ({
+            lines={Object.entries(picks).map(([flareId, quantity]) => ({
               flareId,
-              name: cardName,
-              quantity: 1,
+              name: haveOf(flareId)?.name ?? "one card",
+              quantity,
+              max: haveOf(flareId)?.remaining ?? 1,
             }))}
+            onChange={(flareId, quantity) => {
+              const next = { ...picks };
+              if (quantity <= 0) delete next[flareId];
+              else next[flareId] = quantity;
+              setPicks(next);
+            }}
             send={door.onOffer}
             onSent={(outcome) => {
               const refused = outcome.refused ?? [];
               const taken = Object.keys(picks).filter((id) => !refused.includes(id));
               setSent((previous) => ({
                 flareIds: [...(previous?.flareIds ?? []), ...taken],
-                refused: refused.map((id) => picks[id] ?? "one card"),
+                refused: refused.map((id) => haveOf(id)?.name ?? "one card"),
               }));
               setPicks({});
               setReviewing(false);

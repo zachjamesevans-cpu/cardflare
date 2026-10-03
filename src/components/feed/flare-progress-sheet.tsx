@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { cn } from "@/lib/cn";
+import { wantsLine } from "@/lib/feed/offer-copy";
 import { setFlareFoundAction } from "@/lib/players/hunt-actions";
 import type { FeedCard } from "@/lib/feed/repository";
 
@@ -158,7 +159,7 @@ export function FlareProgressSheet({
                         {row.found} of {row.needed} found
                       </span>
                       <span className="font-semibold text-accent">
-                        {row.remaining === 0 ? "Found" : `Need ${row.remaining} more`}
+                        {wantsLine(row.needed, row.remaining)}
                       </span>
                     </p>
                   </div>

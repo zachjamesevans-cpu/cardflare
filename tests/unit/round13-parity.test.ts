@@ -55,7 +55,8 @@ const app = {
  * files and keeps its own note behind "Add a note"; the pins that say
  * "no note here" must not catch it.
  */
-const webHave = between(web.zoom, "interface ZoomOffers", "const OPEN_MS");
+/* Round 16 moved the picks into useOfferBuild above the block. */
+const webHave = between(web.zoom, "function ZoomHaveBlock(", "const OPEN_MS");
 const appHave = between(
   app.zoom,
   "function ZoomHaveForm(",
@@ -70,7 +71,8 @@ const appHave = between(
  */
 const GONE = ["Have this card?", "Add it to your offer.", "+ Add another card"];
 const CTA = ["I have this card", "Added to your offer"];
-const TRAY = "Review offer ·";
+/* Round 16: the tray's words come from reviewLabel in offer-copy. */
+const TRAY = "reviewLabel(";
 
 describe("the viewer builds an offer in the same words on both platforms", () => {
   it("has the toggle and the tray, and no lines or link to explain them", () => {
@@ -99,10 +101,13 @@ describe("the viewer builds an offer in the same words on both platforms", () =>
     expect(appHave).not.toContain("✓");
   });
 
-  it("says the tray with a middle dot and counts cards", () => {
-    for (const zoom of [web.zoom, app.zoom]) {
-      expect(zoom).toContain(TRAY);
-      expect(zoom).toMatch(/Review offer ·[^"]*(card|cards)/);
+  it("says the tray with a middle dot and counts cards", async () => {
+    for (const zoom of [web.zoom, app.zoom]) expect(zoom).toContain(TRAY);
+    const webCopy = await import("@/lib/feed/offer-copy");
+    const appCopy = await import("../../mobile/src/offer-copy");
+    for (const copy of [webCopy, appCopy]) {
+      expect(copy.reviewLabel(1)).toBe("Review offer · 1 card");
+      expect(copy.reviewLabel(3)).toBe("Review offer · 3 cards");
     }
   });
 
@@ -154,9 +159,14 @@ describe("the review is one screen, and the viewer opens it", () => {
       expect(source).toContain("<OfferReview");
       expect(source).toContain("offerItemsAction(");
     }
-    /* The lines come from the picks; the note is the review's own. */
-    expect(web.zoom).toContain("picks.has(");
-    expect(web.zoom).toContain("onSubmit={submitOffer}");
+    /* The lines come from the picks; the note is the review's own. A
+       post draws the review once for all its tiles (round 16); the
+       viewer's own is the fallback for a shelf with no post around it. */
+    expect(web.zoom).toContain("offers.picks[have.flareId]");
+    expect(web.zoom).toContain("onSubmit={local.submit}");
+    expect(read("src/components/feed/post-actions.tsx")).toContain(
+      "onSubmit={build.submit}",
+    );
     expect(web.zoom).not.toContain("POST_COMMENT_MAX");
   });
 
@@ -179,8 +189,8 @@ describe("the wait after a send is the server's, not the page rebuild's", () => 
     /* The refresh is an effect on the recorded send, not a step of it. */
     const sendBlock = between(
       web.zoom,
-      "const submitOffer = async (message: string) => {",
-      "A swipe ends in a click",
+      "const submit = async (message: string): Promise<OfferOutcome> => {",
+      "const closeReview = useCallback",
     );
     expect(sendBlock.length).toBeGreaterThan(0);
     expect(sendBlock).not.toContain("router.refresh()");

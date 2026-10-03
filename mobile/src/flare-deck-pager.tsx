@@ -2,10 +2,11 @@ import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { FeedCard } from "./api";
-import { availableLabel, GONE_LABEL, needLabel, printingLabel } from "./flare-copy";
+import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
+import { seeAllLabel, wantsLine } from "./offer-copy";
 import { haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
-import { CardImage, Tap, type ZoomCard } from "./ui";
+import { CardImage, Tap, type ZoomCard, type ZoomHave, type ZoomPicks } from "./ui";
 
 /**
  * A multi-card Flare on the Feed: compact slides, one card each.
@@ -16,14 +17,18 @@ import { CardImage, Tap, type ZoomCard } from "./ui";
  * are the whole point now that a Flare can ask for two of something.
  *
  * So each slide is the single-card row: the art beside its name, the
- * printing asked for and "Need 2 more", and the next slide peeks in
- * from the right so the swipe is discoverable. Dots say where you are,
- * and that is all: the count line and "View all" that used to sit
- * under them moved behind the post's three dots, the founder wanting
- * the post concise and its extras "only visible when you need it".
+ * printing asked for and "Wants 2" (or "Need 1 more" once one is
+ * found), and the next slide peeks in from the right so the swipe is
+ * discoverable. Dots say where you are; the count line and "View all"
+ * that used to sit under them moved behind the post's three dots, the
+ * founder wanting the post concise and its extras "only visible when
+ * you need it". Round 16 put one door back on the dots row, right
+ * aligned: "See all 4 cards", because the audit found the full list
+ * "hidden: it's only in the ⋯ menu". The menu entry stays.
  *
  * Every card is the same CardImage the rest of the Feed draws, so a
- * tap still opens the zoom with "Offer this card" inside it.
+ * tap still opens the zoom with "I have this card" inside it, and the
+ * post's picks ride through here to that zoom.
  */
 
 const GAP = spacing(2);
@@ -51,6 +56,18 @@ export function remainingAcross(
   );
 }
 
+/**
+ * "I have this card" for one card of a post, with the cap the review
+ * steps up to: the copies the post still wants of it.
+ */
+export function haveWithCap(
+  card: FeedCard,
+  post: PostRef | undefined,
+): ZoomHave | null {
+  const have = haveFor(card, post);
+  return have ? { ...have, remaining: remainingOf(card) } : null;
+}
+
 /** The shelf the zoom pages along, built from the cards it draws. */
 export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard[] {
   return cards.map((card) => ({
@@ -59,7 +76,7 @@ export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard
     cardNumber: card.cardNumber,
     caption: card.printingLabel ?? null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
-    have: haveFor(card, post),
+    have: haveWithCap(card, post),
   }));
 }
 
@@ -76,6 +93,8 @@ export function FlareCardSlide({
   position,
   width,
   cardWidth = 72,
+  picks,
+  onPicks,
 }: {
   card: FeedCard;
   direction: "want" | "showcase";
@@ -86,6 +105,9 @@ export function FlareCardSlide({
   /** The slide's width, when it sits in the carousel. */
   width?: number;
   cardWidth?: number;
+  /** The post's offer in progress, handed through to the zoom. */
+  picks?: ZoomPicks;
+  onPicks?: (picks: ZoomPicks) => void;
 }) {
   const remaining = remainingOf(card);
   const count =
@@ -93,9 +115,7 @@ export function FlareCardSlide({
       ? card.state === "found"
         ? GONE_LABEL
         : availableLabel(copiesOf(card))
-      : card.state === "found"
-        ? "Found"
-        : needLabel(remaining);
+      : wantsLine(copiesOf(card), remaining);
 
   return (
     <View
@@ -114,9 +134,11 @@ export function FlareCardSlide({
         caption={card.printingLabel ?? null}
         youHave={card.match ? { kind: card.match, count: 0 } : undefined}
         state={card.state}
-        have={haveFor(card, post)}
+        have={haveWithCap(card, post)}
         siblings={siblings}
         position={position}
+        picks={picks}
+        onPicks={onPicks}
       />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text
@@ -163,10 +185,18 @@ export function FlareCarousel({
   cards,
   direction,
   post,
+  picks,
+  onPicks,
+  onSeeAll,
 }: {
   cards: FeedCard[];
   direction: "want" | "showcase";
   post?: PostRef;
+  /** The post's offer in progress, handed through to the zoom. */
+  picks?: ZoomPicks;
+  onPicks?: (picks: ZoomPicks) => void;
+  /** "See all 4 cards": the full-list sheet, the one the menu opens. */
+  onSeeAll?: () => void;
 }) {
   const [at, setAt] = useState(0);
   const [width, setWidth] = useState(0);
@@ -209,23 +239,46 @@ export function FlareCarousel({
               siblings={shelf}
               position={index}
               width={slide}
+              picks={picks}
+              onPicks={onPicks}
             />
           ))}
         </ScrollView>
       ) : null}
 
-      <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
-        {cards.map((card, index) => (
-          <View
-            key={card.cardId}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: index === at ? colors.accent : colors.borderStrong,
-            }}
-          />
-        ))}
+      {/* The dots on the left, the door to the full list on the right. */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(2),
+        }}
+      >
+        <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
+          {cards.map((card, index) => (
+            <View
+              key={card.cardId}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: index === at ? colors.accent : colors.borderStrong,
+              }}
+            />
+          ))}
+        </View>
+        {onSeeAll && cards.length > 1 ? (
+          <Tap
+            onPress={onSeeAll}
+            hitSlop={8}
+            accessibilityLabel={seeAllLabel(cards.length)}
+          >
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              {seeAllLabel(cards.length)}
+            </Text>
+          </Tap>
+        ) : null}
       </View>
     </View>
   );

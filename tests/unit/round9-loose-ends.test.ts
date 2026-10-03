@@ -36,7 +36,9 @@ describe("the Feed carousel is one tab stop", () => {
   const rail = read("src/components/feed/flare-carousel.tsx");
 
   it("keeps only the card in view in the tab order, and Enter opens it", () => {
-    expect(rail).toContain("stop.tabIndex = index === at ? 0 : -1;");
+    /* Round 16: the pass reads the current slide from a ref so it can
+       run from the MutationObserver as well as from render. */
+    expect(rail).toContain("stop.tabIndex = index === current.current ? 0 : -1;");
     expect(rail).toContain('slide?.querySelector<HTMLElement>("button")?.click();');
   });
 });

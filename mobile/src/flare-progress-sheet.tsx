@@ -6,7 +6,8 @@ import { SheetBackdrop } from "./action-menu";
 import { setFlareFound, type FeedCard } from "./api";
 import type { FlareSheetPost } from "./flare-cards-sheet";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
-import { needLabel, printingLabel } from "./flare-copy";
+import { printingLabel } from "./flare-copy";
+import { wantsLine } from "./offer-copy";
 import { HuntProgress, UndoLine } from "./hunts-panel";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
@@ -180,7 +181,7 @@ export function FlareProgressSheet({
                         fontWeight: "600",
                       }}
                     >
-                      {`${have} of ${total} found${finished ? "" : ` · ${needLabel(left)}`}`}
+                      {`${have} of ${total} found${finished ? "" : ` · ${wantsLine(total, left)}`}`}
                     </Text>
                   </View>
                   <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>

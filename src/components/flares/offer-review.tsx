@@ -1,23 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/controls";
+import { Stepper } from "@/components/ui/stepper";
+import { selectionSummary } from "@/lib/feed/offer-copy";
 import { MAX_OFFER_MESSAGE } from "@/lib/matching/schema";
 
 /**
  * "I have these": the review before an offer goes.
  *
- * One sheet for both places an offer starts, a hunt on a profile and a
- * post in the Feed. The caller owns the selection and the server call;
- * this lists what was picked, takes the one optional message, and says
- * what happened - including which cards could not be taken, by name,
- * so nobody wonders why two of three went. The server refuses a card
- * only when it is no longer up; somebody else's offer never gates
- * yours.
+ * One sheet for every place an offer starts: the card viewer, a post's
+ * full list and a hunt on a profile. The caller owns the selection and
+ * the server call; this lists what was picked, takes the one optional
+ * message, and says what happened - including which cards could not
+ * be taken, by name, so nobody wonders why two of three went. The
+ * server refuses a card only when it is no longer up; somebody else's
+ * offer never gates yours.
+ *
+ * THE NUMBER IS RAISED HERE. The audit of 2026-10-02: "Viewer offers
+ * always send 1 copy... The review shows '1 copy' as plain text, with
+ * no stepper." So every line carries a stepper, capped at what the
+ * line allows, and a Remove; the viewer's picks come in as one copy
+ * each and this is where they become three. Removing the last line
+ * closes the review: there is nothing left to review.
  */
 
 export interface OfferLine {
@@ -27,6 +36,8 @@ export interface OfferLine {
   imageUrl: string | null;
   printingLabel: string | null;
   quantity: number;
+  /** The most the line allows: the card's remaining, or its quantity. */
+  max: number;
 }
 
 export interface OfferOutcome {
@@ -37,20 +48,21 @@ export interface OfferOutcome {
   refused: string[];
 }
 
-/** "2 cards selected · 3 copies". Cards and copies stay two numbers. */
-export function selectionSummary(cards: number, copies: number): string {
-  return `${cards} ${cards === 1 ? "card" : "cards"} selected · ${copies} ${
-    copies === 1 ? "copy" : "copies"
-  }`;
-}
-
 /**
  * The selection a list of offerable cards builds up: which lines, and
- * how many copies of each, never above what the line allows.
+ * how many copies of each, never above what the line allows. The
+ * summary it prints is `selectionSummary` in lib/feed/offer-copy, a
+ * plain module, so the server-rendered card can say the same words.
  */
 export function useSelection(maxFor: (key: string) => number) {
   const [selected, setSelected] = useState<Record<string, number>>({});
   const keys = Object.keys(selected);
+  const remove = (key: string) =>
+    setSelected((current) => {
+      const rest = { ...current };
+      delete rest[key];
+      return rest;
+    });
   return {
     selected,
     has: (key: string) => key in selected,
@@ -69,6 +81,7 @@ export function useSelection(maxFor: (key: string) => number) {
         ...current,
         [key]: Math.max(1, Math.min(maxFor(key), Math.round(value))),
       })),
+    remove,
     clear: () => setSelected({}),
     count: keys.length,
     copies: keys.reduce((sum, key) => sum + (selected[key] ?? 0), 0),
@@ -79,12 +92,18 @@ export function OfferReview({
   open,
   onClose,
   lines,
+  onQuantity,
+  onRemove,
   onSubmit,
   onSent,
 }: {
   open: boolean;
   onClose: () => void;
   lines: OfferLine[];
+  /** The stepper on a line moved; the caller clamps and keeps it. */
+  onQuantity: (key: string, value: number) => void;
+  /** A line's Remove was pressed. */
+  onRemove: (key: string) => void;
   onSubmit: (message: string) => Promise<OfferOutcome>;
   /** Called once an offer landed, so the caller can clear its selection. */
   onSent: () => void;
@@ -105,6 +124,12 @@ export function OfferReview({
     setSent(null);
     setMessage("");
     onClose();
+  };
+
+  /* Removing the last line closes the review: nothing left to review. */
+  const remove = (key: string) => {
+    if (lines.length === 1) close();
+    onRemove(key);
   };
 
   const send = () => {
@@ -175,28 +200,52 @@ export function OfferReview({
         <div className="flex flex-col gap-3">
           <ul className="flex flex-col gap-2">
             {lines.map((line) => (
-              <li key={line.key} className="flex items-center gap-3">
-                <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
-                  {line.imageUrl && (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={line.imageUrl}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  )}
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-semibold text-text-primary">
-                    {line.name}
+              <li
+                key={line.key}
+                className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
+                    {line.imageUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={line.imageUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    )}
                   </span>
-                  <span className="truncate text-xs text-text-muted">
-                    {line.printingLabel ?? "Any printing"}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-semibold text-text-primary">
+                      {line.name}
+                    </span>
+                    <span className="truncate text-xs text-text-muted">
+                      {line.printingLabel ?? "Any printing"}
+                    </span>
                   </span>
-                </span>
-                <span className="shrink-0 text-sm font-semibold text-accent tabular-nums">
-                  {line.quantity} {line.quantity === 1 ? "copy" : "copies"}
-                </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Remove ${line.name}`}
+                    onClick={() => remove(line.key)}
+                    className="shrink-0"
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                    Remove
+                  </Button>
+                </div>
+                {/* How many, capped at what the line allows: the card's
+                    remaining, or its quantity before anything is found. */}
+                <div className="pl-[3.25rem]">
+                  <Stepper
+                    value={line.quantity}
+                    min={1}
+                    max={line.max}
+                    label={`copies of ${line.name}`}
+                    onChange={(value) => onQuantity(line.key, value)}
+                  />
+                </div>
               </li>
             ))}
           </ul>
