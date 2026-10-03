@@ -204,6 +204,11 @@ export default async function AdminReportsPage({
             label="Embers earned by trading"
             value={embers.earned}
           />
+          <StatTile
+            icon={Flame}
+            label="Embers from attendance and grants"
+            value={embers.earnedOther}
+          />
           <StatTile icon={Flame} label="Embers reversed" value={embers.reversed} />
           <StatTile
             icon={Handshake}

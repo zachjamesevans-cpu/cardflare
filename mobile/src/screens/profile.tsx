@@ -684,9 +684,9 @@ export function ProfileScreen() {
     <View style={{ gap: spacing(3) }}>
       <View style={{ flexDirection: "row", gap: spacing(3) }}>
         <Stat
-          label="Earned by trading, all time"
+          label="Earned, all time"
           value={profile.embersEarned}
-          note="Public. The number on your badge. Trades are the only thing that raise it, and it never goes down."
+          note="Public. The number on your badge. Trades, turning up at your stores and grants raise it, and it never goes down."
         />
       </View>
 

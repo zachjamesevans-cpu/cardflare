@@ -12,6 +12,7 @@ import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { playerForUser } from "@/lib/players/accounts";
+import { mergeFlareRows } from "@/lib/players/want-rows";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { huntsFor } from "@/lib/players/hunts";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
@@ -125,7 +126,9 @@ export default async function FlarePage({
     ]);
   /* One list, both directions: what you are looking for and what you
      are offering, since you posted both here. */
-  const wants = asked && offering ? [...asked, ...offering] : asked;
+  const wants = mergeFlareRows(
+    asked && offering ? [...asked, ...offering] : (asked ?? []),
+  );
 
   return (
     <>

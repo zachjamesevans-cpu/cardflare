@@ -43,7 +43,10 @@ export interface TradeRow {
 }
 
 export interface EmbersReport {
+  /** Earned by trading in the window: ledger rows with reason "trade". */
   earned: number;
+  /** Earned any other way in the window: attendance and grants. */
+  earnedOther: number;
   reversed: number;
   topEarners: EarnerRow[];
   busyPairs: PairRow[];
@@ -54,6 +57,7 @@ export interface EmbersReport {
 
 const EMPTY: EmbersReport = {
   earned: 0,
+  earnedOther: 0,
   reversed: 0,
   topEarners: [],
   busyPairs: [],
@@ -92,10 +96,19 @@ export async function embersReport(range: ReportRange): Promise<EmbersReport> {
   const rows = ledger ?? [];
   const earnedBy = new Map<string, number>();
   let earned = 0;
+  let earnedOther = 0;
   let reversed = 0;
   for (const row of rows) {
     if (row.reason === "reversal") {
       reversed += -row.balance_delta;
+      continue;
+    }
+    /* One definition, named: "earned by trading" is reason "trade" and
+       nothing else. The second audit read 6 here against 0 trades,
+       because attendance and grants were summed under the trading
+       label. They have their own number now. */
+    if (row.earned_delta > 0 && row.reason !== "trade") {
+      earnedOther += row.earned_delta;
       continue;
     }
     if (row.earned_delta > 0) {
@@ -257,6 +270,7 @@ export async function embersReport(range: ReportRange): Promise<EmbersReport> {
 
   return {
     earned,
+    earnedOther,
     reversed,
     topEarners: earners.slice(0, 10),
     busyPairs: [...pairs.values()]

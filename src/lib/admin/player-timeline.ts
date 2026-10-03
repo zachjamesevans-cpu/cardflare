@@ -3,6 +3,7 @@ import "server-only";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { emailForPlayer } from "@/lib/players/accounts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { profileStats } from "@/lib/players/stats";
 
 /**
  * One player's activity, for the admin handling a support question or
@@ -22,7 +23,9 @@ export type ActivityKind =
   | "report-filed"
   | "report-received"
   | "block"
-  | "embers";
+  | "embers"
+  | "offer"
+  | "logged";
 
 export interface ActivityItem {
   kind: ActivityKind;
@@ -41,14 +44,17 @@ export interface PlayerTimeline {
     email: string | null;
     tier: string;
     createdAt: string;
-    /** Last seen in a room, or null. */
+    /** Last seen in a room: the newest seat's last_seen_at, or null. */
     lastActiveAt: string | null;
     embersBadge: number;
     embersBalance: number;
   };
   counts: {
     rooms: number;
+    /** Open Flares, wants and offerings: the profile's number. */
     flares: number;
+    /** Every Flare row ever written, room copies and taken-down ones included. */
+    flareRows: number;
     posts: number;
     hunts: number;
     trades: number;
@@ -81,11 +87,6 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
     .eq("player_id", playerId);
   const sessionIds = (sessions ?? []).map((row) => row.id);
   const sessionList = sessionIds.map((id) => `"${id}"`).join(",");
-  const lastActiveAt =
-    (sessions ?? [])
-      .map((row) => row.last_seen_at)
-      .sort()
-      .at(-1) ?? null;
 
   const [
     email,
@@ -100,6 +101,10 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
     reportsReceived,
     blocks,
     ledger,
+    offers,
+    logged,
+    openFlares,
+    seats,
   ] = await Promise.all([
     emailForPlayer(playerId),
     sessionIds.length > 0
@@ -115,7 +120,10 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
         }),
     admin
       .from("flares")
-      .select("id, created_at, card_id, intent, status, event_id", { count: "exact" })
+      .select(
+        "id, created_at, updated_at, card_id, intent, status, event_id, found_quantity",
+        { count: "exact" },
+      )
       .or(
         [
           `player_id.eq.${playerId}`,
@@ -195,13 +203,79 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
       .eq("player_id", playerId)
       .order("created_at", { ascending: false })
       .limit(PER_SOURCE),
+    /* Offers the player made on other people's Flares. The second
+       audit: "no offers (you offered on Soupie's cards)". */
+    sessionIds.length > 0
+      ? admin
+          .from("flare_responses")
+          .select("id, created_at, flare_id, quantity")
+          .in("responder_session_id", sessionIds)
+          .order("created_at", { ascending: false })
+          .limit(PER_SOURCE)
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            created_at: string;
+            flare_id: string;
+            quantity: number;
+          }[],
+        }),
+    /* Trades written down by hand, off CardFlare. */
+    admin
+      .from("logged_trades")
+      .select(
+        "id, created_at, card_id, direction, partner_name, partner_player_id, traded_on",
+      )
+      .eq("player_id", playerId)
+      .order("traded_on", { ascending: false })
+      .limit(PER_SOURCE),
+    /* The profile's own number: open wants plus offerings. */
+    profileStats(playerId),
+    /* "Last in a room" is a seat's clock, not a session's: a session's
+       last_seen_at moves on every page, so it read 19h ago right after
+       the player posted into a night. */
+    sessionIds.length > 0
+      ? admin
+          .from("event_participants")
+          .select("last_seen_at, joined_at")
+          .in("player_session_id", sessionIds)
+          .order("last_seen_at", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: [] as { last_seen_at: string; joined_at: string }[] }),
   ]);
+  const lastActiveAt = seats.data?.[0]?.last_seen_at ?? null;
+  /* The Flares behind the offers, for a card name and a room. */
+  const offerFlareIds = [...new Set((offers.data ?? []).map((row) => row.flare_id))];
+  const { data: offerFlares } =
+    offerFlareIds.length > 0
+      ? await admin
+          .from("flares")
+          .select("id, card_id, event_id")
+          .in("id", offerFlareIds)
+      : { data: [] as { id: string; card_id: string; event_id: string | null }[] };
+  const offerFlareById = new Map((offerFlares ?? []).map((row) => [row.id, row]));
+  const partnerIds = [
+    ...new Set(
+      (logged.data ?? []).flatMap((row) =>
+        row.partner_player_id ? [row.partner_player_id] : [],
+      ),
+    ),
+  ];
+  const { data: partners } =
+    partnerIds.length > 0
+      ? await admin.from("players").select("id, display_name").in("id", partnerIds)
+      : { data: [] as { id: string; display_name: string }[] };
+  const partnerName = new Map(
+    (partners ?? []).map((row) => [row.id, row.display_name]),
+  );
 
   /* Names for the ids the rows carry: cards, rooms and their stores. */
   const cardIds = [
     ...new Set([
       ...(flares.data ?? []).map((row) => row.card_id),
       ...(trades.data ?? []).map((row) => row.card_id),
+      ...(offerFlares ?? []).map((row) => row.card_id),
+      ...(logged.data ?? []).map((row) => row.card_id),
     ]),
   ];
   const eventIds = [
@@ -209,6 +283,7 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
       ...(rooms.data ?? []).map((row) => row.event_id),
       ...(flares.data ?? []).flatMap((row) => (row.event_id ? [row.event_id] : [])),
       ...(trades.data ?? []).flatMap((row) => (row.event_id ? [row.event_id] : [])),
+      ...(offerFlares ?? []).flatMap((row) => (row.event_id ? [row.event_id] : [])),
     ]),
   ];
 
@@ -267,6 +342,55 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
             : `, ${row.status}`
       }`,
       href: roomHref(row.event_id),
+    })),
+    /* A Flare that came down, and one found: the second audit, "no
+       take-down entry, no found updates". The posting row above keeps
+       its own line, at its own time. */
+    ...(flares.data ?? []).flatMap((row) => {
+      const name = cardName.get(row.card_id) ?? "a card";
+      const out: ActivityItem[] = [];
+      if (row.status === "cancelled" && row.updated_at !== row.created_at) {
+        out.push({
+          kind: "flare" as const,
+          at: row.updated_at,
+          text: `Took down ${name}`,
+          href: roomHref(row.event_id),
+        });
+      }
+      if ((row.found_quantity ?? 0) > 0 && row.status !== "traded") {
+        out.push({
+          kind: "flare" as const,
+          at: row.updated_at,
+          text: `Found ${row.found_quantity} of ${name}`,
+          href: roomHref(row.event_id),
+        });
+      }
+      return out;
+    }),
+    ...(offers.data ?? []).map((row) => {
+      const flare = offerFlareById.get(row.flare_id);
+      return {
+        kind: "offer" as const,
+        at: row.created_at,
+        text: `Offered ${row.quantity > 1 ? `${row.quantity} of ` : ""}${
+          flare ? (cardName.get(flare.card_id) ?? "a card") : "a card"
+        }${flare?.event_id ? ` in ${roomLabel(flare.event_id) ?? "a room"}` : ""}`,
+        href: roomHref(flare?.event_id ?? null),
+      };
+    }),
+    ...(logged.data ?? []).map((row) => ({
+      kind: "logged" as const,
+      at: `${row.traded_on}T12:00:00.000Z`,
+      text: `Wrote down a trade: ${row.direction === "got" ? "got" : "gave"} ${
+        cardName.get(row.card_id) ?? "a card"
+      }${
+        row.partner_player_id
+          ? ` with ${partnerName.get(row.partner_player_id) ?? "a player"}`
+          : row.partner_name
+            ? ` with ${row.partner_name}`
+            : ""
+      }`,
+      href: null,
     })),
     ...(posts.data ?? []).map((row) => ({
       kind: "post" as const,
@@ -355,7 +479,8 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
     },
     counts: {
       rooms: rooms.count ?? 0,
-      flares: flares.count ?? 0,
+      flares: openFlares.flares,
+      flareRows: flares.count ?? 0,
       posts: posts.count ?? 0,
       hunts: hunts.count ?? 0,
       trades: trades.count ?? 0,
