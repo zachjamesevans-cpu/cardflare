@@ -85,7 +85,9 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
           onClick={() => setOpen(true)}
           className="flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-[var(--radius-control)] text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
         >
-          <span className="flex size-16 items-center justify-center rounded-full border border-dashed border-border-strong">
+          {/* A binder's outline, dashed: the xs cover's 58x76 box with
+              its corners, so the tile sits level with the binders. */}
+          <span className="flex h-[76px] w-[58px] items-center justify-center rounded-l-[2px] rounded-r-[6px] border border-dashed border-border-strong">
             <Plus className="size-6" aria-hidden="true" />
           </span>
           <span className="text-[11px] leading-none">New</span>

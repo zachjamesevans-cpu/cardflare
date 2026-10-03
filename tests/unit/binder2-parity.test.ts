@@ -131,16 +131,17 @@ describe("the cover: the colour and the name, no picture", () => {
   });
 });
 
-describe("the highlights: colour plus initial", () => {
-  it("draws each circle as the cover colour with the first letter in the spine colour", () => {
-    expect(web.highlights).toContain("binderInitial(binder.name)");
-    expect(web.highlights).toContain("style={{ background: edge, color: spine }}");
-    expect(web.highlights).toContain("font-bold");
+describe("the highlights: the binder itself, small", () => {
+  it("draws each one as the cover at xs, no circle, no initial, no picture", () => {
+    expect(web.highlights).toContain(
+      '<BinderCover cover={binder.cover} size="xs" plain />',
+    );
+    expect(web.highlights).not.toContain("binderInitial");
     expect(web.highlights).not.toContain("<img");
-    expect(app.highlights).toContain("binderCover(binder.cover)");
-    expect(app.highlights).toMatch(/slice\(0,\s*1\)|charAt\(0\)|\[0\]|\.at\(0\)/);
-    expect(app.highlights).toContain("spine");
-    expect(app.highlights).toMatch(/fontWeight:\s*"(700|800|bold)"/);
+    expect(app.highlights).toContain(
+      '<BinderCover cover={binder.cover} size="xs" plain />',
+    );
+    expect(app.highlights).not.toContain("binderInitial");
     expect(app.highlights).not.toContain("RemoteImage");
     expect(app.highlights).not.toContain("frontImageUrl");
   });
