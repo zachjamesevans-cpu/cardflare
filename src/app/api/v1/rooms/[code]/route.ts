@@ -5,11 +5,13 @@ import { apiPlayer, apiSession, badRequest } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import {
+  countParticipants,
   findParticipation,
   joinEvent,
   listParticipants,
   touchParticipation,
 } from "@/lib/events/participants";
+import { findStoreById } from "@/lib/events/repository";
 import { enterRoomByCode, resolveCode } from "@/lib/events/rooms";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import {
@@ -92,6 +94,25 @@ function normalized(raw: string): string | null {
   return isValidJoinCode(code) ? code : null;
 }
 
+/**
+ * The store's public contact lines for the night's Event details:
+ * where it is, how to call, where to read more. Read off the store
+ * row rather than the published listing, because a room runs at a
+ * store whether or not its page is published yet. Nulls when the shop
+ * has not said.
+ */
+async function storeContact(
+  storeId: string,
+): Promise<{ address: string | null; phone: string | null; website: string | null }> {
+  const store = await findStoreById(storeId);
+  if (!store) return { address: null, phone: null, website: null };
+  const address =
+    [store.address_line, store.city, store.region, store.postal_code]
+      .filter(Boolean)
+      .join(", ") || null;
+  return { address, phone: store.phone, website: store.website };
+}
+
 export async function GET(request: Request, { params }: Params): Promise<Response> {
   const code = normalized((await params).code);
   if (!code) return Response.json({ error: "not-found" }, { status: 404 });
@@ -155,8 +176,14 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   const phase = roomPhase(room, Date.now());
 
   /* Who has said Going, and whether this account has: the Going button's
-     first paint, on the joined and the not-joined answer alike. */
-  const going = await goingState(room.id, account?.playerId ?? null);
+     first paint, on the joined and the not-joined answer alike. Beside
+     it, who is here now and the store's contact lines, for the compact
+     header and the Event details disclosure. */
+  const [going, attendance, store] = await Promise.all([
+    goingState(room.id, account?.playerId ?? null),
+    countParticipants([room.id]),
+    storeContact(room.storeId),
+  ]);
 
   const base = {
     state: "room" as const,
@@ -179,6 +206,11 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       phase,
       goingCount: going.goingCount,
       youGoing: going.youGoing,
+      /* Seen in the last fifteen minutes. The header's "3 here now",
+         drawn only while the night is early or live and the count is
+         above zero; a finished night clears to nothing. */
+      hereNow: boardReadable(phase) ? (attendance.get(room.id)?.present ?? 0) : 0,
+      store,
     },
     following,
   };

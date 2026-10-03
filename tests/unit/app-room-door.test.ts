@@ -3,97 +3,104 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The app's Room tab after the redesign, read off its source.
+ * The app's Room screen, read off its source.
  *
- * The founder: "There's just so many blocks... moving the remote from a
- * big block to a small little remote icon if they have access to it.
- * It's all just disconnected and want it to flow better." The page is
- * two cards now: the door (store, night's name with two round icons,
- * a meta line that opens the people list) and the board (every Flare,
- * players separated by hairlines, a foot row for what you are still
- * after), with one button under them. These pins hold the words and
- * the shape; nobody here has a renderer, so what a phone draws is not
- * what they prove.
+ * The founder, on the old page: "There's just so many blocks... It's
+ * all just disconnected and want it to flow better." And in Nights
+ * round 2: "REMOVE REPEATED INFORMATION", "USE LESS CONTAINERIZATION",
+ * "The current giant lime 'Post a Flare' bar is too visually
+ * dominant." So the page is one compact header (the store with its
+ * glyph, the night's name with two round icons at the end of its
+ * line, when, one line of RSVP and attendance), the sections under it
+ * divided by labels and hairlines, the board with players split by
+ * hairlines, and a floating "+ Flare" button. These pins hold the
+ * words and the shape; nobody here has a renderer, so what a phone
+ * draws is not what they prove.
  */
 
 const read = (path: string) =>
   readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
 
 const room = read("mobile/src/screens/room.tsx");
-const people = read("mobile/src/room-people.tsx");
+const header = read("mobile/src/night-header.tsx");
 const composer = read("mobile/src/screens/flare-composer.tsx");
+const fab = read("mobile/src/flare-fab.tsx");
 const app = read("mobile/App.tsx");
 
-/** The joined room's screen, from the door card to the action bar. */
+/** The night's screen, from the header to the end of the component. */
 const joined = room.slice(
-  room.indexOf("THE DOOR CARD"),
+  room.indexOf("THE HEADER"),
   room.indexOf("/** The website's pledge arithmetic"),
 );
 
-describe("the door card", () => {
-  it("puts the remote and the help door on the night's name line", () => {
-    const door = joined.slice(0, joined.indexOf("THE BOARD CARD"));
-    /* Name and icons share one row: the name first, then the two. */
-    expect(door).toMatch(
-      /<Text style=\{styles\.nightName\}>\{room\.name\}<\/Text>[\s\S]*?<RemoteEntry \/>[\s\S]*?<DoorIconButton[\s\S]*?icon="help-circle-outline"[\s\S]*?label="How a night works"/,
+describe("the header", () => {
+  it("is the one NightHeader, with the remote and the help door at the name's end", () => {
+    const top = joined.slice(0, joined.indexOf("THE BOARD:"));
+    expect(top).toMatch(
+      /<NightHeader[\s\S]*?right=\{[\s\S]*?<RemoteEntry \/>[\s\S]*?<DoorIconButton[\s\S]*?icon="help-circle-outline"[\s\S]*?label="How a night works"/,
     );
-    expect(door).toContain("setTournamentHelp(true)");
+    expect(top).toContain("setTournamentHelp(true)");
     /* Both come from one place, so they cannot drift apart. */
     expect(room).toContain(
       'import { DoorIconButton, RemoteEntry } from "../remote-entry";',
     );
+    /* The header draws the name uppercase by style, never in the data. */
+    expect(header).toContain('textTransform: "uppercase"');
+    expect(header).not.toContain("toUpperCase()");
   });
 
-  it("has a meta line that opens the people list", () => {
-    const door = joined.slice(0, joined.indexOf("THE BOARD CARD"));
-    expect(door).toContain('accessibilityLabel="Who\'s here"');
-    expect(door).toContain("setPeopleOpen(true)");
-    expect(door).toContain("here now");
-    expect(door).toContain("tonight");
-    /* Up to three present faces, tiny and overlapping, present first.
-       From the deduped list: an account in from two devices is one
-       face and one in the count, the website's room-door rule. */
+  it("says attendance once, on the header's line, and nowhere else", () => {
+    expect(joined).toContain("playersCount={playersCount}");
+    expect(joined).toContain("hereNow={hereNow}");
+    expect(header).toContain("{playersLine(playersCount)}");
+    expect(header).toContain("{hereNowLine(hereNow)}");
+    /* The old meta line, the people sheet and the roster card are gone. */
+    expect(room).not.toContain('accessibilityLabel="Who\'s here"');
+    expect(room).not.toContain("tonight ·");
+    expect(room).not.toContain("RoomPeopleModal");
+    expect(room).not.toContain("peopleOpen");
+    expect(room).not.toContain("function RosterCard");
+    /* People, not seats: an account in from two devices is one in the
+       count, the website's room-door rule. */
     expect(room).toContain("const people = dedupeParticipants(participants);");
-    expect(room).toContain("const hereNow = people.filter((p) => p.present).length;");
     expect(room).toContain(
-      "const faces = people.filter((p) => p.present).slice(0, 3);",
+      "const hereNow = room.hereNow ?? people.filter((p) => p.present).length;",
     );
-    expect(people).toContain("export function dedupeParticipants(");
-    expect(door).toMatch(/marginLeft: index === 0 \? 0 : -6/);
-    expect(door).toMatch(/<PlayerAvatar[\s\S]*?size=\{22\}/);
   });
 
   it("has lost the old text link, counts and remote card", () => {
     expect(room).not.toContain("New to tournaments?");
     expect(room).not.toContain("Here's how a night works");
     expect(room).not.toContain("Open remote");
-    /* The remote is on the door card now, not a block above it. */
-    expect(joined.indexOf("<RemoteEntry />")).toBeGreaterThan(
-      joined.indexOf("styles.nightName"),
-    );
+    expect(room).not.toContain("styles.nightName");
   });
 });
 
-describe("the board card", () => {
+describe("the board section", () => {
   const board = joined.slice(
-    joined.indexOf("THE BOARD CARD"),
-    joined.indexOf("<Title>Traded tonight</Title>"),
+    joined.indexOf("THE BOARD:"),
+    joined.indexOf('label="Traded tonight"'),
   );
 
-  it("is one card headed Flares in the room, players split by hairlines", () => {
-    expect(board).toContain("<Title>Flares in the room</Title>");
+  it("is one section labelled Flares at this Night, players split by hairlines, with the filter on its line", () => {
+    expect(board).toContain("label={FLARES_AT_THIS_NIGHT}");
+    expect(board).toContain(
+      "right={<FlareFilterRow value={filter} onChange={setFilter} />}",
+    );
+    expect(room).not.toContain("<Title>Flares in the room</Title>");
     expect(room).not.toContain("Newest first");
-    /* The per-player groups are Views inside the one card. */
+    /* The per-player groups are Views inside the one section. */
     expect(board).toMatch(/<View\s+key=\{sessionId\}/);
     expect(board).not.toMatch(/<Card key=\{sessionId\}/);
     expect(board).toContain("borderTopWidth: index === 0 ? 0 : 1");
     expect(board).toContain("borderTopColor: colors.border");
   });
 
-  it("says the empty line inside the card", () => {
+  it("says the empty line inside the section, by filter", () => {
     expect(board).toContain(
       "Nothing posted yet. Yours would be the first one on the board tonight.",
     );
+    expect(board).toContain(": emptyFilterLine(filter)}");
     expect(room).not.toContain("No Flares yet");
   });
 
@@ -123,8 +130,8 @@ describe("a long section folds", () => {
    * with the same words.
    */
   const board = joined.slice(
-    joined.indexOf("THE BOARD CARD"),
-    joined.indexOf("<Title>Traded tonight</Title>"),
+    joined.indexOf("THE BOARD:"),
+    joined.indexOf('label="Traded tonight"'),
   );
 
   it("names the count once, as SECTION_FOLD = 6", () => {
@@ -149,13 +156,13 @@ describe("a long section folds", () => {
       "const folded = total > SECTION_FOLD && !foldOpen[sessionId];",
     );
     expect(board).toMatch(
-      /const toggleFold = \(\) => \{\s*LayoutAnimation\.configureNext\(LayoutAnimation\.Presets\.easeInEaseOut\);\s*setFoldOpen/,
+      /const toggleFold = \(\) => \{\s*LayoutAnimation\.configureNext\(\s*LayoutAnimation\.Presets\.easeInEaseOut,?\s*\);\s*setFoldOpen/,
     );
   });
 
   it("cuts the rail and the stacked list, each in its own drawn order", () => {
-    expect(board).toContain(
-      "const railShown = folded ? orderedRail.slice(0, SECTION_FOLD) : orderedRail;",
+    expect(board).toMatch(
+      /const railShown = folded\s*\? orderedRail\.slice\(0, SECTION_FOLD\)\s*: orderedRail;/,
     );
     expect(board).toContain("{railWantsShown.map(tile)}");
     expect(board).toContain("{railShowcasesShown.map(tile)}");
@@ -189,38 +196,32 @@ describe("a long section folds", () => {
   });
 });
 
-describe("the people list", () => {
-  it("replaces the In this room card with a Who's here modal", () => {
+describe("the profile popup", () => {
+  it("still opens from a board header's face, and leaves for the profile screen", () => {
     expect(room).not.toContain("<Title>In this room</Title>");
     expect(room).not.toContain("rosterOpen");
-    expect(room).toContain(
-      'import { dedupeParticipants, RoomPeopleModal } from "../room-people";',
-    );
+    expect(room).toContain('import { dedupeParticipants } from "../room-people";');
     expect(room).toMatch(
-      /<RoomPeopleModal[\s\S]*?open=\{peopleOpen\}[\s\S]*?onPeek=\{setPeek\}/,
+      /<PlayerPeekModal[\s\S]*?playerId=\{peek\}[\s\S]*?navigation\.navigate\("PlayerProfile", \{ playerId \}\)/,
     );
-
-    expect(people).toContain("Who&rsquo;s here");
-    expect(people).toContain('import { SheetBackdrop } from "./action-menu";');
-    expect(people).toContain("<SheetBackdrop />");
-    expect(people).toContain('animationType="fade"');
-    expect(people).toContain('accessibilityLabel="Close"');
-    /* The rows the fold drew: present first, dimmed away, the tag. */
-    expect(people).toContain("Number(b.present) - Number(a.present)");
-    expect(people).toContain("dimmed={!p.present}");
-    expect(people).toContain("<OpenToTradesTag />");
-    expect(people).toContain("onPeek(p.playerId!)");
+    expect(room).toContain("setPeek(playerBySession.get(sessionId)!)");
   });
 });
 
 describe("the one button", () => {
-  it("is Post a Flare, carrying whether you are open to trades", () => {
-    const bar = joined.slice(joined.indexOf("styles.actionBar"));
-    expect(bar).toContain('label="Post a Flare"');
-    expect(bar).toContain(
+  it("is the floating + Flare, carrying whether you are open to trades, and the bar is gone", () => {
+    const foot = joined.slice(joined.indexOf("<FlareFab"));
+    expect(foot).toContain(
       'navigation.navigate("PostFlare", { code, openToTrades: youOpen })',
     );
-    expect(bar).not.toContain("I'm open to trades");
+    expect(joined).toContain("{joined && writable ? (");
+    expect(room).not.toContain("styles.actionBar");
+    expect(room).not.toContain("ACTION_BAR_HEIGHT");
+    expect(room).not.toContain('label="Post a Flare"');
+    expect(fab).toContain("accessibilityLabel={POST_A_FLARE}");
+    expect(fab).toContain('position: "absolute"');
+    /* The undo rides above the floating button. */
+    expect(joined).toContain("bottom={FAB_HEIGHT + bottomClear + spacing(6)}");
     /* One mention of the toggle on the whole screen: the guest row. */
     expect(joined.split("I'm open to trades")).toHaveLength(2);
   });

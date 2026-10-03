@@ -1,27 +1,30 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { CalendarClock, MapPin } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
 import { FlareComposer } from "@/components/flares/flare-composer";
 import { AccountPitch } from "@/components/players/account-pitch";
-import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { FlareBoard } from "@/components/lists/list-entries";
+import { EarlyBanner } from "@/components/events/early-banner";
+import { EventDetails } from "@/components/events/event-details";
+import { FlaresAtNight, OffersNote } from "@/components/events/flares-at-night";
 import { JoinEventForm } from "@/components/events/join-event-form";
-import { MatchSummary } from "@/components/matching/match-summary";
-import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import { MatchesForYou } from "@/components/events/matches-for-you";
 import {
-  NightRosterCard,
-  PreStartCard,
-  PreStartRoom,
-} from "@/components/events/pre-start-room";
+  NightHeader,
+  NightShell,
+  nightWhenLine,
+} from "@/components/events/night-header";
+import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import { dedupeRoster, PlayersGoing } from "@/components/events/players-going";
+import { ReadOnlyBoard } from "@/components/events/pre-start-room";
 import { RoomBoardCard } from "@/components/events/room-board-card";
 import { RoomComposerDoor } from "@/components/events/room-composer-door";
 import { RoomDoor } from "@/components/events/room-door";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { RoomTimers } from "@/components/event-hub/room-timers";
+import { WhatToBring } from "@/components/events/what-to-bring";
 import { ShowSearch } from "@/components/shows/show-search";
 import { RoomLoading } from "@/components/events/room-loading";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
@@ -36,7 +39,6 @@ import {
 } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { getPlayerSession } from "@/lib/players/session";
-import { SITE } from "@/lib/site";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { showAvailability } from "@/lib/shows/repository";
@@ -57,14 +59,16 @@ import {
   matchFor,
   offersByFlare,
 } from "@/lib/matching/schema";
-import { roomPhase } from "@/lib/events/schema";
+import { boardReadable, boardWritable, roomPhase } from "@/lib/events/schema";
 import { goingState, nightRoster } from "@/lib/events/going";
+import { EMPTY_MATCHES, nightMatches } from "@/lib/events/night-matches";
 import { gameProfile } from "@/lib/event-hub/game-profiles";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import { organizerStoresFor } from "@/lib/stores/staff";
+import { publicStore } from "@/lib/stores/public-profile";
 import { listMyTrades } from "@/lib/trades/repository";
-import { cn } from "@/lib/cn";
+import type { ListEntry } from "@/lib/lists/repository";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -75,50 +79,10 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/**
- * `wide` is for a player who is actually in the room. Everything else here —
- * a join form, an error, a closed event — is a single card that should stay
- * narrow and centred; a room with Flare boards in it needs the space.
- */
-function Shell({
-  children,
-  wide = false,
-}: {
-  children: React.ReactNode;
-  /** Wide is for a player in the room; everything else stays narrow. */
-  wide?: boolean;
-}) {
-  return (
-    <>
-      <main
-        id="main"
-        className={cn(
-          "flex min-h-dvh flex-col items-center justify-start gap-3 px-5 pt-5 pb-16 sm:gap-5 sm:pt-10",
-        )}
-      >
-        <Link href="/feed" aria-label={`${SITE.name} feed`}>
-          <Logo size={40} priority />
-        </Link>
-        <div
-          className={cn("flex w-full flex-col gap-3", wide ? "max-w-2xl" : "max-w-md")}
-        >
-          {children}
-        </div>
-
-        {/* The board's last control must not hide under the tab bar. */}
-        <TabBarSpacer />
-      </main>
-
-      {/* The app's bottom bar, so a room feels the same in both. */}
-      <PlayerTabBar />
-    </>
-  );
-}
-
 /** Shown when the code is well-formed but cannot be checked right now. */
 function Unavailable() {
   return (
-    <Shell>
+    <NightShell>
       <Card className="flex flex-col gap-2">
         <h1 className="text-xl font-bold text-text-primary">
           We can&rsquo;t check that code right now
@@ -127,7 +91,17 @@ function Unavailable() {
           Nothing is wrong with the code on the sheet. Give it a moment and scan again.
         </p>
       </Card>
-    </Shell>
+    </NightShell>
+  );
+}
+
+/** A short note under the header, in the accent's tint: not a card. */
+function Note({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-[var(--radius-control)] border border-accent/30 bg-accent/[0.07] px-3 py-2 text-sm">
+      <p className="font-semibold text-text-primary">{title}</p>
+      <p className="text-text-secondary">{children}</p>
+    </div>
   );
 }
 
@@ -168,7 +142,7 @@ async function RoomBody({
 }) {
   /*
    * Set by the join action when the tap picked up a seat this account
-   * already had — from the app, or from this browser earlier. Saying so is
+   * already had: from the app, or from this browser earlier. Saying so is
    * the point: a join that appears to do nothing is exactly what a duplicate
    * used to look like from the inside.
    */
@@ -203,15 +177,15 @@ async function RoomBody({
 
   /*
    * A signed-in player joins as themselves rather than filling in a name.
-   * Resolved once here because both doors into a room — the walk-in lobby
-   * and the open board — ask the same question.
+   * Resolved once here because both doors into a room, the walk-in lobby
+   * and the open board, ask the same question.
    */
   const accountName = (await accountIdentity(await getViewer()))?.displayName;
 
   /*
    * A card show: search-only, sessionless on purpose. An attendee in a
    * convention hall gets "booth A12 has it" with nothing between them and
-   * the answer — no name, no join, no account.
+   * the answer: no name, no join, no account.
    */
   if (resolved.outcome === "show") {
     const show = resolved.show;
@@ -219,7 +193,7 @@ async function RoomBody({
 
     /*
      * The wants a signed-in attendee carries meet the hall's inventory the
-     * moment they scan in — no search, no asking every vendor. Guests get
+     * moment they scan in: no search, no asking every vendor. Guests get
      * the same search box as always; this panel simply never renders.
      */
     const showViewer = await getViewer();
@@ -243,7 +217,7 @@ async function RoomBody({
     );
 
     return (
-      <Shell wide>
+      <NightShell wide>
         <Card className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-accent">Card show</p>
@@ -298,22 +272,22 @@ async function RoomBody({
         )}
 
         <ShowSearch code={normalized} />
-      </Shell>
+      </NightShell>
     );
   }
 
   /* Walk-in trading is off and no event is running. */
   if (resolved.outcome === "quiet") {
     return (
-      <Shell>
+      <NightShell>
         <StoreQuiet storeName={resolved.store.name} earlyBoard={resolved.earlyBoard} />
-      </Shell>
+      </NightShell>
     );
   }
 
   /*
    * Nothing open yet, but walk-in trading is allowed. Looking at this page
-   * does not open the room — submitting the form does, so an empty session
+   * does not open the room: submitting the form does, so an empty session
    * never lands in the store's history because somebody glanced at the counter
    * on their way past.
    */
@@ -321,7 +295,7 @@ async function RoomBody({
     const waiting = await getPlayerSession();
 
     return (
-      <Shell>
+      <NightShell>
         <StoreLobby
           storeName={resolved.store.name}
           code={normalized}
@@ -329,7 +303,7 @@ async function RoomBody({
           accountName={accountName}
           earlyBoard={resolved.earlyBoard}
         />
-      </Shell>
+      </NightShell>
     );
   }
 
@@ -349,26 +323,31 @@ async function RoomBody({
   /*
    * One phase, decided once, rendered everywhere below. "early" is a real
    * room days before doors: the join form works, the board works, and a
-   * loud banner says the people on it are still on their way. "upcoming"
-   * is the night from the moment the store posts it: browsable by
-   * anyone, and Going is the way onto it.
+   * one-line banner says the people on it are still on their way.
+   * "upcoming" is the night from the moment the store posts it:
+   * browsable by anyone, and Going is the way onto it.
    */
   const phase = roomPhase(event);
 
   /*
-   * Before the night starts the room is open to look at. The founder:
-   * "anyone can go into there and see who is looking for which cards
-   * before the tournament or event starts." A viewer with a seat gets
-   * the working board; one without gets the same board read-only.
+   * The board is open to look at from the moment the night is posted
+   * until it closes, and read-only once it has (a night in Past keeps
+   * its board, so what was wanted is still there to see). A viewer
+   * with a seat gets the working board; one without gets the same
+   * board read-only.
    */
-  const preStart = phase === "upcoming" || phase === "early";
-  const browsing = preStart && !inRoom;
+  const readable = boardReadable(phase);
+  const writable = boardWritable(phase);
+  const finished = phase === "finished";
+  const browsing = (readable || finished) && !inRoom;
+  /* A scheduled night gets the compact header; a walk-in room keeps
+     its door, with the people list and the leave form behind it. */
+  const scheduled = event.kind !== "walk_in";
 
   /*
    * The lists are read for a player in the room, and the board alone
-   * for somebody browsing a night ahead of time. A visitor looking at a
-   * join form on a live night has no business causing a read of
-   * anybody's lists.
+   * for somebody browsing. A visitor looking at a join form on a night
+   * that never opened has no business causing a read of anybody's lists.
    */
   const [participants, flares, binder, roomOffers, myTrades] = inRoom
     ? await Promise.all([
@@ -381,13 +360,13 @@ async function RoomBody({
     : [[], browsing ? await listRoomFlares(event.id) : [], [], [], []];
 
   /* The tournament clocks, for anyone who cannot see the wall from
-     their seat — or stepped outside with the room in their pocket. */
+     their seat, or stepped outside with the room in their pocket. */
   const roomTimers = inRoom ? await roomTimersForStore(event.storeId) : [];
 
   /*
    * The counter check: which of the board's cards the store's synced
    * singles cover. Empty when the store has never synced, so the line
-   * simply never appears — no store setting, no toggle, no dead UI.
+   * simply never appears: no store setting, no toggle, no dead UI.
    */
   const counterHas = inRoom
     ? await counterAvailability(
@@ -426,16 +405,23 @@ async function RoomBody({
   }
 
   /*
-   * The night's roster and the viewer's place on it, before the night
-   * starts. Read after the link above, so an account that just signed
-   * in mid-night counts as going the moment its seat is its own.
+   * The night's roster, the viewer's place on it, and what Cardflare
+   * found for them: who has what they want, who wants what they have,
+   * and what to pack. Read after the link above, so an account that
+   * just signed in mid-night counts as going the moment its seat is
+   * its own. A guest gets no matches: matching runs on an account's
+   * wants and binder, and a finished night matches nobody.
    */
-  const [night, roster] = preStart
-    ? await Promise.all([
-        goingState(event.id, accountPlayerId),
-        nightRoster(event.id, accountPlayerId),
-      ])
-    : [null, []];
+  const [night, rawRoster, matches, store] = await Promise.all([
+    readable ? goingState(event.id, accountPlayerId) : Promise.resolve(null),
+    readable || finished ? nightRoster(event.id, accountPlayerId) : Promise.resolve([]),
+    readable && accountPlayerId
+      ? nightMatches(event.id, accountPlayerId)
+      : Promise.resolve(EMPTY_MATCHES),
+    scheduled ? publicStore(event.storeId, accountPlayerId) : Promise.resolve(null),
+  ]);
+  const roster = dedupeRoster(rawRoster);
+  const hereNow = roster.filter((player) => player.present).length;
 
   /*
    * The composer is the Flare tab's, given the same things: the hunts a
@@ -483,7 +469,7 @@ async function RoomBody({
   /*
    * The matching engine, such as it is: derived from the binder that was just
    * read rather than queried again, because the cross-reference *is* the
-   * binder. Computed for this viewer only — the room learns somebody can help
+   * binder. Computed for this viewer only: the room learns somebody can help
    * only when that somebody offers.
    */
   const held = heldByCard(binder);
@@ -496,7 +482,7 @@ async function RoomBody({
    * The imported collection joins the cross-reference the quiet way:
    * checked against the board rather than loaded whole. A card arrives
    * with exactly the printings the import proved from the file's own
-   * names — a proven alternate art matches a Flare for that alt art
+   * names: a proven alternate art matches a Flare for that alt art
    * exactly; an unproven one stays a key with no printings, which
    * `matchFor` honestly downgrades when a Flare names one.
    */
@@ -513,7 +499,7 @@ async function RoomBody({
     held.set(cardId, proven);
   }
 
-  const matches = new Map(
+  const boardMatches = new Map(
     flares.flatMap((entry) => {
       const match = matchFor(entry, held);
       return match ? [[entry.id, match] as const] : [];
@@ -534,7 +520,7 @@ async function RoomBody({
 
   /*
    * Read off the participant list that was already loaded rather than queried
-   * again — being open to trades is a property of being in the room, so the
+   * again: being open to trades is a property of being in the room, so the
    * answer is already in hand.
    */
   const openPlayers = participants
@@ -544,7 +530,7 @@ async function RoomBody({
   /*
    * Who each session is, keyed by session: their picture and their
    * lifetime Ember badge. Derived from the participant list that is
-   * already in hand rather than queried again — it is the same set of
+   * already in hand rather than queried again: it is the same set of
    * people, and a second query would be a second chance for the two
    * lists to disagree. Guests carry a null total and are left out, so
    * their header shows initials and no badge.
@@ -590,56 +576,109 @@ async function RoomBody({
    */
   const tickerMs = phase === "live" ? 12_000 : phase === "early" ? 60_000 : null;
 
-  return (
-    <Shell wide={inRoom || browsing}>
-      {/*
-       * The door: store, night, pulse. The people list opens from the
-       * pulse line; the remote and the help page are the two small
-       * round controls at the end of the night's name.
-       *
-       * A walk-in room has no schedule to report, and a player standing
-       * in the store does not need one. A scheduled event does: knowing
-       * when it finishes is how somebody decides whether to wait around.
-       * The help link is a scheduled event's too, for the person
-       * deciding whether to sit down next week; a walk-in room is just
-       * trading, where the question does not arise.
-       */}
-      <RoomDoor
-        storeId={event.storeId}
-        storeName={event.storeName}
-        storeVerified={event.storeVerified}
-        following={accountPlayerId ? followingStore : null}
-        code={normalized}
-        name={event.name}
-        when={
-          event.kind === "walk_in"
-            ? "Trading now"
-            : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)
-        }
-        location={location}
-        remoteHref={remoteHref}
-        helpHref={
-          event.kind !== "walk_in"
-            ? `/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`
-            : null
-        }
-        people={
-          inRoom && session
-            ? {
-                participants,
-                youId: session.id,
-                imagesEnabled: images,
-                flareCount: flares.length,
-              }
-            : null
-        }
-      />
+  /*
+   * The board, once per filter: everything, the Hunting Flares (intent
+   * "want") and the Offering ones (intent "showcase"). Server-rendered
+   * three times so every tile and every offer form is exactly the
+   * board's own, and the filter island only picks which is on screen.
+   * A filter with nothing behind it hands over null, and the island
+   * says so in one line.
+   */
+  const hunting = flares.filter((entry) => entry.intent === "want");
+  const offering = flares.filter((entry) => entry.intent === "showcase");
+  const boardFor = (entries: ListEntry[], all: boolean) => {
+    if (inRoom && session && !finished) {
+      if (!all && entries.length === 0) return null;
+      return (
+        <RoomBoardCard
+          empty={entries.length === 0 && openPlayers.length === 0}
+          guestTrades={
+            accountPlayerId ? null : (
+              <OpenToTradesToggle code={normalized} open={youAreOpen} />
+            )
+          }
+        >
+          <FlareBoard
+            entries={entries}
+            code={normalized}
+            imagesEnabled={images}
+            youId={session.id}
+            matches={boardMatches}
+            offers={offers}
+            openToTrades={openPlayers}
+            identities={boardIdentities}
+            counterHas={counterHas}
+            counterName={event.storeName}
+            heldCounts={heldCounts}
+            early={phase === "early"}
+          />
+        </RoomBoardCard>
+      );
+    }
+    if (!all && entries.length === 0) return null;
+    return <ReadOnlyBoard flares={entries} roster={roster} imagesEnabled={images} />;
+  };
 
-      {/* The pitch, to guests only, right under the door: the one thing
-          they lose without an account, and the way to fix it. */}
-      {inRoom && !accountPlayerId && (
-        <AccountPitch next={`/e/${normalized}`} variant="room" />
-      )}
+  const header = scheduled ? (
+    <NightHeader
+      storeId={event.storeId}
+      storeName={event.storeName}
+      storeVerified={event.storeVerified}
+      following={accountPlayerId ? followingStore : null}
+      code={normalized}
+      name={event.name}
+      when={nightWhenLine(event.startsAt, event.endsAt, event.storeTimeZone)}
+      remoteHref={remoteHref}
+      helpHref={`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`}
+      line={
+        readable && night
+          ? {
+              eventId: event.id,
+              youGoing: night.youGoing,
+              goingCount: night.goingCount,
+              signedIn: Boolean(accountPlayerId),
+              hereNow: phase === "upcoming" ? 0 : hereNow,
+            }
+          : null
+      }
+    />
+  ) : (
+    /*
+     * The walk-in door: store, night, pulse. A walk-in room has no
+     * schedule and no RSVP, so its door keeps the people list and the
+     * leave form behind the pulse line.
+     */
+    <RoomDoor
+      storeId={event.storeId}
+      storeName={event.storeName}
+      storeVerified={event.storeVerified}
+      following={accountPlayerId ? followingStore : null}
+      code={normalized}
+      name={event.name}
+      when={
+        event.kind === "walk_in"
+          ? "Trading now"
+          : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)
+      }
+      location={location}
+      remoteHref={remoteHref}
+      helpHref={null}
+      people={
+        inRoom && session
+          ? {
+              participants,
+              youId: session.id,
+              imagesEnabled: images,
+              flareCount: flares.length,
+            }
+          : null
+      }
+    />
+  );
+
+  return (
+    <NightShell wide={inRoom || browsing}>
+      {header}
 
       {/* The wall's clocks, for a seat that cannot see the wall.
           Self-polling, so a reset or a fresh tournament shows up
@@ -648,194 +687,144 @@ async function RoomBody({
       {live && <RoomTimers initial={roomTimers} code={normalized} />}
 
       {inRoom && skipped > 0 && (
-        <Card className="flex flex-col gap-1 border-accent/30">
-          <h2 className="font-semibold text-text-primary">
-            {skipped} of your Flares did not fit
-          </h2>
-          <p className="text-sm text-text-secondary">
-            The board holds {MAX_FLARES} per player. The rest stay on your list, and the
-            Feed still shows them.
-          </p>
-        </Card>
+        <Note title={`${skipped} of your Flares did not fit`}>
+          The board holds {MAX_FLARES} per player. The rest stay on your list, and the
+          Feed still shows them.
+        </Note>
       )}
 
       {inRoom && resumed && (
-        <Card className="flex flex-col gap-1 border-accent/30">
-          <h2 className="font-semibold text-text-primary">
-            You were already in this room
-          </h2>
-          <p className="text-sm text-text-secondary">
-            Same seat, same Flares, same binder. Your account is one player here however
-            you got in, so nothing was posted twice.
-          </p>
-        </Card>
+        <Note title="You were already in this room">
+          Same seat, same Flares, same binder. Your account is one player here however
+          you got in, so nothing was posted twice.
+        </Note>
       )}
 
-      {phase === "early" && (
-        <Card className="flex flex-col gap-1 border-accent/30">
-          <h2 className="font-semibold text-text-primary">This board is open early</h2>
-          <p className="text-sm text-text-secondary">
-            Everyone here is still on their way. The event starts{" "}
-            {formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)}. Post
-            what you&rsquo;re looking for now, so people know what to bring from home.
-            Flares from players who never make it are cleared when the night ends.
-          </p>
-        </Card>
-      )}
+      {phase === "early" && <EarlyBanner />}
 
-      {phase === "pending" || phase === "finished" ? (
-        <Card className="flex flex-col gap-2">
+      {/* "Not open yet" and "This room has closed" keep their lines,
+          under the header rather than in a tall card. The closed line
+          points at the Follow chip above only when there is one. */}
+      {(phase === "pending" || finished) && (
+        <div className="flex flex-col gap-0.5 border-t border-border pt-3">
           <h2 className="font-semibold text-text-primary">
             {phase === "pending" ? "Not open yet" : "This room has closed"}
           </h2>
-          {/* The same two sentences the store's quiet code shows, so a
-              room that is not open yet reads one way wherever it is met.
-              Closed: the Follow button is in the header above, so the
-              prompt points at it only when there is one to press. */}
-          <p className="text-text-secondary">
+          <p className="text-sm text-text-secondary">
             {phase === "pending"
               ? "The store has not opened this room yet. Scan the code again when it starts."
               : accountPlayerId && !followingStore
                 ? `This room has closed. Follow ${event.storeName} above to hear about the next one.`
                 : "This room has closed. Thanks for coming."}
           </p>
+        </div>
+      )}
+
+      {/* The way in, for whoever the Going chip cannot seat: a guest,
+          who has no account to say Going with; and anyone on a live
+          night, where the door is what pays attendance. */}
+      {browsing && readable && (!accountName || phase === "live") && (
+        <Card className="p-4">
+          <JoinEventForm
+            code={normalized}
+            knownAs={session?.display_name}
+            accountName={phase === "live" ? accountName : undefined}
+          />
         </Card>
-      ) : inRoom && session ? (
+      )}
+
+      {readable && (
         <>
           {/* Offers land while people wander; the room re-reads itself. */}
           {tickerMs !== null && <RoomTicker intervalMs={tickerMs} />}
 
-          {/* Before the night: you are on the roster, and here is who
-              else is. The board below is the working one, since a seat
-              in the room is what Going gave you. A guest in the room
-              keeps the account pitch above instead of a button that
-              would only send them to sign in. */}
-          {preStart && night && accountPlayerId && (
-            <PreStartCard
-              eventId={event.id}
-              code={normalized}
-              youGoing
-              goingCount={night.goingCount}
-              signedIn
-            />
-          )}
-          {preStart && <NightRosterCard roster={roster} />}
-
-          <MatchSummary
-            offerCount={offersOnMine}
-            flareCount={myFlaresWithOffers.length}
-            anchor={`#flares-${session.id}`}
-          />
-
-          <section className="flex flex-col gap-4" aria-label="Wanted in this room">
-            {/*
-             * The Flare tab's composer, behind one door: a room page is
-             * for seeing the room, so the composer opens in place when
-             * asked and folds away again. It needs an account, so a
-             * guest keeps the pitch above and gets their open-to-trades
-             * row at the foot of the board instead.
-             */}
-            {poster && (
-              <RoomComposerDoor
-                eventName={event.name}
-                storeName={event.storeName}
-                composer={
-                  <FlareComposer
-                    viewer={poster}
-                    hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
-                    imagesEnabled={images}
-                    playerGames={games}
-                    game={scannedGame}
-                    room={{ name: event.name, storeName: event.storeName }}
-                    initialHuntId={null}
-                    footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
-                  />
-                }
-              />
-            )}
-
-            {/*
-             * One card for the board. Nothing of the viewer's waits at
-             * its foot any more: joining posted their Flares to it.
-             */}
-            <RoomBoardCard
-              empty={flares.length === 0 && openPlayers.length === 0}
-              guestTrades={
-                accountPlayerId ? null : (
-                  <OpenToTradesToggle code={normalized} open={youAreOpen} />
-                )
-              }
-            >
-              <FlareBoard
-                entries={flares}
-                code={normalized}
-                imagesEnabled={images}
-                youId={session.id}
-                matches={matches}
-                offers={offers}
-                openToTrades={openPlayers}
-                identities={boardIdentities}
-                counterHas={counterHas}
-                counterName={event.storeName}
-                heldCounts={heldCounts}
-                early={phase === "early"}
-              />
-            </RoomBoardCard>
-          </section>
-
           {/*
-           * There is deliberately no "What you brought" section any more.
-           * The founder's read, and it holds up: nobody types their binder
-           * in at a store table, and someone who sees a Flare already
-           * knows whether they have the card. The binder and the imported
-           * collection still power the "You have this" badges on the
-           * board above — silently, which is all they were ever good for.
+           * The Flare tab's composer, behind the floating "+ Flare"
+           * button: a night page is for seeing the night, so the
+           * composer opens in place when asked and folds away again.
+           * It needs an account and a seat, so a guest keeps the pitch
+           * below and gets their open-to-trades row at the foot of the
+           * board instead.
            */}
-          <TradedTonight
-            trades={myTrades}
-            timeZone={event.storeTimeZone}
-            code={normalized}
-          />
-        </>
-      ) : browsing && night ? (
-        <>
-          {tickerMs !== null && <RoomTicker intervalMs={tickerMs} />}
-
-          <PreStartRoom
-            eventId={event.id}
-            code={normalized}
-            youGoing={night.youGoing}
-            goingCount={night.goingCount}
-            signedIn={Boolean(accountPlayerId)}
-            roster={roster}
-            flares={flares}
-            imagesEnabled={images}
-          />
-
-          {/* A guest's way in is still the walk-in form, the same as on
-              a live night: Going needs an account, and the pitch under
-              the form says why one is worth having. */}
-          {!accountName && (
-            <>
-              <Card>
-                <JoinEventForm code={normalized} knownAs={session?.display_name} />
-              </Card>
-              <AccountPitch next={`/e/${normalized}`} variant="join" />
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <Card>
-            <JoinEventForm
-              code={normalized}
-              knownAs={session?.display_name}
-              accountName={accountName}
+          {poster && writable && (
+            <RoomComposerDoor
+              composer={
+                <FlareComposer
+                  viewer={poster}
+                  hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
+                  imagesEnabled={images}
+                  playerGames={games}
+                  game={scannedGame}
+                  room={{ name: event.name, storeName: event.storeName }}
+                  initialHuntId={null}
+                  footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}
+                />
+              }
             />
-          </Card>
-          {!accountName && <AccountPitch next={`/e/${normalized}`} variant="join" />}
+          )}
+
+          {/* Matches for you: the first section, for an account. A
+              guest sees here the one thing they lose without one. */}
+          {accountPlayerId ? (
+            <MatchesForYou matches={matches} code={normalized} imagesEnabled={images} />
+          ) : (
+            <AccountPitch
+              next={`/e/${normalized}`}
+              variant={inRoom ? "room" : "join"}
+            />
+          )}
+
+          {accountPlayerId && matches.bring.length > 0 && (
+            <WhatToBring eventId={event.id} bring={matches.bring} />
+          )}
         </>
       )}
-    </Shell>
+
+      {(readable || finished) && (
+        <FlaresAtNight
+          boards={{
+            all: boardFor(flares, true),
+            hunting: boardFor(hunting, false),
+            offering: boardFor(offering, false),
+          }}
+          note={
+            session && offersOnMine > 0 ? (
+              <OffersNote
+                offerCount={offersOnMine}
+                flareCount={myFlaresWithOffers.length}
+                anchor={`#flares-${session.id}`}
+              />
+            ) : null
+          }
+        />
+      )}
+
+      {readable && scheduled && <PlayersGoing roster={roster} code={normalized} />}
+
+      {scheduled && (
+        <EventDetails
+          storeId={event.storeId}
+          storeName={event.storeName}
+          address={store?.address ?? (location || null)}
+          code={normalized}
+        />
+      )}
+
+      {/*
+       * There is deliberately no "What you brought" section any more.
+       * The founder's read, and it holds up: nobody types their binder
+       * in at a store table, and someone who sees a Flare already
+       * knows whether they have the card. The binder and the imported
+       * collection still power the "You have this" badges on the
+       * board above, silently, which is all they were ever good for.
+       */}
+      {inRoom && (
+        <TradedTonight
+          trades={myTrades}
+          timeZone={event.storeTimeZone}
+          code={normalized}
+        />
+      )}
+    </NightShell>
   );
 }

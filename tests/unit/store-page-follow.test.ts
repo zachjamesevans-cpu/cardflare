@@ -197,7 +197,8 @@ describe("following a store", () => {
 
     /* Both app screens draw the button: the store's page and the room. */
     expect(read("mobile/src/screens/store-profile.tsx")).toContain("FollowStoreButton");
-    expect(read("mobile/src/screens/room.tsx")).toContain("FollowStoreButton");
+    /* Nights round 2: the room's header is its own file. */
+    expect(read("mobile/src/night-header.tsx")).toContain("FollowStoreButton");
     expect(read("mobile/src/screens/room.tsx")).toContain('navigate("StoreProfile"');
     expect(read("mobile/src/api.ts")).toContain("export const followStore");
   });

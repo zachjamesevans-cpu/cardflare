@@ -76,11 +76,13 @@ describe("the mark beside a store's name", () => {
       "storeVerified={event.storeVerified}",
     );
 
-    const app = read("mobile/src/screens/room.tsx");
-    expect(app).toContain('from "../verified-mark"');
-    /* The store-name taps: the join screen, the door card, and the
-       pre-start room's header (Nights round 1). */
-    expect(app.match(/room\.verified \? <VerifiedMark/g)).toHaveLength(3);
+    /* Nights round 2: the compact header is its own file, and the
+       room hands it the flag; Event details draws it beside the
+       organizer too. */
+    const appHeader = read("mobile/src/night-header.tsx");
+    expect(appHeader).toContain('from "./verified-mark"');
+    expect(appHeader).toContain("<VerifiedMark");
+    expect(read("mobile/src/screens/room.tsx")).toContain("verified={room.verified}");
   });
 
   it("is on the nearby store cards, and the old ticks are gone", () => {

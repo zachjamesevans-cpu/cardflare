@@ -1777,6 +1777,21 @@ export type PlayerWantInsert = Omit<
   deck_label?: string | null;
 };
 
+/**
+ * A Packed tick on a night's What to bring checklist. The list itself
+ * is derived at read time; this is the one fact the player adds.
+ */
+export type NightPackingRow = {
+  event_id: string;
+  player_id: string;
+  card_id: string;
+  packed_at: string;
+};
+
+export type NightPackingInsert = Omit<NightPackingRow, "packed_at"> & {
+  packed_at?: string;
+};
+
 export type PlayerCollectionRow = {
   id: string;
   created_at: string;
@@ -1999,6 +2014,7 @@ export type Database = {
       player_showcase: Table<PlayerShowcaseRow, PlayerShowcaseInsert>;
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
+      night_packing: Table<NightPackingRow, NightPackingInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
       announcements: Table<AnnouncementRow, AnnouncementInsert>;
       event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;

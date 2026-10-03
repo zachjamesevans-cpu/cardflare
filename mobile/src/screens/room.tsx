@@ -17,10 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RemoteImage } from "../remote-image";
 import { DoorIconButton, RemoteEntry } from "../remote-entry";
-import { dedupeParticipants, RoomPeopleModal } from "../room-people";
+import { dedupeParticipants } from "../room-people";
 import { UndoToast, type UndoOffer } from "../undo-toast";
-import { FollowStoreButton } from "../follow-store-button";
-import { VerifiedMark } from "../verified-mark";
 
 import type { StackParams } from "../../App";
 import {
@@ -31,6 +29,7 @@ import {
   confirmTrade,
   forgetRoom,
   getMe,
+  getNightMatches,
   getRoom,
   goingOf,
   joinRoom,
@@ -48,14 +47,27 @@ import {
   storedAccessToken,
   takeDownRoomFlare,
   type Me,
+  type NightMatches,
   type RoomFlare,
   type RoomPhase,
   type RoomState,
   type RosterPlayer,
 } from "../api";
-import { binderCover } from "../binder-covers";
-import { GoingButton } from "../going-button";
-import { PRE_START_PITCH, YOURE_ON_THE_BOARD } from "../going-copy";
+import { EarlyBanner } from "../early-banner";
+import { EventDetails } from "../event-details";
+import { FAB_HEIGHT, FlareFab } from "../flare-fab";
+import {
+  FlareFilterRow,
+  emptyFilterLine,
+  filterFlares,
+  type FlareFilter,
+} from "../flares-at-night";
+import { MatchesForYou } from "../matches-for-you";
+import { FLARES_AT_THIS_NIGHT } from "../night-copy";
+import { NightHeader } from "../night-header";
+import { NightSection } from "../night-section";
+import { PlayersGoing } from "../players-going";
+import { WhatToBring } from "../what-to-bring";
 import {
   AsyncButton,
   Body,
@@ -116,11 +128,25 @@ export function pollMsFor(phase: RoomPhase | null): number | null {
 const SECTION_FOLD = 6;
 
 /**
- * The Room tab — the app's rendering of `/e/[code]`, at the website's
- * depth: the lobby with presence, the board grouped under whoever posted
- * (because "who do I go and talk to" is the actual question), offers
- * with a where-to-find-me note, open-to-trades, and a bottom action bar
- * that keeps Post a Flare one thumb away.
+ * How often the viewer's matches are re-read while the room polls.
+ * The matcher reads every binder on the roster, so it does not ride
+ * the twelve-second live poll; a minute is the early board's rhythm,
+ * and a pull, a Going or a fresh open reads it at once.
+ */
+const MATCHES_REFRESH_MS = 60_000;
+
+/**
+ * The Room screen: the app's rendering of `/e/[code]`, a Night's page.
+ *
+ * The founder (2026-10-03): "Do NOT make Nights feel like a generic
+ * social media event page. It should feel like a trading dashboard."
+ * Top to bottom, the website's hierarchy: the compact header (venue,
+ * name, when, one line of RSVP and attendance), the early banner,
+ * Matches for you with the mutual match blocks, What to bring, Flares
+ * at this Night (the board grouped under whoever posted, with the
+ * All / Hunting / Offering filter), Players going, Event details
+ * folded shut, and the floating "+ Flare" button in place of the lime
+ * action bar. The lobby for a counter code is unchanged.
  */
 export function RoomTab() {
   const [code, setCode] = useState<string | null>(null);
@@ -242,7 +268,7 @@ export function RoomTab() {
          * Getting INTO a room happens here now, not on the Feed. The
          * founder: "move the qr code scanner/code entry to Room. No need
          * to have that in the feed." Both ways in are on this card,
-         * because typing is a first-class route and not a consolation —
+         * because typing is a first-class route and not a consolation,
          * a meaningful share of players have a camera that will not
          * focus, a locked-down work phone or a cracked screen.
          */}
@@ -384,7 +410,7 @@ function RoomScreen({
   onForget,
 }: {
   code: string;
-  /** Jump this tab to another room — how an early board is stepped into. */
+  /** Jump this tab to another room, how an early board is stepped into. */
   onSwitch: (code: string) => void;
   /** Drop the remembered code and go back to the way in. */
   onForget: () => void;
@@ -423,17 +449,22 @@ function RoomScreen({
   const [skipped, setSkipped] = useState<{ count: number; cap: number } | null>(null);
 
   /*
-   * The names, behind the door card's meta line. They were a folded
-   * card at the foot of the page; the counts are what a scanning eye
-   * needs and they sit on the door now, and the list waits in a sheet
-   * for whoever wants to know who the third face is.
+   * The viewer's matches at this night: who has what they want, who
+   * wants what they have, what to bring. Null until the first read
+   * lands, and never read for a guest, who sees the sign-in pitch in
+   * the section's place. `matchesAt` is when it was last read, so the
+   * live poll does not re-run the matcher every twelve seconds.
    */
-  const [peopleOpen, setPeopleOpen] = useState(false);
+  const [matches, setMatches] = useState<NightMatches | null>(null);
+  const matchesAt = useRef(0);
+
+  /* All, Hunting or Offering, over Flares at this Night. Per visit. */
+  const [filter, setFilter] = useState<FlareFilter>("all");
 
   /*
    * The founder's synthesis, replacing the stacked/carousel toggle: the
    * rail is every player's default face, and the chevron on a player's
-   * header unfolds THEM into the full stacked view — the same gesture
+   * header unfolds THEM into the full stacked view, the same gesture
    * the roster taught. Detail is a per-person question, not a mode.
    */
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -449,7 +480,7 @@ function RoomScreen({
    * Which player's rail has nothing further to scroll, so the trailing
    * fade can get out of the way. The two widths live in refs rather
    * than state because they are inputs to that decision, not something
-   * the screen renders — writing them through state would re-render the
+   * the screen renders, writing them through state would re-render the
    * whole board on every layout pass.
    */
   const [railsAtEnd, setRailsAtEnd] = useState<Record<string, boolean>>({});
@@ -497,62 +528,85 @@ function RoomScreen({
   }, []);
   const guest = signedIn === false && !state?.account;
 
-  const refresh = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+  const refresh = useCallback(
+    async (options?: { matches?: boolean }) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
 
-    try {
-      const fresh = await getRoom(code);
-      setState(fresh);
-      setError(null);
+      try {
+        const fresh = await getRoom(code);
+        setState(fresh);
+        setError(null);
 
-      /*
-       * ALREADY IN, WITH NOTHING TO PROVE IT.
-       *
-       * The founder: "if i join a room on my computer... if i open that
-       * same room in app, it should skip the whole join thing... if im
-       * in a room it should just be persistent across platforms."
-       *
-       * The server now finds a signed-in player's seat by account, so
-       * the room answers `joined` on a phone that has never held a
-       * token for it. That is enough to draw the board - every room
-       * route resolves the same way - but it costs an account lookup on
-       * every poll. So the seat is adopted ONCE, through the join the
-       * tap used to make: it mints a token for the session already
-       * there rather than adding a second person to the board.
-       */
-      if (fresh.joined && !(await storedSessionToken())) {
-        /* Silent on purpose: nothing was asked for, so nothing is
+        /*
+         * The matches, for a signed-in viewer at a night: on the first
+         * read, on a pull, on Going, and otherwise once a minute. An
+         * older server without the route, or a failed read, leaves what
+         * is on screen; a viewer with no account is never asked for.
+         */
+        const eventId = fresh.room?.eventId ?? fresh.eventId ?? null;
+        const wanted =
+          options?.matches || Date.now() - matchesAt.current >= MATCHES_REFRESH_MS;
+        if (eventId && wanted && (await storedAccessToken())) {
+          matchesAt.current = Date.now();
+          try {
+            setMatches(await getNightMatches(eventId));
+          } catch {
+            /* Garnish on the room; the room must not fail over it. */
+          }
+        }
+
+        /*
+         * ALREADY IN, WITH NOTHING TO PROVE IT.
+         *
+         * The founder: "if i join a room on my computer... if i open that
+         * same room in app, it should skip the whole join thing... if im
+         * in a room it should just be persistent across platforms."
+         *
+         * The server now finds a signed-in player's seat by account, so
+         * the room answers `joined` on a phone that has never held a
+         * token for it. That is enough to draw the board - every room
+         * route resolves the same way - but it costs an account lookup on
+         * every poll. So the seat is adopted ONCE, through the join the
+         * tap used to make: it mints a token for the session already
+         * there rather than adding a second person to the board.
+         */
+        if (fresh.joined && !(await storedSessionToken())) {
+          /* Silent on purpose: nothing was asked for, so nothing is
            reported. A failure just means the next poll tries again, and
            the account lookup keeps the room working meanwhile. */
-        await joinRoom(code).catch(() => {});
-      }
-
-      if (fresh.joined) {
-        try {
-          setTrades((await getTrades(code)).trades);
-        } catch {
-          /* The list is garnish; the room must not fail over it. */
+          await joinRoom(code).catch(() => {});
         }
+
+        if (fresh.joined) {
+          try {
+            setTrades((await getTrades(code)).trades);
+          } catch {
+            /* The list is garnish; the room must not fail over it. */
+          }
+        }
+      } catch (caught) {
+        const missing = caught instanceof ApiError && caught.status === 404;
+        setDead(missing);
+        setError(
+          missing
+            ? "That code does not point at a room."
+            : "Could not reach the room. Check your connection and pull to retry.",
+        );
+      } finally {
+        inFlight.current = false;
       }
-    } catch (caught) {
-      const missing = caught instanceof ApiError && caught.status === 404;
-      setDead(missing);
-      setError(
-        missing
-          ? "That code does not point at a room."
-          : "Could not reach the room. Check your connection and pull to retry.",
-      );
-    } finally {
-      inFlight.current = false;
-    }
-  }, [code]);
+    },
+    [code],
+  );
 
   useEffect(() => {
     setState(null);
     setResumed(false);
     setSkipped(null);
     setExpandedGroups({});
+    setMatches(null);
+    matchesAt.current = 0;
     void refresh();
   }, [refresh]);
 
@@ -661,7 +715,7 @@ function RoomScreen({
            * A typo used to be permanent: the code is remembered before
            * the room answers, so a dead one reopened this same screen
            * every visit and Try again only asked it again. This is the
-           * way back to the field — offered only when the room is
+           * way back to the field, offered only when the room is
            * genuinely not there, because forgetting a good code over a
            * dropped connection would be the worse mistake.
            */}
@@ -714,7 +768,7 @@ function RoomScreen({
 
         {guest && <AccountPitch variant="join" />}
 
-        {/* Nothing at the counter — but a board may already be taking
+        {/* Nothing at the counter, but a board may already be taking
             Flares, which is exactly what someone checking from home wants. */}
         {state.earlyBoard && (
           <Card>
@@ -769,7 +823,7 @@ function RoomScreen({
           </Body>
         </Card>
 
-        {/* Nothing at the counter — but a board may already be taking
+        {/* Nothing at the counter, but a board may already be taking
             Flares, which is exactly what someone checking from home wants. */}
         {state.earlyBoard && (
           <Card>
@@ -806,127 +860,41 @@ function RoomScreen({
 
   /*
    * Going, when the server knows the word, and the night's id the
-   * button needs. Both absent from an older server, which gets the
-   * door it always had.
+   * header's chip and the matcher need. Both absent from an older
+   * server, which gets a header with no chip and no matches.
    */
   const going = goingOf(state);
   const eventId = room.eventId ?? state.eventId ?? null;
-  const preStart = phase === "upcoming" || phase === "early";
+  const joined = Boolean(state.joined);
+  /* A phase the board takes Flares in. An older server without the
+     word is read off the flags it does send. */
+  const writable =
+    phase === null
+      ? room.status === "open" || room.early
+      : phase === "live" || phase === "early";
+  const finished = phase === "finished" || (phase === null && room.status === "closed");
+  const shut = finished || phase === "pending";
 
   /*
-   * THE ROOM BEFORE IT STARTS, for a viewer who has not said Going.
-   *
-   * The founder: "That room stays 'open' and anyone can go into there
-   * and see who is looking for which cards before the tournament or
-   * event starts." So the door is open: the pitch and the button, then
-   * who is going with their Flares and trade binders, then the board
-   * to read. The website's pre-start-room, card for card.
+   * THE WAY IN, for whoever still needs one. A signed-in viewer says
+   * Going on the header line and is on the roster with their Flares;
+   * that is the join, before the night and during it. The name form
+   * stays for a guest, who has no account to be Going as, and for a
+   * server too old to say Going, in a room that is taking people.
    */
-  if (!state.joined && preStart && going && eventId) {
-    return (
-      <PreStartRoom
-        state={state}
-        eventId={eventId}
-        youGoing={going.youGoing}
-        goingCount={going.goingCount}
-        guest={guest}
-        onSettled={() => void refresh()}
-        onStore={(storeId) => navigation.navigate("StoreProfile", { storeId })}
-        onPlayer={(playerId) => navigation.navigate("PlayerProfile", { playerId })}
-        onBinder={(playerId, binderId) =>
-          navigation.navigate("Binder", { playerId, binderId })
-        }
-      />
-    );
-  }
+  const needsJoinForm =
+    !joined && (guest || !going || !eventId) && (room.status === "open" || room.early);
 
-  if (!state.joined) {
-    return (
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-          gap: spacing(4),
-        }}
-      >
-        <Card>
-          {room.storeId ? (
-            <Tap
-              onPress={() =>
-                navigation.navigate("StoreProfile", { storeId: room.storeId! })
-              }
-              hitSlop={6}
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-            >
-              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-                {room.storeName}
-              </Text>
-              {/* Verified is the badge everybody sees beside a store's
-                  name. Ultra is a tier and is never drawn here. */}
-              {room.verified ? <VerifiedMark size={14} /> : null}
-            </Tap>
-          ) : (
-            <Muted>{room.storeName}</Muted>
-          )}
-          <Title>{room.name}</Title>
-          {room.status !== "open" && !room.early ? (
-            /* The website's two states, word for word. Closed points at
-               the Follow button only when there is one to press: an
-               account that does not follow the store yet. */
-            <>
-              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                {room.status === "closed" ? "This room has closed" : "Not open yet"}
-              </Text>
-              <Body>
-                {room.status !== "closed"
-                  ? "The store has not opened this room yet. Scan the code again when it starts."
-                  : state.account && state.following === false
-                    ? `This room has closed. Follow ${room.storeName} above to hear about the next one.`
-                    : "This room has closed. Thanks for coming."}
-              </Body>
-            </>
-          ) : (
-            <>
-              <Body>
-                {state.account
-                  ? "You are signed in, so the room will know you."
-                  : "Pick a name people in the room will recognise."}
-              </Body>
-              <ErrorLine message={error} />
-              {state.account ? (
-                <JoiningAs name={state.account.displayName} />
-              ) : (
-                <Input
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Display name"
-                  autoCapitalize="words"
-                />
-              )}
-              <Button
-                label={busy ? "Joining…" : "Join the room"}
-                onPress={() => void join()}
-                busy={busy}
-              />
-            </>
-          )}
-        </Card>
-
-        {guest && (room.status === "open" || room.early) && (
-          <AccountPitch variant="join" />
-        )}
-      </ScrollView>
-    );
-  }
-
-  const youId = state.you!.sessionId;
+  /* The viewer's seat, once they have one; the board reads without it. */
+  const youId = state.you?.sessionId ?? null;
   const participants = state.participants ?? [];
 
   /* The account behind each session, for tapping a board header. */
   const playerBySession = new Map(
     participants.map((p) => [p.playerSessionId, p.playerId ?? null]),
   );
-  const flares = state.flares ?? [];
+  /* All, Hunting or Offering: the filter runs before the board groups. */
+  const flares = filterFlares(state.flares ?? [], filter);
   const youOpen = participants.some(
     (p) => p.playerSessionId === youId && p.openToTrades,
   );
@@ -988,27 +956,36 @@ function RoomScreen({
    * else's section keeps the board's order. An older server sends no
    * `createdAt`, and ties leave the order as it came.
    */
-  const own = groups.get(youId);
+  const own = youId ? groups.get(youId) : undefined;
   if (own) {
     own.flares = [...own.flares].sort(
       (a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? "") || 0,
     );
   }
 
-  /* The door card's pulse: who is here, and up to three of their faces.
-     People, not seats: an account in from two devices is one face and
-     one in the count. See dedupeParticipants. */
+  /*
+   * Attendance, for the header's one line. People, not seats: an
+   * account in from two devices is one face and one in the count. See
+   * dedupeParticipants. The server's presence count when it sends one, the
+   * present seats it can see otherwise; the players count is the
+   * roster's, and the roster is whoever the answer carries.
+   */
   const people = dedupeParticipants(participants);
-  const hereNow = people.filter((p) => p.present).length;
-  const faces = people.filter((p) => p.present).slice(0, 3);
-
+  const roster = rosterOf(state);
+  const hereNow = room.hereNow ?? people.filter((p) => p.present).length;
+  const playersCount = going?.goingCount ?? roster.length;
+  const matchesByPlayer = matches?.perPlayer ?? {};
+  const bring = matches?.bring ?? [];
+  const openPlayer = (playerId: string) =>
+    navigation.navigate("NightPlayer", { code, playerId });
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={{
-          padding: spacing(3),
-          gap: spacing(2),
-          paddingBottom: spacing(24) + bottomClear,
+          paddingHorizontal: gutter + spacing(1),
+          paddingTop: spacing(3),
+          gap: spacing(4),
+          paddingBottom: spacing(20) + bottomClear,
         }}
         refreshControl={
           <RefreshControl
@@ -1017,62 +994,36 @@ function RoomScreen({
             onRefresh={() => {
               refreshTick();
               setRefreshing(true);
-              void refresh().finally(() => setRefreshing(false));
+              void refresh({ matches: true }).finally(() => setRefreshing(false));
             }}
           />
         }
       >
         {/*
-         * THE DOOR CARD. The founder, on the old page: "There's just so
-         * many blocks... It's all just disconnected and want it to flow
-         * better." So the remote's card, the help link and the roster's
-         * counts are all on this one card now: the store, the night's
-         * name with two small round buttons at the end of its line,
-         * and a meta line that opens the people list.
+         * THE HEADER. One compact block: the venue with its glyph and
+         * the Follow chip, the night's name with the remote and the
+         * help door at the end of its line, when, and the one line of
+         * RSVP and attendance. The founder: "REMOVE REPEATED
+         * INFORMATION." Attendance is said here and nowhere else.
          */}
-        <Card>
-          {/* The store is linked from the room, with Follow beside it.
-              The founder: "if a player is in a room for that store, the
-              store is linked in there for them to quickly follow that
-              store's page and stay updated." The chip is for a
-              signed-in account only, the website's rule: a guest has
-              the account pitch just below instead. */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing(2),
-            }}
-          >
-            {room.storeId ? (
-              <Tap
-                onPress={() =>
-                  navigation.navigate("StoreProfile", { storeId: room.storeId! })
-                }
-                hitSlop={6}
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-              >
-                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-                  {room.storeName}
-                </Text>
-                {room.verified ? <VerifiedMark size={14} /> : null}
-              </Tap>
-            ) : (
-              <Muted>{room.storeName}</Muted>
-            )}
-            {room.storeId && state.account && state.following !== undefined ? (
-              <FollowStoreButton
-                key={`${room.storeId}:${state.following}`}
-                storeId={room.storeId}
-                initial={state.following}
-                size="chip"
-              />
-            ) : null}
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-            <Text style={styles.nightName}>{room.name}</Text>
-            <View style={{ flexDirection: "row", gap: spacing(2) }}>
+        <NightHeader
+          name={room.name}
+          storeName={room.storeName}
+          storeId={room.storeId}
+          verified={room.verified}
+          /* The Follow chip is for a signed-in account only, the
+             website's rule: a guest has the account pitch below. */
+          following={room.storeId && state.account ? state.following : undefined}
+          startsAt={room.startsAt}
+          endsAt={room.endsAt}
+          phase={phase}
+          eventId={eventId}
+          going={going}
+          playersCount={playersCount}
+          hereNow={hereNow}
+          onSettled={() => void refresh({ matches: true })}
+          right={
+            <>
               {/* The organizer's door to the timer remote; nothing for
                   anyone else. */}
               <RemoteEntry />
@@ -1084,661 +1035,682 @@ function RoomScreen({
                 label="How a night works"
                 onPress={() => setTournamentHelp(true)}
               />
-            </View>
-          </View>
-          {/* The room's pulse: the numbers a glance wants first, and
-              the whole line is the door to the names behind them. */}
-          <Tap
-            onPress={() => setPeopleOpen(true)}
-            accessibilityLabel="Who's here"
-            hitSlop={6}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing(2),
-              alignSelf: "flex-start",
-            }}
-          >
-            {faces.length > 0 && (
-              <View style={{ flexDirection: "row" }}>
-                {faces.map((p, index) => (
-                  <View
-                    key={p.playerSessionId}
-                    /* Overlapping like a thread's faces; the first one
-                       sits on top so the pile reads left to right. */
-                    style={{
-                      marginLeft: index === 0 ? 0 : -6,
-                      zIndex: faces.length - index,
-                    }}
-                  >
-                    <PlayerAvatar
-                      displayName={p.displayName ?? "A player"}
-                      seed={p.playerSessionId}
-                      avatarUrl={p.avatarUrl ?? null}
-                      frame={p.frame ?? null}
-                      ring={p.ring ?? null}
-                      aura={p.aura ?? null}
-                      ringArt={p.ringArt ?? null}
-                      auraArt={p.auraArt ?? null}
-                      size={22}
-                    />
-                  </View>
-                ))}
-              </View>
-            )}
-            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-              <Text style={{ color: colors.textSecondary, fontWeight: "700" }}>
-                {`${hereNow} here now`}
-              </Text>
-              {` · ${people.length} tonight · ${flares.length} ${
-                flares.length === 1 ? "Flare" : "Flares"
-              }`}
-            </Text>
-          </Tap>
-        </Card>
+            </>
+          }
+        />
 
         <TournamentHelpModal
           open={tournamentHelp}
           onClose={() => setTournamentHelp(false)}
         />
 
-        {/* The pitch, to guests only, right under the door. */}
-        {guest && <AccountPitch variant="room" />}
+        {/* The one-line banner, early only; the long text is behind
+            the glyph. The big early-board card is gone. */}
+        {phase === "early" ? <EarlyBanner /> : null}
 
-        {/* The wall's clocks, for a seat that cannot see the wall — or
+        {/* The two shut doors keep their lines, under the header
+            rather than in a tall card. Closed points at the Follow
+            chip only when there is one to press. */}
+        {shut ? (
+          <View style={{ gap: spacing(1) }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+              {finished ? "This room has closed" : "Not open yet"}
+            </Text>
+            <Body>
+              {!finished
+                ? "The store has not opened this room yet. Scan the code again when it starts."
+                : state.account && state.following === false
+                  ? `This room has closed. Follow ${room.storeName} above to hear about the next one.`
+                  : "This room has closed. Thanks for coming."}
+            </Body>
+          </View>
+        ) : null}
+
+        {/* The name form, for whoever Going cannot carry in. */}
+        {needsJoinForm ? (
+          <Card>
+            <Body>
+              {state.account
+                ? "You are signed in, so the room will know you."
+                : "Pick a name people in the room will recognise."}
+            </Body>
+            <ErrorLine message={error} />
+            {state.account ? (
+              <JoiningAs name={state.account.displayName} />
+            ) : (
+              <Input
+                value={name}
+                onChangeText={setName}
+                placeholder="Display name"
+                autoCapitalize="words"
+              />
+            )}
+            <Button
+              label={busy ? "Joining…" : "Join the room"}
+              onPress={() => void join()}
+              busy={busy}
+            />
+          </Card>
+        ) : null}
+
+        {/*
+         * MATCHES FOR YOU: the first section under the header, for a
+         * signed-in viewer. A guest sees the sign-in pitch in its
+         * place, because matching is between accounts and their
+         * binders. A finished night has no matches to draw.
+         */}
+        {guest ? (
+          finished ? null : (
+            <AccountPitch variant={joined ? "room" : "join"} />
+          )
+        ) : eventId && !finished ? (
+          <MatchesForYou
+            matches={matches}
+            onSeeAll={() => navigation.navigate("NightMatches", { code })}
+            onPlayer={openPlayer}
+          />
+        ) : null}
+
+        {/* What to bring, only when there is something to pack. */}
+        {!guest && eventId && !finished && bring.length > 0 ? (
+          <WhatToBring eventId={eventId} bring={bring} />
+        ) : null}
+
+        {/* The wall's clocks, for a seat that cannot see the wall, or
             somebody who stepped out with the room in their pocket. */}
         <RoomTimersCard timers={state.timers} />
 
         {/* The same words the website uses, for the same moment. */}
         {skipped && (
-          <Card>
-            <Title>{`${skipped.count} of your Flares did not fit`}</Title>
-            <Body>
-              {`The board holds ${skipped.cap} per player. The rest stay on your list, and the Feed still shows them.`}
-            </Body>
-          </Card>
+          <Muted>
+            {`${skipped.count} of your Flares did not fit. The board holds ${skipped.cap} per player. The rest stay on your list, and the Feed still shows them.`}
+          </Muted>
         )}
 
         {resumed && (
-          <Card>
-            <Title>You were already in this room</Title>
-            <Body>
-              Same seat, same Flares, same binder. Your account is one player here
-              however you got in, so nothing was posted twice.
-            </Body>
-          </Card>
-        )}
-
-        {/* You said Going: the same card the door showed, now in its
-            on state, and tapping it again is Not going. The roster,
-            with everyone's binders, sits under it as it did outside.
-            Not shown live, where the code is the door. */}
-        {preStart && going && eventId ? (
-          <>
-            <Card>
-              <Body>{YOURE_ON_THE_BOARD}</Body>
-              <GoingButton
-                eventId={eventId}
-                youGoing={going.youGoing}
-                goingCount={going.goingCount}
-                onSettled={() => void refresh()}
-              />
-            </Card>
-            <RosterCard
-              roster={rosterOf(state)}
-              onPlayer={(playerId) =>
-                navigation.navigate("PlayerProfile", { playerId })
-              }
-              onBinder={(playerId, binderId) =>
-                navigation.navigate("Binder", { playerId, binderId })
-              }
-            />
-          </>
-        ) : null}
-
-        {/* An early board never pretends to be a live room. */}
-        {room.early && (
-          <Card>
-            <Title>This board is open early</Title>
-            <Body>
-              {`Everyone here is still on their way. The event starts ${
-                room.startsAt
-                  ? new Date(room.startsAt).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : "soon"
-              }. Post what you're looking for so people know what to bring from home.`}
-            </Body>
-          </Card>
+          <Muted>
+            You were already in this room. Same seat, same Flares, same binder: your
+            account is one player here however you got in, so nothing was posted twice.
+          </Muted>
         )}
 
         {/*
-         * THE BOARD CARD: every Flare in the room, grouped under
-         * whoever posted it, inside one card. Each player used to be a
-         * card of their own, which is most of the "so many blocks" the
-         * founder was looking at; now a hairline separates them.
+         * THE BOARD: every Flare at this Night, grouped under whoever
+         * posted it, players separated by hairlines, with the All /
+         * Hunting / Offering filter on the section's label line. The
+         * tiles and the offer flow are exactly what they were; a
+         * viewer without a seat reads the same board without them.
          */}
-        <Card>
-          <Title>Flares in the room</Title>
+        {/* A shut door with nothing on the board draws no board: a
+            closed night the server sends no Flares for has nothing to
+            filter, and "Nothing posted yet" would be a lie about it. */}
+        {shut && (state.flares ?? []).length === 0 ? null : (
+          <NightSection
+            label={FLARES_AT_THIS_NIGHT}
+            right={<FlareFilterRow value={filter} onChange={setFilter} />}
+          >
+            {joined ? (
+              <>
+                {groups.size === 0 && (
+                  <Body>
+                    {filter === "all"
+                      ? "Nothing posted yet. Yours would be the first one on the board tonight."
+                      : emptyFilterLine(filter)}
+                  </Body>
+                )}
 
-          {groups.size === 0 && (
-            <Body>
-              Nothing posted yet. Yours would be the first one on the board tonight.
-            </Body>
-          )}
+                {[...groups.entries()].map(([sessionId, group], index) => {
+                  const mine = sessionId === youId;
 
-          {[...groups.entries()].map(([sessionId, group], index) => {
-            const mine = sessionId === youId;
+                  /*
+                   * A player's section splits into deck folders and loose cards,
+                   * same as the website: "RG Luffy" typed on each card of the
+                   * hunt gathers them under one named heading.
+                   */
+                  /*
+                   * Cards pointing the other way come out first and stay out.
+                   * A showcase is "I have this", the opposite statement to a
+                   * Flare, and reading the two as one list is how somebody
+                   * walks over about a card the owner was trying to move.
+                   */
+                  const showcases = group.flares.filter((f) => f.intent === "showcase");
+                  const wants = group.flares.filter((f) => f.intent !== "showcase");
+                  const { folders, loose } = partitionByDeck(wants);
 
-            /*
-             * A player's section splits into deck folders and loose cards,
-             * same as the website: "RG Luffy" typed on each card of the
-             * hunt gathers them under one named heading.
-             */
-            /*
-             * Cards pointing the other way come out first and stay out.
-             * A showcase is "I have this", the opposite statement to a
-             * Flare, and reading the two as one list is how somebody
-             * walks over about a card the owner was trying to move.
-             */
-            const showcases = group.flares.filter((f) => f.intent === "showcase");
-            const wants = group.flares.filter((f) => f.intent !== "showcase");
-            const { folders, loose } = partitionByDeck(wants);
-
-            /* Headings only when both directions are in play; labelling a
+                  /* Headings only when both directions are in play; labelling a
              lone hunt "Looking for" is furniture. */
-            const labelled = showcases.length > 0;
+                  const labelled = showcases.length > 0;
 
-            /* One answer for the whole rail, so tiles beside each other
+                  /* One answer for the whole rail, so tiles beside each other
              still agree on where their buttons sit. */
-            const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
+                  const railHasDecks = group.flares.some((f) => Boolean(f.deckLabel));
 
-            const tile = (flare: RoomFlare) => (
-              <CarouselFlare
-                key={flare.id}
-                flare={flare}
-                mine={mine}
-                reserveCaption={railHasDecks}
-                siblings={shelf}
-                position={shelfAt.get(flare.id) ?? 0}
-                onRemove={() => act(() => removeFlare(code, flare.id))}
-                onTakeDown={() => takeDown(flare.id)}
-              />
-            );
+                  const tile = (flare: RoomFlare) => (
+                    <CarouselFlare
+                      key={flare.id}
+                      flare={flare}
+                      mine={mine}
+                      reserveCaption={railHasDecks}
+                      siblings={shelf}
+                      position={shelfAt.get(flare.id) ?? 0}
+                      onRemove={() => act(() => removeFlare(code, flare.id))}
+                      onTakeDown={() => takeDown(flare.id)}
+                    />
+                  );
 
-            /* Fully pledged hunts park at the rail's far end, dimmed but
-             present — the bring-extras crowd can still see the ask. */
-            const isCovered = (flare: RoomFlare) =>
-              flare.offers.length > 0 &&
-              pledgeTally(flare.offers, flare.quantity).remaining === 0;
+                  /* Fully pledged hunts park at the rail's far end, dimmed but
+             present, the bring-extras crowd can still see the ask. */
+                  const isCovered = (flare: RoomFlare) =>
+                    flare.offers.length > 0 &&
+                    pledgeTally(flare.offers, flare.quantity).remaining === 0;
 
-            /*
-             * Cards you can answer come first — the website's rule, word for
-             * word: "all cards you have will automatically sort to the
-             * leftmost portion of the carousel." A rail you can only read the
-             * front of should open on the part that concerns you, and the
-             * ring then says which without a sentence.
-             *
-             * Covered hunts still park at the far end whatever else is true:
-             * those are settled, and settled outranks interesting.
-             */
-            const held = (flare: RoomFlare) => Boolean(flare.match);
+                  /*
+                   * Cards you can answer come first, the website's rule, word for
+                   * word: "all cards you have will automatically sort to the
+                   * leftmost portion of the carousel." A rail you can only read the
+                   * front of should open on the part that concerns you, and the
+                   * ring then says which without a sentence.
+                   *
+                   * Covered hunts still park at the far end whatever else is true:
+                   * those are settled, and settled outranks interesting.
+                   */
+                  const held = (flare: RoomFlare) => Boolean(flare.match);
 
-            const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
-            /*
-             * ONE SHELF, BOTH DIRECTIONS - the wants in rail order, then
-             * the showcases in theirs.
-             *
-             * The founder: "when a flare is in the 'letting go' tab if im
-             * trying to offer something up, when i click it, it only shows
-             * the cards that are in cards im looking for. the letting go
-             * cards should be swipable in the carousel like normal, but
-             * should say im offering it up or letting it go once i swipe
-             * to it."
-             *
-             * The shelf was built from `wants` alone, so a showcase tile
-             * was never in it: `shelfAt` missed, the `?? 0` put the viewer
-             * at the FIRST WANTED CARD, and opening a card somebody was
-             * letting go showed a card they were hunting instead.
-             *
-             * They stay visibly separate - the two sections below are
-             * untouched - but the swipe runs through both, which is what
-             * the website has always done. The zoom reads `direction` off
-             * each card, so swiping onto a showcase says "Offering"
-             * on its own.
-             */
-            const orderedRail = [
-              ...inRailOrder(railFlares, held, isCovered),
-              ...inRailOrder(showcases, held, isCovered),
-            ];
+                  const railFlares = [...folders.flatMap((f) => f.flares), ...loose];
+                  /*
+                   * ONE SHELF, BOTH DIRECTIONS - the wants in rail order, then
+                   * the showcases in theirs.
+                   *
+                   * The founder: "when a flare is in the 'letting go' tab if im
+                   * trying to offer something up, when i click it, it only shows
+                   * the cards that are in cards im looking for. the letting go
+                   * cards should be swipable in the carousel like normal, but
+                   * should say im offering it up or letting it go once i swipe
+                   * to it."
+                   *
+                   * The shelf was built from `wants` alone, so a showcase tile
+                   * was never in it: `shelfAt` missed, the `?? 0` put the viewer
+                   * at the FIRST WANTED CARD, and opening a card somebody was
+                   * letting go showed a card they were hunting instead.
+                   *
+                   * They stay visibly separate - the two sections below are
+                   * untouched - but the swipe runs through both, which is what
+                   * the website has always done. The zoom reads `direction` off
+                   * each card, so swiping onto a showcase says "Offering"
+                   * on its own.
+                   */
+                  const orderedRail = [
+                    ...inRailOrder(railFlares, held, isCovered),
+                    ...inRailOrder(showcases, held, isCovered),
+                  ];
 
-            /*
-             * The rail as one shelf, in the order it is drawn, so swiping
-             * goes the way the eye already went. The website's rule and the
-             * website's shape.
-             */
-            const shelf: ZoomCard[] = orderedRail.map((f) => ({
-              imageUrl: f.imageUrl,
-              name: f.cardName,
-              cardNumber: f.cardNumber,
-              caption: f.printingLabel ?? "Any printing",
-              note: f.note,
-              lookingFor: f.quantity,
-              direction: f.intent,
-              stillNeeds:
-                f.offers.length > 0
-                  ? pledgeTally(f.offers, f.quantity).remaining
-                  : null,
-              pledges: f.offers.map((offer) => ({
-                name: offer.displayName ?? "A player",
-                quantity: offer.quantity,
-              })),
-              youHave: f.match ? { kind: f.match, count: f.heldCount ?? 0 } : null,
-              /* The offer, for somebody else's want only: your own card
+                  /*
+                   * The rail as one shelf, in the order it is drawn, so swiping
+                   * goes the way the eye already went. The website's rule and the
+                   * website's shape.
+                   */
+                  const shelf: ZoomCard[] = orderedRail.map((f) => ({
+                    imageUrl: f.imageUrl,
+                    name: f.cardName,
+                    cardNumber: f.cardNumber,
+                    caption: f.printingLabel ?? "Any printing",
+                    note: f.note,
+                    lookingFor: f.quantity,
+                    direction: f.intent,
+                    stillNeeds:
+                      f.offers.length > 0
+                        ? pledgeTally(f.offers, f.quantity).remaining
+                        : null,
+                    pledges: f.offers.map((offer) => ({
+                      name: offer.displayName ?? "A player",
+                      quantity: offer.quantity,
+                    })),
+                    youHave: f.match
+                      ? { kind: f.match, count: f.heldCount ?? 0 }
+                      : null,
+                    /* The offer, for somebody else's want only: your own card
                has nothing to offer on, and a card on offer is answered
                at the table, not with a hand. */
-              offer:
-                mine || f.intent === "showcase"
-                  ? null
-                  : {
-                      early: room.early,
-                      quantity: f.quantity,
-                      own: (() => {
-                        const own = f.offers.find(
-                          (o) => o.responderSessionId === youId,
-                        );
-                        return own
-                          ? { quantity: own.quantity, message: own.message }
-                          : null;
-                      })(),
-                      onOffer: (message, quantity) =>
-                        act(() => offerOnFlare(code, f.id, message, quantity)),
-                      onWithdraw: () => act(() => withdrawOffer(code, f.id)),
-                    },
-            }));
-            const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
+                    offer:
+                      mine || f.intent === "showcase"
+                        ? null
+                        : {
+                            early: room.early,
+                            quantity: f.quantity,
+                            own: (() => {
+                              const own = f.offers.find(
+                                (o) => o.responderSessionId === youId,
+                              );
+                              return own
+                                ? { quantity: own.quantity, message: own.message }
+                                : null;
+                            })(),
+                            onOffer: (message, quantity) =>
+                              act(() => offerOnFlare(code, f.id, message, quantity)),
+                            onWithdraw: () => act(() => withdrawOffer(code, f.id)),
+                          },
+                  }));
+                  const shelfAt = new Map(orderedRail.map((f, index) => [f.id, index]));
 
-            /*
-             * THE FOLD. A section shows at most SECTION_FOLD cards; past
-             * that, a control at its end says how many are waiting and
-             * opens the whole section in place. The shelf above was built
-             * from the whole section on purpose: the zoom still pages
-             * every card, not only the ones the fold left showing.
-             *
-             * The rail and the stacked list each fold by their own drawn
-             * order, so what you see is always the first six of what that
-             * view would have drawn.
-             */
-            const total = group.flares.length;
-            const folded = total > SECTION_FOLD && !foldOpen[sessionId];
-            const foldLabel =
-              total > SECTION_FOLD
-                ? folded
-                  ? `and ${total - SECTION_FOLD} more`
-                  : "Show less"
-                : null;
-            const toggleFold = () => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setFoldOpen((current) => ({
-                ...current,
-                [sessionId]: !current[sessionId],
-              }));
-            };
+                  /*
+                   * THE FOLD. A section shows at most SECTION_FOLD cards; past
+                   * that, a control at its end says how many are waiting and
+                   * opens the whole section in place. The shelf above was built
+                   * from the whole section on purpose: the zoom still pages
+                   * every card, not only the ones the fold left showing.
+                   *
+                   * The rail and the stacked list each fold by their own drawn
+                   * order, so what you see is always the first six of what that
+                   * view would have drawn.
+                   */
+                  const total = group.flares.length;
+                  const folded = total > SECTION_FOLD && !foldOpen[sessionId];
+                  const foldLabel =
+                    total > SECTION_FOLD
+                      ? folded
+                        ? `and ${total - SECTION_FOLD} more`
+                        : "Show less"
+                      : null;
+                  const toggleFold = () => {
+                    LayoutAnimation.configureNext(
+                      LayoutAnimation.Presets.easeInEaseOut,
+                    );
+                    setFoldOpen((current) => ({
+                      ...current,
+                      [sessionId]: !current[sessionId],
+                    }));
+                  };
 
-            /* The rail draws the shelf's order: wants, the divider, then
+                  /* The rail draws the shelf's order: wants, the divider, then
                the showcases. Cut at six, the divider only stands when a
                showcase made it through. */
-            const railShown = folded ? orderedRail.slice(0, SECTION_FOLD) : orderedRail;
-            const railWantsShown = railShown.filter((f) => f.intent !== "showcase");
-            const railShowcasesShown = railShown.filter((f) => f.intent === "showcase");
+                  const railShown = folded
+                    ? orderedRail.slice(0, SECTION_FOLD)
+                    : orderedRail;
+                  const railWantsShown = railShown.filter(
+                    (f) => f.intent !== "showcase",
+                  );
+                  const railShowcasesShown = railShown.filter(
+                    (f) => f.intent === "showcase",
+                  );
 
-            /* The stacked list draws showcases first, then the folders,
+                  /* The stacked list draws showcases first, then the folders,
                then the loose cards, and its first six are those. A folder
                the cut lands inside shows the cards within the six and
                nothing of the rest; its heading still counts the whole
                folder, because that is how many it holds. */
-            const stackOrder = [
-              ...showcases,
-              ...folders.flatMap((f) => f.flares),
-              ...loose,
-            ];
-            const stackShown = new Set(
-              (folded ? stackOrder.slice(0, SECTION_FOLD) : stackOrder).map(
-                (f) => f.id,
-              ),
-            );
-            const inStack = (list: RoomFlare[]) =>
-              list.filter((f) => stackShown.has(f.id));
-            const showcasesShown = inStack(showcases);
-            const wantsShown = inStack(wants);
-            const foldersShown = folders
-              .map((folder) => ({
-                label: folder.label,
-                total: folder.flares.length,
-                flares: inStack(folder.flares),
-              }))
-              .filter((folder) => folder.flares.length > 0);
-            const looseShown = inStack(loose);
+                  const stackOrder = [
+                    ...showcases,
+                    ...folders.flatMap((f) => f.flares),
+                    ...loose,
+                  ];
+                  const stackShown = new Set(
+                    (folded ? stackOrder.slice(0, SECTION_FOLD) : stackOrder).map(
+                      (f) => f.id,
+                    ),
+                  );
+                  const inStack = (list: RoomFlare[]) =>
+                    list.filter((f) => stackShown.has(f.id));
+                  const showcasesShown = inStack(showcases);
+                  const wantsShown = inStack(wants);
+                  const foldersShown = folders
+                    .map((folder) => ({
+                      label: folder.label,
+                      total: folder.flares.length,
+                      flares: inStack(folder.flares),
+                    }))
+                    .filter((folder) => folder.flares.length > 0);
+                  const looseShown = inStack(loose);
 
-            const rows = (list: RoomFlare[]) =>
-              list.map((flare) => (
-                <FlareRow
-                  key={flare.id}
-                  flare={flare}
-                  mine={mine}
-                  storeName={room.storeName}
-                  early={room.early}
-                  onOffer={(message, quantity) =>
-                    void act(() => offerOnFlare(code, flare.id, message, quantity))
-                  }
-                  onRemove={() => act(() => removeFlare(code, flare.id))}
-                  onTakeDown={() => takeDown(flare.id)}
-                  onTraded={(partner) =>
-                    void act(() => confirmTrade(code, flare.id, partner))
-                  }
-                />
-              ));
+                  const rows = (list: RoomFlare[]) =>
+                    list.map((flare) => (
+                      <FlareRow
+                        key={flare.id}
+                        flare={flare}
+                        mine={mine}
+                        storeName={room.storeName}
+                        early={room.early}
+                        onOffer={(message, quantity) =>
+                          void act(() =>
+                            offerOnFlare(code, flare.id, message, quantity),
+                          )
+                        }
+                        onRemove={() => act(() => removeFlare(code, flare.id))}
+                        onTakeDown={() => takeDown(flare.id)}
+                        onTraded={(partner) =>
+                          void act(() => confirmTrade(code, flare.id, partner))
+                        }
+                      />
+                    ));
 
-            const groupOpen = Boolean(expandedGroups[sessionId]);
+                  const groupOpen = Boolean(expandedGroups[sessionId]);
 
-            return (
-              <View
-                key={sessionId}
-                style={{
-                  gap: spacing(1),
-                  /* The hairline between players; the card's own gap
+                  return (
+                    <View
+                      key={sessionId}
+                      style={{
+                        gap: spacing(1),
+                        /* The hairline between players; the card's own gap
                    sits above it and this padding below. */
-                  paddingTop: index === 0 ? 0 : spacing(2),
-                  borderTopWidth: index === 0 ? 0 : 1,
-                  borderTopColor: colors.border,
-                }}
-              >
-                {/*
-                 * The founder's synthesis, replacing the page-wide toggle:
-                 * the rail is every player's default face, and the chevron
-                 * on their header unfolds THEM into the full stacked view —
-                 * the same gesture the roster taught.
-                 */}
-                <Tap
-                  onPress={() => {
-                    LayoutAnimation.configureNext(
-                      LayoutAnimation.Presets.easeInEaseOut,
-                    );
-                    setExpandedGroups((current) => ({
-                      ...current,
-                      [sessionId]: !current[sessionId],
-                    }));
-                  }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: spacing(2),
-                    /* The website's hairline, for the same reason: the
+                        paddingTop: index === 0 ? 0 : spacing(2),
+                        borderTopWidth: index === 0 ? 0 : 1,
+                        borderTopColor: colors.border,
+                      }}
+                    >
+                      {/*
+                       * The founder's synthesis, replacing the page-wide toggle:
+                       * the rail is every player's default face, and the chevron
+                       * on their header unfolds THEM into the full stacked view,
+                       * the same gesture the roster taught.
+                       */}
+                      <Tap
+                        onPress={() => {
+                          LayoutAnimation.configureNext(
+                            LayoutAnimation.Presets.easeInEaseOut,
+                          );
+                          setExpandedGroups((current) => ({
+                            ...current,
+                            [sessionId]: !current[sessionId],
+                          }));
+                        }}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: spacing(2),
+                          /* The website's hairline, for the same reason: the
                      person and their cards used to run together as one
                      block of things at slightly different sizes. */
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
-                    /* Two points shorter than it was, given to the rail
+                          borderBottomWidth: 1,
+                          borderBottomColor: colors.border,
+                          /* Two points shorter than it was, given to the rail
                      below so a held card's ring clears this line. */
-                    paddingBottom: spacing(1),
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(1.5),
-                      flexShrink: 1,
-                      flexGrow: 1,
-                    }}
-                  >
-                    {/* An account's identity opens their popup; the rest
-                      of the header still folds the section. Same split
-                      as the website's board header. */}
-                    {(() => {
-                      const person = participants.find(
-                        (p) => p.playerSessionId === sessionId,
-                      );
-                      const identity = (
+                          paddingBottom: spacing(1),
+                        }}
+                      >
                         <View
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            gap: spacing(2),
+                            gap: spacing(1.5),
                             flexShrink: 1,
+                            flexGrow: 1,
                           }}
                         >
-                          <PlayerAvatar
-                            displayName={group.name ?? "A player"}
-                            seed={sessionId}
-                            avatarUrl={person?.avatarUrl ?? null}
-                            frame={person?.frame ?? null}
-                            ring={person?.ring ?? null}
-                            aura={person?.aura ?? null}
-                            ringArt={person?.ringArt ?? null}
-                            auraArt={person?.auraArt ?? null}
-                            /* 64, matching the website's `lg`. The
+                          {/* An account's identity opens their popup; the rest
+                      of the header still folds the section. Same split
+                      as the website's board header. */}
+                          {(() => {
+                            const person = participants.find(
+                              (p) => p.playerSessionId === sessionId,
+                            );
+                            const identity = (
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: spacing(2),
+                                  flexShrink: 1,
+                                }}
+                              >
+                                <PlayerAvatar
+                                  displayName={group.name ?? "A player"}
+                                  seed={sessionId}
+                                  avatarUrl={person?.avatarUrl ?? null}
+                                  frame={person?.frame ?? null}
+                                  ring={person?.ring ?? null}
+                                  aura={person?.aura ?? null}
+                                  ringArt={person?.ringArt ?? null}
+                                  auraArt={person?.auraArt ?? null}
+                                  /* 64, matching the website's `lg`. The
                              founder's mockup settles what this row is:
                              the picture anchors it, and a worn ring is
                              most of why anybody bought one. */
-                            size={48}
-                          />
-                          {/*
-                           * The name and the line under it are a COLUMN
-                           * beside the picture, never items wrapped around
-                           * it. Placed after the picture-and-name pair, the
-                           * tag lands beneath the PICTURE and reads as a
-                           * caption on the avatar — the same bug the
-                           * website had, reported three times.
-                           */}
-                          <View style={{ flexShrink: 1, gap: spacing(1) }}>
-                            <Title>{group.name ?? "A player"}</Title>
-                            {openIds.has(sessionId) && <OpenToTradesTag />}
-                          </View>
+                                  size={48}
+                                />
+                                {/*
+                                 * The name and the line under it are a COLUMN
+                                 * beside the picture, never items wrapped around
+                                 * it. Placed after the picture-and-name pair, the
+                                 * tag lands beneath the PICTURE and reads as a
+                                 * caption on the avatar, the same bug the
+                                 * website had, reported three times.
+                                 */}
+                                <View style={{ flexShrink: 1, gap: spacing(1) }}>
+                                  <Title>{group.name ?? "A player"}</Title>
+                                  {openIds.has(sessionId) && <OpenToTradesTag />}
+                                </View>
+                              </View>
+                            );
+                            return playerBySession.get(sessionId) ? (
+                              <Tap
+                                onPress={() => setPeek(playerBySession.get(sessionId)!)}
+                              >
+                                {identity}
+                              </Tap>
+                            ) : (
+                              identity
+                            );
+                          })()}
                         </View>
-                      );
-                      return playerBySession.get(sessionId) ? (
-                        <Tap onPress={() => setPeek(playerBySession.get(sessionId)!)}>
-                          {identity}
-                        </Tap>
-                      ) : (
-                        identity
-                      );
-                    })()}
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(1.5),
-                    }}
-                  >
-                    <Muted>
-                      {`${group.flares.length} ${group.flares.length === 1 ? "card" : "cards"}`}
-                    </Muted>
-                    <MaterialCommunityIcons
-                      name={groupOpen ? "chevron-up" : "chevron-down"}
-                      size={18}
-                      color={colors.textMuted}
-                    />
-                  </View>
-                </Tap>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: spacing(1.5),
+                          }}
+                        >
+                          <Muted>
+                            {`${group.flares.length} ${group.flares.length === 1 ? "card" : "cards"}`}
+                          </Muted>
+                          <MaterialCommunityIcons
+                            name={groupOpen ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color={colors.textMuted}
+                          />
+                        </View>
+                      </Tap>
 
-                {!groupOpen ? (
-                  <View>
-                    {/* One rail, wants first: the founder's revision.
+                      {!groupOpen ? (
+                        <View>
+                          {/* One rail, wants first: the founder's revision.
                       Nearly all of a board is wants, so a labelled
                       shelf for one showcase cluttered every section
                       that had one. Cards on offer sit past the divider
                       at the far end, same as the website. */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      scrollEventThrottle={16}
-                      onScroll={(event) =>
-                        railMeasure(
-                          sessionId,
-                          event.nativeEvent.contentSize.width,
-                          event.nativeEvent.layoutMeasurement.width,
-                          event.nativeEvent.contentOffset.x,
-                        )
-                      }
-                      onLayout={(event) => {
-                        railLayout.current[sessionId] = event.nativeEvent.layout.width;
-                        const content = railContent.current[sessionId];
-                        if (content != null) {
-                          railMeasure(
-                            sessionId,
-                            content,
-                            event.nativeEvent.layout.width,
-                            0,
-                          );
-                        }
-                      }}
-                      onContentSizeChange={(width) => {
-                        railContent.current[sessionId] = width;
-                        const layout = railLayout.current[sessionId];
-                        if (layout != null) railMeasure(sessionId, width, layout, 0);
-                      }}
-                      /*
-                       * Pulled back by exactly the padding below, so the
-                       * first card's edge lands on the same line as the
-                       * header above it. The padding itself is for the ring
-                       * on a card you are holding: a ScrollView clips what
-                       * leaves its bounds, and the ring sits two pixels
-                       * outside the art with a glow past that. The website
-                       * had this bug and this fix.
-                       *
-                       * The same allowance on top. The rail used to start
-                       * four points under the header's hairline with no
-                       * vertical padding of its own, so a held card's ring
-                       * sat two points off the divider and its glow drew
-                       * straight across it: the founder's screenshot. Four
-                       * more points on top put the ring and its whole
-                       * shadow under the line, and the header gives back
-                       * two of its own so the row does not visibly loosen.
-                       */
-                      style={{ marginHorizontal: -spacing(2) }}
-                      contentContainerStyle={{
-                        gap: spacing(2),
-                        paddingHorizontal: spacing(2),
-                        paddingTop: spacing(1),
-                        paddingBottom: 0,
-                        alignItems: "flex-start",
-                      }}
-                    >
-                      {railWantsShown.map(tile)}
-                      {railShowcasesShown.length > 0 && (
-                        <>
-                          <View
-                            style={{
-                              width: 1,
-                              alignSelf: "stretch",
-                              backgroundColor: colors.border,
-                              marginHorizontal: spacing(0.5),
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            scrollEventThrottle={16}
+                            onScroll={(event) =>
+                              railMeasure(
+                                sessionId,
+                                event.nativeEvent.contentSize.width,
+                                event.nativeEvent.layoutMeasurement.width,
+                                event.nativeEvent.contentOffset.x,
+                              )
+                            }
+                            onLayout={(event) => {
+                              railLayout.current[sessionId] =
+                                event.nativeEvent.layout.width;
+                              const content = railContent.current[sessionId];
+                              if (content != null) {
+                                railMeasure(
+                                  sessionId,
+                                  content,
+                                  event.nativeEvent.layout.width,
+                                  0,
+                                );
+                              }
                             }}
-                          />
-                          {railShowcasesShown.map(tile)}
+                            onContentSizeChange={(width) => {
+                              railContent.current[sessionId] = width;
+                              const layout = railLayout.current[sessionId];
+                              if (layout != null)
+                                railMeasure(sessionId, width, layout, 0);
+                            }}
+                            /*
+                             * Pulled back by exactly the padding below, so the
+                             * first card's edge lands on the same line as the
+                             * header above it. The padding itself is for the ring
+                             * on a card you are holding: a ScrollView clips what
+                             * leaves its bounds, and the ring sits two pixels
+                             * outside the art with a glow past that. The website
+                             * had this bug and this fix.
+                             *
+                             * The same allowance on top. The rail used to start
+                             * four points under the header's hairline with no
+                             * vertical padding of its own, so a held card's ring
+                             * sat two points off the divider and its glow drew
+                             * straight across it: the founder's screenshot. Four
+                             * more points on top put the ring and its whole
+                             * shadow under the line, and the header gives back
+                             * two of its own so the row does not visibly loosen.
+                             */
+                            style={{ marginHorizontal: -spacing(2) }}
+                            contentContainerStyle={{
+                              gap: spacing(2),
+                              paddingHorizontal: spacing(2),
+                              paddingTop: spacing(1),
+                              paddingBottom: 0,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            {railWantsShown.map(tile)}
+                            {railShowcasesShown.length > 0 && (
+                              <>
+                                <View
+                                  style={{
+                                    width: 1,
+                                    alignSelf: "stretch",
+                                    backgroundColor: colors.border,
+                                    marginHorizontal: spacing(0.5),
+                                  }}
+                                />
+                                {railShowcasesShown.map(tile)}
+                              </>
+                            )}
+                            {/* The fold's control, the size of a tile's art so
+                          it stands in the rail like one more card. */}
+                            {foldLabel && (
+                              <Tap onPress={toggleFold} style={styles.foldTile}>
+                                <Text style={styles.foldText}>{foldLabel}</Text>
+                              </Tap>
+                            )}
+                          </ScrollView>
+                          {/*
+                           * The edge fades so the rail visibly continues instead
+                           * of the last card looking cut off, and stops fading
+                           * once there is nothing left to continue to, which is
+                           * the founder's correction: a fade that never leaves
+                           * keeps promising cards that are not there.
+                           */}
+                          {!railsAtEnd[sessionId] && (
+                            <LinearGradient
+                              pointerEvents="none"
+                              colors={[`${colors.surface}00`, colors.surface]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={styles.railFade}
+                            />
+                          )}
+                        </View>
+                      ) : (
+                        <>
+                          {labelled && showcasesShown.length > 0 && (
+                            <View style={{ gap: spacing(1) }}>
+                              <Text style={styles.folderLabel}>
+                                {`Offering · ${showcases.length} ${
+                                  showcases.length === 1 ? "card" : "cards"
+                                }`}
+                              </Text>
+                              <View>{rows(showcasesShown)}</View>
+                            </View>
+                          )}
+
+                          {labelled && wantsShown.length > 0 && (
+                            <Text style={styles.folderLabel}>
+                              {`Looking for · ${wants.length} ${
+                                wants.length === 1 ? "card" : "cards"
+                              }`}
+                            </Text>
+                          )}
+
+                          {foldersShown.map((folder) => (
+                            <View
+                              key={folder.label.toLowerCase()}
+                              style={{ gap: spacing(1) }}
+                            >
+                              <Text style={styles.folderLabel} numberOfLines={1}>
+                                {`${folder.label} · ${folder.total} ${
+                                  folder.total === 1 ? "card" : "cards"
+                                }`}
+                              </Text>
+                              <View>{rows(folder.flares)}</View>
+                            </View>
+                          ))}
+
+                          {looseShown.length > 0 && <View>{rows(looseShown)}</View>}
+
+                          {/* The fold's control as a row, where the list's eye
+                        already is. */}
+                          {foldLabel && (
+                            <Tap onPress={toggleFold} style={styles.foldRow}>
+                              <Text style={styles.foldText}>{foldLabel}</Text>
+                            </Tap>
+                          )}
                         </>
                       )}
-                      {/* The fold's control, the size of a tile's art so
-                          it stands in the rail like one more card. */}
-                      {foldLabel && (
-                        <Tap onPress={toggleFold} style={styles.foldTile}>
-                          <Text style={styles.foldText}>{foldLabel}</Text>
-                        </Tap>
-                      )}
-                    </ScrollView>
-                    {/*
-                     * The edge fades so the rail visibly continues instead
-                     * of the last card looking cut off — and stops fading
-                     * once there is nothing left to continue to, which is
-                     * the founder's correction: a fade that never leaves
-                     * keeps promising cards that are not there.
-                     */}
-                    {!railsAtEnd[sessionId] && (
-                      <LinearGradient
-                        pointerEvents="none"
-                        colors={[`${colors.surface}00`, colors.surface]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.railFade}
-                      />
-                    )}
-                  </View>
-                ) : (
-                  <>
-                    {labelled && showcasesShown.length > 0 && (
-                      <View style={{ gap: spacing(1) }}>
-                        <Text style={styles.folderLabel}>
-                          {`Offering · ${showcases.length} ${
-                            showcases.length === 1 ? "card" : "cards"
-                          }`}
-                        </Text>
-                        <View>{rows(showcasesShown)}</View>
-                      </View>
-                    )}
+                    </View>
+                  );
+                })}
 
-                    {labelled && wantsShown.length > 0 && (
-                      <Text style={styles.folderLabel}>
-                        {`Looking for · ${wants.length} ${
-                          wants.length === 1 ? "card" : "cards"
-                        }`}
-                      </Text>
-                    )}
-
-                    {foldersShown.map((folder) => (
-                      <View
-                        key={folder.label.toLowerCase()}
-                        style={{ gap: spacing(1) }}
-                      >
-                        <Text style={styles.folderLabel} numberOfLines={1}>
-                          {`${folder.label} · ${folder.total} ${
-                            folder.total === 1 ? "card" : "cards"
-                          }`}
-                        </Text>
-                        <View>{rows(folder.flares)}</View>
-                      </View>
-                    ))}
-
-                    {looseShown.length > 0 && <View>{rows(looseShown)}</View>}
-
-                    {/* The fold's control as a row, where the list's eye
-                        already is. */}
-                    {foldLabel && (
-                      <Tap onPress={toggleFold} style={styles.foldRow}>
-                        <Text style={styles.foldText}>{foldLabel}</Text>
-                      </Tap>
-                    )}
-                  </>
+                {/* A guest has no composer, so the toggle that moved into the
+                  composer's foot would vanish for them. One quiet row here
+                  keeps it; a signed-in player finds it under Post a Flare. */}
+                {guest && (
+                  <AsyncButton
+                    label={youOpen ? "Open to trades ✓" : "I'm open to trades"}
+                    pendingLabel={youOpen ? "Closing…" : "Opening…"}
+                    variant="secondary"
+                    onPress={() => act(() => setOpenToTrades(code, !youOpen))}
+                  />
                 )}
-              </View>
-            );
-          })}
+              </>
+            ) : (
+              <ReadOnlyBoard flares={flares} filter={filter} />
+            )}
+          </NightSection>
+        )}
 
-          {/* A guest has no composer, so the toggle that moved into the
-              composer's foot would vanish for them. One quiet row here
-              keeps it; a signed-in player finds it under Post a Flare. */}
-          {guest && (
-            <AsyncButton
-              label={youOpen ? "Open to trades ✓" : "I'm open to trades"}
-              pendingLabel={youOpen ? "Closing…" : "Opening…"}
-              variant="secondary"
-              onPress={() => act(() => setOpenToTrades(code, !youOpen))}
-            />
-          )}
-        </Card>
+        {/* PLAYERS GOING: low on the page, and each row says why the
+            person matters. A tap opens their event-facing profile. */}
+        <PlayersGoing
+          roster={roster}
+          matchesByPlayer={matchesByPlayer}
+          live={phase === "live"}
+          onPlayer={openPlayer}
+        />
+
+        {/* EVENT DETAILS, folded shut: venue, address, organizer, code. */}
+        <EventDetails
+          storeName={room.storeName}
+          verified={room.verified}
+          address={room.store?.address ?? null}
+          code={code}
+          onStore={
+            room.storeId
+              ? () => navigation.navigate("StoreProfile", { storeId: room.storeId! })
+              : undefined
+          }
+        />
 
         {trades.length > 0 && (
-          <Card>
-            <Title>Traded tonight</Title>
-            <Body>
+          <NightSection label="Traded tonight" last>
+            <Muted>
               Only you can see this list. The store sees tonight's totals, never who
               traded what.
-            </Body>
+            </Muted>
             <View>
               {trades.map((trade) =>
                 trade.awaitingYou ? (
@@ -1833,60 +1805,48 @@ function RoomScreen({
                 ),
               )}
             </View>
-          </Card>
+          </NightSection>
         )}
       </ScrollView>
 
-      {/* The names, behind the meta line. A row opens the profile popup
-          over the list, so closing it lands back on the people. View
-          full profile leaves both behind for the profile screen. */}
-      <RoomPeopleModal
-        open={peopleOpen}
-        participants={people}
-        onClose={() => setPeopleOpen(false)}
-        onPeek={setPeek}
-      />
-
+      {/* The profile popup, from a board header's face and name. View
+          full profile leaves it behind for the profile screen. */}
       <PlayerPeekModal
         playerId={peek}
         onClose={() => setPeek(null)}
         onViewProfile={(playerId) => {
           setPeek(null);
-          setPeopleOpen(false);
           navigation.navigate("PlayerProfile", { playerId });
         }}
       />
 
-      {/* The action bar: the one thing a thumb reaches for in a room.
-          The open-to-trades toggle used to share this bar and now sits
-          at the composer's foot, so the bar is one button. Its own padding
-          plus the home indicator's strip, so the button stops above the
-          swipe area rather than sitting inside it. The composer is
-          told whether you are open so its toggle starts right. */}
-      <View style={[styles.actionBar, { paddingBottom: spacing(3) + bottomClear }]}>
-        <View style={{ flex: 1 }}>
-          <Button
-            label="Post a Flare"
-            onPress={() =>
-              navigation.navigate("PostFlare", { code, openToTrades: youOpen })
-            }
-          />
-        </View>
-      </View>
+      {/*
+       * "+ FLARE", floating above the dock, in place of the lime action
+       * bar. The founder: "The current giant lime 'Post a Flare' bar is
+       * too visually dominant." It opens the same composer, which
+       * attaches the Flare to this night, and carries whether you are
+       * open to trades so the composer's toggle starts right. For a
+       * seat in a phase that takes Flares; the open-to-trades toggle
+       * that used to share the bar lives at the composer's foot.
+       */}
+      {joined && writable ? (
+        <FlareFab
+          bottom={bottomClear + spacing(4)}
+          onPress={() =>
+            navigation.navigate("PostFlare", { code, openToTrades: youOpen })
+          }
+        />
+      ) : null}
 
-      {/* The undo, above the action bar: its button, its padding, and
-          whatever the bar itself clears. */}
+      {/* The undo, above the floating button and whatever it clears. */}
       <UndoToast
         offer={undo}
         onDismiss={dismissUndo}
-        bottom={ACTION_BAR_HEIGHT + bottomClear + spacing(2)}
+        bottom={FAB_HEIGHT + bottomClear + spacing(6)}
       />
     </View>
   );
 }
-
-/** The action bar's own height: the button and the padding around it. */
-const ACTION_BAR_HEIGHT = 48 + spacing(3) * 2;
 
 /** The website's pledge arithmetic, in miniature: how much of the ask is
     spoken for, and what is still missing. */
@@ -1981,7 +1941,7 @@ function partitionByDeck(flares: RoomFlare[]): {
 /**
  * One Flare as the carousel shows it: a contact sheet, not a row.
  *
- * Sized so five cards share a phone's width — the founder's number,
+ * Sized so five cards share a phone's width, the founder's number,
  * after two rounds of "still too big". At this size the tile is for
  * browsing: art (tap to zoom for the rest), name, count, and one-line
  * signals. The quick offer stays as a text link; writing a note,
@@ -2034,7 +1994,7 @@ function CarouselFlare({
    * Same complaint, the other side of the trade: Remove sat there
    * looking untouched until the next poll repainted the board. Now the
    * whole tile greys out under a spinner the moment it is tapped, so
-   * the tap is visibly taken. Whole tile, not just the art — the card
+   * the tap is visibly taken. Whole tile, not just the art, the card
    * is the thing going away.
    */
   const [removing, setRemoving] = useState(false);
@@ -2052,7 +2012,7 @@ function CarouselFlare({
   };
 
   /*
-   * Quantity drawn instead of written — and it is the *live need*, the
+   * Quantity drawn instead of written, and it is the *live need*, the
    * founder's confirm: copies still unpledged render as faded layers
    * behind the art, fanned out to the RIGHT. Sideways only: the first
    * cut nudged them downward, every stacked tile grew taller, and the
@@ -2074,7 +2034,7 @@ function CarouselFlare({
     // whole tile including the spinner and the feedback disappears into
     // the thing it is meant to be feedback about.
     <View style={{ width: 56 + fan }}>
-      {/* Fully covered: dimmed AND drained of colour — "taken care of"
+      {/* Fully covered: dimmed AND drained of colour, "taken care of"
           should read from across the room. (filter needs RN 0.76+ with
           the new architecture; this project ships 0.81 with it on.) */}
       <View
@@ -2084,7 +2044,7 @@ function CarouselFlare({
           filter: covered ? [{ grayscale: 1 }] : undefined,
         }}
       >
-        {/* Being removed greys the card and nothing else — the founder's
+        {/* Being removed greys the card and nothing else, the founder's
             correction. Dimming the tile took the name and the button
             with it, which said "this row is disabled" rather than "this
             card is on its way out". */}
@@ -2097,7 +2057,7 @@ function CarouselFlare({
           }}
         >
           {/*
-           * A ring on a card you are holding — the website's mark, and the
+           * A ring on a card you are holding, the website's mark, and the
            * founder's replacement for the old "you have 2 of 6" count: a
            * ring on the card IS the finding, and it survives being glanced
            * at across a table in a way a sentence does not.
@@ -2198,7 +2158,7 @@ function CarouselFlare({
           {/*
            * Every signal that used to be its own caption line lives on
            * the art as a badge now. The founder's screenshot counted the
-           * handshake at three heights in one rail — variable caption
+           * handshake at three heights in one rail, variable caption
            * stacks were the culprit, so below the art the tile is a
            * fixed grid: one name line, one caption slot, one action row.
            */}
@@ -2216,7 +2176,7 @@ function CarouselFlare({
               <Text style={styles.noteBadgeGlyph}>✎</Text>
             </View>
           ) : null}
-          {/* The number, right on the card — the fan draws it, this chip
+          {/* The number, right on the card, the fan draws it, this chip
               says it, and both count down together as pledges land.
               Anchored from the fan's bleed so it sits on the top card. */}
           {visible > 1 ? (
@@ -2406,7 +2366,7 @@ function FlareRow({
         )}
 
         {/* Coverage first, for everyone: the founder's example is Damian
-            asking for 2x with one pledged — the room should read "still
+            asking for 2x with one pledged, the room should read "still
             needs 1 more", not "someone's got it". */}
         {pledgeLine && (
           <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
@@ -2443,7 +2403,7 @@ function FlareRow({
           </Tap>
         )}
 
-        {/* Anyone can pledge — no binder match required, the founder's
+        {/* Anyone can pledge, no binder match required, the founder's
             call. The match badge above stays a hint, not a permission. */}
         {!mine && !offering && (
           <Button
@@ -2510,13 +2470,6 @@ function FlareRow({
 }
 
 const styles = StyleSheet.create({
-  /* The night's name: the page's h1, bigger than a card's Title. */
-  nightName: {
-    color: colors.textPrimary,
-    fontSize: 24,
-    fontWeight: "800",
-    flex: 1,
-  },
   flare: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -2672,18 +2625,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  actionBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    gap: spacing(2),
-    padding: spacing(3),
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
 });
 
 /**
@@ -2711,203 +2652,21 @@ function rosterOf(state: RoomState): RosterPlayer[] {
 }
 
 /**
- * The room before it starts, for a viewer not yet on the roster: the
- * header, the pitch with the Going button and "{n} going", who is
- * going, and the board to read. A guest gets the account pitch under
- * the Going card, because Going needs an account and the button says
- * so by opening sign-in.
- */
-function PreStartRoom({
-  state,
-  eventId,
-  youGoing,
-  goingCount,
-  guest,
-  onSettled,
-  onStore,
-  onPlayer,
-  onBinder,
-}: {
-  state: RoomState;
-  eventId: string;
-  youGoing: boolean;
-  goingCount: number;
-  guest: boolean;
-  onSettled: () => void;
-  onStore: (storeId: string) => void;
-  onPlayer: (playerId: string) => void;
-  onBinder: (playerId: string, binderId: string) => void;
-}) {
-  const room = state.room!;
-  const flares = state.flares ?? [];
-
-  return (
-    <ScrollView
-      contentContainerStyle={{
-        paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
-        gap: spacing(4),
-      }}
-    >
-      <Card>
-        {room.storeId ? (
-          <Tap
-            onPress={() => onStore(room.storeId!)}
-            hitSlop={6}
-            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-          >
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-              {room.storeName}
-            </Text>
-            {room.verified ? <VerifiedMark size={14} /> : null}
-          </Tap>
-        ) : (
-          <Muted>{room.storeName}</Muted>
-        )}
-        <Title>{room.name}</Title>
-        {room.startsAt ? (
-          <Muted>
-            {new Intl.DateTimeFormat("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            }).format(new Date(room.startsAt))}
-          </Muted>
-        ) : null}
-      </Card>
-
-      <Card>
-        <Body>{PRE_START_PITCH}</Body>
-        <GoingButton
-          eventId={eventId}
-          youGoing={youGoing}
-          goingCount={goingCount}
-          onSettled={onSettled}
-        />
-      </Card>
-
-      {guest && <AccountPitch variant="join" />}
-
-      <RosterCard roster={rosterOf(state)} onPlayer={onPlayer} onBinder={onBinder} />
-
-      <ReadOnlyBoard flares={flares} />
-    </ScrollView>
-  );
-}
-
-/**
- * Who is going: a face, a name that opens the profile, "{k} Flares",
- * and up to three binder chips that open that binder. Nothing to draw
- * means no card, the same as every section on the Nights tab.
- */
-function RosterCard({
-  roster,
-  onPlayer,
-  onBinder,
-}: {
-  roster: RosterPlayer[];
-  onPlayer: (playerId: string) => void;
-  onBinder: (playerId: string, binderId: string) => void;
-}) {
-  if (roster.length === 0) return null;
-
-  return (
-    <Card>
-      <Title>Who&rsquo;s going</Title>
-      <View>
-        {roster.map((p, index) => (
-          <View
-            key={p.playerSessionId}
-            style={{
-              gap: spacing(2),
-              paddingVertical: spacing(2.5),
-              borderTopWidth: index === 0 ? 0 : 1,
-              borderTopColor: colors.border,
-            }}
-          >
-            <Tap
-              onPress={p.playerId ? () => onPlayer(p.playerId!) : undefined}
-              disabled={!p.playerId}
-              accessibilityLabel={p.displayName}
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}
-            >
-              <PlayerAvatar
-                displayName={p.displayName}
-                seed={p.playerId ?? p.playerSessionId}
-                avatarUrl={p.avatarUrl}
-                frame={p.frame}
-                ring={p.ring}
-                aura={p.aura}
-                size={36}
-              />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {p.displayName}
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                  {`${p.flares} ${p.flares === 1 ? "Flare" : "Flares"}`}
-                </Text>
-              </View>
-            </Tap>
-            {p.binders.length > 0 && p.playerId ? (
-              <View
-                style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}
-              >
-                {p.binders.slice(0, 3).map((binder) => (
-                  <Tap
-                    key={binder.id}
-                    onPress={() => onBinder(p.playerId!, binder.id)}
-                    accessibilityLabel={binder.name}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(1.5),
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.elevated,
-                      paddingHorizontal: spacing(2.5),
-                      paddingVertical: spacing(1),
-                    }}
-                  >
-                    {/* The cover's colour, as a dot: the binder's own
-                        swatch at chip size. */}
-                    <View
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 5,
-                        backgroundColor: colors[binderCover(binder.cover).edge],
-                      }}
-                    />
-                    <Text
-                      style={{
-                        color: colors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {binder.name}
-                    </Text>
-                  </Tap>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ))}
-      </View>
-    </Card>
-  );
-}
-
-/**
  * The board, to read: every Flare, grouped under whoever posted it,
- * the way the live board groups them, with no offer controls. Tapping
- * a card opens the viewer and the rest of that player's rail.
+ * the way the seated board groups them, with no offer controls. For a
+ * viewer without a seat yet: the founder, "anyone can go into there
+ * and see who is looking for which cards before the tournament or
+ * event starts." Tapping a card opens the viewer and the rest of that
+ * player's rail. The filter has already run; it only decides the
+ * empty line.
  */
-function ReadOnlyBoard({ flares }: { flares: RoomFlare[] }) {
+function ReadOnlyBoard({
+  flares,
+  filter,
+}: {
+  flares: RoomFlare[];
+  filter: FlareFilter;
+}) {
   const groups = new Map<string, { name: string | null; flares: RoomFlare[] }>();
   for (const flare of flares) {
     const group = groups.get(flare.playerSessionId) ?? {
@@ -2918,64 +2677,67 @@ function ReadOnlyBoard({ flares }: { flares: RoomFlare[] }) {
     groups.set(flare.playerSessionId, group);
   }
 
-  return (
-    <Card>
-      <Title>On the board</Title>
-      {groups.size === 0 ? (
-        <Muted>Nothing posted yet. Say you&rsquo;re going and yours go up first.</Muted>
-      ) : (
-        <View>
-          {[...groups.entries()].map(([sessionId, group], index) => {
-            const shelf: ZoomCard[] = group.flares.map((f) => ({
-              imageUrl: f.imageUrl,
-              name: f.cardName,
-              cardNumber: f.cardNumber,
-              caption: f.printingLabel,
-              note: f.note,
-              lookingFor: f.quantity,
-              direction: f.intent,
-            }));
+  if (groups.size === 0) {
+    return (
+      <Muted>
+        {filter === "all"
+          ? "Nothing posted yet. Say you're going and yours go up first."
+          : emptyFilterLine(filter)}
+      </Muted>
+    );
+  }
 
-            return (
-              <View
-                key={sessionId}
-                style={{
-                  gap: spacing(2),
-                  paddingVertical: spacing(2.5),
-                  borderTopWidth: index === 0 ? 0 : 1,
-                  borderTopColor: colors.border,
-                }}
-              >
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {group.name ?? "A player"}
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: spacing(2) }}
-                >
-                  {group.flares.map((f, position) => (
-                    <CardImage
-                      key={f.id}
-                      imageUrl={f.imageUrl}
-                      width={96}
-                      name={f.cardName}
-                      cardNumber={f.cardNumber}
-                      caption={f.printingLabel}
-                      note={f.note}
-                      lookingFor={f.quantity}
-                      direction={f.intent}
-                      siblings={shelf}
-                      position={position}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </Card>
+  return (
+    <View>
+      {[...groups.entries()].map(([sessionId, group], index) => {
+        const shelf: ZoomCard[] = group.flares.map((f) => ({
+          imageUrl: f.imageUrl,
+          name: f.cardName,
+          cardNumber: f.cardNumber,
+          caption: f.printingLabel,
+          note: f.note,
+          lookingFor: f.quantity,
+          direction: f.intent,
+        }));
+
+        return (
+          <View
+            key={sessionId}
+            style={{
+              gap: spacing(2),
+              paddingVertical: spacing(2.5),
+              borderTopWidth: index === 0 ? 0 : 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+              {group.name ?? "A player"}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing(2) }}
+            >
+              {group.flares.map((f, position) => (
+                <CardImage
+                  key={f.id}
+                  imageUrl={f.imageUrl}
+                  width={72}
+                  name={f.cardName}
+                  cardNumber={f.cardNumber}
+                  caption={f.printingLabel}
+                  note={f.note}
+                  lookingFor={f.quantity}
+                  direction={f.intent}
+                  siblings={shelf}
+                  position={position}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
