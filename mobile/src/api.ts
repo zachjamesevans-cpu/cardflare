@@ -694,6 +694,14 @@ export interface RosterPlayer {
   flares: number;
   /** Up to three binders up for trade; empty for a guest. */
   binders: RosterBinder[];
+  /**
+   * How many cards are on their Have list, and how many of those and
+   * the viewer's cross: the "42 trade cards" and "2 matches" on a
+   * Players going row. Absent from an older server, which draws the
+   * row without them.
+   */
+  tradeCards?: number;
+  matches?: number;
 }
 
 export interface RoomState {
@@ -731,6 +739,18 @@ export interface RoomState {
      * code. Without it the room draws the door it always had.
      */
     eventId?: string;
+    /**
+     * How many of the roster are in the room right now, for the
+     * header's "3 here now". Absent from an older server: the header
+     * counts the present participants it can see instead.
+     */
+    hereNow?: number;
+    /** The store's whereabouts, for the collapsed Event details. */
+    store?: {
+      address: string | null;
+      phone: string | null;
+      website: string | null;
+    };
   };
   /**
    * The same four, when a server puts them beside the room rather
@@ -835,8 +855,9 @@ export function goingOf(
 /* ------------------------------------------------------------------ */
 
 /** Where a night in the Nights list is: a room open now, an early
-    board, or a night posted and not yet open. */
-export type NightPhase = "live" | "early" | "upcoming";
+    board, a night posted and not yet open, or one that has ended and
+    the viewer went to (the Past tab). */
+export type NightPhase = "live" | "early" | "upcoming" | "finished";
 
 /**
  * One night that matters to this player: at a store they follow or one
@@ -860,11 +881,163 @@ export interface NightItem {
   /** Flares on the board. */
   flares: number;
   following: boolean;
+  /**
+   * Trade matches for the viewer at this night: the summary total for
+   * a night they are going to, null otherwise. Absent from an older
+   * server, which reads the same as null: the players count takes the
+   * slot on the card.
+   */
+  matches?: number | null;
+  /** How many of the roster are in the room right now. */
+  hereNow?: number;
 }
 
-/** Live rooms first, then by start time, within the next fourteen days.
-    The server orders; the app draws in the order given. */
+/** Live rooms first, then upcoming and early by start time, then
+    finished nights newest first. The server orders; the app draws in
+    the order given. */
 export const getNights = () => call<{ nights: NightItem[] }>("GET", "/api/v1/nights");
+
+/* ------------------------------------------------------------------ */
+/* Night matches: who can I trade with here, and why                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One card in a match, as the server names it. The website's
+ * `MatchCard` in src/lib/events/night-matches.ts, field for field.
+ */
+export interface MatchCard {
+  cardId: string;
+  name: string;
+  number: string;
+  imageUrl: string | null;
+  printingLabel: string | null;
+}
+
+/** Somebody on the roster, as a match names them. */
+export interface MatchPlayer {
+  playerId: string;
+  playerSessionId: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+}
+
+/** A player whose Trade binder or Flares hold cards the viewer wants. */
+export interface TheyHaveMatch {
+  player: MatchPlayer;
+  cards: {
+    card: MatchCard;
+    /** Where the card was found: their Have list, or a Flare here. */
+    source: "binder" | "flare";
+    /** The viewer's matching want is a Flare at this night. */
+    fromYourFlare: boolean;
+  }[];
+}
+
+/** A player whose wants are on the viewer's Have list. */
+export interface TheyWantMatch {
+  player: MatchPlayer;
+  cards: MatchCard[];
+}
+
+/** Both directions at once: the signature match. */
+export interface MutualMatch {
+  player: MatchPlayer;
+  youWant: MatchCard[];
+  theyWant: MatchCard[];
+}
+
+/** A card of the viewer's that somebody here is looking for. */
+export interface BringCard {
+  card: MatchCard;
+  /** Display names, for "Wanted by CHUNC + 1 other". */
+  wantedBy: string[];
+  /** Ticked off in the checklist; the server remembers it. */
+  packed: boolean;
+}
+
+/**
+ * Everything the matcher found for the viewer at one night. The
+ * website's `NightMatches`; a guest gets the empty one.
+ */
+export interface NightMatches {
+  summary: {
+    total: number;
+    cardsHuntingHere: number;
+    playersWantYours: number;
+    mutual: number;
+  };
+  mutual: MutualMatch[];
+  theyHave: TheyHaveMatch[];
+  theyWant: TheyWantMatch[];
+  bring: BringCard[];
+  /** playerId -> how many matched cards that player and the viewer share, both directions. */
+  perPlayer: Record<string, number>;
+}
+
+/** What a viewer with nothing to match, or no account, reads. */
+export const EMPTY_MATCHES: NightMatches = {
+  summary: { total: 0, cardsHuntingHere: 0, playersWantYours: 0, mutual: 0 },
+  mutual: [],
+  theyHave: [],
+  theyWant: [],
+  bring: [],
+  perPlayer: {},
+};
+
+/**
+ * The matches for the signed-in viewer at a night. A guest's answer is
+ * the empty set, not an error, so the room draws the sign-in pitch
+ * where the matches would be.
+ */
+export const getNightMatches = (eventId: string) =>
+  call<NightMatches>("GET", `/api/v1/nights/${encodeURIComponent(eventId)}/matches`);
+
+/** Packed, or unpacked, one card on the What to bring list. */
+export const setPacked = (eventId: string, cardId: string, packed: boolean) =>
+  call<{ ok: true }>("PUT", `/api/v1/nights/${encodeURIComponent(eventId)}/packed`, {
+    cardId,
+    packed,
+  });
+
+/** A Flare on a player's event-facing profile: the board's row, bare. */
+export type NightPlayerFlare = Omit<
+  RoomFlare,
+  "match" | "heldCount" | "counterMayHave" | "offers"
+> &
+  Partial<Pick<RoomFlare, "match" | "heldCount" | "counterMayHave" | "offers">>;
+
+/**
+ * One player as this night sees them: the website's `NightPlayerView`.
+ * Their Flares here, their binders up for trade (never a private one),
+ * and the cards that cross with the viewer's.
+ */
+export interface NightPlayerView {
+  player: MatchPlayer;
+  matches: number;
+  theyHave: MatchCard[];
+  theyWant: MatchCard[];
+  /**
+   * Their Flares at this night: the board's entries as the server
+   * stores them, without the viewer's match, the counter's shelf and
+   * the offers the room route adds. The tiles need none of those.
+   */
+  flares: NightPlayerFlare[];
+  /** Up for trade only. */
+  binders: BinderSummary[];
+  flaresCount: number;
+  /** The size of their Have list. */
+  tradeCards: number;
+}
+
+/** 404 when they are not on the roster. */
+export const getNightPlayer = (eventId: string, playerId: string) =>
+  call<NightPlayerView>(
+    "GET",
+    `/api/v1/nights/${encodeURIComponent(eventId)}/players/${encodeURIComponent(playerId)}`,
+  );
 
 /** What saying Going, or Not going, comes back with. */
 export interface GoingAnswer {

@@ -47,7 +47,9 @@ import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
-import { NightsScreen } from "./src/screens/nights";
+import { NightMatchesScreen } from "./src/screens/night-matches";
+import { NightPlayerScreen } from "./src/screens/night-player";
+import { NightsCodeButton, NightsScreen } from "./src/screens/nights";
 import { RoomTab } from "./src/screens/room";
 import { ThreadScreen } from "./src/screens/thread";
 import { ScanScreen } from "./src/screens/scan";
@@ -74,8 +76,10 @@ import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
  * Five tabs: Feed, Nights (the nights near you and the ones you are
  * going to), Flare, Inbox, Profile. The Room (where you are right now;
  * remembers the last room), scanning, posting, signing in and settings
- * ride on top as stack screens; Nights' "Scan or enter a code" is the
- * door to the Room. Local can take Nights' slot (src/local-enabled.ts)
+ * ride on top as stack screens; the QR icon on Nights' header is the
+ * door to the scanner and the Room's code form, and a night's matches
+ * and its players' event-facing profiles are stack screens of their
+ * own (NightMatches, NightPlayer). Local can take Nights' slot (src/local-enabled.ts)
  * and is switched off. The founder, on the dock: "Trying to keep our
  * tabs to our 'hero's'."
  *
@@ -168,6 +172,17 @@ export type StackParams = {
   PostFlare: { code: string; openToTrades?: boolean };
   /** Somebody else's profile, from the room popup's View full profile. */
   PlayerProfile: { playerId: string };
+  /**
+   * Every match the viewer has at a night: the website's
+   * /e/[code]/matches. Reached from See all matches on the night.
+   */
+  NightMatches: { code: string };
+  /**
+   * A player as this night sees them: the website's
+   * /e/[code]/p/[playerId]. Reached from a Players going row and from
+   * a match's name.
+   */
+  NightPlayer: { code: string; playerId: string };
   /** A Flare post's thread: likes, comments, "I have this" on a card. */
   FlarePost: { postId: string };
   /** One hunt, whole: the website's /hunts/[huntId]. */
@@ -218,6 +233,8 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Customize: "Profile",
   Pro: "Back",
   PlayerProfile: "Back",
+  NightMatches: "Night",
+  NightPlayer: "Night",
   LogTrade: "History",
   Remote: "Room",
   FindPlayer: "Feed",
@@ -481,7 +498,13 @@ function Tabs() {
         <Tab.Screen
           name="Nights"
           component={NightsScreen}
-          options={{ title: "Nights", tabBarLabel: "Nights" }}
+          /* The QR icon at the header's end: Scan QR, or Enter event
+             code. The giant "Scan or enter a code" button is gone. */
+          options={{
+            title: "Nights",
+            tabBarLabel: "Nights",
+            headerRight: () => <NightsCodeButton />,
+          }}
         />
       )}
       {/* The tab keeps the product's name; the header says what the
@@ -818,6 +841,23 @@ export default function App() {
             component={PlayerProfileScreen}
             options={{ title: "Player", headerBackTitle: "Back" }}
           />
+          <Stack.Screen
+            name="NightMatches"
+            options={{ title: "Matches", headerBackTitle: "Night" }}
+          >
+            {({ route }) => <NightMatchesScreen code={route.params.code} />}
+          </Stack.Screen>
+          <Stack.Screen
+            name="NightPlayer"
+            options={{ title: "Player", headerBackTitle: "Night" }}
+          >
+            {({ route }) => (
+              <NightPlayerScreen
+                code={route.params.code}
+                playerId={route.params.playerId}
+              />
+            )}
+          </Stack.Screen>
           <Stack.Screen
             name="TradeHistory"
             component={TradeHistoryScreen}

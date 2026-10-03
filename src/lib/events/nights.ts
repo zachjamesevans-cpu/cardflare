@@ -1,5 +1,6 @@
 import "server-only";
 
+import { countParticipants } from "@/lib/events/participants";
 import { NEARBY_RADIUS_MILES } from "@/lib/feed/repository";
 import { countOpenFlares } from "@/lib/lists/repository";
 import { listLocals } from "@/lib/players/locals";
@@ -7,6 +8,7 @@ import { storesNear } from "@/lib/stores/nearby";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { EventKind, EventStatus } from "@/lib/supabase/types";
 import { goingStates } from "./going";
+import { nightMatchSummaries } from "./night-matches";
 import { roomPhase } from "./schema";
 
 /**
@@ -17,10 +19,15 @@ import { roomPhase } from "./schema";
  * Room's slot becomes Nights, and the code door is a secondary button
  * on it. What the tab shows is every night at a store the player
  * follows or that is near them, every night they are going to wherever
- * it is, and every room live at those stores, within a fortnight.
+ * it is, and every room live at those stores, within a fortnight; and,
+ * for the Past tab, the nights they went to in the last thirty days.
+ *
+ * Round 2, the founder: "Potential matches should have significantly
+ * more visual priority than generic attendance." So a night the
+ * player is going to carries how many matches the dashboard found.
  */
 
-export type NightPhase = "live" | "early" | "upcoming";
+export type NightPhase = "live" | "early" | "upcoming" | "finished";
 
 export interface NightItem {
   eventId: string;
@@ -36,6 +43,15 @@ export interface NightItem {
   phase: NightPhase;
   youGoing: boolean;
   goingCount: number;
+  /** Seen inside the presence window. Zero once the night is finished. */
+  hereNow: number;
+  /**
+   * The dashboard's total for a night the viewer is going to; null for
+   * one they are not going to, and for a finished night, where there
+   * is nothing left to match. Null and zero draw differently: zero is
+   * "no matches", null is "not yours to have matches at".
+   */
+  matches: number | null;
   /** Flares on the board. */
   flares: number;
   following: boolean;
@@ -51,18 +67,29 @@ const HORIZON_MS = 14 * 24 * 60 * 60 * 1000;
  */
 const LOOKBACK_MS = 48 * 60 * 60 * 1000;
 
+/** How far back the Past tab reaches for nights the player went to. */
+const PAST_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** Stores "near you" are read a little deeper than the Feed shows. */
 const NEARBY_STORES = 20;
 
-/** Live rooms first, then by start time, then by name for a stable list. */
+/**
+ * Live rooms first, then what is coming by start time, then what is
+ * over newest first, and by name within a tie for a stable list.
+ */
 export function orderNights<
   T extends { phase: NightPhase; startsAt: string; name: string },
 >(items: T[]): T[] {
+  const rank = (phase: NightPhase) =>
+    phase === "live" ? 0 : phase === "finished" ? 2 : 1;
   return [...items].sort((a, b) => {
-    const liveA = a.phase === "live" ? 0 : 1;
-    const liveB = b.phase === "live" ? 0 : 1;
-    if (liveA !== liveB) return liveA - liveB;
-    const byStart = a.startsAt.localeCompare(b.startsAt);
+    const rankA = rank(a.phase);
+    const rankB = rank(b.phase);
+    if (rankA !== rankB) return rankA - rankB;
+    const byStart =
+      rankA === 2
+        ? b.startsAt.localeCompare(a.startsAt)
+        : a.startsAt.localeCompare(b.startsAt);
     if (byStart !== 0) return byStart;
     return a.name.localeCompare(b.name);
   });
@@ -133,14 +160,16 @@ export async function listNights(
   const now = Date.now();
   const lower = new Date(now - LOOKBACK_MS).toISOString();
   const upper = new Date(now + HORIZON_MS).toISOString();
+  const pastLower = new Date(now - PAST_MS).toISOString();
 
   /*
-   * Two reads of the same columns: the calendar at the player's stores,
-   * and the nights they are going to wherever those are. Closed rooms
-   * are history; the phase rule below drops anything the clock has
-   * passed without the store opening it.
+   * Three reads of the same columns: the calendar at the player's
+   * stores, the nights they are going to wherever those are, and the
+   * closed nights they held a seat at in the last month, for Past. The
+   * phase rule below drops anything the clock has passed without the
+   * store opening it.
    */
-  const [atStores, going] = await Promise.all([
+  const [atStores, going, past] = await Promise.all([
     storeIds.length > 0
       ? admin
           .from("events")
@@ -159,15 +188,30 @@ export async function listNights(
           .gte("starts_at", lower)
           .lte("starts_at", upper)
       : Promise.resolve({ data: [] as NightRow[], error: null }),
+    seated.length > 0
+      ? admin
+          .from("events")
+          .select(NIGHT_COLUMNS)
+          .in("id", seated)
+          .eq("status", "closed")
+          .gte("starts_at", pastLower)
+      : Promise.resolve({ data: [] as NightRow[], error: null }),
   ]);
 
-  if (atStores.error || going.error) {
-    console.error("Could not list the nights", atStores.error ?? going.error);
+  if (atStores.error || going.error || past.error) {
+    console.error(
+      "Could not list the nights",
+      atStores.error ?? going.error ?? past.error,
+    );
     return [];
   }
 
   const rows = new Map<string, NightRow>();
-  for (const row of [...(atStores.data ?? []), ...(going.data ?? [])] as NightRow[]) {
+  for (const row of [
+    ...(atStores.data ?? []),
+    ...(going.data ?? []),
+    ...(past.data ?? []),
+  ] as NightRow[]) {
     if (row.cancelled_at) continue;
     rows.set(row.id, row);
   }
@@ -185,7 +229,10 @@ export async function listNights(
   }
   const storeById = new Map((stores ?? []).map((store) => [store.id, store]));
 
-  const candidates: Omit<NightItem, "youGoing" | "goingCount" | "flares">[] = [];
+  const candidates: Omit<
+    NightItem,
+    "youGoing" | "goingCount" | "hereNow" | "matches" | "flares"
+  >[] = [];
   for (const row of rows.values()) {
     const store = storeById.get(row.store_id);
     if (!store) continue;
@@ -201,7 +248,9 @@ export async function listNights(
       },
       now,
     );
-    if (phase !== "live" && phase !== "early" && phase !== "upcoming") continue;
+    /* A start that passed without the store opening it is a door with
+       nothing behind it, and not a night anyone went to. */
+    if (phase === "pending") continue;
 
     candidates.push({
       eventId: row.id,
@@ -221,17 +270,37 @@ export async function listNights(
   if (candidates.length === 0) return [];
 
   const ids = candidates.map((night) => night.eventId);
-  const [states, flares] = await Promise.all([
+  const [states, flares, present] = await Promise.all([
     goingStates(ids, playerId),
     countOpenFlares(ids),
+    countParticipants(ids),
   ]);
 
+  /* The dashboard's total, only where it means something: a night the
+     viewer is going to that has not ended. One batch for all of them. */
+  const matchable = candidates.filter(
+    (night) => night.phase !== "finished" && states.get(night.eventId)?.youGoing,
+  );
+  const summaries = playerId
+    ? await nightMatchSummaries(
+        matchable.map((night) => night.eventId),
+        playerId,
+      )
+    : new Map<string, { total: number }>();
+
   return orderNights(
-    candidates.map((night) => ({
-      ...night,
-      youGoing: states.get(night.eventId)?.youGoing ?? false,
-      goingCount: states.get(night.eventId)?.goingCount ?? 0,
-      flares: flares.get(night.eventId) ?? 0,
-    })),
+    candidates.map((night) => {
+      const state = states.get(night.eventId);
+      const summary = summaries.get(night.eventId);
+      return {
+        ...night,
+        youGoing: state?.youGoing ?? false,
+        goingCount: state?.goingCount ?? 0,
+        hereNow:
+          night.phase === "finished" ? 0 : (present.get(night.eventId)?.present ?? 0),
+        matches: summary ? summary.total : null,
+        flares: flares.get(night.eventId) ?? 0,
+      };
+    }),
   );
 }

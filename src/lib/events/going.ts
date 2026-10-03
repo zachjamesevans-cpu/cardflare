@@ -6,7 +6,11 @@ import {
   type BinderCoverId,
 } from "@/lib/binder/covers";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
-import { afterGoing } from "@/lib/events/night-matches";
+import {
+  afterGoing,
+  perPlayerMatches,
+  tradeCardCounts,
+} from "@/lib/events/night-matches";
 import { joinEvent, leaveEvent, listParticipants } from "@/lib/events/participants";
 import { findEventById, findStoreById } from "@/lib/events/repository";
 import { boardWritable, roomPhase } from "@/lib/events/schema";
@@ -293,6 +297,13 @@ export interface RosterPlayer {
   present: boolean;
   /** Their Flares on this board. */
   flares: number;
+  /** The size of their Have list: the cards in their binders up for trade. */
+  tradeCards: number;
+  /**
+   * Matched cards between them and the viewer, both directions, from
+   * the night's dashboard. Zero for a guest viewer, who has no lists.
+   */
+  matches: number;
   /** Up to three binders up for trade; empty for a guest. */
   binders: RosterBinder[];
 }
@@ -363,10 +374,13 @@ async function tradeBindersFor(
 }
 
 /**
- * Who is going, with what they brought: their Flares on this board and
- * the binders they will trade from. Read by anyone the phase lets read
- * the board; `viewerId` is who is looking, so a later round can mark
- * the binders on the viewer's hunts without changing the call.
+ * Who is going, with what they brought: their Flares on this board,
+ * the binders they will trade from, how many cards are in them, and
+ * how many of those match the viewer. Read by anyone the phase lets
+ * read the board; `viewerId` is who is looking, and a guest viewer
+ * gets zero matches beside every name because a guest has no lists.
+ * The founder: "People should not just appear as names; show why they
+ * may matter."
  */
 export async function nightRoster(
   eventId: string,
@@ -389,9 +403,14 @@ export async function nightRoster(
       );
     }
 
-    const binders = await tradeBindersFor(
-      participants.flatMap((row) => (row.playerId ? [row.playerId] : [])),
+    const accounts = participants.flatMap((row) =>
+      row.playerId ? [row.playerId] : [],
     );
+    const [binders, tradeCards, matches] = await Promise.all([
+      tradeBindersFor(accounts),
+      tradeCardCounts(accounts),
+      perPlayerMatches(eventId, viewerId),
+    ]);
 
     return participants.map((row) => ({
       playerSessionId: row.playerSessionId,
@@ -403,6 +422,8 @@ export async function nightRoster(
       aura: row.aura,
       present: row.present,
       flares: flaresBySession.get(row.playerSessionId) ?? 0,
+      tradeCards: row.playerId ? (tradeCards.get(row.playerId) ?? 0) : 0,
+      matches: row.playerId ? (matches[row.playerId] ?? 0) : 0,
       binders: row.playerId ? (binders.get(row.playerId) ?? []) : [],
     }));
   } catch (error) {

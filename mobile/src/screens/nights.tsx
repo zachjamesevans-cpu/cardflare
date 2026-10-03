@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useRef, useState } from "react";
@@ -12,8 +13,10 @@ import Animated, {
 } from "react-native-reanimated";
 
 import type { StackParams } from "../../App";
+import { ActionSheet, type ActionItem } from "../action-menu";
 import {
   ApiError,
+  forgetRoom,
   getNights,
   rememberRoom,
   storedAccessToken,
@@ -21,7 +24,16 @@ import {
 } from "../api";
 import { useTabBarInset } from "../glass";
 import { GoingButton } from "../going-button";
-import { goingLine, NO_NIGHTS, SCAN_OR_CODE } from "../going-copy";
+import { GOING, NO_NIGHTS, SCAN_OR_CODE } from "../going-copy";
+import {
+  ENTER_CODE,
+  GOING_EMPTY,
+  NIGHT_TABS,
+  PAST_EMPTY,
+  SCAN_QR,
+  matchesLine,
+  playersLine,
+} from "../night-copy";
 import { openRoom } from "../open-room";
 import { refreshTick } from "../refresh-tick";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -29,65 +41,166 @@ import { Body, Button, Card, Loading, Tap, Title } from "../ui";
 import { VerifiedMark } from "../verified-mark";
 
 /**
- * The Nights tab: the website's /nights.
+ * The Nights tab: the website's /nights, round 2.
  *
- * The founder (2026-10-03): "What if, you just say you're going to an
- * event. Or a tournament night. That room stays 'open' and anyone can
- * go into there and see who is looking for which cards before the
- * tournament or event starts." And on the dock: "Trying to keep our
- * tabs to our 'hero's'." So the Room's slot is this list: every night
- * at a store you follow or near you, and every night you are going to
- * wherever it is, for the next fourteen days. Live rooms first, then
- * by start time; the server orders and the app keeps that order.
- *
- * Three sections, each drawn only when it has rows: "Live now",
- * "You're going", "Coming up". A row is the night, the store (with
- * the Verified glyph where the store has it), when, "{n} going" and
- * the Going button, and the whole row opens the room. Under the list,
- * "Scan or enter a code" is the door to the Room screen that used to
- * be this tab: scanning and typing a code live there, unchanged.
+ * The founder (2026-10-03): "The current Nights landing page is too
+ * large and sparse ... Redesign to be much denser and more useful."
+ * The navigator's header says Nights with the QR icon at its end
+ * (`NightsCodeButton`, mounted from App.tsx); under it the Going |
+ * Nearby | Past row, Going by default; then one short card per night:
+ * the date block, the name, the venue with its Verified glyph, the
+ * start time, and one line with the RSVP state, "{n} players" and
+ * "{n} matches" in the accent with the flame. "Potential matches
+ * should have significantly more visual priority than generic
+ * attendance." The whole card opens the night.
  */
 
 /** How far past the top the thumb drags before a release refreshes. */
 const PULL_TRIGGER = 80;
 
-type SectionKey = "live" | "going" | "coming";
+export type NightTab = keyof typeof NIGHT_TABS;
 
-const SECTION_TITLES: Record<SectionKey, string> = {
-  live: "Live now",
-  going: "You're going",
-  coming: "Coming up",
-};
+export const TAB_ORDER: NightTab[] = ["going", "nearby", "past"];
 
-const SECTION_ORDER: SectionKey[] = ["live", "going", "coming"];
+/** The tab everyone lands on. */
+export const DEFAULT_TAB: NightTab = "going";
 
-/** Which section a night belongs in: a live room first, whatever else
-    is true of it; then the ones you said Going to; then the rest. */
-export function sectionFor(night: NightItem): SectionKey {
-  if (night.phase === "live") return "live";
+/**
+ * Which tab a night belongs to. Past is a night that has ended (the
+ * server lists only the ones the viewer went to); Going is a night the
+ * viewer said Going to that has not; Nearby is everything else.
+ */
+export function tabFor(night: NightItem): NightTab {
+  if (night.phase === "finished") return "past";
   if (night.youGoing) return "going";
-  return "coming";
+  return "nearby";
+}
+
+/** The month over the day, in the store's own zone: "OCT" and "03". */
+export function dateBlock(
+  iso: string,
+  timeZone: string,
+): { month: string; day: string } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    timeZone,
+  }).formatToParts(new Date(iso));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return { month: part("month").toUpperCase(), day: part("day") };
+}
+
+/** "11:00 AM" in the store's zone, "Open now" live, "Ended" in Past. */
+export function startLine(night: NightItem): string {
+  if (night.phase === "live") return "Open now";
+  if (night.phase === "finished") return "Ended";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: night.timeZone,
+  }).format(new Date(night.startsAt));
 }
 
 /**
- * "Fri, Sep 25, 6:30 PM" in the store's own zone: the same words the
- * store screen's `whenAt` says, and the website's `formatEventMoment`
- * without the zone abbreviation a phone's locale does not need.
+ * The QR icon at the end of the header, and the small sheet behind
+ * it: Scan QR opens the scanner, Enter event code opens the Room
+ * screen's code form. The Room screen reopens the last room when it
+ * remembers one, so entering a code forgets it first: the person
+ * tapped this because they want a different door.
  */
-function whenAt(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
+export function NightsCodeButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const [items, setItems] = useState<ActionItem[] | null>(null);
+
+  const open = () =>
+    setItems([
+      {
+        key: "scan",
+        label: SCAN_QR,
+        icon: "qr-code-outline",
+        onPress: () => navigation.navigate("Scan"),
+      },
+      {
+        key: "code",
+        label: ENTER_CODE,
+        icon: "keypad-outline",
+        onPress: () => {
+          void forgetRoom().finally(() => openRoom(navigation));
+        },
+      },
+    ]);
+
+  return (
+    <>
+      <Tap
+        onPress={open}
+        hitSlop={8}
+        accessibilityLabel={SCAN_OR_CODE}
+        style={{ paddingHorizontal: spacing(2), paddingVertical: spacing(1) }}
+      >
+        <Ionicons name="qr-code-outline" size={22} color={colors.textPrimary} />
+      </Tap>
+      <ActionSheet items={items} onClose={() => setItems(null)} />
+    </>
+  );
+}
+
+/** Going | Nearby | Past: three equal segments. */
+function NightTabs({
+  value,
+  onChange,
+}: {
+  value: NightTab;
+  onChange: (tab: NightTab) => void;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        borderRadius: radius.control + 4,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
+        padding: 3,
+      }}
+    >
+      {TAB_ORDER.map((tab) => {
+        const on = tab === value;
+        return (
+          <Tap
+            key={tab}
+            onPress={() => onChange(tab)}
+            accessibilityLabel={`${NIGHT_TABS[tab]}${on ? ", selected" : ""}`}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              borderRadius: radius.control + 2,
+              backgroundColor: on ? colors.elevated : "transparent",
+              borderWidth: 1,
+              borderColor: on ? colors.accent : "transparent",
+              paddingVertical: spacing(2),
+            }}
+          >
+            <Text
+              style={{
+                color: on ? colors.accent : colors.textSecondary,
+                fontSize: 13,
+                fontWeight: "700",
+              }}
+            >
+              {NIGHT_TABS[tab]}
+            </Text>
+          </Tap>
+        );
+      })}
+    </View>
+  );
 }
 
 export function NightsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const tabInset = useTabBarInset();
+  const [tab, setTab] = useState<NightTab>(DEFAULT_TAB);
   const [nights, setNights] = useState<NightItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -178,7 +291,7 @@ export function NightsScreen() {
     },
   });
 
-  /** A row opens its room: remembered, then the Room screen reads it. */
+  /** A card opens its night: remembered, then the Room screen reads it. */
   const open = async (night: NightItem) => {
     if (!night.code) return;
     await rememberRoom(night.code);
@@ -189,11 +302,8 @@ export function NightsScreen() {
     return <Loading />;
   }
 
-  const sections = SECTION_ORDER.map((key) => ({
-    key,
-    title: SECTION_TITLES[key],
-    rows: (nights ?? []).filter((night) => sectionFor(night) === key),
-  })).filter((section) => section.rows.length > 0);
+  const rows = (nights ?? []).filter((night) => tabFor(night) === tab);
+  const loadFailed = failed && nights === null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -204,116 +314,121 @@ export function NightsScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={{
           paddingHorizontal: gutter,
-          paddingVertical: spacing(4),
-          gap: spacing(4),
+          paddingVertical: spacing(3),
+          gap: spacing(2),
           paddingBottom: spacing(4) + tabInset,
         }}
       >
-        {failed && nights === null ? (
+        <NightTabs value={tab} onChange={setTab} />
+
+        {loadFailed ? (
           <Card>
             <Title>Could not load your nights</Title>
             <Body>Check your connection and pull to try again.</Body>
           </Card>
         ) : null}
 
-        {sections.map((section) => (
-          <Card key={section.key}>
-            <Title>{section.title}</Title>
-            <View>
-              {section.rows.map((night, index) => (
-                <NightRow
-                  key={night.eventId}
-                  night={night}
-                  first={index === 0}
-                  onOpen={() => void open(night)}
-                  onStore={() =>
-                    navigation.navigate("StoreProfile", { storeId: night.storeId })
-                  }
-                />
-              ))}
-            </View>
-          </Card>
+        {rows.map((night) => (
+          <NightCard
+            key={night.eventId}
+            night={night}
+            onOpen={() => void open(night)}
+            onStore={() =>
+              navigation.navigate("StoreProfile", { storeId: night.storeId })
+            }
+          />
         ))}
 
-        {/* Nothing in any section: the website's empty state, word for
-            word, with the Feed as the way to a store to follow. */}
-        {sections.length === 0 && !(failed && nights === null) ? (
-          <Card>
-            <Body>{NO_NIGHTS}</Body>
-            <Button
-              label="Open the Feed"
-              variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
-            />
-          </Card>
+        {/* Nothing on this tab: each tab's own line, the website's
+            words. Nearby keeps the Feed as the way to a store to follow. */}
+        {rows.length === 0 && !loadFailed ? (
+          <View style={{ paddingVertical: spacing(4), gap: spacing(3) }}>
+            <Body>
+              {tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}
+            </Body>
+            {tab === "nearby" ? (
+              <Button
+                label="Open the Feed"
+                variant="secondary"
+                onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
+              />
+            ) : null}
+          </View>
         ) : null}
-
-        {/* The old Room tab, one tap away: the scanner and the code
-            field live there, unchanged. */}
-        <Button
-          label={SCAN_OR_CODE}
-          variant="secondary"
-          onPress={() => openRoom(navigation)}
-        />
       </Animated.ScrollView>
     </View>
   );
 }
 
 /**
- * One night: the name, the store with its glyph, when, who is going,
- * and the button. The whole row opens the room; the store's name
- * opens the store, as it does on the Feed.
+ * One night, short: the date block, the name, the venue with its
+ * glyph, the start time, then one line with the RSVP state, the
+ * players count and the matches. The whole card opens the night; the
+ * store's name opens the store, as it does on the Feed.
  */
-function NightRow({
+function NightCard({
   night,
-  first,
   onOpen,
   onStore,
 }: {
   night: NightItem;
-  first: boolean;
   onOpen: () => void;
   onStore: () => void;
 }) {
+  const { month, day } = dateBlock(night.startsAt, night.timeZone);
+  const past = night.phase === "finished";
+  const live = night.phase === "live";
+  const matches = night.matches ?? null;
+
   return (
-    <View
+    <Tap
+      onPress={onOpen}
+      disabled={!night.code}
+      accessibilityLabel={night.name}
       style={{
-        gap: spacing(2),
-        paddingVertical: spacing(3),
-        borderTopWidth: first ? 0 : 1,
-        borderTopColor: colors.border,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(3),
+        borderRadius: radius.card,
+        borderWidth: 1,
+        borderColor: live ? colors.accent : colors.border,
+        backgroundColor: colors.surface,
+        paddingVertical: spacing(2.5),
+        paddingHorizontal: spacing(3),
       }}
     >
-      <Tap
-        onPress={onOpen}
-        disabled={!night.code}
-        accessibilityLabel={night.name}
-        style={{ gap: spacing(0.5) }}
+      {/* The date, as a calendar page: month over day. */}
+      <View
+        style={{
+          width: 44,
+          alignItems: "center",
+          borderRadius: radius.control,
+          backgroundColor: colors.elevated,
+          paddingVertical: spacing(1.5),
+        }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}>
-            {night.name}
-          </Text>
-          {night.phase === "live" ? (
-            <Text
-              style={{
-                color: colors.accent,
-                fontSize: 11,
-                fontWeight: "700",
-                letterSpacing: 1.2,
-                textTransform: "uppercase",
-                backgroundColor: colors.elevated,
-                borderRadius: radius.control,
-                paddingHorizontal: spacing(2),
-                paddingVertical: spacing(0.5),
-                overflow: "hidden",
-              }}
-            >
-              Live
-            </Text>
-          ) : null}
-        </View>
+        <Text
+          style={{
+            color: live ? colors.accent : colors.textMuted,
+            fontSize: 10,
+            fontWeight: "800",
+            letterSpacing: 1,
+          }}
+        >
+          {month}
+        </Text>
+        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+          {day}
+        </Text>
+      </View>
+
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
+        >
+          {night.name}
+        </Text>
         <Tap
           onPress={onStore}
           hitSlop={4}
@@ -326,6 +441,7 @@ function NightRow({
           }}
         >
           <Text
+            numberOfLines={1}
             style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}
           >
             {night.storeName}
@@ -333,31 +449,60 @@ function NightRow({
           {/* Verified is trust, drawn beside a store's name wherever
               the name is; never Ultra, which is a tier. */}
           {night.storeVerified ? <VerifiedMark size={14} /> : null}
-          {night.city ? (
-            <Text
-              style={{ color: colors.textMuted, fontSize: 13 }}
-            >{` · ${night.city}`}</Text>
-          ) : null}
         </Tap>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-          {whenAt(night.startsAt, night.timeZone)}
+        <Text
+          style={{
+            color: live ? colors.accent : colors.textMuted,
+            fontSize: 13,
+            fontWeight: live ? "700" : "400",
+          }}
+        >
+          {startLine(night)}
         </Text>
-      </Tap>
-      {/* A live room's door is the code and the QR, as on the room
-          page and the website's list; the row shows the count only. */}
-      {night.phase === "live" ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-          {goingLine(night.goingCount)}
-        </Text>
-      ) : (
-        <GoingButton
-          eventId={night.eventId}
-          youGoing={night.youGoing}
-          goingCount={night.goingCount}
-          size="chip"
-        />
-      )}
-    </View>
+
+        {/* The one line: RSVP state, players, matches. Matches outrank
+            attendance; with none to show, the players count has the slot. */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: spacing(2.5),
+            marginTop: spacing(1),
+          }}
+        >
+          {past ? null : night.youGoing ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <Ionicons name="checkmark" size={14} color={colors.accent} />
+              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+                {GOING}
+              </Text>
+            </View>
+          ) : (
+            <GoingButton
+              eventId={night.eventId}
+              youGoing={false}
+              goingCount={night.goingCount}
+              withCount={false}
+              size="chip"
+            />
+          )}
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {playersLine(night.goingCount)}
+          </Text>
+          {matches !== null && matches > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <Ionicons name="flame" size={13} color={colors.accent} />
+              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+                {matchesLine(matches)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </Tap>
   );
 }
 

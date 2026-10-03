@@ -13,18 +13,21 @@ import {
 } from "../../mobile/src/going-copy";
 
 /**
- * Nights in the app, round 1, read off the source.
+ * Nights in the app, read off the source.
  *
- * The founder (2026-10-03): "What if, you just say you're going to an
+ * Round 1 (2026-10-03): "What if, you just say you're going to an
  * event. Or a tournament night. That room stays 'open' and anyone can
  * go into there and see who is looking for which cards before the
  * tournament or event starts." And on the dock: "Trying to keep our
  * tabs to our 'hero's'." So Room's tab slot is Nights, Going is one
  * button used everywhere, and the room opens before the night does.
  *
- * These pin the tab, the screen's sections, the button's two words,
- * the poll by phase and `goingLine`. tests/unit/nights-parity.test.ts
- * holds the same words against the website. Nobody here has a
+ * Round 2, the same day: "Redesign to be much denser and more useful"
+ * and "It should feel like a trading dashboard." The tab is the QR
+ * icon, Going | Nearby | Past, and short cards; the room is one
+ * compact header with the matches under it. tests/unit/app-nights2
+ * .test.ts pins that hierarchy; these pin the tab, the button's two
+ * words, the poll by phase and `goingLine`. Nobody here has a
  * renderer; what a phone draws is the visual pass.
  */
 
@@ -34,6 +37,7 @@ const read = (path: string) =>
 const app = read("mobile/App.tsx");
 const nights = read("mobile/src/screens/nights.tsx");
 const button = read("mobile/src/going-button.tsx");
+const header = read("mobile/src/night-header.tsx");
 const room = read("mobile/src/screens/room.tsx");
 const home = read("mobile/src/screens/home.tsx");
 const store = read("mobile/src/screens/store-profile.tsx");
@@ -63,10 +67,12 @@ describe("goingLine", () => {
 });
 
 describe("the dock", () => {
-  it("gives Room's slot to Nights, with the calendar glyphs", () => {
+  it("gives Room's slot to Nights, with the calendar glyphs and the QR icon", () => {
     expect(app).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
     expect(app).toContain('<Tab.Screen\n          name="Nights"');
-    expect(app).toContain('options={{ title: "Nights", tabBarLabel: "Nights" }}');
+    expect(app).toMatch(
+      /options=\{\{\s*title: "Nights",\s*tabBarLabel: "Nights",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*\}\}/,
+    );
     expect(app).toContain('Nights: { idle: "calendar-outline", focused: "calendar" }');
     expect(app).not.toContain('<Tab.Screen name="Room"');
   });
@@ -82,35 +88,47 @@ describe("the dock", () => {
 });
 
 describe("the Nights screen", () => {
-  it("has the three sections, in order, each only when it has rows", () => {
-    expect(nights).toContain('live: "Live now"');
-    expect(nights).toContain('going: "You\'re going"');
-    expect(nights).toContain('coming: "Coming up"');
+  it("has the three tabs, Going first and by default", () => {
     expect(nights).toContain(
-      'const SECTION_ORDER: SectionKey[] = ["live", "going", "coming"];',
+      'export const TAB_ORDER: NightTab[] = ["going", "nearby", "past"];',
     );
-    expect(nights).toContain(".filter((section) => section.rows.length > 0)");
+    expect(nights).toContain('export const DEFAULT_TAB: NightTab = "going";');
+    expect(nights).toContain("useState<NightTab>(DEFAULT_TAB)");
+    /* The old three sections are gone with their headings. */
+    expect(nights).not.toContain('"Live now"');
+    expect(nights).not.toContain('"Coming up"');
+    expect(nights).not.toContain("SECTION_ORDER");
   });
 
-  it("files a live room first, whatever else is true of it", () => {
+  it("files a finished night in Past, a Going one in Going, the rest in Nearby", () => {
     expect(nights).toMatch(
-      /if \(night\.phase === "live"\) return "live";\s*if \(night\.youGoing\) return "going";\s*return "coming";/,
+      /if \(night\.phase === "finished"\) return "past";\s*if \(night\.youGoing\) return "going";\s*return "nearby";/,
     );
   });
 
-  it("draws the row: name, store with Verified, when, the button; the row opens the room", () => {
+  it("draws the card: date block, name, store with Verified, start, the one line; the card opens the night", () => {
+    expect(nights).toContain("dateBlock(night.startsAt, night.timeZone)");
     expect(nights).toContain("{night.name}");
     expect(nights).toContain("{night.storeName}");
     expect(nights).toContain("night.storeVerified ? <VerifiedMark size={14} /> : null");
-    expect(nights).toContain("whenAt(night.startsAt, night.timeZone)");
+    expect(nights).toContain("{startLine(night)}");
+    expect(nights).toContain("{playersLine(night.goingCount)}");
+    expect(nights).toContain("{matchesLine(matches)}");
     expect(nights).toContain("<GoingButton");
     expect(nights).toContain("await rememberRoom(night.code);");
   });
 
-  it("says the empty state and keeps the code door", () => {
-    expect(nights).toContain("<Body>{NO_NIGHTS}</Body>");
+  it("says each tab's empty state and keeps the Feed door on Nearby", () => {
+    expect(nights).toContain(
+      '{tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}',
+    );
     expect(nights).toContain('navigation.navigate("Tabs", { screen: "Feed" })');
-    expect(nights).toContain("label={SCAN_OR_CODE}");
+  });
+
+  it("keeps the code door behind the QR icon, named the old way for a screen reader", () => {
+    expect(nights).toContain("export function NightsCodeButton()");
+    expect(nights).toContain("accessibilityLabel={SCAN_OR_CODE}");
+    expect(nights).not.toContain("label={SCAN_OR_CODE}");
   });
 
   it("refreshes on a pull, the Feed's way", () => {
@@ -142,14 +160,19 @@ describe("the Going button", () => {
     expect(button).toContain('navigation.navigate("SignIn");');
   });
 
-  it("is the one button, used in the room, the Feed and the store", () => {
-    for (const source of [room, home, store, nights]) {
+  it("is the one button, used on the night's header, the Feed, the store and the list", () => {
+    for (const source of [home, store, nights]) {
       expect(source).toContain('import { GoingButton } from "../going-button";');
     }
+    expect(header).toContain('import { GoingButton } from "./going-button";');
+    expect(header).toContain("<GoingButton");
+    /* The room draws the header, and the header draws the button. */
+    expect(room).toContain('import { NightHeader } from "../night-header";');
+    expect(room).toContain("<NightHeader");
   });
 });
 
-describe("the room before it starts", () => {
+describe("the room and its night", () => {
   it("polls by phase: twelve seconds live, sixty early, never upcoming", () => {
     expect(room).toMatch(/const POLL_MS: Record<RoomPhase, number \| null> = \{/);
     expect(room).toContain("live: 12_000,");
@@ -160,24 +183,26 @@ describe("the room before it starts", () => {
     expect(room).not.toContain("const POLL_MS = 12_000;");
   });
 
-  it("opens the door for a viewer who has not said Going", () => {
-    expect(room).toContain(
-      'const preStart = phase === "upcoming" || phase === "early";',
-    );
-    expect(room).toContain("if (!state.joined && preStart && going && eventId) {");
-    expect(room).toContain("<Body>{PRE_START_PITCH}</Body>");
-    expect(room).toContain("function RosterCard");
+  it("has lost the round-1 pre-start card, the roster card and the on-the-board card", () => {
+    expect(room).not.toContain("function PreStartRoom");
+    expect(room).not.toContain("function RosterCard");
+    expect(room).not.toContain("PRE_START_PITCH");
+    expect(room).not.toContain("YOURE_ON_THE_BOARD");
+    expect(room).not.toContain("Who&rsquo;s going");
+    /* The board to read survives, under the same filter as the board
+       to write on. */
     expect(room).toContain("function ReadOnlyBoard");
-    /* Face, name, "{k} Flares", up to three binder chips. */
-    expect(room).toContain('{`${p.flares} ${p.flares === 1 ? "Flare" : "Flares"}`}');
-    expect(room).toContain("p.binders.slice(0, 3)");
+    expect(room).toContain("<ReadOnlyBoard flares={flares} filter={filter} />");
   });
 
-  it("says you are on the board once you are, and not when live", () => {
-    expect(room).toContain("<Body>{YOURE_ON_THE_BOARD}</Body>");
-    expect(room).toMatch(
-      /\{preStart && going && eventId \? \(\s*<>\s*<Card>\s*<Body>\{YOURE_ON_THE_BOARD\}/,
+  it("says Going on the header line, as a chip off and a check on", () => {
+    expect(header).toMatch(
+      /going\.youGoing \? \(\s*<GoingMark eventId=\{eventId\} onSettled=\{onSettled\} \/>\s*\) : \(\s*<GoingButton/,
     );
+    expect(header).toContain('size="chip"');
+    expect(header).toContain("withCount={false}");
+    expect(header).toContain("await setGoing(eventId, false);");
+    expect(header).toContain("{GOING}");
   });
 
   it("reads Going from whichever place the server put it", () => {
@@ -199,6 +224,18 @@ describe("the API client", () => {
     expect(api).toMatch(
       /export const setGoing = \(eventId: string, going: boolean\) =>\s*call<GoingAnswer>\(\s*going \? "POST" : "DELETE",\s*`\/api\/v1\/nights\/\$\{encodeURIComponent\(eventId\)\}\/going`,/,
     );
+  });
+
+  it("knows a finished night and the card's two new numbers", () => {
+    expect(api).toContain(
+      'export type NightPhase = "live" | "early" | "upcoming" | "finished";',
+    );
+    const night = api.slice(
+      api.indexOf("export interface NightItem"),
+      api.indexOf("export const getNights"),
+    );
+    expect(night).toContain("matches?: number | null;");
+    expect(night).toContain("hereNow?: number;");
   });
 
   it("gives the Feed's upcoming card and the store's nights their Going fields", () => {

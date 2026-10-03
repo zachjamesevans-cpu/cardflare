@@ -3,18 +3,21 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The room, redesigned as three things: a door card, a board card and
- * one button.
+ * The room, redesigned as three things: a door card, a board and one
+ * button.
  *
  * The founder, on the Room tab: "There's just so many blocks... moving
  * the remote from a big block to a small little remote icon if they
  * have access to it. It's all just disconnected and want it to flow
  * better." These pins hold the shape he approved: the store, the
  * night's name with two small round controls on its line, and the
- * pulse line that opens the people list; one card for the Flares, with
- * nothing of the viewer's waiting at its foot because joining posted
- * their Flares; "Post a Flare" alone, with the trades toggle inside the
- * composer. The words are the app's, exactly.
+ * pulse line that opens the people list (the walk-in door; a
+ * scheduled night wears the compact header of Nights round 2, pinned
+ * in tests/unit/nights2-parity.test.ts); the Flares as rows under one
+ * label, with nothing of the viewer's waiting at the foot because
+ * joining posted their Flares; "Post a Flare" alone, as the floating
+ * "+ Flare" button, with the trades toggle inside the composer. The
+ * words are the app's, exactly.
  */
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -25,6 +28,8 @@ const door = read("src/components/events/room-door.tsx");
 const lobby = read("src/components/events/event-lobby.tsx");
 const board = read("src/components/events/room-board-card.tsx");
 const composerDoor = read("src/components/events/room-composer-door.tsx");
+const fab = read("src/components/events/flare-fab.tsx");
+const flaresAtNight = read("src/components/events/flares-at-night.tsx");
 const toggle = read("src/components/events/open-to-trades-toggle.tsx");
 
 describe("the door card", () => {
@@ -78,10 +83,12 @@ describe("the door card", () => {
   });
 
   it("links help for scheduled events only, the way the text link did", () => {
+    /* The scheduled night's header carries it; the walk-in door does not. */
     expect(page).toContain(
-      "`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`",
+      "helpHref={`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`}",
     );
-    expect(page).toMatch(/helpHref=\{\s*event\.kind !== "walk_in"/);
+    expect(page).toContain("helpHref={null}");
+    expect(page).toContain('const scheduled = event.kind !== "walk_in";');
     /* The text link and the two badges are gone from the door. */
     expect(page).not.toContain("Here&rsquo;s how a night works");
     expect(page).not.toContain("here now");
@@ -128,14 +135,19 @@ describe("the door card", () => {
   });
 });
 
-describe("the board card", () => {
-  it("is one card headed Flares in the room, wrapping FlareBoard", () => {
+describe("the board", () => {
+  it("is the rows under the Flares at this Night label, wrapping FlareBoard", () => {
     expect(page).toContain(
       'import { RoomBoardCard } from "@/components/events/room-board-card"',
     );
     expect(board).not.toContain('"use client"');
-    expect(board).toContain(">Flares in the room</h2>");
+    /* Nights round 2: no card and no heading of its own; the label and
+       the All | Hunting | Offering filter belong to the section. */
+    expect(board).not.toContain("Flares in the room");
+    expect(board).not.toContain('from "@/components/ui/card"');
     expect(board).not.toContain("Newest first");
+    expect(flaresAtNight).toContain("FLARES_AT_THIS_NIGHT");
+    expect(page).toContain("<FlaresAtNight");
     expect(page).toMatch(/<RoomBoardCard[\s\S]*<FlareBoard[\s\S]*<\/RoomBoardCard>/);
     /* Players separated by a hairline, not by cards of their own. */
     expect(board).toContain("[&>ul>li]:border-t");
@@ -144,12 +156,12 @@ describe("the board card", () => {
     expect(board).toContain("[&>ul>li]:shadow-none");
   });
 
-  it("says one secondary line when empty, inside the card", () => {
+  it("says one secondary line when empty", () => {
     expect(board).toContain(
       '"Nothing posted yet. Yours would be the first one on the board tonight."',
     );
     expect(board).toContain('<p className="text-sm leading-5 text-text-secondary">');
-    expect(page).toContain("empty={flares.length === 0 && openPlayers.length === 0}");
+    expect(page).toContain("empty={entries.length === 0 && openPlayers.length === 0}");
   });
 
   it("has no repost row: joining posted the viewer's Flares already", () => {
@@ -169,23 +181,26 @@ describe("the board card", () => {
 });
 
 describe("the one button", () => {
-  it("is Post a Flare alone; the trades toggle rides in the composer's foot", () => {
-    expect(composerDoor).toContain("Post a Flare");
+  it("is Post a Flare alone, floating; the trades toggle rides in the composer's foot", () => {
+    /* Nights round 2: the trigger is the floating "+ Flare" button,
+       whose accessible name is still Post a Flare. */
+    expect(composerDoor).toContain("<FlareFab onOpen={() => setOpen(true)} />");
+    expect(fab).toContain("aria-label={POST_A_FLARE}");
     /* No `trades` prop, not in the destructuring and not in the type. */
     expect(composerDoor).not.toMatch(/\btrades\??:/);
     expect(composerDoor).not.toMatch(/^\s*trades,\s*$/m);
     expect(composerDoor).not.toContain('from "@/components/ui/card"');
-    /* The door's props, up to the board card: no `trades` slot. */
+    /* The door's props, up to the matches: no `trades` slot. */
     const doorBlock = page.slice(
       page.indexOf("<RoomComposerDoor"),
-      page.indexOf("<RoomBoardCard"),
+      page.indexOf("<MatchesForYou"),
     );
     expect(doorBlock).toContain("composer={");
     expect(doorBlock).not.toMatch(/\btrades=/);
     expect(page).toContain(
       "footer={<OpenToTradesToggle code={normalized} open={youAreOpen} />}",
     );
-    expect(page).toMatch(/\{poster && \(\s*<RoomComposerDoor/);
+    expect(page).toMatch(/\{poster && writable && \(\s*<RoomComposerDoor/);
   });
 
   it("labels the toggle I'm open to trades / Open to trades ✓", () => {
@@ -197,18 +212,24 @@ describe("the one button", () => {
 });
 
 describe("what stays, in order", () => {
-  it("keeps the contextual cards after the door: pitch, timers, resumed, early, closed", () => {
+  it("keeps the contextual lines after the header: timers, resumed, early, closed, then the sections", () => {
+    /* Nights round 2's hierarchy; the guest's pitch sits where Matches
+       for you would be, and the offers note rides inside the Flares
+       section. tests/unit/nights2-parity.test.ts pins the app to it. */
     const order = [
-      "<RoomDoor",
-      '<AccountPitch next={`/e/${normalized}`} variant="room" />',
+      "<NightHeader",
       "{live && <RoomTimers",
       "You were already in this room",
-      "This board is open early",
+      '{phase === "early" && <EarlyBanner />}',
       '{phase === "pending" ? "Not open yet" : "This room has closed"}',
       "<RoomTicker",
-      "<MatchSummary",
       "<RoomComposerDoor",
-      "<RoomBoardCard",
+      "<MatchesForYou",
+      'variant={inRoom ? "room" : "join"}',
+      "<WhatToBring",
+      "<FlaresAtNight",
+      "<PlayersGoing",
+      "<EventDetails",
       "<TradedTonight",
     ];
     const positions = order.map((marker) => page.indexOf(marker));

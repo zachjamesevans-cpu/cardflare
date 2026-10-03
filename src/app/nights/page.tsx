@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { NightList } from "@/components/nights/night-list";
+import { NightList, nightTabFrom } from "@/components/nights/night-list";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
 import { listNights } from "@/lib/events/nights";
@@ -22,14 +22,20 @@ export const dynamic = "force-dynamic";
  * our 'hero's'," and a night is the hero now that rooms open the
  * moment a store posts one. Every night at a store the player follows
  * or that is near them, every night they are going to wherever it is,
- * and every live room at those stores, live first and then by start.
+ * every live room at those stores, and the nights they went to in the
+ * last month, behind Going | Nearby | Past.
  *
  * A Server Component that re-reads on load, the way the app's screen
  * pulls to refresh: a night is a thing that changes by the day, not
- * by the second, so there is no ticker here.
+ * by the second, so there is no ticker here. The tab comes off the
+ * address, so a shared link to Nearby opens on Nearby.
  */
-export default async function NightsPage() {
-  const viewer = await getViewer();
+export default async function NightsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
+  const [viewer, { tab }] = await Promise.all([getViewer(), searchParams]);
   const playerId =
     viewer.kind === "player"
       ? viewer.playerId
@@ -45,7 +51,7 @@ export default async function NightsPage() {
 
   return (
     <TabPageShell title="Nights">
-      <NightList nights={nights} signedIn={Boolean(playerId)} />
+      <NightList nights={nights} signedIn={Boolean(playerId)} tab={nightTabFrom(tab)} />
     </TabPageShell>
   );
 }

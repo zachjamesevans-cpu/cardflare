@@ -227,7 +227,7 @@ describe("the feed's upcoming card", () => {
 describe("the Nights list", () => {
   const night = (
     over: Partial<{
-      phase: "live" | "early" | "upcoming";
+      phase: "live" | "early" | "upcoming" | "finished";
       startsAt: string;
       name: string;
     }>,
@@ -270,11 +270,53 @@ describe("the Nights list", () => {
     expect(items[0].name).toBe("B");
   });
 
-  it("reaches fourteen days ahead and dedupes by event", () => {
+  it("puts finished nights last, newest first: the Past tab's order", () => {
+    const ordered = orderNights([
+      night({
+        name: "Last week",
+        phase: "finished",
+        startsAt: "2026-09-26T01:00:00.000Z",
+      }),
+      night({ name: "Friday", startsAt: "2026-10-10T01:00:00.000Z" }),
+      night({
+        name: "Yesterday",
+        phase: "finished",
+        startsAt: "2026-10-02T01:00:00.000Z",
+      }),
+      night({ name: "Tonight", phase: "live", startsAt: "2026-10-04T01:00:00.000Z" }),
+    ]);
+    expect(ordered.map((item) => item.name)).toEqual([
+      "Tonight",
+      "Friday",
+      "Yesterday",
+      "Last week",
+    ]);
+  });
+
+  it("reaches fourteen days ahead, thirty back for Past, and dedupes by event", () => {
     const nights = read("src/lib/events/nights.ts");
     expect(nights).toContain("HORIZON_MS = 14 * 24 * 60 * 60 * 1000");
+    expect(nights).toContain("PAST_MS = 30 * 24 * 60 * 60 * 1000");
     expect(nights).toContain("new Map<string, NightRow>()");
     expect(nights).toContain("NEARBY_RADIUS_MILES");
+    /* Only a seat the viewer held makes a closed night theirs. */
+    expect(nights).toMatch(/\.in\("id", seated\)\s+\.eq\("status", "closed"\)/);
+    expect(nights).toContain('if (phase === "pending") continue;');
+  });
+
+  it("carries here now and the dashboard's total where it means something", () => {
+    const nights = read("src/lib/events/nights.ts");
+    expect(nights).toContain(
+      'export type NightPhase = "live" | "early" | "upcoming" | "finished";',
+    );
+    expect(nights).toContain("hereNow: number;");
+    expect(nights).toContain("matches: number | null;");
+    /* One batch for every night the viewer is going to, not one per card. */
+    expect(nights).toContain("nightMatchSummaries(");
+    expect(nights).toContain(
+      '(night) => night.phase !== "finished" && states.get(night.eventId)?.youGoing',
+    );
+    expect(nights).toContain("matches: summary ? summary.total : null");
   });
 });
 

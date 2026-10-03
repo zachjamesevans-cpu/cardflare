@@ -30,6 +30,8 @@ const webDock = read("src/components/players/player-tabs.tsx");
 const appRoot = read("mobile/App.tsx");
 
 const webNights = read("src/components/nights/night-list.tsx");
+const webNightCard = read("src/components/nights/night-card.tsx");
+const webCodeSheet = read("src/components/nights/code-sheet.tsx");
 const webNightsPage = read("src/app/nights/page.tsx");
 const appNights = read("mobile/src/screens/nights.tsx");
 
@@ -38,6 +40,7 @@ const appButton = read("mobile/src/going-button.tsx");
 
 const webRoom = read("src/app/e/[code]/page.tsx");
 const webPreStart = read("src/components/events/pre-start-room.tsx");
+const webNightHeader = read("src/components/events/night-header.tsx");
 const appRoom = read("mobile/src/screens/room.tsx");
 
 const webFeedItems = read("src/components/feed/feed-items.tsx");
@@ -141,9 +144,12 @@ describe("the dock", () => {
   });
 
   it("keeps the old Room reachable from Nights on both", () => {
-    /* Website: a link to /room. App: the Room stack screen, pushed. */
-    expect(webNights).toContain('href="/room"');
-    expect(webNights).toContain("SCAN_OR_CODE");
+    /* Website: the QR icon's sheet links to /room. App: the Room
+       stack screen, pushed. Nights round 2 moved the big button into
+       the small icon; the label is the same words. */
+    expect(webNights).toContain("<CodeSheet />");
+    expect(webCodeSheet).toContain('href="/room"');
+    expect(webCodeSheet).toContain("SCAN_OR_CODE");
     expect(appNights).toContain("SCAN_OR_CODE");
     expect(appRoot).toMatch(/<Stack\.Screen\s+name="Room"/);
   });
@@ -156,12 +162,18 @@ describe("the Nights screen", () => {
     expect(appRoot).toContain('title: "Nights"');
   });
 
-  it("draws the same three sections in the same order on both", () => {
-    const order = ["Live now", "You're going", "Coming up"];
+  it("draws the same three tabs in the same order on both", () => {
+    /* Nights round 2: the three sections became Going | Nearby | Past.
+       tests/unit/nights2-parity.test.ts pins the words and the order
+       in the copy file; this holds both screens to drawing from it. */
+    expect(webNights).toContain(
+      'NIGHT_TAB_ORDER: NightTab[] = ["going", "nearby", "past"]',
+    );
+    expect(webNights).toContain("<NightsTabs");
+    expect(appNights).toContain("NIGHT_TABS[tab]");
     for (const source of [webNights, appNights]) {
-      const positions = order.map((title) => source.indexOf(`"${title}"`));
-      expect(positions.every((at) => at >= 0)).toBe(true);
-      expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+      expect(source).not.toContain('"Live now"');
+      expect(source).not.toContain('"Coming up"');
     }
   });
 
@@ -172,13 +184,14 @@ describe("the Nights screen", () => {
     expect(webNights).toContain('href="/feed"');
   });
 
-  it("counts the roster through goingLine on both", () => {
-    /* The count rides with the button on every row that has one, and
-       a live row, which has no button, says it on its own. The button
-       draws it through goingLine (pinned below), so a screen that
-       draws nothing but buttons has still said it the one way. */
-    expect(webNights).toContain("goingLine(");
-    expect(appNights).toMatch(/goingLine\(|<GoingButton/);
+  it("counts the roster through playersLine on both", () => {
+    /* Nights round 2: the card's one line says "{n} players" itself,
+       and the Going chip beside it carries no count of its own. */
+    expect(webNightCard).toContain("playersLine(");
+    expect(webNightCard).toContain("<GoingButton");
+    expect(webNightCard).toContain("compact");
+    expect(appNights).toContain("playersLine(");
+    expect(appNights).toContain("<GoingButton");
   });
 });
 
@@ -205,29 +218,41 @@ describe("the Going button", () => {
   });
 
   it("is used everywhere a night is drawn", () => {
-    expect(webNights).toContain("<GoingButton");
-    expect(webPreStart).toContain("<GoingButton");
+    expect(webNightCard).toContain("<GoingButton");
+    /* On the night page it lives on the header line (Nights round 2). */
+    expect(webNightHeader).toContain("<GoingButton");
+    expect(webRoom).toContain("<NightHeader");
     expect(webFeedItems).toContain("<GoingButton");
     expect(webStore).toContain("<GoingButton");
     expect(appNights).toContain("<GoingButton");
-    expect(appRoom).toContain("<GoingButton");
+    /* Nights round 2: the app's room draws its header from
+       mobile/src/night-header.tsx, which holds the button. */
+    expect(appRoom).toContain("<NightHeader");
+    expect(read("mobile/src/night-header.tsx")).toContain("<GoingButton");
     expect(appHome).toContain("<GoingButton");
     expect(appStore).toContain("<GoingButton");
   });
 });
 
 describe("the room before its night", () => {
-  it("pitches with the same two sentences on both", () => {
-    expect(webPreStart).toContain("PRE_START_PITCH");
-    expect(webPreStart).toContain("YOURE_ON_THE_BOARD");
-    expect(appRoom).toContain("PRE_START_PITCH");
-    expect(appRoom).toContain("YOURE_ON_THE_BOARD");
+  it("no longer pitches in a card: the RSVP is the header line (Nights round 2)", () => {
+    /* The founder: "REMOVE REPEATED INFORMATION." The pitch card and
+       the roster card are gone from the website's night page; the
+       Going chip sits on the header line and the roster is "Players
+       going", lower down. tests/unit/nights2-parity.test.ts pins the
+       app's header the same way. */
+    expect(webPreStart).not.toContain("PRE_START_PITCH");
+    expect(webPreStart).not.toContain("YOURE_ON_THE_BOARD");
+    expect(webRoom).not.toContain("<PreStartCard");
+    expect(webRoom).not.toContain("<NightRosterCard");
+    expect(webRoom).not.toContain("<PreStartRoom");
   });
 
-  it("draws the pre-start view and the roster on the website", () => {
-    expect(webRoom).toContain("<PreStartRoom");
-    expect(webRoom).toContain("<NightRosterCard");
-    expect(webRoom).toContain('phase === "upcoming" || phase === "early"');
+  it("draws the board read-only for a viewer without a seat, on the website", () => {
+    expect(webRoom).toContain("<ReadOnlyBoard");
+    expect(webPreStart).toContain("export function ReadOnlyBoard(");
+    expect(webRoom).toContain("const readable = boardReadable(phase);");
+    expect(webRoom).toContain("<PlayersGoing");
   });
 
   it("polls by phase: none upcoming, a minute early, twelve seconds live", () => {
@@ -239,8 +264,9 @@ describe("the room before its night", () => {
     expect(appRoom).toContain("12_000");
   });
 
-  it("keeps the early-board card for the early phase", () => {
-    expect(webRoom).toContain("This board is open early");
+  it("draws the one-line early banner for the early phase", () => {
+    expect(webRoom).toContain('{phase === "early" && <EarlyBanner />}');
+    expect(webRoom).not.toContain("This board is open early");
   });
 });
 
