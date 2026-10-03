@@ -964,6 +964,11 @@ export type PlayerRow = {
   cover_image: string | null;
   /** Joining a room posts their open Flares to its board. On by default. */
   auto_post_flares: boolean;
+  /** The four push switches, on by default; the Inbox keeps every notice either way. */
+  push_offers: boolean;
+  push_messages: boolean;
+  push_nights: boolean;
+  push_social: boolean;
   /** The short public line under the name, up to 150 characters. */
   bio: string | null;
   /** How to refer to them, "he/him", up to 20 characters. */
@@ -1097,6 +1102,10 @@ export type PlayerInsert = Omit<
   | "avatar_animated"
   | "cover_image"
   | "auto_post_flares"
+  | "push_offers"
+  | "push_messages"
+  | "push_nights"
+  | "push_social"
   | "bio"
   | "pronouns"
   | "tier"
@@ -1122,6 +1131,10 @@ export type PlayerInsert = Omit<
   avatar_animated?: string | null;
   cover_image?: string | null;
   auto_post_flares?: boolean;
+  push_offers?: boolean;
+  push_messages?: boolean;
+  push_nights?: boolean;
+  push_social?: boolean;
   bio?: string | null;
   pronouns?: string | null;
   embers_earned?: number;
@@ -1868,6 +1881,19 @@ export type PlayerDeviceRow = {
   last_seen_at: string;
 };
 
+/** A ticket Expo handed back for one push to one device, until its receipt is read. */
+export type PushTicketRow = {
+  id: string;
+  created_at: string;
+  ticket_id: string;
+  device_id: string;
+};
+
+export type PushTicketInsert = Omit<PushTicketRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
 export type PlayerDeviceInsert = Omit<
   PlayerDeviceRow,
   "id" | "created_at" | "last_seen_at"
@@ -2026,6 +2052,7 @@ export type Database = {
       notifications: Table<NotificationRow, NotificationInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
+      push_tickets: Table<PushTicketRow, PushTicketInsert>;
       player_collection: Table<PlayerCollectionRow, PlayerCollectionInsert>;
       player_collection_syncs: Table<
         PlayerCollectionSyncRow,

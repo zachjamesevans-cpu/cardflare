@@ -1,5 +1,10 @@
 import "server-only";
 
+import { unreadCount } from "@/lib/notifications/inbox";
+import { groupForKind } from "@/lib/notifications/push-prefs";
+import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
+import type { NotificationRow } from "@/lib/supabase/types";
+
 import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -181,8 +186,14 @@ async function deliverByPush(
   title: string,
   body: string | null,
   path: string,
+  kind: NotificationRow["kind"],
 ): Promise<void> {
   const admin = getSupabaseAdmin();
+
+  /* The account's switch for this kind of notice. Off means the Inbox
+     keeps the notice and the phone stays quiet. */
+  const prefs = await pushPrefsFor(playerId);
+  if (!prefs[groupForKind(kind)]) return;
 
   const { data: devices, error } = await admin
     .from("player_devices")
@@ -190,6 +201,10 @@ async function deliverByPush(
     .eq("player_id", playerId);
 
   if (error || !devices || devices.length === 0) return;
+
+  /* The badge is the Inbox's unread count, so the icon's number and
+     the Inbox agree; the notice this push carries is already in it. */
+  const badge = await unreadCount(playerId).catch(() => 0);
 
   try {
     const response = await fetch(EXPO_PUSH_ENDPOINT, {
@@ -201,6 +216,10 @@ async function deliverByPush(
           title,
           body: body ?? undefined,
           sound: "default",
+          badge,
+          /* Android 8 and later drops a push with no channel. The app
+             creates "default" when it registers. */
+          channelId: "default",
           data: { url: path },
         })),
       ),
@@ -208,13 +227,12 @@ async function deliverByPush(
     });
 
     const result = (await response.json().catch(() => null)) as {
-      data?: { status: string; details?: { error?: string } }[];
+      data?: { status: string; id?: string; details?: { error?: string } }[];
     } | null;
 
     const dead = devices.filter(
       (_, index) => result?.data?.[index]?.details?.error === "DeviceNotRegistered",
     );
-
     if (dead.length > 0) {
       await admin
         .from("player_devices")
@@ -223,6 +241,20 @@ async function deliverByPush(
           "id",
           dead.map((device) => device.id),
         );
+    }
+
+    /* A ticket per accepted send. "DeviceNotRegistered" for a phone
+       that deleted the app arrives in the RECEIPT, read later by the
+       push-receipts cron, which is where the token is pruned. */
+    const tickets = devices.flatMap((device, index) => {
+      const ticket = result?.data?.[index];
+      return ticket?.status === "ok" && ticket.id
+        ? [{ ticket_id: ticket.id, device_id: device.id }]
+        : [];
+    });
+    if (tickets.length > 0) {
+      const { error: ticketError } = await admin.from("push_tickets").insert(tickets);
+      if (ticketError) console.error("Could not keep the push tickets", ticketError);
     }
   } catch (caught) {
     console.error("Could not reach the push service", caught);
@@ -329,7 +361,7 @@ export async function notifyOfferReceived(
     });
 
     if (id) {
-      await deliverByPush(recipient.playerId, title, body, path);
+      await deliverByPush(recipient.playerId, title, body, path, "offer-received");
       if (recipient.email) {
         await deliverByEmail(id, recipient.email, title, body, path);
       }
@@ -426,7 +458,7 @@ export async function notifyEarlyBoardFlares(eventId: string): Promise<void> {
       });
 
       if (id) {
-        await deliverByPush(saver.player_id, title, body, path);
+        await deliverByPush(saver.player_id, title, body, path, "early-board");
 
         const email = await playerEmail(saver.player_id);
         if (email) await deliverByEmail(id, email, title, body, path);
@@ -481,7 +513,7 @@ export async function notifyShowcaseMatch(
       });
 
       if (id) {
-        await deliverByPush(recipient.playerId, title, body, path);
+        await deliverByPush(recipient.playerId, title, body, path, "offer-received");
         if (recipient.email) {
           await deliverByEmail(id, recipient.email, title, body, path);
         }
@@ -575,7 +607,7 @@ export async function notifyBoardOpen(eventId: string): Promise<void> {
         dedupeKey: `board-open:${eventId}:${saver.player_id}`,
       });
 
-      if (id) await deliverByPush(saver.player_id, title, body, path);
+      if (id) await deliverByPush(saver.player_id, title, body, path, "board-open");
     }
   } catch (error) {
     console.error("Could not ring the board-open doorbell", error);
@@ -658,7 +690,7 @@ export async function sendTestNotice(
     actorId: kind === "board-open" || kind === "early-board" ? null : playerId,
   });
 
-  if (id) await deliverByPush(playerId, sample.title, sample.body, path);
+  if (id) await deliverByPush(playerId, sample.title, sample.body, path, "board-open");
 
   return { recorded: id !== null, devices: count ?? 0 };
 }
@@ -715,7 +747,7 @@ export async function notifyNewFollower(
       actorId: followerId,
     });
 
-    if (id) await deliverByPush(followedId, title, body, path);
+    if (id) await deliverByPush(followedId, title, body, path, "new-follower");
   } catch (error) {
     console.error("Could not announce the new follower", error);
   }
@@ -841,7 +873,7 @@ export async function notifyRoomFlare(
             actorId,
           });
 
-          if (id) await deliverByPush(playerId, title, body, path);
+          if (id) await deliverByPush(playerId, title, body, path, "room-flare");
         }),
       );
     }
@@ -892,7 +924,7 @@ export async function notifyTradeConfirmed(
     });
 
     if (id) {
-      await deliverByPush(recipient.playerId, title, body, path);
+      await deliverByPush(recipient.playerId, title, body, path, "trade-confirmed");
       if (recipient.email) {
         await deliverByEmail(id, recipient.email, title, body, path);
       }
@@ -944,7 +976,8 @@ export async function notifyMessageReceived(
       ? `${name} messaged about ${card.exact_name}`
       : `${name} sent a message`;
     const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
-    const path = "/local";
+    /* The thread itself, not the list: a tap lands in the conversation. */
+    const path = `/local?thread=${encodeURIComponent(threadId)}`;
 
     const id = await record({
       playerId: recipientId,
@@ -956,7 +989,7 @@ export async function notifyMessageReceived(
       actorId: senderId,
     });
 
-    if (id) await deliverByPush(recipientId, title, preview, path);
+    if (id) await deliverByPush(recipientId, title, preview, path, "message-received");
   } catch (error) {
     console.error("Could not announce the message", error);
   }
@@ -994,7 +1027,7 @@ export async function notifyPostComment(
       actorId: commenterId,
     });
 
-    if (id) await deliverByPush(authorId, title, preview, path);
+    if (id) await deliverByPush(authorId, title, preview, path, "post-comment");
   } catch (error) {
     console.error("Could not announce the comment", error);
   }
@@ -1037,7 +1070,7 @@ export async function notifyNearbyMatch(match: {
       actorId: match.wanterId,
     });
 
-    if (id) await deliverByPush(match.holderId, title, body, path);
+    if (id) await deliverByPush(match.holderId, title, body, path, "nearby-match");
   } catch (error) {
     console.error("Could not notify the nearby match", error);
   }
@@ -1080,7 +1113,7 @@ export async function notifyNightMatchForGoer(entry: {
       actorId: null,
     });
 
-    if (id) await deliverByPush(entry.playerId, title, body, path);
+    if (id) await deliverByPush(entry.playerId, title, body, path, "night-match");
   } catch (error) {
     console.error("Could not notify the goer's night matches", error);
   }
@@ -1118,7 +1151,7 @@ export async function notifyNightMatchForHolder(entry: {
       actorId: entry.goerId,
     });
 
-    if (id) await deliverByPush(entry.holderId, title, body, path);
+    if (id) await deliverByPush(entry.holderId, title, body, path, "night-match");
   } catch (error) {
     console.error("Could not notify the holder's night match", error);
   }
@@ -1160,7 +1193,8 @@ export async function notifyTradeAcknowledged(
       actorId,
     });
 
-    if (id) await deliverByPush(recipient.playerId, title, body, path);
+    if (id)
+      await deliverByPush(recipient.playerId, title, body, path, "trade-confirmed");
   } catch (error) {
     console.error("Could not notify the trade's author", error);
   }
@@ -1223,7 +1257,7 @@ export async function notifyThreadTrade(
       actorId,
     });
 
-    if (id) await deliverByPush(recipientId, title, body, path);
+    if (id) await deliverByPush(recipientId, title, body, path, "trade-confirmed");
   } catch (error) {
     console.error("Could not announce the conversation's trade", error);
   }
@@ -1308,7 +1342,7 @@ export async function notifyStorePost(
             actorId: null,
           });
 
-          if (id) await deliverByPush(playerId, title, body, path);
+          if (id) await deliverByPush(playerId, title, body, path, "store-post");
         }),
       );
     }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Ban,
+  Bell,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -19,6 +20,9 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FeedViewPicker } from "@/components/feed/feed-view-picker";
 import { AutoPostToggle } from "@/components/players/auto-post-toggle";
+import { PushPrefToggles } from "@/components/players/push-pref-toggles";
+import { PUSH_HEADING, PUSH_LINE } from "@/lib/notifications/push-prefs";
+import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
 import { autoPostFor } from "@/lib/events/auto-post";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -176,6 +180,25 @@ export default async function ProfileSettingsPage() {
   );
 
   /*
+   * Which notices reach the phone. Four groups, each a switch, saved
+   * to the account so the app draws the same four. Nothing here
+   * touches the Inbox: every notice is kept whatever the switches say,
+   * and this is only about the buzz.
+   */
+  const notificationsCard = !playerId ? null : (
+    <Card key="notifications" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Bell className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">{PUSH_HEADING}</p>
+          <p className="text-sm text-text-secondary">{PUSH_LINE}</p>
+        </div>
+      </div>
+      <PushPrefToggles initial={await pushPrefsFor(playerId)} />
+    </Card>
+  );
+
+  /*
    * Everyone this player has blocked, with the way back. A block is
    * taken on a profile and is never announced; this is the one list
    * of them, and the app shows the same chip and Unblock on the
@@ -309,6 +332,7 @@ export default async function ProfileSettingsPage() {
     ? [
         feedViewCard,
         roomsCard,
+        notificationsCard,
         deckListCard,
         collectionCard,
         locationCard,
@@ -324,6 +348,7 @@ export default async function ProfileSettingsPage() {
         locationCard,
         feedViewCard,
         roomsCard,
+        notificationsCard,
         deckListCard,
         collectionCard,
         blockedCard,

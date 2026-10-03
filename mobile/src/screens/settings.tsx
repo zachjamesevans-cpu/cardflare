@@ -14,6 +14,7 @@ import {
   describeError,
   getMe,
   getProfile,
+  getPushPrefs,
   listBlockedPlayers,
   type BlockedPlayer,
   type Me,
@@ -22,6 +23,7 @@ import {
   saveDeckList,
   setAutoPost as saveAutoPost,
   setFeedView,
+  setPushPref,
   signOut,
   unblockPlayer,
 } from "../api";
@@ -38,6 +40,13 @@ import {
   Title,
 } from "../ui";
 import { parseDeckList } from "../deck-list";
+import {
+  PUSH_GROUPS,
+  PUSH_HEADING,
+  PUSH_LINE,
+  type PushGroup,
+  type PushPrefs,
+} from "../push-copy";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
   FEED_VIEWS,
@@ -354,6 +363,8 @@ export function SettingsScreen() {
         {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
+      <PushPrefSwitches />
+
       <BlockedPlayers />
 
       {/* Tooling, for a development build only. A player's settings
@@ -408,6 +419,107 @@ export function SettingsScreen() {
 
       {profile && <DeleteAccount handle={profile.handle} />}
     </ScrollView>
+  );
+}
+
+/**
+ * PUSH NOTIFICATIONS: what buzzes the phone, by group. The website's
+ * settings draw the same four switches in the same words
+ * (src/components/players/push-pref-toggles.tsx); the Inbox keeps
+ * every notice whatever these say.
+ *
+ * Null until the first read lands, so the switches never paint a
+ * default somebody then "turns off" that was never on. Its own read,
+ * so a settings screen on an older server still draws everything
+ * else. Optimistic on a tap, the way the Rooms switch is: the switch
+ * moves at once, the write follows, and a failure paints the truth
+ * back and says so.
+ */
+function PushPrefSwitches() {
+  const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      getPushPrefs()
+        .then((result) => {
+          if (!live) return;
+          setPrefs(result.prefs);
+          setError(null);
+        })
+        .catch(() => {
+          /* No switches to draw until the read lands; the line says why. */
+          if (!live) return;
+          setPrefs((current) => {
+            if (!current) {
+              setError("Could not load these right now. Try again in a moment.");
+            }
+            return current;
+          });
+        });
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
+
+  const flip = (group: PushGroup) => {
+    if (!prefs) return;
+    const next = !prefs[group];
+    setPrefs({ ...prefs, [group]: next });
+    setError(null);
+    setPushPref(group, next)
+      .then((result) => setPrefs(result.prefs))
+      .catch(() => {
+        setPrefs((current) => (current ? { ...current, [group]: !next } : current));
+        setError("Could not save that. Try again in a moment.");
+      });
+  };
+
+  return (
+    <Card>
+      <Title>{PUSH_HEADING}</Title>
+      <Muted>{PUSH_LINE}</Muted>
+      {prefs ? (
+        <View style={{ gap: spacing(2) }}>
+          {PUSH_GROUPS.map(({ key, label, line }) => {
+            const on = prefs[key];
+            return (
+              <Tap
+                key={key}
+                accessibilityLabel={`${label}, ${on ? "on" : "off"}`}
+                onPress={() => flip(key)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing(3),
+                  borderRadius: radius.control,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                    {label}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>{line}</Text>
+                </View>
+                <Ionicons
+                  name={on ? "toggle" : "toggle-outline"}
+                  size={32}
+                  color={on ? colors.accent : colors.textMuted}
+                />
+              </Tap>
+            );
+          })}
+        </View>
+      ) : null}
+      <ErrorLine message={error} />
+    </Card>
   );
 }
 

@@ -1,13 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
+import { followHref } from "../follow-href";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
 import { getNotifications, listLocalThreads, markRead, type InboxItem } from "../api";
+import { syncBadge } from "../push";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Loading, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -28,6 +30,10 @@ import { useTabBarInset } from "../glass";
  * Opening the screen marks the unread ones read (the app's advantage
  * over a browser tab: it knows you looked), but the tint from THIS
  * visit stays on screen, so what was new when you arrived reads as new.
+ * The app icon's badge follows the same two beats: set to what loaded
+ * unread, cleared once the server has them marked read. Every focus,
+ * not every mount: a tab stays mounted, and a notice that landed while
+ * you were on the Feed has to be here when you come back.
  * The website draws the same row in `src/components/inbox/inbox-list.tsx`.
  */
 export function InboxScreen() {
@@ -38,24 +44,43 @@ export function InboxScreen() {
      read, so a Messages outage cannot take the notices down with it. */
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { notifications } = await getNotifications();
-        setItems(notifications);
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      void (async () => {
+        try {
+          const { notifications } = await getNotifications();
+          if (!live) return;
+          setItems(notifications);
 
-        const unread = notifications.filter((n) => !n.readAt).map((n) => n.id);
-        if (unread.length > 0) await markRead(unread);
-      } catch {
-        setItems([]);
-      }
-    })();
-    void listLocalThreads()
-      .then(({ threads }) =>
-        setUnreadMessages(threads.reduce((sum, thread) => sum + thread.unread, 0)),
-      )
-      .catch(() => setUnreadMessages(0));
-  }, []);
+          const unread = notifications.filter((n) => !n.readAt).map((n) => n.id);
+          /* The icon's badge says what the list says: this many, then
+             none once the server has them marked read. Every push
+             carries the count, so the icon is right the moment a
+             notice lands; this is what makes it right afterwards. */
+          await syncBadge(unread.length);
+          if (unread.length > 0) {
+            await markRead(unread);
+            await syncBadge(0);
+          }
+        } catch {
+          if (live) setItems((current) => current ?? []);
+        }
+      })();
+      void listLocalThreads()
+        .then(({ threads }) => {
+          if (live) {
+            setUnreadMessages(threads.reduce((sum, thread) => sum + thread.unread, 0));
+          }
+        })
+        .catch(() => {
+          if (live) setUnreadMessages(0);
+        });
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
 
   const openProfile = (playerId: string) =>
     navigation.navigate("PlayerProfile", { playerId });
@@ -68,23 +93,17 @@ export function InboxScreen() {
       : navigation.navigate("Messages");
 
   /*
-   * A notice that names a screen the app has is a door to it. Messages
-   * land on Local, where the conversation is one row down; a follow
-   * opens the follower; everything else stays a note, honestly.
+   * A notice with a path is a door. The same router a push tap and the
+   * Feed's notice buttons go through (src/follow-href.ts): a message
+   * opens its conversation, a follow opens the follower, a night opens
+   * the room, and a path the app has no screen for opens the website,
+   * so the row always lands where its words said. A notice with no
+   * path stays a note, honestly.
    */
   const destination = (item: InboxItem): (() => void) | null => {
-    if (item.url === "/local") {
-      return openMessages;
-    }
-    if (item.url?.startsWith("/p/")) {
-      const playerId = item.url.slice("/p/".length);
-      return () => openProfile(playerId);
-    }
-    /* A nearby match lives on the Feed, where its card has the buttons. */
-    if (item.url === "/feed") {
-      return () => navigation.navigate("Tabs", { screen: "Feed" });
-    }
-    return null;
+    const url = item.url;
+    if (!url || !url.startsWith("/")) return null;
+    return () => void followHref(navigation, url).catch(() => {});
   };
 
   return (
