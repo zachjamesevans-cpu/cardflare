@@ -1,47 +1,29 @@
 import { absoluteImageUrls } from "@/lib/api/absolute";
-import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
-import { readJsonPayload } from "@/lib/api/payload";
-import { readBinder, saveBinderSettings } from "@/lib/binder/binder";
-import { isBinderCover, isBinderLayout } from "@/lib/binder/covers";
-import { z } from "zod";
+import { apiPlayer, unauthorized } from "@/lib/api/auth";
+import { firstTradeBinderId, readBinder } from "@/lib/binder/binder";
+import { forOldBuild } from "@/app/api/v1/binders/_shared";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Your own trade binder, for the app: the cards and the settings in
- * one read, the settings in one write. The cards themselves are added
- * and removed at /api/v1/binder/cards.
+ * For the app build that still asks for "the" trade binder: the first
+ * binder up for trade. Settings are written through /api/v1/binders
+ * now; this answers reads only, and PATCH answers with the binder
+ * unchanged so the old screen does not error.
  */
-export async function GET(request: Request): Promise<Response> {
+async function theTradeBinder(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
-  const binder = await readBinder(player.playerId, player.playerId);
+  const id = await firstTradeBinderId(player.playerId);
+  const binder = id ? await readBinder(player.playerId, player.playerId, id) : null;
   if (!binder) return Response.json({ error: "not-found" }, { status: 404 });
-  return Response.json(absoluteImageUrls({ binder }));
+  return Response.json(absoluteImageUrls({ binder: forOldBuild(binder) }));
 }
 
-const settingsSchema = z.object({
-  isPublic: z.boolean().optional(),
-  layout: z.custom<2 | 3>(isBinderLayout).optional(),
-  cover: z.custom<string>(isBinderCover).optional(),
-  frontEntryId: z.guid().nullable().optional(),
-});
+export async function GET(request: Request): Promise<Response> {
+  return theTradeBinder(request);
+}
 
 export async function PATCH(request: Request): Promise<Response> {
-  const player = await apiPlayer(request);
-  if (!player) return unauthorized();
-  const parsed = settingsSchema.safeParse(await readJsonPayload(request));
-  if (!parsed.success) return badRequest("isPublic, layout, cover or frontEntryId");
-  const patch = parsed.data;
-  await saveBinderSettings(player.playerId, {
-    ...(patch.isPublic !== undefined ? { isPublic: patch.isPublic } : {}),
-    ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
-    ...(patch.cover !== undefined && isBinderCover(patch.cover)
-      ? { cover: patch.cover }
-      : {}),
-    ...(patch.frontEntryId !== undefined ? { frontEntryId: patch.frontEntryId } : {}),
-  });
-  const binder = await readBinder(player.playerId, player.playerId);
-  if (!binder) return Response.json({ error: "not-found" }, { status: 404 });
-  return Response.json(absoluteImageUrls({ binder }));
+  return theTradeBinder(request);
 }

@@ -20,7 +20,7 @@ import { addBinderCardAction } from "@/lib/binder/actions";
  * The page owns whether the sheet is open, because the button under
  * the page is not the only way in: every empty pocket on the owner's
  * binder is a "+" that opens this same sheet. The binder's id says
- * which binder the card lands in: the Trade binder, or a custom one.
+ * which binder the card lands in.
  */
 export function AddBinderCard({
   binderId,
@@ -29,7 +29,7 @@ export function AddBinderCard({
   open,
   onOpenChange,
 }: {
-  /** "trade", or a custom binder's uuid. */
+  /** The binder the card lands in. */
   binderId: string;
   imagesEnabled: boolean;
   /** The reader's sign-up games, for the search's default chip. */
@@ -83,32 +83,44 @@ export function AddBinderCard({
           </div>
         }
       >
-        <CardSearch
-          imagesEnabled={imagesEnabled}
-          playerGames={playerGames}
-          autoFocus
-          onSelect={(card, printing) => {
-            if (pending) return;
-            setError(null);
-            setAdded(null);
-            start(async () => {
-              const result = await addBinderCardAction(
-                {
-                  cardId: card.id,
-                  printingId: printing?.id ?? null,
-                  quantity: 1,
-                },
-                binderId,
-              );
-              if (!result.ok) {
-                setError(result.message);
-                return;
-              }
-              setAdded(card.exactName);
-              router.refresh();
-            });
-          }}
-        />
+        {/*
+         * TALL ON PURPOSE. The sheet sizes itself to its content, and
+         * before anything is typed the content is one field and a
+         * hint, so the game menu under the chip opened into a body a
+         * few lines high and was cut off; the founder: "when u click
+         * the TCG dropdown, it gets cut off". The search is left as it
+         * is; its container gets the room: at least 70dvh, so the
+         * menu opens inside the scroll area whole, and once results
+         * come they scroll inside the sheet under the footer.
+         */}
+        <div className="flex min-h-[70dvh] flex-col">
+          <CardSearch
+            imagesEnabled={imagesEnabled}
+            playerGames={playerGames}
+            autoFocus
+            onSelect={(card, printing) => {
+              if (pending) return;
+              setError(null);
+              setAdded(null);
+              start(async () => {
+                const result = await addBinderCardAction(
+                  {
+                    cardId: card.id,
+                    printingId: printing?.id ?? null,
+                    quantity: 1,
+                  },
+                  binderId,
+                );
+                if (!result.ok) {
+                  setError(result.message);
+                  return;
+                }
+                setAdded(card.exactName);
+                router.refresh();
+              });
+            }}
+          />
+        </div>
       </Sheet>
     </>
   );

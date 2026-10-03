@@ -3,7 +3,7 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { readBinder, saveBinderOrder } from "@/lib/binder/binder";
 import { z } from "zod";
-import { binderIdSchema } from "../../_shared";
+import { binderIdSchema, forOldBuild } from "../../_shared";
 
 export const dynamic = "force-dynamic";
 
@@ -28,5 +28,5 @@ export async function PUT(
     );
   }
   const binder = await readBinder(player.playerId, player.playerId, id.data);
-  return Response.json(absoluteImageUrls({ binder }));
+  return Response.json(absoluteImageUrls({ binder: binder && forOldBuild(binder) }));
 }

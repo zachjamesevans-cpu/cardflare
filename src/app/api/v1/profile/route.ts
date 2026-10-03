@@ -1,3 +1,4 @@
+import { forOldBuild } from "@/app/api/v1/binders/_shared";
 import { absoluteImageUrls } from "@/lib/api/absolute";
 import { z } from "zod";
 
@@ -118,9 +119,7 @@ export async function GET(request: Request): Promise<Response> {
       pro: tierAllows(profile.tier, "cosmetics"),
       /* The stores that named them an organizer: the TO chip. */
       organizerAt: profile.organizerAt,
-      /* The binder's panel, always present for the owner. */
-      binder: absoluteImageUrls(profile.binder),
-      binders: absoluteImageUrls(profile.binders),
+      binders: absoluteImageUrls(profile.binders.map(forOldBuild)),
       flares: absoluteImageUrls(profile.flares),
       /* How they want the Feed drawn. Sent with the profile because the
          settings screen lives here and the Feed asks the same answer. */

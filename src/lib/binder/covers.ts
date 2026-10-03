@@ -13,9 +13,8 @@
  * colour.
  */
 
-export type BinderLayout = 2 | 3;
-
-export const BINDER_LAYOUTS: readonly BinderLayout[] = [2, 3];
+/** Pages are three by three. The founder: "it may be best to not even give them the option for a 2x2". */
+export type BinderLayout = 3;
 
 export type BinderCoverId =
   "charcoal" | "lime" | "ember" | "frost" | "rose" | "galaxy" | "gold";
@@ -78,10 +77,6 @@ export const DEFAULT_BINDER_LAYOUT: BinderLayout = 3;
 
 export function isBinderCover(value: unknown): value is BinderCoverId {
   return BINDER_COVERS.some((cover) => cover.id === value);
-}
-
-export function isBinderLayout(value: unknown): value is BinderLayout {
-  return value === 2 || value === 3;
 }
 
 export function binderCover(id: BinderCoverId): BinderCover {

@@ -1,8 +1,6 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Text, View } from "react-native";
 
 import { binderCover, type BinderCoverId } from "./binder-covers";
-import { RemoteImage } from "./remote-image";
 import { colors } from "./theme";
 
 /**
@@ -11,8 +9,8 @@ import { colors } from "./theme";
  *
  * The one place a cover is drawn in the app, the website's
  * `src/components/binder/binder-cover.tsx` matched piece for piece.
- * The profile panel, the binder screen and the cover swatches all
- * come here, so a cover looks the same wherever it sits.
+ * The Binders list, the binder screen and the cover swatches all come
+ * here, so a cover looks the same wherever it sits.
  *
  * The founder, on the first version: "the binder shouldn't be modeled
  * after a 3 ring binder. I'm attaching a picture of a VaultX binder,
@@ -21,22 +19,26 @@ import { colors } from "./theme";
  * thin padded spine down the left with straight edges, large rounded
  * corners on the right and small ones on the left, a zipper running
  * along the top, the right side and the bottom with its pull at the
- * top-left where the zip starts, the front card slipped into a clear
- * sleeve on the cover, and the owner's name embossed low on the left.
- * No rings, no window, nothing shiny.
+ * top-left where the zip starts, and the binder's name embossed low on
+ * the left. No rings, no picture, nothing shiny.
+ *
+ * No picture on the front. The founder, on the front card that used
+ * to sit there: "Delete the ability to have a picture on the binder,
+ * it's tacky imo." And the embossed line is the binder's own
+ * name now, not the owner's: "Notice how it says 'yours' in bottom
+ * left of binder? Allow us to change that text."
  *
  * Geometry, the same on both platforms: rounded 2 on the left and 10%
  * of the width on the right; the spine 5% wide; the zipper track inset
  * 4% from the top, right and bottom, 2 thick, dashed in the spine
  * colour at 70%; the pull 10% wide and 4% tall in the accent, on the
- * track just right of the spine; the card centred, top at 16%, 50%
- * wide, at a card's 63/88; the label at bottom 9%, left 8%.
+ * track just right of the spine; the name at bottom 9%, left 8%.
  */
 
 export type BinderCoverSize = "lg" | "sm" | "xs";
 
-/* lg 232x300: the binder screen. sm 100x130: the profile panel.
-   xs 58x76: lists and swatches. */
+/* lg 232x300: the binder screen. sm 100x130: the Binders list.
+   xs 58x76: swatches. */
 const BOX: Record<BinderCoverSize, { width: number; height: number }> = {
   lg: { width: 232, height: 300 },
   sm: { width: 100, height: 130 },
@@ -51,18 +53,15 @@ const TRACK = 2;
 
 export function BinderCover({
   cover,
-  frontImageUrl,
   label,
   size = "sm",
   plain = false,
 }: {
   cover: BinderCoverId;
-  /** The front card's picture, or null for an empty sleeve. */
-  frontImageUrl: string | null;
-  /** The owner's name, or nothing on a swatch. */
+  /** The binder's name, embossed; nothing on a swatch. */
   label?: string | null;
   size?: BinderCoverSize;
-  /** A swatch: the body, the spine and the zipper, no card and no label. */
+  /** A swatch: the body, the spine and the zipper, no name. */
   plain?: boolean;
 }) {
   const { edge, spine } = binderCover(cover);
@@ -72,10 +71,6 @@ export function BinderCover({
   const pull = {
     width: Math.round(box.width * 0.1),
     height: Math.max(3, Math.round(box.height * 0.04)),
-  };
-  const card = {
-    width: Math.round(box.width * 0.5),
-    height: Math.round((box.width * 0.5 * 88) / 63),
   };
   const track = {
     position: "absolute" as const,
@@ -155,41 +150,6 @@ export function BinderCover({
           backgroundColor: colors.accent,
         }}
       />
-
-      {/* The front card in a clear sleeve, or the empty sleeve. */}
-      {plain ? null : (
-        <View
-          style={{
-            position: "absolute",
-            top: "16%",
-            left: (box.width - card.width) / 2,
-            width: card.width,
-            height: card.height,
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.25)",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            overflow: "hidden",
-          }}
-        >
-          {frontImageUrl ? (
-            <RemoteImage
-              uri={frontImageUrl}
-              contentFit="cover"
-              style={{ width: "100%", height: "100%" }}
-            />
-          ) : null}
-          {/* The sleeve's gloss: a soft white sweep across the top-left. */}
-          <LinearGradient
-            colors={["rgba(255,255,255,0.18)", "rgba(255,255,255,0)"]}
-            locations={[0, 0.45]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            pointerEvents="none"
-            style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
-          />
-        </View>
-      )}
 
       {/* The name, embossed: tone on tone, a hair of light beneath. */}
       {label && !plain ? (

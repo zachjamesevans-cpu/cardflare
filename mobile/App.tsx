@@ -144,7 +144,7 @@ export type StackParams = {
    * binderId means the Trade binder. Reached from the highlights row
    * on either profile and from the Binders list.
    */
-  Binder: { playerId?: string; binderId?: string } | undefined;
+  Binder: { playerId?: string; binderId: string } | undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;

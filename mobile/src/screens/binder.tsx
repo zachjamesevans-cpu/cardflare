@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   PanResponder,
   Platform,
@@ -14,20 +15,16 @@ import {
   Switch,
   Text,
   View,
-  useWindowDimensions,
   type GestureResponderHandlers,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
 import Animated, {
-  cancelAnimation,
   Easing,
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
   withTiming,
   type SharedValue,
@@ -39,7 +36,6 @@ import { SheetBackdrop } from "../action-menu";
 import {
   ApiError,
   BINDER_NAME_MAX,
-  TRADE_BINDER_ID,
   addBinderCard,
   deleteBinder,
   describeError,
@@ -54,12 +50,7 @@ import {
   type BinderSettingsPatch,
 } from "../api";
 import { BinderCover } from "../binder-cover";
-import {
-  BINDER_COVERS,
-  BINDER_LAYOUTS,
-  pocketsPerPage,
-  type BinderLayout,
-} from "../binder-covers";
+import { BINDER_COVERS, BINDER_LAYOUT, POCKETS_PER_PAGE } from "../binder-covers";
 import { CardPicker } from "../card-picker";
 import { RemoteImage } from "../remote-image";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -78,78 +69,72 @@ import {
 /**
  * One binder, open: the website's /profile/binders/[binderId] and
  * /p/[playerId]/binders/[binderId] on one screen. No playerId means
- * yours; no binderId means the Trade binder.
+ * yours; binderId is the binder's uuid.
  *
- * Two kinds come through here and draw the same. The Trade binder is
- * the Have list: the cards the owner will trade, the ones nearby
- * matching and the room hear about. A custom binder is a folder the
- * owner named ("One Piece", "Grails") whose cards take no part in
- * matching. Pages of pockets, two by two or three by three, turned
- * with a swipe, dots under them. A tap on a pocket is the card large,
- * in the one viewer every shelf uses, with nothing to offer: the
- * binder is not answerable yet, that is a later round.
+ * Every binder is one of the owner's own, named by them, with one
+ * switch, Up for trade: on, it is public to signed-in players and its
+ * cards are there to be traded (nearby matching and the room hear
+ * about them); off, it is private and only the owner opens it. Pages
+ * of nine pockets, three by three, turned with a swipe, dots under
+ * them. A tap on a pocket is the card large, in the one viewer every
+ * shelf uses, with nothing to offer: the binder is not answerable
+ * yet, that is a later round.
  *
  * The owner adds cards through the card picker (the button under the
- * page, or the "+" in any empty pocket), takes one out or names the
- * front card with Edit on, holds a card to move it, and sets the
- * binder up in the strip at the foot: private or not, the layout, the
- * cover, and on a custom binder its name and, at the bottom, Delete
- * binder. The Trade binder cannot be renamed or deleted. Every write
- * paints at once from what the server sends back and then asks for
- * the truth again behind it. A visitor gets the chips when any of the
- * cards are on their hunts, and one button, Message.
+ * page, or the "+" in any empty pocket), takes one out with Edit on,
+ * holds a card to move it, and sets the binder up in the strip at the
+ * foot: its name, Up for trade, the cover, and at the bottom Delete
+ * binder. Every write paints at once from what the server sends back
+ * and then asks for the truth again behind it. A visitor gets the
+ * chips when any of the cards are on their hunts, and one button,
+ * Message.
  *
- * HOLD TO MOVE is the card tray's gesture (mobile/src/card-tray.tsx),
- * the founder's ask: "similar animations to how people can adjust
- * which order their flares are in when they post." The same three
- * rules keep it smooth here. The laid-out order never changes while a
- * finger is down: the card in hand is an overlay drawn over the page
- * from where it was picked up, its pocket kept as an invisible
- * placeholder, and the neighbours slide by a transform driven from
- * one spring-animated number, the pocket the card is heading for. The
- * pocket changes with a dead zone, so a card resting on a line does
- * not flicker between two. And the drop is one movement: the overlay
- * glides onto its pocket, and only when it has landed is the order
- * committed, in one render that swaps the overlay for the real pocket
- * in the same pixels.
+ * THE GRID is measured, never guessed. The page frame reports its
+ * width through onLayout and the pocket is a third of what is left
+ * inside the frame's padding and the two gaps, floored, so three
+ * always fit on a row. The first build read the window's width and
+ * drew the frame's 1pt border on top of the arithmetic: three pockets
+ * plus two gaps came to 2pt more than the frame had inside its
+ * border, the third pocket wrapped, and the founder's screenshots
+ * showed two pockets to a row on a 3x3. Here the border is part of
+ * PAGE_PAD, so what is measured is what is divided.
  *
- * The page is a grid, so "the pocket the card is heading for" is the
- * one under the card's centre, and a neighbour making way slides to
- * the pocket before or after its own, which at the end of a row means
- * the next row. Holding at the page's left or right edge turns the
- * page and keeps the card in hand: on the new page the card has no
- * pocket of its own, so every pocket from the target on makes way
- * (coming from a later page) or every pocket up to it shuffles back
- * one, the first leaving for the page before (coming from an earlier
- * page), which is exactly what the committed order will look like.
+ * HOLD TO MOVE is one card in the air and nothing else moving. A long
+ * press lifts the held card as an overlay that follows the finger,
+ * its pocket left as an empty dashed outline; the pocket under the
+ * finger wears the accent ring. On release the order is committed in
+ * one go and the grid re-lays out with a LayoutAnimation while the
+ * overlay glides onto its pocket, then the real card takes over in
+ * the same pixels. No wiggle, no neighbour sliding, no page turn
+ * while a card is in hand: a card crosses pages by being dropped on
+ * the last pocket of this one and carried over with the Next arrow.
  */
 
-/** The ring round each pocket, the gap between them, the page's padding. */
+/** The ring round each pocket, the gap between them. */
 const POCKET_RING = 2;
 const POCKET_GAP = spacing(2);
+/**
+ * The page frame: PAGE_PAD is everything between the frame's outer
+ * edge and the first pocket, the 1pt border included, so the measured
+ * width minus two of these is exactly what the pockets have.
+ */
+const PAGE_BORDER = 1;
 const PAGE_PAD = spacing(3);
 
-/* How far into a pocket a card's centre must be before that pocket is
-   the one it is heading for: within this of the pocket's own centre,
-   in pocket widths. Under a half, so a card resting on the line
-   between two pockets stays where it was. */
-const DEAD_ZONE = 0.4;
-/* The strip at the page's left and right edge where a held card turns
-   the page, and how long it has to wait there. */
-const EDGE = 28;
-const EDGE_HOLD_MS = 600;
-
-/** Snappy, not rigid: the pick-up, and the neighbours making way. */
+/** Snappy, not rigid: the pick-up. */
 const SPRING = { damping: 20, stiffness: 240, mass: 0.6 } as const;
-/** The drop: one glide onto the pocket, deterministic so it can be waited for. */
-const DROP = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
+/** The drop: one glide onto the pocket, the grid re-laying out under it on the same clock. */
+const DROP = { duration: 200, easing: Easing.out(Easing.cubic) } as const;
+/** How much the held card grows in hand. */
+const LIFT_SCALE = 0.05;
+
+/** Under the Up for trade switch, the create sheet's line word for word. */
+const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";
 
 type Filter = "all" | "hunts";
 
 /** What one page's grid measures, in points. */
 interface Geometry {
-  layout: BinderLayout;
-  per: number;
   pageWidth: number;
   pocketWidth: number;
   pocketHeight: number;
@@ -157,20 +142,34 @@ interface Geometry {
   slotH: number;
 }
 
+/**
+ * The pocket, from the page frame's measured width: three across,
+ * always, floored so three of them and two gaps never outgrow the row.
+ */
+export function pocketWidthFor(pageWidth: number): number {
+  return Math.floor((pageWidth - 2 * PAGE_PAD - 2 * POCKET_GAP) / 3);
+}
+
+function geometryFor(pageWidth: number): Geometry {
+  const pocketWidth = pageWidth > 0 ? pocketWidthFor(pageWidth) : 0;
+  const pocketHeight = Math.round((pocketWidth * 88) / 63);
+  return {
+    pageWidth,
+    pocketWidth,
+    pocketHeight,
+    slotW: pocketWidth + POCKET_GAP,
+    slotH: pocketHeight + POCKET_GAP,
+  };
+}
+
 const clamp = (value: number, low: number, high: number) =>
   Math.max(low, Math.min(high, value));
 
-/**
- * Where pocket `index` sits on its page. Out of range on purpose for
- * a neighbour leaving the page: -1 is off the left of the first row,
- * `per` is off the right of the last.
- */
-function cellOf(index: number, layout: number, slotW: number, slotH: number) {
-  "worklet";
-  const per = layout * layout;
-  const col = index < 0 ? -1 : index >= per ? layout : index % layout;
-  const row = index < 0 ? 0 : index >= per ? layout - 1 : Math.floor(index / layout);
-  return { x: PAGE_PAD + col * slotW, y: PAGE_PAD + row * slotH };
+/** Where pocket `index` sits on its page, in the page's coordinates. */
+function cellOf(index: number, geometry: Geometry) {
+  const col = index % BINDER_LAYOUT;
+  const row = Math.floor(index / BINDER_LAYOUT);
+  return { x: PAGE_PAD + col * geometry.slotW, y: PAGE_PAD + row * geometry.slotH };
 }
 
 /** The list with the card at `from` now at `to`, the others shifted. */
@@ -187,12 +186,11 @@ export function BinderScreen({
   binderId,
 }: {
   playerId?: string;
-  /** "trade" or a custom binder's uuid; missing means the Trade binder. */
+  /** The binder's uuid. */
   binderId?: string;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const window = useWindowDimensions();
-  const id = binderId ?? TRADE_BINDER_ID;
+  const id = binderId || "";
   const [binder, setBinder] = useState<Binder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -200,11 +198,14 @@ export function BinderScreen({
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
-  /* The delete confirm, over the page; custom binders only. */
+  /* The delete confirm, over the page. */
   const [deleting, setDeleting] = useState(false);
+  /* The page frame's width, as laid out; nothing is drawn before it is known. */
+  const [pageWidth, setPageWidth] = useState(0);
   const pager = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
+    if (!id) return;
     try {
       const { binder: fresh } = await getBinder(playerId, id);
       setBinder(fresh);
@@ -224,9 +225,9 @@ export function BinderScreen({
     }, [load]),
   );
 
-  /* The header is the binder's name, once that is known: "Trade
-     binder", the custom name, or "<Name>'s Trade binder" on somebody
-     else's. The website's page title says the same. */
+  /* The header is the binder's name, once that is known: the name, or
+     "<Name>'s <name>" on somebody else's. The website's page title
+     says the same. */
   useEffect(() => {
     if (!binder) return;
     navigation.setOptions({ title: binderTitle(binder) });
@@ -260,9 +261,9 @@ export function BinderScreen({
     void write(() => saveBinder(patch, id));
   };
 
-  /* A custom binder, gone with its cards. Back to wherever it was
-     opened from: the list or the profile, both of which re-read on
-     focus, so the circle and the row are gone by the time Back lands. */
+  /* The binder, gone with its cards. Back to wherever it was opened
+     from: the list or the profile, both of which re-read on focus, so
+     the circle and the row are gone by the time Back lands. */
   const remove = async () => {
     setWriteError(null);
     try {
@@ -281,8 +282,7 @@ export function BinderScreen({
   const allCards = binder?.cards ?? [];
   const cards =
     filter === "hunts" ? allCards.filter((card) => card.onYourHunt) : allCards;
-  const layout = binder?.layout ?? 3;
-  const per = pocketsPerPage(layout);
+  const per = POCKETS_PER_PAGE;
   /*
    * The owner always has somewhere to put the next card: when the
    * last page is full (or there are no cards at all) one more page of
@@ -294,18 +294,7 @@ export function BinderScreen({
     : Math.max(1, Math.ceil(cards.length / per));
   const at = Math.min(page, pageCount - 1);
 
-  const pageWidth = window.width - 2 * gutter;
-  const pocketWidth = (pageWidth - 2 * PAGE_PAD - (layout - 1) * POCKET_GAP) / layout;
-  const pocketHeight = Math.round((pocketWidth * 88) / 63);
-  const geometry: Geometry = {
-    layout,
-    per,
-    pageWidth,
-    pocketWidth,
-    pocketHeight,
-    slotW: pocketWidth + POCKET_GAP,
-    slotH: pocketHeight + POCKET_GAP,
-  };
+  const geometry = useMemo(() => geometryFor(pageWidth), [pageWidth]);
 
   const turnTo = (index: number) => {
     const next = clamp(index, 0, pageCount - 1);
@@ -314,17 +303,22 @@ export function BinderScreen({
   };
 
   const onPagerEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pageWidth <= 0) return;
     const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
     setPage(clamp(index, 0, pageCount - 1));
+  };
+
+  /* Whole points: a fractional width would put a fraction of a point
+     into every pocket, and the pager snaps by this number. */
+  const onFrameLayout = (event: LayoutChangeEvent) => {
+    const width = Math.floor(event.nativeEvent.layout.width);
+    if (width !== pageWidth) setPageWidth(width);
   };
 
   const drag = useHoldToMove({
     enabled: yours,
     cards: allCards,
     geometry,
-    page: at,
-    pageCount,
-    turnTo,
     onMove: (from, to) => {
       const next = moved(allCards, from, to);
       setBinder((current) => (current ? { ...current, cards: next } : current));
@@ -347,7 +341,9 @@ export function BinderScreen({
           paddingVertical: spacing(4),
         }}
       >
-        {error === "private" ? (
+        {!id ? (
+          <Muted>This binder could not be opened.</Muted>
+        ) : error === "private" ? (
           <Muted>This binder is private.</Muted>
         ) : error ? (
           <Muted>{`This binder could not be opened (${error}).`}</Muted>
@@ -385,15 +381,11 @@ export function BinderScreen({
           gap: spacing(3),
         }}
       >
-        {/* What the Trade binder is for, in one line under the title.
-            A custom binder is just what its owner called it. */}
-        {binder.kind === "trade" ? (
-          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-            {yours
-              ? "Cards you will trade. Somebody nearby hunting one of them hears about it."
-              : `Cards ${binder.ownerName} will trade.`}
-          </Text>
-        ) : null}
+        {/* What the switch means for this binder, in one line under
+            the title. A visitor is never shown a private one. */}
+        <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+          {binderLine(binder)}
+        </Text>
 
         <Text style={{ color: colors.textMuted, fontSize: 12 }}>
           {`${binder.count} ${binder.count === 1 ? "card" : "cards"} · Page ${at + 1} of ${pageCount}`}
@@ -423,55 +415,52 @@ export function BinderScreen({
           </View>
         ) : null}
 
-        {/* The pages, one screen wide each, turned with a swipe. The
-            card in hand is drawn beside the pager, not in it, so the
-            pager keeps clipping and paging like any other. */}
-        <View style={{ width: pageWidth }}>
-          <ScrollView
-            ref={pager}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={!drag.held}
-            onMomentumScrollEnd={onPagerEnd}
-            style={{ width: pageWidth }}
-          >
-            {Array.from({ length: pageCount }, (_, index) => (
-              <BinderPage
-                key={index}
-                geometry={geometry}
-                cards={cards.slice(index * per, index * per + per)}
-                shelfStart={index * per}
-                shelf={shelf}
-                yours={yours}
-                editing={yours && editing}
-                frontEntryId={binder.frontEntryId}
-                drag={drag}
-                /* Only the page under the card makes way. */
-                dragging={drag.held !== null && index === at}
-                onAdd={() => setAdding(true)}
-                onRemove={(entryId) => {
-                  setBinder((current) =>
-                    current
-                      ? {
-                          ...current,
-                          cards: current.cards.filter(
-                            (card) => card.entryId !== entryId,
-                          ),
-                          count: Math.max(0, current.count - 1),
-                          frontEntryId:
-                            current.frontEntryId === entryId
-                              ? null
-                              : current.frontEntryId,
-                        }
-                      : current,
-                  );
-                  void write(() => removeBinderCard(entryId, id));
-                }}
-                onFront={(entryId) => save({ frontEntryId: entryId })}
-              />
-            ))}
-          </ScrollView>
+        {/* The page frame: as wide as the screen's content, measured,
+            and the pages inside it exactly that wide. The card in
+            hand is drawn beside the pager, not in it, so the pager
+            keeps clipping and paging like any other. */}
+        <View onLayout={onFrameLayout} style={{ alignSelf: "stretch" }}>
+          {pageWidth > 0 ? (
+            <ScrollView
+              ref={pager}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEnabled={!drag.held}
+              onMomentumScrollEnd={onPagerEnd}
+              style={{ width: pageWidth }}
+            >
+              {Array.from({ length: pageCount }, (_, index) => (
+                <BinderPage
+                  key={index}
+                  geometry={geometry}
+                  cards={cards.slice(index * per, index * per + per)}
+                  shelfStart={index * per}
+                  shelf={shelf}
+                  yours={yours}
+                  editing={yours && editing}
+                  drag={drag}
+                  /* Only the page under the finger has a target pocket. */
+                  target={drag.held && drag.held.page === index ? drag.target : null}
+                  onAdd={() => setAdding(true)}
+                  onRemove={(entryId) => {
+                    setBinder((current) =>
+                      current
+                        ? {
+                            ...current,
+                            cards: current.cards.filter(
+                              (card) => card.entryId !== entryId,
+                            ),
+                            count: Math.max(0, current.count - 1),
+                          }
+                        : current,
+                    );
+                    void write(() => removeBinderCard(entryId, id));
+                  }}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
 
           {/* The card in hand, over the page, following the finger. */}
           {drag.held && heldCard ? (
@@ -527,7 +516,7 @@ export function BinderScreen({
         />
       ) : null}
 
-      {yours && binder.kind === "custom" ? (
+      {yours ? (
         <DeleteBinderConfirm
           binder={deleting ? binder : null}
           onKeep={() => setDeleting(false)}
@@ -539,12 +528,21 @@ export function BinderScreen({
 }
 
 /**
- * "Trade binder" or the custom name for the owner; "<Name>'s Trade
- * binder" (or "<Name>'s Grails") for anyone else. The website's page
- * title, word for word.
+ * The name for the owner; "<Name>'s <name>" for anyone else. The
+ * website's page title, word for word.
  */
 function binderTitle(binder: Binder): string {
   return binder.yours ? binder.name : `${binder.ownerName}'s ${binder.name}`;
+}
+
+/** The line under the title: what Up for trade means for this one. */
+function binderLine(binder: Binder): string {
+  if (binder.forTrade) {
+    return binder.yours
+      ? "Up for trade. Somebody nearby hunting one of these hears about it."
+      : `Cards ${binder.ownerName} will trade.`;
+  }
+  return "Private. Only you can open it.";
 }
 
 /* ------------------------------------------------------------------ */
@@ -554,25 +552,23 @@ function binderTitle(binder: Binder): string {
 /** A card in hand: which, where it came from, where its overlay starts. */
 interface Held {
   entryId: string;
-  /** The page it was picked up from, and its pocket there. */
+  /** Its place on the whole shelf, the page it is on, its pocket there. */
+  index: number;
   page: number;
-  from: number;
-  /** Where the overlay is drawn from, in the pager's coordinates. */
+  local: number;
+  /** Where the overlay is drawn from, in the page's coordinates. */
   x: number;
   y: number;
 }
 
 interface HoldToMove {
   held: Held | null;
-  /** The pocket the card is heading for, spring-smoothed. */
-  slot: SharedValue<number>;
-  /** The pocket it left on the page under it: its own, or off-page. */
-  from: SharedValue<number>;
+  /** The pocket under the finger on the held card's page, or null off the grid. */
+  target: number | null;
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   lift: SharedValue<number>;
-  wobble: SharedValue<number>;
-  /** The long press on a pocket: the card lifts and the page wiggles. */
+  /** The long press on a pocket: the card lifts. */
   pickUp: (entryId: string) => void;
   /** The pan on a pocket, built once per card. */
   handlersFor: (entryId: string) => GestureResponderHandlers | undefined;
@@ -581,33 +577,27 @@ interface HoldToMove {
 }
 
 /**
- * The gesture, all of it: the card tray's machinery with a grid under
- * it instead of a row, and a page turn at the edges.
+ * The gesture, all of it. Only the held card moves, as an overlay;
+ * the grid underneath keeps its layout until the drop commits the
+ * order. Every number the handlers need is read from a ref at the
+ * moment of the question, so the touch that lifts the card can turn
+ * into the drag without lifting the finger, and a re-render never
+ * pulls the handlers out from under a gesture.
  */
 function useHoldToMove({
   enabled,
   cards,
   geometry,
-  page,
-  pageCount,
-  turnTo,
   onMove,
 }: {
   enabled: boolean;
   cards: BinderCard[];
   geometry: Geometry;
-  page: number;
-  pageCount: number;
-  turnTo: (index: number) => void;
-  /** Told once, when the card has landed: the card at `from` now sits at `to`. */
+  /** Told once, on the drop: the card at `from` now sits at `to`. */
   onMove: (from: number, to: number) => void;
 }): HoldToMove {
   const [held, setHeld] = useState<Held | null>(null);
-  /*
-   * Read at the moment of the question rather than captured when the
-   * responder was built, so the touch that lifts the card can turn
-   * into the drag without lifting the finger.
-   */
+  const [target, setTarget] = useState<number | null>(null);
   const heldRef = useRef(false);
   const grantedRef = useRef(false);
   const droppingRef = useRef(false);
@@ -615,169 +605,88 @@ function useHoldToMove({
   cardsRef.current = cards;
   const geometryRef = useRef(geometry);
   geometryRef.current = geometry;
-  const pageRef = useRef(page);
-  pageRef.current = page;
-  const pageCountRef = useRef(pageCount);
-  pageCountRef.current = pageCount;
-  const turnToRef = useRef(turnTo);
-  turnToRef.current = turnTo;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
 
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
-  const slot = useSharedValue(0);
-  const from = useSharedValue(0);
   const lift = useSharedValue(0);
-  const wobble = useSharedValue(0);
 
   /* The card in hand, as the handlers see it. */
-  const source = useRef<{
-    entryId: string;
-    index: number;
-    page: number;
-    local: number;
-  }>({ entryId: "", index: 0, page: 0, local: 0 });
-  const targetPage = useRef(0);
-  const slotNow = useRef(0);
-  const overlay = useRef({ x: 0, y: 0 });
-  /* Where the card's centre is, for re-aiming after a page turn. */
-  const centre = useRef({ x: 0, y: 0 });
-  /* Where the finger holds the card, for the edge zones. */
+  const source = useRef<Held>({ entryId: "", index: 0, page: 0, local: 0, x: 0, y: 0 });
+  const targetRef = useRef<number | null>(null);
+  /* Where the finger holds the card, from the pocket's top-left. */
   const grab = useRef({ x: 0, y: 0 });
-  const edgeZone = useRef(0);
-  const edgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const startWiggle = () => {
-    wobble.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 110, easing: Easing.linear }),
-        withTiming(-1, { duration: 220, easing: Easing.linear }),
-        withTiming(0, { duration: 110, easing: Easing.linear }),
-      ),
-      -1,
-    );
-  };
-
-  const stopWiggle = () => {
-    cancelAnimation(wobble);
-    wobble.value = withTiming(0, { duration: 140 });
-  };
-
-  const clearEdge = () => {
-    if (edgeTimer.current) clearTimeout(edgeTimer.current);
-    edgeTimer.current = null;
-    edgeZone.current = 0;
-  };
-
-  useEffect(() => clearEdge, []);
-
-  /* The pocket this page has for a card coming from elsewhere: before
-     its first (an earlier page) or after its last (a later page). */
-  const neutralFor = (pageIndex: number) => {
-    if (source.current.page === pageIndex) return source.current.local;
-    return source.current.page < pageIndex ? -1 : geometryRef.current.per;
-  };
 
   /**
-   * The pocket under the card's centre on the page under it, with the
-   * dead zone, and the neighbours told to make way when it changes.
+   * The pocket under the finger: the column and row the finger is
+   * in, a gap counting with the pocket to its left or above it, and
+   * nothing when the finger is off the grid.
    */
-  const aim = (cx: number, cy: number) => {
+  const aim = (fingerX: number, fingerY: number) => {
     const g = geometryRef.current;
-    const onPage = clamp(
-      cardsRef.current.length - targetPage.current * g.per,
-      0,
-      g.per,
-    );
-    const samePage = source.current.page === targetPage.current;
-    /* Insert after the last card from another page; on its own page
-       the card is already one of them. */
-    const last = samePage ? onPage - 1 : onPage;
-
-    const fx = (cx - PAGE_PAD - g.pocketWidth / 2) / g.slotW;
-    const fy = (cy - PAGE_PAD - g.pocketHeight / 2) / g.slotH;
-    const col = Math.round(fx);
-    const row = Math.round(fy);
-    const ccol = clamp(col, 0, g.layout - 1);
-    const crow = clamp(row, 0, g.layout - 1);
-    const wanted = clamp(crow * g.layout + ccol, 0, Math.max(0, last));
-    if (wanted === slotNow.current) return;
-    /* On the grid, the card has to be well inside the new pocket;
-       off it, the nearest edge pocket is wanted at once. */
-    if (col === ccol && Math.abs(fx - col) > DEAD_ZONE) return;
-    if (row === crow && Math.abs(fy - row) > DEAD_ZONE) return;
-    slotNow.current = wanted;
-    slot.value = withSpring(wanted, SPRING);
-    Haptics.selectionAsync().catch(() => {});
+    const col = Math.floor((fingerX - PAGE_PAD) / g.slotW);
+    const row = Math.floor((fingerY - PAGE_PAD) / g.slotH);
+    const inside = col >= 0 && col < BINDER_LAYOUT && row >= 0 && row < BINDER_LAYOUT;
+    const next = inside ? row * BINDER_LAYOUT + col : null;
+    if (next === targetRef.current) return;
+    targetRef.current = next;
+    setTarget(next);
+    if (next !== null) Haptics.selectionAsync().catch(() => {});
   };
 
-  /** The page turns under the held card; the card keeps its place in hand. */
-  const turnHeld = (direction: -1 | 1) => {
-    edgeTimer.current = null;
-    if (!heldRef.current || droppingRef.current) return;
-    const next = targetPage.current + direction;
-    if (next < 0 || next > pageCountRef.current - 1) return;
-    targetPage.current = next;
-    turnToRef.current(next);
-    const neutral = neutralFor(next);
-    from.value = neutral;
-    slotNow.current = neutral;
-    slot.value = neutral;
-    aim(centre.current.x, centre.current.y);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    /* Still at the edge: the next page after the same wait. */
-    edgeTimer.current = setTimeout(() => turnHeld(direction), EDGE_HOLD_MS);
-  };
-
-  const watchEdge = (fingerX: number) => {
-    const g = geometryRef.current;
-    const zone =
-      fingerX < EDGE && targetPage.current > 0
-        ? -1
-        : fingerX > g.pageWidth - EDGE && targetPage.current < pageCountRef.current - 1
-          ? 1
-          : 0;
-    if (zone === edgeZone.current) return;
-    if (edgeTimer.current) clearTimeout(edgeTimer.current);
-    edgeTimer.current = null;
-    edgeZone.current = zone;
-    if (zone !== 0) {
-      edgeTimer.current = setTimeout(() => turnHeld(zone), EDGE_HOLD_MS);
-    }
-  };
-
-  /*
-   * The overlay has landed on its pocket: commit the order and take
-   * the overlay away, in ONE render. The real pocket appears exactly
-   * where the overlay was, so the swap is invisible.
-   */
-  const land = (fromIndex: number, toIndex: number) => {
+  /** The overlay has landed: the real pocket shows the card from here. */
+  const land = () => {
     heldRef.current = false;
     grantedRef.current = false;
     droppingRef.current = false;
-    stopWiggle();
+    targetRef.current = null;
     setHeld(null);
-    if (fromIndex !== toIndex) onMoveRef.current(fromIndex, toIndex);
+    setTarget(null);
     dragX.value = 0;
     dragY.value = 0;
     lift.value = 0;
   };
 
+  /**
+   * The drop. Over a pocket, the order is committed now and the grid
+   * re-lays out with a layout animation, the overlay gliding onto the
+   * pocket on the same clock; only when both have finished does the
+   * overlay give way to the real card, in the same pixels. Off the
+   * grid, or over its own pocket, the card glides home.
+   */
   const release = () => {
     if (!heldRef.current || droppingRef.current) return;
     droppingRef.current = true;
-    clearEdge();
     const g = geometryRef.current;
-    const to = slotNow.current;
-    const target = cellOf(to, g.layout, g.slotW, g.slotH);
-    const toIndex = targetPage.current * g.per + to;
-    /* Glide to where the pocket is laid out, then land. The three run
-       the same clock, so they finish together. */
+    const from = source.current;
+    const onPage = clamp(
+      cardsRef.current.length - from.page * POCKETS_PER_PAGE,
+      0,
+      POCKETS_PER_PAGE,
+    );
+    /* A drop past the last card on the page lands after it. */
+    const toLocal =
+      targetRef.current === null ? from.local : Math.min(targetRef.current, onPage - 1);
+    const toIndex = from.page * POCKETS_PER_PAGE + toLocal;
+    const cell = cellOf(toLocal, g);
+    if (toIndex !== from.index) {
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          DROP.duration,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      onMoveRef.current(from.index, toIndex);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    targetRef.current = null;
+    setTarget(null);
     lift.value = withTiming(0, DROP);
-    dragY.value = withTiming(target.y - overlay.current.y, DROP);
-    dragX.value = withTiming(target.x - overlay.current.x, DROP, (finished) => {
-      if (finished) runOnJS(land)(source.current.index, toIndex);
+    dragY.value = withTiming(cell.y - from.y, DROP);
+    dragX.value = withTiming(cell.x - from.x, DROP, (finished) => {
+      if (finished) runOnJS(land)();
     });
   };
 
@@ -786,25 +695,21 @@ function useHoldToMove({
     const index = cardsRef.current.findIndex((card) => card.entryId === entryId);
     if (index < 0) return;
     const g = geometryRef.current;
-    const sourcePage = Math.floor(index / g.per);
-    const local = index % g.per;
+    if (g.pocketWidth <= 0) return;
+    const page = Math.floor(index / POCKETS_PER_PAGE);
+    const local = index % POCKETS_PER_PAGE;
+    const cell = cellOf(local, g);
     heldRef.current = true;
     grantedRef.current = false;
     droppingRef.current = false;
-    source.current = { entryId, index, page: sourcePage, local };
-    targetPage.current = sourcePage;
-    slotNow.current = local;
-    from.value = local;
-    slot.value = local;
+    targetRef.current = local;
+    source.current = { entryId, index, page, local, x: cell.x, y: cell.y };
+    grab.current = { x: g.pocketWidth / 2, y: g.pocketHeight / 2 };
     dragX.value = 0;
     dragY.value = 0;
     lift.value = withSpring(1, SPRING);
-    const cell = cellOf(local, g.layout, g.slotW, g.slotH);
-    overlay.current = cell;
-    centre.current = { x: cell.x + g.pocketWidth / 2, y: cell.y + g.pocketHeight / 2 };
-    grab.current = { x: g.pocketWidth / 2, y: g.pocketHeight / 2 };
-    startWiggle();
-    setHeld({ entryId, page: sourcePage, from: local, x: cell.x, y: cell.y });
+    setHeld(source.current);
+    setTarget(local);
   };
 
   const responders = useMemo(
@@ -841,12 +746,10 @@ function useHoldToMove({
                      is under the finger on the very next frame. */
                   dragX.value = g.dx;
                   dragY.value = g.dy;
-                  const geo = geometryRef.current;
-                  const cx = overlay.current.x + geo.pocketWidth / 2 + g.dx;
-                  const cy = overlay.current.y + geo.pocketHeight / 2 + g.dy;
-                  centre.current = { x: cx, y: cy };
-                  aim(cx, cy);
-                  watchEdge(overlay.current.x + grab.current.x + g.dx);
+                  aim(
+                    source.current.x + grab.current.x + g.dx,
+                    source.current.y + grab.current.y + g.dy,
+                  );
                 },
                 /* Once the card is in hand, nobody else gets the touch:
                    the pager and the screen both scroll, and both would
@@ -867,12 +770,10 @@ function useHoldToMove({
 
   return {
     held,
-    slot,
-    from,
+    target,
     dragX,
     dragY,
     lift,
-    wobble,
     pickUp,
     handlersFor: (entryId) => responders.get(entryId)?.panHandlers,
     onTouchEnd: () => {
@@ -888,8 +789,10 @@ function useHoldToMove({
 /* ------------------------------------------------------------------ */
 
 /**
- * One page: a grid of pockets. An empty pocket is a "+" for the owner
- * and plain black for anyone else.
+ * One page: a grid of nine pockets, three across. An empty pocket is
+ * a "+" for the owner and plain black for anyone else. The frame's
+ * border is part of PAGE_PAD (see the top of the file), so the
+ * pockets have exactly the width the arithmetic gave them.
  */
 function BinderPage({
   geometry,
@@ -898,12 +801,10 @@ function BinderPage({
   shelf,
   yours,
   editing,
-  frontEntryId,
   drag,
-  dragging,
+  target,
   onAdd,
   onRemove,
-  onFront,
 }: {
   geometry: Geometry;
   cards: BinderCard[];
@@ -912,34 +813,29 @@ function BinderPage({
   shelf: ZoomCard[];
   yours: boolean;
   editing: boolean;
-  frontEntryId: string | null;
   drag: HoldToMove;
-  /** A card is in hand over this page: its pockets make way. */
-  dragging: boolean;
+  /** The pocket on this page under the held card, or null. */
+  target: number | null;
   onAdd: () => void;
   onRemove: (entryId: string) => void;
-  onFront: (entryId: string) => void;
 }) {
-  const { per, pageWidth, pocketWidth, pocketHeight } = geometry;
+  const { pageWidth, pocketWidth, pocketHeight } = geometry;
 
   return (
     <View
       style={{
         width: pageWidth,
-        padding: PAGE_PAD,
+        padding: PAGE_PAD - PAGE_BORDER,
         borderRadius: radius.card,
-        borderWidth: 1,
+        borderWidth: PAGE_BORDER,
         borderColor: colors.border,
         backgroundColor: colors.elevated,
         flexDirection: "row",
         flexWrap: "wrap",
         gap: POCKET_GAP,
-        /* A pocket making way for a card from another page slides
-           off the edge, and stops there. */
-        overflow: "hidden",
       }}
     >
-      {Array.from({ length: per }, (_, index) => {
+      {Array.from({ length: POCKETS_PER_PAGE }, (_, index) => {
         const card = cards[index];
         if (!card) {
           return yours ? (
@@ -947,6 +843,7 @@ function BinderPage({
               key={`empty-${index}`}
               width={pocketWidth}
               height={pocketHeight}
+              targeted={target === index}
               onPress={onAdd}
             />
           ) : (
@@ -967,17 +864,12 @@ function BinderPage({
             position={shelfStart + index}
             yours={yours}
             editing={editing}
-            isFront={frontEntryId === card.entryId}
             placeholder={drag.held?.entryId === card.entryId}
-            dragging={dragging}
+            targeted={target === index}
             handlers={drag.handlersFor(card.entryId)}
-            slot={drag.slot}
-            from={drag.from}
-            wobble={drag.wobble}
             onPickUp={() => drag.pickUp(card.entryId)}
             onTouchEnd={drag.onTouchEnd}
             onRemove={() => onRemove(card.entryId)}
-            onFront={() => onFront(card.entryId)}
           />
         );
       })}
@@ -1003,15 +895,18 @@ function EmptyPocket({ width, height }: { width: number; height: number }) {
 /**
  * An empty pocket on the owner's page is a way in: the founder,
  * "there should be a + on the open card areas in the binder to add a
- * card that way."
+ * card that way." Under a held card it wears the accent ring like any
+ * other pocket; a drop there lands the card after the last one.
  */
 function AddPocket({
   width,
   height,
+  targeted,
   onPress,
 }: {
   width: number;
   height: number;
+  targeted: boolean;
   onPress: () => void;
 }) {
   return (
@@ -1023,9 +918,9 @@ function AddPocket({
         height,
         borderRadius: 5,
         backgroundColor: colors.canvas,
-        borderWidth: 1,
-        borderStyle: "dashed",
-        borderColor: colors.borderStrong,
+        borderWidth: targeted ? POCKET_RING : 1,
+        borderStyle: targeted ? "solid" : "dashed",
+        borderColor: targeted ? colors.accent : colors.borderStrong,
         alignItems: "center",
         justifyContent: "center",
         gap: 2,
@@ -1086,12 +981,15 @@ function Copies({ quantity }: { quantity: number }) {
  * A card in its pocket: the picture in a black ring with the sleeve's
  * lip caught along the top, the copies in a corner when there is more
  * than one, and the lime strip at the foot when it is on the viewer's
- * hunts. With Edit on, the owner's two controls sit over it.
+ * hunts. With Edit on, the owner's remove button sits over it.
  *
- * Laid out where the page puts it, always; while a card is in the air
- * over this page it slides aside by a transform driven from the pocket
- * that card is heading for, and the picked-up card's own pocket stays
- * as an invisible placeholder so the page keeps its shape.
+ * Exactly the width and height it is given, and nothing inside can
+ * widen it: the picture is told the width inside the ring and the
+ * pocket clips the rest. Laid out where the page puts it, always;
+ * while its own card is in the air it is the empty dashed outline the
+ * card left behind, and under a held card it wears the accent ring.
+ * The pan handlers live on this view, so it is the same view in every
+ * state and a gesture never loses its responder.
  */
 function Pocket({
   card,
@@ -1101,17 +999,12 @@ function Pocket({
   position,
   yours,
   editing,
-  isFront,
   placeholder,
-  dragging,
+  targeted,
   handlers,
-  slot,
-  from,
-  wobble,
   onPickUp,
   onTouchEnd,
   onRemove,
-  onFront,
 }: {
   card: BinderCard;
   /** This pocket's place on its page. */
@@ -1121,185 +1014,115 @@ function Pocket({
   position: number;
   yours: boolean;
   editing: boolean;
-  isFront: boolean;
+  /** Its card is in the air: an empty dashed outline. */
   placeholder: boolean;
-  dragging: boolean;
+  /** The held card is over it: the accent ring. */
+  targeted: boolean;
   handlers: GestureResponderHandlers | undefined;
-  slot: SharedValue<number>;
-  from: SharedValue<number>;
-  wobble: SharedValue<number>;
   onPickUp: () => void;
   onTouchEnd: () => void;
   onRemove: () => void;
-  onFront: () => void;
 }) {
-  const { layout, pocketWidth: width, pocketHeight: height, slotW, slotH } = geometry;
-  const big = layout === 2;
-
-  const style = useAnimatedStyle(() => {
-    /*
-     * Making way. A pocket after the pick-up point slides to the
-     * pocket before it once the card is heading for its pocket or
-     * beyond; a pocket before it slides to the one after. `slot` is a
-     * spring, so the slide is a glide and the pocket is exactly where
-     * its new place will be laid out when it stops. At the end of a
-     * row "the pocket before" is on the row above, and off the page
-     * for the first and the last.
-     */
-    let shift = { x: 0, y: 0 };
-    if (dragging && !placeholder) {
-      const origin = from.value;
-      const heading = slot.value;
-      let toward = 0;
-      let amount = 0;
-      if (index > origin) {
-        toward = -1;
-        amount = Math.max(0, Math.min(1, heading - index + 1));
-      } else if (index < origin) {
-        toward = 1;
-        amount = Math.max(0, Math.min(1, index + 1 - heading));
-      }
-      if (amount > 0) {
-        const here = cellOf(index, layout, slotW, slotH);
-        const there = cellOf(index + toward, layout, slotW, slotH);
-        shift = { x: (there.x - here.x) * amount, y: (there.y - here.y) * amount };
-      }
-    }
-    return {
-      opacity: placeholder ? 0 : 1,
-      transform: [
-        { translateX: shift.x },
-        { translateY: shift.y },
-        { rotate: `${interpolate(wobble.value, [-1, 1], [-2.5, 2.5])}deg` },
-      ],
-    };
-  });
+  const { pocketWidth: width, pocketHeight: height } = geometry;
 
   return (
-    <Animated.View
+    <View
       {...(handlers ?? {})}
       onTouchEnd={yours ? onTouchEnd : undefined}
       onTouchCancel={yours ? onTouchEnd : undefined}
-      accessibilityLabel={`${card.name}, pocket ${index + 1} of ${layout * layout}${
+      accessibilityLabel={`${card.name}, pocket ${index + 1} of ${POCKETS_PER_PAGE}${
         yours ? ", hold to move" : ""
       }`}
-      style={[
-        {
-          width,
-          height,
-          borderRadius: 5,
-          borderWidth: POCKET_RING,
-          borderColor: colors.canvas,
-          backgroundColor: colors.canvas,
-          overflow: "hidden",
-        },
-        style,
-      ]}
+      style={{
+        width,
+        height,
+        borderRadius: 5,
+        borderWidth: placeholder ? 1 : POCKET_RING,
+        borderStyle: placeholder ? "dashed" : "solid",
+        borderColor: targeted
+          ? colors.accent
+          : placeholder
+            ? colors.borderStrong
+            : colors.canvas,
+        backgroundColor: colors.canvas,
+        overflow: "hidden",
+      }}
     >
-      <CardImage
-        imageUrl={card.imageUrl}
-        width={width - 2 * POCKET_RING}
-        name={card.name}
-        cardNumber={card.number}
-        caption={card.printingLabel}
-        note={card.note}
-        direction="showcase"
-        siblings={shelf}
-        position={position}
-        onLongPress={yours ? onPickUp : undefined}
-      />
-
-      <SleeveLip />
-      <Copies quantity={card.quantity} />
-
-      {card.onYourHunt ? (
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.accent,
-            paddingVertical: big ? 4 : 2,
-            alignItems: "center",
-          }}
-        >
-          <Text
-            style={{
-              color: colors.accentContrast,
-              fontSize: big ? 10 : 8,
-              fontWeight: "700",
-              letterSpacing: 1,
-            }}
-          >
-            ON YOUR HUNT
-          </Text>
-        </View>
-      ) : null}
-
-      {editing ? (
+      {placeholder ? null : (
         <>
-          <Tap
-            onPress={onRemove}
-            hitSlop={6}
-            accessibilityLabel={`Remove ${card.name} from your binder`}
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "rgba(0,0,0,0.75)",
-            }}
-          >
-            <Ionicons name="close" size={16} color={colors.textPrimary} />
-          </Tap>
-          <Tap
-            onPress={onFront}
-            hitSlop={4}
-            accessibilityLabel={
-              isFront
-                ? `${card.name} is the front card`
-                : `Make ${card.name} the front card`
-            }
-            style={{
-              position: "absolute",
-              left: 4,
-              right: 4,
-              bottom: 4,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: isFront ? colors.accent : colors.borderStrong,
-              backgroundColor: isFront ? colors.accent : "rgba(0,0,0,0.75)",
-              paddingVertical: 3,
-              alignItems: "center",
-            }}
-          >
-            <Text
+          <CardImage
+            imageUrl={card.imageUrl}
+            width={width - 2 * POCKET_RING}
+            name={card.name}
+            cardNumber={card.number}
+            caption={card.printingLabel}
+            note={card.note}
+            direction="showcase"
+            siblings={shelf}
+            position={position}
+            onLongPress={yours ? onPickUp : undefined}
+          />
+
+          <SleeveLip />
+          <Copies quantity={card.quantity} />
+
+          {card.onYourHunt ? (
+            <View
+              pointerEvents="none"
               style={{
-                color: isFront ? colors.accentContrast : colors.textPrimary,
-                fontSize: big ? 11 : 9,
-                fontWeight: "700",
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: colors.accent,
+                paddingVertical: 2,
+                alignItems: "center",
               }}
             >
-              Front
-            </Text>
-          </Tap>
+              <Text
+                style={{
+                  color: colors.accentContrast,
+                  fontSize: 8,
+                  fontWeight: "700",
+                  letterSpacing: 1,
+                }}
+              >
+                ON YOUR HUNT
+              </Text>
+            </View>
+          ) : null}
+
+          {editing ? (
+            <Tap
+              onPress={onRemove}
+              hitSlop={6}
+              accessibilityLabel={`Remove ${card.name} from your binder`}
+              style={{
+                position: "absolute",
+                top: 4,
+                right: 4,
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(0,0,0,0.75)",
+              }}
+            >
+              <Ionicons name="close" size={16} color={colors.textPrimary} />
+            </Tap>
+          ) : null}
         </>
-      ) : null}
-    </Animated.View>
+      )}
+    </View>
   );
 }
 
 /**
  * The card in hand: drawn over the page from the picked-up pocket's
- * place, moved only by the finger, lifted a little and ringed in the
- * accent. It never re-lays out, so it never jumps; on release it
- * glides onto its pocket and the page takes over.
+ * place, moved only by the finger, a touch larger, with a shadow and
+ * the accent ring. It never re-lays out, so it never jumps; on release
+ * it glides onto its pocket and the page takes over.
  */
 function HeldPocket({
   card,
@@ -1323,7 +1146,7 @@ function HeldPocket({
     transform: [
       { translateX: dragX.value },
       { translateY: dragY.value },
-      { scale: 1 + 0.08 * lift.value },
+      { scale: 1 + LIFT_SCALE * lift.value },
     ],
     shadowOpacity: 0.5 * lift.value,
   }));
@@ -1433,17 +1256,16 @@ function Chip({
 }
 
 /**
- * The strip at the foot of your own binder: on a custom binder its
- * name, then private or not, the layout, the cover, and on a custom
- * binder Delete binder at the bottom. Every change saves at once and
- * paints at once; the name saves when the field is left or Return is
- * pressed. The Trade binder has no name field and no delete: it is
- * the one binder every player has.
+ * The strip at the foot of your own binder: its name, Up for trade,
+ * the cover, and Delete binder at the bottom. Every change saves at
+ * once and paints at once; the name saves when the field is left or
+ * Return is pressed. Every binder has all four: there is no binder
+ * that cannot be renamed or deleted, and deleting the last one leaves
+ * the profile with "+" alone.
  *
- * The switch says Private, and on means private. The founder: "the
- * toggle for public is kinda weird. should be a toggle for 'private'
- * if anything. so if the toggle is on, it is a private binder." The
- * server still keeps `isPublic`; the switch writes its opposite.
+ * The one switch says Up for trade, and on means public and tradable.
+ * The founder: "a toggle to enable it as a public / trade binder.
+ * Anything that's public is up for trade."
  */
 function BinderSettings({
   binder,
@@ -1452,10 +1274,9 @@ function BinderSettings({
 }: {
   binder: Binder;
   onSave: (patch: BinderSettingsPatch) => void;
-  /** The delete confirm; custom binders only. */
+  /** The delete confirm. */
   onDelete: () => void;
 }) {
-  const custom = binder.kind === "custom";
   /* The name as typed; what is saved is the trimmed, non-empty one. */
   const [name, setName] = useState(binder.name);
   useEffect(() => {
@@ -1485,60 +1306,38 @@ function BinderSettings({
         Binder
       </Text>
 
-      {custom ? (
-        <View style={{ gap: spacing(2) }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
-            Name
-          </Text>
-          <Input
-            value={name}
-            onChangeText={(text) => setName(text.slice(0, BINDER_NAME_MAX))}
-            onBlur={saveName}
-            onSubmitEditing={saveName}
-            returnKeyType="done"
-            maxLength={BINDER_NAME_MAX}
-            autoCapitalize="words"
-            accessibilityLabel="Binder name"
-          />
-        </View>
-      ) : null}
+      <View style={{ gap: spacing(2) }}>
+        <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
+          Name
+        </Text>
+        <Input
+          value={name}
+          onChangeText={(text) => setName(text.slice(0, BINDER_NAME_MAX))}
+          onBlur={saveName}
+          onSubmitEditing={saveName}
+          returnKeyType="done"
+          maxLength={BINDER_NAME_MAX}
+          autoCapitalize="words"
+          accessibilityLabel="Binder name"
+        />
+      </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-            Private
+            Up for trade
           </Text>
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {binder.isPublic
-              ? "Anyone on cardflare can open it"
-              : "Only you can open it"}
+            {FOR_TRADE_LINE}
           </Text>
         </View>
         <Switch
-          value={!binder.isPublic}
-          onValueChange={(next) => onSave({ isPublic: !next })}
+          value={binder.forTrade}
+          onValueChange={(next) => onSave({ forTrade: next })}
           trackColor={{ true: colors.accent, false: colors.borderStrong }}
           thumbColor={colors.textPrimary}
-          accessibilityLabel="Private"
+          accessibilityLabel="Up for trade"
         />
-      </View>
-
-      <View style={{ gap: spacing(2) }}>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
-          Layout
-        </Text>
-        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-          {BINDER_LAYOUTS.map((layout) => (
-            <Chip
-              key={layout}
-              label={layout === 2 ? "2 × 2" : "3 × 3"}
-              on={binder.layout === layout}
-              onPress={() => {
-                if (binder.layout !== layout) onSave({ layout });
-              }}
-            />
-          ))}
-        </View>
       </View>
 
       <View style={{ gap: spacing(2) }}>
@@ -1566,12 +1365,7 @@ function BinderSettings({
                       borderColor: on ? colors.accent : "transparent",
                     }}
                   >
-                    <BinderCover
-                      cover={cover.id}
-                      frontImageUrl={null}
-                      size="xs"
-                      plain
-                    />
+                    <BinderCover cover={cover.id} size="xs" plain />
                   </View>
                   <Text
                     style={{
@@ -1589,24 +1383,22 @@ function BinderSettings({
         </ScrollView>
       </View>
 
-      {custom ? (
-        <Tap
-          onPress={onDelete}
-          accessibilityLabel="Delete binder"
-          style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
-        >
-          <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 14 }}>
-            Delete binder
-          </Text>
-        </Tap>
-      ) : null}
+      <Tap
+        onPress={onDelete}
+        accessibilityLabel="Delete binder"
+        style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
+      >
+        <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 14 }}>
+          Delete binder
+        </Text>
+      </Tap>
     </View>
   );
 }
 
 /**
  * The second step of a delete, in the website's words: the name, how
- * many cards go with it, Delete and Keep.
+ * many cards go with it, Keep and Delete.
  */
 function DeleteBinderConfirm({
   binder,
@@ -1652,10 +1444,10 @@ function DeleteBinderConfirm({
           <Body>{line}</Body>
           <View style={{ flexDirection: "row", gap: spacing(2) }}>
             <View style={{ flex: 1 }}>
-              <Button label="Delete" onPress={onDelete} />
+              <Button label="Keep" variant="secondary" onPress={onKeep} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="Keep" variant="secondary" onPress={onKeep} />
+              <Button label="Delete" onPress={onDelete} />
             </View>
           </View>
         </Pressable>

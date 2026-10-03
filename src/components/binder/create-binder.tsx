@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { BinderCover } from "@/components/binder/binder-cover";
+import { ForTradeSwitch } from "@/components/binder/for-trade-switch";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { Sheet } from "@/components/ui/sheet";
@@ -17,17 +18,21 @@ import {
 import { cn } from "@/lib/cn";
 
 /**
- * Starting a custom binder: a name, one of the seven covers, Create.
+ * Starting a binder: a name, one of the seven covers, whether it is
+ * up for trade, Create.
  *
- * A custom binder is a folder or a showcase the owner named ("One
- * Piece", "Grails", "Deck pieces"); its cards take no part in
- * matching, which is the Trade binder's job alone. The dialog is the
- * same whichever door opens it: the dashed "+" at the end of the
+ * A binder is whatever the owner names it ("Grails", "Playables",
+ * "One Piece"). The one switch, Up for trade, is off to start: on,
+ * the binder is open to every signed-in player and its cards are the
+ * ones nearby hunters hear about; off, only the owner opens it. The
+ * founder: "Anything that's public is up for trade." The dialog is
+ * the same whichever door opens it: the dashed "+" at the end of the
  * highlights row on the profile, or the "New binder" button on the
- * Binders page. The binder opens as soon as it exists. The app's
- * create-binder-sheet.tsx asks the same two things with the same
+ * Binders tab. The binder opens as soon as it exists. The app's
+ * create-binder-sheet.tsx asks the same three things with the same
  * words.
  */
+
 /**
  * As long as a name may be: the client's copy of the server's
  * BINDER_NAME_MAX, which lives in a server-only module. The parity
@@ -40,6 +45,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
+  const [forTrade, setForTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -48,6 +54,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
     setOpen(false);
     setName("");
     setCover(DEFAULT_BINDER_COVER);
+    setForTrade(false);
     setError(null);
   };
 
@@ -60,7 +67,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
     }
     setError(null);
     start(async () => {
-      const result = await createBinderAction({ name: trimmed, cover });
+      const result = await createBinderAction({ name: trimmed, cover, forTrade });
       if (!result.ok) {
         setError(result.message);
         return;
@@ -127,7 +134,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
                 setName(event.target.value.slice(0, BINDER_NAME_MAX))
               }
               maxLength={BINDER_NAME_MAX}
-              placeholder='Name it, like "One Piece" or "Grails"'
+              placeholder='Name it, like "Grails" or "Playables"'
               autoFocus
               required
             />
@@ -150,7 +157,6 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
                   >
                     <BinderCover
                       cover={option.id}
-                      frontImageUrl={null}
                       size="xs"
                       plain
                       className={cn(
@@ -172,6 +178,8 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
               })}
             </div>
           </div>
+
+          <ForTradeSwitch on={forTrade} disabled={pending} onChange={setForTrade} />
         </form>
       </Sheet>
     </>

@@ -24,11 +24,12 @@ export const dynamic = "force-dynamic";
 /**
  * One of your own binders, open, with the tools under it.
  *
- * `binderId` is "trade" for the Trade binder or a custom binder's
- * uuid; a id that is nobody's is a 404. The same screen a visitor
- * gets at /p/<you>/binders/<id>, plus Add cards, Edit and the
- * settings strip, because `readBinder` knows it is you looking. The
- * app's Binder screen with no playerId draws the same.
+ * `binderId` is the binder's id; one that is nobody's is a 404. The
+ * same screen a visitor gets at /p/<you>/binders/<id>, plus Add
+ * cards, Edit and the settings strip, because `readBinder` knows it
+ * is you looking. The line under the title (up for trade, or
+ * private) is the page's own, following the switch as it is flipped.
+ * The app's Binder screen with no playerId draws the same.
  */
 export default async function OwnBinderPage({
   params,
@@ -75,18 +76,12 @@ export default async function OwnBinderPage({
             Back to your binders
           </Link>
 
+          {/* The shell names the page; the view draws the line under it. */}
           <BinderView
             binder={binder}
             imagesEnabled={cardImagesEnabled()}
             playerGames={games}
-            /* The shell names the page; the line under it says what
-               the Trade binder's cards mean. */
             title={null}
-            subtitle={
-              binder.kind === "trade"
-                ? "Cards you will trade. Somebody nearby hunting one of them hears about it."
-                : null
-            }
           />
 
           <TabBarSpacer />

@@ -3,26 +3,25 @@ import { Text, View } from "react-native";
 
 import type { BinderSummary } from "./api";
 import { BinderCover } from "./binder-cover";
-import { binderCountLine } from "./binder-covers";
 import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
 /**
  * Every binder as a row: the app's half of
  * src/components/binder/binder-list.tsx, same rows, same words, same
- * order. The small cover, the name, how many cards, and for the Trade
- * binder a lime "Trade" chip, because it is the one whose cards are
- * up for trade. The Trade binder is first, always; the server orders
- * the rest. A tap opens the binder.
+ * order. The small cover with the name on it, the name, how many
+ * cards, and on the owner's own rows which way the switch is: a lime
+ * "Up for trade" chip when on, "Private" in muted text when off. A
+ * visitor is handed only the binders up for trade, so their rows
+ * carry no chip. The owner's order, as the server gives it. A tap
+ * opens the binder.
  */
 export function BinderList({
   binders,
-  ownerName,
   yours,
   onOpen,
 }: {
   binders: BinderSummary[];
-  ownerName: string;
   yours: boolean;
   onOpen: (binderId: string) => void;
 }) {
@@ -44,12 +43,7 @@ export function BinderList({
             padding: spacing(3),
           }}
         >
-          <BinderCover
-            cover={binder.cover}
-            frontImageUrl={binder.frontImageUrl}
-            label={yours ? "Yours" : ownerName}
-            size="sm"
-          />
+          <BinderCover cover={binder.cover} label={binder.name} size="sm" />
           <View style={{ flex: 1, minWidth: 0, gap: spacing(1) }}>
             <Text
               numberOfLines={1}
@@ -62,34 +56,33 @@ export function BinderList({
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
               <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                {binderCountLine(binder.count)}
+                {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
               </Text>
-              {binder.kind === "trade" ? (
-                <View
-                  style={{
-                    borderRadius: 999,
-                    backgroundColor: colors.accent,
-                    paddingHorizontal: spacing(2),
-                    paddingVertical: 2,
-                  }}
-                >
-                  <Text
+              {yours ? (
+                binder.forTrade ? (
+                  <View
                     style={{
-                      color: colors.accentContrast,
-                      fontSize: 10,
-                      fontWeight: "700",
+                      borderRadius: 999,
+                      backgroundColor: colors.accent,
+                      paddingHorizontal: spacing(2),
+                      paddingVertical: 2,
                     }}
                   >
-                    Trade
-                  </Text>
-                </View>
+                    <Text
+                      style={{
+                        color: colors.accentContrast,
+                        fontSize: 10,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Up for trade
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>Private</Text>
+                )
               ) : null}
             </View>
-            {yours ? (
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                {binder.isPublic ? "Public" : "Private, only you"}
-              </Text>
-            ) : null}
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Tap>

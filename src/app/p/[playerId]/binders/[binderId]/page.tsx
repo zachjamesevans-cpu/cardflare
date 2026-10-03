@@ -32,16 +32,15 @@ export async function generateMetadata({
 export const dynamic = "force-dynamic";
 
 /**
- * Somebody's binder, open: the Trade binder at /binders/trade, or a
- * custom one by its id.
+ * Somebody's binder, open, by its id.
  *
  * Only what they chose to show: `readBinder` answers null for a
- * private binder unless the viewer is its owner, and null here is a
- * 404, the same door a profile that does not exist gets. A visitor
- * sees the pockets, the "On your hunts" chip when any card is one
- * they are hunting, and the message door. The owner, arriving by
- * their own public link, gets their tools, the same as
- * /profile/binders/<id>.
+ * binder that is not up for trade unless the viewer is its owner,
+ * and null here is a 404, the same door a profile that does not
+ * exist gets. A visitor sees the pockets, the "On your hunts" chip
+ * when any card is one they are hunting, and the message door. The
+ * owner, arriving by their own public link, gets their tools, the
+ * same as /profile/binders/<id>.
  */
 export default async function PlayerBinderPage({
   params,
@@ -67,20 +66,13 @@ export default async function PlayerBinderPage({
     blockState(me, playerId),
   ]);
 
-  /* "Trade binder" or the custom name for the owner; "<Name>'s Trade
-     binder" for anyone else. */
+  /* The name for the owner; "<Name>'s <binder name>" for anyone else. */
   const name = binder.yours ? binder.name : `${binder.ownerName}'s ${binder.name}`;
-  const subtitle =
-    binder.kind === "trade"
-      ? binder.yours
-        ? "Cards you will trade. Somebody nearby hunting one of them hears about it."
-        : `Cards ${binder.ownerName} will trade.`
-      : null;
 
   return (
     <TabPageShell title={name}>
       <Link
-        href={`/p/${playerId}/binders`}
+        href={`/p/${playerId}?tab=binders`}
         className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
@@ -92,7 +84,6 @@ export default async function PlayerBinderPage({
         imagesEnabled={cardImagesEnabled()}
         playerGames={games}
         title={name}
-        subtitle={subtitle}
         footer={
           other ? (
             /* The message door, under the same block rule as the

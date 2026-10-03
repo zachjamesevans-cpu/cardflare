@@ -786,7 +786,6 @@ export function ProfileScreen() {
               ) : (
                 <BinderList
                   binders={profile.binders ?? []}
-                  ownerName={profile.displayName}
                   yours
                   onOpen={(binderId) => navigation.navigate("Binder", { binderId })}
                 />
@@ -950,9 +949,9 @@ export function ProfileScreen() {
         {/* No Pro row here: the website's profile has none. The pitch
             lives in Customize and behind the animated-picture door. */}
 
-        {/* Your binders as a row of circles, the Trade binder first
-            with its lime ring, and a dashed "+" at the end that starts
-            a new one. Tap one and it opens. */}
+        {/* Your binders as a row of circles in your order, the ones up
+            for trade with the lime ring, and a dashed "+" at the end
+            that starts a new one. Tap one and it opens. */}
         <BinderHighlights
           binders={profile.binders ?? []}
           yours

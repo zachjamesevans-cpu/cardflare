@@ -7,7 +7,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
-import { binderSummary, listBinders, type BinderSummary } from "@/lib/binder/binder";
+import { listBinders, type BinderSummary } from "@/lib/binder/binder";
 import { listOfferings, listWants } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
@@ -105,13 +105,7 @@ export interface PublicProfile {
    */
   organizerAt: OrganizerStore[];
   /**
-   * The trade binder's panel facts, for whoever is looking: null when
-   * the binder is private and the viewer is not its owner, so the
-   * panel is simply absent. The owner always gets one, cards or not.
-   */
-  binder: BinderSummary | null;
-  /**
-   * Every binder the viewer may open, the Trade binder first: the
+   * Every binder the viewer may open, in the owner's order: the
    * highlights row under the header. A visitor sees only public ones.
    */
   binders: BinderSummary[];
@@ -169,7 +163,7 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt, binder, binders, wants, offerings] =
+  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings] =
     await Promise.all([
       huntsFor(playerId, viewerId),
       /*
@@ -182,7 +176,6 @@ async function loadProfile(
       verifiedAvatar(playerId, avatarPathFor(player)),
       listShowcase(playerId),
       organizerStoresFor(playerId),
-      binderSummary(playerId, viewerId),
       listBinders(playerId, viewerId),
       listWants(playerId),
       listOfferings(playerId),
@@ -224,7 +217,6 @@ async function loadProfile(
     },
     showcase,
     organizerAt,
-    binder,
     binders,
     flares,
     joinedAt: player.created_at,

@@ -5,7 +5,7 @@ import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
-import type { BinderCoverId, BinderLayout } from "./binder-covers";
+import type { BinderCoverId } from "./binder-covers";
 import { offerFailureMessage } from "./offer-copy";
 
 /**
@@ -1277,16 +1277,8 @@ export interface Profile {
   /** The three numbers under the picture; absent from an older server. */
   stats?: ProfileStats;
   /**
-   * Your binder, closed: count, cover, front card, public or not. The
-   * owner always gets one, even empty. Absent from an older server.
-   * The Trade binder's summary, kept for a build that reads only it;
-   * `binders` carries the same one first.
-   */
-  binder?: BinderSummary | null;
-  /**
-   * Every binder, the Trade binder first and then the custom ones in
-   * the owner's order: the highlights row and the Binders screen.
-   * Absent from an older server.
+   * Every binder, in the owner's order: the highlights row and the
+   * Binders pane. Absent from an older server.
    */
   binders?: BinderSummary[];
   /**
@@ -1469,15 +1461,9 @@ export interface PeekProfile {
   /** Their named hunts. Absent from an older server. */
   hunts?: Hunt[];
   /**
-   * Their binder, closed, with how many of its cards are on your
-   * hunts. Null when it is private, or they have no account behind
-   * the name; absent from an older server. The Trade binder's
-   * summary; `binders` carries the same one first.
-   */
-  binder?: BinderSummary | null;
-  /**
-   * Every binder of theirs you may open, the Trade binder first.
-   * Empty when all of them are private. Absent from an older server.
+   * Every binder of theirs that is up for trade, in their order, with
+   * how many of its cards are on your hunts. Empty when none is.
+   * Absent from an older server.
    */
   binders?: BinderSummary[];
   /** Their Flares, newest first. Absent from an older server. */
@@ -1690,27 +1676,22 @@ export const peekPlayer = (playerId: string) =>
 /* ------------------------------------------------------------------ */
 
 /**
- * The trade binder: the Have list, made public by choice and drawn as
- * a binder. Nothing new is stored about a card; what is new is one
- * row of settings per player (public or not, the layout, the cover,
- * the front card) and these screens. The types are the server's
+ * Binders: a player's cards in pages of nine pockets, each binder
+ * named by its owner, with one switch. The types are the server's
  * `src/lib/binder/binder.ts`, same names, same shapes.
+ *
+ * There is no system Trade binder. The founder: "Ability for multiple
+ * types of binders - and a toggle to enable it as a public / trade
+ * binder. Anything that's public is up for trade." So every binder
+ * carries `forTrade`: on, it is public to signed-in players and its
+ * cards are available to trade (they feed nearby matching and the
+ * room); off, it is private, only the owner opens it, and its cards
+ * take no part in anything. `isPublic` is the same fact, read back.
+ * A player can have several up for trade at once.
  */
 
-export type { BinderCoverId, BinderLayout };
+export type { BinderCoverId };
 
-/**
- * Two kinds of binder. The Trade binder is the Have list: one per
- * player, always first, always there for its owner, and the cards in
- * it are the ones the owner will trade, so it feeds nearby matching
- * and the room. A custom binder is a folder or a showcase the owner
- * named ("One Piece", "Grails"); its cards take no part in matching.
- */
-export type BinderKind = "trade" | "custom";
-
-/** The Trade binder's id on every route that takes one. */
-export const TRADE_BINDER_ID = "trade";
-export const TRADE_BINDER_NAME = "Trade binder";
 /** As long as a binder's name may be. */
 export const BINDER_NAME_MAX = 40;
 
@@ -1728,18 +1709,20 @@ export interface BinderCard {
 }
 
 export interface Binder {
-  /** "trade", or a custom binder's uuid. */
+  /** The binder's uuid. */
   id: string;
-  kind: BinderKind;
-  /** "Trade binder", or what the owner called it. */
+  /** What the owner called it. */
   name: string;
+  /** Up for trade: public, and its cards are there to be traded. */
+  forTrade: boolean;
   ownerId: string;
   ownerName: string;
   yours: boolean;
+  /** The same fact as `forTrade`, as the server reads it back. */
   isPublic: boolean;
-  layout: BinderLayout;
+  /** Every page is three by three. */
+  layout: 3;
   cover: BinderCoverId;
-  frontEntryId: string | null;
   /**
    * In the owner's order. A card the owner has never placed has no
    * position and arrives first, so a new card lands in pocket 1 and
@@ -1753,32 +1736,27 @@ export interface Binder {
 /** The binder closed: the highlights row, the Binders list. */
 export interface BinderSummary {
   id: string;
-  kind: BinderKind;
   name: string;
+  forTrade: boolean;
   isPublic: boolean;
   count: number;
-  layout: BinderLayout;
+  layout: 3;
   cover: BinderCoverId;
-  frontImageUrl: string | null;
   onYourHunts: number;
 }
 
+/** What the owner may change: the name, the cover, the one switch. */
 export type BinderSettingsPatch = {
-  isPublic?: boolean;
-  layout?: BinderLayout;
-  cover?: BinderCoverId;
-  frontEntryId?: string | null;
-  /** A custom binder's name; the Trade binder keeps its own. */
   name?: string;
+  cover?: BinderCoverId;
+  forTrade?: boolean;
 };
 
 /*
- * Every binder route takes a binder's id, "trade" or a custom binder's
- * uuid, as its LAST argument, the Trade binder when it is left out:
- * the website's actions take `binderId?` last the same way. Yours
- * under /api/v1/binders, anybody's public ones under
- * /api/players/[id]/binders. The older /api/v1/binder routes still
- * answer for the Trade binder, but nothing here calls them.
+ * Every binder route takes the binder's uuid as its LAST argument,
+ * the way the website's actions take `binderId` last. Yours under
+ * /api/v1/binders, anybody's under /api/players/[id]/binders, where
+ * only the ones up for trade answer.
  */
 
 const binderPath = (binderId: string, playerId?: string) =>
@@ -1787,8 +1765,8 @@ const binderPath = (binderId: string, playerId?: string) =>
     : `/api/v1/binders/${encodeURIComponent(binderId)}`;
 
 /**
- * Every binder, the Trade binder first: all of yours with no id, or
- * the ones of theirs you may open, which can be none.
+ * Every binder in the owner's order: all of yours with no id, or the
+ * ones of theirs that are up for trade, which can be none.
  */
 export const listBinders = (playerId?: string) =>
   playerId
@@ -1799,37 +1777,34 @@ export const listBinders = (playerId?: string) =>
     : call<{ binders: BinderSummary[] }>("GET", "/api/v1/binders");
 
 /**
- * One binder open: yours with no playerId (the Trade binder always,
- * even empty); somebody else's with theirs. A private one that is not
- * yours, an id that is nobody's, or a name with no account behind it
- * is a 404 whose code is "private".
+ * One binder open: yours with no playerId, somebody else's with
+ * theirs. A private one that is not yours, an id that is nobody's, or
+ * a name with no account behind it is a 404 whose code is "private".
  */
-export const getBinder = (playerId?: string, binderId: string = TRADE_BINDER_ID) =>
+export const getBinder = (playerId: string | undefined, binderId: string) =>
   call<{ binder: Binder }>("GET", binderPath(binderId, playerId));
 
-/** A new custom binder. A 409 whose code is "at-cap" at twenty. */
-export const createBinder = (input: { name: string; cover?: BinderCoverId }) =>
-  call<{ binder: Binder }>("POST", "/api/v1/binders", input);
+/** A new binder, private unless `forTrade`. A 409 whose code is "at-cap" at twenty. */
+export const createBinder = (input: {
+  name: string;
+  cover?: BinderCoverId;
+  forTrade?: boolean;
+}) => call<{ binder: Binder }>("POST", "/api/v1/binders", input);
 
-/** A custom binder, gone with its cards. The Trade binder cannot go. */
+/** A binder, gone with its cards. Any of them, the last one too. */
 export const deleteBinder = (binderId: string) =>
   call<{ ok: true }>("DELETE", binderPath(binderId));
 
-/**
- * One setting at a time or several, and on a custom binder its name;
- * the binder comes back whole.
- */
-export const saveBinder = (
-  patch: BinderSettingsPatch,
-  binderId: string = TRADE_BINDER_ID,
-) => call<{ binder: Binder }>("PATCH", binderPath(binderId), patch);
+/** One setting at a time or several; the binder comes back whole. */
+export const saveBinder = (patch: BinderSettingsPatch, binderId: string) =>
+  call<{ binder: Binder }>("PATCH", binderPath(binderId), patch);
 
 /** A 409 whose code is "at-cap" when the binder holds 200 already. */
 export const addBinderCard = (
   cardId: string,
   printingId: string | null,
-  quantity = 1,
-  binderId: string = TRADE_BINDER_ID,
+  quantity: number,
+  binderId: string,
 ) =>
   call<{ binder: Binder }>("POST", `${binderPath(binderId)}/cards`, {
     cardId,
@@ -1837,7 +1812,7 @@ export const addBinderCard = (
     quantity,
   });
 
-export const removeBinderCard = (entryId: string, binderId: string = TRADE_BINDER_ID) =>
+export const removeBinderCard = (entryId: string, binderId: string) =>
   call<{ binder: Binder }>("DELETE", `${binderPath(binderId)}/cards`, { entryId });
 
 /**
@@ -1846,7 +1821,7 @@ export const removeBinderCard = (entryId: string, binderId: string = TRADE_BINDE
  * left out keep a place after the ones listed, so sending every id is
  * the only way to be sure of the order.
  */
-export const reorderBinder = (entryIds: string[], binderId: string = TRADE_BINDER_ID) =>
+export const reorderBinder = (entryIds: string[], binderId: string) =>
   call<{ binder: Binder }>("PUT", `${binderPath(binderId)}/order`, { entryIds });
 
 /**

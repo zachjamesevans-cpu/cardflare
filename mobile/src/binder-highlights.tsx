@@ -3,7 +3,6 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { BinderSummary } from "./api";
 import { binderCover } from "./binder-covers";
-import { RemoteImage } from "./remote-image";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
 
@@ -12,22 +11,23 @@ import { Tap } from "./ui";
  * src/components/binder/binder-highlights.tsx, same circles, same
  * ring, same words.
  *
- * One circle per binder, scrolling sideways, no box round the row.
- * Each shows the binder's front card, cover-fit and centred, or the
- * cover's colour when it has no card yet, with the name under it on
- * one line. The Trade binder comes first and wears the lime ring and
- * a tiny badge with the trade arrows, because it is the one binder
- * whose cards are up for trade; a custom binder has a plain ring. The
- * owner's row ends with a dashed "+" that starts a new binder.
+ * One circle per binder, scrolling sideways, no box round the row, in
+ * the owner's order. Each circle is the cover's colour with the
+ * binder's first letter in the cover's dark colour, bold and centred,
+ * and the name under it on one line. No picture: the founder, "Delete
+ * the ability to have a picture on the binder, it's tacky imo." A
+ * binder up for trade wears the lime ring and a tiny badge with the
+ * trade arrows; a private one a hairline ring. The owner's row ends
+ * with a dashed "+" that starts a new binder.
  *
- * A visitor with nothing to open (every binder private) gets no row
+ * A visitor with nothing to open (no binder up for trade) gets no row
  * at all: the server hands over an empty list and this draws nothing.
  */
 
 /** The circle, and the cell it sits in with its label. */
 const CIRCLE = 64;
 const CELL = 72;
-/** The Trade binder's ring: 2px lime, 2px clear of the circle. */
+/** The up-for-trade ring: 2px lime, 2px clear of the circle. */
 const RING = 2;
 const RING_GAP = 2;
 
@@ -89,6 +89,11 @@ export function BinderHighlights({
   );
 }
 
+/** The binder's first letter, as the circle wears it. */
+export function binderInitial(name: string): string {
+  return (Array.from(name.trim())[0] ?? "").toUpperCase();
+}
+
 function Highlight({
   binder,
   onPress,
@@ -96,17 +101,16 @@ function Highlight({
   binder: BinderSummary;
   onPress: () => void;
 }) {
-  const trade = binder.kind === "trade";
-  const { edge } = binderCover(binder.cover);
+  const trade = binder.forTrade;
+  const { edge, spine } = binderCover(binder.cover);
   return (
     <Tap
       onPress={onPress}
       accessibilityLabel={binder.name}
       style={{ width: CELL, alignItems: "center", gap: spacing(1.5) }}
     >
-      {/* The ring sits outside the circle with a gap, so the art is
-          never under it: lime for the Trade binder, a hairline for the
-          rest. */}
+      {/* The ring sits outside the circle with a gap: lime when the
+          binder is up for trade, a hairline when it is private. */}
       <View
         style={{
           padding: RING_GAP,
@@ -123,15 +127,20 @@ function Highlight({
             borderRadius: CIRCLE / 2,
             overflow: "hidden",
             backgroundColor: colors[edge],
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {binder.frontImageUrl ? (
-            <RemoteImage
-              uri={binder.frontImageUrl}
-              contentFit="cover"
-              style={{ width: "100%", height: "100%" }}
-            />
-          ) : null}
+          <Text
+            style={{
+              color: colors[spine],
+              fontSize: 26,
+              fontWeight: "700",
+              lineHeight: 30,
+            }}
+          >
+            {binderInitial(binder.name)}
+          </Text>
         </View>
         {trade ? (
           <View

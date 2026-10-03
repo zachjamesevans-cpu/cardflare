@@ -1527,6 +1527,8 @@ export type BinderRow = {
   cover: string;
   layout: number;
   is_public: boolean;
+  /** Up for trade: public, and its cards are on the Have list. Off = private. */
+  for_trade: boolean;
   position: number;
   front_card_id: string | null;
   created_at: string;
