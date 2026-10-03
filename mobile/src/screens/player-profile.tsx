@@ -351,7 +351,6 @@ export function PlayerProfileScreen() {
           ) : (
             <BinderList
               binders={profile.binders ?? []}
-              ownerName={profile.displayName}
               yours={false}
               onOpen={(binderId) =>
                 navigation.navigate("Binder", { playerId, binderId })
@@ -519,8 +518,8 @@ export function PlayerProfileScreen() {
           <ErrorLine message={blockError} />
         </View>
 
-        {/* Their binders you may open, the Trade binder first with its
-            lime ring. Every one private: no row at all. */}
+        {/* Their binders up for trade, each with the lime ring. None
+            up for trade: no row at all. */}
         <BinderHighlights
           binders={profile.binders ?? []}
           yours={false}

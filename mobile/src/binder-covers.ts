@@ -1,7 +1,7 @@
 import type { colors } from "./theme";
 
 /**
- * The trade binder's covers and page layouts: the app's half of
+ * The binder's covers and its one page size: the app's half of
  * src/lib/binder/covers.ts, mirrored word for word.
  *
  * Same ids, same names, same two colours per cover. The website names
@@ -13,11 +13,13 @@ import type { colors } from "./theme";
  * first with a few simple color change options, no animated stuff
  * yet." Names follow the cosmetic rule in AGENTS.md: the heading says
  * Cover, so the name says only the colour.
+ *
+ * Every page is three by three. The founder, on the phone: "The 2x2
+ * and 3x3 are both broken on phone. I think it may be best to not
+ * even give them the option for a 2x2. Just have a 3x3." So there is
+ * no layout to pick and no layout to store; the server still says
+ * `layout: 3` on every binder, and this is where that number lives.
  */
-
-export type BinderLayout = 2 | 3;
-
-export const BINDER_LAYOUTS: readonly BinderLayout[] = [2, 3];
 
 export type BinderCoverId =
   "charcoal" | "lime" | "ember" | "frost" | "rose" | "galaxy" | "gold";
@@ -43,33 +45,16 @@ export const BINDER_COVERS: readonly BinderCover[] = [
 ];
 
 export const DEFAULT_BINDER_COVER: BinderCoverId = "charcoal";
-export const DEFAULT_BINDER_LAYOUT: BinderLayout = 3;
+
+/** Pockets across and down a page: three, the one binder people own. */
+export const BINDER_LAYOUT = 3;
+/** Pockets on a page: nine. */
+export const POCKETS_PER_PAGE = BINDER_LAYOUT * BINDER_LAYOUT;
 
 export function isBinderCover(value: unknown): value is BinderCoverId {
   return BINDER_COVERS.some((cover) => cover.id === value);
 }
 
-export function isBinderLayout(value: unknown): value is BinderLayout {
-  return value === 2 || value === 3;
-}
-
 export function binderCover(id: BinderCoverId): BinderCover {
   return BINDER_COVERS.find((cover) => cover.id === id) ?? BINDER_COVERS[0]!;
-}
-
-/** "24 cards to trade", "1 card to trade", "Nothing to trade yet". */
-export function binderCountLine(count: number): string {
-  if (count === 0) return "Nothing to trade yet";
-  return `${count} ${count === 1 ? "card" : "cards"} to trade`;
-}
-
-/** "3 on your hunts", "1 on your hunts", or null when none. */
-export function binderMatchLine(onYourHunts: number): string | null {
-  if (onYourHunts <= 0) return null;
-  return `${onYourHunts} on your hunts`;
-}
-
-/** Pockets per page: four or nine, the two binders people actually own. */
-export function pocketsPerPage(layout: BinderLayout): number {
-  return layout * layout;
 }

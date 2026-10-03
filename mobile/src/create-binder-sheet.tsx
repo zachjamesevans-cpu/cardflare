@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -28,12 +29,16 @@ import {
 import { colors, radius, spacing } from "./theme";
 import { AsyncButton, ErrorLine, Input, Tap } from "./ui";
 
+/** Under the Up for trade switch, here and in the binder's settings. */
+export const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";
+
 /**
- * Starting a custom binder: the app's half of
+ * Starting a binder: the app's half of
  * src/components/binder/create-binder.tsx, same field, same swatches,
- * same button. A name (up to forty characters), one of the seven
- * covers, and Create. The binder opens as soon as it exists; the
- * caller gets its id and goes there.
+ * same switch, same button. A name (up to forty characters), one of
+ * the seven covers, Up for trade (off to begin with: a new binder is
+ * private until its owner says otherwise), and Create. The binder
+ * opens as soon as it exists; the caller gets its id and goes there.
  */
 export function CreateBinderSheet({
   visible,
@@ -48,6 +53,7 @@ export function CreateBinderSheet({
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
+  const [forTrade, setForTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!visible) return null;
@@ -60,9 +66,10 @@ export function CreateBinderSheet({
     }
     setError(null);
     try {
-      const { binder } = await createBinder({ name: trimmed, cover });
+      const { binder } = await createBinder({ name: trimmed, cover, forTrade });
       setName("");
       setCover(DEFAULT_BINDER_COVER);
+      setForTrade(false);
       onCreated(binder.id);
     } catch (caught) {
       setError(
@@ -123,7 +130,7 @@ export function CreateBinderSheet({
             <Input
               value={name}
               onChangeText={(text) => setName(text.slice(0, BINDER_NAME_MAX))}
-              placeholder={'Name it, like "One Piece" or "Grails"'}
+              placeholder={'Name it, like "Trade binder" or "Playables"'}
               maxLength={BINDER_NAME_MAX}
               autoCapitalize="words"
               autoFocus
@@ -159,12 +166,7 @@ export function CreateBinderSheet({
                             borderColor: on ? colors.accent : "transparent",
                           }}
                         >
-                          <BinderCover
-                            cover={option.id}
-                            frontImageUrl={null}
-                            size="xs"
-                            plain
-                          />
+                          <BinderCover cover={option.id} size="xs" plain />
                         </View>
                         <Text
                           style={{
@@ -180,6 +182,30 @@ export function CreateBinderSheet({
                   })}
                 </View>
               </ScrollView>
+            </View>
+
+            {/* The one switch. On: public to signed-in players, and the
+                cards are there to be traded. Off: private. */}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+            >
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text
+                  style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
+                >
+                  Up for trade
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {FOR_TRADE_LINE}
+                </Text>
+              </View>
+              <Switch
+                value={forTrade}
+                onValueChange={setForTrade}
+                trackColor={{ true: colors.accent, false: colors.borderStrong }}
+                thumbColor={colors.textPrimary}
+                accessibilityLabel="Up for trade"
+              />
             </View>
 
             <AsyncButton label="Create" pendingLabel="Creating…" onPress={create} />

@@ -18,13 +18,13 @@ import { Button, Loading, Muted } from "../ui";
 
 /**
  * Every binder somebody has, as a list: the website's
- * /profile/binders with no id, /p/[playerId]/binders with one.
- * Reached from the Binders stop in the icon row on either profile,
- * and from nowhere else.
+ * /profile/binders with no id, /p/[playerId]/binders with one. The
+ * profile's Binders pane draws the same rows in place; this screen
+ * stays registered for anything else that wants to open the list.
  *
- * The Trade binder first, then the custom ones in the owner's order.
- * The owner starts a new one from the button at the top; a visitor
- * sees only the binders they may open, which can be none.
+ * The owner's order. The owner starts a new one from the button at
+ * the top; a visitor sees only the binders up for trade, which can be
+ * none.
  */
 export function BindersScreen({ playerId }: { playerId?: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -53,8 +53,7 @@ export function BindersScreen({ playerId }: { playerId?: string }) {
     }, [load]),
   );
 
-  /* Whose binders these are, for the header and the covers' labels.
-     The owner's own name is on the covers as "Yours". */
+  /* Whose binders these are, for the header. */
   useEffect(() => {
     if (!playerId) return;
     let live = true;
@@ -111,21 +110,13 @@ export function BindersScreen({ playerId }: { playerId?: string }) {
           gap: spacing(3),
         }}
       >
-        {yours ? (
-          <>
-            <Muted>
-              The Trade binder is what you will trade. The rest are yours to name.
-            </Muted>
-            <Button label="New binder" onPress={() => setCreating(true)} />
-          </>
-        ) : null}
+        {yours ? <Button label="New binder" onPress={() => setCreating(true)} /> : null}
 
         {binders.length === 0 ? (
           <Muted>{yours ? "No binders yet." : "No binders to open."}</Muted>
         ) : (
           <BinderList
             binders={binders}
-            ownerName={ownerName}
             yours={yours}
             onOpen={(binderId) => navigation.navigate("Binder", { playerId, binderId })}
           />
