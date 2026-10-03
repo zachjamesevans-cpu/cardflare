@@ -16,7 +16,7 @@ const read = (path: string) => {
  * The profile IA round, both platforms: a trader's profile, binders as
  * highlights. (The Trade binder it introduced went in binder round 2:
  * every binder is named and has one switch, Up for trade, and the
- * highlights are the cover's colour and the binder's initial. The
+ * highlights are the binder itself, small, in its cover colour. The
  * pins here read that truth; binder2-parity.test.ts pins the round.)
  *
  * The founder, on the profile before this: it "feels cluttered and
@@ -216,22 +216,38 @@ describe("the profile page, top to bottom, on both platforms", () => {
 });
 
 describe("the binder highlights row", () => {
-  it("is a row of 64px circles in 72px cells, one line of name, no box", () => {
-    expect(web.highlights).toContain("size-16");
+  it("is a row of small binders in 72px cells, one line of name, no box", () => {
+    /* Each highlight is the binder itself at the cover's xs size, the
+       founder's "actual binder as a curved rectangle like how it is
+       under the binder view"; no circle, no initial, no picture. */
+    expect(web.highlights).toContain(
+      '<BinderCover cover={binder.cover} size="xs" plain />',
+    );
+    expect(web.highlights).not.toContain('rounded-full"');
+    expect(web.highlights).not.toContain("binderInitial");
     expect(web.highlights).toContain("w-[72px]");
     expect(web.highlights).toContain("truncate");
     expect(web.highlights).toContain("text-[11px]");
     expect(web.highlights).toContain("overflow-x-auto");
-    /* The circle is the cover's colour with the binder's initial on
-       it, in the cover's dark colour: no picture. */
-    expect(web.highlights).toContain("binderInitial(binder.name)");
-    expect(web.highlights).toContain("style={{ background: edge, color: spine }}");
     expect(web.highlights).not.toContain("<img");
-    expect(app.highlights).toMatch(/CIRCLE = 64/);
+    expect(app.highlights).toContain(
+      '<BinderCover cover={binder.cover} size="xs" plain />',
+    );
+    expect(app.highlights).not.toContain("binderInitial");
     expect(app.highlights).toMatch(/CELL = 72/);
     expect(app.highlights).toContain("numberOfLines={1}");
     expect(app.highlights).toContain("fontSize: 11");
     expect(app.highlights).toContain("horizontal");
+    /* The xs cover is 58x76 on both, and the ring follows its corners. */
+    expect(read("src/components/binder/binder-cover.tsx")).toContain(
+      'xs: "h-[76px] w-[58px] rounded-r-[6px]"',
+    );
+    expect(read("mobile/src/binder-cover.tsx")).toContain(
+      "xs: { width: 58, height: 76 }",
+    );
+    expect(web.highlights).toContain("rounded-l-[4px] rounded-r-[8px]");
+    expect(app.highlights).toContain("BINDER = { width: 58, height: 76 }");
+    expect(app.highlights).toContain("OPEN_RADIUS = Math.round(BINDER.width * 0.1)");
   });
 
   it("rings a binder up for trade in lime with the arrows badge, a private one with a hairline", () => {
@@ -250,10 +266,15 @@ describe("the binder highlights row", () => {
     expect(web.highlights).toContain(
       "if (binders.length === 0 && !yours) return null;",
     );
+    /* The + tile is a binder's outline, dashed, the cover's box. */
     expect(web.create).toContain("border-dashed");
+    expect(web.create).toMatch(
+      /h-\[76px\] w-\[58px\][^"]*rounded-l-\[2px\] rounded-r-\[6px\]/,
+    );
     expect(web.create).toContain(">New<");
     expect(app.highlights).toMatch(/binders\.length === 0 && !yours/);
     expect(app.highlights).toContain('borderStyle: "dashed"');
+    expect(app.highlights).toContain("width: BINDER.width,");
     expect(app.highlights).toContain("New");
   });
 
@@ -504,11 +525,11 @@ describe("copy and colour rules", () => {
   });
 
   it("draws the cover's colours through the one cover list, never a colour of its own", () => {
-    /* Both colours come from the list: the edge behind the initial,
-       the spine for the initial. Neither is defined here. */
+    /* The colours come through the cover drawing, which reads the
+       list; the highlight names no colour of its own. */
     for (const [name, source] of platforms) {
-      expect(source.highlights, name).toContain("binderCover(binder.cover)");
-      expect(source.highlights, name).toContain("spine");
+      expect(source.highlights, name).toContain("<BinderCover");
+      expect(source.highlights, name).not.toContain("binderCover(");
       expect(source.highlights, name).not.toMatch(/spine\s*:/);
       expect(source.highlights, name).not.toMatch(/edge\s*:/);
     }

@@ -172,7 +172,9 @@ describe("the binder's model in the app", () => {
     expect(cover).not.toContain("frontImageUrl");
     expect(cover).toContain("label?: string | null;");
     expect(highlights).not.toContain("RemoteImage");
-    expect(highlights).toContain("binderInitial(binder.name)");
+    expect(highlights).toContain(
+      '<BinderCover cover={binder.cover} size="xs" plain />',
+    );
     expect(highlights).toContain("binder.forTrade");
     expect(list).toContain("Up for trade");
     expect(list).toContain(">Private<");
