@@ -14,7 +14,10 @@ const read = (path: string) => {
 
 /**
  * The profile IA round, both platforms: a trader's profile, binders as
- * highlights, a Trade binder.
+ * highlights. (The Trade binder it introduced went in binder round 2:
+ * every binder is named and has one switch, Up for trade, and the
+ * highlights are the cover's colour and the binder's initial. The
+ * pins here read that truth; binder2-parity.test.ts pins the round.)
  *
  * The founder, on the profile before this: it "feels cluttered and
  * more like a management dashboard than a social profile"; "use a
@@ -41,7 +44,10 @@ const web = {
   tabs: read("src/components/players/profile-tabs.tsx"),
   highlights: read("src/components/binder/binder-highlights.tsx"),
   list: read("src/components/binder/binder-list.tsx"),
-  create: read("src/components/binder/create-binder.tsx"),
+  /* The dialog, with the Up for trade switch it draws from its own file. */
+  create:
+    read("src/components/binder/create-binder.tsx") +
+    read("src/components/binder/for-trade-switch.tsx"),
   flares: read("src/components/players/profile-flares.tsx"),
   view: read("src/components/binder/binder-page.tsx"),
   settings: read("src/components/binder/binder-settings.tsx"),
@@ -74,6 +80,7 @@ const app = {
   binder: read("mobile/src/screens/binder.tsx"),
   stack: read("mobile/App.tsx"),
   api: read("mobile/src/api.ts"),
+  covers: read("mobile/src/binder-covers.ts"),
 };
 
 const platforms = [
@@ -215,7 +222,11 @@ describe("the binder highlights row", () => {
     expect(web.highlights).toContain("truncate");
     expect(web.highlights).toContain("text-[11px]");
     expect(web.highlights).toContain("overflow-x-auto");
-    expect(web.highlights).toContain("object-cover");
+    /* The circle is the cover's colour with the binder's initial on
+       it, in the cover's dark colour: no picture. */
+    expect(web.highlights).toContain("binderInitial(binder.name)");
+    expect(web.highlights).toContain("style={{ background: edge, color: spine }}");
+    expect(web.highlights).not.toContain("<img");
     expect(app.highlights).toMatch(/CIRCLE = 64/);
     expect(app.highlights).toMatch(/CELL = 72/);
     expect(app.highlights).toContain("numberOfLines={1}");
@@ -223,12 +234,14 @@ describe("the binder highlights row", () => {
     expect(app.highlights).toContain("horizontal");
   });
 
-  it("rings the Trade binder in lime with the arrows badge, the rest with a hairline", () => {
-    expect(web.highlights).toContain('binder.kind === "trade"');
+  it("rings a binder up for trade in lime with the arrows badge, a private one with a hairline", () => {
+    expect(web.highlights).toContain("binder.forTrade");
+    expect(web.highlights).not.toContain("binder.kind");
     expect(web.highlights).toContain("ring-2 ring-accent ring-offset-2");
     expect(web.highlights).toContain("ring-1 ring-border-strong");
     expect(web.highlights).toContain("<ArrowLeftRight");
-    expect(app.highlights).toContain('binder.kind === "trade"');
+    expect(app.highlights).toContain("binder.forTrade");
+    expect(app.highlights).not.toContain("binder.kind");
     expect(app.highlights).toContain('"swap-horizontal"');
   });
 
@@ -255,12 +268,16 @@ describe("the binder highlights row", () => {
 });
 
 describe("the create binder dialog", () => {
-  it("asks a name of up to forty characters and one of the seven covers, then Create", () => {
+  it("asks a name of up to forty characters, one of the seven covers and Up for trade, then Create", () => {
     for (const [name, source] of platforms) {
       expect(source.create, name).toContain("New binder");
       expect(source.create, name).toContain("Cover");
       expect(source.create, name).toContain("BINDER_NAME_MAX");
       expect(source.create, name).toContain("BINDER_COVERS.map(");
+      expect(source.create, name).toContain("Up for trade");
+      expect(source.create, name).toContain(
+        "People nearby hunting one of these cards hear about it.",
+      );
       expect(source.create, name).toMatch(/[>"]Create["<]/);
     }
     /* The client's copy of the server's ceiling, and the app's. */
@@ -286,16 +303,24 @@ describe("the create binder dialog", () => {
 });
 
 describe("the Binders tab", () => {
-  it("lists every binder as a row: cover, name, count, a Trade chip, a chevron", () => {
+  it("lists every binder as a row: cover with its name, name, count, Up for trade or Private, a chevron", () => {
     for (const [name, source] of platforms) {
       expect(source.list.length, `${name}: the list exists`).toBeGreaterThan(0);
       expect(source.list, name).toContain("<BinderCover");
-      expect(source.list, name).toContain('yours ? "Yours" : ownerName');
-      expect(source.list, name).toContain("binderCountLine(");
-      expect(source.list, name).toContain('binder.kind === "trade"');
-      expect(source.list, name).toMatch(/>\s*Trade\s*</);
-      expect(source.list, name).toContain("Private, only you");
+      /* The binder's own name on the cover, not "Yours". */
+      expect(source.list, name).toContain("label={binder.name}");
+      expect(source.list, name).not.toContain('"Yours"');
+      expect(source.list, name).toContain("binder.forTrade");
+      expect(source.list, name).not.toContain("binder.kind");
+      expect(source.list, name).toMatch(/>\s*Up for trade\s*</);
+      expect(source.list, name).toMatch(/>\s*Private\s*</);
+      expect(source.list, name).not.toContain("Private, only you");
     }
+    /* "12 cards": inline on the web, inline or through the app's own
+       cover helpers. */
+    expect(web.list).toContain('=== 1 ? "card" : "cards"');
+    expect(app.list + app.covers).toContain('=== 1 ? "card" : "cards"');
+    expect(app.list + app.covers).not.toContain("to trade");
     expect(web.list).toContain("<ChevronRight");
     expect(app.list).toContain('"chevron-forward"');
   });
@@ -325,31 +350,30 @@ describe("the binder page, by id", () => {
     expect(web.playerBinder).toContain("readBinder(playerId, me, binderId)");
     expect(web.playerBinder).toContain("if (!binder) notFound();");
     expect(web.playerBinder).toContain("`${binder.ownerName}'s ${binder.name}`");
-    expect(web.oldOwnBinder).toContain(
-      "redirect(`/profile/binders/${TRADE_BINDER_ID}`)",
-    );
-    expect(web.oldPlayerBinder).toContain(
-      "redirect(`/p/${playerId}/binders/${TRADE_BINDER_ID}`)",
-    );
-    /* The app's Binder screen takes the id; missing means the Trade binder. */
-    expect(app.stack).toMatch(/Binder: \{ playerId\?: string; binderId\?: string \}/);
+    /* There is no Trade binder to send the old address to: it lands
+       on the profile's Binders tab. */
+    expect(web.oldOwnBinder).toContain('redirect("/profile?tab=binders")');
+    expect(web.oldPlayerBinder).toContain("redirect(`/p/${playerId}?tab=binders`)");
+    /* The app's Binder screen takes the id, always. */
+    expect(app.stack).toMatch(/Binder: \{ playerId\?: string; binderId: string \}/);
     expect(app.stack).toMatch(/name="Hunts"/);
     expect(app.stack).toContain("<HuntsScreen");
   });
 
-  it("says what the Trade binder's cards mean, under the title", () => {
-    const own =
-      "Cards you will trade. Somebody nearby hunting one of them hears about it.";
-    expect(web.view).toContain("subtitle");
-    expect(web.ownBinder).toContain(own);
-    expect(web.playerBinder).toContain(own);
-    expect(web.playerBinder).toContain("`Cards ${binder.ownerName} will trade.`");
+  it("says what the binder's cards mean, under the title", () => {
+    /* The line follows the switch: up for trade, or private. */
+    const own = "Up for trade. Somebody nearby hunting one of these hears about it.";
+    const ownPrivate = "Private. Only you can open it.";
+    expect(web.view).toContain(own);
+    expect(web.view).toContain(ownPrivate);
+    expect(web.view).toContain("`Cards ${ownerName} will trade.`");
     expect(app.binder).toContain(own);
+    expect(app.binder).toContain(ownPrivate);
     expect(app.binder).toContain("will trade.");
   });
 
-  it("names and deletes a custom binder, never the Trade binder", () => {
-    expect(web.settings).toContain('kind === "custom"');
+  it("names and deletes every binder", () => {
+    expect(web.settings).not.toContain("kind");
     expect(web.settings).toContain("Name");
     expect(web.settings).toContain("Delete binder");
     expect(web.settings).toContain("Delete {name}?");
@@ -359,12 +383,11 @@ describe("the binder page, by id", () => {
     expect(web.settings).toContain('event.key === "Enter"');
     expect(app.binder).toContain("Delete binder");
     expect(app.binder).toContain("deleteBinder(");
-    expect(app.binder).toMatch(/kind === "custom"/);
+    expect(app.binder).not.toMatch(/kind === "custom"/);
   });
 
   it("sends every write to the binder it is looking at", () => {
     expect(web.view).toContain("removeBinderCardAction(card.entryId, binder.id)");
-    expect(web.view).toContain("saveBinderSettingsAction(patch, binder.id)");
     expect(web.view).toMatch(
       /reorderBinderAction\(\s*next\.map\(\(card\) => card\.entryId\),\s*binder\.id,?\s*\)/,
     );
@@ -450,7 +473,8 @@ describe("the Flares grid", () => {
     expect(web.profileLib).toContain("flares: ProfileFlare[];");
     expect(app.api).toContain("binders?: BinderSummary[];");
     expect(app.api).toContain("flares?: ProfileFlare[];");
-    expect(app.api).toContain('export const TRADE_BINDER_NAME = "Trade binder";');
+    expect(app.api).toContain("forTrade: boolean;");
+    expect(app.api).not.toContain("TRADE_BINDER_NAME");
   });
 });
 
@@ -479,10 +503,14 @@ describe("copy and colour rules", () => {
     }
   });
 
-  it("draws the cover's colour through the one cover list, never a spine of its own", () => {
-    expect(web.highlights).toContain("binderCover(binder.cover)");
-    expect(web.highlights).not.toContain("spine");
-    expect(app.highlights).toContain("binderCover(binder.cover)");
-    expect(app.highlights).not.toContain("spine");
+  it("draws the cover's colours through the one cover list, never a colour of its own", () => {
+    /* Both colours come from the list: the edge behind the initial,
+       the spine for the initial. Neither is defined here. */
+    for (const [name, source] of platforms) {
+      expect(source.highlights, name).toContain("binderCover(binder.cover)");
+      expect(source.highlights, name).toContain("spine");
+      expect(source.highlights, name).not.toMatch(/spine\s*:/);
+      expect(source.highlights, name).not.toMatch(/edge\s*:/);
+    }
   });
 });

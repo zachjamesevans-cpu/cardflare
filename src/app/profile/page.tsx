@@ -275,9 +275,8 @@ export default async function ProfilePage({
               />
             </div>
 
-            {/* Your binders, the Trade binder first, and a "+" to start
-                another. The public page draws the same row without the
-                "+". */}
+            {/* Your binders, in your order, and a "+" to start another.
+                The public page draws the same row without the "+". */}
             <BinderHighlights binders={profile.binders} yours base="/profile" />
 
             {/* The sections, as tabs that slide in place under the
@@ -311,12 +310,7 @@ export default async function ProfilePage({
                     <div className="flex justify-end">
                       <CreateBinder trigger="button" />
                     </div>
-                    <BinderList
-                      binders={profile.binders}
-                      ownerName=""
-                      yours
-                      base="/profile"
-                    />
+                    <BinderList binders={profile.binders} yours base="/profile" />
                   </div>
                 ),
                 /* The showcase: the shelf on its worn background, the

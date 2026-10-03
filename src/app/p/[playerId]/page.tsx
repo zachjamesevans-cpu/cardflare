@@ -230,9 +230,8 @@ export default async function PublicProfilePage({
             />
           </div>
 
-          {/* Their binders, the ones they chose to show, the Trade
-                binder first. Null when there is nothing to open: then
-                there is no row. */}
+          {/* Their binders, the ones up for trade, in their order. Null
+                when there is nothing to open: then there is no row. */}
           <BinderHighlights
             binders={profile.binders}
             yours={yours}
@@ -282,7 +281,6 @@ export default async function PublicProfilePage({
                   ) : (
                     <BinderList
                       binders={profile.binders}
-                      ownerName={profile.displayName}
                       yours={yours}
                       base={`/p/${playerId}`}
                     />

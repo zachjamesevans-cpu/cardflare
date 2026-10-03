@@ -8,33 +8,25 @@ import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { Button } from "@/components/ui/button";
-import {
-  removeBinderCardAction,
-  reorderBinderAction,
-  saveBinderSettingsAction,
-} from "@/lib/binder/actions";
+import { removeBinderCardAction, reorderBinderAction } from "@/lib/binder/actions";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
-import {
-  pocketsPerPage,
-  type BinderCoverId,
-  type BinderLayout,
-} from "@/lib/binder/covers";
+import type { BinderCoverId } from "@/lib/binder/covers";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 
 /**
  * The binder, open: the cards in pockets, a page at a time.
  *
- * The Have list drawn the way a trade binder sits on a table. Two by
- * two or three by three pockets per page, arrows and dots to turn it,
- * and a tap on any pocket opens the card large in the same viewer
- * every other card on the site opens in, with no offer control: the
- * binder is not answerable yet, this round.
+ * Drawn the way a binder sits on a table: three by three pockets per
+ * page, always (the founder: "Just have a 3x3."), arrows and dots to
+ * turn it, and a tap on any pocket opens the card large in the same
+ * viewer every other card on the site opens in, with no offer
+ * control: the binder is not answerable yet, this round.
  *
  * The owner gets their tools under the page: Add cards, an Edit
- * toggle that puts a remove cross and a Front tag on every pocket,
- * and the settings strip. A visitor gets the "On your hunts" chip
- * when any card is one they are hunting, and the message door.
+ * toggle that puts a remove cross on every pocket, and the settings
+ * strip. A visitor gets the "On your hunts" chip when any card is one
+ * they are hunting, and the message door.
  *
  * The order of the pockets is the owner's. The founder: "I think we
  * should have a 'hold to move' thing, similar animations to how
@@ -52,39 +44,54 @@ import { cn } from "@/lib/cn";
  *
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the
- * refresh and wins, which is also what keeps two tabs honest.
- *
- * Two kinds of binder open here, the Trade binder and a custom one,
- * and the pockets do not care which: every write carries the binder's
- * id, and the settings strip is the only part that knows a custom
- * binder has a name to edit and can be deleted.
+ * refresh and wins, which is also what keeps two tabs honest. The
+ * line under the title follows the live Up for trade switch, so
+ * flipping it in the strip repaints the words at the top.
  */
 
 type Settings = {
-  layout: BinderLayout;
   cover: BinderCoverId;
-  isPublic: boolean;
-  frontEntryId: string | null;
+  forTrade: boolean;
   name: string;
 };
 
 const settingsOf = (binder: Binder): Settings => ({
-  layout: binder.layout,
   cover: binder.cover,
-  isPublic: binder.isPublic,
-  frontEntryId: binder.frontEntryId,
+  forTrade: binder.forTrade,
   name: binder.name,
 });
 
+/* Three across, three down: the one page a binder has. */
+const COLUMNS = 3;
+const POCKETS_PER_PAGE = COLUMNS * COLUMNS;
+
 /** Where a dragged pocket is hovering: a slot, or an arrow. */
 type DropSpot = number | "prev" | "next";
+
+/**
+ * The line under the title: what this binder's cards mean. Up for
+ * trade, the owner reads what that gets them and a visitor what they
+ * are looking at; private, the owner reads that it is theirs alone.
+ * The same three sentences on the app's Binder screen.
+ */
+function binderLine(
+  forTrade: boolean,
+  yours: boolean,
+  ownerName: string,
+): string | null {
+  if (forTrade) {
+    return yours
+      ? "Up for trade. Somebody nearby hunting one of these hears about it."
+      : `Cards ${ownerName} will trade.`;
+  }
+  return yours ? "Private. Only you can open it." : null;
+}
 
 export function BinderView({
   binder,
   imagesEnabled,
   playerGames = [],
   title,
-  subtitle = null,
   footer = null,
 }: {
   binder: Binder;
@@ -93,13 +100,6 @@ export function BinderView({
   playerGames?: readonly string[];
   /** The visible heading, or null when the shell already names the page. */
   title: string | null;
-  /**
-   * One line under the title, on the Trade binder: what its cards
-   * mean. "Cards you will trade. Somebody nearby hunting one of them
-   * hears about it." for the owner, "Cards <Name> will trade." for a
-   * visitor. Null on a custom binder.
-   */
-  subtitle?: string | null;
   /** A visitor's one control under the page: the message door. */
   footer?: ReactNode;
 }) {
@@ -127,14 +127,14 @@ export function BinderView({
 
   const list =
     !binder.yours && onHuntsOnly ? cards.filter((card) => card.onYourHunt) : cards;
-  const perPage = pocketsPerPage(settings.layout);
+  const perPage = POCKETS_PER_PAGE;
   /* The owner always has an empty pocket in reach: when the last page
      is full (or there are no cards), one more page of "+" pockets. */
   const pages = binder.yours
     ? Math.floor(list.length / perPage) + 1
     : Math.max(1, Math.ceil(list.length / perPage));
-  /* Never off the end: removing the last card on the last page, or
-     widening the layout, folds back onto a page that exists. */
+  /* Never off the end: removing the last card on the last page folds
+     back onto a page that exists. */
   const page = Math.min(at, pages - 1);
   const shown = list.slice(page * perPage, page * perPage + perPage);
   const pockets: (BinderCard | null)[] = [
@@ -218,6 +218,7 @@ export function BinderView({
     setOver((current) => (current === spot ? null : current));
 
   const countLine = `${binder.count} ${binder.count === 1 ? "card" : "cards"}`;
+  const line = binderLine(settings.forTrade, binder.yours, binder.ownerName);
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -225,7 +226,7 @@ export function BinderView({
         {title && (
           <h2 className="truncate text-lg font-extrabold text-text-primary">{title}</h2>
         )}
-        {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
+        {line && <p className="text-sm text-text-secondary">{line}</p>}
         <p className="text-xs text-text-muted tabular-nums">
           {countLine} · Page {page + 1} of {pages}
         </p>
@@ -257,10 +258,7 @@ export function BinderView({
           over its middle. */}
       <div className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]">
         <ul
-          className={cn(
-            "grid gap-2",
-            settings.layout === 2 ? "grid-cols-2 gap-3" : "grid-cols-3",
-          )}
+          className="grid grid-cols-3 gap-2"
           aria-label={`Page ${page + 1} of ${pages}`}
         >
           {pockets.map((card, index) => {
@@ -271,8 +269,8 @@ export function BinderView({
                 key={card ? card.entryId : `empty-${page}-${index}`}
                 /*
                  * DRAGGED INTO PLACE, the website's half of the app's
-                 * hold-and-wiggle. A mouse needs no long press to say
-                 * it means to drag, so a filled pocket is draggable
+                 * hold to move. A mouse needs no long press to say it
+                 * means to drag, so a filled pocket is draggable
                  * outright, and every pocket, filled or not, takes the
                  * drop.
                  */
@@ -326,7 +324,7 @@ export function BinderView({
                         ? (event) => {
                             if (!event.altKey) return;
                             if ((event.target as HTMLElement).closest("dialog")) return;
-                            const step = ARROW_STEP(event.key, settings.layout);
+                            const step = ARROW_STEP(event.key);
                             if (step === null) return;
                             event.preventDefault();
                             move(card.entryId, slot + step);
@@ -349,53 +347,25 @@ export function BinderView({
                       siblings={zoomCards}
                       position={list.indexOf(card)}
                       thumbClassName="w-full"
-                      thumb={
-                        <PocketTile
-                          card={card}
-                          imagesEnabled={imagesEnabled}
-                          big={settings.layout === 2}
-                        />
-                      }
+                      thumb={<PocketTile card={card} imagesEnabled={imagesEnabled} />}
                     />
+                    {/* Edit mode: remove, and nothing else. */}
                     {binder.yours && editing && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={pending}
-                          aria-label={`Remove ${card.name}`}
-                          onClick={() =>
-                            act(() => removeBinderCardAction(card.entryId, binder.id))
-                          }
-                          className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
-                        >
-                          <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pending}
-                          aria-pressed={settings.frontEntryId === card.entryId}
-                          onClick={() => {
-                            const patch = { frontEntryId: card.entryId };
-                            paint(patch);
-                            act(() => saveBinderSettingsAction(patch, binder.id));
-                          }}
-                          className={cn(
-                            "absolute bottom-1 left-1 z-10 cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ring-1 transition-colors",
-                            settings.frontEntryId === card.entryId
-                              ? "bg-accent text-accent-contrast ring-accent"
-                              : "bg-canvas/85 text-text-secondary ring-border-strong hover:text-text-primary",
-                          )}
-                        >
-                          Front
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        aria-label={`Remove ${card.name}`}
+                        onClick={() =>
+                          act(() => removeBinderCardAction(card.entryId, binder.id))
+                        }
+                        className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
+                      >
+                        <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                      </button>
                     )}
                   </div>
                 ) : binder.yours ? (
-                  <AddPocket
-                    onClick={() => setAdding(true)}
-                    big={settings.layout === 2}
-                  />
+                  <AddPocket onClick={() => setAdding(true)} />
                 ) : (
                   <EmptyPocket />
                 )}
@@ -496,11 +466,9 @@ export function BinderView({
           </div>
           <BinderSettings
             binderId={binder.id}
-            kind={binder.kind}
             name={settings.name}
             count={binder.count}
-            isPublic={settings.isPublic}
-            layout={settings.layout}
+            forTrade={settings.forTrade}
             cover={settings.cover}
             onChange={paint}
           />
@@ -513,16 +481,16 @@ export function BinderView({
 }
 
 /** One slot sideways, one row up or down, or nothing for any other key. */
-function ARROW_STEP(key: string, layout: BinderLayout): number | null {
+function ARROW_STEP(key: string): number | null {
   switch (key) {
     case "ArrowLeft":
       return -1;
     case "ArrowRight":
       return 1;
     case "ArrowUp":
-      return -layout;
+      return -COLUMNS;
     case "ArrowDown":
-      return layout;
+      return COLUMNS;
     default:
       return null;
   }
@@ -567,11 +535,9 @@ const POCKET =
 function PocketTile({
   card,
   imagesEnabled,
-  big,
 }: {
   card: BinderCard;
   imagesEnabled: boolean;
-  big: boolean;
 }) {
   const art = imagesEnabled && isRenderableImageUrl(card.imageUrl);
 
@@ -589,12 +555,7 @@ function PocketTile({
         />
       ) : (
         <span className="flex size-full flex-col items-center justify-center gap-0.5 bg-elevated px-1 text-center">
-          <span
-            className={cn(
-              "line-clamp-2 font-semibold text-text-primary",
-              big ? "text-xs" : "text-[10px]",
-            )}
-          >
+          <span className="line-clamp-2 text-[10px] font-semibold text-text-primary">
             {card.name}
           </span>
           <span className="text-[9px] text-text-muted">{card.number}</span>
@@ -611,12 +572,7 @@ function PocketTile({
         </span>
       )}
       {card.onYourHunt && (
-        <span
-          className={cn(
-            "absolute inset-x-0 bottom-0 bg-accent text-center font-bold tracking-wider text-accent-contrast uppercase",
-            big ? "py-1 text-[10px]" : "py-0.5 text-[8px]",
-          )}
-        >
+        <span className="absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[8px] font-bold tracking-wider text-accent-contrast uppercase">
           ON YOUR HUNT
         </span>
       )}
@@ -634,7 +590,7 @@ function EmptyPocket() {
  * "there should be a + on the open card areas in the binder to add a
  * card that way."
  */
-function AddPocket({ onClick, big }: { onClick: () => void; big: boolean }) {
+function AddPocket({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
@@ -642,13 +598,10 @@ function AddPocket({ onClick, big }: { onClick: () => void; big: boolean }) {
       aria-label="Add a card"
       className="flex aspect-[63/88] w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[5px] border-2 border-dashed border-border-strong bg-black/60 text-text-secondary transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
     >
-      <span
-        aria-hidden="true"
-        className={cn("leading-none font-light", big ? "text-4xl" : "text-3xl")}
-      >
+      <span aria-hidden="true" className="text-3xl leading-none font-light">
         +
       </span>
-      <span className={cn("font-semibold", big ? "text-xs" : "text-[10px]")}>Add</span>
+      <span className="text-[10px] font-semibold">Add</span>
     </button>
   );
 }

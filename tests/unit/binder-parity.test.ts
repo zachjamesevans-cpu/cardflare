@@ -32,7 +32,11 @@ const read = (path: string) => {
  * The profile panel this round built is gone: the profile IA round
  * turned it into the highlights row and the Binders list (pinned in
  * profile-ia-parity.test.ts), and the binder page moved to
- * /binders/<id>, the Trade binder being "trade".
+ * /binders/<id>. Binder round 2 (binder2-parity.test.ts) took the
+ * picture off the cover, the Front control off the page, the 2 x 2
+ * off the strip and the Private switch out: every binder is named
+ * and has one switch, Up for trade. The pins here are what those
+ * rounds left standing.
  */
 
 const web = {
@@ -73,35 +77,34 @@ describe("the binder page", () => {
       for (const word of [
         "Add cards",
         "Edit",
-        "Private",
-        "2 × 2",
-        "3 × 3",
+        "Up for trade",
         "ON YOUR HUNT",
         "Cards you would trade. Add the ones you carry.",
         "Nothing to trade yet.",
-        "Anyone on cardflare can open it",
         "Only you can open it",
         "On your hunts",
-        "Front",
       ]) {
         expect(page, `${name}: ${word}`).toContain(word);
       }
     }
   });
 
-  it("has a Private switch that is on for private, on both platforms", () => {
-    /* The founder: "should be a toggle for 'private' if anything. so
-       if the toggle is on, it is a private binder." The server still
-       stores isPublic, so the switch writes its opposite. */
+  it("has one switch, Up for trade, that is on for up for trade, on both platforms", () => {
+    /* Round 2: the Private switch is gone. The founder: "a toggle to
+       enable it as a public / trade binder. Anything that's public is
+       up for trade." The switch writes forTrade as it reads: on is on. */
     for (const [name, page] of [
       ["web", web.page],
       ["app", app.page],
     ] as const) {
-      expect(page, name).toContain("isPublic: !");
-      expect(page, name).not.toContain("isPublic: event.target.checked");
-      expect(page, name).not.toContain("isPublic: next");
+      expect(page, name).toContain("forTrade");
+      expect(page, name).not.toContain("isPublic: !");
+      expect(page, name).not.toContain("isPublic:");
     }
-    expect(web.settings).toContain("checked={!isPublic}");
+    expect(web.settings).toContain("save({ forTrade: on })");
+    expect(read("src/components/binder/for-trade-switch.tsx")).toContain(
+      "checked={on}",
+    );
   });
 
   it("moves a held pocket, shifting the others, on both platforms", () => {
@@ -155,7 +158,11 @@ describe("the binder page", () => {
   it("turns pages with arrows and dots on the web", () => {
     expect(web.view).toContain('aria-label="Previous page"');
     expect(web.view).toContain('aria-label="Next page"');
-    expect(web.view).toContain("pocketsPerPage(settings.layout)");
+    /* Three by three, the one page a binder has. */
+    expect(web.view).toContain("const COLUMNS = 3;");
+    expect(web.view).toContain("const POCKETS_PER_PAGE = COLUMNS * COLUMNS;");
+    expect(web.view).toContain("grid-cols-3");
+    expect(web.view).not.toContain("grid-cols-2");
     expect(web.view).toContain("cfa-bg-binder-page");
     expect(web.view).toContain("aspect-[63/88]");
   });
@@ -177,30 +184,31 @@ describe("the binder page", () => {
     expect(web.ownPage).toContain("title={binder.name}");
     expect(web.playerPage).toContain("readBinder(playerId, me, binderId)");
     expect(web.playerPage).toContain("if (!binder) notFound();");
-    /* The old addresses still open the Trade binder. */
-    expect(read("src/app/profile/binder/page.tsx")).toContain("/profile/binders/");
-    expect(read("src/app/p/[playerId]/binder/page.tsx")).toContain("/binders/");
+    /* The old addresses still redirect, and there is no Trade binder
+       to send them to: profile-ia-parity pins where they go. */
+    expect(read("src/app/profile/binder/page.tsx")).toContain("redirect(");
+    expect(read("src/app/profile/binder/page.tsx")).not.toContain("TRADE_BINDER_ID");
+    expect(read("src/app/p/[playerId]/binder/page.tsx")).toContain("redirect(");
+    expect(read("src/app/p/[playerId]/binder/page.tsx")).not.toContain(
+      "TRADE_BINDER_ID",
+    );
   });
 });
 
 describe("one cover drawing per platform", () => {
   it("draws the spine in the cover component and nowhere else", () => {
+    /* The highlights are the one other place that reads the spine
+       colour: the binder's initial is drawn in it (round 2). Nothing
+       else knows the word. */
     const webElsewhere = [
       web.list,
-      web.highlights,
       web.page,
       web.ownPage,
       web.playerPage,
       web.ownProfile,
       web.playerProfile,
     ];
-    const appElsewhere = [
-      app.list,
-      app.highlights,
-      app.page,
-      app.ownProfile,
-      app.playerProfile,
-    ];
+    const appElsewhere = [app.list, app.page, app.ownProfile, app.playerProfile];
     expect(web.cover).toContain("spine");
     expect(app.cover).toContain("spine");
     for (const source of [...webElsewhere, ...appElsewhere]) {
@@ -216,7 +224,9 @@ describe("one cover drawing per platform", () => {
     /* The founder: "the binder shouldn't be modeled after a 3 ring
        binder. I'm attaching a picture of a VaultX binder, which is the
        most common binder and will be most recognizable." So no ring
-       dots, a zipper with a pull, and the front card in a sleeve. */
+       dots, and a zipper with a pull. The front card in a sleeve went
+       in round 2: "Delete the ability to have a picture on the binder,
+       it's tacky imo." */
     for (const [name, cover] of [
       ["web", web.cover],
       ["app", app.cover],
@@ -226,7 +236,8 @@ describe("one cover drawing per platform", () => {
       expect(cover, name).not.toContain("ring dots");
       expect(cover, name).toMatch(/zipper/i);
       expect(cover, name).toMatch(/pull/i);
-      expect(cover, name).toMatch(/sleeve/i);
+      expect(cover, name).not.toMatch(/sleeve/i);
+      expect(cover, name).not.toContain("frontImageUrl");
     }
   });
 
@@ -241,10 +252,7 @@ describe("one cover drawing per platform", () => {
       "inset-y-0 left-0 w-[5%]",
       "top-[4%] right-[4%] bottom-[4%] left-[5%] border-y-2 border-r-2 border-dashed opacity-70",
       "top-[2%] left-[7%] h-[4%] w-[10%] rounded-[2px] bg-accent",
-      /* The card in its sleeve, and the embossed name. */
-      "top-[16%] left-1/2 aspect-[63/88] w-1/2 -translate-x-1/2",
-      "rounded-[4px] bg-black/60 ring-1 ring-white/25",
-      "linear-gradient(135deg,rgb(255_255_255/0.18),transparent_45%)",
+      /* The embossed name. */
       "right-[8%] bottom-[9%] left-[8%] truncate font-bold",
       'textShadow: "0 1px 0 rgb(255 255 255/0.12)"',
     ]) {
@@ -255,9 +263,10 @@ describe("one cover drawing per platform", () => {
     expect(web.cover).toContain("style={{ borderColor: spine }}");
     expect(web.cover).not.toContain("#");
     expect(web.cover).not.toContain("uppercase");
-    /* A swatch is the body alone: no card, no name. */
-    expect(web.cover).toContain("{!plain && (");
+    /* A swatch is the body alone: no name. Nothing else is optional,
+       because there is nothing else on the cover. */
     expect(web.cover).toContain("{!plain && label && (");
+    expect(web.cover).not.toContain("<img");
     expect(web.settings).toContain("plain");
   });
 
