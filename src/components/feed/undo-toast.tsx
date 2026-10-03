@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
 
+import { hidePost, unhidePost } from "@/components/feed/hidden-posts";
 import { Button } from "@/components/ui/button";
 import {
   restoreFlaresAction,
@@ -22,8 +23,15 @@ import {
  * The audit of 2026-10-01: "Remove" on a Flare marked it found and
  * announced it, and a wrong post had no way out. Take down is the
  * second exit, and this is its safety net: the row leaves the screen
- * the moment the tap lands, and the toast holds the ids for the same
- * sixty seconds the server will honour a restore.
+ * the moment the server says ok, and the toast holds the ids for the
+ * same sixty seconds the server will honour a restore.
+ *
+ * LEAVES THE LIST AT ONCE. The audit of 2026-10-02: the toast came up
+ * in under a second and the post stayed for three to five more, until
+ * the refresh behind it had rebuilt the page. So a post's take-down
+ * hands its id to the hidden-posts store on the same tick as the
+ * toast, the Feed card hides itself on that paint, Undo unhides it,
+ * and the refresh only confirms.
  *
  * The toast outlives the post that fired it. A take-down ends in
  * `router.refresh()`, which removes the post, and with it any state
@@ -42,6 +50,8 @@ interface UndoState {
   flareIds: string[];
   /** The room the take-down happened in, for a guest's restore. */
   code?: string;
+  /** The Feed post hidden on the spot, which Undo brings back. */
+  postId?: string;
   /** Distinguishes two toasts with the same words, so the timer restarts. */
   at: number;
 }
@@ -79,19 +89,20 @@ export function dismissUndoToast(): void {
 /**
  * The take-down flow, for a post's menu and a board's tile alike.
  *
- * Runs the action; on success the toast goes up and the page re-reads
- * itself so the post is gone before anybody can tap it twice. A refusal
- * is said in the same toast, without an Undo, rather than in an error
- * line under a row that may no longer exist.
+ * Runs the action; on success the post is hidden (when the caller
+ * names one), the toast goes up, and the page re-reads itself behind
+ * them so the server's word replaces the page's. A refusal is said in
+ * the same toast, without an Undo, rather than in an error line under
+ * a row that may no longer exist.
  */
 export function useTakeDown(code?: string): {
-  takeDown: (run: () => Promise<TakeDownResult>) => void;
+  takeDown: (run: () => Promise<TakeDownResult>, postId?: string) => void;
   pending: boolean;
 } {
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  const takeDown = (run: () => Promise<TakeDownResult>) => {
+  const takeDown = (run: () => Promise<TakeDownResult>, postId?: string) => {
     if (pending) return;
     start(async () => {
       const result = await run();
@@ -99,7 +110,14 @@ export function useTakeDown(code?: string): {
         showUndoToast({ message: result.message, flareIds: [] });
         return;
       }
-      showUndoToast({ message: "Taken down.", flareIds: result.flareIds, code });
+      /* The moment the server says ok: hidden and said, on one paint. */
+      if (postId) hidePost(postId);
+      showUndoToast({
+        message: "Taken down.",
+        flareIds: result.flareIds,
+        code,
+        postId,
+      });
       router.refresh();
     });
   };
@@ -136,6 +154,8 @@ function UndoToast({ state }: { state: UndoState }) {
         setFailed(true);
         return;
       }
+      /* Back in the list at once; the refresh behind it only confirms. */
+      if (state.postId) unhidePost(state.postId);
       dismissUndoToast();
       router.refresh();
     });

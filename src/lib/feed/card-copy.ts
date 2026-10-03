@@ -1,8 +1,9 @@
+import { wantsLine } from "@/lib/feed/offer-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
- * The one line under a card's name on a post: "Need 2 more", "2
- * available", "Found".
+ * The one line under a card's name on a post: "Wants 2", "Need 1
+ * more", "2 available", "Found".
  *
  * A plain module on purpose. It is read by the server-rendered feed
  * card for a single-card post and by the client-side carousel and
@@ -28,6 +29,8 @@ export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): 
     return `${quantity} available`;
   }
   const remaining = card.remaining ?? quantity;
-  if (card.state === "found" || remaining === 0) return "Found";
-  return `Need ${remaining} more`;
+  if (card.state === "found") return "Found";
+  /* "Wants 2" until something is found, "Need 1 more" after; one rule
+     for every surface that prints it, on both platforms. */
+  return wantsLine(quantity, remaining);
 }

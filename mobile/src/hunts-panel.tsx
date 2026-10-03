@@ -26,13 +26,8 @@ import {
   type HuntCard,
 } from "./api";
 import { API_BASE } from "./config";
-import {
-  cardsLabel,
-  copiesLabel,
-  needLabel,
-  printingLabel,
-  selectionLabel,
-} from "./flare-copy";
+import { cardsLabel, copiesLabel, printingLabel } from "./flare-copy";
+import { reviewLabel, selectionSummary, wantsLine } from "./offer-copy";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
@@ -903,7 +898,7 @@ export function HuntCardRow({
             fontWeight: "600",
           }}
         >
-          {`${found} of ${needed} found${done ? "" : ` · ${needLabel(remaining)}`}`}
+          {`${found} of ${needed} found${done ? "" : ` · ${wantsLine(needed, remaining)}`}`}
         </Text>
         {card.tradedAway ? (
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>Traded here</Text>
@@ -958,12 +953,18 @@ export function HuntCardRow({
         </Tap>
       ) : null}
 
+      {/* The viewer's words, the full list's words: "I have this card",
+          then "Added to your offer" with the check. The stepper is
+          always drawn, disabled until the row is ticked, so a tick
+          moves nothing below it. */}
       {visitor && !done ? (
         <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
           <Tap
             onPress={() => visitor.onPick(selected ? 0 : 1)}
             accessibilityLabel={
-              selected ? `Unselect ${card.cardName}` : `Offer ${card.cardName}`
+              selected
+                ? `Remove ${card.cardName} from your offer`
+                : `Add ${card.cardName} to your offer`
             }
             style={{
               flexDirection: "row",
@@ -977,11 +978,9 @@ export function HuntCardRow({
               paddingVertical: 4,
             }}
           >
-            <Ionicons
-              name={selected ? "checkmark" : "hand-right-outline"}
-              size={12}
-              color={selected ? colors.accentContrast : colors.textSecondary}
-            />
+            {selected ? (
+              <Ionicons name="checkmark" size={12} color={colors.accentContrast} />
+            ) : null}
             <Text
               style={{
                 color: selected ? colors.accentContrast : colors.textSecondary,
@@ -989,18 +988,17 @@ export function HuntCardRow({
                 fontWeight: "700",
               }}
             >
-              Offer this card
+              {selected ? "Added to your offer" : "I have this card"}
             </Text>
           </Tap>
-          {selected ? (
-            <Stepper
-              value={visitor.picked}
-              min={1}
-              max={remaining}
-              onChange={visitor.onPick}
-              label={`copies of ${card.cardName} you have`}
-            />
-          ) : null}
+          <Stepper
+            value={selected ? visitor.picked : 1}
+            min={1}
+            max={remaining}
+            disabled={!selected}
+            onChange={visitor.onPick}
+            label={`copies of ${card.cardName} you have`}
+          />
         </View>
       ) : null}
     </View>
@@ -1029,9 +1027,9 @@ export function HuntOfferFooter({
       }}
     >
       <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "600" }}>
-        {selectionLabel(cards, copies)}
+        {selectionSummary(cards, copies)}
       </Text>
-      <Button label="Continue to offer" onPress={onContinue} />
+      <Button label={reviewLabel(cards)} onPress={onContinue} />
     </View>
   );
 }

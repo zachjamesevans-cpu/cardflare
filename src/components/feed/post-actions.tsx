@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useMemo, useState, type ReactNode } from "react";
 import { Flag, LayoutList, ListChecks, Trash2 } from "lucide-react";
 
+import {
+  OfferPicksContext,
+  useOfferBuild,
+  type OfferableCard,
+} from "@/components/cards/card-image-zoom";
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
+import { usePostHidden } from "@/components/feed/hidden-posts";
 import { useTakeDown } from "@/components/feed/undo-toast";
+import { OfferReview } from "@/components/flares/offer-review";
 import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
+import { inYourOfferLine } from "@/lib/feed/offer-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
 
@@ -35,13 +43,115 @@ import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
  * profile and a conversation open, filed against this post.
  */
 
-interface PostShape {
+export interface PostShape {
   postId: string;
   cards: FeedCard[];
   total: number;
   direction: "want" | "showcase";
   yours: boolean;
   completed: boolean;
+}
+
+/**
+ * THE POST OWNS THE PICKS.
+ *
+ * The audit of 2026-10-02: "Closing the viewer silently drops every
+ * picked card." The founder's call: keep them for the page's life, no
+ * warning dialog, and show them under the post while the viewer is
+ * closed. The Feed card is server-rendered and its tiles are built
+ * there, so the picks cannot travel as props; they live in this one
+ * client component around the post and reach every tile's viewer
+ * through `OfferPicksContext`. The review is drawn here, once, so the
+ * viewer and the "Review" link under the post open the same sheet
+ * over the same lines. Nothing is stored: a reload starts clean.
+ */
+export function PostOffer({
+  post,
+  children,
+}: {
+  post: PostShape;
+  children: ReactNode;
+}) {
+  const offerable = post.direction === "want" && !post.yours && !post.completed;
+  const cards = useMemo<OfferableCard[]>(
+    () =>
+      offerable
+        ? post.cards.flatMap((card) =>
+            card.flareId && card.state !== "found"
+              ? [
+                  {
+                    flareId: card.flareId,
+                    name: card.cardName,
+                    imageUrl: card.imageUrl,
+                    printingLabel: card.printingLabel ?? null,
+                    max: card.remaining ?? card.quantity ?? 1,
+                  },
+                ]
+              : [],
+          )
+        : [],
+    [offerable, post.cards],
+  );
+  const build = useOfferBuild(post.postId, cards);
+
+  if (cards.length === 0) return <>{children}</>;
+
+  return (
+    <OfferPicksContext.Provider value={build}>
+      {children}
+      <OfferReview
+        open={build.reviewOpen}
+        onClose={build.closeReview}
+        lines={build.lines}
+        onQuantity={build.setQuantity}
+        onRemove={build.remove}
+        onSubmit={build.submit}
+        onSent={build.clear}
+      />
+    </OfferPicksContext.Provider>
+  );
+}
+
+/**
+ * "2 in your offer · Review", under the post, while anything is picked
+ * and the viewer is closed: the picks are never out of sight, and the
+ * review is one press away without reopening a card. Sending or
+ * taking everything out clears it.
+ */
+export function InYourOffer() {
+  const build = useContext(OfferPicksContext);
+  if (!build || build.count === 0) return null;
+  return (
+    <p className="flex items-center gap-1.5 text-sm font-semibold text-accent tabular-nums">
+      {inYourOfferLine(build.count)}
+      <span className="text-text-muted" aria-hidden="true">
+        ·
+      </span>
+      <button
+        type="button"
+        onClick={build.openReview}
+        className="cursor-pointer rounded-[var(--radius-control)] font-semibold text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        Review
+      </button>
+    </p>
+  );
+}
+
+/**
+ * A post that was just taken down is not drawn. The server already
+ * said ok; the refresh behind the toast confirms it. See hidden-posts.
+ */
+export function UnlessHidden({
+  postId,
+  children,
+}: {
+  postId: string;
+  children: ReactNode;
+}) {
+  const hidden = usePostHidden(postId);
+  if (hidden) return null;
+  return <>{children}</>;
 }
 
 export function PostMenu({ post }: { post: PostShape }) {
@@ -74,7 +184,7 @@ export function PostMenu({ post }: { post: PostShape }) {
       key: "take-down",
       label: "Take down",
       icon: <Trash2 />,
-      onSelect: () => takeDown(() => takeDownPostAction(post.postId)),
+      onSelect: () => takeDown(() => takeDownPostAction(post.postId), post.postId),
     });
   }
   if (!post.yours) {

@@ -1,7 +1,8 @@
 /**
  * What an offer says, in words shared by the website, its actions and
- * the unit tests. Free of server-only imports on purpose; the app
- * mirrors these sentences by hand in `mobile/src/offer-copy.ts`.
+ * the unit tests. Free of server-only imports on purpose: it is read
+ * by server-rendered cards and client sheets alike. The app mirrors
+ * these sentences by hand in `mobile/src/offer-copy.ts`.
  */
 
 export type OfferFailure =
@@ -38,7 +39,58 @@ export function offeredLine(cards: { name: string; quantity: number }[]): string
   return `Offered ${listOf(names)}.`;
 }
 
-/** The button, by how many cards are picked. */
-export function offerButtonLabel(count: number): string {
-  return count <= 1 ? "Offer this card" : `Offer ${count} cards`;
+/**
+ * ONE SET OF WORDS FOR BUILDING AN OFFER.
+ *
+ * The audit of 2026-10-02: "Two wordings for one action: the viewer
+ * says 'I have this card / Review offer'; the full list and hunts say
+ * 'Offer this card / Continue to offer'." So the toggle is "I have
+ * this card" and, once added, "Added to your offer", wherever a card
+ * can be offered; the way on is `reviewLabel`; and "Offer this card",
+ * "Offer N cards" and "Continue to offer" are gone from both
+ * platforms. The app's `mobile/src/offer-copy.ts` carries the same
+ * five helpers with the same bodies, and
+ * `tests/unit/round16-parity.test.ts` runs both.
+ */
+
+/** "Review offer · 1 card" / "Review offer · 3 cards". The dot is U+00B7. */
+export function reviewLabel(count: number): string {
+  return `Review offer · ${count} ${count === 1 ? "card" : "cards"}`;
+}
+
+/**
+ * "1 in your offer" / "3 in your offer": under a post while the viewer
+ * is closed, so the picks it holds are never out of sight. "Review"
+ * sits beside it.
+ */
+export function inYourOfferLine(count: number): string {
+  return `${count} in your offer`;
+}
+
+/** "See all 4 cards", on the carousel's dots row. */
+export function seeAllLabel(count: number): string {
+  return `See all ${count} ${count === 1 ? "card" : "cards"}`;
+}
+
+/**
+ * "2 cards · 3 copies" ("1 card · 1 copy"). Cards and copies stay two
+ * numbers, and nothing else: "selected" wrapped the line at phone
+ * width.
+ */
+export function selectionSummary(cards: number, copies: number): string {
+  return `${cards} ${cards === 1 ? "card" : "cards"} · ${copies} ${
+    copies === 1 ? "copy" : "copies"
+  }`;
+}
+
+/**
+ * The one line under a wanted card: "Wants 2" until something is
+ * found, "Need 1 more" once the owner has marked progress, "Found"
+ * when nothing is left. The founder: "Need 2 more" reads wrong before
+ * anything is found.
+ */
+export function wantsLine(quantity: number, remaining: number): string {
+  if (remaining <= 0) return "Found";
+  if (remaining === quantity) return `Wants ${quantity}`;
+  return `Need ${remaining} more`;
 }

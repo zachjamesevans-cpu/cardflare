@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
+
 import {
   OfferReview,
-  selectionSummary,
   useSelection,
   type OfferLine,
 } from "@/components/flares/offer-review";
@@ -12,18 +13,26 @@ import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { cn } from "@/lib/cn";
 import { cardCountLabel } from "@/lib/feed/card-copy";
+import { reviewLabel, selectionSummary } from "@/lib/feed/offer-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
  * Every card of a post, in one list, and the way to say which you have.
  *
- * Opened from the post's menu to read, or by "Offer cards" to answer:
- * the same sheet either way, because reading the list is how you
- * decide. A visitor picks cards and how many copies of each, never
- * above what is still wanted, then reviews and sends one offer for the
- * lot. The author's own post opens the list with no boxes; a post with
- * nothing left says so instead of offering a button that cannot work.
+ * Opened from the post's menu, from "See all N cards" on the carousel,
+ * or by "Offer cards" to answer: the same sheet every way, because
+ * reading the list is how you decide. A visitor picks cards and how
+ * many copies of each, never above what is still wanted, then reviews
+ * and sends one offer for the lot. The author's own post opens the
+ * list with no toggles; a post with nothing left says so instead of
+ * offering a button that cannot work.
+ *
+ * The words are the viewer's: "I have this card", "Added to your
+ * offer", and `reviewLabel` for the way on. The audit of 2026-10-02
+ * found two wordings for one action. And a row never jumps: every
+ * stepper is drawn from the start, dimmed until its card is added,
+ * so adding one changes nothing below it ("my next tap missed").
  *
  * Controlled: whoever renders the button that opens it holds `open`.
  * The count line and the buttons that used to sit beside them are gone
@@ -93,6 +102,7 @@ export function FlareCardsSheet({
               imageUrl: card.imageUrl,
               printingLabel: card.printingLabel ?? null,
               quantity,
+              max: remainingFor(flareId),
             },
           ]
         : [];
@@ -117,6 +127,8 @@ export function FlareCardsSheet({
                   ? selectionSummary(selection.count, selection.copies)
                   : "Tick the cards you have"}
               </p>
+              {/* Drawn disabled until a card is added, so its room is
+                  kept and it wears the accent the moment one is. */}
               <Button
                 type="button"
                 size="sm"
@@ -124,7 +136,7 @@ export function FlareCardsSheet({
                 onClick={() => setReview(true)}
                 className="shrink-0"
               >
-                Continue to offer
+                {selection.count > 0 ? reviewLabel(selection.count) : "Review offer"}
               </Button>
             </div>
           ) : null
@@ -170,26 +182,35 @@ export function FlareCardsSheet({
                     )}
                   </div>
                 </div>
+                {/* Two lines, always: the toggle across the row and the
+                    stepper under it. Side by side, the added state's
+                    words spilled out of the pill at a phone's width. */}
                 {pickable && (
-                  <div className="flex flex-wrap items-center gap-3 pl-[3.25rem]">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-text-primary">
-                      <input
-                        type="checkbox"
-                        checked={picked}
-                        onChange={() => selection.toggle(flareId)}
-                        className="size-5 cursor-pointer rounded-[6px] border border-border-strong bg-canvas accent-accent"
-                      />
-                      Offer this card
-                    </label>
-                    {picked && (
-                      <Stepper
-                        value={selection.quantity(flareId)}
-                        min={1}
-                        max={remainingFor(flareId)}
-                        label={`copies of ${card.cardName} you have`}
-                        onChange={(value) => selection.setQuantity(flareId, value)}
-                      />
-                    )}
+                  <div className="flex flex-col gap-2 pl-[3.25rem]">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      aria-pressed={picked}
+                      onClick={() => selection.toggle(flareId)}
+                      className="w-full"
+                    >
+                      {picked && (
+                        <Check className="size-4 text-accent" aria-hidden="true" />
+                      )}
+                      {picked ? "Added to your offer" : "I have this card"}
+                    </Button>
+                    {/* Reserved from the start: disabled and dimmed
+                        until the card is added, never absent. */}
+                    <Stepper
+                      value={picked ? selection.quantity(flareId) : 1}
+                      min={1}
+                      max={remainingFor(flareId)}
+                      disabled={!picked}
+                      label={`copies of ${card.cardName} you have`}
+                      onChange={(value) => selection.setQuantity(flareId, value)}
+                      className={cn("shrink-0 self-end", !picked && "opacity-50")}
+                    />
                   </div>
                 )}
               </li>
@@ -203,6 +224,8 @@ export function FlareCardsSheet({
           open={review}
           onClose={() => setReview(false)}
           lines={lines}
+          onQuantity={selection.setQuantity}
+          onRemove={selection.remove}
           onSubmit={async (message) => {
             const result = await offerItemsAction(
               postId,

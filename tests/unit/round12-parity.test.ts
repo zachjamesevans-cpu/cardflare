@@ -58,17 +58,19 @@ describe("the offer's sentences are one set on both platforms", () => {
     "You have offers on the most cards this room allows.",
     "That is a lot of offers. Give it a minute.",
     "Could not send the offer. Try again.",
-    "Offer this card",
   ];
 
   it("has the same functions with the same words", () => {
+    /* Round 16 retired offerButtonLabel ("Offer this card" / "Offer N
+       cards"): the way on is reviewLabel, pinned by round16-parity. */
     for (const copy of [web.copy, app.copy]) {
       expect(copy).toContain("export function offerFailureMessage(");
       expect(copy).toContain("export function offeredLine(");
       expect(copy).toContain("export function listOf(");
-      expect(copy).toContain("export function offerButtonLabel(");
+      expect(copy).toContain("export function reviewLabel(");
+      expect(copy).not.toContain("offerButtonLabel");
       for (const sentence of SENTENCES) expect(copy).toContain(sentence);
-      expect(copy).toContain("`Offer ${count} cards`");
+      expect(copy).not.toContain("`Offer ${count} cards`");
       expect(copy).toContain("`Offered ${listOf(names)}.`");
     }
   });
@@ -87,15 +89,19 @@ describe("the verb is Offer wherever a hand goes up on a post", () => {
     }
   });
 
-  it("says Offer this card on the full list and the hunt", () => {
-    expect(web.sheet).toContain("Offer this card");
-    expect(web.hunt).toContain("Offer this card");
-    expect(app.sheet).toContain("`Offer ${card.cardName}`");
-    expect(app.hunt).toContain("`Offer ${card.cardName}`");
-    expect(app.hunt).toContain("Offer this card");
-    /* The buttons that follow the ticks keep their names. */
-    expect(web.sheet).toContain("Continue to offer");
-    expect(app.sheet).toMatch(/Send offer|Continue to offer/);
+  it("says I have this card on the full list and the hunt", () => {
+    /* Round 16: the viewer's words everywhere a card can be offered.
+       "Offer this card" and "Continue to offer" are gone. */
+    for (const source of [web.sheet, web.hunt, app.sheet, app.hunt]) {
+      expect(source).toContain("I have this card");
+      expect(source).toContain("Added to your offer");
+      expect(source).not.toContain("Continue to offer");
+    }
+    /* The button that follows the picks is the review's label. */
+    expect(web.sheet).toContain("reviewLabel(");
+    expect(web.hunt).toContain("reviewLabel(");
+    expect(app.sheet).toContain("reviewLabel(");
+    expect(app.hunt).toContain("reviewLabel(");
   });
 
   it("says You offered this once the hand is up", () => {
@@ -138,7 +144,8 @@ describe("one send, one notice, through the door that answers", () => {
   it("sends from the zoom through offer-items, never the silent form action", () => {
     expect(web.zoom).toContain("offerItemsAction(");
     expect(web.zoom).not.toContain("offerFromFeedAction");
-    expect(web.zoom).toContain("quantity: 1");
+    /* Round 16: a pick comes in as one copy; the review raises it. */
+    expect(web.zoom).toContain("return { ...current, [flareId]: 1 };");
     /* Lands on the shelf's bar, under the picture, as round 9 put it. */
     expect(web.zoom.indexOf("<ZoomHaveBlock")).toBeGreaterThan(
       web.zoom.indexOf("aspect-[60/84]"),
@@ -148,7 +155,7 @@ describe("one send, one notice, through the door that answers", () => {
        which the screen wires to offer-items, so one send is one notice
        there too. The refusal is read through offer-copy wherever the
        send lives now. */
-    expect(app.zoom).toContain("quantity: 1");
+    expect(app.zoom).toMatch(/quantity: 1|= 1;/);
     expect(app.zoom + app.review + app.sheet).toContain("offerFailureMessage(");
     expect(app.zoom).not.toMatch(/action: "offer"[^-]/);
     for (const screen of [app.home, app.thread]) {
@@ -160,11 +167,13 @@ describe("one send, one notice, through the door that answers", () => {
     /* Round 13: the picks persist between swipes and go as one send
        from "Review offer · N cards". The zoom never sends on its own. */
     for (const zoom of [web.zoom, app.zoom]) {
-      expect(zoom).toContain("Review offer ·");
+      /* Round 16: the words come from reviewLabel in offer-copy. */
+      expect(zoom).toContain("reviewLabel(");
       expect(zoom).not.toContain("Pick more cards");
       expect(zoom).not.toContain("Pick this card");
     }
-    expect(web.zoom).toContain("picks.has(");
+    /* Round 16: the picks are quantities, keyed by Flare. */
+    expect(web.zoom).toContain("offers.picks[have.flareId]");
   });
 
   it("says why when the server refuses, and which cards were not taken", () => {
@@ -180,12 +189,16 @@ describe("one send, one notice, through the door that answers", () => {
 
   it("keeps the zoom up after a send", () => {
     /* The confirmation strip takes the block's place; nothing closes the dialog. */
+    /* Round 16 moved the send into useOfferBuild, in the same file. */
+    const from = web.zoom.indexOf(
+      "const submit = async (message: string): Promise<OfferOutcome> => {",
+    );
     const sendBlock = web.zoom.slice(
-      web.zoom.indexOf("const submitOffer = async (message: string) => {"),
-      web.zoom.indexOf("A swipe ends in a click"),
+      from,
+      web.zoom.indexOf("const closeReview = useCallback", from),
     );
     expect(sendBlock.length).toBeGreaterThan(0);
     expect(sendBlock).not.toContain("close()");
-    expect(web.zoom).toContain("onSent={() => setPicks(new Set())}");
+    expect(web.zoom).toContain("onSent={local.clear}");
   });
 });
