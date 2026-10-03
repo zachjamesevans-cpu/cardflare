@@ -48,12 +48,15 @@ export const TABS: Record<
   ProfileTab,
   { label: string; icon: keyof typeof Ionicons.glyphMap }
 > = {
-  flares: { label: "Flares", icon: "grid-outline" },
+  /* Flares wear the flame, the dock's Flare glyph, and Embers the
+     shop, since the tab is the store: the website's profile-tabs.tsx
+     draws the same pair. */
+  flares: { label: "Flares", icon: "flame-outline" },
   hunts: { label: "Hunts", icon: "locate-outline" },
   binders: { label: "Binders", icon: "book-outline" },
   showcase: { label: "Showcase", icon: "sparkles-outline" },
   trades: { label: "Trades", icon: "swap-horizontal-outline" },
-  embers: { label: "Embers", icon: "flame-outline" },
+  embers: { label: "Embers", icon: "storefront-outline" },
 };
 
 /** Your own profile: all six. Trades and Embers are nobody else's. */

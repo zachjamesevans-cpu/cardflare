@@ -177,8 +177,6 @@ export default async function ProfilePage({
       <AppShell
         area="Profile"
         email={viewer.user.email ?? ""}
-        title="Your profile"
-        description="What other players see wherever your name comes up."
         areas={areas}
         currentArea={currentArea}
       >

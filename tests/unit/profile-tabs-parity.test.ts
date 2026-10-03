@@ -97,24 +97,24 @@ describe("the strip: six tabs for the owner, four for anyone else, Flares first"
     inOrder(
       web.tabs,
       [
-        "icon: LayoutGrid",
+        "icon: Flame",
         "icon: Crosshair",
         "icon: BookOpen",
         "icon: Sparkles",
         "icon: ArrowLeftRight",
-        "icon: Flame",
+        "icon: Store",
       ],
       "web",
     );
     inOrder(
       app.tabs,
       [
-        '"grid-outline"',
+        '"flame-outline"',
         '"locate-outline"',
         '"book-outline"',
         '"sparkles-outline"',
         '"swap-horizontal-outline"',
-        '"flame-outline"',
+        '"storefront-outline"',
       ],
       "app",
     );
