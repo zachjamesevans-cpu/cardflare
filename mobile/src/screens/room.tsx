@@ -32,6 +32,7 @@ import {
   forgetRoom,
   getMe,
   getRoom,
+  goingOf,
   joinRoom,
   storedSessionToken,
   lastRoom,
@@ -42,13 +43,19 @@ import {
   removeFlare,
   removeLocal,
   restoreRoomFlares,
+  roomPhaseOf,
   setOpenToTrades,
   storedAccessToken,
   takeDownRoomFlare,
   type Me,
   type RoomFlare,
+  type RoomPhase,
   type RoomState,
+  type RosterPlayer,
 } from "../api";
+import { binderCover } from "../binder-covers";
+import { GoingButton } from "../going-button";
+import { PRE_START_PITCH, YOURE_ON_THE_BOARD } from "../going-copy";
 import {
   AsyncButton,
   Body,
@@ -74,9 +81,30 @@ import { useTabBarInset } from "../glass";
 import { colors, gutter, radius, spacing } from "../theme";
 import { refreshTick } from "../refresh-tick";
 
-// The website's room ticker runs at twelve seconds now; the app keeps
-// the same rhythm so an offer never looks slower in the pocket client.
-const POLL_MS = 12_000;
+/*
+ * How often the room re-reads, by phase: the website's RoomTicker
+ * intervals, so an offer never looks slower in the pocket client.
+ * Twelve seconds live; sixty on an early board, where people are still
+ * at home; none at all for a night that is only upcoming, where nothing
+ * moves but Going and the button re-reads on its own. A shut door
+ * ("Not open yet") keeps the live rhythm so it opens the moment the
+ * store opens it; a finished room has nothing left to watch.
+ */
+const POLL_MS: Record<RoomPhase, number | null> = {
+  live: 12_000,
+  early: 60_000,
+  upcoming: null,
+  pending: 12_000,
+  finished: null,
+};
+
+/** Before the room has answered, and for a counter with no room yet. */
+const POLL_MS_UNKNOWN = 12_000;
+
+/** The poll for a phase, or null for no poll at all. */
+export function pollMsFor(phase: RoomPhase | null): number | null {
+  return phase === null ? POLL_MS_UNKNOWN : POLL_MS[phase];
+}
 
 /*
  * How many cards a player's section shows before it folds. The founder
@@ -526,9 +554,17 @@ function RoomScreen({
     setSkipped(null);
     setExpandedGroups({});
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(timer);
   }, [refresh]);
+
+  /* The poll, by phase. Re-armed when the phase changes, so an early
+     board that goes live speeds up without a visit. */
+  const phase = state ? roomPhaseOf(state) : null;
+  const pollMs = pollMsFor(phase);
+  useEffect(() => {
+    if (pollMs === null) return;
+    const timer = setInterval(() => void refresh(), pollMs);
+    return () => clearInterval(timer);
+  }, [refresh, pollMs]);
 
   const join = async () => {
     setBusy(true);
@@ -767,6 +803,42 @@ function RoomScreen({
   }
 
   const room = state.room!;
+
+  /*
+   * Going, when the server knows the word, and the night's id the
+   * button needs. Both absent from an older server, which gets the
+   * door it always had.
+   */
+  const going = goingOf(state);
+  const eventId = room.eventId ?? state.eventId ?? null;
+  const preStart = phase === "upcoming" || phase === "early";
+
+  /*
+   * THE ROOM BEFORE IT STARTS, for a viewer who has not said Going.
+   *
+   * The founder: "That room stays 'open' and anyone can go into there
+   * and see who is looking for which cards before the tournament or
+   * event starts." So the door is open: the pitch and the button, then
+   * who is going with their Flares and trade binders, then the board
+   * to read. The website's pre-start-room, card for card.
+   */
+  if (!state.joined && preStart && going && eventId) {
+    return (
+      <PreStartRoom
+        state={state}
+        eventId={eventId}
+        youGoing={going.youGoing}
+        goingCount={going.goingCount}
+        guest={guest}
+        onSettled={() => void refresh()}
+        onStore={(storeId) => navigation.navigate("StoreProfile", { storeId })}
+        onPlayer={(playerId) => navigation.navigate("PlayerProfile", { playerId })}
+        onBinder={(playerId, binderId) =>
+          navigation.navigate("Binder", { playerId, binderId })
+        }
+      />
+    );
+  }
 
   if (!state.joined) {
     return (
@@ -1096,6 +1168,33 @@ function RoomScreen({
             </Body>
           </Card>
         )}
+
+        {/* You said Going: the same card the door showed, now in its
+            on state, and tapping it again is Not going. The roster,
+            with everyone's binders, sits under it as it did outside.
+            Not shown live, where the code is the door. */}
+        {preStart && going && eventId ? (
+          <>
+            <Card>
+              <Body>{YOURE_ON_THE_BOARD}</Body>
+              <GoingButton
+                eventId={eventId}
+                youGoing={going.youGoing}
+                goingCount={going.goingCount}
+                onSettled={() => void refresh()}
+              />
+            </Card>
+            <RosterCard
+              roster={rosterOf(state)}
+              onPlayer={(playerId) =>
+                navigation.navigate("PlayerProfile", { playerId })
+              }
+              onBinder={(playerId, binderId) =>
+                navigation.navigate("Binder", { playerId, binderId })
+              }
+            />
+          </>
+        ) : null}
 
         {/* An early board never pretends to be a live room. */}
         {room.early && (
@@ -2586,6 +2685,299 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
 });
+
+/**
+ * The roster, from whichever answer carries it: the server's roster
+ * when it sends one (binders and all), else the participants with
+ * their Flares counted off the board and no binders, so a joined view
+ * on a server that only puts the roster on the door still lists who
+ * is coming.
+ */
+function rosterOf(state: RoomState): RosterPlayer[] {
+  if (state.roster) return state.roster;
+  const flares = state.flares ?? [];
+  return dedupeParticipants(state.participants ?? []).map((p) => ({
+    playerSessionId: p.playerSessionId,
+    playerId: p.playerId ?? null,
+    displayName: p.displayName ?? "A player",
+    avatarUrl: p.avatarUrl ?? null,
+    frame: p.frame ?? null,
+    ring: p.ring ?? null,
+    aura: p.aura ?? null,
+    present: p.present,
+    flares: flares.filter((f) => f.playerSessionId === p.playerSessionId).length,
+    binders: [],
+  }));
+}
+
+/**
+ * The room before it starts, for a viewer not yet on the roster: the
+ * header, the pitch with the Going button and "{n} going", who is
+ * going, and the board to read. A guest gets the account pitch under
+ * the Going card, because Going needs an account and the button says
+ * so by opening sign-in.
+ */
+function PreStartRoom({
+  state,
+  eventId,
+  youGoing,
+  goingCount,
+  guest,
+  onSettled,
+  onStore,
+  onPlayer,
+  onBinder,
+}: {
+  state: RoomState;
+  eventId: string;
+  youGoing: boolean;
+  goingCount: number;
+  guest: boolean;
+  onSettled: () => void;
+  onStore: (storeId: string) => void;
+  onPlayer: (playerId: string) => void;
+  onBinder: (playerId: string, binderId: string) => void;
+}) {
+  const room = state.room!;
+  const flares = state.flares ?? [];
+
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: gutter,
+        paddingVertical: spacing(4),
+        gap: spacing(4),
+      }}
+    >
+      <Card>
+        {room.storeId ? (
+          <Tap
+            onPress={() => onStore(room.storeId!)}
+            hitSlop={6}
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+              {room.storeName}
+            </Text>
+            {room.verified ? <VerifiedMark size={14} /> : null}
+          </Tap>
+        ) : (
+          <Muted>{room.storeName}</Muted>
+        )}
+        <Title>{room.name}</Title>
+        {room.startsAt ? (
+          <Muted>
+            {new Intl.DateTimeFormat("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            }).format(new Date(room.startsAt))}
+          </Muted>
+        ) : null}
+      </Card>
+
+      <Card>
+        <Body>{PRE_START_PITCH}</Body>
+        <GoingButton
+          eventId={eventId}
+          youGoing={youGoing}
+          goingCount={goingCount}
+          onSettled={onSettled}
+        />
+      </Card>
+
+      {guest && <AccountPitch variant="join" />}
+
+      <RosterCard roster={rosterOf(state)} onPlayer={onPlayer} onBinder={onBinder} />
+
+      <ReadOnlyBoard flares={flares} />
+    </ScrollView>
+  );
+}
+
+/**
+ * Who is going: a face, a name that opens the profile, "{k} Flares",
+ * and up to three binder chips that open that binder. Nothing to draw
+ * means no card, the same as every section on the Nights tab.
+ */
+function RosterCard({
+  roster,
+  onPlayer,
+  onBinder,
+}: {
+  roster: RosterPlayer[];
+  onPlayer: (playerId: string) => void;
+  onBinder: (playerId: string, binderId: string) => void;
+}) {
+  if (roster.length === 0) return null;
+
+  return (
+    <Card>
+      <Title>Who&rsquo;s going</Title>
+      <View>
+        {roster.map((p, index) => (
+          <View
+            key={p.playerSessionId}
+            style={{
+              gap: spacing(2),
+              paddingVertical: spacing(2.5),
+              borderTopWidth: index === 0 ? 0 : 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Tap
+              onPress={p.playerId ? () => onPlayer(p.playerId!) : undefined}
+              disabled={!p.playerId}
+              accessibilityLabel={p.displayName}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}
+            >
+              <PlayerAvatar
+                displayName={p.displayName}
+                seed={p.playerId ?? p.playerSessionId}
+                avatarUrl={p.avatarUrl}
+                frame={p.frame}
+                ring={p.ring}
+                aura={p.aura}
+                size={36}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  {p.displayName}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  {`${p.flares} ${p.flares === 1 ? "Flare" : "Flares"}`}
+                </Text>
+              </View>
+            </Tap>
+            {p.binders.length > 0 && p.playerId ? (
+              <View
+                style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}
+              >
+                {p.binders.slice(0, 3).map((binder) => (
+                  <Tap
+                    key={binder.id}
+                    onPress={() => onBinder(p.playerId!, binder.id)}
+                    accessibilityLabel={binder.name}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing(1.5),
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.elevated,
+                      paddingHorizontal: spacing(2.5),
+                      paddingVertical: spacing(1),
+                    }}
+                  >
+                    {/* The cover's colour, as a dot: the binder's own
+                        swatch at chip size. */}
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: colors[binderCover(binder.cover).edge],
+                      }}
+                    />
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {binder.name}
+                    </Text>
+                  </Tap>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * The board, to read: every Flare, grouped under whoever posted it,
+ * the way the live board groups them, with no offer controls. Tapping
+ * a card opens the viewer and the rest of that player's rail.
+ */
+function ReadOnlyBoard({ flares }: { flares: RoomFlare[] }) {
+  const groups = new Map<string, { name: string | null; flares: RoomFlare[] }>();
+  for (const flare of flares) {
+    const group = groups.get(flare.playerSessionId) ?? {
+      name: flare.displayName,
+      flares: [],
+    };
+    group.flares.push(flare);
+    groups.set(flare.playerSessionId, group);
+  }
+
+  return (
+    <Card>
+      <Title>On the board</Title>
+      {groups.size === 0 ? (
+        <Muted>Nothing posted yet. Say you&rsquo;re going and yours go up first.</Muted>
+      ) : (
+        <View>
+          {[...groups.entries()].map(([sessionId, group], index) => {
+            const shelf: ZoomCard[] = group.flares.map((f) => ({
+              imageUrl: f.imageUrl,
+              name: f.cardName,
+              cardNumber: f.cardNumber,
+              caption: f.printingLabel,
+              note: f.note,
+              lookingFor: f.quantity,
+              direction: f.intent,
+            }));
+
+            return (
+              <View
+                key={sessionId}
+                style={{
+                  gap: spacing(2),
+                  paddingVertical: spacing(2.5),
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: colors.border,
+                }}
+              >
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  {group.name ?? "A player"}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing(2) }}
+                >
+                  {group.flares.map((f, position) => (
+                    <CardImage
+                      key={f.id}
+                      imageUrl={f.imageUrl}
+                      width={96}
+                      name={f.cardName}
+                      cardNumber={f.cardNumber}
+                      caption={f.printingLabel}
+                      note={f.note}
+                      lookingFor={f.quantity}
+                      direction={f.intent}
+                      siblings={shelf}
+                      position={position}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </Card>
+  );
+}
 
 /**
  * Who a signed-in player is joining as.

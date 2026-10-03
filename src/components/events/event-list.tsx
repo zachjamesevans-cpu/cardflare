@@ -3,6 +3,7 @@ import { CalendarDays, DoorOpen, Users } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import { formatEventWindow } from "@/lib/events/format";
+import { goingLine } from "@/lib/events/going-copy";
 import { STATUS_LABELS } from "@/lib/events/schema";
 import type { EventRow } from "@/lib/supabase/types";
 
@@ -34,7 +35,15 @@ export function EventRowCard({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {attendance && attendance.total > 0 && (
+        {/* A night the store has not opened yet has nobody "here now":
+            the people on it said Going, and the number reads that way.
+            Once the room is open the count is who is in the building. */}
+        {attendance && attendance.total > 0 && event.status === "draft" ? (
+          <span className="flex items-center gap-1.5 text-sm text-text-muted tabular-nums">
+            <Users className="size-4" aria-hidden="true" />
+            {goingLine(attendance.total)}
+          </span>
+        ) : attendance && attendance.total > 0 ? (
           <span
             className="flex items-center gap-1.5 text-sm text-text-muted tabular-nums"
             title={`${attendance.present} here now of ${attendance.total} joined`}
@@ -46,7 +55,7 @@ export function EventRowCard({
               {attendance.total} joined in total
             </span>
           </span>
-        )}
+        ) : null}
         {/*
          * A walk-in room has no code of its own — it is reached through the
          * store's counter code — so it is labelled by what it is instead.

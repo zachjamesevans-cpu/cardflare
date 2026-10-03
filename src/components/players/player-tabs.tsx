@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Flame, Home, MapPin, UserCircle2, Users } from "lucide-react";
+import { Bell, CalendarDays, Flame, Home, MapPin, UserCircle2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -12,8 +12,8 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
  *
  * The founder's parity call: somebody who uses the app on Wednesday and
  * the site on Thursday should not have to learn two products. Same five
- * destinations, same order, same centre mark — Join, Room, Flare,
- * Inbox, Profile — so a thumb that knows one knows the other.
+ * destinations, same order, same centre mark (Feed, Nights, Flare,
+ * Inbox, Profile), so a thumb that knows one knows the other.
  *
  * Fixed to the bottom on every width. On a laptop that is unusual for a
  * website and deliberate here: this is the signed-in player surface, the
@@ -29,10 +29,13 @@ const TABS = [
      is fewer taps than the tab it replaced. See PRODUCT.md. */
   { href: "/feed", label: "Feed", icon: Home },
   /* Room's slot. Local took it for a while; with Local switched off
-     (src/lib/local/enabled.ts) the live room has its tab back. */
+     (src/lib/local/enabled.ts) the slot is Nights: rooms open the
+     moment a store posts a night, so the tab is the calendar of them.
+     The founder: "Trying to keep our tabs to our 'hero's'." The code
+     door (/room) is a button on the Nights page, not a tab. */
   ...(LOCAL_ENABLED
     ? [{ href: "/local", label: "Local", icon: MapPin } as const]
-    : [{ href: "/room", label: "Room", icon: Users } as const]),
+    : [{ href: "/nights", label: "Nights", icon: CalendarDays } as const]),
   { href: "/flare", label: "Flare", icon: null },
   { href: "/inbox", label: "Inbox", icon: Bell },
   { href: "/profile", label: "Profile", icon: UserCircle2 },
@@ -60,11 +63,12 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
       <ul className="flex items-stretch">
         {TABS.map((tab) => {
           /*
-           * The room lives at /e/CODE once you are in one, so the Room
-           * tab has to own that path too or the bar goes blank exactly
-           * when a player is deepest in the product.
+           * The room lives at /e/CODE once you are in one, and the code
+           * door at /room, so the Nights tab has to own both paths too
+           * or the bar goes blank exactly when a player is deepest in
+           * the product.
            */
-          const roomOwner = LOCAL_ENABLED ? "/feed" : "/room";
+          const roomOwner = LOCAL_ENABLED ? "/feed" : "/nights";
           /*
            * With Local off, /local is the Messages page, and Messages
            * is a door inside the Inbox. So the Inbox tab stays lit
@@ -74,7 +78,8 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
           const inboxOwnsLocal = !LOCAL_ENABLED && pathname.startsWith("/local");
           const active =
             pathname === tab.href ||
-            (tab.href === roomOwner && pathname.startsWith("/e/")) ||
+            (tab.href === roomOwner &&
+              (pathname.startsWith("/e/") || pathname === "/room")) ||
             (tab.href === "/inbox" && inboxOwnsLocal);
 
           const Icon = tab.icon;

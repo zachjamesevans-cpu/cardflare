@@ -126,7 +126,8 @@ async function record(entry: {
     | "message-received"
     | "nearby-match"
     | "post-comment"
-    | "store-post";
+    | "store-post"
+    | "night-match";
   title: string;
   body: string | null;
   url: string;
@@ -1039,6 +1040,87 @@ export async function notifyNearbyMatch(match: {
     if (id) await deliverByPush(match.holderId, title, body, path);
   } catch (error) {
     console.error("Could not notify the nearby match", error);
+  }
+}
+
+/**
+ * Night matches, the goer's side: somebody going to the same night
+ * wants a card on your Have list. Counted rather than named, once a
+ * day per night, because a roster grows all week and the point is to
+ * open the room and look. Nobody did this, so no actor.
+ */
+export async function notifyNightMatchForGoer(entry: {
+  playerId: string;
+  eventId: string;
+  eventName: string;
+  storeName: string;
+  /** `formatEventMoment` in the store's zone. */
+  when: string;
+  /** The room's code, or the store's for a room with none of its own. */
+  code: string;
+  count: number;
+  /** YYYY-MM-DD in the store's zone: the once-a-day key. */
+  day: string;
+}): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const n = entry.count;
+    const title = `${n} ${n === 1 ? "person" : "people"} going to ${entry.eventName} ${n === 1 ? "is" : "are"} hunting cards in your binder`;
+    const body = `${entry.storeName} · ${entry.when}. Open the room to see who.`;
+    const path = `/e/${entry.code}`;
+
+    const id = await record({
+      playerId: entry.playerId,
+      kind: "night-match",
+      title,
+      body,
+      url: path,
+      dedupeKey: `night:${entry.eventId}:${entry.playerId}:${entry.day}`,
+      actorId: null,
+    });
+
+    if (id) await deliverByPush(entry.playerId, title, body, path);
+  } catch (error) {
+    console.error("Could not notify the goer's night matches", error);
+  }
+}
+
+/**
+ * Night matches, the roster's side: somebody just said Going and wants
+ * a card you hold. Once per (night, goer), with the goer's face on it.
+ */
+export async function notifyNightMatchForHolder(entry: {
+  holderId: string;
+  goerId: string;
+  goerName: string;
+  cardName: string;
+  eventId: string;
+  eventName: string;
+  storeName: string;
+  when: string;
+  code: string;
+}): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    const title = `${entry.goerName} is going to ${entry.eventName} and wants your ${entry.cardName}`;
+    const body = `${entry.storeName} · ${entry.when}. Tap to see the board.`;
+    const path = `/e/${entry.code}`;
+
+    const id = await record({
+      playerId: entry.holderId,
+      kind: "night-match",
+      title,
+      body,
+      url: path,
+      dedupeKey: `night:${entry.eventId}:${entry.holderId}:${entry.goerId}`,
+      actorId: entry.goerId,
+    });
+
+    if (id) await deliverByPush(entry.holderId, title, body, path);
+  } catch (error) {
+    console.error("Could not notify the holder's night match", error);
   }
 }
 

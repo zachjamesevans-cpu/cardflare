@@ -205,7 +205,7 @@ describe("what stays, in order", () => {
       "You were already in this room",
       "This board is open early",
       '{phase === "pending" ? "Not open yet" : "This room has closed"}',
-      "<RoomTicker />",
+      "<RoomTicker",
       "<MatchSummary",
       "<RoomComposerDoor",
       "<RoomBoardCard",

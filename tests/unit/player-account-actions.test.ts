@@ -297,11 +297,25 @@ describe("rsvpAction", () => {
     expect(linkSessionToPlayer).toHaveBeenCalledWith("sess-new", "player-1");
   });
 
-  it("refuses a board outside its early window", async () => {
+  it("joins a posted night ahead of its early window (Nights round 1)", async () => {
+    /* A night is a door from the day it is posted: the same rule as
+       Going, boardWritable in src/lib/events/schema.ts. */
     enterRoomByCode.mockResolvedValue({
       ...earlyEvent(),
       startsAt: new Date(Date.now() + 100 * HOUR).toISOString(),
       endsAt: new Date(Date.now() + 104 * HOUR).toISOString(),
+    });
+
+    await rsvpAction(form({ code: "K3M9PZ" }));
+
+    expect(joinEvent).toHaveBeenCalled();
+  });
+
+  it("refuses a draft whose start has passed and was never opened", async () => {
+    enterRoomByCode.mockResolvedValue({
+      ...earlyEvent(),
+      startsAt: new Date(Date.now() - 30 * HOUR).toISOString(),
+      endsAt: new Date(Date.now() - 26 * HOUR).toISOString(),
     });
 
     await rsvpAction(form({ code: "K3M9PZ" }));

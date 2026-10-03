@@ -166,7 +166,30 @@ export interface PublicEvent {
  * why pages render the phase loudly instead of pretending the room is
  * live.
  */
-export type RoomPhase = "early" | "live" | "pending" | "finished";
+export type RoomPhase = "upcoming" | "early" | "live" | "pending" | "finished";
+
+/**
+ * Whether the board and the roster can be read in this phase.
+ *
+ * The founder (2026-10-03): "That room stays 'open' and anyone can go
+ * into there and see who is looking for which cards before the
+ * tournament or event starts." So a room is browsable from the moment
+ * the night is posted, through the early window, until it closes. A
+ * pending draft (start passed, never opened) and a finished room are
+ * doors with nothing behind them.
+ */
+export function boardReadable(phase: RoomPhase): boolean {
+  return phase === "upcoming" || phase === "early" || phase === "live";
+}
+
+/**
+ * Whether a participant may write to the board (post Flares, offer)
+ * in this phase. The same three phases: saying Going puts your Flares
+ * up, and that has to be allowed wherever Going is.
+ */
+export function boardWritable(phase: RoomPhase): boolean {
+  return phase === "upcoming" || phase === "early" || phase === "live";
+}
 
 /**
  * When a scheduled event's board starts taking Flares, as an epoch ms —
@@ -218,6 +241,13 @@ export function roomPhase(
   ) {
     return "early";
   }
+
+  /*
+   * Ahead of the early window, the night is upcoming: posted, browsable,
+   * and Going is a tap away. Once the start has passed and the store has
+   * not opened it, the door says "Not open yet", as it always has.
+   */
+  if (now < new Date(event.startsAt).getTime()) return "upcoming";
 
   return "pending";
 }

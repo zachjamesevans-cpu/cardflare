@@ -9,7 +9,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { autoPostFor } from "@/lib/events/auto-post";
 import { currentRoomForSession } from "@/lib/players/current-room";
-import { roomPhase } from "@/lib/events/schema";
+import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { CAPTION_MAX, publishPost } from "@/lib/flares/publish";
 import { pointFromCoords } from "@/lib/geo/zip";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
@@ -81,7 +81,9 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ ok: false, error: "not-open" }, { status: 409 });
     }
     const phase = roomPhase(resolved.room, Date.now());
-    if (phase !== "live" && phase !== "early") {
+    /* A posted night takes Flares from the moment it is posted (Going
+       put the player on its roster), so the gate is boardWritable. */
+    if (!boardWritable(phase)) {
       return Response.json({ ok: false, error: "not-open" }, { status: 409 });
     }
     const participation = await findParticipation(resolved.room.id, room.id);

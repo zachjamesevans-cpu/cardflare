@@ -24,11 +24,14 @@ export const EMPTY_BOARD =
  */
 export function RoomBoardCard({
   empty,
+  emptyLine = EMPTY_BOARD,
   children,
   guestTrades = null,
 }: {
   /** No Flares and nobody open to trades: say so instead of drawing the board. */
   empty: boolean;
+  /** What the empty board says; a night days away does not say "tonight". */
+  emptyLine?: string;
   /** The FlareBoard, when there is one to draw. */
   children?: ReactNode;
   /** A guest's open-to-trades toggle; a player's rides in the composer. */
@@ -39,7 +42,7 @@ export function RoomBoardCard({
       <h2 className="text-lg font-bold text-text-primary">Flares in the room</h2>
 
       {empty ? (
-        <p className="text-sm leading-5 text-text-secondary">{EMPTY_BOARD}</p>
+        <p className="text-sm leading-5 text-text-secondary">{emptyLine}</p>
       ) : (
         /*
          * FlareBoard draws a <ul> of per-player <Card as="li">s. Inside

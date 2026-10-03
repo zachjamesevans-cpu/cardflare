@@ -209,7 +209,7 @@ describe("POST /rooms/[code] (join)", () => {
     expect(joinEvent).toHaveBeenCalled();
   });
 
-  it("refuses a draft outside the early window", async () => {
+  it("joins a posted night ahead of the early window: the room is open from the post", async () => {
     const HOUR = 60 * 60 * 1000;
     enterRoomByCode.mockResolvedValue({
       id: "event-1",
@@ -217,6 +217,23 @@ describe("POST /rooms/[code] (join)", () => {
       status: "draft",
       startsAt: new Date(Date.now() + 100 * HOUR).toISOString(),
       endsAt: new Date(Date.now() + 104 * HOUR).toISOString(),
+      earlyBoardHours: 48,
+    });
+
+    const response = await rooms.POST(request("POST", { displayName: "Nami" }), CODE);
+
+    expect(response.status).toBe(200);
+    expect(joinEvent).toHaveBeenCalled();
+  });
+
+  it("refuses a draft whose start has passed without the store opening it", async () => {
+    const HOUR = 60 * 60 * 1000;
+    enterRoomByCode.mockResolvedValue({
+      id: "event-1",
+      kind: "scheduled",
+      status: "draft",
+      startsAt: new Date(Date.now() - 30 * HOUR).toISOString(),
+      endsAt: new Date(Date.now() - 26 * HOUR).toISOString(),
       earlyBoardHours: 48,
     });
 

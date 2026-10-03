@@ -17,6 +17,7 @@ import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
+import { goingStates } from "@/lib/events/going";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
@@ -164,7 +165,8 @@ const RECENT_SHOWN = 4;
 const SHOP_SAMPLE = 3;
 
 /** How far a "nearby store" may be, and how many to name. */
-const NEARBY_RADIUS_MILES = 25;
+/** How far "near you" reaches, for the Feed and for Nights alike. */
+export const NEARBY_RADIUS_MILES = 25;
 const NEARBY_SHOWN = 4;
 
 export interface CardFacts {
@@ -548,6 +550,14 @@ export interface UpcomingItem {
   walkIn: boolean;
   /** How many cards are on your want list — what there is to go and ask for. */
   wants: number;
+  /**
+   * The next night's own id, for the Going button; null when the
+   * calendar is empty and the card is only the counter code.
+   */
+  nextEventId: string | null;
+  /** Who has said Going to that night, and whether you have. 0/false without one. */
+  goingCount: number;
+  youGoing: boolean;
 }
 
 /**
@@ -2090,7 +2100,53 @@ function upcomingItems(
       timeZone: local.timeZone,
       walkIn: local.walkIn,
       wants,
+      nextEventId: null,
+      goingCount: 0,
+      youGoing: false,
     }));
+}
+
+/**
+ * The Going half of an upcoming card: the next night's id, who has
+ * said Going, and whether you have. A local carries the night's code,
+ * not its id, so the codes are resolved in one query and the counts
+ * in one more; a card with no night on the calendar is left at zero.
+ */
+async function withGoing(
+  items: UpcomingItem[],
+  playerId: string,
+): Promise<UpcomingItem[]> {
+  const codes = items.flatMap((item) =>
+    item.nextEventCode ? [item.nextEventCode] : [],
+  );
+  if (codes.length === 0) return items;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select("id, join_code")
+    .in("join_code", codes);
+  if (error) {
+    console.error("Could not resolve the upcoming nights", error);
+    return items;
+  }
+
+  const idByCode = new Map(
+    (data ?? []).flatMap((row) => (row.join_code ? [[row.join_code, row.id]] : [])),
+  );
+  const states = await goingStates([...idByCode.values()], playerId);
+
+  return items.map((item) => {
+    const eventId = item.nextEventCode
+      ? (idByCode.get(item.nextEventCode) ?? null)
+      : null;
+    const state = eventId ? states.get(eventId) : undefined;
+    return {
+      ...item,
+      nextEventId: eventId,
+      goingCount: state?.goingCount ?? 0,
+      youGoing: state?.youGoing ?? false,
+    };
+  });
 }
 
 /** Profile pictures for a batch of accounts. */
@@ -2728,7 +2784,7 @@ export async function listFeed(
   const nearbyItems: NearbyMatchItem[] =
     nearby.length > 0 ? [{ kind: "nearbyMatch", matches: nearby }] : [];
 
-  const upcoming = upcomingItems(locals, shown, wanted.size);
+  const upcoming = await withGoing(upcomingItems(locals, shown, wanted.size), playerId);
 
   /*
    * The order is an argument about what is worth a tap, and it runs from

@@ -1806,7 +1806,8 @@ export type NotificationRow = {
     | "message-received"
     | "nearby-match"
     | "post-comment"
-    | "store-post";
+    | "store-post"
+    | "night-match";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */

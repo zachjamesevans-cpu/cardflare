@@ -10,7 +10,7 @@ import { playerInviteEmail } from "@/lib/email/store-invite";
 import { joinEvent } from "@/lib/events/participants";
 import { postAreaFlare, postAreaFlares } from "@/lib/local/area";
 import { enterRoomByCode } from "@/lib/events/rooms";
-import { roomPhase } from "@/lib/events/schema";
+import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import { addFlareBatch, addToBinder } from "@/lib/lists/repository";
 import { binderSessionFor } from "@/lib/lists/haves";
@@ -128,7 +128,8 @@ export async function rsvpAction(formData: FormData): Promise<void> {
   if (!event) return;
 
   const phase = roomPhase(event, Date.now());
-  if (phase !== "early" && phase !== "live") return;
+  /* A posted night is a door from the day it is posted; see boardWritable. */
+  if (!boardWritable(phase)) return;
 
   /*
    * The player's room identity: the same resolver the join form uses, so an

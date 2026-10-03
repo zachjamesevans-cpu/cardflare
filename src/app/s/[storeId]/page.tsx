@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { CalendarClock, CalendarDays, Clock, Globe, MapPin, Phone } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import { GoingButton } from "@/components/nights/going-button";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { StorePageHeader } from "@/components/stores/store-page-header";
@@ -12,6 +13,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { goingLine } from "@/lib/events/going-copy";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { hasLocal, storeBoard } from "@/lib/players/locals";
 import { hoursLines, openNow } from "@/lib/stores/hours";
@@ -73,14 +75,13 @@ export default async function StoreProfilePage({
   params: Promise<{ storeId: string }>;
 }) {
   const { storeId } = await params;
-  const store = await publicStore(storeId);
-
-  if (!store) notFound();
 
   /*
    * The optional account, never required. The same rule as the room
    * page: a player viewer carries its id, and an admin or owner who
-   * also holds a player row follows as that player.
+   * also holds a player row follows as that player. Resolved before
+   * the store, because the store's nights carry whether this viewer
+   * is going to each.
    */
   const viewer = await getViewer();
   const playerId =
@@ -89,6 +90,10 @@ export default async function StoreProfilePage({
       : viewer.kind === "anonymous"
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
+
+  const store = await publicStore(storeId, playerId);
+
+  if (!store) notFound();
 
   const [following, board] = await Promise.all([
     playerId ? hasLocal(playerId, store.storeId) : Promise.resolve(false),
@@ -234,13 +239,34 @@ export default async function StoreProfilePage({
                           </span>
                         )}
                       </span>
-                      {night.live && night.joinCode && (
-                        <Link
-                          href={`/e/${night.joinCode}`}
-                          className={buttonStyles("primary", "sm")}
-                        >
-                          Join the room
-                        </Link>
+                      {/* A night that is running is a door; one that is
+                          not yet is a yes. Going from the store's page
+                          is the same tap as the Nights tab, the roster's
+                          size beside it either way. */}
+                      {night.live && night.joinCode ? (
+                        <span className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm text-text-secondary tabular-nums">
+                            {goingLine(night.goingCount)}
+                          </span>
+                          <Link
+                            href={`/e/${night.joinCode}`}
+                            className={buttonStyles("primary", "sm")}
+                          >
+                            Join the room
+                          </Link>
+                        </span>
+                      ) : (
+                        <GoingButton
+                          eventId={night.eventId}
+                          youGoing={night.youGoing}
+                          goingCount={night.goingCount}
+                          signedIn={Boolean(playerId)}
+                          next={
+                            night.joinCode
+                              ? `/e/${night.joinCode}`
+                              : `/s/${store.storeId}`
+                          }
+                        />
                       )}
                     </li>
                   ))}

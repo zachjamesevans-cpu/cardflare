@@ -657,6 +657,45 @@ export interface RoomFlare {
   }[];
 }
 
+/**
+ * Where a room is in its life, the website's `RoomPhase`.
+ *
+ * `upcoming` is a night the store has posted and not yet opened, before
+ * its early window: the board is browsable and Going is allowed from
+ * the moment it is posted. `early` is inside the store's early-board
+ * window. `pending` is a draft whose start has passed with the door
+ * still shut ("Not open yet"). `live` and `finished` are what they say.
+ */
+export type RoomPhase = "upcoming" | "early" | "live" | "pending" | "finished";
+
+/** A binder up for trade, as a roster row shows it: a cover and a name. */
+export interface RosterBinder {
+  id: string;
+  name: string;
+  cover: BinderCoverId;
+  count: number;
+}
+
+/**
+ * Somebody on a night's roster before it starts: who they are, how
+ * many of their Flares are on this board, and the binders they are
+ * bringing to trade. The website's `RosterPlayer`.
+ */
+export interface RosterPlayer {
+  playerSessionId: string;
+  playerId: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+  present: boolean;
+  /** Their Flares on this board. */
+  flares: number;
+  /** Up to three binders up for trade; empty for a guest. */
+  binders: RosterBinder[];
+}
+
 export interface RoomState {
   state: "room" | "show" | "lobby" | "quiet";
   /** Present on lobby and quiet states: whose counter this is. */
@@ -677,7 +716,38 @@ export interface RoomState {
     endsAt: string | null;
     /** The board is open ahead of doors; everyone on it is on their way. */
     early: boolean;
+    /**
+     * Where the night is in its life. Absent from an older server,
+     * which only knew `early` and `status`; see `roomPhaseOf`.
+     */
+    phase?: RoomPhase;
+    /** How many have said Going, and whether this viewer has. Absent
+        from an older server. */
+    goingCount?: number;
+    youGoing?: boolean;
+    /**
+     * The night's own id: what the Going button in the room says
+     * Going TO, since `setGoing` is keyed by event and the room by
+     * code. Without it the room draws the door it always had.
+     */
+    eventId?: string;
   };
+  /**
+   * The same four, when a server puts them beside the room rather
+   * than inside it. Read through `roomPhaseOf` and `goingOf`, which
+   * look in both places.
+   */
+  phase?: RoomPhase;
+  goingCount?: number;
+  youGoing?: boolean;
+  eventId?: string;
+  /**
+   * Who is going, before the night starts. Carried on the not-joined
+   * answer while the board is readable (upcoming, early, live), so a
+   * viewer can see who is coming and what they are hunting before
+   * saying Going themselves. Absent from an older server.
+   */
+  roster?: RosterPlayer[];
   you?: { sessionId: string; displayName: string };
   /**
    * Whether the signed-in account follows this room's store, for the
@@ -729,6 +799,94 @@ export interface RoomState {
 
 export const getRoom = (code: string) =>
   call<RoomState>("GET", `/api/v1/rooms/${encodeURIComponent(code)}`);
+
+/**
+ * The room's phase, from whichever server answered.
+ *
+ * A server that says `phase` is believed. An older one only said
+ * `early` and `status`, which is enough to tell live from early from
+ * the two shut doors, and never says `upcoming`: an old server did not
+ * have the phase, so nothing is drawn that it cannot back.
+ */
+export function roomPhaseOf(state: RoomState): RoomPhase | null {
+  const room = state.room;
+  if (!room) return null;
+  const said = room.phase ?? state.phase;
+  if (said) return said;
+  if (room.status === "open") return "live";
+  if (room.status === "closed") return "finished";
+  return room.early ? "early" : "pending";
+}
+
+/** Going, from wherever the server put it; nothing from an older one. */
+export function goingOf(
+  state: RoomState,
+): { youGoing: boolean; goingCount: number } | null {
+  const count = state.room?.goingCount ?? state.goingCount;
+  if (count === undefined) return null;
+  return {
+    goingCount: count,
+    youGoing: state.room?.youGoing ?? state.youGoing ?? false,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Nights                                                              */
+/* ------------------------------------------------------------------ */
+
+/** Where a night in the Nights list is: a room open now, an early
+    board, or a night posted and not yet open. */
+export type NightPhase = "live" | "early" | "upcoming";
+
+/**
+ * One night that matters to this player: at a store they follow or one
+ * near them, or one they are going to wherever it is. The website's
+ * `NightItem`, row for row.
+ */
+export interface NightItem {
+  eventId: string;
+  code: string | null;
+  name: string;
+  startsAt: string;
+  endsAt: string | null;
+  timeZone: string;
+  storeId: string;
+  storeName: string;
+  storeVerified: boolean;
+  city: string | null;
+  phase: NightPhase;
+  youGoing: boolean;
+  goingCount: number;
+  /** Flares on the board. */
+  flares: number;
+  following: boolean;
+}
+
+/** Live rooms first, then by start time, within the next fourteen days.
+    The server orders; the app draws in the order given. */
+export const getNights = () => call<{ nights: NightItem[] }>("GET", "/api/v1/nights");
+
+/** What saying Going, or Not going, comes back with. */
+export interface GoingAnswer {
+  youGoing: boolean;
+  goingCount: number;
+  /** How many of the account's Flares went on the board with it. */
+  posted: number;
+}
+
+/**
+ * Going (true) or Not going (false) to a night, by its event id.
+ *
+ * One tap. Going puts the account on the roster with its Flares and
+ * trade binders; Not going takes it off. The server refuses with
+ * `no-account` for a guest, `not-open` once the night has finished,
+ * and `not-found` for an id it does not know.
+ */
+export const setGoing = (eventId: string, going: boolean) =>
+  call<GoingAnswer>(
+    going ? "POST" : "DELETE",
+    `/api/v1/nights/${encodeURIComponent(eventId)}/going`,
+  );
 
 export async function joinRoom(
   code: string,
@@ -2489,6 +2647,14 @@ export type FeedItem =
       walkIn: boolean;
       /** Cards on your want list — what there is to go and ask about. */
       wants: number;
+      /**
+       * The next night's id, for the Going button, and who has said
+       * so. Null and 0/false when there is no next night; absent from
+       * an older server, which draws no button.
+       */
+      nextEventId?: string | null;
+      goingCount?: number;
+      youGoing?: boolean;
     }
   /** A Flare somebody posted lately, wherever they posted it. */
   | {
@@ -2948,6 +3114,12 @@ export interface UpcomingNight {
   live: boolean;
   /** When the board opens before doors, or null. Optional: older servers. */
   boardOpensAt?: string | null;
+  /** Who has said Going, and whether this viewer has. Absent from an
+      older server, which draws no Going button. */
+  goingCount?: number;
+  youGoing?: boolean;
+  /** Where the night is; null once it has started without a room. */
+  phase?: NightPhase | null;
 }
 
 export const getStore = (storeId: string) =>

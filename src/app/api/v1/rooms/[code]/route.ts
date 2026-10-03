@@ -18,7 +18,8 @@ import {
   matchFor,
   offersByFlare,
 } from "@/lib/matching/schema";
-import { roomPhase } from "@/lib/events/schema";
+import { boardReadable, boardWritable, roomPhase } from "@/lib/events/schema";
+import { goingState, nightRoster } from "@/lib/events/going";
 import { listRoomOffers } from "@/lib/matching/repository";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
@@ -153,9 +154,16 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   // the app say so instead of pretending the event is live.
   const phase = roomPhase(room, Date.now());
 
+  /* Who has said Going, and whether this account has: the Going button's
+     first paint, on the joined and the not-joined answer alike. */
+  const going = await goingState(room.id, account?.playerId ?? null);
+
   const base = {
     state: "room" as const,
     room: {
+      /* The events row, for the Going button: the app fetches a room by
+         code and says Going by id. */
+      eventId: room.id,
       name: room.name,
       status: room.status,
       /* Links the room to the store's page, the founder's ask. */
@@ -166,20 +174,56 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       kind: room.kind,
       startsAt: room.startsAt,
       endsAt: room.endsAt,
+      /* Kept for the build that reads a boolean; `phase` is the whole word. */
       early: phase === "early",
+      phase,
+      goingCount: going.goingCount,
+      youGoing: going.youGoing,
     },
     following,
   };
 
-  if (!session || !participation || (phase !== "live" && phase !== "early")) {
+  if (!session || !participation || !boardReadable(phase)) {
     /*
      * The account travels with the not-joined answer too. This is the
      * exact screen that used to ask a signed-in player to pick a name.
      */
-    return Response.json({
+    const notJoined = {
       ...base,
       joined: false,
       account: account ? { displayName: account.displayName } : null,
+    };
+    if (!boardReadable(phase)) return Response.json(notJoined);
+
+    /*
+     * The founder: "anyone can go into there and see who is looking for
+     * which cards before the tournament or event starts." A readable
+     * room answers a viewer who has not said Going with the roster and
+     * the board, read-only: the same shape the joined answer uses, with
+     * the viewer's own match fields empty, because there is no binder
+     * of theirs in the room to match against.
+     */
+    const [roster, flares, offers] = await Promise.all([
+      nightRoster(room.id, account?.playerId ?? null),
+      listRoomFlares(room.id),
+      listRoomOffers(room.id),
+    ]);
+    const counterHas = await counterAvailability(
+      room.storeId,
+      flares.map((entry) => entry.cardId),
+    );
+    const grouped = offersByFlare(offers);
+
+    return Response.json({
+      ...notJoined,
+      roster: absoluteAvatars(roster),
+      flares: flares.map((entry) => ({
+        ...entry,
+        match: null,
+        heldCount: 0,
+        counterMayHave: counterHas.has(entry.cardId),
+        offers: offerRows(grouped.get(entry.id) ?? []),
+      })),
     });
   }
 
@@ -232,15 +276,22 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
       /* For the card viewer's "You have N in your binder", on tap. */
       heldCount: heldCounts.get(entry.cardId) ?? 0,
       counterMayHave: counterHas.has(entry.cardId),
-      offers: (grouped.get(entry.id) ?? []).map((offer) => ({
-        responderSessionId: offer.responderSessionId,
-        displayName: offer.displayName,
-        message: offer.message,
-        quantity: offer.quantity,
-        present: offer.present,
-      })),
+      offers: offerRows(grouped.get(entry.id) ?? []),
     })),
   });
+}
+
+/** An offer as the app draws it under a Flare. */
+function offerRows(
+  offers: ReturnType<typeof offersByFlare> extends Map<string, infer O> ? O : never,
+) {
+  return offers.map((offer) => ({
+    responderSessionId: offer.responderSessionId,
+    displayName: offer.displayName,
+    message: offer.message,
+    quantity: offer.quantity,
+    present: offer.present,
+  }));
 }
 
 const joinSchema = z.object({ displayName: z.string().optional() });
@@ -268,10 +319,10 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   }
 
   // The only place a walk-in room is opened, same as the website's form.
-  // Early boards accept joins too: posting ahead is the whole feature.
+  // Early boards accept joins too: posting ahead is the whole feature,
+  // and a posted night is a room from the moment it is posted.
   const event = await enterRoomByCode(code);
-  const joinPhase = event ? roomPhase(event, Date.now()) : null;
-  if (!event || (joinPhase !== "live" && joinPhase !== "early")) {
+  if (!event || !boardWritable(roomPhase(event, Date.now()))) {
     return Response.json({ error: "not-open" }, { status: 409 });
   }
 

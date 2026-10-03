@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { earlyBoardOpensAt, roomPhase } from "@/lib/events/schema";
+import {
+  boardReadable,
+  boardWritable,
+  earlyBoardOpensAt,
+  roomPhase,
+} from "@/lib/events/schema";
 import { plusDaysInZone } from "@/lib/time/zone";
 
 /**
@@ -47,17 +52,35 @@ describe("roomPhase", () => {
     expect(roomPhase(draftEvent(24 * HOUR, 48, now), now)).toBe("early");
   });
 
-  it("a draft outside the window is pending", () => {
-    expect(roomPhase(draftEvent(72 * HOUR, 48, now), now)).toBe("pending");
+  it("a draft ahead of the window is upcoming: posted, browsable, Going", () => {
+    // The founder: "That room stays 'open' and anyone can go into there
+    // and see who is looking for which cards before the tournament or
+    // event starts." Outside the early window used to be a locked door.
+    expect(roomPhase(draftEvent(72 * HOUR, 48, now), now)).toBe("upcoming");
   });
 
-  it("zero hours turns early boards off entirely", () => {
-    expect(roomPhase(draftEvent(1 * HOUR, 0, now), now)).toBe("pending");
+  it("zero hours turns early boards off, and a night ahead is still upcoming", () => {
+    expect(roomPhase(draftEvent(1 * HOUR, 0, now), now)).toBe("upcoming");
   });
 
-  it("a draft whose window already ended is not early", () => {
-    // Never opened, never swept: the event is over, not upcoming.
+  it("a draft whose window already ended is not early, and not upcoming", () => {
+    // Never opened, never swept: the event is over, not ahead.
     expect(roomPhase(draftEvent(-30 * HOUR, 48, now), now)).toBe("pending");
+  });
+
+  it("a draft whose start has passed without the store opening it is pending", () => {
+    expect(roomPhase(draftEvent(-1 * HOUR, 0, now), now)).toBe("pending");
+  });
+
+  it("the board reads and writes in upcoming, early and live only", () => {
+    for (const phase of ["upcoming", "early", "live"] as const) {
+      expect(boardReadable(phase), phase).toBe(true);
+      expect(boardWritable(phase), phase).toBe(true);
+    }
+    for (const phase of ["pending", "finished"] as const) {
+      expect(boardReadable(phase), phase).toBe(false);
+      expect(boardWritable(phase), phase).toBe(false);
+    }
   });
 
   it("a short window still opens at midnight of event day", () => {
