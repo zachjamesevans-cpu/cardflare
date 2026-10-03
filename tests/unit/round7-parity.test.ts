@@ -227,13 +227,15 @@ describe("Embers are three facts, not one number three ways", () => {
   it("keeps the badge in the header and the balance in the Embers pane, both platforms", () => {
     expect(web.ownProfile).toContain("embersEarned={profile.embersEarned}");
     for (const source of [web.ownProfile, app.ownProfile]) {
-      expect(source).toContain("Earned by trading, all time");
+      /* Round 15: the label dropped "by trading", since attendance
+         and grants raise the badge too. */
+      expect(source).toContain("Earned, all time");
       expect(source).toContain("to spend");
-      expect(source).not.toContain("Earned, all time");
+      expect(source).not.toContain("Earned by trading");
     }
     expect(web.ownProfile).toMatch(/>\s*Embers store\s*</);
     for (const source of [web.profile, app.profile]) {
-      expect(source).not.toContain("Earned by trading, all time");
+      expect(source).not.toContain("Earned, all time");
       expect(source).not.toContain("to spend");
       expect(source).not.toMatch(/>\s*Embers store\s*</);
     }

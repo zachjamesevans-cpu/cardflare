@@ -224,6 +224,20 @@ interface ListRow {
  * apply to every open post of that card at once.
  */
 export async function listOfferings(playerId: string): Promise<SavedWant[]> {
+  return describeRows(await offeringRows(playerId));
+}
+
+/**
+ * How many cards a player is offering: the same grouping the list
+ * uses, without the names and art. The profile's Flares number adds
+ * this to the wants, so the number over the grid is the grid.
+ */
+export async function countOfferings(playerId: string): Promise<number> {
+  return (await offeringRows(playerId)).length;
+}
+
+/** The open offerings, one row per card and printing, copies summed. */
+async function offeringRows(playerId: string): Promise<ListRow[]> {
   if (!isSupabaseConfigured()) return [];
 
   const admin = getSupabaseAdmin();
@@ -276,7 +290,7 @@ export async function listOfferings(playerId: string): Promise<SavedWant[]> {
     });
   }
 
-  return describeRows([...grouped.values()]);
+  return [...grouped.values()];
 }
 
 /** Names and pictures for rows, the way the Flare board resolves them. */

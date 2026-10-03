@@ -65,6 +65,8 @@ const ICONS: Record<ActivityKind, LucideIcon> = {
   "report-received": ShieldAlert,
   block: Ban,
   embers: Sparkles,
+  offer: Handshake,
+  logged: Handshake,
 };
 
 export function PlayerActivity({ timeline }: { timeline: PlayerTimeline }) {
@@ -85,6 +87,7 @@ export function PlayerActivity({ timeline }: { timeline: PlayerTimeline }) {
   const chips: [string, number][] = [
     ["rooms", counts.rooms],
     ["Flares", counts.flares],
+    ["Flare rows, all time", counts.flareRows],
     ["posts", counts.posts],
     ["hunts", counts.hunts],
     ["trades", counts.trades],

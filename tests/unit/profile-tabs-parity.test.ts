@@ -376,19 +376,19 @@ describe("the panes' contents, own and theirs", () => {
   });
 
   it("Embers: the earned tile and the store door as they were, owner only", () => {
-    expect(web.ownProfile).toContain("Earned by trading, all time");
+    expect(web.ownProfile).toContain("Earned, all time");
     expect(web.ownProfile).toContain("{profile.embersEarned.toLocaleString()}");
     expect(web.ownProfile).toContain('href="/profile/store"');
     expect(web.ownProfile).toMatch(/>\s*Embers store\s*</);
     expect(web.ownProfile).toContain("{profile.embersBalance.toLocaleString()}");
     expect(web.ownProfile).toContain("to spend");
-    expect(web.playerProfile).not.toContain("Earned by trading");
+    expect(web.playerProfile).not.toContain("Earned, all time");
     expect(web.playerProfile).not.toContain("/profile/store");
     expect(web.playerProfile).not.toContain("to spend");
-    expect(app.ownProfile).toContain("Earned by trading, all time");
+    expect(app.ownProfile).toContain("Earned, all time");
     expect(app.ownProfile).toContain("to spend");
     expect(app.ownProfile).toContain('"Store"');
-    expect(app.playerProfile).not.toContain("Earned by trading");
+    expect(app.playerProfile).not.toContain("Earned, all time");
     expect(app.playerProfile).not.toContain('"Store"');
   });
 });

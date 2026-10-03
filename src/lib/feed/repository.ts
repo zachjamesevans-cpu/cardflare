@@ -2585,6 +2585,47 @@ function byPostedAt<T extends { postedAt: string }>(items: T[]): T[] {
 }
 
 /**
+ * ONE POST, ONCE.
+ *
+ * A Flare posted into a room reaches the Feed by two doors: the board
+ * draws it as the room's post, and the viewer's own room Flares ride
+ * in beside their area Flares so a post made from inside a shop still
+ * shows under My Flares. Both carry the same author and the same post
+ * id, which is why the second audit saw the same post twice, and why
+ * one Take down removed both: they were one post drawn twice. The
+ * room's copy wins, since it knows the shop and the night; the other
+ * is dropped here, before anything is sorted or decorated.
+ */
+export function dedupeHunts<
+  T extends {
+    kind: string;
+    playerId?: string | null;
+    postId?: string;
+    code?: string | null;
+  },
+>(items: T[]): T[] {
+  const kept = new Map<string, number>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (item.kind !== "hunt" || !item.playerId || !item.postId) {
+      out.push(item);
+      continue;
+    }
+    const key = `${item.playerId}::${item.postId}`;
+    const seenAt = kept.get(key);
+    if (seenAt === undefined) {
+      kept.set(key, out.length);
+      out.push(item);
+      continue;
+    }
+    /* Two copies: keep whichever names a room. */
+    const seen = out[seenAt];
+    if (seen && !seen.code && item.code) out[seenAt] = item;
+  }
+  return out;
+}
+
+/**
  * What the shops this player follows have said this week.
  *
  * `going` is read here rather than in the store module because it is
@@ -2825,12 +2866,14 @@ export async function listFeed(
      * the Flare from yesterday and under the one from ten minutes ago,
      * whoever posted it. Neither client draws a heading on this tab.
      */
-    ...byPostedAt<HuntItem | StorePostItem>([
-      ...boards.filter((item): item is HuntItem => item.kind === "hunt"),
-      ...areaHunts,
-      ...storePosts,
-      ...recent.map(asPost).filter((item): item is HuntItem => item.kind === "hunt"),
-    ]),
+    ...byPostedAt<HuntItem | StorePostItem>(
+      dedupeHunts([
+        ...boards.filter((item): item is HuntItem => item.kind === "hunt"),
+        ...areaHunts,
+        ...storePosts,
+        ...recent.map(asPost).filter((item): item is HuntItem => item.kind === "hunt"),
+      ]),
+    ),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,

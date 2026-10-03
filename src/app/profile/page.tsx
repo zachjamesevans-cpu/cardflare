@@ -433,14 +433,14 @@ export default async function ProfilePage({
                         mistaken for each other. */}
                     <div className="rounded-[var(--radius-control)] border border-border bg-elevated p-4">
                       <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-                        Earned by trading, all time
+                        Earned, all time
                       </p>
                       <p className="mt-1 text-2xl font-bold text-text-primary tabular-nums">
                         {profile.embersEarned.toLocaleString()}
                       </p>
                       <p className="mt-1 text-xs text-text-muted">
-                        Public. The number on your badge. Trades are the only thing that
-                        raise it, and it never goes down.
+                        Public. The number on your badge. Trades, turning up at your
+                        stores and grants raise it, and it never goes down.
                       </p>
                     </div>
 
