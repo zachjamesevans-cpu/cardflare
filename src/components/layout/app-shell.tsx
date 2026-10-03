@@ -6,6 +6,7 @@ import { AreaSwitcher } from "@/components/layout/area-switcher";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
 import type { Area } from "@/lib/auth/areas";
+import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
 
 interface AppShellProps {
@@ -13,7 +14,14 @@ interface AppShellProps {
   area: string;
   /** Empty for a signed-out visitor on a page anyone can open, such as a shared profile. */
   email: string;
-  title: string;
+  /**
+   * The page's heading. A page that explains itself, like the profile,
+   * passes none and starts straight under the bar, the way the app
+   * does. The founder: "the 'your profile' text and dead space at the
+   * top can be removed just like it is in the app. No need to explain
+   * what a profile is."
+   */
+  title?: string;
   description?: string;
   /**
    * Every console this account can stand in. With more than one, a
@@ -104,16 +112,23 @@ export function AppShell({
         </div>
       </header>
 
-      <main id="main" className="flex-1 px-2 py-10 sm:px-6">
+      <main
+        id="main"
+        className={cn("flex-1 px-2 pb-10 sm:px-6", title ? "pt-10" : "pt-4")}
+      >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-              {title}
-            </h1>
-            {description && (
-              <p className="max-w-2xl text-pretty text-text-secondary">{description}</p>
-            )}
-          </div>
+          {title && (
+            <div className="flex flex-col gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+                {title}
+              </h1>
+              {description && (
+                <p className="max-w-2xl text-pretty text-text-secondary">
+                  {description}
+                </p>
+              )}
+            </div>
+          )}
 
           {children}
         </div>

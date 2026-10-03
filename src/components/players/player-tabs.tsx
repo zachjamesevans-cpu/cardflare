@@ -95,10 +95,7 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                   ) : (
                     /* The centre tab: a flame, since the mark is off the
                        site for now. The same glyph the Flares list wears. */
-                    <Flame
-                      className={cn("size-5", active ? undefined : "opacity-50")}
-                      aria-hidden="true"
-                    />
+                    <Flame className="size-5" aria-hidden="true" />
                   )}
 
                   {tab.href === "/inbox" && unread > 0 && (

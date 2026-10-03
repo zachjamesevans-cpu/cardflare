@@ -16,13 +16,16 @@ import { BINDER_COVERS, type BinderCoverId } from "@/lib/binder/covers";
 import { cn } from "@/lib/cn";
 
 /**
- * The binder's settings strip, under the page, for its owner.
+ * The binder's settings, for its owner: the body of the "Binder
+ * settings" sheet the page opens from the pencil at the top.
  *
  * The name, whether it is up for trade, and the cover; then Delete
  * binder. Every change saves at once and paints at once: the parent
  * holds the live values and repaints the page from them, the action
  * lands behind, and the refresh confirms it. Nothing here has a Save
- * button because nothing here is worth a second tap.
+ * button because nothing here is worth a second tap. The founder
+ * (round 3) on the strip this used to be, under the page: "Maybe a
+ * small edit icon at the top or something."
  *
  * The name is the binder's own, saved when the field is left or on
  * Return. The founder: "Ability to change name of binder. Notice how
@@ -99,9 +102,7 @@ export function BinderSettings({
   };
 
   return (
-    <section className="flex flex-col gap-4 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-4">
-      <p className="font-semibold text-text-primary">Binder</p>
-
+    <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold text-text-primary">Name</span>
         <TextInput
@@ -219,6 +220,6 @@ export function BinderSettings({
           it.
         </p>
       </Sheet>
-    </section>
+    </div>
   );
 }

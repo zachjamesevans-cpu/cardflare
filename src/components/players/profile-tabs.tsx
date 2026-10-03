@@ -17,8 +17,8 @@ import {
   BookOpen,
   Crosshair,
   Flame,
-  LayoutGrid,
   Sparkles,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,13 +67,17 @@ export {
 } from "@/lib/players/profile-tabs";
 export type { ProfileTab } from "@/lib/players/profile-tabs";
 
+/* Flares wear the flame, the same glyph as the Flare tab in the dock,
+   and Embers the shop, since the tab is the store. The founder: "it
+   should be changed to a flare icon for that section of the profile.
+   The embers store page thing should be a small shop icon." */
 const TABS: Record<ProfileTab, { label: string; icon: LucideIcon }> = {
-  flares: { label: "Flares", icon: LayoutGrid },
+  flares: { label: "Flares", icon: Flame },
   hunts: { label: "Hunts", icon: Crosshair },
   binders: { label: "Binders", icon: BookOpen },
   showcase: { label: "Showcase", icon: Sparkles },
   trades: { label: "Trades", icon: ArrowLeftRight },
-  embers: { label: "Embers", icon: Flame },
+  embers: { label: "Embers", icon: Store },
 };
 
 /** How far a finger goes sideways before it is a swipe, not a tap. */
