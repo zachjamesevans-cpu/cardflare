@@ -80,14 +80,18 @@ import {
  * shelf uses, with nothing to offer: the binder is not answerable
  * yet, that is a later round.
  *
- * The owner adds cards through the card picker (the button under the
- * page, or the "+" in any empty pocket), takes one out with Edit on,
- * holds a card to move it, and sets the binder up in the strip at the
- * foot: its name, Up for trade, the cover, and at the bottom Delete
- * binder. Every write paints at once from what the server sends back
- * and then asks for the truth again behind it. A visitor gets the
- * chips when any of the cards are on their hunts, and one button,
- * Message.
+ * The owner adds cards through the card picker, opened from the "+"
+ * in any empty pocket (the trailing page always has one), holds a
+ * card to move it, and takes one out by dropping it on Remove, the
+ * zone that appears under the page while a card is in hand. The
+ * binder's settings (its name, Up for trade, the cover, and Delete
+ * binder) are a sheet behind the pencil in the header. The founder
+ * (2026-10-03) did not want the settings all the way at the bottom,
+ * asked for "a small edit icon at the top", and called the Add cards
+ * and Edit buttons "completely redundant". Every write
+ * paints at once from what the server sends back and then asks for
+ * the truth again behind it. A visitor gets the chips when any of the
+ * cards are on their hunts, and one button, Message.
  *
  * THE GRID is measured, never guessed. The page frame reports its
  * width through onLayout and the pocket is a third of what is left
@@ -108,6 +112,13 @@ import {
  * the same pixels. No wiggle, no neighbour sliding, no page turn
  * while a card is in hand: a card crosses pages by being dropped on
  * the last pocket of this one and carried over with the Next arrow.
+ *
+ * REMOVE is a drop too. While a card is in hand a dashed zone in the
+ * danger colour appears under the page frame; it is measured with
+ * onLayout against the same parent as the frame, so the finger, which
+ * the gesture tracks in the frame's coordinates, can be asked whether
+ * it is over it. Dropped there, the card leaves the binder and the
+ * overlay fades out where it is instead of gliding home.
  */
 
 /** The ring round each pocket, the gap between them. */
@@ -196,8 +207,9 @@ export function BinderScreen({
   const [writeError, setWriteError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(0);
-  const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  /* The settings sheet, behind the pencil in the header. */
+  const [settingsOpen, setSettingsOpen] = useState(false);
   /* The delete confirm, over the page. */
   const [deleting, setDeleting] = useState(false);
   /* The page frame's width, as laid out; nothing is drawn before it is known. */
@@ -227,10 +239,24 @@ export function BinderScreen({
 
   /* The header is the binder's name, once that is known: the name, or
      "<Name>'s <name>" on somebody else's. The website's page title
-     says the same. */
+     says the same. The owner's header also carries the pencil that
+     opens the settings sheet, where the website's title row has it. */
   useEffect(() => {
     if (!binder) return;
-    navigation.setOptions({ title: binderTitle(binder) });
+    navigation.setOptions({
+      title: binderTitle(binder),
+      headerRight: binder.yours
+        ? () => (
+            <Tap
+              onPress={() => setSettingsOpen(true)}
+              hitSlop={8}
+              accessibilityLabel="Binder settings"
+            >
+              <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
+            </Tap>
+          )
+        : undefined,
+    });
   }, [binder, navigation]);
 
   /*
@@ -308,13 +334,6 @@ export function BinderScreen({
     setPage(clamp(index, 0, pageCount - 1));
   };
 
-  /* Whole points: a fractional width would put a fraction of a point
-     into every pocket, and the pager snaps by this number. */
-  const onFrameLayout = (event: LayoutChangeEvent) => {
-    const width = Math.floor(event.nativeEvent.layout.width);
-    if (width !== pageWidth) setPageWidth(width);
-  };
-
   const drag = useHoldToMove({
     enabled: yours,
     cards: allCards,
@@ -329,7 +348,31 @@ export function BinderScreen({
         ),
       );
     },
+    onRemove: (index) => {
+      const card = allCards[index];
+      if (!card) return;
+      setBinder((current) =>
+        current
+          ? {
+              ...current,
+              cards: current.cards.filter((entry) => entry.entryId !== card.entryId),
+              count: Math.max(0, current.count - 1),
+            }
+          : current,
+      );
+      void write(() => removeBinderCard(card.entryId, id));
+    },
   });
+
+  /* Whole points: a fractional width would put a fraction of a point
+     into every pocket, and the pager snaps by this number. The frame's
+     place in its parent goes to the gesture, which measures the Remove
+     zone against the same parent. */
+  const onFrameLayout = (event: LayoutChangeEvent) => {
+    drag.onFrameLayout(event);
+    const width = Math.floor(event.nativeEvent.layout.width);
+    if (width !== pageWidth) setPageWidth(width);
+  };
 
   if (!binder) {
     return (
@@ -365,9 +408,9 @@ export function BinderScreen({
     direction: "showcase",
   }));
 
-  const heldCard = drag.held
-    ? allCards.find((card) => card.entryId === drag.held?.entryId)
-    : undefined;
+  /* The held card rides with the gesture, not the list: after a drop
+     on Remove it is already off the shelf while the overlay fades. */
+  const heldCard = drag.held?.card;
 
   return (
     <>
@@ -438,25 +481,10 @@ export function BinderScreen({
                   shelfStart={index * per}
                   shelf={shelf}
                   yours={yours}
-                  editing={yours && editing}
                   drag={drag}
                   /* Only the page under the finger has a target pocket. */
                   target={drag.held && drag.held.page === index ? drag.target : null}
                   onAdd={() => setAdding(true)}
-                  onRemove={(entryId) => {
-                    setBinder((current) =>
-                      current
-                        ? {
-                            ...current,
-                            cards: current.cards.filter(
-                              (card) => card.entryId !== entryId,
-                            ),
-                            count: Math.max(0, current.count - 1),
-                          }
-                        : current,
-                    );
-                    void write(() => removeBinderCard(entryId, id));
-                  }}
                 />
               ))}
             </ScrollView>
@@ -472,9 +500,17 @@ export function BinderScreen({
               dragX={drag.dragX}
               dragY={drag.dragY}
               lift={drag.lift}
+              presence={drag.presence}
             />
           ) : null}
         </View>
+
+        {/* Under the page frame, only while a card is in hand: drop it
+            here and it leaves the binder. Measured against the same
+            parent as the frame, so the gesture knows where it is. */}
+        {drag.held ? (
+          <RemoveZone over={drag.overRemove} onLayout={drag.onRemoveZoneLayout} />
+        ) : null}
 
         <PageDots at={at} of={pageCount} />
 
@@ -484,19 +520,12 @@ export function BinderScreen({
           <View style={{ gap: spacing(3) }}>
             {binder.count === 0 ? (
               <Muted>Cards you would trade. Add the ones you carry.</Muted>
-            ) : null}
-            <Button label="Add cards" onPress={() => setAdding(true)} />
-            <Button
-              label={editing ? "Done" : "Edit"}
-              variant="secondary"
-              onPress={() => setEditing((on) => !on)}
-            />
+            ) : (
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                Hold a card to move it, or drop it on Remove.
+              </Text>
+            )}
             <ErrorLine message={writeError} />
-            <BinderSettings
-              binder={binder}
-              onSave={save}
-              onDelete={() => setDeleting(true)}
-            />
           </View>
         ) : (
           <MessageOwner playerId={binder.ownerId} name={binder.ownerName} />
@@ -512,6 +541,23 @@ export function BinderScreen({
             setFilter("all");
             turnTo(0);
             void write(() => addBinderCard(cardId, printingId, 1, id));
+          }}
+        />
+      ) : null}
+
+      {yours ? (
+        <BinderSettingsSheet
+          visible={settingsOpen}
+          binder={binder}
+          error={writeError}
+          onClose={() => setSettingsOpen(false)}
+          onSave={save}
+          onDelete={() => {
+            /* One modal at a time: the sheet goes before the confirm
+               comes, so iOS is never asked to present over a modal it
+               is still presenting. */
+            setSettingsOpen(false);
+            setDeleting(true);
           }}
         />
       ) : null}
@@ -552,6 +598,8 @@ function binderLine(binder: Binder): string {
 /** A card in hand: which, where it came from, where its overlay starts. */
 interface Held {
   entryId: string;
+  /** The card itself, kept so the overlay can fade out after a drop on Remove has taken it off the shelf. */
+  card: BinderCard;
   /** Its place on the whole shelf, the page it is on, its pocket there. */
   index: number;
   page: number;
@@ -565,15 +613,31 @@ interface HoldToMove {
   held: Held | null;
   /** The pocket under the finger on the held card's page, or null off the grid. */
   target: number | null;
+  /** The finger is over the Remove zone. */
+  overRemove: boolean;
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   lift: SharedValue<number>;
+  /** The overlay's opacity: 1 in hand, fading to 0 on a drop on Remove. */
+  presence: SharedValue<number>;
   /** The long press on a pocket: the card lifts. */
   pickUp: (entryId: string) => void;
   /** The pan on a pocket, built once per card. */
   handlersFor: (entryId: string) => GestureResponderHandlers | undefined;
   /** A finger lifted before it ever moved: the card goes back down. */
   onTouchEnd: () => void;
+  /** The page frame's place in its parent, so the zone can be put in its coordinates. */
+  onFrameLayout: (event: LayoutChangeEvent) => void;
+  /** The Remove zone's place in the frame's parent. */
+  onRemoveZoneLayout: (event: LayoutChangeEvent) => void;
+}
+
+/** A rectangle in a parent's coordinates, as onLayout reports one. */
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -589,15 +653,19 @@ function useHoldToMove({
   cards,
   geometry,
   onMove,
+  onRemove,
 }: {
   enabled: boolean;
   cards: BinderCard[];
   geometry: Geometry;
   /** Told once, on the drop: the card at `from` now sits at `to`. */
   onMove: (from: number, to: number) => void;
+  /** Told once, on a drop on Remove: the card at `index` leaves the binder. */
+  onRemove: (index: number) => void;
 }): HoldToMove {
   const [held, setHeld] = useState<Held | null>(null);
   const [target, setTarget] = useState<number | null>(null);
+  const [overRemove, setOverRemove] = useState(false);
   const heldRef = useRef(false);
   const grantedRef = useRef(false);
   const droppingRef = useRef(false);
@@ -607,21 +675,45 @@ function useHoldToMove({
   geometryRef.current = geometry;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
+  const onRemoveRef = useRef(onRemove);
+  onRemoveRef.current = onRemove;
 
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   const lift = useSharedValue(0);
+  const presence = useSharedValue(1);
 
   /* The card in hand, as the handlers see it. */
-  const source = useRef<Held>({ entryId: "", index: 0, page: 0, local: 0, x: 0, y: 0 });
+  const source = useRef<Held | null>(null);
   const targetRef = useRef<number | null>(null);
+  const overRemoveRef = useRef(false);
   /* Where the finger holds the card, from the pocket's top-left. */
   const grab = useRef({ x: 0, y: 0 });
+  /* The page frame and the Remove zone, both in the frame's parent's
+     coordinates; the zone is null until it has been laid out. */
+  const frameRef = useRef<Box>({ x: 0, y: 0, width: 0, height: 0 });
+  const zoneRef = useRef<Box | null>(null);
+
+  /** Whether a finger at (x, y), in the frame's coordinates, is over the Remove zone. */
+  const overZone = (fingerX: number, fingerY: number) => {
+    const zone = zoneRef.current;
+    if (!zone) return false;
+    const frame = frameRef.current;
+    const left = zone.x - frame.x;
+    const top = zone.y - frame.y;
+    return (
+      fingerX >= left &&
+      fingerX <= left + zone.width &&
+      fingerY >= top &&
+      fingerY <= top + zone.height
+    );
+  };
 
   /**
    * The pocket under the finger: the column and row the finger is
    * in, a gap counting with the pocket to its left or above it, and
-   * nothing when the finger is off the grid.
+   * nothing when the finger is off the grid. Below the grid, the
+   * Remove zone is asked whether the finger is over it.
    */
   const aim = (fingerX: number, fingerY: number) => {
     const g = geometryRef.current;
@@ -629,6 +721,12 @@ function useHoldToMove({
     const row = Math.floor((fingerY - PAGE_PAD) / g.slotH);
     const inside = col >= 0 && col < BINDER_LAYOUT && row >= 0 && row < BINDER_LAYOUT;
     const next = inside ? row * BINDER_LAYOUT + col : null;
+    const over = !inside && overZone(fingerX, fingerY);
+    if (over !== overRemoveRef.current) {
+      overRemoveRef.current = over;
+      setOverRemove(over);
+      if (over) Haptics.selectionAsync().catch(() => {});
+    }
     if (next === targetRef.current) return;
     targetRef.current = next;
     setTarget(next);
@@ -641,11 +739,15 @@ function useHoldToMove({
     grantedRef.current = false;
     droppingRef.current = false;
     targetRef.current = null;
+    overRemoveRef.current = false;
+    zoneRef.current = null;
     setHeld(null);
     setTarget(null);
+    setOverRemove(false);
     dragX.value = 0;
     dragY.value = 0;
     lift.value = 0;
+    presence.value = 1;
   };
 
   /**
@@ -653,13 +755,34 @@ function useHoldToMove({
    * re-lays out with a layout animation, the overlay gliding onto the
    * pocket on the same clock; only when both have finished does the
    * overlay give way to the real card, in the same pixels. Off the
-   * grid, or over its own pocket, the card glides home.
+   * grid, or over its own pocket, the card glides home. Over Remove,
+   * the card leaves the binder and the overlay fades out where it is.
    */
   const release = () => {
-    if (!heldRef.current || droppingRef.current) return;
+    const from = source.current;
+    if (!from || !heldRef.current || droppingRef.current) return;
     droppingRef.current = true;
     const g = geometryRef.current;
-    const from = source.current;
+    if (overRemoveRef.current) {
+      overRemoveRef.current = false;
+      targetRef.current = null;
+      setTarget(null);
+      setOverRemove(false);
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          DROP.duration,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      onRemoveRef.current(from.index);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      lift.value = withTiming(0, DROP);
+      presence.value = withTiming(0, DROP, (finished) => {
+        if (finished) runOnJS(land)();
+      });
+      return;
+    }
     const onPage = clamp(
       cardsRef.current.length - from.page * POCKETS_PER_PAGE,
       0,
@@ -692,8 +815,9 @@ function useHoldToMove({
 
   const pickUp = (entryId: string) => {
     if (!enabled || heldRef.current) return;
-    const index = cardsRef.current.findIndex((card) => card.entryId === entryId);
-    if (index < 0) return;
+    const index = cardsRef.current.findIndex((entry) => entry.entryId === entryId);
+    const card = cardsRef.current[index];
+    if (index < 0 || !card) return;
     const g = geometryRef.current;
     if (g.pocketWidth <= 0) return;
     const page = Math.floor(index / POCKETS_PER_PAGE);
@@ -703,13 +827,16 @@ function useHoldToMove({
     grantedRef.current = false;
     droppingRef.current = false;
     targetRef.current = local;
-    source.current = { entryId, index, page, local, x: cell.x, y: cell.y };
+    overRemoveRef.current = false;
+    source.current = { entryId, card, index, page, local, x: cell.x, y: cell.y };
     grab.current = { x: g.pocketWidth / 2, y: g.pocketHeight / 2 };
     dragX.value = 0;
     dragY.value = 0;
+    presence.value = 1;
     lift.value = withSpring(1, SPRING);
     setHeld(source.current);
     setTarget(local);
+    setOverRemove(false);
   };
 
   const responders = useMemo(
@@ -726,12 +853,12 @@ function useHoldToMove({
                 onMoveShouldSetPanResponderCapture: (_e, g) =>
                   heldRef.current &&
                   !grantedRef.current &&
-                  source.current.entryId === card.entryId &&
+                  source.current?.entryId === card.entryId &&
                   (Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2),
                 onMoveShouldSetPanResponder: (_e, g) =>
                   heldRef.current &&
                   !grantedRef.current &&
-                  source.current.entryId === card.entryId &&
+                  source.current?.entryId === card.entryId &&
                   (Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2),
                 onPanResponderGrant: (event) => {
                   grantedRef.current = true;
@@ -741,15 +868,13 @@ function useHoldToMove({
                   };
                 },
                 onPanResponderMove: (_e, g) => {
-                  if (!heldRef.current || droppingRef.current) return;
+                  const from = source.current;
+                  if (!from || !heldRef.current || droppingRef.current) return;
                   /* Straight to shared values: no render, and the card
                      is under the finger on the very next frame. */
                   dragX.value = g.dx;
                   dragY.value = g.dy;
-                  aim(
-                    source.current.x + grab.current.x + g.dx,
-                    source.current.y + grab.current.y + g.dy,
-                  );
+                  aim(from.x + grab.current.x + g.dx, from.y + grab.current.y + g.dy);
                 },
                 /* Once the card is in hand, nobody else gets the touch:
                    the pager and the screen both scroll, and both would
@@ -771,15 +896,23 @@ function useHoldToMove({
   return {
     held,
     target,
+    overRemove,
     dragX,
     dragY,
     lift,
+    presence,
     pickUp,
     handlersFor: (entryId) => responders.get(entryId)?.panHandlers,
     onTouchEnd: () => {
       /* Lifted but never dragged: the pan was never granted, so its
          release never fires. The touch itself says the finger is gone. */
       if (heldRef.current && !grantedRef.current) release();
+    },
+    onFrameLayout: (event) => {
+      frameRef.current = event.nativeEvent.layout;
+    },
+    onRemoveZoneLayout: (event) => {
+      zoneRef.current = event.nativeEvent.layout;
     },
   };
 }
@@ -800,11 +933,9 @@ function BinderPage({
   shelfStart,
   shelf,
   yours,
-  editing,
   drag,
   target,
   onAdd,
-  onRemove,
 }: {
   geometry: Geometry;
   cards: BinderCard[];
@@ -812,12 +943,10 @@ function BinderPage({
   shelfStart: number;
   shelf: ZoomCard[];
   yours: boolean;
-  editing: boolean;
   drag: HoldToMove;
   /** The pocket on this page under the held card, or null. */
   target: number | null;
   onAdd: () => void;
-  onRemove: (entryId: string) => void;
 }) {
   const { pageWidth, pocketWidth, pocketHeight } = geometry;
 
@@ -863,13 +992,11 @@ function BinderPage({
             shelf={shelf}
             position={shelfStart + index}
             yours={yours}
-            editing={editing}
             placeholder={drag.held?.entryId === card.entryId}
             targeted={target === index}
             handlers={drag.handlersFor(card.entryId)}
             onPickUp={() => drag.pickUp(card.entryId)}
             onTouchEnd={drag.onTouchEnd}
-            onRemove={() => onRemove(card.entryId)}
           />
         );
       })}
@@ -981,7 +1108,8 @@ function Copies({ quantity }: { quantity: number }) {
  * A card in its pocket: the picture in a black ring with the sleeve's
  * lip caught along the top, the copies in a corner when there is more
  * than one, and the lime strip at the foot when it is on the viewer's
- * hunts. With Edit on, the owner's remove button sits over it.
+ * hunts. The owner takes it out by holding it and dropping it on
+ * Remove; nothing on the pocket itself removes anything.
  *
  * Exactly the width and height it is given, and nothing inside can
  * widen it: the picture is told the width inside the ring and the
@@ -998,13 +1126,11 @@ function Pocket({
   shelf,
   position,
   yours,
-  editing,
   placeholder,
   targeted,
   handlers,
   onPickUp,
   onTouchEnd,
-  onRemove,
 }: {
   card: BinderCard;
   /** This pocket's place on its page. */
@@ -1013,7 +1139,6 @@ function Pocket({
   shelf: ZoomCard[];
   position: number;
   yours: boolean;
-  editing: boolean;
   /** Its card is in the air: an empty dashed outline. */
   placeholder: boolean;
   /** The held card is over it: the accent ring. */
@@ -1021,7 +1146,6 @@ function Pocket({
   handlers: GestureResponderHandlers | undefined;
   onPickUp: () => void;
   onTouchEnd: () => void;
-  onRemove: () => void;
 }) {
   const { pocketWidth: width, pocketHeight: height } = geometry;
 
@@ -1091,29 +1215,49 @@ function Pocket({
               </Text>
             </View>
           ) : null}
-
-          {editing ? (
-            <Tap
-              onPress={onRemove}
-              hitSlop={6}
-              accessibilityLabel={`Remove ${card.name} from your binder`}
-              style={{
-                position: "absolute",
-                top: 4,
-                right: 4,
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "rgba(0,0,0,0.75)",
-              }}
-            >
-              <Ionicons name="close" size={16} color={colors.textPrimary} />
-            </Tap>
-          ) : null}
         </>
       )}
+    </View>
+  );
+}
+
+/**
+ * The drop that takes a card out: a dashed outline in the danger
+ * colour under the page, drawn only while a card is in hand. Under
+ * the finger it fills in, so the hand knows before it lets go. Its
+ * layout is reported to the gesture, which reads it against the page
+ * frame's own.
+ */
+function RemoveZone({
+  over,
+  onLayout,
+}: {
+  /** The held card is over it. */
+  over: boolean;
+  onLayout: (event: LayoutChangeEvent) => void;
+}) {
+  return (
+    <View
+      onLayout={onLayout}
+      accessibilityLabel="Remove from binder"
+      style={{
+        alignSelf: "stretch",
+        borderRadius: radius.card,
+        borderWidth: over ? POCKET_RING : 1,
+        borderStyle: over ? "solid" : "dashed",
+        borderColor: colors.danger,
+        backgroundColor: over ? colors.elevated : colors.canvas,
+        paddingVertical: spacing(4),
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: spacing(2),
+      }}
+    >
+      <Ionicons name="trash-outline" size={18} color={colors.danger} />
+      <Text style={{ color: colors.danger, fontWeight: "700", fontSize: 14 }}>
+        Remove
+      </Text>
     </View>
   );
 }
@@ -1132,6 +1276,7 @@ function HeldPocket({
   dragX,
   dragY,
   lift,
+  presence,
 }: {
   card: BinderCard;
   geometry: Geometry;
@@ -1140,6 +1285,8 @@ function HeldPocket({
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   lift: SharedValue<number>;
+  /** 1 in hand; fades to 0 after a drop on Remove. */
+  presence: SharedValue<number>;
 }) {
   const { pocketWidth: width, pocketHeight: height } = geometry;
   const style = useAnimatedStyle(() => ({
@@ -1149,6 +1296,7 @@ function HeldPocket({
       { scale: 1 + LIFT_SCALE * lift.value },
     ],
     shadowOpacity: 0.5 * lift.value,
+    opacity: presence.value,
   }));
 
   return (
@@ -1256,9 +1404,90 @@ function Chip({
 }
 
 /**
- * The strip at the foot of your own binder: its name, Up for trade,
- * the cover, and Delete binder at the bottom. Every change saves at
- * once and paints at once; the name saves when the field is left or
+ * Your own binder's settings, in a sheet behind the pencil in the
+ * header: the website's Binder settings sheet, the same fields in
+ * the same order. Nothing in it needs a Save button, so it has none.
+ */
+function BinderSettingsSheet({
+  visible,
+  binder,
+  error,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  visible: boolean;
+  binder: Binder;
+  /** The last write that did not save, shown in the sheet too. */
+  error: string | null;
+  onClose: () => void;
+  onSave: (patch: BinderSettingsPatch) => void;
+  /** The delete confirm. */
+  onDelete: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  if (!visible) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable
+          onPress={onClose}
+          style={{
+            flex: 1,
+            justifyContent: "flex-end",
+            padding: spacing(3),
+            paddingBottom: Math.max(spacing(3), insets.bottom),
+          }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              maxHeight: "85%",
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              padding: spacing(4),
+              gap: spacing(3),
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing(3),
+              }}
+            >
+              <Text
+                style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}
+              >
+                Binder settings
+              </Text>
+              <Tap onPress={onClose} accessibilityLabel="Close">
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </Tap>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <BinderSettings binder={binder} onSave={onSave} onDelete={onDelete} />
+              <ErrorLine message={error} />
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+/**
+ * The settings themselves: the binder's name, Up for trade, the
+ * cover, and Delete binder at the bottom. Every change saves at once
+ * and paints at once; the name saves when the field is left or
  * Return is pressed. Every binder has all four: there is no binder
  * that cannot be renamed or deleted, and deleting the last one leaves
  * the profile with "+" alone.
@@ -1292,20 +1521,7 @@ function BinderSettings({
   };
 
   return (
-    <View
-      style={{
-        gap: spacing(3),
-        borderRadius: radius.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        padding: spacing(4),
-      }}
-    >
-      <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 16 }}>
-        Binder
-      </Text>
-
+    <View style={{ gap: spacing(3) }}>
       <View style={{ gap: spacing(2) }}>
         <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
           Name

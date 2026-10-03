@@ -19,6 +19,10 @@ const read = (path: string) =>
  * padding box, 2pt more than the content box inside the border, and
  * the third pocket wrapped. These pins hold the fix: the width is
  * measured, the border is inside PAGE_PAD, the pocket is floored.
+ *
+ * Round 3 took the buttons off the page: no Add cards button, no Edit
+ * mode, a card leaves by being dropped on Remove, and the settings
+ * are a sheet behind a pencil in the header.
  */
 
 const page = read("mobile/src/screens/binder.tsx");
@@ -121,6 +125,51 @@ describe("hold to move on the phone", () => {
     expect(page).toContain("void load();");
   });
 
+  it("takes a card out by dropping it on Remove, and has no Edit mode", () => {
+    /* Round 3. The founder: "the add cards button and edit button are
+       completely redundant because you should be able to do both of
+       those on that screen already. Delete." */
+    for (const gone of [
+      "editing",
+      "setEditing",
+      '"Done"',
+      'label="Add cards"',
+      'label="Edit"',
+      "from your binder",
+    ]) {
+      expect(page, gone).not.toContain(gone);
+    }
+    /* The zone: under the page frame, only while a card is in hand,
+       dashed in the danger colour, the word Remove in it. */
+    expect(page).toContain("function RemoveZone(");
+    expect(page).toMatch(/\{drag\.held \? \(\s*<RemoveZone/);
+    expect(page).toContain('accessibilityLabel="Remove from binder"');
+    expect(page).toContain("borderColor: colors.danger");
+    expect(page).toMatch(/borderStyle: over \? "solid" : "dashed"/);
+    expect(page).toMatch(/>\s*Remove\s*</);
+    /* Measured with onLayout against the frame's parent, and read in
+       the frame's coordinates, the same ones the finger is tracked in. */
+    expect(page).toContain("onLayout={onLayout}");
+    expect(page).toContain("onRemoveZoneLayout");
+    expect(page).toContain("frameRef.current = event.nativeEvent.layout");
+    expect(page).toContain("zoneRef.current = event.nativeEvent.layout");
+    expect(page).toContain("const left = zone.x - frame.x;");
+    expect(page).toContain("const top = zone.y - frame.y;");
+    /* On release over it: onRemove, not onMove, and the overlay fades
+       rather than gliding home. */
+    expect(page).toContain("if (overRemoveRef.current) {");
+    expect(page).toContain("onRemoveRef.current(from.index)");
+    expect(page).toContain("presence.value = withTiming(0, DROP");
+    expect(page).toContain("opacity: presence.value");
+    expect(page).toContain("removeBinderCard(card.entryId, id)");
+    /* The hint, word for word with the website, only once there is a card. */
+    expect(page).toContain("Hold a card to move it, or drop it on Remove.");
+    expect(page).toContain("Cards you would trade. Add the ones you carry.");
+    expect(page).toMatch(
+      /binder\.count === 0 \? \(\s*<Muted>Cards you would trade\. Add the ones you carry\.<\/Muted>\s*\) : \(\s*<Text style=\{\{ color: colors\.textMuted, fontSize: 12 \}\}>\s*Hold a card to move it, or drop it on Remove\./,
+    );
+  });
+
   it("moves nothing else, and never turns the page in hand", () => {
     for (const gone of [
       "watchEdge",
@@ -184,6 +233,43 @@ describe("the binder's model in the app", () => {
     expect(create).toContain(
       'export const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";',
     );
+  });
+
+  it("keeps its settings in a sheet behind a pencil in the header", () => {
+    /* Round 3. The founder: "having the binder edit screen be all the
+       way at the bottom is kinda meh. Maybe a small edit icon at the
+       top or something." The pencil is the website's, in the header
+       the app already names, and opens the same sheet. */
+    expect(page).toMatch(
+      /navigation\.setOptions\(\{\s*title: binderTitle\(binder\),\s*headerRight:/,
+    );
+    expect(page).toContain('accessibilityLabel="Binder settings"');
+    expect(page).toContain('name="pencil-outline"');
+    expect(page).toMatch(
+      /<Ionicons\s+name="pencil-outline"\s+size=\{22\}\s+color=\{colors\.textPrimary\}/,
+    );
+    expect(page).toContain("function BinderSettingsSheet(");
+    expect(page).toContain("<SheetBackdrop />");
+    expect(page).toMatch(/>\s*Binder settings\s*</);
+    expect(page).toContain(
+      "<BinderSettings binder={binder} onSave={onSave} onDelete={onDelete} />",
+    );
+    /* The settings keep saving at once: no Save button in the sheet. */
+    const sheet = page.slice(
+      page.indexOf("function BinderSettingsSheet("),
+      page.indexOf("function DeleteBinderConfirm("),
+    );
+    expect(sheet.length).toBeGreaterThan(0);
+    expect(sheet).not.toContain('label="Save"');
+    expect(sheet).toContain("Delete binder");
+    /* No settings strip in the page body any more: the page's own
+       owner block is the hint, the empty line and the error. */
+    const body = page.slice(
+      page.indexOf("<PageDots"),
+      page.indexOf("</ScrollView>", page.indexOf("<PageDots")),
+    );
+    expect(body).not.toContain("<BinderSettings");
+    expect(body).not.toContain("<Button");
   });
 
   it("says what the switch means under the title, and deletes any binder", () => {

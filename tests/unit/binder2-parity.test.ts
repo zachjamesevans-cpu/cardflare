@@ -287,8 +287,11 @@ describe("the binder page", () => {
     expect(app.binder).not.toContain("binderId ??");
   });
 
-  it("is in edit mode remove only", () => {
-    expect(web.view).toContain("aria-label={`Remove ${card.name}`}");
+  it("removes a card and nothing else, with no front control", () => {
+    /* Round 3 took the Edit mode: a card is removed by dropping it on
+       the Remove zone (binder3-parity.test.ts). The front control
+       round 2 took stays gone. */
+    expect(web.view).toContain('aria-label="Remove from binder"');
     expect(web.view).not.toContain("aria-pressed={settings.frontEntryId");
     expect(app.binder).not.toContain("the front card");
   });

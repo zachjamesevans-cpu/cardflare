@@ -2,12 +2,12 @@
 
 import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Pencil, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 
 import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
-import { Button } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
 import { removeBinderCardAction, reorderBinderAction } from "@/lib/binder/actions";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import type { BinderCoverId } from "@/lib/binder/covers";
@@ -23,10 +23,15 @@ import { cn } from "@/lib/cn";
  * viewer every other card on the site opens in, with no offer
  * control: the binder is not answerable yet, this round.
  *
- * The owner gets their tools under the page: Add cards, an Edit
- * toggle that puts a remove cross on every pocket, and the settings
- * strip. A visitor gets the "On your hunts" chip when any card is one
- * they are hunting, and the message door.
+ * The owner's tools are the page itself. The founder (round 3): "the
+ * add cards button and edit button are completely redundant because
+ * you should be able to do both of those on that screen already.
+ * Delete." So a card goes in through the "+" in an empty pocket, and
+ * a card comes out by dropping it on the Remove zone that appears
+ * under the page while one is held. The settings (name, Up for trade,
+ * cover, Delete binder) live in a sheet behind the pencil at the top:
+ * "Maybe a small edit icon at the top or something." A visitor gets the "On your hunts" chip when any card is one they
+ * are hunting, and the message door.
  *
  * The order of the pockets is the owner's. The founder: "I think we
  * should have a 'hold to move' thing, similar animations to how
@@ -46,7 +51,7 @@ import { cn } from "@/lib/cn";
  * change paints at once; the server's copy arrives behind it with the
  * refresh and wins, which is also what keeps two tabs honest. The
  * line under the title follows the live Up for trade switch, so
- * flipping it in the strip repaints the words at the top.
+ * flipping it in the sheet repaints the words at the top.
  */
 
 type Settings = {
@@ -65,8 +70,8 @@ const settingsOf = (binder: Binder): Settings => ({
 const COLUMNS = 3;
 const POCKETS_PER_PAGE = COLUMNS * COLUMNS;
 
-/** Where a dragged pocket is hovering: a slot, or an arrow. */
-type DropSpot = number | "prev" | "next";
+/** Where a dragged pocket is hovering: a slot, an arrow, or Remove. */
+type DropSpot = number | "prev" | "next" | "remove";
 
 /**
  * The line under the title: what this binder's cards mean. Up for
@@ -117,8 +122,8 @@ export function BinderView({
 
   const [at, setAt] = useState(0);
   const [onHuntsOnly, setOnHuntsOnly] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   /** The entry id in the air, while a pocket is being dragged. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<DropSpot | null>(null);
@@ -191,16 +196,33 @@ export function BinderView({
     );
   };
 
+  /**
+   * Take the card out: the pocket empties at once and the server
+   * follows; a refusal paints the card back through the refresh. The
+   * count line under the title catches up with the refresh too.
+   */
+  const remove = (entryId: string) => {
+    if (pending) return;
+    const card = cards.find((entry) => entry.entryId === entryId);
+    if (!card) return;
+    setCards((current) => current.filter((entry) => entry.entryId !== entryId));
+    act(() => removeBinderCardAction(card.entryId, binder.id));
+  };
+
   const dropAt = (spot: DropSpot) => (event: DragEvent) => {
     event.preventDefault();
     if (!dragging) return;
-    const to =
-      spot === "prev"
-        ? page * perPage - 1
-        : spot === "next"
-          ? (page + 1) * perPage
-          : spot;
-    move(dragging, to);
+    if (spot === "remove") {
+      remove(dragging);
+    } else {
+      const to =
+        spot === "prev"
+          ? page * perPage - 1
+          : spot === "next"
+            ? (page + 1) * perPage
+            : spot;
+      move(dragging, to);
+    }
     setDragging(null);
     setOver(null);
   };
@@ -222,14 +244,30 @@ export function BinderView({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col gap-0.5">
-        {title && (
-          <h2 className="truncate text-lg font-extrabold text-text-primary">{title}</h2>
+      {/* The title row: the words on the left, and for the owner the
+          pencil on the right that opens the settings sheet. */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          {title && (
+            <h2 className="truncate text-lg font-extrabold text-text-primary">
+              {title}
+            </h2>
+          )}
+          {line && <p className="text-sm text-text-secondary">{line}</p>}
+          <p className="text-xs text-text-muted tabular-nums">
+            {countLine} · Page {page + 1} of {pages}
+          </p>
+        </div>
+        {binder.yours && (
+          <button
+            type="button"
+            aria-label="Binder settings"
+            onClick={() => setSettingsOpen(true)}
+            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+          </button>
         )}
-        {line && <p className="text-sm text-text-secondary">{line}</p>}
-        <p className="text-xs text-text-muted tabular-nums">
-          {countLine} · Page {page + 1} of {pages}
-        </p>
       </div>
 
       {!binder.yours && binder.onYourHunts > 0 && (
@@ -349,20 +387,6 @@ export function BinderView({
                       thumbClassName="w-full"
                       thumb={<PocketTile card={card} imagesEnabled={imagesEnabled} />}
                     />
-                    {/* Edit mode: remove, and nothing else. */}
-                    {binder.yours && editing && (
-                      <button
-                        type="button"
-                        disabled={pending}
-                        aria-label={`Remove ${card.name}`}
-                        onClick={() =>
-                          act(() => removeBinderCardAction(card.entryId, binder.id))
-                        }
-                        className="absolute top-1 right-1 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full bg-canvas/85 text-text-primary ring-1 ring-border-strong transition-colors hover:bg-danger hover:text-accent-contrast"
-                      >
-                        <X className="size-3.5" strokeWidth={3} aria-hidden="true" />
-                      </button>
-                    )}
                   </div>
                 ) : binder.yours ? (
                   <AddPocket onClick={() => setAdding(true)} />
@@ -410,6 +434,28 @@ export function BinderView({
         )}
       </div>
 
+      {/*
+       * REMOVE, under the page, only while a card is in the air. The
+       * one way a card leaves the binder: it is dropped here. Drawn in
+       * the danger colour so it cannot be mistaken for a pocket, and
+       * not drawn at all when nothing is held.
+       */}
+      {binder.yours && dragging && (
+        <div
+          role="group"
+          aria-label="Remove from binder"
+          onDragOver={dragOver("remove", false)}
+          onDragLeave={dragLeave("remove")}
+          onDrop={dropAt("remove")}
+          className={cn(
+            "flex h-14 items-center justify-center rounded-[var(--radius-control)] border-2 border-dashed border-danger text-sm font-semibold text-danger transition-colors",
+            over === "remove" ? "bg-danger/20" : "bg-danger/5",
+          )}
+        >
+          Remove
+        </div>
+      )}
+
       {pages > 1 && (
         <div className="flex items-center justify-center gap-1.5">
           {Array.from({ length: pages }, (_, index) => (
@@ -428,6 +474,12 @@ export function BinderView({
         </div>
       )}
 
+      {binder.yours && cards.length > 0 && (
+        <p className="text-center text-xs text-text-muted">
+          Hold a card to move it, or drop it on Remove.
+        </p>
+      )}
+
       {binder.count === 0 && (
         <p className="text-center text-sm text-text-muted">
           {binder.yours
@@ -444,34 +496,28 @@ export function BinderView({
 
       {binder.yours ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <AddBinderCard
-              binderId={binder.id}
-              imagesEnabled={imagesEnabled}
-              playerGames={playerGames}
-              open={adding}
-              onOpenChange={setAdding}
-            />
-            {binder.count > 0 && (
-              <Button
-                type="button"
-                variant={editing ? "primary" : "secondary"}
-                aria-pressed={editing}
-                onClick={() => setEditing((value) => !value)}
-              >
-                <Pencil className="size-4" aria-hidden="true" />
-                {editing ? "Done" : "Edit"}
-              </Button>
-            )}
-          </div>
-          <BinderSettings
+          {/* The Add cards sheet, opened from the "+" pockets alone. */}
+          <AddBinderCard
             binderId={binder.id}
-            name={settings.name}
-            count={binder.count}
-            forTrade={settings.forTrade}
-            cover={settings.cover}
-            onChange={paint}
+            imagesEnabled={imagesEnabled}
+            playerGames={playerGames}
+            open={adding}
+            onOpenChange={setAdding}
           />
+          <Sheet
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            title="Binder settings"
+          >
+            <BinderSettings
+              binderId={binder.id}
+              name={settings.name}
+              count={binder.count}
+              forTrade={settings.forTrade}
+              cover={settings.cover}
+              onChange={paint}
+            />
+          </Sheet>
         </>
       ) : (
         footer

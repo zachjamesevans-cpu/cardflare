@@ -35,8 +35,10 @@ const read = (path: string) => {
  * /binders/<id>. Binder round 2 (binder2-parity.test.ts) took the
  * picture off the cover, the Front control off the page, the 2 x 2
  * off the strip and the Private switch out: every binder is named
- * and has one switch, Up for trade. The pins here are what those
- * rounds left standing.
+ * and has one switch, Up for trade. Binder round 3
+ * (binder3-parity.test.ts) took the Add cards and Edit buttons from
+ * under the page and moved the settings into a sheet behind a pencil
+ * at the top. The pins here are what those rounds left standing.
  */
 
 const web = {
@@ -68,15 +70,15 @@ const app = {
 };
 
 describe("the binder page", () => {
-  it("has the owner's tools and the visitor's words on both platforms", () => {
+  it("has the owner's switch and the visitor's words on both platforms", () => {
+    /* Round 3 took the Add cards and Edit buttons: the "+" pockets
+       add and the Remove zone removes, so neither word is pinned. */
     for (const [name, page] of [
       ["web", web.page],
       ["app", app.page],
     ] as const) {
       expect(page.length, `${name}: the page exists`).toBeGreaterThan(0);
       for (const word of [
-        "Add cards",
-        "Edit",
         "Up for trade",
         "ON YOUR HUNT",
         "Cards you would trade. Add the ones you carry.",
@@ -137,7 +139,7 @@ describe("the binder page", () => {
        including an empty binder. A visitor never sees the extra page. */
     expect(web.view).toContain("Math.floor(list.length / perPage) + 1");
     expect(web.view).toContain("Math.max(1, Math.ceil(list.length / perPage))");
-    /* The pocket opens the same sheet as the button under the page. */
+    /* The pocket opens the Add cards sheet, and is the one way in. */
     expect(web.view).toMatch(/<AddPocket\s+onClick=\{\(\) => setAdding\(true\)\}/);
     expect(web.page).toContain("onOpenChange={setAdding}");
   });

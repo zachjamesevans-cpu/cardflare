@@ -25,9 +25,9 @@ export const dynamic = "force-dynamic";
  * One of your own binders, open, with the tools under it.
  *
  * `binderId` is the binder's id; one that is nobody's is a 404. The
- * same screen a visitor gets at /p/<you>/binders/<id>, plus Add
- * cards, Edit and the settings strip, because `readBinder` knows it
- * is you looking. The line under the title (up for trade, or
+ * same screen a visitor gets at /p/<you>/binders/<id>, plus the "+"
+ * pockets, hold to move, the Remove drop and the settings behind the
+ * pencil, because `readBinder` knows it is you looking. The line under the title (up for trade, or
  * private) is the page's own, following the switch as it is flipped.
  * The app's Binder screen with no playerId draws the same.
  */

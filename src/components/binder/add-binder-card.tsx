@@ -17,10 +17,13 @@ import { addBinderCardAction } from "@/lib/binder/actions";
  * sheet stays open so a second card is one more tap, which is how
  * somebody loads a binder: in a run, not one visit per card.
  *
- * The page owns whether the sheet is open, because the button under
- * the page is not the only way in: every empty pocket on the owner's
- * binder is a "+" that opens this same sheet. The binder's id says
- * which binder the card lands in.
+ * The page owns whether the sheet is open, because every empty pocket
+ * on the owner's binder is a "+" that opens it, and since round 3
+ * that is the only way in: the founder, "the add cards button and
+ * edit button are completely redundant because you should be able to
+ * do both of those on that screen already. Delete." The button is
+ * still here for a caller that asks for it with `trigger`; the binder
+ * page does not. The binder's id says which binder the card lands in.
  */
 export function AddBinderCard({
   binderId,
@@ -28,6 +31,7 @@ export function AddBinderCard({
   playerGames,
   open,
   onOpenChange,
+  trigger = false,
 }: {
   /** The binder the card lands in. */
   binderId: string;
@@ -36,6 +40,8 @@ export function AddBinderCard({
   playerGames: readonly string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Draw an "Add cards" button that opens the sheet. Off by default. */
+  trigger?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +59,12 @@ export function AddBinderCard({
 
   return (
     <>
-      <Button type="button" onClick={() => onOpenChange(true)}>
-        <Plus className="size-4" aria-hidden="true" />
-        Add cards
-      </Button>
+      {trigger && (
+        <Button type="button" onClick={() => onOpenChange(true)}>
+          <Plus className="size-4" aria-hidden="true" />
+          Add cards
+        </Button>
+      )}
 
       <Sheet
         open={open}
