@@ -1,5 +1,8 @@
 import "server-only";
 
+import { goingStates } from "@/lib/events/going";
+import type { NightPhase } from "@/lib/events/nights";
+import { roomPhase } from "@/lib/events/schema";
 import type { GameSlug } from "@/lib/players/games-catalog";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -76,13 +79,25 @@ export interface UpcomingNight {
    * says so, so a player knows they can post before they arrive.
    */
   boardOpensAt: string | null;
+  /** Who has said Going, and whether the viewer has. */
+  goingCount: number;
+  youGoing: boolean;
+  /**
+   * Where the night stands for the Going button: live, early (board
+   * open ahead of doors) or upcoming (posted, not yet in the window).
+   * Null once the start has passed without the store opening it.
+   */
+  phase: NightPhase | null;
 }
 
 async function upcomingFor(
   storeId: string,
   earlyBoardHours: number,
+  timeZone: string,
+  viewerId: string | null,
 ): Promise<UpcomingNight[]> {
-  const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  const now = Date.now();
+  const since = new Date(now - 4 * 60 * 60 * 1000).toISOString();
   const { data } = await getSupabaseAdmin()
     .from("events")
     .select("id, name, starts_at, ends_at, join_code, status, cancelled_at")
@@ -93,9 +108,25 @@ async function upcomingFor(
     .order("starts_at")
     .limit(3);
 
-  return (data ?? [])
-    .filter((row) => !row.cancelled_at)
-    .map((row) => ({
+  const rows = (data ?? []).filter((row) => !row.cancelled_at);
+  const going = await goingStates(
+    rows.map((row) => row.id),
+    viewerId,
+  );
+
+  return rows.map((row) => {
+    const phase = roomPhase(
+      {
+        kind: "scheduled",
+        status: row.status,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        earlyBoardHours,
+        storeTimeZone: timeZone,
+      },
+      now,
+    );
+    return {
       eventId: row.id,
       name: row.name,
       startsAt: row.starts_at,
@@ -108,10 +139,22 @@ async function upcomingFor(
               new Date(row.starts_at).getTime() - earlyBoardHours * 60 * 60 * 1000,
             ).toISOString()
           : null,
-    }));
+      goingCount: going.get(row.id)?.goingCount ?? 0,
+      youGoing: going.get(row.id)?.youGoing ?? false,
+      phase:
+        phase === "live" || phase === "early" || phase === "upcoming" ? phase : null,
+    };
+  });
 }
 
-export async function publicStore(storeId: string): Promise<PublicStore | null> {
+/**
+ * `viewerId` is the signed-in player, for `youGoing` on each night;
+ * null for a guest, who sees the counts and no button of their own.
+ */
+export async function publicStore(
+  storeId: string,
+  viewerId: string | null = null,
+): Promise<PublicStore | null> {
   if (!isSupabaseConfigured()) return null;
 
   const admin = getSupabaseAdmin();
@@ -156,6 +199,11 @@ export async function publicStore(storeId: string): Promise<PublicStore | null> 
     games: storeGamesFrom(gameRows ?? []),
     timeZone: data.timezone ?? "UTC",
     casePicks: await caseFor(storeId),
-    upcoming: await upcomingFor(storeId, data.early_board_hours ?? 0),
+    upcoming: await upcomingFor(
+      storeId,
+      data.early_board_hours ?? 0,
+      data.timezone ?? "UTC",
+      viewerId,
+    ),
   };
 }

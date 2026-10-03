@@ -16,6 +16,7 @@ import {
 } from "../api";
 import { FollowStoreButton } from "../follow-store-button";
 import { gameShortName } from "../games";
+import { GoingButton } from "../going-button";
 import { RemoteImage } from "../remote-image";
 import { CoverBanner } from "../showcase-zoom";
 import { openRoom } from "../open-room";
@@ -365,6 +366,18 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
                       can post before they are in the door. */}
                   {!night.live && night.boardOpensAt ? (
                     <Muted>{`Board opens ${whenAt(night.boardOpensAt)}`}</Muted>
+                  ) : null}
+                  {/* Going, and who else is, on every night the server
+                      knows the word for: the website's store page, row
+                      for row. A night that has started without a room
+                      (phase null) has nothing to say Going to. */}
+                  {night.goingCount !== undefined && night.phase !== null ? (
+                    <GoingButton
+                      eventId={night.eventId}
+                      youGoing={night.youGoing ?? false}
+                      goingCount={night.goingCount}
+                      size="chip"
+                    />
                   ) : null}
                   {night.live && night.joinCode ? (
                     <Button

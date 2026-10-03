@@ -37,7 +37,7 @@ import {
   setOpenToTrades,
 } from "./participants";
 import { enterRoomByCode, resolveCode } from "./rooms";
-import { roomPhase } from "./schema";
+import { boardWritable, roomPhase } from "./schema";
 
 const JOIN_MAX = 20;
 const JOIN_WINDOW_MS = 10 * 60 * 1000;
@@ -104,9 +104,10 @@ export async function joinEventAction(
 
   // Checked at the moment of joining, not when the page rendered: a store can
   // close the room between a player loading it and tapping the button. An
-  // early board is a real door — joining days ahead is the whole feature.
+  // early board is a real door — joining days ahead is the whole feature,
+  // and a posted night is a door from the moment it is posted.
   const phase = roomPhase(event, Date.now());
-  if (phase !== "live" && phase !== "early") {
+  if (!boardWritable(phase)) {
     return invalid("This room is not open right now.", submitted);
   }
 

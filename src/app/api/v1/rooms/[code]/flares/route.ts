@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { apiSession, badRequest, unauthorized } from "@/lib/api/auth";
-import { roomPhase } from "@/lib/events/schema";
+import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
@@ -39,9 +39,9 @@ export async function POST(
   const session = await apiSession(request, resolved.room.id);
   if (!session) return unauthorized();
 
-  // Live rooms and early boards both take Flares; nothing else does.
+  // Live rooms, early boards and posted nights take Flares; nothing else does.
   const flarePhase = roomPhase(resolved.room, Date.now());
-  if (flarePhase !== "live" && flarePhase !== "early") {
+  if (!boardWritable(flarePhase)) {
     return Response.json({ error: "not-open" }, { status: 409 });
   }
 

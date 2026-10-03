@@ -22,10 +22,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * The app's Room tab, on the website.
+ * The code door, on the website: the app's Room screen.
  *
- * A destination rather than a page: the board itself still lives at
- * `/e/CODE`, and this is the door the bottom bar knocks on. Which room
+ * Nights holds the dock's slot now and this is one button down from
+ * it, "Scan or enter a code". The board itself still lives at
+ * `/e/CODE`, and this is the door that opens it by code. Which room
  * is derived from the session's own participation — see
  * `currentRoomForSession` — so there is no pointer to go stale.
  *
@@ -76,8 +77,8 @@ export default async function RoomPage() {
               No room yet
             </h1>
             <p className="text-text-secondary">
-              Scan the code at your store&rsquo;s counter, or type it here. Either way
-              the room lives on this tab until you leave it.
+              Scan the code at your store&rsquo;s counter, or type it here. The nights
+              coming up, and the ones you&rsquo;re going to, are on the Nights tab.
             </p>
           </div>
 

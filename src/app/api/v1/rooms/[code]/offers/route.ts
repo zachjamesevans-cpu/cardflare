@@ -6,6 +6,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
+import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { offerTrade, withdrawOffer } from "@/lib/matching/repository";
 import { offerMessageSchema, offerQuantitySchema } from "@/lib/matching/schema";
 import { notifyOfferReceived } from "@/lib/notifications/notify";
@@ -20,20 +21,37 @@ export const dynamic = "force-dynamic";
  * pledge, held card or not, and the pledge can say how many copies.
  */
 
-async function membership(request: Request, rawCode: string) {
+type Membership =
+  | {
+      ok: true;
+      eventId: string;
+      session: NonNullable<Awaited<ReturnType<typeof apiSession>>>;
+    }
+  | { ok: false; response: Response };
+
+async function membership(request: Request, rawCode: string): Promise<Membership> {
   const code = normalizeJoinCode(decodeURIComponent(rawCode));
-  if (!isValidJoinCode(code)) return null;
+  if (!isValidJoinCode(code)) return { ok: false, response: unauthorized() };
 
   const resolved = await resolveCode(code);
-  if (resolved.outcome !== "room") return null;
+  if (resolved.outcome !== "room") return { ok: false, response: unauthorized() };
 
   const session = await apiSession(request, resolved.room.id);
-  if (!session) return null;
+  if (!session) return { ok: false, response: unauthorized() };
 
   const participation = await findParticipation(resolved.room.id, session.id);
-  if (!participation) return null;
+  if (!participation) return { ok: false, response: unauthorized() };
 
-  return { eventId: resolved.room.id, session };
+  /* A hand goes up on a board that is taking writes: a posted night, an
+     early board or a live room. A finished room keeps its history. */
+  if (!boardWritable(roomPhase(resolved.room, Date.now()))) {
+    return {
+      ok: false,
+      response: Response.json({ error: "not-open" }, { status: 409 }),
+    };
+  }
+
+  return { ok: true, eventId: resolved.room.id, session };
 }
 
 const offerSchema = z.object({
@@ -47,7 +65,7 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> },
 ): Promise<Response> {
   const found = await membership(request, (await params).code);
-  if (!found) return unauthorized();
+  if (!found.ok) return found.response;
 
   /* Per room identity: a hand raised thirty times in an hour is not a
      night at a store. */
@@ -92,7 +110,7 @@ export async function DELETE(
   { params }: { params: Promise<{ code: string }> },
 ): Promise<Response> {
   const found = await membership(request, (await params).code);
-  if (!found) return unauthorized();
+  if (!found.ok) return found.response;
 
   const parsed = withdrawSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("flareId is required");

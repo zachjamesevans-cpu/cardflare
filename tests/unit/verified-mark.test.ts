@@ -78,8 +78,9 @@ describe("the mark beside a store's name", () => {
 
     const app = read("mobile/src/screens/room.tsx");
     expect(app).toContain('from "../verified-mark"');
-    /* Both store-name taps: the join screen and the door card. */
-    expect(app.match(/room\.verified \? <VerifiedMark/g)).toHaveLength(2);
+    /* The store-name taps: the join screen, the door card, and the
+       pre-start room's header (Nights round 1). */
+    expect(app.match(/room\.verified \? <VerifiedMark/g)).toHaveLength(3);
   });
 
   it("is on the nearby store cards, and the old ticks are gone", () => {

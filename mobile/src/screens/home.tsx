@@ -23,6 +23,7 @@ import {
 
 import type { StackParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
+import { GoingButton } from "../going-button";
 import { openRoom } from "../open-room";
 import { followHref } from "../follow-href";
 import {
@@ -1301,6 +1302,18 @@ export function HomeScreen() {
                   <Body>
                     {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your want list to ask about.`}
                   </Body>
+                ) : null}
+
+                {/* Going, and who else is: the one button for a night,
+                    the same as on the website's upcoming card. Only
+                    with a night to go to, and only from a server that
+                    knows the word. */}
+                {item.nextEventId && item.goingCount !== undefined ? (
+                  <GoingButton
+                    eventId={item.nextEventId}
+                    youGoing={item.youGoing ?? false}
+                    goingCount={item.goingCount}
+                  />
                 ) : null}
 
                 <Button

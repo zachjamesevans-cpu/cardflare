@@ -12,6 +12,11 @@ import { FlareBoard } from "@/components/lists/list-entries";
 import { JoinEventForm } from "@/components/events/join-event-form";
 import { MatchSummary } from "@/components/matching/match-summary";
 import { OpenToTradesToggle } from "@/components/events/open-to-trades-toggle";
+import {
+  NightRosterCard,
+  PreStartCard,
+  PreStartRoom,
+} from "@/components/events/pre-start-room";
 import { RoomBoardCard } from "@/components/events/room-board-card";
 import { RoomComposerDoor } from "@/components/events/room-composer-door";
 import { RoomDoor } from "@/components/events/room-door";
@@ -53,6 +58,7 @@ import {
   offersByFlare,
 } from "@/lib/matching/schema";
 import { roomPhase } from "@/lib/events/schema";
+import { goingState, nightRoster } from "@/lib/events/going";
 import { gameProfile } from "@/lib/event-hub/game-profiles";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
@@ -343,13 +349,26 @@ async function RoomBody({
   /*
    * One phase, decided once, rendered everywhere below. "early" is a real
    * room days before doors: the join form works, the board works, and a
-   * loud banner says the people on it are still on their way.
+   * loud banner says the people on it are still on their way. "upcoming"
+   * is the night from the moment the store posts it: browsable by
+   * anyone, and Going is the way onto it.
    */
   const phase = roomPhase(event);
 
   /*
-   * Only read once the player is actually in the room. A visitor looking at a
-   * join form has no business causing a read of anybody's lists.
+   * Before the night starts the room is open to look at. The founder:
+   * "anyone can go into there and see who is looking for which cards
+   * before the tournament or event starts." A viewer with a seat gets
+   * the working board; one without gets the same board read-only.
+   */
+  const preStart = phase === "upcoming" || phase === "early";
+  const browsing = preStart && !inRoom;
+
+  /*
+   * The lists are read for a player in the room, and the board alone
+   * for somebody browsing a night ahead of time. A visitor looking at a
+   * join form on a live night has no business causing a read of
+   * anybody's lists.
    */
   const [participants, flares, binder, roomOffers, myTrades] = inRoom
     ? await Promise.all([
@@ -359,7 +378,7 @@ async function RoomBody({
         listRoomOffers(event.id),
         listMyTrades(event.id, session!.id),
       ])
-    : [[], [], [], [], []];
+    : [[], browsing ? await listRoomFlares(event.id) : [], [], [], []];
 
   /* The tournament clocks, for anyone who cannot see the wall from
      their seat — or stepped outside with the room in their pocket. */
@@ -405,6 +424,18 @@ async function RoomBody({
        same as somebody who joined signed in. See auto-post.ts. */
     await postFlaresOnJoin(event.id, session, accountPlayerId);
   }
+
+  /*
+   * The night's roster and the viewer's place on it, before the night
+   * starts. Read after the link above, so an account that just signed
+   * in mid-night counts as going the moment its seat is its own.
+   */
+  const [night, roster] = preStart
+    ? await Promise.all([
+        goingState(event.id, accountPlayerId),
+        nightRoster(event.id, accountPlayerId),
+      ])
+    : [null, []];
 
   /*
    * The composer is the Flare tab's, given the same things: the hunts a
@@ -549,10 +580,18 @@ async function RoomBody({
    * the ticker, the clocks, the composer and the board all hang off
    * this one answer.
    */
-  const live = inRoom && session && phase !== "pending" && phase !== "finished";
+  const live = inRoom && session && (phase === "live" || phase === "early");
+
+  /*
+   * How often the page re-reads itself: every twelve seconds while the
+   * night is on, once a minute while the board is open early, and not
+   * at all for a night still days out, where nothing moves by the
+   * minute. The app's POLL_MS steps the same way.
+   */
+  const tickerMs = phase === "live" ? 12_000 : phase === "early" ? 60_000 : null;
 
   return (
-    <Shell wide={inRoom}>
+    <Shell wide={inRoom || browsing}>
       {/*
        * The door: store, night, pulse. The people list opens from the
        * pulse line; the remote and the help page are the two small
@@ -664,7 +703,23 @@ async function RoomBody({
       ) : inRoom && session ? (
         <>
           {/* Offers land while people wander; the room re-reads itself. */}
-          <RoomTicker />
+          {tickerMs !== null && <RoomTicker intervalMs={tickerMs} />}
+
+          {/* Before the night: you are on the roster, and here is who
+              else is. The board below is the working one, since a seat
+              in the room is what Going gave you. A guest in the room
+              keeps the account pitch above instead of a button that
+              would only send them to sign in. */}
+          {preStart && night && accountPlayerId && (
+            <PreStartCard
+              eventId={event.id}
+              code={normalized}
+              youGoing
+              goingCount={night.goingCount}
+              signedIn
+            />
+          )}
+          {preStart && <NightRosterCard roster={roster} />}
 
           <MatchSummary
             offerCount={offersOnMine}
@@ -741,6 +796,33 @@ async function RoomBody({
             timeZone={event.storeTimeZone}
             code={normalized}
           />
+        </>
+      ) : browsing && night ? (
+        <>
+          {tickerMs !== null && <RoomTicker intervalMs={tickerMs} />}
+
+          <PreStartRoom
+            eventId={event.id}
+            code={normalized}
+            youGoing={night.youGoing}
+            goingCount={night.goingCount}
+            signedIn={Boolean(accountPlayerId)}
+            roster={roster}
+            flares={flares}
+            imagesEnabled={images}
+          />
+
+          {/* A guest's way in is still the walk-in form, the same as on
+              a live night: Going needs an account, and the pitch under
+              the form says why one is worth having. */}
+          {!accountName && (
+            <>
+              <Card>
+                <JoinEventForm code={normalized} knownAs={session?.display_name} />
+              </Card>
+              <AccountPitch next={`/e/${normalized}`} variant="join" />
+            </>
+          )}
         </>
       ) : (
         <>

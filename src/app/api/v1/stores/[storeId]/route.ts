@@ -33,11 +33,12 @@ export async function GET(
   { params }: { params: Promise<{ storeId: string }> },
 ): Promise<Response> {
   const { storeId } = await params;
-  const store = await publicStore(storeId);
+  /* The account first: each night's `youGoing` is the viewer's own. */
+  const account = await apiPlayer(request);
+  const store = await publicStore(storeId, account?.playerId ?? null);
 
   if (!store) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const account = await apiPlayer(request);
   const [following, board] = await Promise.all([
     account ? hasLocal(account.playerId, store.storeId) : Promise.resolve(false),
     storeBoard(store.storeId),

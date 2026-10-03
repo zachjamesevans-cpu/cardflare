@@ -47,6 +47,7 @@ import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
+import { NightsScreen } from "./src/screens/nights";
 import { RoomTab } from "./src/screens/room";
 import { ThreadScreen } from "./src/screens/thread";
 import { ScanScreen } from "./src/screens/scan";
@@ -70,10 +71,13 @@ import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
  * rooms as cardflare.gg — plus the one thing a website cannot do: tell
  * you about an offer while your phone is locked.
  *
- * Five tabs: Feed, Room (where you are right now; remembers the last
- * room), Flare, Inbox, Profile. Scanning, posting, signing in and
- * settings ride on top as stack screens. Local can take Room's slot
- * (src/local-enabled.ts) and is switched off.
+ * Five tabs: Feed, Nights (the nights near you and the ones you are
+ * going to), Flare, Inbox, Profile. The Room (where you are right now;
+ * remembers the last room), scanning, posting, signing in and settings
+ * ride on top as stack screens; Nights' "Scan or enter a code" is the
+ * door to the Room. Local can take Nights' slot (src/local-enabled.ts)
+ * and is switched off. The founder, on the dock: "Trying to keep our
+ * tabs to our 'hero's'."
  *
  * Profile replaced Account, which is the founder's call: an account page
  * is housekeeping and nobody visits housekeeping twice. Everything that
@@ -101,7 +105,7 @@ export type TabParams = {
   Feed: undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
-  Room: undefined;
+  Nights: undefined;
   /* `hunt` is the id of the hunt the composer opens into, so "Add
      cards" on a profile row lands here with the hunt already chosen. */
   Flare: { hunt?: string } | undefined;
@@ -111,8 +115,9 @@ export type TabParams = {
 
 export type StackParams = {
   Tabs: { screen?: keyof TabParams; params?: TabParams[keyof TabParams] } | undefined;
-  /** The live room as a stack screen, only while Local holds its tab
-      slot. Open it through src/open-room.ts, never by name. */
+  /** The live room: the code door and the board, reached from Nights'
+      "Scan or enter a code" and from every night's row. Open it through
+      src/open-room.ts, never by name. */
   Room: undefined;
   /** One conversation about one Flare, from Local, Messages or the Inbox. */
   LocalThread: { threadId: string };
@@ -217,7 +222,7 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   Remote: "Room",
   FindPlayer: "Feed",
   PostFlare: "Room",
-  Room: "Back",
+  Room: LOCAL_ENABLED ? "Back" : "Nights",
   LocalThread: LOCAL_ENABLED ? "Local" : "Messages",
   Messages: "Inbox",
 };
@@ -260,14 +265,20 @@ const theme: Theme = {
 
 /* Outline weights, because the website's dock draws line icons - the
    filled set read as a different product sitting on the same colours. */
-const TAB_ICONS: Partial<Record<keyof TabParams, keyof typeof Ionicons.glyphMap>> = {
+type TabGlyph = keyof typeof Ionicons.glyphMap;
+
+const TAB_ICONS: Partial<
+  Record<keyof TabParams, { idle: TabGlyph; focused?: TabGlyph }>
+> = {
   /* Home-shaped, the founder's call: this is the screen you open by
-     habit, and scanning moved to a button on it. */
-  Feed: "home-outline",
-  Local: "location-outline",
-  Room: "people-outline",
-  Inbox: "notifications-outline",
-  Profile: "person-circle-outline",
+       habit, and scanning moved to a button on it. */
+  Feed: { idle: "home-outline" },
+  Local: { idle: "location-outline" },
+  /* The website's dock draws lucide CalendarDays for Nights; the
+       calendar fills in when it is the open tab, like the flame. */
+  Nights: { idle: "calendar-outline", focused: "calendar" },
+  Inbox: { idle: "notifications-outline" },
+  Profile: { idle: "person-circle-outline" },
 };
 
 /*
@@ -421,18 +432,17 @@ function Tabs() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarIcon: ({ color, size, focused }) => {
-          const icon =
-            TAB_ICONS[route.name as keyof TabParams] ??
-            (focused ? FLARE_TAB_ICON.focused : FLARE_TAB_ICON.idle);
+          const pair = TAB_ICONS[route.name as keyof TabParams] ?? FLARE_TAB_ICON;
+          const icon = focused ? (pair.focused ?? pair.idle) : pair.idle;
           return <Ionicons name={icon} color={color} size={size} />;
         },
       })}
     >
       {/* Feed, not Join. Join was a tab used four times a month, on the
-          days somebody stands in a shop; getting into a room lives on
-          the Room tab now, which is the one you are already opening
-          when you are standing at a counter. The header still carries
-          the product name, as the website's does. */}
+          days somebody stands in a shop; getting into a room lives
+          behind Nights now, one tap from the tab you open to see what
+          is on. The header still carries the product name, as the
+          website's does. */}
       <Tab.Screen
         name="Feed"
         component={HomeScreen}
@@ -460,12 +470,19 @@ function Tabs() {
           tabBarLabel: "Feed",
         }}
       />
-      {/* The second slot: Local while it is on, the live room otherwise.
-          See src/local-enabled.ts for the founder's call. */}
+      {/* The second slot: Local while it is on, Nights otherwise. Nights
+          took the Room's slot on 2026-10-03: rooms open the moment a
+          store posts a night, and the tab is the list of them. The
+          website's dock does the same (/nights, CalendarDays). See
+          src/local-enabled.ts for the Local call. */}
       {LOCAL_ENABLED ? (
         <Tab.Screen name="Local" component={LocalScreen} options={{ title: "Local" }} />
       ) : (
-        <Tab.Screen name="Room" component={RoomTab} options={{ title: "Room" }} />
+        <Tab.Screen
+          name="Nights"
+          component={NightsScreen}
+          options={{ title: "Nights", tabBarLabel: "Nights" }}
+        />
       )}
       {/* The tab keeps the product's name; the header says what the
           tab is for, the same words as the website's page heading. */}
@@ -687,13 +704,18 @@ export default function App() {
           })}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-          {LOCAL_ENABLED ? (
-            <Stack.Screen
-              name="Room"
-              component={RoomTab}
-              options={{ title: "Room", headerBackTitle: "Back" }}
-            />
-          ) : (
+          {/* The Room, pushed over the tabs from Nights' "Scan or enter
+              a code" and from every night's row. It was the second tab
+              until Nights took the slot; it is the same screen. */}
+          <Stack.Screen
+            name="Room"
+            component={RoomTab}
+            options={{
+              title: "Room",
+              headerBackTitle: LOCAL_ENABLED ? "Back" : "Nights",
+            }}
+          />
+          {LOCAL_ENABLED ? null : (
             /* Local off: the conversations people already had, one
                screen, reached from the Inbox. */
             <Stack.Screen

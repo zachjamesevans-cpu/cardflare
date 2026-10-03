@@ -14,6 +14,7 @@ import { StorePostCard } from "@/components/feed/store-post-card";
 import type { FeedView } from "@/lib/feed/views";
 import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
+import { GoingButton } from "@/components/nights/going-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -434,6 +435,20 @@ export function Item({
             {item.wants} {item.wants === 1 ? "card" : "cards"} on your want list to ask
             about
           </p>
+        )}
+
+        {/* A night on the calendar can be said yes to from here: the
+            same one tap as the Nights tab, with the roster's size
+            beside it. The Feed is a signed-in page, so the button is
+            always the real one and never the sign-in door. */}
+        {item.nextEventId && (
+          <GoingButton
+            eventId={item.nextEventId}
+            youGoing={item.youGoing}
+            goingCount={item.goingCount}
+            signedIn
+            next={`/e/${item.nextEventCode ?? item.joinCode}`}
+          />
         )}
 
         <Link

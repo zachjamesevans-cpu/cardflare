@@ -18,6 +18,10 @@ import { setEarlyBoardAction } from "@/lib/events/actions";
  * same shape as the timezone picker above it on the page.
  */
 
+/** One sentence on what the window does and does not gate, since Going arrived. */
+export const EARLY_BOARD_GOING_NOTE =
+  "Players can say they're going from the moment a night is posted; this is when locals who follow you get the reminder.";
+
 const CHOICES = [
   { hours: 0, label: "Off. Boards open at doors" },
   { hours: 24, label: "The day before (24 hours)" },
@@ -52,6 +56,11 @@ export function EarlyBoardPicker({
               ? `Your event boards start taking Flares ${hours} hours before doors, and always by midnight of event day, so players post from home and everyone knows what to bring. Flares from anyone who never shows are cleared when the night ends.`
               : "Your event boards open when the event does. Turn this on and players can post Flares from home before your night, so people know what to bring."}
           </p>
+          {/* Going is not gated by this window: the board is browsable
+              and the roster is open from the moment a night is posted.
+              This dial is the reminder's clock, and the sentence says so
+              before an owner reads the window as the only way in. */}
+          <p className="text-sm text-text-secondary">{EARLY_BOARD_GOING_NOTE}</p>
         </div>
       </div>
 

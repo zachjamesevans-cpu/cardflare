@@ -227,19 +227,22 @@ describe("the home screen's furniture", () => {
   });
 
   it("names the tabs the same on both: Feed is Feed, and the second slot follows the flag", () => {
-    /* The founder's third pass on the bar: Local is built and switched
-       off (src/lib/local/enabled.ts), so the live room has its tab back.
-       Both platforms carry BOTH arrangements behind the one constant, and
-       the constant decides — so flipping it is one edit per platform. */
+    /* The founder's fourth pass on the bar: the second slot is Nights
+       (rooms open the moment a night is posted, and Going puts you on
+       the roster), with Local still built and switched off behind the
+       one constant (src/lib/local/enabled.ts). The Room screen stays,
+       reachable from Nights, as the code door. */
     expect(appRoot).toContain('tabBarLabel: "Feed"');
     expect(appRoot).toContain('<Tab.Screen name="Local"');
-    expect(appRoot).toContain('<Tab.Screen name="Room"');
+    expect(appRoot).toMatch(/<Tab\.Screen\s+name="Nights"/);
+    expect(appRoot).not.toContain('<Tab.Screen name="Room"');
     expect(appRoot).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
 
     const webTabs = read("src/components/players/player-tabs.tsx");
     expect(webTabs).toContain('label: "Feed"');
     expect(webTabs).toContain('label: "Local"');
-    expect(webTabs).toContain('label: "Room"');
+    expect(webTabs).toContain('label: "Nights"');
+    expect(webTabs).not.toContain('label: "Room"');
     expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
