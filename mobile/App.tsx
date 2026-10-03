@@ -66,6 +66,7 @@ import { Tap } from "./src/ui";
 import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
+import { registerForPush } from "./src/push";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 
 /**
@@ -91,14 +92,18 @@ import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 /* Guarded because this runs at module scope, before any error boundary
    exists: a throw here would kill the bundle and strand the splash
    screen. Without the handler, foreground notifications fall back to
-   the system default - a working app matters more. */
+   the system default - a working app matters more.
+
+   The badge is on: every push carries the unread count, and the icon
+   wears it. The Inbox clears it (src/push.ts, syncBadge) once the
+   notices are read, so the number never outlives the list. */
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      shouldSetBadge: true,
     }),
   });
 } catch (error) {
@@ -627,7 +632,17 @@ export default function App() {
     let live = true;
     void (async () => {
       const [seen, token] = await Promise.all([hasSeenWelcome(), storedAccessToken()]);
-      if (live) setGate(token || seen ? "open" : "welcome");
+      if (!live) return;
+      setGate(token || seen ? "open" : "welcome");
+      /*
+       * Once per launch, with a session and without a prompt: the token
+       * this phone answers to is registered again. A reinstall, a
+       * restore to a new phone or a token Expo rotated all left the
+       * server pushing at a token nobody held, and nothing fixed it
+       * until the next sign-in. Permission not granted means it returns
+       * without asking; the ask stays with sign-in and welcome.
+       */
+      if (token) void registerForPush({ prompt: false });
     })();
     return () => {
       live = false;

@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/embers",
       "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/push-receipts",
+      "schedule": "0 10 * * *"
     }
   ]
 }

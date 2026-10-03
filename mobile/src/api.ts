@@ -7,6 +7,7 @@ import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
 import type { BinderCoverId } from "./binder-covers";
 import { offerFailureMessage } from "./offer-copy";
+import type { PushGroup, PushPrefs } from "./push-copy";
 
 /**
  * The whole client for cardflare.gg's `/api/v1`.
@@ -1376,6 +1377,16 @@ export const registerDevice = (platform: "ios" | "android", pushToken: string) =
 
 export const unregisterDevice = (pushToken: string) =>
   call<{ ok: true }>("DELETE", "/api/v1/devices", { pushToken });
+
+/**
+ * Which groups of notices reach this phone: the four switches under
+ * Push notifications in Settings. The Inbox keeps every notice either
+ * way; these only decide what buzzes.
+ */
+export const getPushPrefs = () => call<{ prefs: PushPrefs }>("GET", "/api/v1/me/push");
+
+export const setPushPref = (group: PushGroup, on: boolean) =>
+  call<{ prefs: PushPrefs }>("PUT", "/api/v1/me/push", { group, on });
 
 /**
  * The person behind a notice, dressed: the website's `InboxActor`.
