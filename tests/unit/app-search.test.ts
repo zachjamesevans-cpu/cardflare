@@ -217,7 +217,10 @@ describe("the card page", () => {
     );
     expect(block).toContain("{you.wanted ? <Fact>You want this</Fact> : null}");
     expect(block).toContain('label="Post a Flare for it"');
-    expect(block).toContain('navigation.navigate("Tabs", { screen: "Flare" })');
+    /* The card goes with it, to be the draft's first line. */
+    expect(block).toMatch(
+      /navigation\.navigate\("Tabs", \{\s*screen: "Flare",\s*params: \{\s*card: \{\s*cardId: card\.cardId,/,
+    );
   });
 
   it("every section has rows from the page object or its one honest empty line", () => {

@@ -79,6 +79,26 @@ export const CACHE_TTL = {
      the hunt. Somebody who picks three cards and gets a phone call
      should find them still there. A week, then it is a stale idea. */
   composer: 7 * 24 * 60 * 60 * 1000,
+  /*
+   * THE FLARE TAB'S LAST ANSWER: where a new Flare would go (a room or
+   * the list) and the Flares under the composer. A month, because the
+   * founder (2026-10-05) asked for it "saved in your phone's cache
+   * indefinitely": after the first boot the tab should open loaded.
+   * Long is safe here only because the paint is ALWAYS refreshed over
+   * the top: the hub decides again on every focus and swaps if the
+   * answer moved, and posting waits for that decision, never this one.
+   */
+  hub: 30 * 24 * 60 * 60 * 1000,
+  /* The Nights list, as last seen. A day: a night's player and match
+     counts move, and a night that has ended moves tabs. The fresh list
+     lands over it within a second either way. */
+  nights: 24 * 60 * 60 * 1000,
+  /* The composer's own reads: who is posting (the face on the preview,
+     the draft's key) and their hunts (the hunt chooser). A month, for
+     the same reason as `hub`: painted at once, re-read every open, and
+     nothing posts on the strength of it. */
+  composerMe: 30 * 24 * 60 * 60 * 1000,
+  composerHunts: 30 * 24 * 60 * 60 * 1000,
 } as const;
 
 export type CacheKind = keyof typeof CACHE_TTL;

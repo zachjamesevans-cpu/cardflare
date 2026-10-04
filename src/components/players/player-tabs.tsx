@@ -103,19 +103,21 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                     <Flame className="size-5" aria-hidden="true" />
                   )}
 
+                  {/* A dot, not a number: the founder, "a small neon green
+                      dot on the inbox icon so you know to check your
+                      inbox." The app's tab bar draws the same. The ring
+                      in the bar's colour keeps it legible over the icon. */}
                   {tab.href === "/inbox" && unread > 0 && (
                     <span
                       aria-hidden="true"
-                      className="absolute -top-0.5 -right-2 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-bold text-accent-contrast tabular-nums"
-                    >
-                      {unread > 9 ? "9+" : unread}
-                    </span>
+                      className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-accent ring-2 ring-surface"
+                    />
                   )}
                 </span>
 
                 {tab.label}
                 {tab.href === "/inbox" && unread > 0 && (
-                  <span className="sr-only">{unread} unread</span>
+                  <span className="sr-only">, unread</span>
                 )}
               </Link>
             </li>

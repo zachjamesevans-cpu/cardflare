@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Animated, {
   interpolate,
@@ -22,6 +22,7 @@ import {
   storedAccessToken,
   type NightItem,
 } from "../api";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { useTabBarInset } from "../glass";
 import { GoingButton } from "../going-button";
 import { GOING, NO_NIGHTS, SCAN_OR_CODE } from "../going-copy";
@@ -225,6 +226,9 @@ export function NightsScreen() {
         setNights(fresh.nights);
         setFailed(false);
       }
+      /* Remembered for the next open's paint, under this account. */
+      const id = token ? await cachedPlayerId() : null;
+      if (id) void writeCache("nights", id, fresh.nights);
     } catch (caught) {
       if (!alive()) return;
       /* A guest gets the list's empty answer, not an error: the server
@@ -239,6 +243,29 @@ export function NightsScreen() {
     } finally {
       inFlight.current = false;
     }
+  }, []);
+
+  /*
+   * THE PAINT: last visit's list, drawn before getNights() answers, so
+   * the tab opens on its nights rather than a spinner. The founder
+   * (2026-10-05): "Same thing with everything else pretty much on the
+   * main tabs." Only with a session, under this account, and only if
+   * the real list has not landed first. The failure rules hold: a
+   * painted list is something on screen, so a failed reload keeps it.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<NightItem[]>("nights", id);
+      if (!cached || !live || haveList.current || !Array.isArray(cached)) return;
+      setNights((current) => current ?? cached);
+    })();
+    return () => {
+      live = false;
+    };
   }, []);
 
   useFocusEffect(
@@ -298,7 +325,9 @@ export function NightsScreen() {
     openRoom(navigation);
   };
 
-  if (nights === null && signedIn === null) {
+  /* The spinner only when there is nothing to paint: no list, cached
+     or fresh, and no failure to say instead. */
+  if (nights === null && (signedIn === null || (signedIn && !failed))) {
     return <Loading />;
   }
 

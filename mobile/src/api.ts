@@ -1495,6 +1495,15 @@ export const getNotifications = () =>
 export const markRead = (ids: string[]) =>
   call<{ ok: true }>("POST", "/api/v1/notifications", { ids });
 
+/**
+ * How many notices are still unread, for the dot on the Inbox tab.
+ * A number and nothing else, so the tab bar can ask often without
+ * pulling the whole list. Signed out is a 401, which the dot reads as
+ * "no dot" (src/unread.ts).
+ */
+export const getUnreadCount = () =>
+  call<{ unread: number }>("GET", "/api/v1/notifications/unread");
+
 /* ------------------------------------------------------------------ */
 /* Profile, Embers and the wardrobe                                    */
 /* ------------------------------------------------------------------ */

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { StackParams } from "../../App";
+import type { StackParams, TabParams } from "../../App";
 import {
   ApiError,
   describeError,
@@ -20,6 +20,7 @@ import {
   rememberSearchGame,
   searchCards,
   setOpenToTrades,
+  storedAccessToken,
   type CardHit,
   type FeedEntry,
   type Hunt,
@@ -27,7 +28,7 @@ import {
   type NearbySettings,
 } from "../api";
 import { CardTray } from "../card-tray";
-import { readCache, writeCache } from "../cache";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { cardsLabel, copiesLabel } from "../flare-copy";
 import { FlareFeedCard } from "../flare-feed-card";
@@ -125,11 +126,53 @@ const EMPTY: Draft = {
 
 const CAPTION_MAX = 280;
 
+/** The card a card page handed over with "Post a Flare for it". */
+export type HandedCard = NonNullable<NonNullable<TabParams["Flare"]>["card"]>;
+
+/**
+ * THE HANDED CARD GOES FIRST. The founder (2026-10-05): "Searching a
+ * card from the feed and clicking post a flare for it, doesn't
+ * automatically put the card in the flare screen. Should autofill as
+ * the first flare." A card not in the draft becomes its first line:
+ * any printing, one copy, Looking for. A card already in it has its
+ * line moved to the front and nothing else touched, so a draft somebody
+ * built by hand is never rewritten by a tap on a card page.
+ */
+export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem): Draft {
+  const at = draft.items.findIndex((item) => item.cardId === card.cardId);
+  if (at >= 0) {
+    if (at === 0) return draft;
+    const items = [...draft.items];
+    const [moved] = items.splice(at, 1);
+    return moved ? { ...draft, items: [moved, ...items] } : draft;
+  }
+  return {
+    ...draft,
+    intent: "want",
+    items: [
+      line ?? {
+        cardId: card.cardId,
+        name: card.name,
+        cardNumber: card.cardNumber,
+        imageUrl: card.imageUrl,
+        /* Filled by a search as soon as it answers; until then, and if
+           it never does, the line is any printing. */
+        printings: [],
+        printingId: null,
+        quantity: 1,
+      },
+      ...draft.items,
+    ],
+  };
+}
+
 type Step = "select" | "compose" | "preview";
 
 export function FlareComposer({
   target,
   initialHuntId,
+  initialCard,
+  resolveTarget,
   resetSignal,
   onPosted,
   footer,
@@ -138,6 +181,15 @@ export function FlareComposer({
   target: PostTarget;
   /** The hunt to open into, from a profile's "Add cards". */
   initialHuntId?: string;
+  /** The card to open with as the first line, from a card page. */
+  initialCard?: HandedCard;
+  /**
+   * Where the post really goes, asked at the moment of posting. The
+   * Flare tab paints its last answer at once and decides again behind
+   * it; posting waits for that decision rather than trusting the paint
+   * (src/cache.ts, rule 3). Null is "nowhere to post", e.g. signed out.
+   */
+  resolveTarget?: () => Promise<PostTarget | null>;
   /** Bumped by the Flare tab on a re-tap while focused. */
   resetSignal?: number;
   /**
@@ -177,17 +229,38 @@ export function FlareComposer({
   /* Who is posting: their face for the preview, their id for the draft. */
   const [me, setMe] = useState<Me | null>(null);
   const [draftKey, setDraftKey] = useState<string | null>(null);
+  /* Whether the real answer has landed, so the paint never lands on it. */
+  const meFresh = useRef(false);
   useEffect(() => {
     let live = true;
     getMe()
       .then((result) => {
         if (!live) return;
+        meFresh.current = true;
         setMe(result);
         setDraftKey(result.player.id);
+        void writeCache("composerMe", result.player.id, result);
       })
       .catch(() => {
-        if (live) setDraftKey("guest");
+        /* A painted account stays the key: the network blinking is not
+           the same as being signed out. */
+        if (live) setDraftKey((current) => current ?? "guest");
       });
+    /*
+     * The paint: last open's face and key, so the preview, the hunt
+     * chooser and the saved draft are there at once instead of after
+     * a round trip. Account-scoped like everything in cache.ts, and
+     * only with a session, so a signed-out phone paints nothing.
+     */
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<Me>("composerMe", id);
+      if (!cached || !live || meFresh.current || cached.player?.id !== id) return;
+      setMe((current) => current ?? cached);
+      setDraftKey((current) => current ?? id);
+    })();
     return () => {
       live = false;
     };
@@ -206,16 +279,23 @@ export function FlareComposer({
       if (!live) return;
       if (saved && saved.v === 1 && Array.isArray(saved.items)) {
         /* What was typed since mount wins over what was saved before
-           it; a hunt handed in by "Add cards" survives the restore. */
-        setDraft((current) =>
-          current.items.length > 0
-            ? current
-            : {
-                ...saved,
-                hunt: current.hunt ?? saved.hunt,
-                intent: current.hunt ? "want" : saved.intent,
-              },
-        );
+           it; a hunt handed in by "Add cards" survives the restore, and
+           so does a card handed in by a card page: the saved lines
+           stay, the handed card goes first. */
+        setDraft((current) => {
+          const card = handed.current;
+          const handedLine = card
+            ? current.items.find((item) => item.cardId === card.cardId)
+            : undefined;
+          const onlyHanded = handedLine !== undefined && current.items.length === 1;
+          if (current.items.length > 0 && !onlyHanded) return current;
+          const base: Draft = {
+            ...saved,
+            hunt: current.hunt ?? saved.hunt,
+            intent: current.hunt ? "want" : saved.intent,
+          };
+          return card ? withCardFirst(base, card, handedLine) : base;
+        });
       }
       setRestored(true);
     });
@@ -248,6 +328,43 @@ export function FlareComposer({
     setPreviewing(false);
   }, [initialHuntId]);
 
+  /*
+   * "Post a Flare for it" on a card page arrives with the card: the
+   * first line of the draft, on the compose step. The line goes in at
+   * once with no printings, then the card search fills them in so the
+   * printing picker still has something to offer; a search that fails
+   * leaves it as any printing, which is a perfectly good Flare.
+   */
+  const handed = useRef<HandedCard | null>(null);
+  useEffect(() => {
+    if (!initialCard) return;
+    handed.current = initialCard;
+    setDraft((current) => withCardFirst(current, initialCard));
+    setPosted(null);
+    setPreviewing(false);
+    setEditing(null);
+    setPicking(false);
+
+    let live = true;
+    searchCards(initialCard.name)
+      .then(({ cards }) => {
+        const hit = cards.find((card) => card.id === initialCard.cardId);
+        if (!live || !hit) return;
+        setDraft((current) => ({
+          ...current,
+          items: current.items.map((item) =>
+            item.cardId === hit.id && item.printings.length === 0
+              ? { ...item, printings: hit.printings }
+              : item,
+          ),
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [initialCard]);
+
   /* A re-tap on the tab while here: back to the top of the flow. */
   useEffect(() => {
     if (!resetSignal) return;
@@ -259,15 +376,37 @@ export function FlareComposer({
   /* Their hunts, for "Add to a hunt". A guest has none. */
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [huntLimit, setHuntLimit] = useState<number | null>(null);
+  const huntsFresh = useRef(false);
   const loadHunts = () =>
     getHunts()
-      .then((result) => {
+      .then(async (result) => {
+        huntsFresh.current = true;
         setHunts(result.hunts);
         setHuntLimit(result.limit);
+        const id = await cachedPlayerId();
+        if (id) void writeCache("composerHunts", id, result);
       })
       .catch(() => {});
   useEffect(() => {
     void loadHunts();
+    /* Last open's hunts, painted until the real ones land. */
+    let live = true;
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<{ hunts: Hunt[]; limit: number | null }>(
+        "composerHunts",
+        id,
+      );
+      if (!cached || !live || huntsFresh.current || !Array.isArray(cached.hunts))
+        return;
+      setHunts(cached.hunts);
+      setHuntLimit(cached.limit ?? null);
+    })();
+    return () => {
+      live = false;
+    };
   }, []);
 
   /* Where the poster is, when already granted. Never asked for here. */
@@ -305,8 +444,14 @@ export function FlareComposer({
   const post = async () => {
     setError(null);
     try {
+      /* The decided target, never a painted one. */
+      const where = resolveTarget ? await resolveTarget() : target;
+      if (!where) {
+        setError("Could not post the Flare. Try again.");
+        return;
+      }
       const result = await publishFlare({
-        code: target.kind === "room" ? target.code : undefined,
+        code: where.kind === "room" ? where.code : undefined,
         intent: draft.intent,
         caption: draft.caption.trim() || null,
         items: draft.items.map((item) => ({

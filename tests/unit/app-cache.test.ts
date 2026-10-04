@@ -70,10 +70,20 @@ describe("the store", () => {
      * longer?" The paint refreshes over the top within seconds either
      * way, so the ceiling is about not showing a different MONTH, not
      * about freshness - the refresh owns freshness.
+     *
+     * Three kinds go to a month, by the founder (2026-10-05): the Flare
+     * tab "needs to be saved in your phone's cache indefinitely". They
+     * are the tab's last answer and the composer's own reads, each
+     * re-read on every open, and posting waits for the real decision.
+     * A month and no further: "indefinitely" is about never seeing the
+     * spinner twice, not about painting last season.
      */
-    for (const value of Object.values(ttl)) {
+    const MONTH_KINDS = ["hub", "composerMe", "composerHunts"];
+    for (const [name, value] of Object.entries(ttl)) {
       expect(value).toBeGreaterThan(0);
-      expect(value).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
+      expect(value).toBeLessThanOrEqual(
+        (MONTH_KINDS.includes(name) ? 30 : 7) * 24 * 60 * 60 * 1000,
+      );
     }
 
     /* And the one truly live kind stays on a short leash. */

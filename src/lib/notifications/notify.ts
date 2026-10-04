@@ -8,6 +8,7 @@ import type { NotificationRow } from "@/lib/supabase/types";
 import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { avatarSrc } from "@/lib/players/profile-image";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { siteUrl } from "@/lib/site";
 import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
@@ -182,12 +183,37 @@ async function record(entry: {
  */
 const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 
+/**
+ * Who did it, for the push's picture: their name and an absolute link
+ * to their uploaded picture. Null when nobody did it, or when they have
+ * no picture, so a push only ever shows a real face.
+ *
+ * The still picture, never the animated one: a lock screen draws one
+ * frame anyway, and a still is a fraction of the bytes for a phone to
+ * fetch in the few seconds iOS gives it.
+ */
+export async function pushActor(
+  actorId: string | null | undefined,
+): Promise<{ name: string; avatar: string } | null> {
+  if (!actorId) return null;
+  const { data } = await getSupabaseAdmin()
+    .from("players")
+    .select("display_name, avatar_url")
+    .eq("id", actorId)
+    .maybeSingle();
+  const path = avatarSrc(data?.avatar_url ?? null);
+  if (!data || !path) return null;
+  return { name: data.display_name, avatar: `${siteUrl()}${path}` };
+}
+
 async function deliverByPush(
   playerId: string,
   title: string,
   body: string | null,
   path: string,
   kind: NotificationRow["kind"],
+  /** The player who did it, so the push can wear their face. */
+  actorId: string | null = null,
 ): Promise<void> {
   const admin = getSupabaseAdmin();
 
@@ -205,7 +231,10 @@ async function deliverByPush(
 
   /* The badge is the Inbox's unread count, so the icon's number and
      the Inbox agree; the notice this push carries is already in it. */
-  const badge = await unreadCount(playerId).catch(() => 0);
+  const [badge, actor] = await Promise.all([
+    unreadCount(playerId).catch(() => 0),
+    pushActor(actorId).catch(() => null),
+  ]);
 
   try {
     const response = await fetch(EXPO_PUSH_ENDPOINT, {
@@ -221,7 +250,19 @@ async function deliverByPush(
           /* Android 8 and later drops a push with no channel. The app
              creates "default" when it registers. */
           channelId: "default",
-          data: { url: path },
+          /*
+           * The sender's face. On iOS the app's notification service
+           * extension (mobile/targets/notification-service) reads these
+           * two fields and turns the push into a communication
+           * notification: their picture large, the app's icon small in
+           * the corner, the way Messages and Instagram look. It may
+           * only touch a push marked mutable. A push with no actor, or
+           * an actor with no picture, is delivered as it always was.
+           */
+          ...(actor ? { mutableContent: true } : {}),
+          data: actor
+            ? { url: path, actorName: actor.name, actorAvatar: actor.avatar }
+            : { url: path },
         })),
       ),
       signal: AbortSignal.timeout(8_000),
@@ -362,7 +403,14 @@ export async function notifyOfferReceived(
     });
 
     if (id) {
-      await deliverByPush(recipient.playerId, title, body, path, "offer-received");
+      await deliverByPush(
+        recipient.playerId,
+        title,
+        body,
+        path,
+        "offer-received",
+        actorId,
+      );
       if (recipient.email) {
         await deliverByEmail(id, recipient.email, title, body, path);
       }
@@ -514,7 +562,14 @@ export async function notifyShowcaseMatch(
       });
 
       if (id) {
-        await deliverByPush(recipient.playerId, title, body, path, "offer-received");
+        await deliverByPush(
+          recipient.playerId,
+          title,
+          body,
+          path,
+          "offer-received",
+          actorId,
+        );
         if (recipient.email) {
           await deliverByEmail(id, recipient.email, title, body, path);
         }
@@ -692,7 +747,18 @@ export async function sendTestNotice(
     actorId: null,
   });
 
-  if (id) await deliverByPush(playerId, sample.title, sample.body, path, "board-open");
+  /* The push wears the admin's own face, so one tap proves the picture
+     path end to end; the Inbox row keeps no actor (see above). */
+  if (id) {
+    await deliverByPush(
+      playerId,
+      sample.title,
+      sample.body,
+      path,
+      "board-open",
+      playerId,
+    );
+  }
 
   return { recorded: id !== null, devices: count ?? 0 };
 }
@@ -762,7 +828,8 @@ export async function notifyNewFollower(
       actorId: followerId,
     });
 
-    if (id) await deliverByPush(followedId, title, body, path, "new-follower");
+    if (id)
+      await deliverByPush(followedId, title, body, path, "new-follower", followerId);
   } catch (error) {
     console.error("Could not announce the new follower", error);
   }
@@ -888,7 +955,8 @@ export async function notifyRoomFlare(
             actorId,
           });
 
-          if (id) await deliverByPush(playerId, title, body, path, "room-flare");
+          if (id)
+            await deliverByPush(playerId, title, body, path, "room-flare", actorId);
         }),
       );
     }
@@ -939,7 +1007,14 @@ export async function notifyTradeConfirmed(
     });
 
     if (id) {
-      await deliverByPush(recipient.playerId, title, body, path, "trade-confirmed");
+      await deliverByPush(
+        recipient.playerId,
+        title,
+        body,
+        path,
+        "trade-confirmed",
+        actorId,
+      );
       if (recipient.email) {
         await deliverByEmail(id, recipient.email, title, body, path);
       }
@@ -1004,7 +1079,15 @@ export async function notifyMessageReceived(
       actorId: senderId,
     });
 
-    if (id) await deliverByPush(recipientId, title, preview, path, "message-received");
+    if (id)
+      await deliverByPush(
+        recipientId,
+        title,
+        preview,
+        path,
+        "message-received",
+        senderId,
+      );
   } catch (error) {
     console.error("Could not announce the message", error);
   }
@@ -1042,7 +1125,8 @@ export async function notifyPostComment(
       actorId: commenterId,
     });
 
-    if (id) await deliverByPush(authorId, title, preview, path, "post-comment");
+    if (id)
+      await deliverByPush(authorId, title, preview, path, "post-comment", commenterId);
   } catch (error) {
     console.error("Could not announce the comment", error);
   }
@@ -1085,7 +1169,15 @@ export async function notifyNearbyMatch(match: {
       actorId: match.wanterId,
     });
 
-    if (id) await deliverByPush(match.holderId, title, body, path, "nearby-match");
+    if (id)
+      await deliverByPush(
+        match.holderId,
+        title,
+        body,
+        path,
+        "nearby-match",
+        match.wanterId,
+      );
   } catch (error) {
     console.error("Could not notify the nearby match", error);
   }
@@ -1230,7 +1322,15 @@ export async function notifyNightMatchForHolder(entry: {
       actorId: entry.goerId,
     });
 
-    if (id) await deliverByPush(entry.holderId, title, body, path, "night-match");
+    if (id)
+      await deliverByPush(
+        entry.holderId,
+        title,
+        body,
+        path,
+        "night-match",
+        entry.goerId,
+      );
   } catch (error) {
     console.error("Could not notify the holder's night match", error);
   }
@@ -1273,7 +1373,14 @@ export async function notifyTradeAcknowledged(
     });
 
     if (id)
-      await deliverByPush(recipient.playerId, title, body, path, "trade-confirmed");
+      await deliverByPush(
+        recipient.playerId,
+        title,
+        body,
+        path,
+        "trade-confirmed",
+        actorId,
+      );
   } catch (error) {
     console.error("Could not notify the trade's author", error);
   }
@@ -1336,7 +1443,8 @@ export async function notifyThreadTrade(
       actorId,
     });
 
-    if (id) await deliverByPush(recipientId, title, body, path, "trade-confirmed");
+    if (id)
+      await deliverByPush(recipientId, title, body, path, "trade-confirmed", actorId);
   } catch (error) {
     console.error("Could not announce the conversation's trade", error);
   }
