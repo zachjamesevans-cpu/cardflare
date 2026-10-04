@@ -12,6 +12,8 @@
 -- talking about this card" keeps its answer), but this moves their
 -- messages and trades into the pair's conversation, making one first
 -- for any pair that only ever talked about a card.
+--
+-- Safe to run again: every step skips what an earlier run did.
 
 begin;
 
@@ -51,26 +53,38 @@ update public.flare_messages m
    );
 
 -- Every anchor's messages and trades move into the pair's conversation.
-create temporary table conversation_moves on commit drop as
-select anchor.id as anchor_id, pair.id as pair_id
-  from public.flare_threads anchor
-  join public.flare_threads pair
-    on pair.flare_id is null
-   and pair.want_id is null
-   and least(pair.author_player_id, pair.responder_player_id)
-       = least(anchor.author_player_id, anchor.responder_player_id)
-   and greatest(pair.author_player_id, pair.responder_player_id)
-       = greatest(anchor.author_player_id, anchor.responder_player_id)
- where anchor.flare_id is not null or anchor.want_id is not null;
-
+-- The pairing is written inline in each statement (no temporary
+-- table), so it runs the same in the SQL editor as in the CLI.
 update public.flare_messages m
    set thread_id = moves.pair_id
-  from conversation_moves moves
+  from (
+  select anchor.id as anchor_id, pair.id as pair_id
+    from public.flare_threads anchor
+    join public.flare_threads pair
+      on pair.flare_id is null
+     and pair.want_id is null
+     and least(pair.author_player_id, pair.responder_player_id)
+         = least(anchor.author_player_id, anchor.responder_player_id)
+     and greatest(pair.author_player_id, pair.responder_player_id)
+         = greatest(anchor.author_player_id, anchor.responder_player_id)
+   where anchor.flare_id is not null or anchor.want_id is not null
+) moves
  where m.thread_id = moves.anchor_id;
 
 update public.trades tr
    set thread_id = moves.pair_id
-  from conversation_moves moves
+  from (
+  select anchor.id as anchor_id, pair.id as pair_id
+    from public.flare_threads anchor
+    join public.flare_threads pair
+      on pair.flare_id is null
+     and pair.want_id is null
+     and least(pair.author_player_id, pair.responder_player_id)
+         = least(anchor.author_player_id, anchor.responder_player_id)
+     and greatest(pair.author_player_id, pair.responder_player_id)
+         = greatest(anchor.author_player_id, anchor.responder_player_id)
+   where anchor.flare_id is not null or anchor.want_id is not null
+) moves
  where tr.thread_id = moves.anchor_id;
 
 -- The conversation's clock is its newest message.
