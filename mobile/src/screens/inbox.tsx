@@ -1,15 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { followHref } from "../follow-href";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { openRoom } from "../open-room";
-import { getNotifications, listLocalThreads, markRead, type InboxItem } from "../api";
+import {
+  getNotifications,
+  listLocalThreads,
+  markRead,
+  storedAccessToken,
+  type InboxItem,
+} from "../api";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { syncBadge } from "../push";
+import { setUnread } from "../unread";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Loading, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -40,6 +48,36 @@ export function InboxScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const tabInset = useTabBarInset();
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  /*
+   * Whether `items` is this visit's answer or last visit's paint. The
+   * unread tint follows the fresh answer only: a painted row cannot
+   * know whether it has been read since, so it is drawn as read until
+   * the server says otherwise.
+   */
+  const [fresh, setFresh] = useState(false);
+  const freshRef = useRef(false);
+
+  /*
+   * THE PAINT: last visit's notices, from the `inbox` kind, so the
+   * list has its shape the moment the tab opens. The founder
+   * (2026-10-05): "Same thing with everything else pretty much on the
+   * main tabs." Only with a session, under this account, and never
+   * over the real answer.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<InboxItem[]>("inbox", id);
+      if (!cached || !live || freshRef.current || !Array.isArray(cached)) return;
+      setItems((current) => current ?? cached);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
   /* Conversations waiting, for the pill on the Messages door. Its own
      read, so a Messages outage cannot take the notices down with it. */
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -51,7 +89,13 @@ export function InboxScreen() {
         try {
           const { notifications } = await getNotifications();
           if (!live) return;
+          freshRef.current = true;
           setItems(notifications);
+          setFresh(true);
+
+          /* Remembered for the next open's paint, under this account. */
+          const id = await cachedPlayerId();
+          if (id) void writeCache("inbox", id, notifications);
 
           const unread = notifications.filter((n) => !n.readAt).map((n) => n.id);
           /* The icon's badge says what the list says: this many, then
@@ -62,6 +106,8 @@ export function InboxScreen() {
           if (unread.length > 0) {
             await markRead(unread);
             await syncBadge(0);
+            /* And the dot on the tab goes with the badge. */
+            setUnread(0);
           }
         } catch {
           if (live) setItems((current) => current ?? []);
@@ -222,7 +268,7 @@ export function InboxScreen() {
       {items !== null && items.length > 0 && (
         <Card style={{ padding: spacing(2), gap: 0 }}>
           {items.map((item) => {
-            const unread = !item.readAt;
+            const unread = fresh && !item.readAt;
             const actor = item.actor ?? null;
             const { lead, rest } = splitTitle(item.title, actor?.displayName);
             const open = destination(item);

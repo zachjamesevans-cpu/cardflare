@@ -20,6 +20,7 @@ import * as Notifications from "expo-notifications";
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
+  AppState,
   Pressable,
   ScrollView,
   Text,
@@ -69,6 +70,7 @@ import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
 import { registerForPush } from "./src/push";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
+import { refreshUnread, useUnread } from "./src/unread";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -117,8 +119,20 @@ export type TabParams = {
   Local: undefined;
   Nights: undefined;
   /* `hunt` is the id of the hunt the composer opens into, so "Add
-     cards" on a profile row lands here with the hunt already chosen. */
-  Flare: { hunt?: string } | undefined;
+     cards" on a profile row lands here with the hunt already chosen.
+     `card` is the card page's card, so "Post a Flare for it" lands
+     with that card already the first line of the draft. */
+  Flare:
+    | {
+        hunt?: string;
+        card?: {
+          cardId: string;
+          name: string;
+          cardNumber: string;
+          imageUrl: string | null;
+        };
+      }
+    | undefined;
   Inbox: undefined;
   Profile: undefined;
 };
@@ -374,7 +388,39 @@ function TabButton({
   );
 }
 
+/*
+ * THE INBOX DOT. The founder (2026-10-05): "If you have an unread
+ * notification in app, there should be a small neon green dot on the
+ * inbox icon so you know to check your inbox." The accent, no number
+ * (the home screen's icon badge already carries the count), sat on the
+ * icon's top right with a thin ring in the bar's own fill so it reads
+ * as a dot on the glass rather than a smudge on the bell.
+ */
+const INBOX_DOT = 9;
+
+function InboxDot() {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: -1,
+        right: -3,
+        width: INBOX_DOT,
+        height: INBOX_DOT,
+        borderRadius: INBOX_DOT / 2,
+        backgroundColor: colors.accent,
+        borderWidth: 1.5,
+        borderColor: colors.elevated,
+      }}
+    />
+  );
+}
+
 function Tabs() {
+  /* Unread notices, for the dot. src/unread.ts holds the one value. */
+  const unread = useUnread();
+
   return (
     <Tab.Navigator
       // The same light tick every other control gives — switching tabs
@@ -382,6 +428,11 @@ function Tabs() {
       screenListeners={{
         tabPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        },
+        /* Every tab change asks again, so the dot is right by the time
+           anybody looks down at the bar. */
+        focus: () => {
+          void refreshUnread();
         },
       }}
       screenOptions={({ route }) => ({
@@ -460,6 +511,14 @@ function Tabs() {
         tabBarIcon: ({ color, size, focused }) => {
           const pair = TAB_ICONS[route.name as keyof TabParams] ?? FLARE_TAB_ICON;
           const icon = focused ? (pair.focused ?? pair.idle) : pair.idle;
+          if (route.name === "Inbox" && unread > 0) {
+            return (
+              <View>
+                <Ionicons name={icon} color={color} size={size} />
+                <InboxDot />
+              </View>
+            );
+          }
           return <Ionicons name={icon} color={color} size={size} />;
         },
       })}
@@ -527,7 +586,12 @@ function Tabs() {
       <Tab.Screen
         name="Inbox"
         component={InboxScreen}
-        options={{ title: "Inbox", tabBarLabel: "Inbox" }}
+        options={{
+          title: "Inbox",
+          tabBarLabel: "Inbox",
+          /* The dot has no words of its own, so the label says it. */
+          tabBarAccessibilityLabel: unread > 0 ? "Inbox, unread" : "Inbox",
+        }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -676,6 +740,28 @@ export default function App() {
     const subscription =
       Notifications.addNotificationResponseReceivedListener(openNotificationLink);
     return () => subscription.remove();
+  }, [gate]);
+
+  /*
+   * The Inbox dot's count (src/unread.ts), asked for once the tabs are
+   * open (signed out reads as no dot), again whenever the app comes
+   * back to the front, and again when a notice lands while it is open.
+   * The fourth trigger, every tab change, is the navigator's `focus`
+   * listener in Tabs; the fifth, clearing it, is the Inbox's read.
+   */
+  useEffect(() => {
+    if (gate !== "open") return;
+    void refreshUnread();
+    const foreground = AppState.addEventListener("change", (next) => {
+      if (next === "active") void refreshUnread();
+    });
+    const arrived = Notifications.addNotificationReceivedListener(() => {
+      void refreshUnread();
+    });
+    return () => {
+      foreground.remove();
+      arrived.remove();
+    };
   }, [gate]);
 
   if (gate === "checking") {

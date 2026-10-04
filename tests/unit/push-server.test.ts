@@ -126,7 +126,8 @@ describe("the push itself", () => {
   });
 
   it("carries the Inbox's unread count as the badge, and the Android channel", () => {
-    expect(sender).toContain("const badge = await unreadCount(playerId)");
+    expect(sender).toContain("unreadCount(playerId).catch(() => 0),");
+    expect(sender).toContain("const [badge, actor] = await Promise.all([");
     expect(sender).toContain("badge,");
     expect(sender).toContain('channelId: "default",');
   });
@@ -141,7 +142,7 @@ describe("the push itself", () => {
       (call) => !call.includes("playerId: string"),
     );
     expect(calls.length).toBeGreaterThanOrEqual(15);
-    for (const call of calls) expect(call).toMatch(/"[a-z-]+",?\s*\)/);
+    for (const call of calls) expect(call).toMatch(/"[a-z-]+",?(\s*[\w.]+,?)?\s*\)/);
   });
 
   it("sends a message tap to its thread", () => {

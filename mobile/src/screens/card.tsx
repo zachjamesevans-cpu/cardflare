@@ -142,7 +142,21 @@ export function CardScreen({ cardId }: { cardId: string }) {
           <Button
             label="Post a Flare for it"
             variant="secondary"
-            onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+            /* The card goes with it, as the draft's first line: the
+               founder, "Should autofill as the first flare." */
+            onPress={() =>
+              navigation.navigate("Tabs", {
+                screen: "Flare",
+                params: {
+                  card: {
+                    cardId: card.cardId,
+                    name: card.name,
+                    cardNumber: card.number,
+                    imageUrl: card.imageUrl,
+                  },
+                },
+              })
+            }
           />
         </View>
       ) : null}

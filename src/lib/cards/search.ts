@@ -228,6 +228,41 @@ export async function countCards(): Promise<number> {
 }
 
 /**
+ * One card, shaped the way a search result is, for a composer opened
+ * on a card ("Post a Flare for it" on the card page). Null when there
+ * is no such card.
+ */
+export async function cardResultById(cardId: string): Promise<CardResult | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data: row, error } = await getSupabaseAdmin()
+    .from("cards")
+    .select(
+      "id, game, exact_name, canonical_card_number, card_type, colors, traits, cost, power, counter, life, rarity, effect_text, trigger_text",
+    )
+    .eq("id", cardId)
+    .maybeSingle();
+  if (error || !row) return null;
+  const printings = await printingsFor([row.id]);
+  return {
+    id: row.id,
+    game: row.game,
+    exactName: row.exact_name,
+    canonicalCardNumber: row.canonical_card_number,
+    cardType: row.card_type,
+    colors: row.colors ?? [],
+    traits: row.traits ?? [],
+    cost: row.cost,
+    power: row.power,
+    counter: row.counter,
+    life: row.life,
+    rarity: row.rarity,
+    effectText: row.effect_text,
+    triggerText: row.trigger_text,
+    printings: printings.get(row.id) ?? [],
+  };
+}
+
+/**
  * Card ids for a list of printed numbers, keyed by compact number.
  *
  * One query for a whole deck list rather than one per line: a pasted

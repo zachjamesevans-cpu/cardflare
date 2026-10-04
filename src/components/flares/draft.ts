@@ -96,6 +96,20 @@ export function keyOf(item: DraftCard): string {
   return lineKey(item.card.id, item.printingId);
 }
 
+/**
+ * A card handed in from outside the composer goes first, as the cover:
+ * the founder, "Should autofill as the first flare." When the card is
+ * already a line (any printing) that line moves to the front and keeps
+ * its copies; nothing is added twice.
+ */
+export function withCardFirst(cards: DraftCard[], card: CardResult): DraftCard[] {
+  const index = cards.findIndex((item) => item.card.id === card.id);
+  if (index === -1) return [{ card, printingId: null, quantity: 1 }, ...cards];
+  if (index === 0) return cards;
+  const line = cards[index];
+  return line ? [line, ...cards.filter((_, at) => at !== index)] : cards;
+}
+
 export function addCard(
   cards: DraftCard[],
   card: CardResult,

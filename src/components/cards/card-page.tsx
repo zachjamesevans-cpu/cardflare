@@ -107,7 +107,10 @@ export function CardPageView({
                 )}
               </ul>
             )}
-            <Link href="/flare" className={buttonStyles("secondary", "sm")}>
+            <Link
+              href={`/flare?card=${encodeURIComponent(card.cardId)}`}
+              className={buttonStyles("secondary", "sm")}
+            >
               Post a Flare for it
             </Link>
           </>

@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -12,18 +12,60 @@ import {
   getRoom,
   lastRoom,
   nudgeWant,
+  onSignedOut,
   storedAccessToken,
   type Me,
   rememberRoom,
   dropOffering,
   nudgeOffering,
 } from "../api";
-import { FlareComposer } from "./flare-composer";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { FlareComposer, type HandedCard } from "./flare-composer";
 import type { PostTarget } from "../flare-bits";
-import { Body, Button, Card, Muted, Title } from "../ui";
+import { Body, Button, Card, Loading, Muted, Title } from "../ui";
 import { colors, gutter, spacing } from "../theme";
 import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
+
+type HubTarget = PostTarget | "scan";
+
+/*
+ * THE LAST ANSWER, KEPT. The founder (2026-10-05): the Flare tab
+ * "should only show [the loading icon] once ... After the first 'boot'
+ * you should be able to just click it instantly later and everything
+ * is already loaded." So the tab's last decision and its last list
+ * live here for the session, and in the cache (kind `hub`) for the
+ * next launch. Only the very first decision ever draws <Loading />;
+ * every one after paints the last answer at once and decides again
+ * behind it, swapping only if the answer moved. Signing out forgets
+ * both, so the next account never sees this one's.
+ */
+const memory: { target: HubTarget | null; wants: Me["wants"] | null | undefined } = {
+  target: null,
+  wants: undefined,
+};
+onSignedOut(() => {
+  memory.target = null;
+  memory.wants = undefined;
+});
+
+/** A cached target, checked: anything else is a miss, not a paint. */
+function isTarget(value: unknown): value is PostTarget {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kind?: unknown; code?: unknown };
+  return (
+    candidate.kind === "list" ||
+    (candidate.kind === "room" && typeof candidate.code === "string")
+  );
+}
+
+const sameTarget = (a: HubTarget | null, b: HubTarget) =>
+  a === b ||
+  (a !== null &&
+    a !== "scan" &&
+    b !== "scan" &&
+    a.kind === b.kind &&
+    (a.kind !== "room" || (b.kind === "room" && a.code === b.code)));
 
 /**
  * The centre tab — the mark itself, and behind it the list the whole
@@ -58,25 +100,76 @@ export function HubScreen() {
     setOpenInto(hunt);
     navigation.setParams({ hunt: undefined } as never);
   }, [hunt, navigation]);
-  const [target, setTarget] = useState<PostTarget | "scan" | null>(null);
+  /* "Post a Flare for it" on a card page: the card, read once and
+     cleared for the same reason, and handed to the composer to put
+     first. */
+  const card = route.params?.card;
+  const [openWith, setOpenWith] = useState<HandedCard | undefined>(undefined);
+  useEffect(() => {
+    if (card === undefined) return;
+    setOpenWith(card);
+    navigation.setParams({ card: undefined } as never);
+  }, [card, navigation]);
+  const [target, setTarget] = useState<HubTarget | null>(memory.target);
+
+  /* A new launch: last launch's answer, if this account has one. */
+  useEffect(() => {
+    if (memory.target !== null) return;
+    let live = true;
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<PostTarget>("hub", id);
+      if (!live || !isTarget(cached)) return;
+      setTarget((current) => current ?? cached);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
 
   /*
    * The standing list. null = signed out (render nothing), [] = signed
    * in and empty (render the empty state, which earns its space by
    * saying what the list is for).
    */
-  const [wants, setWants] = useState<Me["wants"] | null>(null);
+  const [wants, setWants] = useState<Me["wants"] | null>(memory.wants ?? null);
+  const wantsFresh = useRef(false);
 
   const loadWants = useCallback(async () => {
     if (!(await storedAccessToken())) {
+      wantsFresh.current = true;
+      memory.wants = null;
       setWants(null);
       return;
     }
     try {
-      setWants((await getMe()).wants);
+      const me = await getMe();
+      wantsFresh.current = true;
+      memory.wants = me.wants;
+      setWants(me.wants);
+      void writeCache("hub", me.player.id, me.wants, "wants");
     } catch {
       // Keep whatever was on screen; the next focus retries.
     }
+  }, []);
+
+  /* Last launch's list, painted until the real one lands. */
+  useEffect(() => {
+    if (memory.wants !== undefined) return;
+    let live = true;
+    void (async () => {
+      if (!(await storedAccessToken())) return;
+      const id = await cachedPlayerId();
+      if (!id || !live) return;
+      const cached = await readCache<Me["wants"]>("hub", id, "wants");
+      if (!cached || !live || wantsFresh.current || !Array.isArray(cached)) return;
+      setWants(cached);
+    })();
+    return () => {
+      live = false;
+    };
   }, []);
 
   useFocusEffect(
@@ -115,13 +208,21 @@ export function HubScreen() {
     });
   }, [navigation]);
 
+  /*
+   * The real decision, every focus, behind whatever is painted. Kept
+   * as a promise so posting can wait for it: the paint decides what is
+   * drawn, never where a Flare goes (src/cache.ts, rule 3).
+   */
+  const decision = useRef<Promise<HubTarget> | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       let stale = false;
 
-      const decide = async () => {
+      const decide = async (): Promise<HubTarget> => {
         const code = await lastRoom();
         const signedIn = Boolean(await storedAccessToken());
+        let next: HubTarget = signedIn ? { kind: "list" } : "scan";
 
         if (code) {
           try {
@@ -131,31 +232,38 @@ export function HubScreen() {
               Boolean(state.joined) &&
               (state.room?.status === "open" || state.room?.early);
 
-            if (live) {
-              if (!stale) setTarget({ kind: "room", code });
-              return;
-            }
+            if (live) next = { kind: "room", code };
           } catch {
             // Unreachable room counts as "not live"; fall through.
           }
         }
 
-        if (!stale) setTarget(signedIn ? { kind: "list" } : "scan");
+        memory.target = next;
+        /* Swap only if it moved, so a right paint never re-renders. */
+        if (!stale)
+          setTarget((current) => (sameTarget(current, next) ? current : next));
+        if (next !== "scan") {
+          const id = await cachedPlayerId();
+          if (id) void writeCache("hub", id, next);
+        }
+        return next;
       };
 
-      void decide();
+      decision.current = decide();
       return () => {
         stale = true;
       };
     }, []),
   );
 
+  const resolveTarget = useCallback(async () => {
+    const settled = await (decision.current ?? Promise.resolve(memory.target));
+    return settled === null || settled === "scan" ? null : settled;
+  }, []);
+
+  /* Only the first decision ever: every later one has a paint. */
   if (target === null) {
-    return (
-      <View style={{ paddingHorizontal: gutter, paddingVertical: spacing(4) }}>
-        <Muted>One moment…</Muted>
-      </View>
-    );
+    return <Loading />;
   }
 
   if (target === "scan") {
@@ -191,7 +299,9 @@ export function HubScreen() {
   return (
     <FlareComposer
       target={target}
+      resolveTarget={resolveTarget}
       initialHuntId={openInto}
+      initialCard={openWith}
       resetSignal={resetSignal}
       onPosted={(rows) => {
         /* On the list at once; the re-read confirms it a moment later. */

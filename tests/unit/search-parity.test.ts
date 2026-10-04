@@ -173,7 +173,9 @@ describe("the card page", () => {
     expect(web.cardPage).toContain("Sign in to see what you have");
     expect(web.cardPage).toContain("href={`/login?next=${encodeURIComponent(href)}`}");
     expect(web.cardPage).toContain("const href = `/cards/${card.cardId}`;");
-    expect(web.cardPage).toContain('href="/flare"');
+    expect(web.cardPage).toContain(
+      "href={`/flare?card=${encodeURIComponent(card.cardId)}`}",
+    );
     expect(web.cardPage).toContain("href={`/hunts/${you.onHunt.huntId}`}");
     /* A holder's row: face, name, miles, Message. */
     const holders = between(web.cardPage, '"Who has it near you"', "Who is hunting it");

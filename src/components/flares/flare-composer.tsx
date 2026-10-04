@@ -27,13 +27,14 @@ import {
   changePrinting,
   keyOf,
   lineKey,
+  withCardFirst,
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, Textarea, TextInput } from "@/components/ui/controls";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
-import { printingLabel } from "@/lib/cards/schema";
+import { printingLabel, type CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
 import { draftSummary, MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
 import { publishPostAction } from "@/lib/flares/publish-actions";
@@ -78,6 +79,8 @@ export function FlareComposer(props: {
   room: ComposerRoom | null;
   /** "Add cards" on a hunt arrives with the hunt already chosen. */
   initialHuntId: string | null;
+  /** "Post a Flare for it" on a card page arrives with the card. */
+  initialCard?: CardResult | null;
   /** A row at the foot of the compose step: the room's open-to-trades switch. */
   footer?: ReactNode;
 }) {
@@ -113,6 +116,7 @@ function ComposerBody({
   game = null,
   room,
   initialHuntId,
+  initialCard = null,
   footer,
 }: {
   viewer: ComposerViewer;
@@ -122,10 +126,15 @@ function ComposerBody({
   game?: string | null;
   room: ComposerRoom | null;
   initialHuntId: string | null;
+  initialCard?: CardResult | null;
   footer?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Draft>(() => {
-    const saved = loadDraft() ?? EMPTY_DRAFT;
+    const loaded = loadDraft() ?? EMPTY_DRAFT;
+    /* A card handed in goes first, as a want; the rest of the draft stays. */
+    const saved: Draft = initialCard
+      ? { ...loaded, intent: "want", cards: withCardFirst(loaded.cards, initialCard) }
+      : loaded;
     if (initialHuntId && hunts.some((hunt) => hunt.id === initialHuntId)) {
       return {
         ...saved,
