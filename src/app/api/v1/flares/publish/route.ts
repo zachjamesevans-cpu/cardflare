@@ -8,6 +8,7 @@ import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { autoPostFor } from "@/lib/events/auto-post";
+import { followOntoNights } from "@/lib/events/follow-on";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { CAPTION_MAX, publishPost } from "@/lib/flares/publish";
@@ -158,6 +159,28 @@ export async function POST(request: Request): Promise<Response> {
         body.items.map((item) => item.cardId),
         body.intent,
       ),
+    );
+  }
+
+  /* Onto every night the player is going to, after the answer goes out. */
+  if (!body.code) {
+    const skip = eventId;
+    afterResponse(() =>
+      followOntoNights({
+        playerId: player.playerId,
+        displayName: player.displayName,
+        items: body.items.map((item) => ({
+          cardId: item.cardId,
+          printingId: item.printingId ?? null,
+          quantity: item.quantity,
+        })),
+        intent: body.intent,
+        accepts: {
+          acceptsTrade: (body.acceptsTrade ?? true) || !(body.acceptsCash ?? false),
+          acceptsCash: body.acceptsCash ?? false,
+        },
+        skipEventId: skip,
+      }),
     );
   }
 

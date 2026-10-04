@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/push-receipts",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/night-reminder",
+      "schedule": "0 16 * * *"
     }
   ]
 }

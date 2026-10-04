@@ -8,6 +8,7 @@ import { LIMITS } from "@/lib/api/throttle";
 import { getViewer } from "@/lib/auth/session";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { autoPostFor } from "@/lib/events/auto-post";
+import { followOntoNights } from "@/lib/events/follow-on";
 import { roomPhase } from "@/lib/events/schema";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
@@ -109,6 +110,25 @@ export async function publishPostAction(input: {
       input.items.map((item) => item.cardId),
       input.intent,
     );
+  }
+
+  /* Onto every night the player is going to; the post is already up. */
+  if (!input.toRoom) {
+    void followOntoNights({
+      playerId,
+      displayName: session?.displayName ?? "A player",
+      items: input.items.map((item) => ({
+        cardId: item.cardId,
+        printingId: item.printingId ?? null,
+        quantity: item.quantity,
+      })),
+      intent: input.intent,
+      accepts: {
+        acceptsTrade: input.acceptsTrade || !input.acceptsCash,
+        acceptsCash: input.acceptsCash,
+      },
+      skipEventId: eventId,
+    });
   }
 
   forgetFeed(playerId);

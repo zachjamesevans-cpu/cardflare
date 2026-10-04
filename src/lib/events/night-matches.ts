@@ -1,7 +1,7 @@
 import "server-only";
 
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
-import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
+import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { formatEventMoment } from "@/lib/events/format";
 import { listParticipants } from "@/lib/events/participants";
 import { findEventById, findStoreById } from "@/lib/events/repository";
@@ -13,7 +13,7 @@ import {
   type ListEntry,
   type PrintingRow,
 } from "@/lib/lists/repository";
-import { heldByCard, matchFor } from "@/lib/matching/schema";
+import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import {
   notifyNightMatchForGoer,
   notifyNightMatchForHolder,
@@ -199,11 +199,15 @@ export async function afterGoing(eventId: string, playerId: string): Promise<voi
  * here: there is no query against binder_cards in this file, and there
  * must not be. The founder: "private binders should never be exposed."
  *
- * Matching is on card_id, printing-agnostic this round: a want for any
- * printing of Shanks matches a Shanks in any binder. The printing
- * label on a match card is therefore null, the same way a Flare that
- * takes any printing reads. A later round can tighten this with
- * `matchFor` the way the board does.
+ * Matching is on the card, then graded by printing the way the board
+ * grades an offer (`matchFor`): a want that takes any printing is an
+ * exact match with any copy; a want that names a printing is exact
+ * only when the holder is known to have that printing, and reads
+ * "other printing" when their copy is a different one or one of
+ * unknown printing. Claiming the right alt art would be guessing, and
+ * one wrong "they have this" costs more than ten missed matches. The
+ * label on a match card is the printing the wanter named, or null when
+ * any will do.
  */
 
 export interface MatchCard {
@@ -211,7 +215,10 @@ export interface MatchCard {
   name: string;
   number: string;
   imageUrl: string | null;
+  /** The printing the wanter asked for, or null for any. */
   printingLabel: string | null;
+  /** Whether the holder's copy is the printing asked for. */
+  match: MatchKind;
 }
 
 export interface MatchPlayer {
@@ -275,7 +282,7 @@ export const NIGHT_ATTENDEE_CAP = 200;
 
 /* ---- Pure helpers, unit-tested without a database ------------------ */
 
-/** One player's four lists at one night, as card ids. */
+/** One player's four lists at one night, as card ids, and the printings behind them. */
 export interface CardLists {
   /** Saved wants plus "want" Flares at this night. */
   wants: Set<string>;
@@ -285,6 +292,16 @@ export interface CardLists {
   binderHaves: Set<string>;
   /** "showcase" Flares at this night. */
   flareHaves: Set<string>;
+  /**
+   * Per wanted card, the printings asked for; null in the set means
+   * any printing will do. A card absent here is wanted in any printing.
+   */
+  wantPrintings: Map<string, Set<string | null>>;
+  /**
+   * Per held card, the printings known to be held; null means a copy
+   * of unknown printing. A card absent here is held in unknown printing.
+   */
+  havePrintings: Map<string, Set<string | null>>;
 }
 
 export function emptyLists(): CardLists {
@@ -293,7 +310,54 @@ export function emptyLists(): CardLists {
     flareWants: new Set(),
     binderHaves: new Set(),
     flareHaves: new Set(),
+    wantPrintings: new Map(),
+    havePrintings: new Map(),
   };
+}
+
+/** Adds one printing (or null for unknown) to a card's set in a list. */
+export function notePrinting(
+  into: Map<string, Set<string | null>>,
+  cardId: string,
+  printingId: string | null,
+): void {
+  const set = into.get(cardId) ?? new Set<string | null>();
+  set.add(printingId);
+  into.set(cardId, set);
+}
+
+/**
+ * How well a holder's copies answer a want, the board's rule: any
+ * printing asked for is exact with any copy; a named printing is exact
+ * only when the holder is known to have it, and "other printing"
+ * otherwise, including when the holder's printing is unknown.
+ */
+export function printingMatch(
+  wanted: Set<string | null> | undefined,
+  held: Set<string | null> | undefined,
+): MatchKind {
+  if (!wanted || wanted.size === 0 || wanted.has(null)) return "exact";
+  for (const printingId of wanted) {
+    if (printingId !== null && held?.has(printingId)) return "exact";
+  }
+  return "other-printing";
+}
+
+/**
+ * The printing to name on the match card: null when any will do, the
+ * held one when a named printing matched, otherwise the first one the
+ * wanter asked for, so the card says what was wanted.
+ */
+export function wantedPrinting(
+  wanted: Set<string | null> | undefined,
+  held: Set<string | null> | undefined,
+): string | null {
+  if (!wanted || wanted.size === 0 || wanted.has(null)) return null;
+  for (const printingId of wanted) {
+    if (printingId !== null && held?.has(printingId)) return printingId;
+  }
+  for (const printingId of wanted) if (printingId !== null) return printingId;
+  return null;
 }
 
 /** The members of `a` that are also in `b`, in `a`'s order. */
@@ -314,6 +378,16 @@ export interface MatchedCard {
   cardId: string;
   source: "binder" | "flare";
   fromYourFlare: boolean;
+  match: MatchKind;
+  /** The printing the wanter named, or null for any. */
+  printingId: string | null;
+}
+
+export interface WantedCard {
+  cardId: string;
+  match: MatchKind;
+  /** The printing the wanter named, or null for any. */
+  printingId: string | null;
 }
 
 /** One attendee who matches the viewer in at least one direction. */
@@ -322,7 +396,7 @@ export interface MatchedPlayer {
   /** Cards the viewer wants that this attendee has. */
   theyHave: MatchedCard[];
   /** Cards this attendee wants that the viewer has. */
-  theyWant: string[];
+  theyWant: WantedCard[];
 }
 
 /**
@@ -340,16 +414,26 @@ export function matchAttendees(
     for (const cardId of viewer.wants) {
       const inBinder = lists.binderHaves.has(cardId);
       if (!inBinder && !lists.flareHaves.has(cardId)) continue;
+      const wanted = viewer.wantPrintings.get(cardId);
+      const held = lists.havePrintings.get(cardId);
       theyHave.push({
         cardId,
         source: inBinder ? "binder" : "flare",
         fromYourFlare: viewer.flareWants.has(cardId),
+        match: printingMatch(wanted, held),
+        printingId: wantedPrinting(wanted, held),
       });
     }
-    const theyWant: string[] = [];
+    const theyWant: WantedCard[] = [];
     for (const cardId of lists.wants) {
       if (viewer.binderHaves.has(cardId) || viewer.flareHaves.has(cardId)) {
-        theyWant.push(cardId);
+        const wanted = lists.wantPrintings.get(cardId);
+        const held = viewer.havePrintings.get(cardId);
+        theyWant.push({
+          cardId,
+          match: printingMatch(wanted, held),
+          printingId: wantedPrinting(wanted, held),
+        });
       }
     }
     if (theyHave.length === 0 && theyWant.length === 0) continue;
@@ -392,7 +476,7 @@ export function perPlayerCounts(matched: MatchedPlayer[]): Record<string, number
   for (const player of matched) {
     const cards = new Set<string>();
     for (const card of player.theyHave) cards.add(card.cardId);
-    for (const cardId of player.theyWant) cards.add(cardId);
+    for (const card of player.theyWant) cards.add(card.cardId);
     counts[player.playerId] = cards.size;
   }
   return counts;
@@ -410,7 +494,7 @@ export function bringFrom(
 ): { cardId: string; wantedBy: string[] }[] {
   const byCard = new Map<string, string[]>();
   for (const player of matched) {
-    for (const cardId of player.theyWant) {
+    for (const { cardId } of player.theyWant) {
       if (!viewerBinderHaves.has(cardId)) continue;
       const names = byCard.get(cardId) ?? [];
       names.push(nameOf(player.playerId));
@@ -527,17 +611,17 @@ async function readLists(
   const viewerSessions = sessionsOf.get(viewerId) ?? [];
 
   const [viewerWants, viewerHaves, flares] = await Promise.all([
-    admin.from("player_wants").select("card_id").eq("player_id", viewerId),
+    admin.from("player_wants").select("card_id, printing_id").eq("player_id", viewerId),
     viewerSessions.length > 0
       ? admin
           .from("player_cards")
-          .select("card_id")
+          .select("card_id, printing_id")
           .in("player_session_id", viewerSessions)
           .eq("local_trade", true)
       : Promise.resolve({ data: [], error: null }),
     admin
       .from("flares")
-      .select("event_id, player_session_id, card_id, intent")
+      .select("event_id, player_session_id, card_id, printing_id, intent")
       .in("event_id", eventIds)
       .eq("status", "open"),
   ]);
@@ -545,23 +629,42 @@ async function readLists(
     if (read.error) console.error("Could not read a night's lists", read.error);
   }
 
-  /* Flares per night per player, each way. */
+  /* Flares per night per player, each way, with the printing each named. */
   const flareWantsAt = new Map<string, Map<string, Set<string>>>();
   const flareHavesAt = new Map<string, Map<string, Set<string>>>();
+  type Printings = Map<string, Set<string | null>>;
+  const flareWantPrintingsAt = new Map<string, Map<string, Printings>>();
+  const flareHavePrintingsAt = new Map<string, Map<string, Printings>>();
   for (const row of flares.data ?? []) {
     if (!row.event_id || !row.player_session_id) continue;
     const playerId = playerBySession.get(row.player_session_id);
     if (!playerId) continue;
-    const bucket = row.intent === "showcase" ? flareHavesAt : flareWantsAt;
+    const showcase = row.intent === "showcase";
+    const bucket = showcase ? flareHavesAt : flareWantsAt;
     const byPlayer = bucket.get(row.event_id) ?? new Map<string, Set<string>>();
     const cards = byPlayer.get(playerId) ?? new Set<string>();
     cards.add(row.card_id);
     byPlayer.set(playerId, cards);
     bucket.set(row.event_id, byPlayer);
+    const printingBucket = showcase ? flareHavePrintingsAt : flareWantPrintingsAt;
+    const printingsByPlayer =
+      printingBucket.get(row.event_id) ?? new Map<string, Printings>();
+    const printings = printingsByPlayer.get(playerId) ?? new Map();
+    notePrinting(printings, row.card_id, row.printing_id ?? null);
+    printingsByPlayer.set(playerId, printings);
+    printingBucket.set(row.event_id, printingsByPlayer);
   }
 
   const savedWants = new Set((viewerWants.data ?? []).map((row) => row.card_id));
   const binderHaves = new Set((viewerHaves.data ?? []).map((row) => row.card_id));
+  const viewerWantPrintings: Printings = new Map();
+  for (const row of viewerWants.data ?? []) {
+    notePrinting(viewerWantPrintings, row.card_id, row.printing_id ?? null);
+  }
+  const viewerHavePrintings: Printings = new Map();
+  for (const row of viewerHaves.data ?? []) {
+    notePrinting(viewerHavePrintings, row.card_id, row.printing_id ?? null);
+  }
 
   /* Everything the viewer wants or has at any of these nights: the
      narrowing for the attendees' reads. */
@@ -583,7 +686,7 @@ async function readLists(
           chunk([...viewerWantsAll], CARD_CHUNK).map((cards) =>
             admin
               .from("player_cards")
-              .select("player_session_id, card_id")
+              .select("player_session_id, card_id, printing_id")
               .in("player_session_id", sessions)
               .in("card_id", cards)
               .eq("local_trade", true),
@@ -596,7 +699,7 @@ async function readLists(
           chunk([...viewerHavesAll], CARD_CHUNK).map((cards) =>
             admin
               .from("player_wants")
-              .select("player_id, card_id")
+              .select("player_id, card_id, printing_id")
               .in("player_id", players)
               .in("card_id", cards),
           ),
@@ -608,6 +711,7 @@ async function readLists(
   ]);
 
   const binderHavesOf = new Map<string, Set<string>>();
+  const havePrintingsOf = new Map<string, Printings>();
   for (const read of haveRows) {
     if (read.error) console.error("Could not read the roster's Have lists", read.error);
     for (const row of read.data ?? []) {
@@ -616,15 +720,22 @@ async function readLists(
       const cards = binderHavesOf.get(playerId) ?? new Set<string>();
       cards.add(row.card_id);
       binderHavesOf.set(playerId, cards);
+      const printings = havePrintingsOf.get(playerId) ?? new Map();
+      notePrinting(printings, row.card_id, row.printing_id ?? null);
+      havePrintingsOf.set(playerId, printings);
     }
   }
   const savedWantsOf = new Map<string, Set<string>>();
+  const wantPrintingsOf = new Map<string, Printings>();
   for (const read of wantRows) {
     if (read.error) console.error("Could not read the roster's wants", read.error);
     for (const row of read.data ?? []) {
       const cards = savedWantsOf.get(row.player_id) ?? new Set<string>();
       cards.add(row.card_id);
       savedWantsOf.set(row.player_id, cards);
+      const printings = wantPrintingsOf.get(row.player_id) ?? new Map();
+      notePrinting(printings, row.card_id, row.printing_id ?? null);
+      wantPrintingsOf.set(row.player_id, printings);
     }
   }
 
@@ -633,14 +744,33 @@ async function readLists(
     eventId: string,
     saved: Set<string>,
     binder: Set<string>,
+    savedPrintings: Printings,
+    binderPrintings: Printings,
   ): CardLists => {
     const flareWants = flareWantsAt.get(eventId)?.get(playerId) ?? new Set<string>();
     const flareHaves = flareHavesAt.get(eventId)?.get(playerId) ?? new Set<string>();
+    /* A Flare's printing joins the saved list's: a card saved for any
+       printing and flared for the alt art is wanted in any printing. */
+    const wantPrintings: Printings = new Map();
+    const havePrintings: Printings = new Map();
+    for (const [cardId, set] of savedPrintings) wantPrintings.set(cardId, new Set(set));
+    for (const [cardId, set] of binderPrintings)
+      havePrintings.set(cardId, new Set(set));
+    for (const [cardId, set] of flareWantPrintingsAt.get(eventId)?.get(playerId) ??
+      []) {
+      for (const printingId of set) notePrinting(wantPrintings, cardId, printingId);
+    }
+    for (const [cardId, set] of flareHavePrintingsAt.get(eventId)?.get(playerId) ??
+      []) {
+      for (const printingId of set) notePrinting(havePrintings, cardId, printingId);
+    }
     return {
       wants: new Set([...saved, ...flareWants]),
       flareWants,
       binderHaves: binder,
       flareHaves,
+      wantPrintings,
+      havePrintings,
     };
   };
 
@@ -654,11 +784,20 @@ async function readLists(
           eventId,
           savedWantsOf.get(playerId) ?? new Set(),
           binderHavesOf.get(playerId) ?? new Set(),
+          wantPrintingsOf.get(playerId) ?? new Map(),
+          havePrintingsOf.get(playerId) ?? new Map(),
         ),
       );
     }
     result.set(eventId, {
-      viewer: listsFor(viewerId, eventId, savedWants, binderHaves),
+      viewer: listsFor(
+        viewerId,
+        eventId,
+        savedWants,
+        binderHaves,
+        viewerWantPrintings,
+        viewerHavePrintings,
+      ),
       attendees,
       seatOf: seatOfAt.get(eventId) ?? new Map(),
       nameOf,
@@ -668,13 +807,23 @@ async function readLists(
   return result;
 }
 
+/** A card's facts and every printing of it, for naming a match. */
+export interface NamedCard {
+  cardId: string;
+  name: string;
+  number: string;
+  baseImageUrl: string | null;
+  printings: CardPrinting[];
+}
+
 /**
- * Name, number and art for a batch of cards. The picture is the base
- * printing's, the same stand-in a Flare that takes any printing shows;
- * the label is null because the match is on the card, not a printing.
+ * Name, number, art and printings for a batch of cards. The picture is
+ * the base printing's, the same stand-in a Flare that takes any
+ * printing shows, unless the wanter named a printing, when it is that
+ * printing's; the label is the named printing's, or null for any.
  */
-async function matchCards(cardIds: string[]): Promise<Map<string, MatchCard>> {
-  const cards = new Map<string, MatchCard>();
+async function matchCards(cardIds: string[]): Promise<Map<string, NamedCard>> {
+  const cards = new Map<string, NamedCard>();
   const ids = [...new Set(cardIds)];
   if (ids.length === 0) return cards;
 
@@ -695,25 +844,46 @@ async function matchCards(cardIds: string[]): Promise<Map<string, MatchCard>> {
     byCard.set(row.card_id, [...(byCard.get(row.card_id) ?? []), toPrinting(row)]);
   }
   for (const row of cardRows.data ?? []) {
-    const base = pickBasePrinting(byCard.get(row.id) ?? [], row.exact_name);
+    const printings = byCard.get(row.id) ?? [];
+    const base = pickBasePrinting(printings, row.exact_name);
     cards.set(row.id, {
       cardId: row.id,
       name: row.exact_name,
       number: row.canonical_card_number,
-      imageUrl: base?.imageUrl ?? null,
-      printingLabel: null,
+      baseImageUrl: base?.imageUrl ?? null,
+      printings,
     });
   }
   return cards;
 }
 
-function unknownCard(cardId: string): MatchCard {
+/** One match card: the named card, drawn as the printing the wanter asked for. */
+export function matchCardFor(
+  named: NamedCard | undefined,
+  cardId: string,
+  printingId: string | null,
+  match: MatchKind,
+): MatchCard {
+  if (!named) {
+    return {
+      cardId,
+      name: "Unknown card",
+      number: "",
+      imageUrl: null,
+      printingLabel: null,
+      match,
+    };
+  }
+  const printing = printingId
+    ? named.printings.find((candidate) => candidate.id === printingId)
+    : undefined;
   return {
     cardId,
-    name: "Unknown card",
-    number: "",
-    imageUrl: null,
-    printingLabel: null,
+    name: named.name,
+    number: named.number,
+    imageUrl: printing?.imageUrl ?? named.baseImageUrl,
+    printingLabel: printing ? printingLabel(printing, named.name) : null,
+    match,
   };
 }
 
@@ -802,7 +972,7 @@ export async function nightMatches(
     const cardIds = [
       ...matched.flatMap((player) => [
         ...player.theyHave.map((card) => card.cardId),
-        ...player.theyWant,
+        ...player.theyWant.map((card) => card.cardId),
       ]),
       ...bring.map((card) => card.cardId),
     ];
@@ -814,7 +984,15 @@ export async function nightMatches(
       ),
       packedCards(eventId, viewerId),
     ]);
-    const cardFor = (cardId: string) => cards.get(cardId) ?? unknownCard(cardId);
+    const cardFor = (card: {
+      cardId: string;
+      printingId: string | null;
+      match: MatchKind;
+    }) =>
+      matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match);
+    /* The checklist is the viewer's own copies, so nothing is in question. */
+    const ownCard = (cardId: string) =>
+      matchCardFor(cards.get(cardId), cardId, null, "exact");
     const playerFor = (playerId: string): MatchPlayer =>
       players.get(playerId) ?? {
         playerId,
@@ -834,7 +1012,7 @@ export async function nightMatches(
       summary: summarize(matched),
       mutual: ordered.filter(isMutual).map((player) => ({
         player: playerFor(player.playerId),
-        youWant: player.theyHave.map((card) => cardFor(card.cardId)),
+        youWant: player.theyHave.map(cardFor),
         theyWant: player.theyWant.map(cardFor),
       })),
       theyHave: ordered
@@ -842,7 +1020,7 @@ export async function nightMatches(
         .map((player) => ({
           player: playerFor(player.playerId),
           cards: player.theyHave.map((card) => ({
-            card: cardFor(card.cardId),
+            card: cardFor(card),
             source: card.source,
             fromYourFlare: card.fromYourFlare,
           })),
@@ -854,7 +1032,7 @@ export async function nightMatches(
           cards: player.theyWant.map(cardFor),
         })),
       bring: bring.map((card) => ({
-        card: cardFor(card.cardId),
+        card: ownCard(card.cardId),
         wantedBy: card.wantedBy,
         packed: packed.has(card.cardId),
       })),
@@ -1011,9 +1189,14 @@ export async function nightPlayer(
       : undefined;
     const cards = await matchCards([
       ...(matched?.theyHave.map((card) => card.cardId) ?? []),
-      ...(matched?.theyWant ?? []),
+      ...(matched?.theyWant.map((card) => card.cardId) ?? []),
     ]);
-    const cardFor = (cardId: string) => cards.get(cardId) ?? unknownCard(cardId);
+    const cardFor = (card: {
+      cardId: string;
+      printingId: string | null;
+      match: MatchKind;
+    }) =>
+      matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match);
 
     return {
       player: {
@@ -1026,7 +1209,7 @@ export async function nightPlayer(
         aura: seat.aura,
       },
       matches: matched ? (perPlayerCounts([matched])[playerId] ?? 0) : 0,
-      theyHave: matched?.theyHave.map((card) => cardFor(card.cardId)) ?? [],
+      theyHave: matched?.theyHave.map(cardFor) ?? [],
       theyWant: matched?.theyWant.map(cardFor) ?? [],
       flares,
       binders: binders.filter((binder) => binder.forTrade),
