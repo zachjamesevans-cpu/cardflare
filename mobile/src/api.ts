@@ -2682,7 +2682,7 @@ export type FeedSection =
 /** The heading each section is drawn under. Same words as the website. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
   wanted: "Wanted from you",
-  tonight: "Tonight",
+  tonight: "Coming up",
   yours: "Your flares",
   people: "People you follow",
   walkin: "Where you play",

@@ -91,7 +91,7 @@ export async function recentFailures(now = Date.now()): Promise<{
       failures.push({
         kind: "sync-failed",
         subject: providerName(run.provider_key),
-        detail: `${run.records_failed.toLocaleString()} record${run.records_failed === 1 ? "" : "s"} were refused in the last run.`,
+        detail: `${run.records_failed.toLocaleString()} ${run.records_failed === 1 ? "record was" : "records were"} refused in the last run.`,
         when: run.finished_at ?? run.started_at,
         href: "/admin#sync-heading",
       });

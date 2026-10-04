@@ -102,7 +102,7 @@ describe("the three dots and the sheet behind them", () => {
     const compact = read("src/components/feed/flare-feed-card-compact.tsx");
     expect(compact).toContain("<PostMenu");
     expect(compact).toContain(
-      'import { PostMenu } from "@/components/feed/post-actions"',
+      'import { PostMenu, UnlessHidden } from "@/components/feed/post-actions"',
     );
   });
 

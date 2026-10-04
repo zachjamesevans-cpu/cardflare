@@ -19,16 +19,16 @@ export const dynamic = "force-dynamic";
  *
  * The audit found 482 set codes scrolling inside a box on the dashboard,
  * which is a list nobody reads. The dashboard now says how many; this
- * is where the codes are, with a filter, sorted so a set is found by
- * its code rather than by scrolling.
+ * is where the codes are, one table per game, with a filter, so a set
+ * is found by its code or name rather than by scrolling.
  */
 export default async function AdminSetsPage() {
   // The layout guards too. Duplicated deliberately: a layout is not a
   // security boundary on its own.
   await requireAdmin();
 
+  /* Already ordered by game, then set code, by the aggregate. */
   const { sets, truncated } = await catalogBySet();
-  const sorted = sets.toSorted((a, b) => a.setCode.localeCompare(b.setCode));
   const total = sets.reduce((sum, set) => sum + set.cards, 0);
 
   return (
@@ -48,8 +48,7 @@ export default async function AdminSetsPage() {
           Distinct cards per set, not printings: a card with an alternate art is one
           card in its set. Compare against the official set list before telling anyone
           the catalog is complete.
-          {truncated &&
-            " Counts are partial because the catalog exceeds the read limit."}
+          {truncated && " The database did not answer, so the list is empty."}
         </p>
 
         <p className="text-sm text-text-muted tabular-nums">
@@ -69,7 +68,7 @@ export default async function AdminSetsPage() {
           </p>
         </Card>
       ) : (
-        <SetList sets={sorted} />
+        <SetList sets={sets} />
       )}
     </div>
   );

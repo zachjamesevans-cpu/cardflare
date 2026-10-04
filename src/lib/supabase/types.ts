@@ -2130,6 +2130,15 @@ export type Database = {
         Args: { p_game: string; p_names: string[] };
         Returns: { set_code: string; set_name: string }[];
       };
+      catalog_sets: {
+        Args: Record<string, never>;
+        Returns: {
+          game: string;
+          set_code: string | null;
+          set_name: string | null;
+          cards: number;
+        }[];
+      };
     };
     Enums: {
       waitlist_user_type: UserType;

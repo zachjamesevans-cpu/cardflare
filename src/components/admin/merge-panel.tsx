@@ -24,6 +24,10 @@ export interface MergeCandidate {
 
 const MERGE_IDLE: MergeState = { status: "idle" };
 
+/** What the merge does, said before the button. Pinned by the parity test. */
+export const MERGE_LINE =
+  "Everything on this store moves to the store you pick, then this store is deleted. This cannot be undone.";
+
 function candidateLabel(candidate: MergeCandidate): string {
   const place = [candidate.city, candidate.region].filter(Boolean).join(", ");
   return [candidate.name, place, candidate.joinCode].filter(Boolean).join(" · ");
@@ -50,7 +54,10 @@ function MergeButton({ into }: { into: string }) {
  * no button at all. The survivor's name is typed back, so a merge is
  * never one slip of a dropdown.
  *
- * Closed by default, like every destructive control in the console.
+ * Closed by default, like every destructive control in the console,
+ * and drawn inside the Danger zone with the delete panel, first of the
+ * two: it is the gentler answer to a duplicate, but it still ends in a
+ * deleted store.
  */
 export function MergePanel({
   fromId,
@@ -90,10 +97,7 @@ export function MergePanel({
     <Card className="flex flex-col gap-3 border-warning/40 p-4">
       <div className="flex flex-col gap-1">
         <p className="font-semibold text-text-primary">Merge into another store</p>
-        <p className="text-sm text-text-secondary">
-          For a shop that is in the directory twice. Everything on this store moves to
-          the one you pick, then this one is deleted.
-        </p>
+        <p className="text-sm text-text-secondary">{MERGE_LINE}</p>
       </div>
 
       {!open ? (

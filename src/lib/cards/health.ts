@@ -11,8 +11,8 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * verifying, and a rejected-record table nobody reads is the same as no
  * rejected-record table.
  *
- * Deliberately no new SQL function, so this needs no migration: rows are read
- * and grouped here. Everything is bounded — see PAGE and MAX_ROWS.
+ * The set counts come from one aggregate in the database (`catalog_sets`);
+ * the failure read is paged here and bounded, see PAGE and MAX_ROWS.
  */
 
 /** PostgREST caps a response at 1000 rows regardless of what is asked for. */
@@ -34,60 +34,65 @@ const pages = (): number[] =>
 /* -------------------------------------------------------------------------- */
 
 export interface SetCoverage {
+  /** The game the set belongs to, as the cards table names it. */
+  game: string;
   /** Rows with no set code are grouped under a label rather than dropped. */
   setCode: string;
+  /** The provider's name for the set, when it sent one. */
+  setName: string | null;
   cards: number;
 }
 
-/**
- * Distinct cards per set, not printings per set.
- *
- * A card with a base art and an alternate art is one card in the set. Counting
- * printings would overstate every set that has parallels — and this number
- * exists precisely to be compared against an official set list.
- */
-export function summariseSets(
-  rows: { card_id: string; set_code: string | null }[],
-): SetCoverage[] {
-  const seen = new Map<string, Set<string>>();
-
-  for (const row of rows) {
-    const key = row.set_code ?? "(no set code)";
-    const cards = seen.get(key) ?? new Set<string>();
-    cards.add(row.card_id);
-    seen.set(key, cards);
-  }
-
-  return [...seen.entries()]
-    .map(([setCode, cards]) => ({ setCode, cards: cards.size }))
-    .sort((a, b) => a.setCode.localeCompare(b.setCode));
+/** What the database hands back, one row per game and set code. */
+export interface CatalogSetRow {
+  game: string;
+  set_code: string | null;
+  set_name: string | null;
+  cards: number;
 }
 
+export const NO_SET_CODE = "(no set code)";
+
+/**
+ * Distinct cards per set, not printings per set, shaped for the console.
+ *
+ * A card with a base art and an alternate art is one card in the set. Counting
+ * printings would overstate every set that has parallels, and this number
+ * exists precisely to be compared against an official set list. The counting
+ * happens in the database (`catalog_sets`); this names the codeless bucket and
+ * orders the result so a gap in the codes is visible at a glance.
+ */
+export function coverageFromRows(rows: CatalogSetRow[]): SetCoverage[] {
+  return rows
+    .map((row) => ({
+      game: row.game,
+      setCode: row.set_code ?? NO_SET_CODE,
+      setName: row.set_name,
+      cards: Number(row.cards),
+    }))
+    .sort((a, b) => a.game.localeCompare(b.game) || a.setCode.localeCompare(b.setCode));
+}
+
+/**
+ * One round trip: the database groups the printings, so the front page and
+ * the sets page read the same numbers from the same aggregate. The paged read
+ * this replaced was both slow and unstable (no order clause under PostgREST
+ * paging), which is how the two pages came to disagree.
+ */
 export async function catalogBySet(): Promise<{
   sets: SetCoverage[];
   truncated: boolean;
 }> {
   if (!isSupabaseConfigured()) return { sets: [], truncated: false };
 
-  const rows: { card_id: string; set_code: string | null }[] = [];
+  const { data, error } = await getSupabaseAdmin().rpc("catalog_sets");
 
-  for (const from of pages()) {
-    const { data, error } = await getSupabaseAdmin()
-      .from("card_printings")
-      .select("card_id, set_code")
-      .range(from, from + PAGE - 1);
-
-    if (error) {
-      console.error("Could not read printings for set coverage", error);
-      return { sets: summariseSets(rows), truncated: true };
-    }
-
-    rows.push(...(data ?? []));
-    if ((data?.length ?? 0) < PAGE)
-      return { sets: summariseSets(rows), truncated: false };
+  if (error) {
+    console.error("Could not read the catalogue's sets", error);
+    return { sets: [], truncated: true };
   }
 
-  return { sets: summariseSets(rows), truncated: true };
+  return { sets: coverageFromRows(data ?? []), truncated: false };
 }
 
 /* -------------------------------------------------------------------------- */

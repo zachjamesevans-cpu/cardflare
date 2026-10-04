@@ -13,7 +13,7 @@ import { defaultEventWindow } from "@/lib/events/format";
 import { countParticipants } from "@/lib/events/participants";
 import { listEventsForStore } from "@/lib/events/repository";
 import { sweepStaleRooms } from "@/lib/events/rooms";
-import { NO_TIMEZONE } from "@/lib/events/schema";
+import { NO_TIMEZONE, NO_TIMEZONE_CREATE } from "@/lib/events/schema";
 import { loadStoreConsole } from "@/lib/stores/console";
 import type { EventRow } from "@/lib/supabase/types";
 
@@ -123,7 +123,7 @@ export default async function StoreEventsPage({
             storeId={store.id}
             defaultStartsAt={window.startsAt}
             defaultEndsAt={window.endsAt}
-            disabled={noZone}
+            disabledReason={noZone ? NO_TIMEZONE_CREATE : undefined}
           />
         </Card>
       </section>

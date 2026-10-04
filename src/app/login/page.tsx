@@ -6,7 +6,7 @@ import { Logo } from "@/components/brand/logo";
 import { PasswordSignInForm } from "@/components/auth/password-sign-in-form";
 import { ProviderButtons } from "@/components/auth/provider-buttons";
 import { SignInForm } from "@/components/auth/sign-in-form";
-import { safeNextPath } from "@/lib/auth/redirect";
+import { safeNextPath, signedInHome } from "@/lib/auth/redirect";
 import { getViewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
 
@@ -49,14 +49,17 @@ export default async function LoginPage(props: {
    * server. So the question is answered here instead, on a page that is
    * already dynamic and already has the session in hand.
    *
-   * `safeNextPath` sends them wherever they were headed, defaulting to
-   * `/store` — which forwards an admin to `/admin` and shows an unaffiliated
-   * account the "no store yet" explanation. That is the same destination
-   * signing in would have produced, so the link behaves as though they had.
+   * `safeNextPath` sends them wherever they were headed. With nowhere in
+   * mind, a player lands on the Feed and everybody else on `/store`, which
+   * forwards an admin to `/admin` and shows an unaffiliated account the "no
+   * store yet" explanation. That is the same destination signing in would
+   * have produced, so the link behaves as though they had.
    */
   const viewer = await getViewer();
 
-  if (viewer.kind !== "anonymous") redirect(safeNextPath(rawNext));
+  if (viewer.kind !== "anonymous") {
+    redirect(rawNext ? safeNextPath(rawNext) : signedInHome(viewer.kind));
+  }
 
   return (
     <main

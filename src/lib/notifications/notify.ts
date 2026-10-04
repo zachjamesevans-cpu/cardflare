@@ -625,12 +625,12 @@ export async function notifyBoardOpen(eventId: string): Promise<void> {
  */
 export const TEST_NOTICES = {
   "offer-received": {
-    title: "CHUNC has your Charizard",
+    title: "Kaito has your Charizard",
     body: "They said: “I have the reverse holo, meet at table 4”",
   },
   "trade-confirmed": {
     title: "Trade confirmed: Charizard",
-    body: "CHUNC marked your trade done. Good trade.",
+    body: "Kaito marked your trade done. Good trade.",
   },
   "board-open": {
     title: "The board is open: Friday Locals at Card Cavern",
@@ -641,11 +641,11 @@ export const TEST_NOTICES = {
     body: "12 cards are already wanted for Friday, and you own 3 of them. Bring the binder.",
   },
   "new-follower": {
-    title: "CHUNC followed you",
+    title: "Kaito followed you",
     body: "Follow back to become trade partners.",
   },
   "room-flare": {
-    title: "CHUNC is looking for Umbreon VMAX",
+    title: "Kaito is looking for Umbreon VMAX",
     body: "It just went up in your room. Check your binder.",
   },
 } as const;
@@ -684,10 +684,11 @@ export async function sendTestNotice(
     body: sample.body,
     url: path,
     dedupeKey: `test:${kind}:${playerId}:${crypto.randomUUID()}`,
-    /* The recipient stands in for the sample's CHUNC, so a test notice
-       shows the inbox row the way a real one lands: face first. The
-       two board kinds have nobody behind them for real either. */
-    actorId: kind === "board-open" || kind === "early-board" ? null : playerId,
+    /* No actor. The recipient used to stand in for the sample's trader,
+       which put the admin's own face on a row saying somebody had their
+       card, and the audit read it as a notice from themselves. Kaito is
+       nobody, so the row leads with the bell instead. */
+    actorId: null,
   });
 
   if (id) await deliverByPush(playerId, sample.title, sample.body, path, "board-open");
@@ -734,7 +735,20 @@ export async function notifyNewFollower(
 
     const name = follower?.display_name ?? "A player";
     const title = `${name} followed you`;
-    const body = "Follow back to become trade partners.";
+    /*
+     * "Follow back" is wrong advice to somebody who followed first: this
+     * follow IS the follow back, and the pair are partners now. The audit
+     * had exactly that row in its inbox. One query says which it is.
+     */
+    const { count: alreadyFollowing } = await getSupabaseAdmin()
+      .from("player_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("follower_id", followedId)
+      .eq("followed_id", followerId);
+    const body =
+      (alreadyFollowing ?? 0) > 0
+        ? "You follow each other now, so you're trade partners."
+        : "Follow back to become trade partners.";
     const path = `/p/${followerId}`;
 
     const id = await record({

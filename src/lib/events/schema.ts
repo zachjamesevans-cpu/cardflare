@@ -54,6 +54,10 @@ export type CreateEventInput = z.infer<typeof createEventSchema>;
 export const NO_TIMEZONE =
   "Set your store's timezone first, so 6 PM means 6 PM where you are.";
 
+/** Beside the disabled Create button, so the button says why it waits. */
+export const NO_TIMEZONE_CREATE =
+  "Set your store's time zone above to create an event.";
+
 /** Editing a night: the same fields, with the event in place of the store. */
 export const editEventSchema = createEventSchema.omit({ storeId: true }).extend({
   eventId: z.guid("Please choose an event."),

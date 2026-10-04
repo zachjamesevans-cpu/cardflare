@@ -1,6 +1,19 @@
 export const DEFAULT_SIGNED_IN_PATH = "/store";
 
 /**
+ * Where a signed-in visitor with nowhere particular to go should land.
+ *
+ * A player who opens /login while signed in (the app's footer link, an old
+ * bookmark) is a player, and their home is the Feed. Sending them to /store
+ * bounced them through the console's "no store" rule onto their profile,
+ * two hops to the wrong page. Stores, admins and accounts with no profile
+ * yet keep the console, which already knows what to do with each of them.
+ */
+export function signedInHome(kind: string): string {
+  return kind === "player" ? "/feed" : DEFAULT_SIGNED_IN_PATH;
+}
+
+/**
  * Constrains a post-sign-in redirect to somewhere on this site.
  *
  * Without this, `?next=https://evil.example` would turn the sign-in flow into

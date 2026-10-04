@@ -306,16 +306,10 @@ export function HuntDetail({
               position={index}
               control={
                 yours ? (
+                  /* The stepper is the one control: the audit of
+                     2026-10-03 found the plus-one button beside its
+                     plus to be the same button twice, so it went. */
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => write(card, card.foundCopies + 1)}
-                    >
-                      +1 found
-                    </Button>
                     <Stepper
                       value={card.foundCopies}
                       min={card.tradedCopies}
@@ -582,7 +576,7 @@ export function HuntCardRow({
           {card.cardName}
         </p>
         <p className="truncate text-xs text-text-muted">
-          {card.printingLabel ?? "Any printing"}
+          {card.cardNumber} · {card.printingLabel ?? "Any printing"}
           <span aria-hidden="true"> · </span>
           <span className="text-text-secondary tabular-nums">
             {card.foundCopies} of {card.needed} found

@@ -57,6 +57,7 @@ export function FlareFeedCardCompact({
   onProgress,
   onTakeDown,
   onReport,
+  onBlock,
 }: {
   item: Hunt;
   post: PostRef;
@@ -72,6 +73,8 @@ export function FlareFeedCardCompact({
   onTakeDown?: () => void;
   /** "Report" on somebody else's; behind the three dots. */
   onReport?: () => void;
+  /** "Block" on somebody else's, after Report; behind the three dots. */
+  onBlock?: () => void;
 }) {
   const shelf = shelfFor(item.cards, post);
   const direction = item.direction ?? "want";
@@ -85,6 +88,7 @@ export function FlareFeedCardCompact({
     onProgress,
     onTakeDown,
     onReport,
+    onBlock,
   });
 
   /* Cash is the only term that is not the default, so it is the only

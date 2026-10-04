@@ -57,8 +57,7 @@ function SetCoverageBlock({
           <p className="border-t border-border pt-3 text-xs text-text-muted">
             Distinct cards, not printings. Compare against the official set list before
             telling anyone the catalog is complete.
-            {truncated &&
-              " Counts are partial because the catalog exceeds the read limit."}
+            {truncated && " The database did not answer, so the count is empty."}
           </p>
         </>
       )}

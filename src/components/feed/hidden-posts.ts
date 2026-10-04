@@ -14,9 +14,14 @@ import { useSyncExternalStore } from "react";
  *
  * The page's life, nothing more: a reload reads the server, which is
  * right by then. The app does the same in its Feed screen's state.
+ *
+ * A block works the same way, by author: the moment the server says
+ * the player is blocked, every post of theirs on the page leaves the
+ * list, and the refresh behind the status line only confirms.
  */
 
 let hidden: ReadonlySet<string> = new Set();
+let hiddenAuthors: ReadonlySet<string> = new Set();
 const listeners = new Set<() => void>();
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -34,8 +39,17 @@ function getServerSnapshot(): ReadonlySet<string> {
   return EMPTY;
 }
 
+function getAuthorSnapshot(): ReadonlySet<string> {
+  return hiddenAuthors;
+}
+
 function set(next: ReadonlySet<string>): void {
   hidden = next;
+  for (const listener of listeners) listener();
+}
+
+function setAuthors(next: ReadonlySet<string>): void {
+  hiddenAuthors = next;
   for (const listener of listeners) listener();
 }
 
@@ -57,12 +71,29 @@ export function isPostHidden(postId: string): boolean {
   return hidden.has(postId);
 }
 
+/** Every post by this player leaves the list now; they are blocked. */
+export function hideAuthor(playerId: string): void {
+  if (hiddenAuthors.has(playerId)) return;
+  setAuthors(new Set([...hiddenAuthors, playerId]));
+}
+
+export function isAuthorHidden(playerId: string): boolean {
+  return hiddenAuthors.has(playerId);
+}
+
 /** Whether this post is hidden, live. */
 export function usePostHidden(postId: string): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).has(postId);
 }
 
+/** Whether this post's author is hidden, live. A store post has no author. */
+export function useAuthorHidden(playerId: string | null | undefined): boolean {
+  const authors = useSyncExternalStore(subscribe, getAuthorSnapshot, getServerSnapshot);
+  return playerId ? authors.has(playerId) : false;
+}
+
 /** For tests: back to nothing hidden. */
 export function resetHiddenPosts(): void {
   set(new Set());
+  setAuthors(new Set());
 }

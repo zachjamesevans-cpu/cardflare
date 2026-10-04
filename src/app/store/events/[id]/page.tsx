@@ -153,6 +153,10 @@ export default async function EventPage({
   /* A night the store can still change: scheduled and not called off. */
   const editable = scheduled && !event.cancelled_at;
 
+  /* Finished or cancelled, the numbers are final; until then they are
+     a running count and the heading says so. */
+  const roomOver = event.status === "closed" || Boolean(event.cancelled_at);
+
   return (
     <AppShell
       area="Store"
@@ -184,7 +188,7 @@ export default async function EventPage({
       {stats && (
         <section className="flex flex-col gap-5" aria-labelledby="stats-heading">
           <h2 id="stats-heading" className="text-xl font-bold text-text-primary">
-            How the room went
+            {roomOver ? "How the room went" : "The room so far"}
           </h2>
           <EventStatsCard stats={stats} />
         </section>
@@ -284,7 +288,7 @@ export default async function EventPage({
             </p>
           </div>
           <Card>
-            <CancelEventForm eventId={event.id} />
+            <CancelEventForm eventId={event.id} joined={participants.length} />
           </Card>
         </section>
       )}

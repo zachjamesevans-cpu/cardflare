@@ -127,7 +127,7 @@ describe("found, everywhere", () => {
     const compact = read("src/components/feed/flare-feed-card-compact.tsx");
     expect(compact).not.toContain("All found");
     expect(compact).not.toContain("All gone");
-    expect(compact).toContain("item.completed ? (\n            <CheckCircle2");
+    expect(compact).toContain("item.completed ? (\n              <CheckCircle2");
 
     const appCard = read("mobile/src/flare-feed-card.tsx");
     expect(appCard).toContain('"offered it all"');

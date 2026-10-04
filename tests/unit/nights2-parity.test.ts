@@ -101,7 +101,7 @@ const PINNED = {
   BOARD_EARLY: "Board open early",
   BOARD_EARLY_LINE: "Post now so players know what to bring.",
   BOARD_EARLY_LONG:
-    "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the night ends.",
+    "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the event ends.",
   MATCHES_FOR_YOU: "Matches for you",
   SEE_ALL_MATCHES: "See all matches",
   NO_MATCHES:
@@ -194,8 +194,16 @@ function expectInOrder(source: string, markers: string[], label: string) {
 }
 
 describe("the words on a Night", () => {
+  /* The store's cancel confirm is console copy: the app has no store
+     console, so those two names are the website's alone (round 17). */
+  const WEB_ONLY = new Set(["CANCEL_EMPTY", "CANCEL_JOINED"]);
+
   it("export the same names on both platforms", () => {
-    expect(Object.keys(appCopy).sort()).toEqual(Object.keys(webCopy).sort());
+    expect(Object.keys(appCopy).sort()).toEqual(
+      Object.keys(webCopy)
+        .filter((name) => !WEB_ONLY.has(name))
+        .sort(),
+    );
   });
 
   it("are the pinned strings on the website and in the app, word for word", () => {

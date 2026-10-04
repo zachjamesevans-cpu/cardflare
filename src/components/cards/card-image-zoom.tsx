@@ -500,15 +500,15 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: OfferBuild })
           <span className="font-medium text-accent">
             {sent.count > 1 ? `You offered ${sent.count} cards.` : "You offered this."}
           </span>{" "}
-          They can see your name, so keep an eye out.
+          They will see your name and can message you.
           {sent.notTaken.length > 0 && ` Not taken: ${listOf(sent.notTaken)}.`}
         </p>
       </ZoomSaid>
     ) : have.youOffered ? (
       <ZoomSaid>
         <p>
-          <span className="font-medium text-accent">You offered this.</span> They can
-          see your name, so keep an eye out.
+          <span className="font-medium text-accent">You offered this.</span> They will
+          see your name and can message you.
         </p>
       </ZoomSaid>
     ) : null;

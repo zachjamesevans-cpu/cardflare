@@ -50,8 +50,7 @@ export default async function AdminShowsPage() {
 
         <Card>
           <CreateShowForm
-            zoneGroups={timeZoneChoices("UTC")}
-            defaultZone="UTC"
+            zoneGroups={timeZoneChoices()}
             defaultStartsAt={window.startsAt}
             defaultEndsAt={window.endsAt}
           />

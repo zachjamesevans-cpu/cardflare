@@ -392,6 +392,28 @@ export interface PlayerInviteListing {
   createdAt: string;
 }
 
+/**
+ * How many player accounts there are, for the console's front page.
+ *
+ * A head count, not the list: the front page used to load every player
+ * row and every session to print one number, which was most of its
+ * seven seconds.
+ */
+export async function countPlayers(): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+
+  const { count, error } = await getSupabaseAdmin()
+    .from("players")
+    .select("id", { count: "exact", head: true });
+
+  if (error) {
+    console.error("Could not count players", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
 /** Accounts and open invitations, for the admin's players page. */
 export async function listPlayersForAdmin(): Promise<{
   players: PlayerListing[];

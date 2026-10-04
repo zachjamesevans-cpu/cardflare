@@ -390,7 +390,9 @@ describe("take down leaves the list at once", () => {
     expect(undo).toContain("if (state.postId) unhidePost(state.postId);");
     expect(undo.indexOf("unhidePost(")).toBeLessThan(undo.indexOf("router.refresh()"));
     /* The Feed card reads the store. */
-    expect(WEB.feedCard).toContain("<UnlessHidden postId={item.postId}>");
+    expect(WEB.feedCard).toContain(
+      "<UnlessHidden postId={item.postId} playerId={shape.playerId}>",
+    );
     expect(WEB.actions).toContain("const hidden = usePostHidden(postId);");
   });
 

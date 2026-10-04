@@ -449,7 +449,7 @@ describe("the offer rows are one shape: art left, one column right", () => {
           "printingLabel(card.printingLabel)",
           '{" · "}',
           "wantsLine(needed, remaining)",
-          "+1 found",
+          "<Stepper",
           "I have this card",
           '<View style={{ alignSelf: "flex-start" }}>',
           "disabled={!selected}",
@@ -461,13 +461,14 @@ describe("the offer rows are one shape: art left, one column right", () => {
     expect(huntRow).toContain('alignSelf: "stretch"');
     expect(huntRow).toContain('alignItems: "stretch"');
     expect(huntRow).toContain("gap: spacing(1.5)");
-    /* The owner's +1 found and stepper sit on one row. */
+    /* The owner's stepper is the one control (round 17 dropped the
+       "+1 found" tap that said the same thing beside it). */
     const owner = between(
       huntRow,
       "{owner?.onSet && !done ? (",
       "{owner?.onReopen ? (",
     );
-    expect(owner).toContain('flexDirection: "row"');
     expect(owner).toContain("<Stepper");
+    expect(owner).not.toContain("+1 found");
   });
 });

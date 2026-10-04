@@ -16,7 +16,7 @@ const FACES = 3;
 /**
  * Who is here: the door card's meta line, and the dialog behind it.
  *
- * The line reads "2 here now · 10 tonight · 3 Flares" with up to three
+ * The line reads "2 here now · 10 coming · 3 Flares" with up to three
  * faces in front of it, the present ones first, and the whole line is
  * one button named "Who's here". The names themselves are reference
  * material, not a decision anyone makes on arrival, so they live in a
@@ -89,7 +89,7 @@ export function EventLobby({
           {present} here now
         </span>
         <span className="text-text-muted tabular-nums">
-          · {participants.length} tonight · {flareCount}{" "}
+          · {participants.length} coming · {flareCount}{" "}
           {flareCount === 1 ? "Flare" : "Flares"}
         </span>
       </button>

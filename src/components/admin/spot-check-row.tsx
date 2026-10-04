@@ -28,17 +28,35 @@ export function SpotCheckRow({
   const dash = (value: unknown) =>
     value === null || value === undefined || value === "" ? "-" : String(value);
 
+  /*
+   * The card shape is One Piece's, because that is the catalogue the
+   * sync builds. Counter, Life and Trigger mean nothing on a Magic or a
+   * Pokémon card, and a row of dashes under those labels reads as a
+   * broken import rather than as a different game. The other fields
+   * have a meaning in every game, and show a dash honestly when the
+   * provider sent nothing.
+   */
+  const onePiece = card.game === "one-piece";
   const facts: [string, string][] = [
     ["Type", dash(card.cardType)],
     ["Colors", dash(card.colors.join(", "))],
     ["Traits", dash(card.traits.join(" | "))],
     ["Cost", dash(card.cost)],
     ["Power", dash(card.power)],
-    ["Counter", dash(card.counter)],
-    ["Life", dash(card.life)],
+    ...(onePiece
+      ? ([
+          ["Counter", dash(card.counter)],
+          ["Life", dash(card.life)],
+        ] as [string, string][])
+      : []),
     ["Rarity", dash(card.rarity)],
     ["Effect", dash(card.effectText?.replace(/\s+/g, " "))],
-    ["Trigger", dash(card.triggerText?.replace(/\s+/g, " "))],
+    ...(onePiece
+      ? ([["Trigger", dash(card.triggerText?.replace(/\s+/g, " "))]] as [
+          string,
+          string,
+        ][])
+      : []),
     [
       "Printings",
       dash(

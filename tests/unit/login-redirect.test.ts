@@ -66,6 +66,12 @@ describe("/login when already signed in", () => {
     await expect(visit()).resolves.toBe("/store");
   });
 
+  it("sends a player to the Feed, not through the console", async () => {
+    getViewer.mockResolvedValue({ kind: "player", user: USER, organizerStoreIds: [] });
+
+    await expect(visit()).resolves.toBe("/feed");
+  });
+
   it("sends an account with no store there too, where it is explained", async () => {
     getViewer.mockResolvedValue({ kind: "unaffiliated", user: USER });
 
