@@ -61,6 +61,7 @@ export async function GET(request: Request): Promise<Response> {
       id: card.id,
       name: card.exactName,
       cardNumber: card.canonicalCardNumber,
+      game: card.game ?? null,
       // What the website's result row shows under the name — the app's
       // picker renders the same line and the same stats, so both send it.
       cardType: card.cardType,

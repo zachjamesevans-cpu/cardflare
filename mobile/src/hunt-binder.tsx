@@ -19,7 +19,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StackParams } from "../App";
 import { SheetBackdrop } from "./action-menu";
 import {
+  describeError,
   offerOnHunt,
+  removeHuntCard,
   setFlareFound,
   setRequestFound,
   type Hunt,
@@ -115,7 +117,16 @@ export function HuntBinder({
   onOwner?: () => void;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const cards = hunt.cards ?? [];
+  /*
+   * A card the owner just removed is gone on the next paint, before
+   * the re-read behind it lands: the pocket is dropped from this
+   * page's cards and the hunt is reloaded. Keyed by request, which is
+   * what the server removes.
+   */
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
+  const cards = (hunt.cards ?? []).filter(
+    (card) => !card.requestId || !removed.has(card.requestId),
+  );
   const owner = ownerName ?? hunt.ownerName ?? "them";
 
   /*
@@ -243,6 +254,16 @@ export function HuntBinder({
   /* The owner's open pocket: the card the progress sheet is for. */
   const [open, setOpen] = useState<HuntCard | null>(null);
   const [editing, setEditing] = useState(false);
+
+  /* "Remove from hunt": the server keeps the row with a removed_at and
+     takes its Flares down; here the pocket goes and the hunt re-reads. */
+  const remove = async (card: HuntCard) => {
+    if (!card.requestId) return;
+    await removeHuntCard(card.requestId);
+    setRemoved((current) => new Set(current).add(card.requestId ?? ""));
+    setOpen(null);
+    onChanged?.();
+  };
 
   /* The page frame's width, as laid out; nothing is drawn before it is known. */
   const [pageWidth, setPageWidth] = useState(0);
@@ -476,6 +497,9 @@ export function HuntBinder({
 
       {yours ? (
         <HuntPocketSheet
+          /* Keyed by the card, so the inline "Remove?" question is
+             answered fresh for every pocket opened. */
+          key={open?.requestId ?? open?.cardId ?? "closed"}
           card={open}
           found={open ? foundFor(open) : 0}
           undoLabel={copies.undoLabel}
@@ -484,6 +508,7 @@ export function HuntBinder({
           onSet={(value) => {
             if (open) write(open, value);
           }}
+          onRemove={open?.requestId ? () => remove(open) : undefined}
           onClose={() => setOpen(null)}
         />
       ) : null}
@@ -621,8 +646,13 @@ function HuntPocket({
  * cannot be stepped back: a trade is a thing that happened between
  * two people.
  *
- * There is no "Remove from hunt" here because the server has no such
- * action; the founder: "If they're added to a hunt, they stay there."
+ * Under the stepper, "Remove from hunt", in the danger colour. It asks
+ * inline, "Remove {name} from this hunt? Its Flares come down too.",
+ * with Remove and Keep, and Remove goes through `onRemove`: the owner
+ * decides, and the server takes the card's open Flares down with it.
+ * The website's ProgressSheet (src/components/players/hunt-binder.tsx)
+ * says the same words. A card with no request behind it (an older
+ * server) has nothing to remove and offers no button.
  */
 function HuntPocketSheet({
   card,
@@ -631,6 +661,7 @@ function HuntPocketSheet({
   onUndo,
   error,
   onSet,
+  onRemove,
   onClose,
 }: {
   /** Null while closed. */
@@ -640,13 +671,31 @@ function HuntPocketSheet({
   onUndo: () => void;
   error: string | null;
   onSet: (value: number) => void;
+  /** "Remove from hunt", once confirmed. Absent: no button. */
+  onRemove?: () => Promise<void>;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  /* The inline question, and what went wrong answering it. */
+  const [confirming, setConfirming] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   if (!card) return null;
   const needed = neededOf(card);
   const remaining = Math.max(0, needed - found);
   const done = remaining === 0;
+
+  const confirmRemove = async () => {
+    if (!onRemove || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      await onRemove();
+    } catch (caught) {
+      setRemoveError(`Could not remove that (${describeError(caught)}).`);
+      setRemoving(false);
+    }
+  };
 
   return (
     /* Fade, not slide: see SheetBackdrop for the black wall this replaces. */
@@ -748,9 +797,88 @@ function HuntPocketSheet({
 
           {undoLabel ? <UndoLine label={undoLabel} onUndo={onUndo} /> : null}
           <ErrorLine message={error} />
+
+          {onRemove ? (
+            confirming ? (
+              <View style={{ gap: spacing(2) }}>
+                <Text
+                  style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 20 }}
+                >
+                  {`Remove ${card.cardName} from this hunt? Its Flares come down too.`}
+                </Text>
+                <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                  <View style={{ flex: 1 }}>
+                    <DangerButton
+                      label="Remove"
+                      busy={removing}
+                      onPress={() => void confirmRemove()}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      label="Keep"
+                      variant="secondary"
+                      disabled={removing}
+                      onPress={() => setConfirming(false)}
+                    />
+                  </View>
+                </View>
+                <ErrorLine message={removeError} />
+              </View>
+            ) : (
+              <Tap
+                onPress={() => setConfirming(true)}
+                accessibilityLabel={`Remove ${card.cardName} from this hunt`}
+                style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
+              >
+                <Text style={{ color: colors.danger, fontSize: 14, fontWeight: "600" }}>
+                  Remove from hunt
+                </Text>
+              </Tap>
+            )
+          ) : null}
+
           <Button label="Done" variant="secondary" onPress={onClose} />
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+/**
+ * A button in the danger colour, for the one answer that cannot be
+ * undone: the outline and the word in `colors.danger`, nothing filled,
+ * so it reads as a warning and not as the page's main action.
+ */
+function DangerButton({
+  label,
+  busy,
+  onPress,
+}: {
+  label: string;
+  busy: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      disabled={busy}
+      accessibilityLabel={label}
+      style={{
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.danger,
+        paddingHorizontal: spacing(5),
+        paddingVertical: spacing(3),
+        minHeight: 48,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: busy ? 0.7 : 1,
+      }}
+    >
+      <Text style={{ color: colors.danger, fontSize: 14, fontWeight: "700" }}>
+        {busy ? "Removing…" : label}
+      </Text>
+    </Tap>
   );
 }

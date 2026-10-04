@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -20,7 +20,7 @@ import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
-import { Button, Muted, Tap, Title } from "./ui";
+import { Button, Muted, Tap, Title, type ZoomPicks } from "./ui";
 
 /**
  * The post a sheet is about: enough to list its cards and to offer on
@@ -58,27 +58,44 @@ export interface FlareSheetPost {
  *
  * Owners, showcase posts and finished hunts get the list and nothing
  * to press: there is nothing to offer on any of them.
+ *
+ * THE SHEET KEEPS NO PICKS OF ITS OWN. They are the post's, handed in
+ * as `picks` and written back through `onPicks`, the same store the
+ * card viewer and the "N in your offer · Review" line read, so a card
+ * ticked here is ticked there and the other way round. A pick is keyed
+ * by flareId, as the viewer keys it. Opening the sheet on a post that
+ * already has picks opens it picking, so they are in sight.
  */
 export function FlareCardsSheet({
   open,
+  picks,
+  onPicks,
   onClose,
   onChanged,
 }: {
   open: (FlareSheetPost & { mode: "view" | "offer" }) | null;
+  /** The open post's offer in progress, flareId -> copies. */
+  picks: ZoomPicks;
+  onPicks: (next: ZoomPicks) => void;
   onClose: () => void;
   /** An offer landed; the list behind the sheet should re-read. */
   onChanged?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [selecting, setSelecting] = useState(false);
-  const [picked, setPicked] = useState<Record<string, number>>({});
   const [reviewing, setReviewing] = useState(false);
 
-  /* A fresh open is a fresh sheet: nothing picked, nothing in review. */
+  /* The picks as they stand, for the moment of opening only: a tick
+     afterwards must not flip the mode under the person's thumb. */
+  const picksAtOpen = useRef(picks);
+  picksAtOpen.current = picks;
+
+  /* A fresh open starts in the mode it was opened in, or picking when
+     the post already has picks, with nothing in review; the picks are
+     the post's and come along as they are. */
   useEffect(() => {
     if (!open) return;
-    setSelecting(open.mode === "offer");
-    setPicked({});
+    setSelecting(open.mode === "offer" || Object.keys(picksAtOpen.current).length > 0);
     setReviewing(false);
   }, [open]);
 
@@ -90,6 +107,13 @@ export function FlareCardsSheet({
     Boolean(card.flareId) &&
     card.state !== "found" &&
     remainingOf(card) > 0;
+  const picked = picks;
+  const setPick = (key: string, quantity: number) => {
+    const next = { ...picks };
+    if (quantity <= 0) delete next[key];
+    else next[key] = quantity;
+    onPicks(next);
+  };
   const chosen = open.cards.filter((card) => card.flareId && picked[card.flareId]);
   const copies = chosen.reduce(
     (sum, card) => sum + (picked[card.flareId ?? ""] ?? 0),
@@ -111,15 +135,12 @@ export function FlareCardsSheet({
           quantity: picked[card.flareId ?? ""] ?? 1,
           max: remainingOf(card),
         }))}
-        onChange={(flareId, quantity) =>
-          setPicked((current) => {
-            const next = { ...current };
-            if (quantity <= 0) delete next[flareId];
-            else next[flareId] = quantity;
-            return next;
-          })
-        }
-        onSent={() => onChanged?.()}
+        onChange={setPick}
+        /* Sent: the post's picks are spent, and the list behind re-reads. */
+        onSent={() => {
+          onPicks({});
+          onChanged?.();
+        }}
         onBack={() => setReviewing(false)}
         onClose={onClose}
       />
@@ -259,14 +280,7 @@ export function FlareCardsSheet({
                           <>
                             {/* The toggle fills the column's width. */}
                             <Tap
-                              onPress={() =>
-                                setPicked((current) => {
-                                  const next = { ...current };
-                                  if (count > 0) delete next[key];
-                                  else next[key] = 1;
-                                  return next;
-                                })
-                              }
+                              onPress={() => setPick(key, count > 0 ? 0 : 1)}
                               accessibilityLabel={
                                 count > 0
                                   ? `Remove ${card.cardName} from your offer`
@@ -317,12 +331,7 @@ export function FlareCardsSheet({
                                 min={1}
                                 max={remaining}
                                 disabled={count === 0}
-                                onChange={(value) =>
-                                  setPicked((current) => ({
-                                    ...current,
-                                    [key]: value,
-                                  }))
-                                }
+                                onChange={(value) => setPick(key, value)}
                                 label={`copies of ${card.cardName} you have`}
                               />
                             </View>

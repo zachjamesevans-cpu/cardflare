@@ -255,8 +255,13 @@ describe("the picks live on the post, not in the viewer", () => {
     }
   });
 
-  it("the app's Feed card owns them the same way", () => {
-    expect(APP.card).toContain("useState<ZoomPicks>({})");
+  it("the app's Feed owns them per post and hands each card its own", () => {
+    /* One pick store: the Feed screen keeps a post's picks and hands
+       them to its card and to the cards sheet, so the two cannot
+       disagree. Pinned in full by search-parity.test.ts. */
+    expect(APP.home).toMatch(/useState<Record<string, ZoomPicks>>/);
+    expect(APP.card).toContain("picks: ZoomPicks;");
+    expect(APP.card).not.toContain("useState<ZoomPicks>({})");
     expect(APP.zoom).toContain("ZoomPicks = Record<string, number>");
     expect(APP.card).not.toContain("AsyncStorage");
   });

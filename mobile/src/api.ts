@@ -1327,6 +1327,8 @@ export interface CardHit {
   /** The printing whose art leads the row — the website's base-art rule. */
   basePrintingId: string | null;
   printings: { id: string; label: string | null; imageUrl: string | null }[];
+  /** The game's slug, for its short name on a search row. Older servers omit it. */
+  game?: string | null;
 }
 
 export const searchCards = (query: string, game?: string | null) =>
@@ -1336,6 +1338,67 @@ export const searchCards = (query: string, game?: string | null) =>
       game ? `&game=${encodeURIComponent(game)}` : ""
     }`,
   );
+
+/* ------------------------------------------------------------------ */
+/* The card page: one card, who has it, who hunts it, where it sits    */
+/* ------------------------------------------------------------------ */
+
+/** Somebody on the card page: enough for a face, a name and a door. */
+export interface CardPagePlayer {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  frame: string | null;
+  ring: string | null;
+  aura: string | null;
+}
+
+/**
+ * The website's /cards/[cardId], the app's copy of
+ * src/lib/cards/card-page.ts. Every row a screen draws comes from
+ * here; nothing on the page is made up.
+ */
+export interface CardPage {
+  card: {
+    cardId: string;
+    name: string;
+    number: string;
+    game: string;
+    imageUrl: string | null;
+  };
+  /** Null when signed out. */
+  you: {
+    inTradeBinder: boolean;
+    onHunt: { huntId: string; name: string } | null;
+    wanted: boolean;
+  } | null;
+  /** The viewer has a postal code, so distances exist. */
+  located: boolean;
+  /** Players with it in a binder up for trade, nearest first. */
+  holders: { player: CardPagePlayer; milesLabel: string | null }[];
+  /** Players after it: an open Flare, or a card on a public hunt. */
+  hunters: {
+    player: CardPagePlayer;
+    milesLabel: string | null;
+    postId: string | null;
+    huntId: string | null;
+    printingLabel: string | null;
+    quantity: number;
+  }[];
+  /** Stores with it in the case or the counter's synced singles, nearest first. */
+  stores: {
+    storeId: string;
+    name: string;
+    city: string | null;
+    region: string | null;
+    miles: number | null;
+    inCase: boolean;
+  }[];
+}
+
+/** The card page. A 404 is "no such card", which the screen says. */
+export const getCardPage = (cardId: string) =>
+  call<{ page: CardPage }>("GET", `/api/v1/cards/${encodeURIComponent(cardId)}/page`);
 
 /** One trade, as the room renders it for one viewer - the web's shape. */
 export interface TradeRecord {
@@ -2405,6 +2468,17 @@ export const setFlareFound = (flareId: string, found: number) =>
     found,
   });
 
+/**
+ * "Remove from hunt": one card off the owner's hunt. The server keeps
+ * the request row with a removed_at and takes its open Flares down;
+ * the pocket is simply gone on the next paint.
+ */
+export const removeHuntCard = (requestId: string) =>
+  call<{ ok: true }>("POST", "/api/v1/hunts", {
+    action: "remove-card",
+    requestId,
+  });
+
 /** One post of one or many cards, to a room by code or to the area. */
 export const publishFlare = (input: {
   code?: string;
@@ -3117,6 +3191,22 @@ export const searchPlayersByName = (query: string) =>
   call<{ players: FoundPlayer[] }>(
     "GET",
     `/api/players/search?q=${encodeURIComponent(query)}`,
+  );
+
+/** A shop found by name or city: the website's `FoundStore`. */
+export interface FoundStore {
+  storeId: string;
+  name: string;
+  city: string | null;
+  region: string | null;
+  verified: boolean;
+}
+
+/** Published stores by name or city, eight at most. */
+export const searchStores = (query: string) =>
+  call<{ stores: FoundStore[] }>(
+    "GET",
+    `/api/v1/stores/search?q=${encodeURIComponent(query)}`,
   );
 
 /* ------------------------------------------------------------------ */

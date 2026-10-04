@@ -256,6 +256,8 @@ export function LabScreen() {
             onLike={async () => {}}
             onOpenThread={() => {}}
             onEnterRoom={() => {}}
+            picks={{}}
+            onPicks={() => {}}
           />
         </View>
       ))}

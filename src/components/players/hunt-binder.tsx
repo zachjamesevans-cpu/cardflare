@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Crosshair, Pencil } from "lucide-react";
 
 import {
@@ -30,9 +31,11 @@ import {
   type LiveHuntCard,
 } from "@/components/players/hunt-detail";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
+import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { wantsLine } from "@/lib/feed/offer-copy";
+import { removeHuntCardAction } from "@/lib/players/hunt-actions";
 import { huntRowLine } from "@/lib/players/hunt-copy";
 import type { HuntView } from "@/lib/players/hunts";
 
@@ -59,7 +62,8 @@ import type { HuntView } from "@/lib/players/hunts";
  * The owner's empty pockets are "+" pockets into the Flare composer
  * with this hunt chosen, and the trailing page always has them, as on
  * a binder. A tap on a filled pocket opens Update progress for that
- * one card: the art, the facts, the one stepper, and Undo. A visitor
+ * one card: the art, the facts, the one stepper, Undo, and under the
+ * stepper the way to take the card off the hunt. A visitor
  * taps a pocket and gets the card large, in the same viewer every
  * other card opens in, with the Feed's "I have this card" under it;
  * the picks are this page's own and outlive the viewer, the footer
@@ -81,7 +85,16 @@ export function HuntBinder({
   imagesEnabled: boolean;
 }) {
   const progress = useHuntProgress(hunt);
-  const { cards } = progress;
+  const router = useRouter();
+  /**
+   * Cards the owner took off the hunt this visit. Gone from the pages
+   * on the next paint, before the server's page catches up: the sheet
+   * closes and the pocket is not there. The server keeps the request
+   * row with its removal stamped and withdraws its open Flares; none
+   * of that is this screen's concern beyond the words.
+   */
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
+  const cards = progress.cards.filter((card) => !removed.has(card.requestId));
   const offer = useHuntOffer(hunt, cards);
   const [at, setAt] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -113,6 +126,16 @@ export function HuntBinder({
   const open = openId
     ? (cards.find((card) => card.requestId === openId) ?? null)
     : null;
+
+  /** "Remove from hunt", confirmed: the server first, then the paint. */
+  const remove = async (card: LiveHuntCard) => {
+    const result = await removeHuntCardAction(card.requestId);
+    if (!result.ok) return result;
+    setRemoved((current) => new Set([...current, card.requestId]));
+    setOpenId(null);
+    router.refresh();
+    return result;
+  };
 
   /**
    * The viewer's picks, keyed by request, as the Feed keys its by
@@ -360,6 +383,7 @@ export function HuntBinder({
                     : null
                 }
                 onUndo={progress.undo}
+                onRemove={() => remove(open)}
               />
             )}
           </Sheet>
@@ -374,8 +398,11 @@ export function HuntBinder({
  * art on the left (the round 16b shape, 88 x 123), the name, the
  * number and printing, how many are found, and the one Stepper,
  * writing through the hunt's existing progress write with the Undo
- * line under it. There is no "Remove from hunt" here because the
- * server has no such action; nothing is invented for it.
+ * line under it. Under the stepper, "Remove from hunt": a danger text
+ * button that asks inline before it does anything, because a tap on
+ * the wrong line in a sheet is easy and a removed card takes its
+ * Flares down with it. Remove goes through the server; Keep puts the
+ * question away. The app's HuntPocketSheet asks the same words.
  */
 function ProgressSheet({
   card,
@@ -383,13 +410,28 @@ function ProgressSheet({
   onChange,
   undoLabel,
   onUndo,
+  onRemove,
 }: {
   card: LiveHuntCard;
   pending: boolean;
   onChange: (value: number) => void;
   undoLabel: string | null;
   onUndo: () => void;
+  /** Resolves once the server has answered; the caller closes on ok. */
+  onRemove: () => Promise<{ ok: true } | { ok: false; message: string }>;
 }) {
+  const [confirming, setConfirming] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removing, startRemove] = useTransition();
+
+  const confirmRemove = () => {
+    setRemoveError(null);
+    startRemove(async () => {
+      const result = await onRemove();
+      if (!result.ok) setRemoveError(result.message);
+    });
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-stretch gap-3">
@@ -431,6 +473,51 @@ function ProgressSheet({
         </div>
       </div>
       {undoLabel && <UndoLine label={undoLabel} onUndo={onUndo} />}
+
+      {confirming ? (
+        <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-danger/40 bg-danger/5 p-3">
+          <p className="text-sm text-text-primary">
+            Remove {card.cardName} from this hunt? Its Flares come down too.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              disabled={removing}
+              onClick={confirmRemove}
+            >
+              Remove
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={removing}
+              onClick={() => {
+                setConfirming(false);
+                setRemoveError(null);
+              }}
+            >
+              Keep
+            </Button>
+          </div>
+          {removeError && (
+            <p role="alert" className="text-xs text-danger">
+              {removeError}
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={pending}
+          className="w-fit cursor-pointer text-sm font-semibold text-danger underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-danger focus-visible:outline-none disabled:opacity-50"
+        >
+          Remove from hunt
+        </button>
+      )}
     </div>
   );
 }

@@ -39,7 +39,8 @@ import { EditProfileScreen } from "./src/screens/edit-profile";
 import { BinderScreen } from "./src/screens/binder";
 import { BindersScreen } from "./src/screens/binders";
 import { HuntsScreen } from "./src/screens/hunts";
-import { FindPlayerScreen } from "./src/screens/find-player";
+import { CardScreen } from "./src/screens/card";
+import { SearchScreen } from "./src/screens/search";
 import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
@@ -200,8 +201,10 @@ export type StackParams = {
   TradeHistory: { logged?: boolean } | undefined;
   /** Writing down a trade made off CardFlare, the website's sheet. */
   LogTrade: undefined;
-  /** Finding somebody by name, from the Feed's own header. */
-  FindPlayer: undefined;
+  /** One search for cards, players and stores, from the Feed's own header. */
+  Search: undefined;
+  /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
+  Card: { cardId: string };
   /**
    * A shop, from a Nearby row — the website's /s/[storeId].
    *
@@ -242,7 +245,8 @@ const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
   NightPlayer: "Night",
   LogTrade: "History",
   Remote: "Room",
-  FindPlayer: "Feed",
+  Search: "Feed",
+  Card: "Back",
   PostFlare: "Room",
   Room: LOCAL_ENABLED ? "Back" : "Nights",
   LocalThread: LOCAL_ENABLED ? "Local" : "Messages",
@@ -908,10 +912,16 @@ export default function App() {
             {({ route }) => <RemoteScreen storeId={route.params?.storeId} />}
           </Stack.Screen>
           <Stack.Screen
-            name="FindPlayer"
-            component={FindPlayerScreen}
-            options={{ title: "Find a player", headerBackTitle: "Feed" }}
+            name="Search"
+            component={SearchScreen}
+            options={{ title: "Search", headerBackTitle: "Feed" }}
           />
+          <Stack.Screen
+            name="Card"
+            options={{ title: "Card", headerBackTitle: "Back" }}
+          >
+            {({ route }) => <CardScreen cardId={route.params.cardId} />}
+          </Stack.Screen>
           <Stack.Screen
             name="PostFlare"
             // The back button names where it goes, not the screen's internal

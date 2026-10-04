@@ -12,6 +12,7 @@ import {
   setRequestFound,
   updateHunt,
   type RequestInput,
+  removeHuntRequest,
 } from "@/lib/players/hunts";
 
 /**
@@ -76,6 +77,26 @@ export async function setRequestFoundAction(
   }
   repaint(playerId);
   return { ok: true, found: result.found, needed: result.needed };
+}
+
+/** Takes a card off the owner's hunt; its open Flares come down with it. */
+export async function removeHuntCardAction(
+  requestId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const playerId = await viewerPlayerId();
+  if (!playerId) return { ok: false, message: SIGN_IN };
+  const result = await removeHuntRequest(playerId, requestId);
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === "not-yours"
+          ? "That card is not on one of your hunts."
+          : "Could not remove that card.",
+    };
+  }
+  repaint(playerId);
+  return { ok: true };
 }
 
 /** Copies in hand for a posted card, by its Flare, from the Feed. */

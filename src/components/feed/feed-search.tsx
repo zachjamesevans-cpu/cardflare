@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 
-import { PlayerSearch } from "@/components/players/player-search";
+import { EverythingSearch } from "@/components/feed/everything-search";
 
 /**
- * Finding somebody, from the screen you already have open.
+ * Finding anything, from the screen you already have open.
  *
  * The founder: "the social features should be a litle more front and
  * center. for example, having the abilty to search for someone outside
@@ -15,9 +15,12 @@ import { PlayerSearch } from "@/components/players/player-search";
  *
  * A button rather than a permanent field, because the Feed is a reading
  * screen: a search box pinned above it would take the top of every
- * render for something used occasionally. Closed it costs one icon; open
- * it is the same search that already lives on the profile, so there is
- * one way to find a player and not two that can disagree.
+ * render for something used occasionally. Closed it costs one icon;
+ * open it is one search for everything: cards, players and stores,
+ * in that order, each a door to its page. The profile keeps its own
+ * player search, because somebody managing who they follow is
+ * already standing there. The app's header icon opens its Search
+ * screen, the same search.
  */
 export function FeedSearch() {
   const [open, setOpen] = useState(false);
@@ -28,7 +31,7 @@ export function FeedSearch() {
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label={open ? "Close player search" : "Find a player"}
+        aria-label={open ? "Close search" : "Search"}
         className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
       >
         {open ? (
@@ -40,7 +43,7 @@ export function FeedSearch() {
 
       {open && (
         <div className="w-full">
-          <PlayerSearch />
+          <EverythingSearch />
         </div>
       )}
     </>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 
+import { OfferPicksContext } from "@/components/cards/card-image-zoom";
 import {
   OfferReview,
   useSelection,
@@ -33,6 +34,16 @@ import type { FeedCard } from "@/lib/feed/repository";
  * found two wordings for one action. And a row never jumps: every
  * stepper is drawn from the start, dimmed until its card is added,
  * so adding one changes nothing below it ("my next tap missed").
+ *
+ * ONE PICK STORE. Inside a Feed post the picks are the post's, read
+ * from `OfferPicksContext`: a card ticked here is the same pick the
+ * viewer shows under the art and the "N in your offer · Review" line
+ * counts, and a card added in the viewer is already ticked when this
+ * list opens. The review this sheet opens is the post's review, drawn
+ * once by the post. With no provider around it (no post), the sheet
+ * keeps a build of its own and draws its own review, the same rule at
+ * the smaller scope. The app's sheet takes the post's picks as props
+ * for the same reason.
  *
  * Controlled: whoever renders the button that opens it holds `open`.
  * The count line and the buttons that used to sit beside them are gone
@@ -67,14 +78,25 @@ export function FlareCardsSheet({
    * made an offer on it without having to refresh the feed."
    */
   const [offered, setOffered] = useState<ReadonlySet<string>>(() => new Set());
+  /* The post's picks when there is a post around this sheet; the
+     sheet's own otherwise. The hook is always run, so the fallback is
+     inert rather than conditional. */
+  const shared = useContext(OfferPicksContext);
+  const sharesPicks = shared !== null;
   useEffect(() => {
     const onOffered = (event: Event) => {
-      const { flareIds } = (event as CustomEvent<{ flareIds: string[] }>).detail;
+      const { postId: sentFor, flareIds } = (
+        event as CustomEvent<{ postId: string; flareIds: string[] }>
+      ).detail;
       setOffered((current) => new Set([...current, ...flareIds]));
+      /* Sent from the post's review, which this sheet opened: the
+         list has done its job and goes, as the sheet's own review
+         closes it below. */
+      if (sharesPicks && sentFor === postId) onClose();
     };
     window.addEventListener("cardflare:offered", onOffered);
     return () => window.removeEventListener("cardflare:offered", onOffered);
-  }, []);
+  }, [postId, sharesPicks, onClose]);
   const rows = cards.map((card) =>
     card.flareId && offered.has(card.flareId) ? { ...card, youOffered: true } : card,
   );
@@ -90,7 +112,20 @@ export function FlareCardsSheet({
     const card = cards.find((row) => row.flareId === flareId);
     return card ? (card.remaining ?? card.quantity ?? 1) : 0;
   };
-  const selection = useSelection(remainingFor);
+  const own = useSelection(remainingFor);
+  const picked = shared ? shared.picks : own.selected;
+  const selection = {
+    selected: picked,
+    has: (flareId: string) => flareId in picked,
+    quantity: (flareId: string) => picked[flareId] ?? 0,
+    toggle: shared ? shared.toggle : own.toggle,
+    setQuantity: shared ? shared.setQuantity : own.setQuantity,
+    remove: shared ? shared.remove : own.remove,
+    clear: shared ? shared.clear : own.clear,
+    count: Object.keys(picked).length,
+    copies: Object.values(picked).reduce((sum, quantity) => sum + quantity, 0),
+  };
+  const openReview = shared ? shared.openReview : () => setReview(true);
   const lines: OfferLine[] = Object.entries(selection.selected).flatMap(
     ([flareId, quantity]) => {
       const card = cards.find((row) => row.flareId === flareId);
@@ -133,7 +168,7 @@ export function FlareCardsSheet({
                 type="button"
                 size="sm"
                 disabled={selection.count === 0}
-                onClick={() => setReview(true)}
+                onClick={openReview}
                 className="shrink-0"
               >
                 {selection.count > 0 ? reviewLabel(selection.count) : "Review offer"}
@@ -221,7 +256,8 @@ export function FlareCardsSheet({
         </ul>
       </Sheet>
 
-      {offerable && (
+      {/* The sheet's own review, only when no post draws one. */}
+      {offerable && !shared && (
         <OfferReview
           open={review}
           onClose={() => setReview(false)}

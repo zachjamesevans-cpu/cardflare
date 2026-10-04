@@ -232,15 +232,15 @@ export function CollapsingHeader({
         />
 
         {/*
-          * The positioning lives on this wrapper, NOT on the Tap.
-          *
-          * Tap puts its `style` on an inner Animated.View rather than on
-          * the Pressable, so `position: absolute` there takes the icon
-          * out of its own button's flow: the Pressable collapses to
-          * nothing, stays in the row beside the title, and the glyph
-          * lands under the wordmark instead of right of it. Which is
-          * exactly what it did.
-          */}
+         * The positioning lives on this wrapper, NOT on the Tap.
+         *
+         * Tap puts its `style` on an inner Animated.View rather than on
+         * the Pressable, so `position: absolute` there takes the icon
+         * out of its own button's flow: the Pressable collapses to
+         * nothing, stays in the row beside the title, and the glyph
+         * lands under the wordmark instead of right of it. Which is
+         * exactly what it did.
+         */}
         <Animated.View
           style={[
             {
@@ -256,7 +256,7 @@ export function CollapsingHeader({
           ]}
         >
           <Tap
-            accessibilityLabel="Find a player"
+            accessibilityLabel="Search"
             onPress={onSearch}
             style={{
               paddingLeft: spacing(4),

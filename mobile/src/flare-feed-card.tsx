@@ -44,6 +44,14 @@ import { Button, Tap, type ZoomPicks } from "./ui";
  * directly. Sending, or taking everything out, clears the line. The
  * founder's call: for the page's life, no warning dialog, nothing
  * stored, so a reload starts clean.
+ *
+ * AND THERE IS ONE STORE PER POST. The Feed screen keeps every post's
+ * picks in `picksByPost` and hands this card its own as `picks` and
+ * `onPicks`, and hands the same picks to the full-list sheet when it
+ * opens on this post. So a card ticked in the viewer is ticked in the
+ * sheet and counted on the "N in your offer" line, and the other way
+ * round: one pick, three places to see it. This card keeps no picks
+ * of its own.
  */
 
 type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
@@ -279,9 +287,14 @@ export function FlareFeedCard({
   onReport,
   onBlock,
   onOpenHunt,
+  picks,
+  onPicks,
 }: {
   item: Hunt;
   post: PostRef;
+  /** This post's offer in progress, flareId -> copies, kept by the Feed screen. */
+  picks: ZoomPicks;
+  onPicks: (next: ZoomPicks) => void;
   onOpenProfile: (playerId: string) => void;
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
@@ -309,9 +322,8 @@ export function FlareFeedCard({
   const shelf = shelfFor(item.cards, post);
   const completed = item.completed ?? false;
   const [menu, setMenu] = useState(false);
-  /* The offer in progress on this post, and whether its review is up
-     over the Feed (the viewer draws its own while it is open). */
-  const [picks, setPicks] = useState<ZoomPicks>({});
+  /* Whether the post's review is up over the Feed (the viewer draws
+     its own while it is open). The picks themselves are the post's. */
   const [reviewing, setReviewing] = useState(false);
   const inOffer = Object.keys(picks).length;
   const actions = postActions({
@@ -480,7 +492,7 @@ export function FlareFeedCard({
           siblings={shelf}
           position={0}
           picks={picks}
-          onPicks={setPicks}
+          onPicks={onPicks}
         />
       ) : (
         <FlareCarousel
@@ -488,7 +500,7 @@ export function FlareFeedCard({
           direction={direction}
           post={post}
           picks={picks}
-          onPicks={setPicks}
+          onPicks={onPicks}
           onSeeAll={onViewAll}
         />
       )}
@@ -532,20 +544,18 @@ export function FlareFeedCard({
               max: card ? remainingOf(card) : 1,
             };
           })}
-          onChange={(flareId, quantity) =>
-            setPicks((current) => {
-              const next = { ...current };
-              if (quantity <= 0) delete next[flareId];
-              else next[flareId] = quantity;
-              return next;
-            })
-          }
+          onChange={(flareId, quantity) => {
+            const next = { ...picks };
+            if (quantity <= 0) delete next[flareId];
+            else next[flareId] = quantity;
+            onPicks(next);
+          }}
           /* The same door the viewer sends through: the post's, which
              marks the cards offered at once and reloads behind it. */
           send={async (items, note) =>
             (await post.offer(items, note)) ?? { offered: items.length, refused: [] }
           }
-          onSent={() => setPicks({})}
+          onSent={() => onPicks({})}
           onClose={() => setReviewing(false)}
         />
       ) : null}
