@@ -28,7 +28,11 @@ const web = {
   feedItems: read("src/components/feed/feed-items.tsx"),
   wantedButton: read("src/components/feed/wanted-message-button.tsx"),
   local: read("src/components/local/local-screen.tsx"),
-  huntDetail: read("src/components/players/hunt-detail.tsx"),
+  /* The hunt page, drawn like a binder since the hunts-as-binders
+     round: the view and the machinery under it. */
+  huntDetail:
+    read("src/components/players/hunt-detail.tsx") +
+    read("src/components/players/hunt-binder.tsx"),
   historyPage: read("src/app/profile/trades/page.tsx"),
   history: read("src/components/trades/history.tsx"),
   logTrade: read("src/components/trades/log-trade-sheet.tsx"),
@@ -39,7 +43,7 @@ const app = {
   home: read("mobile/src/screens/home.tsx"),
   local: read("mobile/src/screens/local.tsx"),
   thread: read("mobile/src/screens/thread.tsx"),
-  hunts: read("mobile/src/hunts-panel.tsx"),
+  hunts: read("mobile/src/hunts-panel.tsx") + read("mobile/src/hunt-binder.tsx"),
   historyScreen: read("mobile/src/screens/trade-history.tsx"),
   history: read("mobile/src/trade-history.tsx"),
   logTrade: read("mobile/src/screens/log-trade.tsx"),
@@ -200,7 +204,9 @@ describe("a hunt can be answered in full", () => {
 
   it("picks by request and sends once, on both", () => {
     expect(web.huntDetail).toContain("useSelection(remainingFor)");
-    expect(web.huntDetail).toContain("selection.toggle(card.requestId)");
+    /* The toggle is the viewer's, keyed by the request it calls a flareId. */
+    expect(web.huntDetail).toContain("toggle: offer.selection.toggle");
+    expect(web.huntDetail).toContain("flareId: card.requestId");
     expect(web.huntDetail).toContain("requestId: line.key");
     expect(web.huntDetail).not.toContain("card.flareId");
 

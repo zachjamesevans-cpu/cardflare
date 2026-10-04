@@ -40,6 +40,8 @@ const web = {
   create: read("src/components/binder/create-binder.tsx"),
   forTrade: read("src/components/binder/for-trade-switch.tsx"),
   view: read("src/components/binder/binder-page.tsx"),
+  /* Shared with the hunt page since the hunts-as-binders round. */
+  pockets: read("src/components/binder/pockets.tsx"),
   settings: read("src/components/binder/binder-settings.tsx"),
   add: read("src/components/binder/add-binder-card.tsx"),
   ownBinder: read("src/app/profile/binders/[binderId]/page.tsx"),
@@ -54,6 +56,7 @@ const app = {
   list: read("mobile/src/binder-list.tsx"),
   create: read("mobile/src/create-binder-sheet.tsx"),
   binder: read("mobile/src/screens/binder.tsx"),
+  pockets: read("mobile/src/pockets.tsx"),
   binders: read("mobile/src/screens/binders.tsx"),
   covers: read("mobile/src/binder-covers.ts"),
   ownProfile: read("mobile/src/screens/profile.tsx"),
@@ -245,8 +248,8 @@ describe("the binder page", () => {
       expect(source, name).not.toMatch(/>\s*Layout\s*</);
       expect(source, name).not.toMatch(/layout === 2/);
     }
-    expect(web.view).toContain("const COLUMNS = 3;");
-    expect(web.view).toContain("const POCKETS_PER_PAGE = COLUMNS * COLUMNS;");
+    expect(web.pockets).toContain("export const COLUMNS = 3;");
+    expect(web.pockets).toContain("export const POCKETS_PER_PAGE = COLUMNS * COLUMNS;");
     expect(web.view).toContain("grid-cols-3");
     expect(web.view).not.toContain("grid-cols-2");
     expect(web.view).not.toContain("pocketsPerPage(");
@@ -311,15 +314,19 @@ describe("the website's Add cards sheet", () => {
 
 describe("the app's grid and hold to move", () => {
   it("measures the page with onLayout and gives every pocket a third of it", () => {
+    /* The maths moved into pockets.tsx with the hunts-as-binders round,
+       and the binder screen reads it from there. */
+    const grid = app.binder + app.pockets;
     expect(app.binder).toContain("onLayout");
-    expect(app.binder).toContain("PAGE_PAD");
-    expect(app.binder).toContain("POCKET_GAP");
-    expect(app.binder).toMatch(
+    expect(app.binder).toContain('from "../pockets"');
+    expect(grid).toContain("PAGE_PAD");
+    expect(grid).toContain("POCKET_GAP");
+    expect(grid).toMatch(
       /Math\.floor\(\s*\(\s*\w+\s*-\s*2 \* PAGE_PAD\s*-\s*2 \* POCKET_GAP\s*\)\s*\/\s*3\s*\)/,
     );
     expect(app.binder).not.toContain("useWindowDimensions");
     expect(app.binder).not.toContain('Dimensions.get("window")');
-    expect(app.binder).toContain('overflow: "hidden"');
+    expect(grid).toContain('overflow: "hidden"');
   });
 
   it("lifts only the held card, and never turns a page while holding", () => {

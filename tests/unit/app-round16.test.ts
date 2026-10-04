@@ -45,6 +45,10 @@ const src = {
   review: read("mobile/src/offer-review-sheet.tsx"),
   sheet: read("mobile/src/flare-cards-sheet.tsx"),
   hunt: read("mobile/src/hunts-panel.tsx"),
+  /* "Hunts drawn like binders": the hunt's page moved out of the panel
+     into pockets. The owner's stepper is in the pocket sheet there; a
+     visitor's toggle is the viewer's own, wired through `have`. */
+  huntPage: read("mobile/src/hunt-binder.tsx"),
   progress: read("mobile/src/flare-progress-sheet.tsx"),
   home: read("mobile/src/screens/home.tsx"),
 };
@@ -218,7 +222,6 @@ describe("one set of words wherever a card can be offered", () => {
     for (const [name, source] of [
       ["zoom", have],
       ["sheet", src.sheet],
-      ["hunt", src.hunt],
     ] as const) {
       for (const word of TOGGLE) expect(source, name).toContain(word);
       for (const word of GONE) expect(source, name).not.toContain(word);
@@ -226,11 +229,21 @@ describe("one set of words wherever a card can be offered", () => {
       expect(source, name).toContain('name="checkmark"');
       expect(source, name).not.toContain("✓");
     }
-    /* The toggle names the card for a screen reader, in and out. */
-    for (const source of [src.sheet, src.hunt]) {
-      expect(source).toContain("`Add ${card.cardName} to your offer`");
-      expect(source).toContain("`Remove ${card.cardName} from your offer`");
+    /* The hunt page hands its pockets to the viewer, which says the
+       words; it writes none of its own, so the two cannot drift. */
+    expect(src.huntPage).toContain("have={shelf[position]?.have ?? null}");
+    expect(src.huntPage).toContain("picks={picked}");
+    expect(src.huntPage).toContain("onPicks={setPicked}");
+    const code = src.huntPage.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const word of [...TOGGLE, ...GONE]) {
+      expect(code, word).not.toContain(word);
+      expect(src.hunt, word).not.toContain(word);
     }
+    /* The toggle names the card for a screen reader, in and out; the
+       hunt's review names it on the way out. */
+    expect(src.sheet).toContain("`Add ${card.cardName} to your offer`");
+    expect(src.sheet).toContain("`Remove ${card.cardName} from your offer`");
+    expect(src.hunt).toContain("`Remove ${card.cardName} from your offer`");
   });
 
   it("the continue control is Review offer · N cards everywhere", () => {
@@ -272,9 +285,12 @@ describe("the next step stands out and nothing jumps", () => {
     expect(src.sheet).toContain("disabled={count === 0}");
     expect(src.sheet).toContain("value={count > 0 ? count : 1}");
     expect(src.sheet).not.toMatch(/\{count > 0 \? \(\s*<Stepper/);
-    expect(src.hunt).toContain("disabled={!selected}");
-    expect(src.hunt).toContain("value={selected ? visitor.picked : 1}");
-    expect(src.hunt).not.toMatch(/\{selected \? \(\s*<Stepper/);
+    /* The hunt page's picks go in at one copy from the viewer and the
+       number is raised in the review, as on a post: the review's line
+       has the stepper, capped at what the hunt still wants. */
+    expect(src.hunt).toContain("value={quantity}");
+    expect(src.hunt).toContain("max={remaining}");
+    expect(src.hunt).not.toContain("disabled={!selected}");
   });
 });
 
@@ -294,7 +310,7 @@ describe("Wants N until something is found", () => {
   it("every place that printed Need N more goes through wantsLine", () => {
     expect(src.pager).toContain("wantsLine(copiesOf(card), remaining)");
     expect(src.sheet).toContain("wantsLine(copiesOf(card), remaining)");
-    expect(src.hunt).toContain("wantsLine(needed, remaining)");
+    expect(src.huntPage).toContain("wantsLine(needed, remaining)");
     expect(src.progress).toContain("wantsLine(total, left)");
   });
 
@@ -354,11 +370,9 @@ describe("take down leaves the list at once", () => {
 describe("the offer rows are one shape: art left, one column right", () => {
   const sheetRow = between(src.sheet, "{open.cards.map((card) => {", "</ScrollView>");
   const reviewLine = between(src.review, "{lines.map((line) => (", "</ScrollView>");
-  const huntRow = between(
-    src.hunt,
-    "export function HuntCardRow(",
-    "export function HuntOfferFooter(",
-  );
+  /* The owner's row is the pocket sheet now, "Update progress" for the
+     one card under the tap: the same art-left shape. */
+  const huntRow = src.huntPage.slice(src.huntPage.indexOf("function HuntPocketSheet("));
 
   /** Each marker's position, in the order given; every one must exist. */
   const order = (source: string, markers: string[]) =>
@@ -440,7 +454,7 @@ describe("the offer rows are one shape: art left, one column right", () => {
     expect(reviewLine).toContain("gap: spacing(1.5)");
   });
 
-  it("the hunt page's rows, owner's and visitor's, share the shape", () => {
+  it("the hunt page's pocket sheet is the same shape", () => {
     expect(
       ascending(
         order(huntRow, [
@@ -450,25 +464,19 @@ describe("the offer rows are one shape: art left, one column right", () => {
           '{" · "}',
           "wantsLine(needed, remaining)",
           "<Stepper",
-          "I have this card",
-          '<View style={{ alignSelf: "flex-start" }}>',
-          "disabled={!selected}",
         ]),
       ),
     ).toBe(true);
-    /* Both controls live in the column: nothing stacks on the right. */
+    /* The control lives in the column: nothing stacks on the right. */
     expect(huntRow).not.toContain('alignItems: "flex-end"');
-    expect(huntRow).toContain('alignSelf: "stretch"');
     expect(huntRow).toContain('alignItems: "stretch"');
     expect(huntRow).toContain("gap: spacing(1.5)");
     /* The owner's stepper is the one control (round 17 dropped the
        "+1 found" tap that said the same thing beside it). */
-    const owner = between(
-      huntRow,
-      "{owner?.onSet && !done ? (",
-      "{owner?.onReopen ? (",
-    );
+    const owner = between(huntRow, '<View style={{ marginTop: "auto" }}>', "</View>");
     expect(owner).toContain("<Stepper");
     expect(owner).not.toContain("+1 found");
+    /* A visitor's pocket is the viewer's, with the hunt's picks. */
+    expect(src.huntPage).toContain("have={shelf[position]?.have ?? null}");
   });
 });

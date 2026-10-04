@@ -1,22 +1,20 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { describeError, getHunt, type HuntView } from "../api";
-import { HuntExpanded } from "../hunts-panel";
+import { HuntBinder } from "../hunt-binder";
 import { colors, gutter, spacing } from "../theme";
-import { Card, Loading, Muted, Tap, Title } from "../ui";
+import { Loading, Muted } from "../ui";
 
 /**
  * One hunt on its own screen: the website's /hunts/[huntId].
  *
- * The profile shows a hunt folded under its row, which is right for a
- * glance and wrong for a list of thirty. This is the same expanded
- * content with the whole screen to itself, reached from "View hunt" on
- * a Feed post and from a shared link.
+ * Drawn like an open binder, by hunt-binder.tsx: the name on top, the
+ * progress bar, pages of nine pockets. Reached from a row on the Hunts
+ * tab, from "View hunt" on a Feed post and from a shared link.
  *
  * Who owns it decides what it offers: the owner sets copies and adds
  * cards, a visitor picks what they have. The server says which with
@@ -70,47 +68,21 @@ export function HuntScreen({ huntId }: { huntId: string }) {
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
+        paddingVertical: spacing(3),
         gap: spacing(3),
       }}
     >
-      <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <MaterialCommunityIcons
-            name="format-list-checks"
-            size={16}
-            color={colors.accent}
-          />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Title>{hunt.name}</Title>
-            {/* The owner's name opens their profile, the website's link. */}
-            {!hunt.yours ? (
-              <Tap
-                onPress={() =>
-                  navigation.navigate("PlayerProfile", { playerId: hunt.playerId })
-                }
-                accessibilityLabel={`${hunt.ownerName}'s profile`}
-                hitSlop={6}
-              >
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                  <Text style={{ color: colors.textSecondary, fontWeight: "600" }}>
-                    {hunt.ownerName}
-                  </Text>
-                  {"'s hunt"}
-                </Text>
-              </Tap>
-            ) : null}
-          </View>
-        </View>
-        <HuntExpanded
-          hunt={hunt}
-          yours={hunt.yours}
-          onAdd={(id) =>
-            navigation.navigate("Tabs", { screen: "Flare", params: { hunt: id } })
-          }
-          onChanged={() => void load()}
-        />
-      </Card>
+      <HuntBinder
+        hunt={hunt}
+        yours={hunt.yours}
+        onAdd={(id) =>
+          navigation.navigate("Tabs", { screen: "Flare", params: { hunt: id } })
+        }
+        onChanged={() => void load()}
+        onOwner={() =>
+          navigation.navigate("PlayerProfile", { playerId: hunt.playerId })
+        }
+      />
     </ScrollView>
   );
 }

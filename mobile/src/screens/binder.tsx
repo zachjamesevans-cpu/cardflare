@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -52,6 +51,21 @@ import {
 import { BinderCover } from "../binder-cover";
 import { BINDER_COVERS, BINDER_LAYOUT, POCKETS_PER_PAGE } from "../binder-covers";
 import { CardPicker } from "../card-picker";
+import {
+  AddPocket,
+  Copies,
+  EmptyPocket,
+  PAGE_PAD,
+  PageDots,
+  PageFrame,
+  Pocket,
+  POCKET_RING,
+  SleeveLip,
+  cellOf,
+  geometryFor,
+  pocketLabel,
+  type Geometry,
+} from "../pockets";
 import { RemoteImage } from "../remote-image";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
@@ -93,15 +107,13 @@ import {
  * the truth again behind it. A visitor gets the chips when any of the
  * cards are on their hunts, and one button, Message.
  *
- * THE GRID is measured, never guessed. The page frame reports its
- * width through onLayout and the pocket is a third of what is left
- * inside the frame's padding and the two gaps, floored, so three
- * always fit on a row. The first build read the window's width and
- * drew the frame's 1pt border on top of the arithmetic: three pockets
- * plus two gaps came to 2pt more than the frame had inside its
- * border, the third pocket wrapped, and the founder's screenshots
- * showed two pockets to a row on a 3x3. Here the border is part of
- * PAGE_PAD, so what is measured is what is divided.
+ * THE GRID is measured, never guessed, and it is drawn from
+ * src/pockets.tsx: the page frame, the pocket, the "+" pocket and
+ * the dots are the same ones a hunt's page draws, so the two can
+ * never disagree about what a pocket is. The frame reports its width
+ * through onLayout and the pocket is a third of what is left inside
+ * the frame's padding and the two gaps, floored, so three always fit
+ * on a row; the arithmetic and the reason for it are with the pocket.
  *
  * HOLD TO MOVE is one card in the air and nothing else moving. A long
  * press lifts the held card as an overlay that follows the finger,
@@ -121,17 +133,6 @@ import {
  * overlay fades out where it is instead of gliding home.
  */
 
-/** The ring round each pocket, the gap between them. */
-const POCKET_RING = 2;
-const POCKET_GAP = spacing(2);
-/**
- * The page frame: PAGE_PAD is everything between the frame's outer
- * edge and the first pocket, the 1pt border included, so the measured
- * width minus two of these is exactly what the pockets have.
- */
-const PAGE_BORDER = 1;
-const PAGE_PAD = spacing(3);
-
 /** Snappy, not rigid: the pick-up. */
 const SPRING = { damping: 20, stiffness: 240, mass: 0.6 } as const;
 /** The drop: one glide onto the pocket, the grid re-laying out under it on the same clock. */
@@ -144,44 +145,8 @@ const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it."
 
 type Filter = "all" | "hunts";
 
-/** What one page's grid measures, in points. */
-interface Geometry {
-  pageWidth: number;
-  pocketWidth: number;
-  pocketHeight: number;
-  slotW: number;
-  slotH: number;
-}
-
-/**
- * The pocket, from the page frame's measured width: three across,
- * always, floored so three of them and two gaps never outgrow the row.
- */
-export function pocketWidthFor(pageWidth: number): number {
-  return Math.floor((pageWidth - 2 * PAGE_PAD - 2 * POCKET_GAP) / 3);
-}
-
-function geometryFor(pageWidth: number): Geometry {
-  const pocketWidth = pageWidth > 0 ? pocketWidthFor(pageWidth) : 0;
-  const pocketHeight = Math.round((pocketWidth * 88) / 63);
-  return {
-    pageWidth,
-    pocketWidth,
-    pocketHeight,
-    slotW: pocketWidth + POCKET_GAP,
-    slotH: pocketHeight + POCKET_GAP,
-  };
-}
-
 const clamp = (value: number, low: number, high: number) =>
   Math.max(low, Math.min(high, value));
-
-/** Where pocket `index` sits on its page, in the page's coordinates. */
-function cellOf(index: number, geometry: Geometry) {
-  const col = index % BINDER_LAYOUT;
-  const row = Math.floor(index / BINDER_LAYOUT);
-  return { x: PAGE_PAD + col * geometry.slotW, y: PAGE_PAD + row * geometry.slotH };
-}
 
 /** The list with the card at `from` now at `to`, the others shifted. */
 function moved<T>(list: T[], from: number, to: number): T[] {
@@ -923,9 +888,9 @@ function useHoldToMove({
 
 /**
  * One page: a grid of nine pockets, three across. An empty pocket is
- * a "+" for the owner and plain black for anyone else. The frame's
- * border is part of PAGE_PAD (see the top of the file), so the
- * pockets have exactly the width the arithmetic gave them.
+ * a "+" for the owner and plain black for anyone else. The frame and
+ * the pockets are the shared ones in pockets.tsx; what is in each
+ * pocket, and the hold to move, is this screen's.
  */
 function BinderPage({
   geometry,
@@ -948,22 +913,10 @@ function BinderPage({
   target: number | null;
   onAdd: () => void;
 }) {
-  const { pageWidth, pocketWidth, pocketHeight } = geometry;
+  const { pocketWidth, pocketHeight } = geometry;
 
   return (
-    <View
-      style={{
-        width: pageWidth,
-        padding: PAGE_PAD - PAGE_BORDER,
-        borderRadius: radius.card,
-        borderWidth: PAGE_BORDER,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: POCKET_GAP,
-      }}
-    >
+    <PageFrame geometry={geometry}>
       {Array.from({ length: POCKETS_PER_PAGE }, (_, index) => {
         const card = cards[index];
         if (!card) {
@@ -984,7 +937,7 @@ function BinderPage({
           );
         }
         return (
-          <Pocket
+          <BinderPocket
             key={card.entryId}
             card={card}
             index={index}
@@ -1000,126 +953,25 @@ function BinderPage({
           />
         );
       })}
-    </View>
-  );
-}
-
-function EmptyPocket({ width, height }: { width: number; height: number }) {
-  return (
-    <View
-      style={{
-        width,
-        height,
-        borderRadius: 5,
-        backgroundColor: colors.canvas,
-        borderWidth: POCKET_RING,
-        borderColor: "rgba(255,255,255,0.06)",
-      }}
-    />
+    </PageFrame>
   );
 }
 
 /**
- * An empty pocket on the owner's page is a way in: the founder,
- * "there should be a + on the open card areas in the binder to add a
- * card that way." Under a held card it wears the accent ring like any
- * other pocket; a drop there lands the card after the last one.
- */
-function AddPocket({
-  width,
-  height,
-  targeted,
-  onPress,
-}: {
-  width: number;
-  height: number;
-  targeted: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityLabel="Add cards"
-      style={{
-        width,
-        height,
-        borderRadius: 5,
-        backgroundColor: colors.canvas,
-        borderWidth: targeted ? POCKET_RING : 1,
-        borderStyle: targeted ? "solid" : "dashed",
-        borderColor: targeted ? colors.accent : colors.borderStrong,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 2,
-      }}
-    >
-      <Text
-        style={{
-          color: colors.accent,
-          fontSize: Math.min(28, Math.round(width / 3)),
-          fontWeight: "300",
-          lineHeight: Math.min(30, Math.round(width / 3) + 2),
-        }}
-      >
-        +
-      </Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}>
-        Add
-      </Text>
-    </Tap>
-  );
-}
-
-/** The sleeve lip: a thin highlight where the plastic folds. */
-function SleeveLip() {
-  return (
-    <LinearGradient
-      colors={["rgba(255,255,255,0.22)", "transparent"]}
-      pointerEvents="none"
-      style={{ position: "absolute", top: 0, left: 0, right: 0, height: "6%" }}
-    />
-  );
-}
-
-/** The copies, in a corner, when there is more than one. */
-function Copies({ quantity }: { quantity: number }) {
-  if (quantity <= 1) return null;
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        top: 4,
-        left: 4,
-        borderRadius: 999,
-        backgroundColor: "rgba(0,0,0,0.75)",
-        paddingHorizontal: 5,
-        paddingVertical: 1,
-      }}
-    >
-      <Text style={{ color: colors.textPrimary, fontSize: 9, fontWeight: "700" }}>
-        {`×${quantity}`}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * A card in its pocket: the picture in a black ring with the sleeve's
- * lip caught along the top, the copies in a corner when there is more
- * than one, and the lime strip at the foot when it is on the viewer's
- * hunts. The owner takes it out by holding it and dropping it on
- * Remove; nothing on the pocket itself removes anything.
+ * A card in its pocket: the shared Pocket (the black ring, the
+ * sleeve's lip, the clipping, the dashed outline while its card is in
+ * the air, the accent ring under a held card) with the picture in it,
+ * the copies in a corner when there is more than one, and the lime
+ * strip at the foot when it is on the viewer's hunts. The owner takes
+ * it out by holding it and dropping it on Remove; nothing on the
+ * pocket itself removes anything.
  *
- * Exactly the width and height it is given, and nothing inside can
- * widen it: the picture is told the width inside the ring and the
- * pocket clips the rest. Laid out where the page puts it, always;
- * while its own card is in the air it is the empty dashed outline the
- * card left behind, and under a held card it wears the accent ring.
- * The pan handlers live on this view, so it is the same view in every
- * state and a gesture never loses its responder.
+ * The picture is told the width inside the ring and the pocket clips
+ * the rest. The pan handlers live on the pocket's own view, so it is
+ * the same view in every state and a gesture never loses its
+ * responder.
  */
-function Pocket({
+function BinderPocket({
   card,
   index,
   geometry,
@@ -1147,49 +999,19 @@ function Pocket({
   onPickUp: () => void;
   onTouchEnd: () => void;
 }) {
-  const { pocketWidth: width, pocketHeight: height } = geometry;
+  const { pocketWidth: width } = geometry;
 
   return (
-    <View
-      {...(handlers ?? {})}
+    <Pocket
+      geometry={geometry}
+      accessibilityLabel={pocketLabel(card.name, index, yours ? ", hold to move" : "")}
+      placeholder={placeholder}
+      targeted={targeted}
+      handlers={handlers}
       onTouchEnd={yours ? onTouchEnd : undefined}
-      onTouchCancel={yours ? onTouchEnd : undefined}
-      accessibilityLabel={`${card.name}, pocket ${index + 1} of ${POCKETS_PER_PAGE}${
-        yours ? ", hold to move" : ""
-      }`}
-      style={{
-        width,
-        height,
-        borderRadius: 5,
-        borderWidth: placeholder ? 1 : POCKET_RING,
-        borderStyle: placeholder ? "dashed" : "solid",
-        borderColor: targeted
-          ? colors.accent
-          : placeholder
-            ? colors.borderStrong
-            : colors.canvas,
-        backgroundColor: colors.canvas,
-        overflow: "hidden",
-      }}
-    >
-      {placeholder ? null : (
+      corner={
         <>
-          <CardImage
-            imageUrl={card.imageUrl}
-            width={width - 2 * POCKET_RING}
-            name={card.name}
-            cardNumber={card.number}
-            caption={card.printingLabel}
-            note={card.note}
-            direction="showcase"
-            siblings={shelf}
-            position={position}
-            onLongPress={yours ? onPickUp : undefined}
-          />
-
-          <SleeveLip />
           <Copies quantity={card.quantity} />
-
           {card.onYourHunt ? (
             <View
               pointerEvents="none"
@@ -1216,8 +1038,21 @@ function Pocket({
             </View>
           ) : null}
         </>
-      )}
-    </View>
+      }
+    >
+      <CardImage
+        imageUrl={card.imageUrl}
+        width={width - 2 * POCKET_RING}
+        name={card.name}
+        cardNumber={card.number}
+        caption={card.printingLabel}
+        note={card.note}
+        direction="showcase"
+        siblings={shelf}
+        position={position}
+        onLongPress={yours ? onPickUp : undefined}
+      />
+    </Pocket>
   );
 }
 
@@ -1337,31 +1172,6 @@ function HeldPocket({
       <SleeveLip />
       <Copies quantity={card.quantity} />
     </Animated.View>
-  );
-}
-
-function PageDots({ at, of }: { at: number; of: number }) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-      }}
-    >
-      {Array.from({ length: of }, (_, index) => (
-        <View
-          key={index}
-          style={{
-            height: 6,
-            width: index === at ? 16 : 6,
-            borderRadius: 3,
-            backgroundColor: index === at ? colors.accent : colors.borderStrong,
-          }}
-        />
-      ))}
-    </View>
   );
 }
 

@@ -1,65 +1,53 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronDown, Layers, ListChecks, Plus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Crosshair, Plus } from "lucide-react";
 
-import { HuntDetail } from "@/components/players/hunt-detail";
+import { BinderCover } from "@/components/binder/binder-cover";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
-import { cn } from "@/lib/cn";
-import { remainingLabel } from "@/lib/flares/draft-rules";
+import { huntCover } from "@/lib/binder/covers";
 import { createHuntAction } from "@/lib/players/hunt-actions";
+import { huntRowLine } from "@/lib/players/hunt-copy";
 import type { Hunt } from "@/lib/players/hunts";
 
 /**
  * Somebody's hunts, on their profile.
  *
- * A hunt is a persistent named list: "Green Zoro", "Wishlist upgrades".
- * Each row is closed by default and says the one thing worth reading
- * shut - what is left - and opens onto the full list with its progress.
- * Every hunt has a page of its own at /hunts/<id> for sharing.
+ * A hunt is a persistent named want: "Green Zoro", "Wishlist
+ * upgrades". Drawn like a binder now (the founder: "Do you think the
+ * Hunts feature should just be binders instead of lists? So it's all
+ * kinda the same language."): one row per hunt, the binder row
+ * exactly, the small cover with the hunt's name embossed on it, the
+ * name, the line that says how many cards and how many are left, and
+ * a chevron. A tap opens the hunt's own page at /hunts/<id>; nothing
+ * expands in place any more. The cover's colour comes from the hunt's
+ * id, so the same hunt wears the same colour on the website and in
+ * the app. The app's hunts-panel.tsx draws the same rows.
  *
  * The panel used to sit on the profile, capped at three rows with a
  * "See all" under them. The profile IA round moved it behind the Hunts
- * door in the profile's icon row, onto a page of its own
- * (/profile/hunts, /p/<id>/hunts, the app's Hunts screen), and a page
+ * door in the profile's icon row, onto a page of its own, and a page
  * that is nothing but the hunts has no reason to hide any: every row
  * is drawn.
  *
- * The owner starts a hunt here, edits it here and ticks copies off
- * here. A visitor picks the cards they have and offers them, on the
- * posts those cards were flared in. Neither sees the other's controls.
+ * The owner starts a hunt here. Everything else, editing, ticking
+ * copies off, a visitor's offer, happens on the hunt's page.
  */
 
 export function HuntsPanel({
   hunts,
   limit,
   yours,
-  ownerName,
 }: {
   hunts: Hunt[];
   /** How many they may keep, when it is worth saying. */
   limit?: number;
   yours?: boolean;
-  /** Whose profile this is, for what a visitor's send says. */
-  ownerName?: string;
 }) {
-  /* One open at a time: two open hunts are two lists and a scroll. The
-     first opens itself so the panel is never a row of closed lids. */
-  /*
-   * CLOSED UNTIL ASKED.
-   *
-   * The first folder used to open itself, on the argument that a panel
-   * of closed lids shows nothing. The founder, opening somebody else's
-   * profile: "it immediately unnests their top hunt holder. dont do
-   * that."
-   *
-   * Right - a profile is a thing you glance at, and the top hunt
-   * springing open makes one arbitrary folder the loudest thing on
-   * somebody's page. Closed is also the only state that reads the same
-   * whoever is looking.
-   */
-  const [open, setOpen] = useState<string | null>(null);
+  const router = useRouter();
   const [creating, setCreating] = useState(false);
 
   const atLimit = limit !== undefined && hunts.length >= limit;
@@ -68,9 +56,8 @@ export function HuntsPanel({
     <section className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-2 font-semibold text-text-primary">
-          {/* A list with ticks, not the crosshair: the reticle is the
-              Flare status mark and means one thing. */}
-          <ListChecks className="size-4 text-accent" aria-hidden="true" />
+          {/* The crosshair: the hunts icon everywhere, the tab's included. */}
+          <Crosshair className="size-4 text-accent" aria-hidden="true" />
           Hunts
         </p>
         <div className="flex items-center gap-2">
@@ -107,7 +94,9 @@ export function HuntsPanel({
         <NewHuntForm
           onDone={(huntId) => {
             setCreating(false);
-            if (huntId) setOpen(huntId);
+            /* Straight onto the new hunt's page, where the "+" pockets
+               are: the same step a new binder takes. */
+            if (huntId) router.push(`/hunts/${huntId}`);
           }}
         />
       )}
@@ -115,112 +104,40 @@ export function HuntsPanel({
       {hunts.length === 0 ? (
         <p className="text-sm text-text-secondary">
           {yours
-            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole list follows you, with what is found and what is left."
+            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole hunt follows you, with what is found and what is left."
             : "No hunts yet."}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {hunts.map((hunt) => (
-            <HuntRow
-              key={hunt.id}
-              hunt={hunt}
-              open={open === hunt.id}
-              onToggle={() => setOpen(open === hunt.id ? null : hunt.id)}
-              yours={Boolean(yours)}
-              ownerName={ownerName}
-            />
+            <li key={hunt.id}>
+              <Link
+                href={`/hunts/${hunt.id}`}
+                className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-3 transition-colors hover:border-border-strong"
+              >
+                <BinderCover cover={huntCover(hunt.id)} label={hunt.name} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate font-bold text-text-primary">
+                    {hunt.name}
+                  </span>
+                  {/* The chip rides the count line, so the name keeps the row's width. */}
+                  <span className="flex items-center gap-2 text-sm text-text-secondary">
+                    {huntRowLine(hunt.cards.length, hunt.looking)}
+                    {yours && hunt.visibility === "private" && (
+                      <span className="shrink-0 text-xs text-text-muted">Private</span>
+                    )}
+                  </span>
+                </span>
+                <ChevronRight
+                  className="size-4 shrink-0 text-text-muted"
+                  aria-hidden="true"
+                />
+              </Link>
+            </li>
           ))}
         </ul>
       )}
     </section>
-  );
-}
-
-/**
- * "5 copies left · 2 cards", or "All found". Copies and cards are two
- * numbers and both are said, because a hunt for one card in four copies
- * and a hunt for four cards are different amounts of help to give.
- */
-export function lookingLabel(hunt: Hunt): string {
-  if (hunt.cards.length === 0) return "No cards yet";
-  return remainingLabel(hunt.cards);
-}
-
-/** One hunt, shut or open. Shut is a lid; open is the whole list. */
-function HuntRow({
-  hunt,
-  open,
-  onToggle,
-  yours,
-  ownerName,
-}: {
-  hunt: Hunt;
-  open: boolean;
-  onToggle: () => void;
-  yours: boolean;
-  ownerName?: string;
-}) {
-  const previews = hunt.cards.slice(0, 3);
-  const finished = hunt.cards.length > 0 && hunt.lookingCopies === 0;
-
-  return (
-    <li
-      className={cn(
-        "rounded-[var(--radius-control)] border bg-elevated",
-        open ? "border-accent" : "border-border",
-      )}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 py-2.5 text-left transition-colors hover:bg-surface/60"
-      >
-        {previews.length > 0 ? (
-          <span className="flex shrink-0 -space-x-3" aria-hidden="true">
-            {previews.map((card) => (
-              <span
-                key={card.requestId}
-                className="block h-10 w-7 overflow-hidden rounded-[4px] border border-border bg-surface ring-1 ring-surface"
-              >
-                {card.imageUrl && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={card.imageUrl} alt="" className="size-full object-cover" />
-                )}
-              </span>
-            ))}
-          </span>
-        ) : (
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface">
-            <Layers className="size-4 text-text-muted" aria-hidden="true" />
-          </span>
-        )}
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-semibold text-text-primary">{hunt.name}</span>
-          <span
-            className={cn(
-              "truncate text-xs tabular-nums",
-              finished ? "text-text-muted" : "text-accent",
-            )}
-          >
-            {lookingLabel(hunt)}
-          </span>
-        </span>
-        <ChevronDown
-          className={cn(
-            "size-4 shrink-0 text-text-muted transition-transform",
-            open && "rotate-180",
-          )}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open && (
-        <div className="border-t border-border px-3 pt-3 pb-3">
-          <HuntDetail hunt={hunt} yours={yours} ownerName={ownerName} />
-        </div>
-      )}
-    </li>
   );
 }
 

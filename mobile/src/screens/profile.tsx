@@ -760,8 +760,9 @@ export function ProfileScreen() {
           );
         case "hunts":
           /* The panel the Hunts screen draws, with exactly its wiring:
-             "Add cards" lands in the composer with the hunt chosen by
-             id, and every write inside asks for the truth again. */
+             a row opens the hunt's own screen, "Add cards" lands in the
+             composer with the hunt chosen by id, and every write inside
+             asks for the truth again. */
           return (
             <HuntsPanel
               hunts={profile.hunts ?? []}
@@ -773,6 +774,7 @@ export function ProfileScreen() {
                   params: { hunt: huntId },
                 })
               }
+              onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}
               onChanged={() => void load()}
             />
           );

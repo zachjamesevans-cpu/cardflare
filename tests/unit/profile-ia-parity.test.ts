@@ -422,7 +422,9 @@ describe("the Hunts tab", () => {
   it("is the hunts panel in a pane, every row drawn, with the old pages redirecting", () => {
     expect(web.ownProfile).toContain("<HuntsPanel");
     expect(web.ownProfile).toContain("limit={huntLimitFor(profile.tier)}");
-    expect(web.playerProfile).toContain("ownerName={profile.displayName}");
+    /* A visitor's panel is the rows alone: the send moved to the
+       hunt's page with the hunts-as-binders round. */
+    expect(web.playerProfile).toMatch(/<HuntsPanel hunts=\{profile\.hunts\} \/>/);
     expect(web.ownHunts).toContain('redirect("/profile?tab=hunts")');
     expect(web.playerHunts).toContain("redirect(`/p/${playerId}?tab=hunts`)");
     expect(web.huntsPanel).not.toContain("const SHOWN");
