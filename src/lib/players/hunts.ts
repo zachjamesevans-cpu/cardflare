@@ -136,6 +136,7 @@ async function assemble(
       "hunt_id",
       huntRows.map((hunt) => hunt.id),
     )
+    .is("removed_at", null)
     .order("position")
     .order("created_at");
 
@@ -476,7 +477,8 @@ export async function addHuntRequests(
   const { data: existing } = await admin
     .from("hunt_requests")
     .select("id, card_id, printing_id, quantity_needed, position")
-    .eq("hunt_id", huntId);
+    .eq("hunt_id", huntId)
+    .is("removed_at", null);
   const rows = existing ?? [];
   const key = (cardId: string, printingId: string | null) =>
     `${cardId}::${printingId ?? "any"}`;
@@ -555,6 +557,7 @@ export async function setRequestFound(
     .from("hunt_requests")
     .select("id, hunt_id, quantity_needed")
     .eq("id", requestId)
+    .is("removed_at", null)
     .maybeSingle();
   if (!request) return { ok: false, reason: "not-yours" };
   const { data: hunt } = await admin
@@ -587,6 +590,58 @@ export async function setRequestFound(
   }
   await admin.from("hunts").update({ updated_at: now }).eq("id", hunt.id);
   return { ok: true, found: next, needed: request.quantity_needed };
+}
+
+/**
+ * Takes a card off the owner's hunt.
+ *
+ * A soft removal: the request row stays with `removed_at` set, so a
+ * trade that closed against it keeps its history, and readers skip it.
+ * The card's open Flares come down with it, since a Flare for a card
+ * nobody is hunting any more is a false signal on every board. Owner
+ * only, decided by the hunt the request belongs to.
+ */
+export async function removeHuntRequest(
+  playerId: string,
+  requestId: string,
+): Promise<{ ok: true } | { ok: false; reason: "not-yours" | "unavailable" }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const admin = getSupabaseAdmin();
+
+  const { data: request } = await admin
+    .from("hunt_requests")
+    .select("id, hunt_id")
+    .eq("id", requestId)
+    .is("removed_at", null)
+    .maybeSingle();
+  if (!request) return { ok: false, reason: "not-yours" };
+  const { data: hunt } = await admin
+    .from("hunts")
+    .select("id")
+    .eq("id", request.hunt_id)
+    .eq("player_id", playerId)
+    .maybeSingle();
+  if (!hunt) return { ok: false, reason: "not-yours" };
+
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from("hunt_requests")
+    .update({ removed_at: now, updated_at: now })
+    .eq("id", requestId);
+  if (error) {
+    console.error("Could not take the card off the hunt", error);
+    return { ok: false, reason: "unavailable" };
+  }
+
+  const { error: flareError } = await admin
+    .from("flares")
+    .update({ status: "cancelled", withdrawn_at: now, updated_at: now })
+    .eq("hunt_request_id", requestId)
+    .eq("status", "open");
+  if (flareError) console.error("Could not take the card's Flares down", flareError);
+
+  await admin.from("hunts").update({ updated_at: now }).eq("id", hunt.id);
+  return { ok: true };
 }
 
 /**

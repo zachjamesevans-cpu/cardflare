@@ -137,11 +137,16 @@ describe("the helpers match the website's, body for body", () => {
 
 describe("the picks live on the post, not in the viewer", () => {
   it("the Feed card owns them as quantities and hands them down", () => {
-    expect(src.card).toContain("const [picks, setPicks] = useState<ZoomPicks>({});");
+    /* Since the one-pick-store round the card is HANDED its post's
+       picks by the Feed screen (tests/unit/app-search.test.ts pins
+       the store); it keeps none of its own. */
+    expect(src.card).toContain("picks: ZoomPicks;");
+    expect(src.card).toContain("onPicks: (next: ZoomPicks) => void;");
+    expect(src.card).not.toContain("useState<ZoomPicks>");
     expect(src.zoom).toContain("export type ZoomPicks = Record<string, number>;");
     /* Both the single-card row and the carousel carry them to the zoom. */
     expect(src.card.match(/picks=\{picks\}/g)?.length).toBe(2);
-    expect(src.card.match(/onPicks=\{setPicks\}/g)?.length).toBe(2);
+    expect(src.card.match(/onPicks=\{onPicks\}/g)?.length).toBe(2);
     expect(src.pager).toContain("picks?: ZoomPicks;");
     expect(src.pager.match(/picks=\{picks\}/g)?.length).toBe(2);
   });
@@ -170,7 +175,7 @@ describe("the picks live on the post, not in the viewer", () => {
     expect(src.card).toContain("<OfferReviewSheet");
     expect(src.card).toContain("await post.offer(items, note)");
     /* Sending clears the line. */
-    expect(src.card).toContain("onSent={() => setPicks({})}");
+    expect(src.card).toContain("onSent={() => onPicks({})}");
   });
 });
 
@@ -202,15 +207,20 @@ describe("the review has a stepper and a Remove on every line", () => {
     expect(src.review).not.toContain("copiesLabel(line.quantity)");
   });
 
-  it("every caller answers onChange by editing its own picks", () => {
+  it("every caller answers onChange by editing the picks it was handed", () => {
+    /* The card and the zoom edit by flareId and write the result back
+       up; the sheet routes every edit through its one setPick, which
+       does the same. None of them keeps a second copy. */
     for (const [name, source] of [
       ["card", src.card],
-      ["sheet", src.sheet],
       ["zoom", src.zoom],
     ] as const) {
       expect(source, name).toContain("onChange={(flareId, quantity) =>");
       expect(source, name).toContain("if (quantity <= 0) delete next[flareId];");
     }
+    expect(src.sheet).toContain("onChange={setPick}");
+    expect(src.sheet).toContain("if (quantity <= 0) delete next[key];");
+    expect(src.sheet).toContain("onPicks(next);");
   });
 });
 

@@ -703,11 +703,19 @@ export type HuntRequestRow = {
   quantity_needed: number;
   quantity_found: number;
   position: number;
+  /** Set when the owner took the card off the hunt; the row stays for its history. */
+  removed_at: string | null;
 };
 
 export type HuntRequestInsert = Omit<
   HuntRequestRow,
-  "id" | "created_at" | "updated_at" | "printing_id" | "quantity_found" | "position"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "printing_id"
+  | "quantity_found"
+  | "position"
+  | "removed_at"
 > & {
   id?: string;
   created_at?: string;
@@ -715,6 +723,7 @@ export type HuntRequestInsert = Omit<
   printing_id?: string | null;
   quantity_found?: number;
   position?: number;
+  removed_at?: string | null;
 };
 
 /**

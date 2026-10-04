@@ -32,7 +32,16 @@ import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
 import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
-import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
+import {
+  AsyncButton,
+  Button,
+  ErrorLine,
+  Input,
+  Loading,
+  Muted,
+  Tap,
+  type ZoomPicks,
+} from "../ui";
 import { UndoToast, type UndoOffer } from "../undo-toast";
 
 /**
@@ -60,6 +69,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     (FlareSheetPost & { mode: "view" | "offer" }) | null
   >(null);
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
+  /* The one offer in progress on this post, flareId -> copies: the
+     viewer and the sheet both read and write it, so a card ticked in
+     either is ticked in the other. */
+  const [picks, setPicks] = useState<ZoomPicks>({});
   const [menu, setMenu] = useState(false);
   /* "Report", on somebody else's post: the same sheet the Feed opens. */
   const [report, setReport] = useState<ReportTarget | null>(null);
@@ -314,9 +327,17 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                 post={ref}
                 siblings={shelf}
                 position={0}
+                picks={picks}
+                onPicks={setPicks}
               />
             ) : (
-              <FlareCarousel cards={post.cards} direction={direction} post={ref} />
+              <FlareCarousel
+                cards={post.cards}
+                direction={direction}
+                post={ref}
+                picks={picks}
+                onPicks={setPicks}
+              />
             )}
 
             {post.caption ? (
@@ -498,6 +519,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
 
       <FlareCardsSheet
         open={cardsSheet}
+        picks={picks}
+        onPicks={setPicks}
         onClose={() => setCardsSheet(null)}
         onChanged={() => void load()}
       />

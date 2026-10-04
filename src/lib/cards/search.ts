@@ -69,10 +69,14 @@ export async function searchCards(
   const rows = (data ?? []) as unknown as SearchRow[];
   if (rows.length === 0) return [];
 
-  const printings = await printingsFor(rows.map((row) => row.id));
+  const [printings, games] = await Promise.all([
+    printingsFor(rows.map((row) => row.id)),
+    gamesFor(rows.map((row) => row.id)),
+  ]);
 
   return rows.map((row) => ({
     id: row.id,
+    game: games.get(row.id) ?? null,
     exactName: row.exact_name,
     canonicalCardNumber: row.canonical_card_number,
     cardType: row.card_type,
@@ -87,6 +91,24 @@ export async function searchCards(
     triggerText: row.trigger_text,
     printings: printings.get(row.id) ?? [],
   }));
+}
+
+/**
+ * Which game each result belongs to, in one query. The search function
+ * ranks across the catalogue and does not say, and a search from the
+ * Feed mixes games, so a row has to.
+ */
+async function gamesFor(cardIds: string[]): Promise<Map<string, string>> {
+  if (cardIds.length === 0) return new Map();
+  const { data, error } = await getSupabaseAdmin()
+    .from("cards")
+    .select("id, game")
+    .in("id", cardIds);
+  if (error) {
+    console.error("Could not read the results' games", error);
+    return new Map();
+  }
+  return new Map((data ?? []).map((row) => [row.id, row.game as string]));
 }
 
 /**

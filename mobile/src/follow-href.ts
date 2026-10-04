@@ -19,10 +19,10 @@ import { openRoom } from "./open-room";
  *
  * Every path a notice can carry has a line here: /e/<code> (with or
  * without a query), /local?thread=<id>, /local, /feed, /inbox,
- * /profile, /p/<playerId>, /s/<storeId> and /nights. A tap on a push
- * used to land a message notice on the Messages list with the
- * conversation one row down; now the path names the thread and the
- * tap opens it.
+ * /profile, /p/<playerId>, /s/<storeId>, /cards/<cardId> and /nights.
+ * A tap on a push used to land a message notice on the Messages list
+ * with the conversation one row down; now the path names the thread
+ * and the tap opens it.
  */
 export async function followHref(
   navigation: Pick<NativeStackNavigationProp<StackParams>, "navigate">,
@@ -82,6 +82,14 @@ export async function followHref(
     const storeId = segmentAfter(href, "/s/");
     if (storeId) {
       navigation.navigate("StoreProfile", { storeId });
+      return;
+    }
+  }
+  /* One card's page: who has it, who hunts it, where it sits. */
+  if (href.startsWith("/cards/")) {
+    const cardId = segmentAfter(href, "/cards/");
+    if (cardId) {
+      navigation.navigate("Card", { cardId });
       return;
     }
   }

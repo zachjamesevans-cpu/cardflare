@@ -53,6 +53,8 @@ export interface CardResult {
   effectText: string | null;
   triggerText: string | null;
   printings: CardPrinting[];
+  /** The game's slug, for a result list that mixes games. Absent on older callers. */
+  game?: string | null;
 }
 
 export type CardSearchState =

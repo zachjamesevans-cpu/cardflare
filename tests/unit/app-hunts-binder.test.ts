@@ -342,11 +342,12 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.page).toContain("? setRequestFound(card.requestId, next)");
     expect(src.page).toContain("? setFlareFound(card.flareId, next)");
     expect(src.page).toContain("useCopiesFound({ reset: hunt, onChanged })");
-    /* No remove: the server has no such action, and nothing is invented. */
-    expect(src.page.replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain("Remove from hunt");
-    expect(read("mobile/src/api.ts")).not.toMatch(
-      /remove-card|removeHuntCard|removeRequest/,
-    );
+    /* "Remove from hunt" lives under the stepper now, through the
+       server's remove-card action; tests/unit/app-search.test.ts pins
+       the words and the flow. */
+    expect(sheet).toContain("Remove from hunt");
+    expect(read("mobile/src/api.ts")).toContain('action: "remove-card"');
+    expect(read("mobile/src/api.ts")).toContain("export const removeHuntCard");
   });
 
   it("a visitor's tap is the viewer with the Feed's picks; a found card cannot be picked", () => {

@@ -14,6 +14,7 @@ import {
   setFlareFound,
   setRequestFound,
   updateHunt,
+  removeHuntRequest,
 } from "@/lib/players/hunts";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,11 @@ const actionSchema = z.discriminatedUnion("action", [
     action: z.literal("set-flare-found"),
     flareId: z.string().uuid(),
     found: z.number().int().min(0).max(99),
+  }),
+  /* The owner takes a card off the hunt; its open Flares come down. */
+  z.object({
+    action: z.literal("remove-card"),
+    requestId: z.string().uuid(),
   }),
 ]);
 
@@ -152,6 +158,12 @@ export async function POST(request: Request) {
 
   if (body.action === "set-found") {
     const result = await setRequestFound(player.playerId, body.requestId, body.found);
+    if (!result.ok) return badRequest("That card is not on one of your hunts.");
+    return answer(player.playerId);
+  }
+
+  if (body.action === "remove-card") {
+    const result = await removeHuntRequest(player.playerId, body.requestId);
     if (!result.ok) return badRequest("That card is not on one of your hunts.");
     return answer(player.playerId);
   }

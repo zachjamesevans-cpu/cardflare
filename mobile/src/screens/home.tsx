@@ -69,6 +69,7 @@ import {
   Muted,
   Tap,
   Title,
+  type ZoomPicks,
   type ZoomCard,
 } from "../ui";
 import { silentCoords } from "../location";
@@ -173,6 +174,10 @@ const PULL_TRIGGER = 80;
 
 /** The toast after a block lands, in the website's words. */
 const BLOCKED_LINE = "Blocked. Their posts are hidden and they cannot message you.";
+
+/* No picks yet on a post: one frozen object, so a card with nothing in
+   its offer is handed the same props every paint. */
+const NO_PICKS: ZoomPicks = Object.freeze({}) as ZoomPicks;
 
 /**
  * The pull-to-refresh spinner, drawn rather than asked for.
@@ -412,6 +417,18 @@ export function HomeScreen() {
   const [cardsSheet, setCardsSheet] = useState<
     (FlareSheetPost & { mode: "view" | "offer" }) | null
   >(null);
+  /*
+   * ONE PICK STORE PER POST. Every offer in progress on the Feed, by
+   * postId, flareId -> copies. A post's card reads and writes its own
+   * entry, and the full-list sheet reads and writes the entry of the
+   * post it is open on, so a card ticked in the viewer is the same pick
+   * the sheet shows and the "N in your offer · Review" line counts.
+   * For the page's life only; nothing stored.
+   */
+  const [picksByPost, setPicksByPost] = useState<Record<string, ZoomPicks>>({});
+  const picksFor = (postId: string): ZoomPicks => picksByPost[postId] ?? NO_PICKS;
+  const setPicksFor = (postId: string, next: ZoomPicks) =>
+    setPicksByPost((current) => ({ ...current, [postId]: next }));
   /* Your own post, with its copies-found stepper open. */
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
   /* "Report" behind the three dots on somebody else's post. */
@@ -855,10 +872,7 @@ export function HomeScreen() {
        */}
       <PullSpinner pull={pull} refreshing={refreshing} top={headerRoom} />
 
-      <CollapsingHeader
-        state={header}
-        onSearch={() => navigation.navigate("FindPlayer")}
-      />
+      <CollapsingHeader state={header} onSearch={() => navigation.navigate("Search")} />
       <Animated.ScrollView
         /*
          * flex: 1, and it is load-bearing rather than tidy.
@@ -1357,6 +1371,8 @@ export function HomeScreen() {
                       : () => block(item.playerId, item.displayName)
                   }
                   onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+                  picks={picksFor(item.postId)}
+                  onPicks={(next) => setPicksFor(item.postId, next)}
                 />
               )
             ) : item.kind === "upcoming" ? (
@@ -1716,7 +1732,7 @@ export function HomeScreen() {
             <Button
               label="Find a player"
               variant="secondary"
-              onPress={() => navigation.navigate("FindPlayer")}
+              onPress={() => navigation.navigate("Search")}
             />
           </Card>
         )}
@@ -1763,6 +1779,10 @@ export function HomeScreen() {
         />
         <FlareCardsSheet
           open={cardsSheet}
+          picks={cardsSheet ? picksFor(cardsSheet.postId) : NO_PICKS}
+          onPicks={(next) => {
+            if (cardsSheet) setPicksFor(cardsSheet.postId, next);
+          }}
           onClose={() => setCardsSheet(null)}
           onChanged={() => void load(() => true)}
         />

@@ -363,8 +363,9 @@ describe("the home screen's furniture", () => {
        way on scroll, which a navigator header cannot do. Same place on
        screen, different owner. */
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      'navigation.navigate("FindPlayer")',
+      'navigation.navigate("Search")',
     );
+    expect(read("mobile/src/screens/home.tsx")).not.toContain("FindPlayer");
   });
 
   it("keeps one wants list, and lets it say which state a card is in", () => {

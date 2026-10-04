@@ -1173,6 +1173,9 @@ export function FlareComposerPreview({
         onLike={async () => undefined}
         onOpenThread={() => undefined}
         onEnterRoom={() => undefined}
+        /* Your own post, not yet posted: nothing to pick, nowhere to keep it. */
+        picks={{}}
+        onPicks={() => undefined}
       />
       <ErrorLine message={error} />
       <AsyncButton label="Post flare" pendingLabel="Posting…" onPress={onPost} />

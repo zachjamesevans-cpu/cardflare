@@ -313,13 +313,14 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toContain("progress.write(open, value)");
     expect(web.detail).toContain("setRequestFoundAction(card.requestId, next)");
     expect(web.binder).not.toContain("+1 found");
-    /* No remove-from-hunt action exists on the server, so none is drawn. */
-    expect(spoken(web.binder).join("\n")).not.toContain("Remove from hunt");
+    /* Under the stepper, the way off the hunt; the words are pinned
+       on both platforms in search-parity.test.ts. */
+    expect(spoken(web.binder).join("\n")).toContain("Remove from hunt");
     expect(app.binder).toContain("Update progress");
     expect(app.binder.match(/<Stepper/g)).toHaveLength(1);
     expect(app.binder).toContain("<UndoLine");
     expect(app.binder).toContain("wantsLine(");
-    expect(spoken(app.binder).join("\n")).not.toContain("Remove from hunt");
+    expect(spoken(app.binder).join("\n")).toContain("Remove from hunt");
   });
 
   it("hands a visitor's pocket to the viewer with the Feed's picks, keyed by request", () => {
