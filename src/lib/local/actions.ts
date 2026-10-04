@@ -128,7 +128,7 @@ async function openAnyThread(
           ? "That is you."
           : "That one is yours."
         : outcome.reason === "closed"
-          ? "This conversation was ended."
+          ? "You can't message this player."
           : GENERIC;
   return { ok: false, message };
 }
@@ -153,7 +153,7 @@ export async function sendMessageAction(
   if (outcome.ok) return { ok: true };
   return {
     ok: false,
-    message: outcome.reason === "closed" ? "This conversation was ended." : GENERIC,
+    message: outcome.reason === "closed" ? "You can't message this player." : GENERIC,
   };
 }
 

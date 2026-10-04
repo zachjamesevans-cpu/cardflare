@@ -3689,7 +3689,7 @@ export function threadTradeFailureMessage(caught: unknown): string {
   const reason = caught instanceof ApiError ? caught.code : "";
   switch (reason) {
     case "closed":
-      return "This conversation was ended.";
+      return "You can't message this player.";
     case "pending":
       return "One trade at a time. Wait for their answer first.";
     case "already-traded":

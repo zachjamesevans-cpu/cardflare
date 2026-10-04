@@ -192,7 +192,7 @@ export async function offerOnHunt(
       refused.push(...toMessage);
       failure ??=
         opened.reason === "closed"
-          ? "This conversation was ended."
+          ? "You can't message this player."
           : "Could not send the message.";
     }
   }

@@ -443,7 +443,7 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
               numberOfLines={1}
               style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
             >
-              {thread.closed ? "Conversation ended" : (thread.lastMessagePreview ?? "")}
+              {thread.lastMessagePreview ?? ""}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end", gap: spacing(1) }}>

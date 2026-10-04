@@ -86,7 +86,7 @@ export async function POST(request: Request): Promise<Response> {
             ? "That is you."
             : "That one is yours."
           : outcome.reason === "closed"
-            ? "This conversation was ended."
+            ? "You can't message this player."
             : "Could not start the conversation.";
     return Response.json({ ok: false, message }, { status: 409 });
   }

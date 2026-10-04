@@ -12,7 +12,7 @@ export const THREAD_TRADE_QUANTITY_MAX = 99;
 export function tradeFailureMessage(reason: ThreadTradeFailure): string {
   switch (reason) {
     case "closed":
-      return "This conversation was ended.";
+      return "You can't message this player.";
     case "pending":
       return "One trade at a time. Wait for their answer first.";
     case "already-traded":

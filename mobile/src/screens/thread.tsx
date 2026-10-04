@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StackParams } from "../../App";
 import {
   answerThreadTrade,
-  closeLocalThread,
+  blockPlayer,
   proposeThreadTrade,
   readLocalThread,
   sendLocalMessage,
@@ -85,7 +86,9 @@ export function ThreadScreen() {
   const [withName, setWithName] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
   const [meet, setMeet] = useState<MeetSuggestion | null>(null);
-  const [closed, setClosed] = useState(false);
+  const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
+  /* Set once a block from this screen has landed. */
+  const [blocked, setBlocked] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [draft, setDraft] = useState("");
@@ -99,7 +102,7 @@ export function ThreadScreen() {
   const [tradeDirection, setTradeDirection] = useState<"got" | "gave">("got");
   const [tradeQuantity, setTradeQuantity] = useState(1);
   const [tradeError, setTradeError] = useState<string | null>(null);
-  /* "Report", beside End conversation: the conversation itself, so the
+  /* "Report", beside Block: the conversation itself, so the
      admins can read it. The same sheet a post and a profile open. */
   const [report, setReport] = useState<ReportTarget | null>(null);
   const list = useRef<FlatList<LocalThreadMessage>>(null);
@@ -148,7 +151,7 @@ export function ThreadScreen() {
         setWithName(thread.withName);
         setCardName(thread.cardName);
         setMeet(thread.meet ?? null);
-        setClosed(thread.closed);
+        setWithPlayerId(thread.withPlayerId ?? null);
         /* An older server does not say what the thread is about; one
            with a card name is read as a thread about that card. */
         setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
@@ -189,13 +192,30 @@ export function ThreadScreen() {
     }
   };
 
-  const end = async () => {
-    try {
-      await closeLocalThread(threadId);
-      setClosed(true);
-    } catch {
-      setError("Could not end the conversation.");
-    }
+  /*
+   * Block, where "End conversation" used to be. Conversations do not
+   * end now, the way a DM does not; the block is how somebody is
+   * stopped, with the profile's own words and the profile's confirm.
+   */
+  const block = () => {
+    if (!withPlayerId) return;
+    const name = withName ?? "them";
+    Alert.alert(
+      `Block ${name}?`,
+      "You will not see their posts, and neither of you can message the other. They are not told.",
+      [
+        { text: "Keep", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => {
+            void blockPlayer(withPlayerId)
+              .then(() => setBlocked(true))
+              .catch(() => setError("Could not block them. Try again in a moment."));
+          },
+        },
+      ],
+    );
   };
 
   const closeTradeForm = () => {
@@ -343,8 +363,8 @@ export function ThreadScreen() {
           borderTopColor: colors.border,
         }}
       >
-        {closed ? (
-          <Muted>This conversation was ended. Ended conversations stay ended.</Muted>
+        {blocked ? (
+          <Muted>Blocked. Neither of you can message the other.</Muted>
         ) : (
           <>
             {/* Somewhere public to meet, suggested rather than asked for:
@@ -576,11 +596,9 @@ export function ThreadScreen() {
                   }}
                 />
               ) : null}
-              <Button
-                label="End conversation"
-                variant="secondary"
-                onPress={() => void end()}
-              />
+              {withPlayerId ? (
+                <Button label="Block" variant="secondary" onPress={block} />
+              ) : null}
               <Button
                 label="Report"
                 variant="secondary"

@@ -90,13 +90,13 @@ describe("We traded, in a conversation", () => {
     expect(web.thread).toContain("<ThreadTradeBlock");
     expect(web.thread).toContain("proposeTradeAction(threadId, input)");
     expect(web.thread).toContain("answerTradeAction(tradeId, yes)");
-    /* The trigger leads the row with End this conversation and Report. */
+    /* The trigger leads the row with Block and Report. */
     expect(web.thread.indexOf("<TradeTrigger")).toBeLessThan(
-      web.thread.indexOf("End this conversation"),
+      web.thread.indexOf("onClick={() => setAsking(true)}"),
     );
-    /* And the block sits above the composer, hidden once ended. */
+    /* And the block sits above the composer, hidden once blocked. */
     expect(web.thread.indexOf("<ThreadTradeBlock")).toBeGreaterThan(
-      web.thread.indexOf("{closed ? ("),
+      web.thread.indexOf("{blocked ? ("),
     );
     expect(web.thread.indexOf("<ThreadTradeBlock")).toBeLessThan(
       web.thread.indexOf('aria-label="Message"'),

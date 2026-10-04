@@ -24,14 +24,15 @@ describe("a thread with no card", () => {
     expect(migration).toContain("where flare_id is null and want_id is null");
   });
 
-  it("opens from a player id, finds the pair either way round, and stays closed", () => {
+  it("opens from a player id, finds the pair either way round, and only a block refuses", () => {
     expect(lib).toContain("export async function openDirectThread(");
     expect(lib).toContain(
       "and(author_player_id.eq.${fromPlayerId},responder_player_id.eq.${toPlayerId}),and(author_player_id.eq.${toPlayerId},responder_player_id.eq.${fromPlayerId})",
     );
-    expect(lib).toContain(
-      'if (existing?.closed_at) return { ok: false, reason: "closed" }',
-    );
+    expect(lib).not.toContain("existing?.closed_at");
+    expect(lib).not.toContain("raced?.closed_at");
+    const open = lib.slice(lib.indexOf("export async function openDirectThread("));
+    expect(open.slice(0, 600)).toContain("blockedBetween(fromPlayerId, toPlayerId)");
   });
 
   it("is listed as a conversation only once somebody wrote in it", () => {
