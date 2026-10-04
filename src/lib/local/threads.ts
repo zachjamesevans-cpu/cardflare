@@ -23,10 +23,14 @@ import { MESSAGE_MAX_LENGTH } from "./shared";
  * posted the Flare. A guest's Flare shows in Local but cannot be
  * messaged — the server refuses here, whatever a client renders.
  *
- * CLOSING IS FINAL. Either side can end a thread and an ended thread
- * takes no more messages, with no reopen. "Stop messaging me" has to
- * mean something, and this is v1's whole safety surface — kept small
- * enough to be airtight.
+ * NOTHING ENDS A CONVERSATION BUT A BLOCK. Threads used to be
+ * endable by either side, and an ended thread took no more messages,
+ * ever. The founder, unable to write to somebody from her profile:
+ * "Messages should act more like instagram DM's. I can't even message
+ * her again because it says the convo is closed." So a conversation is
+ * always open, the way a DM is, and "stop messaging me" is the block,
+ * which closes every door in both directions (`blockedBetween`). The
+ * `closed_at` column stays for history; nothing reads it as a refusal.
  */
 
 export type ThreadFailure =
@@ -141,8 +145,6 @@ export async function openFlareThread(
     .eq("responder_player_id", responderPlayerId)
     .maybeSingle();
 
-  if (existing?.closed_at) return { ok: false, reason: "closed" };
-
   let threadId = existing?.id ?? null;
 
   if (!threadId) {
@@ -220,8 +222,6 @@ export async function openWantThread(
     .eq("responder_player_id", responderPlayerId)
     .maybeSingle();
 
-  if (existing?.closed_at) return { ok: false, reason: "closed" };
-
   let threadId = existing?.id ?? null;
 
   if (!threadId) {
@@ -264,8 +264,8 @@ export async function openWantThread(
  * listed (see listThreads), so opening and leaving costs nothing.
  *
  * One per pair, whichever side opened it: the unique index orders the
- * two ids, and this looks the pair up both ways before inserting. A
- * closed one stays closed; "stop messaging me" means something.
+ * two ids, and this looks the pair up both ways before inserting. Only
+ * a block refuses it.
  */
 export async function openDirectThread(
   fromPlayerId: string,
@@ -298,7 +298,6 @@ export async function openDirectThread(
       .maybeSingle();
 
   const { data: existing } = await find();
-  if (existing?.closed_at) return { ok: false, reason: "closed" };
   if (existing) return { ok: true, threadId: existing.id };
 
   /* The person written to sits in the author's chair, so the role reads
@@ -311,7 +310,6 @@ export async function openDirectThread(
 
   if (error && error.code === "23505") {
     const { data: raced } = await find();
-    if (raced?.closed_at) return { ok: false, reason: "closed" };
     return raced
       ? { ok: true, threadId: raced.id }
       : { ok: false, reason: "unavailable" };
@@ -374,7 +372,8 @@ async function threadForViewer(
     wantId: data.want_id,
     authorId: data.author_player_id,
     responderId: data.responder_player_id,
-    closed: data.closed_at !== null,
+    /* Nothing ends a conversation now; the field stays for older builds. */
+    closed: false,
   };
 }
 
@@ -418,7 +417,6 @@ export async function sendThreadMessage(
 
   const thread = await threadForViewer(threadId, senderId);
   if (!thread) return { ok: false, reason: "not-found" };
-  if (thread.closed) return { ok: false, reason: "closed" };
 
   const recipient = thread.authorId === senderId ? thread.responderId : thread.authorId;
   if (await blockedBetween(senderId, recipient)) return { ok: false, reason: "closed" };
@@ -428,29 +426,19 @@ export async function sendThreadMessage(
 }
 
 /**
- * Ends a thread, from either chair. Not an error to repeat — ending an
- * ended conversation is the outcome the caller wanted.
+ * What "End conversation" used to do, kept answering for the builds
+ * still on phones that show the button. It ends nothing any more (see
+ * the note at the top of this file): the thread is the viewer's, and
+ * the answer is the same "ok" the button expects, so an old build does
+ * not show an error for a door that no longer exists.
  */
 export async function closeThread(
   threadId: string,
   viewerId: string,
 ): Promise<{ ok: true } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
-
   const thread = await threadForViewer(threadId, viewerId);
   if (!thread) return { ok: false, reason: "not-found" };
-  if (thread.closed) return { ok: true };
-
-  const { error } = await getSupabaseAdmin()
-    .from("flare_threads")
-    .update({ closed_at: new Date().toISOString(), closed_by: viewerId })
-    .eq("id", threadId);
-
-  if (error) {
-    console.error("Could not close the thread", error);
-    return { ok: false, reason: "unavailable" };
-  }
-
   return { ok: true };
 }
 
@@ -589,7 +577,7 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
         lastMessageAt: row.last_message_at,
         lastMessagePreview: preview.get(row.id) ?? null,
         unread: unread.get(row.id) ?? 0,
-        closed: row.closed_at !== null,
+        closed: false,
       },
     ];
   });
@@ -773,8 +761,7 @@ export async function unreadMessages(playerId: string): Promise<number> {
   const { data: threads } = await admin
     .from("flare_threads")
     .select("id")
-    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
-    .is("closed_at", null);
+    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`);
 
   const ids = (threads ?? []).map((row) => row.id);
   if (ids.length === 0) return 0;

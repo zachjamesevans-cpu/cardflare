@@ -16,13 +16,13 @@ import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { ThreadTradeBlock, TradeTrigger } from "@/components/local/thread-trade-block";
 import { ReportSheet } from "@/components/players/report-sheet";
+import { blockPlayerAction } from "@/lib/players/safety-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
 import { Spinner } from "@/components/ui/spinner";
 import {
   answerTradeAction,
-  closeThreadAction,
   localFeedAtAction,
   openThreadAction,
   proposeTradeAction,
@@ -419,7 +419,7 @@ function ThreadRow({ thread, onOpen }: { thread: ThreadSummary; onOpen: () => vo
           )}
         </span>
         <span className="block truncate text-sm text-text-secondary">
-          {thread.closed ? "Conversation ended" : (thread.lastMessagePreview ?? "")}
+          {thread.lastMessagePreview ?? ""}
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
@@ -583,7 +583,10 @@ function ThreadView({
   const [kind, setKind] = useState<ThreadRead["kind"]>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [meet, setMeet] = useState<MeetSuggestion | null>(null);
-  const [closed, setClosed] = useState(false);
+  const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
+  /* Block's inline question, and whether it has landed. */
+  const [asking, setAsking] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
@@ -609,7 +612,7 @@ function ThreadView({
       setKind(thread.kind);
       setTrade(thread.trade);
       setMeet(thread.meet);
-      setClosed(thread.closed);
+      setWithPlayerId(thread.withPlayerId ?? null);
     });
     /* onBack is stable enough for a mount effect; re-running on its
        identity would reload the thread on every parent render. */
@@ -661,10 +664,21 @@ function ThreadView({
     });
   }
 
-  function end() {
+  /*
+   * Block, where "End this conversation" used to be. Conversations do
+   * not end now, the way a DM does not; the block is how somebody is
+   * stopped, with the profile's own words.
+   */
+  function block() {
+    if (!withPlayerId) return;
     startTransition(async () => {
-      await closeThreadAction(threadId);
-      setClosed(true);
+      const result = await blockPlayerAction(withPlayerId);
+      if (result.ok) {
+        setBlocked(true);
+        setAsking(false);
+      } else {
+        setError("Could not block them. Try again in a moment.");
+      }
     });
   }
 
@@ -727,10 +741,10 @@ function ThreadView({
         )}
       </Card>
 
-      {closed ? (
+      {blocked ? (
         <p className="flex items-center gap-2 text-sm text-text-secondary">
           <Check className="size-4" aria-hidden="true" />
-          This conversation was ended. Ended conversations stay ended.
+          Blocked. Neither of you can message the other.
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -792,7 +806,37 @@ function ThreadView({
             </Button>
           </div>
           {error && <p className="text-sm text-danger">{error}</p>}
-          {/* Two quiet exits side by side: end it, or tell us about it.
+          {asking && (
+            <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border p-3">
+              <p className="text-sm font-semibold text-text-primary">
+                Block {withName ?? "them"}?
+              </p>
+              <p className="text-sm text-text-secondary">
+                You will not see their posts, and neither of you can message the other.
+                They are not told.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={pending}
+                  onClick={block}
+                >
+                  Block
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAsking(false)}
+                >
+                  Keep
+                </Button>
+              </div>
+            </div>
+          )}
+          {/* Two quiet exits side by side: block them, or tell us about it.
               Report files the conversation, not the person, so the
               admin opens the thread the reporter was actually in. */}
           <div className="flex items-center gap-4">
@@ -803,13 +847,15 @@ function ThreadView({
               (trade === null || trade.status !== "pending") && (
                 <TradeTrigger onClick={() => setComposingTrade(true)} />
               )}
-            <button
-              type="button"
-              onClick={end}
-              className="text-xs text-text-muted hover:text-text-secondary"
-            >
-              End this conversation
-            </button>
+            {withPlayerId && (
+              <button
+                type="button"
+                onClick={() => setAsking(true)}
+                className="text-xs text-text-muted hover:text-text-secondary"
+              >
+                Block
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setReporting(true)}

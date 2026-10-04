@@ -98,7 +98,7 @@ export async function haveThisAction(
     ok: false,
     message:
       outcome.reason === "closed"
-        ? "This conversation was ended."
+        ? "You can't message this player."
         : outcome.reason === "yourself"
           ? "That one is yours."
           : GENERIC,
