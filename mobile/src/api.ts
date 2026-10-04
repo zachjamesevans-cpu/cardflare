@@ -3553,9 +3553,13 @@ export interface LocalThread {
   imageUrl: string | null;
   withName: string;
   withPlayerId: string;
+  /** Their face, as an absolute URL, or null for the initials. */
+  withAvatarUrl: string | null;
   role: "author" | "responder";
   lastMessageAt: string;
   lastMessagePreview: string | null;
+  /** The last message was the viewer's: the row reads "You: ...". */
+  lastFromYou: boolean;
   unread: number;
   closed: boolean;
 }
@@ -3565,6 +3569,13 @@ export interface LocalThreadMessage {
   body: string;
   sentAt: string;
   yours: boolean;
+  /** The card this message offered ("I have this", a nearby match), or null. */
+  card: {
+    cardId: string;
+    name: string;
+    number: string;
+    imageUrl: string | null;
+  } | null;
 }
 
 export const listLocalThreads = () =>
@@ -3641,6 +3652,8 @@ export const readLocalThread = (threadId: string) =>
     cardName: string | null;
     withName: string | null;
     withPlayerId?: string | null;
+    /** Their face for the header, as an absolute URL, or null for the initials. */
+    withAvatarUrl: string | null;
     messages: LocalThreadMessage[];
     /** Optional: an older server does not send one. */
     meet?: MeetSuggestion | null;

@@ -5,7 +5,9 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
 import { blockedBetween, blockedSet } from "@/lib/players/safety";
 import { latestThreadTrade, type ThreadTrade } from "@/lib/trades/thread-trades";
+import { conversationIdFor, pairThreadId } from "./pairs";
 import { MESSAGE_MAX_LENGTH } from "./shared";
+import { avatarSrc } from "@/lib/players/profile-image";
 
 /**
  * Conversations between two accounts.
@@ -63,6 +65,10 @@ export interface ThreadSummary {
   lastMessagePreview: string | null;
   unread: number;
   closed: boolean;
+  /** Their face, for the row: site-relative, or null for the initials face. */
+  withAvatarUrl: string | null;
+  /** The last message was the viewer's, so the row says "You: ". */
+  lastFromYou: boolean;
 }
 
 export interface ThreadMessage {
@@ -71,6 +77,13 @@ export interface ThreadMessage {
   sentAt: string;
   /** True when the viewer sent it. */
   yours: boolean;
+  /** The card this message offered or asked about, drawn as a bubble above it. */
+  card: {
+    cardId: string;
+    name: string;
+    number: string;
+    imageUrl: string | null;
+  } | null;
 }
 
 function trimmedBody(raw: string): string | null {
@@ -174,11 +187,24 @@ export async function openFlareThread(
 
   if (!threadId) return { ok: false, reason: "unavailable" };
 
-  const sent = await appendMessage(threadId, responderPlayerId, authorPlayerId, body, {
-    flareCardId: flare.card_id,
-  });
+  /* The anchor says "already talking about this card"; the message goes
+     to the pair's one conversation, carrying the card. */
+  const conversation = await pairThreadId(authorPlayerId, responderPlayerId);
+  if (!conversation) return { ok: false, reason: "unavailable" };
 
-  return sent ? { ok: true, threadId } : { ok: false, reason: "unavailable" };
+  const sent = await appendMessage(
+    conversation,
+    responderPlayerId,
+    authorPlayerId,
+    body,
+    {
+      flareCardId: flare.card_id,
+    },
+  );
+
+  return sent
+    ? { ok: true, threadId: conversation }
+    : { ok: false, reason: "unavailable" };
 }
 
 /**
@@ -250,11 +276,22 @@ export async function openWantThread(
 
   if (!threadId) return { ok: false, reason: "unavailable" };
 
-  const sent = await appendMessage(threadId, responderPlayerId, want.player_id, body, {
-    flareCardId: want.card_id,
-  });
+  const conversation = await pairThreadId(want.player_id, responderPlayerId);
+  if (!conversation) return { ok: false, reason: "unavailable" };
 
-  return sent ? { ok: true, threadId } : { ok: false, reason: "unavailable" };
+  const sent = await appendMessage(
+    conversation,
+    responderPlayerId,
+    want.player_id,
+    body,
+    {
+      flareCardId: want.card_id,
+    },
+  );
+
+  return sent
+    ? { ok: true, threadId: conversation }
+    : { ok: false, reason: "unavailable" };
 }
 
 /**
@@ -335,11 +372,14 @@ export async function threadsOnFlaresFor(
     .eq("responder_player_id", responderPlayerId)
     .in("flare_id", flareIds);
 
-  return new Map(
-    (data ?? []).flatMap((row) =>
-      row.flare_id ? [[row.flare_id, row.id] as const] : [],
-    ),
-  );
+  /* Each anchor opens the pair's one conversation. */
+  const pairs = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (!row.flare_id) continue;
+    const conversation = await conversationIdFor(row.id);
+    if (conversation) pairs.set(row.flare_id, conversation);
+  }
+  return pairs;
 }
 
 /** The two ends of a thread, or null when the viewer is neither. */
@@ -391,6 +431,7 @@ async function appendMessage(
     thread_id: threadId,
     sender_player_id: senderId,
     body,
+    card_id: context?.flareCardId ?? null,
   });
 
   if (error) {
@@ -421,7 +462,9 @@ export async function sendThreadMessage(
   const recipient = thread.authorId === senderId ? thread.responderId : thread.authorId;
   if (await blockedBetween(senderId, recipient)) return { ok: false, reason: "closed" };
 
-  const sent = await appendMessage(threadId, senderId, recipient, body);
+  /* An anchor id from an old link writes to the pair's conversation. */
+  const conversation = (await conversationIdFor(threadId)) ?? threadId;
+  const sent = await appendMessage(conversation, senderId, recipient, body);
   return sent ? { ok: true } : { ok: false, reason: "unavailable" };
 }
 
@@ -442,7 +485,12 @@ export async function closeThread(
   return { ok: true };
 }
 
-/** Every conversation the player is part of, most recent talk first. */
+/**
+ * Every conversation the player is part of, most recent talk first:
+ * one row per person, the way Instagram's Messages reads. Only the
+ * pair's own conversation is listed; a thread on a Flare or a want is
+ * an anchor that holds no messages of its own (see `./pairs`).
+ */
 export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   if (!isSupabaseConfigured()) return [];
 
@@ -450,10 +498,10 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
 
   const { data: threads, error } = await admin
     .from("flare_threads")
-    .select(
-      "id, flare_id, want_id, author_player_id, responder_player_id, last_message_at, closed_at",
-    )
+    .select("id, author_player_id, responder_player_id, last_message_at")
     .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
+    .is("flare_id", null)
+    .is("want_id", null)
     .order("last_message_at", { ascending: false })
     .limit(50);
 
@@ -480,60 +528,29 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       ),
     ),
   ];
-  const flareIds = [
-    ...new Set(rows.flatMap((row) => (row.flare_id ? [row.flare_id] : []))),
-  ];
-  const wantIds = [
-    ...new Set(rows.flatMap((row) => (row.want_id ? [row.want_id] : []))),
-  ];
 
-  const [{ data: others }, { data: flares }, { data: wants }, { data: messages }] =
-    await Promise.all([
-      admin.from("players").select("id, display_name").in("id", otherIds),
-      admin.from("flares").select("id, card_id").in("id", flareIds),
-      /* A thread on a saved want names its card the same way. */
-      admin.from("player_wants").select("id, card_id").in("id", wantIds),
-      /* Recent messages for previews and unread counts, one query. 50
-       threads × a busy conversation still fits comfortably. */
-      admin
-        .from("flare_messages")
-        .select("thread_id, sender_player_id, body, created_at, read_at")
-        .in("thread_id", threadIds)
-        .order("created_at", { ascending: false })
-        .limit(500),
-    ]);
+  const [{ data: others }, { data: messages }] = await Promise.all([
+    admin.from("players").select("id, display_name, avatar_url").in("id", otherIds),
+    /* Recent messages for previews and unread counts, one query. 50
+       conversations x a busy one still fits comfortably. */
+    admin
+      .from("flare_messages")
+      .select("thread_id, sender_player_id, body, created_at, read_at")
+      .in("thread_id", threadIds)
+      .order("created_at", { ascending: false })
+      .limit(500),
+  ]);
 
-  const nameById = new Map((others ?? []).map((row) => [row.id, row.display_name]));
-  const flareCard = new Map((flares ?? []).map((row) => [row.id, row.card_id]));
-  const wantCard = new Map((wants ?? []).map((row) => [row.id, row.card_id]));
+  const otherById = new Map((others ?? []).map((row) => [row.id, row]));
 
-  const cardIds = [...new Set([...flareCard.values(), ...wantCard.values()])];
-  const { data: cards } = await admin
-    .from("cards")
-    .select("id, exact_name, canonical_card_number")
-    .in("id", cardIds);
-  const cardById = new Map((cards ?? []).map((row) => [row.id, row]));
-
-  /* Art for the row: the flare's card's base printing image. One query
-     over the page's cards; a missing image is an empty thumb, not a
-     missing thread. */
-  const { data: art } = await admin
-    .from("card_printings")
-    .select("card_id, image_url")
-    .in("card_id", cardIds)
-    .not("image_url", "is", null);
-  const artByCard = new Map<string, string>();
-  for (const row of art ?? []) {
-    if (!artByCard.has(row.card_id) && row.image_url) {
-      artByCard.set(row.card_id, row.image_url);
-    }
-  }
-
-  const preview = new Map<string, string>();
+  const latest = new Map<string, { body: string; fromYou: boolean }>();
   const unread = new Map<string, number>();
   for (const message of messages ?? []) {
-    if (!preview.has(message.thread_id)) {
-      preview.set(message.thread_id, message.body);
+    if (!latest.has(message.thread_id)) {
+      latest.set(message.thread_id, {
+        body: message.body,
+        fromYou: message.sender_player_id === playerId,
+      });
     }
     if (message.sender_player_id !== playerId && message.read_at === null) {
       unread.set(message.thread_id, (unread.get(message.thread_id) ?? 0) + 1);
@@ -541,41 +558,36 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   }
 
   return rows.flatMap((row) => {
+    /* Opened and never written in: a profile's Message button was
+       tapped and the person walked away. Nothing to list. */
+    const last = latest.get(row.id);
+    if (!last) return [];
+
     const otherId =
       row.author_player_id === playerId
         ? row.responder_player_id
         : row.author_player_id;
-    const kind = row.flare_id ? "flare" : row.want_id ? "want" : "direct";
-    const cardId = row.flare_id
-      ? flareCard.get(row.flare_id)
-      : row.want_id
-        ? wantCard.get(row.want_id)
-        : undefined;
-    const card = cardId ? cardById.get(cardId) : undefined;
-    /* A thread about a card that no longer exists has nothing to say
-       for itself; a direct one needs no card. */
-    if (kind !== "direct" && !card) return [];
-    /* A direct thread opened and never written in: a profile's Message
-       button was tapped and the person walked away. Nothing to list. */
-    if (kind === "direct" && !preview.has(row.id)) return [];
+    const other = otherById.get(otherId);
 
     return [
       {
         threadId: row.id,
-        kind,
-        flareId: row.flare_id,
-        wantId: row.want_id,
-        cardName: card?.exact_name ?? null,
-        cardNumber: card?.canonical_card_number ?? null,
-        imageUrl: (cardId && artByCard.get(cardId)) || null,
-        withName: nameById.get(otherId) ?? "A player",
+        kind: "direct" as const,
+        flareId: null,
+        wantId: null,
+        cardName: null,
+        cardNumber: null,
+        imageUrl: null,
+        withName: other?.display_name ?? "A player",
         withPlayerId: otherId,
+        withAvatarUrl: avatarSrc(other?.avatar_url),
         role:
           row.author_player_id === playerId
             ? ("author" as const)
             : ("responder" as const),
         lastMessageAt: row.last_message_at,
-        lastMessagePreview: preview.get(row.id) ?? null,
+        lastMessagePreview: last.body,
+        lastFromYou: last.fromYou,
         unread: unread.get(row.id) ?? 0,
         closed: false,
       },
@@ -644,9 +656,16 @@ export interface ThreadRead {
   closed: boolean;
   /** What it is about: a posted Flare, a saved want, or the two people. */
   kind: "flare" | "want" | "direct";
+  /**
+   * The conversation actually read: the pair's one chat, which may not
+   * be the id asked for when an old link held an anchor's id.
+   */
+  threadId: string | null;
   cardName: string | null;
   withName: string | null;
   withPlayerId: string | null;
+  /** Their face for the header, or null for the initials face. */
+  withAvatarUrl: string | null;
   messages: ThreadMessage[];
   /** A public place to suggest meeting, or null when neither side has a local. */
   meet: MeetSuggestion | null;
@@ -665,86 +684,130 @@ export async function readThread(
     ok: false,
     closed: false,
     kind: "direct",
+    threadId: null,
     cardName: null,
     withName: null,
     withPlayerId: null,
+    withAvatarUrl: null,
     messages: [],
     meet: null,
     trade: null,
   };
   if (!isSupabaseConfigured()) return empty;
 
-  const thread = await threadForViewer(threadId, viewerId);
-  if (!thread) return empty;
+  /* Checked on the id asked for, so an anchor cannot be probed into
+     somebody else's conversation; then read as the pair's one chat. */
+  const asked = await threadForViewer(threadId, viewerId);
+  if (!asked) return empty;
+  const conversationId = (await conversationIdFor(threadId)) ?? threadId;
 
   const admin = getSupabaseAdmin();
-  const otherId = thread.authorId === viewerId ? thread.responderId : thread.authorId;
+  const otherId = asked.authorId === viewerId ? asked.responderId : asked.authorId;
 
-  const [{ data: messages }, { data: other }, anchor, meet, trade] = await Promise.all([
+  const [{ data: messages }, { data: other }, meet, trade] = await Promise.all([
     admin
       .from("flare_messages")
-      .select("id, sender_player_id, body, created_at")
-      .eq("thread_id", threadId)
-      .order("created_at", { ascending: true })
+      .select("id, sender_player_id, body, created_at, card_id")
+      .eq("thread_id", conversationId)
+      .order("created_at", { ascending: false })
       .limit(200),
-    admin.from("players").select("display_name").eq("id", otherId).maybeSingle(),
-    thread.flareId
-      ? admin
-          .from("flares")
-          .select("card_id")
-          .eq("id", thread.flareId)
-          .maybeSingle()
-          .then((result) => result.data)
-      : thread.wantId
-        ? admin
-            .from("player_wants")
-            .select("card_id")
-            .eq("id", thread.wantId)
-            .maybeSingle()
-            .then((result) => result.data)
-        : Promise.resolve(null),
+    admin
+      .from("players")
+      .select("display_name, avatar_url")
+      .eq("id", otherId)
+      .maybeSingle(),
     meetSuggestion(viewerId, otherId).catch(() => null),
-    latestThreadTrade(threadId, viewerId).catch(() => null),
+    latestThreadTrade(conversationId, viewerId).catch(() => null),
   ]);
 
-  const { data: card } = anchor?.card_id
-    ? await admin
+  /* The newest 200, drawn oldest first. */
+  const ordered = [...(messages ?? [])].reverse();
+
+  /* The cards messages were about, one query each for facts and art. */
+  const cardIds = [
+    ...new Set(
+      ordered.flatMap((message) => (message.card_id ? [message.card_id] : [])),
+    ),
+  ];
+  const cardById = new Map<
+    string,
+    { name: string; number: string; imageUrl: string | null }
+  >();
+  if (cardIds.length > 0) {
+    const [{ data: cards }, { data: art }] = await Promise.all([
+      admin
         .from("cards")
-        .select("exact_name")
-        .eq("id", anchor.card_id)
-        .maybeSingle()
-    : { data: null };
+        .select("id, exact_name, canonical_card_number")
+        .in("id", cardIds),
+      admin
+        .from("card_printings")
+        .select("card_id, image_url")
+        .in("card_id", cardIds)
+        .not("image_url", "is", null),
+    ]);
+    const artByCard = new Map<string, string>();
+    for (const row of art ?? []) {
+      if (!artByCard.has(row.card_id) && row.image_url) {
+        artByCard.set(row.card_id, row.image_url);
+      }
+    }
+    for (const card of cards ?? []) {
+      cardById.set(card.id, {
+        name: card.exact_name,
+        number: card.canonical_card_number,
+        imageUrl: artByCard.get(card.id) ?? null,
+      });
+    }
+  }
 
   /* The read receipts, and the notification reset. Failures here are
-     logged, never surfaced: the messages were already read. */
+     logged, never surfaced: the messages were already read. A notice
+     rung on an old anchor id belongs to this chat too. */
   const now = new Date().toISOString();
   const { error: readError } = await admin
     .from("flare_messages")
     .update({ read_at: now })
-    .eq("thread_id", threadId)
+    .eq("thread_id", conversationId)
     .neq("sender_player_id", viewerId)
     .is("read_at", null);
   if (readError) console.error("Could not mark the thread read", readError);
 
+  const noticeKeys = [...new Set([conversationId, threadId])].map(
+    (id) => `message:${id}:${viewerId}`,
+  );
   const { error: noticeError } = await admin
     .from("notifications")
     .delete()
-    .eq("dedupe_key", `message:${threadId}:${viewerId}`);
+    .in("dedupe_key", noticeKeys);
   if (noticeError) console.error("Could not clear the message notice", noticeError);
 
   return {
     ok: true,
-    closed: thread.closed,
-    kind: thread.flareId ? "flare" : thread.wantId ? "want" : "direct",
-    cardName: card?.exact_name ?? null,
+    closed: false,
+    kind: "direct",
+    threadId: conversationId,
+    cardName: null,
     withName: other?.display_name ?? null,
     withPlayerId: otherId,
-    messages: (messages ?? []).map((message) => ({
-      id: message.id,
-      body: message.body,
-      sentAt: message.created_at,
-      yours: message.sender_player_id === viewerId,
-    })),
+    withAvatarUrl: avatarSrc(other?.avatar_url),
+    messages: ordered.map((message) => {
+      const card = message.card_id ? cardById.get(message.card_id) : undefined;
+      return {
+        id: message.id,
+        body: message.body,
+        sentAt: message.created_at,
+        yours: message.sender_player_id === viewerId,
+        card:
+          card && message.card_id
+            ? {
+                cardId: message.card_id,
+                name: card.name,
+                number: card.number,
+                imageUrl: card.imageUrl,
+              }
+            : null,
+      };
+    }),
     meet,
     trade,
   };

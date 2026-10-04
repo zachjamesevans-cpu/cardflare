@@ -1092,15 +1092,18 @@ export type FlareMessageRow = {
   sender_player_id: string;
   body: string;
   read_at: string | null;
+  /** The card this message offered or asked about, or null. */
+  card_id: string | null;
 };
 
 export type FlareMessageInsert = Omit<
   FlareMessageRow,
-  "id" | "created_at" | "read_at"
+  "id" | "created_at" | "read_at" | "card_id"
 > & {
   id?: string;
   created_at?: string;
   read_at?: string | null;
+  card_id?: string | null;
 };
 
 export type PlayerInsert = Omit<

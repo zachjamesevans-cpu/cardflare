@@ -37,7 +37,10 @@ describe("a thread with no card", () => {
 
   it("is listed as a conversation only once somebody wrote in it", () => {
     expect(lib).toContain('kind: "flare" | "want" | "direct"');
-    expect(lib).toContain('if (kind === "direct" && !preview.has(row.id)) return []');
+    const list = lib.slice(lib.indexOf("export async function listThreads("));
+    expect(list).toContain(
+      "const last = latest.get(row.id);\n    if (!last) return [];",
+    );
   });
 
   it("is reachable from the app's API by player id, with no first message", () => {

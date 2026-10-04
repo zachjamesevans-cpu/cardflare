@@ -35,6 +35,8 @@ import {
 } from "../card-picker";
 import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
 import { meetLine, suggestText } from "../meet";
+import { PlayerAvatar } from "../player-avatar";
+import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
@@ -156,7 +158,26 @@ export function ThreadScreen() {
            with a card name is read as a thread about that card. */
         setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
         setTrade(thread.trade ?? null);
-        navigation.setOptions({ title: thread.withName ?? "Conversation" });
+        /* Their face beside their name, and both open their profile:
+           the conversation is the person. The website's header link. */
+        const title = thread.withName ?? "Conversation";
+        const otherId = thread.withPlayerId ?? null;
+        const face = thread.withAvatarUrl ?? null;
+        navigation.setOptions({
+          title,
+          headerTitle: () => (
+            <ThreadHeader
+              name={title}
+              playerId={otherId}
+              avatarUrl={face}
+              onOpen={
+                otherId
+                  ? () => navigation.navigate("PlayerProfile", { playerId: otherId })
+                  : undefined
+              }
+            />
+          ),
+        });
       } catch {
         if (isCurrent()) setError("Could not load the conversation.");
       }
@@ -326,30 +347,46 @@ export function ThreadScreen() {
             style={{
               maxWidth: "85%",
               alignSelf: item.yours ? "flex-end" : "flex-start",
-              backgroundColor: item.yours ? colors.accent : colors.elevated,
-              borderRadius: 12,
-              paddingHorizontal: spacing(3),
-              paddingVertical: spacing(2),
+              alignItems: item.yours ? "flex-end" : "flex-start",
+              gap: spacing(1),
             }}
           >
-            <Text
+            {/* The card a message is about ("I have this", a nearby
+                match), on the sender's side just above the words, so
+                "I have this one" reads as being about that card. */}
+            {item.card ? (
+              <CardBubble
+                card={item.card}
+                onOpen={(cardId) => navigation.navigate("Card", { cardId })}
+              />
+            ) : null}
+            <View
               style={{
-                color: item.yours ? colors.accentContrast : colors.textPrimary,
-                fontSize: 15,
+                backgroundColor: item.yours ? colors.accent : colors.elevated,
+                borderRadius: 12,
+                paddingHorizontal: spacing(3),
+                paddingVertical: spacing(2),
               }}
             >
-              {item.body}
-            </Text>
-            <Text
-              style={{
-                color: item.yours ? colors.accentContrast : colors.textMuted,
-                opacity: item.yours ? 0.7 : 1,
-                fontSize: 10,
-                marginTop: 2,
-              }}
-            >
-              {agoLabel(item.sentAt)}
-            </Text>
+              <Text
+                style={{
+                  color: item.yours ? colors.accentContrast : colors.textPrimary,
+                  fontSize: 15,
+                }}
+              >
+                {item.body}
+              </Text>
+              <Text
+                style={{
+                  color: item.yours ? colors.accentContrast : colors.textMuted,
+                  opacity: item.yours ? 0.7 : 1,
+                  fontSize: 10,
+                  marginTop: 2,
+                }}
+              >
+                {agoLabel(item.sentAt)}
+              </Text>
+            </View>
           </View>
         )}
       />
@@ -610,5 +647,104 @@ export function ThreadScreen() {
       </View>
       <ReportSheet target={report} onClose={() => setReport(null)} />
     </KeyboardAvoidingView>
+  );
+}
+
+/** The header: their face beside their name, opening their profile. */
+function ThreadHeader({
+  name,
+  playerId,
+  avatarUrl,
+  onOpen,
+}: {
+  name: string;
+  playerId: string | null;
+  avatarUrl: string | null;
+  onOpen?: () => void;
+}) {
+  const row = (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+      {playerId ? (
+        <PlayerAvatar
+          displayName={name}
+          seed={playerId}
+          avatarUrl={avatarUrl}
+          size={32}
+        />
+      ) : null}
+      <Text
+        numberOfLines={1}
+        style={{
+          flexShrink: 1,
+          color: colors.textPrimary,
+          fontSize: 17,
+          fontWeight: "600",
+        }}
+      >
+        {name}
+      </Text>
+    </View>
+  );
+  if (!onOpen) return row;
+  return (
+    <Tap onPress={onOpen} accessibilityLabel={`Open ${name}'s profile`}>
+      {row}
+    </Tap>
+  );
+}
+
+/** The card a message carries, small, opening the card's page. */
+function CardBubble({
+  card,
+  onOpen,
+}: {
+  card: NonNullable<LocalThreadMessage["card"]>;
+  onOpen: (cardId: string) => void;
+}) {
+  return (
+    <Tap onPress={() => onOpen(card.cardId)} accessibilityLabel={`Open ${card.name}`}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing(2),
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          padding: spacing(2),
+        }}
+      >
+        <View
+          style={{
+            width: 44,
+            aspectRatio: 60 / 84,
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            overflow: "hidden",
+          }}
+        >
+          {card.imageUrl ? (
+            <RemoteImage
+              uri={card.imageUrl}
+              style={{ width: "100%", height: "100%" }}
+            />
+          ) : null}
+        </View>
+        <View style={{ flexShrink: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 14 }}
+          >
+            {card.name}
+          </Text>
+          <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+            {card.number}
+          </Text>
+        </View>
+      </View>
+    </Tap>
   );
 }

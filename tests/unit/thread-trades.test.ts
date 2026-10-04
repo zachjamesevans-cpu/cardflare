@@ -34,9 +34,9 @@ describe("a trade confirmed in a conversation", () => {
     );
   });
 
-  it("uses the conversation's own card, and asks for one only on a direct message", () => {
-    expect(lib).toContain("if (thread.flare_id) {");
-    expect(lib).toContain("} else if (thread.want_id) {");
+  it("uses an old anchor's card unless one was picked, and asks for one on a direct message", () => {
+    expect(lib).toContain("if (thread.flare_id && !input.cardId) {");
+    expect(lib).toContain("} else if (thread.want_id && !input.cardId) {");
     expect(lib).toContain(
       'if (!input.cardId) return { ok: false, reason: "no-card" };',
     );
@@ -74,7 +74,7 @@ describe("a trade confirmed in a conversation", () => {
 
   it("rides the thread read, and the app has the same two doors", () => {
     expect(read("src/lib/local/threads.ts")).toContain(
-      "latestThreadTrade(threadId, viewerId).catch(() => null),",
+      "latestThreadTrade(conversationId, viewerId).catch(() => null),",
     );
     const route = read("src/app/api/v1/local/threads/[threadId]/trade/route.ts");
     expect(route).toContain("export async function POST");
