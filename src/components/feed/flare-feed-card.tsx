@@ -153,6 +153,9 @@ export function FlareFeedCard({
     direction,
     yours: item.yours,
     completed: item.completed,
+    /* A guest's post carries an empty id: nobody to block. */
+    playerId: item.playerId || null,
+    playerName: item.displayName,
   };
 
   /* The zoom pages along the whole deck from any card. */
@@ -377,7 +380,7 @@ export function FlareFeedCard({
   if (preview) return article;
 
   return (
-    <UnlessHidden postId={item.postId}>
+    <UnlessHidden postId={item.postId} playerId={shape.playerId}>
       <PostOffer post={shape}>{article}</PostOffer>
     </UnlessHidden>
   );

@@ -533,7 +533,7 @@ function ZoomHaveForm({
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             {offeredStrip(sent.flareIds.length)}{" "}
           </Text>
-          They can see your name, so keep an eye out.
+          They will see your name and can message you.
           {sent.refused.length > 0 ? ` Not taken: ${listOf(sent.refused)}.` : ""}
         </Text>
       </ZoomSaid>
@@ -545,7 +545,7 @@ function ZoomHaveForm({
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             You offered this.{" "}
           </Text>
-          They can see your name, so keep an eye out.
+          They will see your name and can message you.
         </Text>
       </ZoomSaid>
     );

@@ -1,7 +1,8 @@
 "use client";
 
-import { useContext, useMemo, useState, type ReactNode } from "react";
-import { Flag, LayoutList, ListChecks, Trash2 } from "lucide-react";
+import { useContext, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { Ban, Flag, LayoutList, ListChecks, Trash2 } from "lucide-react";
 
 import {
   OfferPicksContext,
@@ -10,15 +11,21 @@ import {
 } from "@/components/cards/card-image-zoom";
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
 import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
-import { usePostHidden } from "@/components/feed/hidden-posts";
-import { useTakeDown } from "@/components/feed/undo-toast";
+import {
+  hideAuthor,
+  useAuthorHidden,
+  usePostHidden,
+} from "@/components/feed/hidden-posts";
+import { showUndoToast, useTakeDown } from "@/components/feed/undo-toast";
 import { OfferReview } from "@/components/flares/offer-review";
 import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
+import { Sheet } from "@/components/ui/sheet";
 import { inYourOfferLine } from "@/lib/feed/offer-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
+import { blockPlayerAction } from "@/lib/players/safety-actions";
 
 /**
  * What you can do to a post, behind the three dots.
@@ -39,8 +46,12 @@ import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
  * Take down withdraws the cards everywhere, tells nobody, and puts up
  * an Undo for a minute. It shows for both directions.
  *
- * Somebody else's post ends with "Report" instead: the same sheet a
- * profile and a conversation open, filed against this post.
+ * Somebody else's post ends with "Report" and then "Block": the same
+ * report sheet a profile and a conversation open, filed against this
+ * post, and the same block a profile's three dots take, confirmed in
+ * the same words. A block hides every post by that player on the page
+ * at once (see hidden-posts) and says so in the status line. A post
+ * by a store or a guest has no player to block, so it has no Block.
  */
 
 export interface PostShape {
@@ -50,7 +61,15 @@ export interface PostShape {
   direction: "want" | "showcase";
   yours: boolean;
   completed: boolean;
+  /** The author, for Block. Null for a store's or a guest's post. */
+  playerId: string | null;
+  /** The author's name, for "Block Alex?". */
+  playerName: string;
 }
+
+/** The status line after a block lands, the same words as the app's. */
+export const BLOCKED_LINE =
+  "Blocked. Their posts are hidden and they cannot message you.";
 
 /**
  * THE POST OWNS THE PICKS.
@@ -139,23 +158,116 @@ export function InYourOffer() {
 }
 
 /**
- * A post that was just taken down is not drawn. The server already
- * said ok; the refresh behind the toast confirms it. See hidden-posts.
+ * A post that was just taken down, or whose author was just blocked,
+ * is not drawn. The server already said ok; the refresh behind the
+ * status line confirms it. See hidden-posts.
  */
 export function UnlessHidden({
   postId,
+  playerId,
   children,
 }: {
   postId: string;
+  /** The author, so a block takes every one of their posts at once. */
+  playerId?: string | null;
   children: ReactNode;
 }) {
   const hidden = usePostHidden(postId);
-  if (hidden) return null;
+  const authorHidden = useAuthorHidden(playerId);
+  if (hidden || authorHidden) return null;
   return <>{children}</>;
 }
 
+/**
+ * The second step of Block, from a post: what it does, and the one
+ * word to confirm. The words are the profile's (block-controls.tsx),
+ * verbatim; what differs is what happens after, since a Feed has
+ * posts to hide rather than a row to swap. "They are not told" is the
+ * promise the whole feature rests on, so it is said here too.
+ */
+function BlockPostSheet({
+  open,
+  onClose,
+  playerId,
+  name,
+}: {
+  open: boolean;
+  onClose: () => void;
+  playerId: string;
+  name: string;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const block = () => {
+    if (pending) return;
+    setError(null);
+    start(async () => {
+      const result = await blockPlayerAction(playerId);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      /* Their posts leave on this paint; the line says so; the refresh
+         behind it only confirms. */
+      hideAuthor(playerId);
+      onClose();
+      showUndoToast({ message: BLOCKED_LINE, flareIds: [] });
+      router.refresh();
+    });
+  };
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Block"
+      footer={
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="danger"
+            size="md"
+            className="flex-1"
+            onClick={block}
+            disabled={pending}
+          >
+            {pending ? "Blocking…" : "Block"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            className="flex-1"
+            onClick={onClose}
+            disabled={pending}
+          >
+            Keep
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <p className="font-semibold text-text-primary">Block {name}?</p>
+        <p className="text-sm text-text-secondary">
+          You will not see their posts, and neither of you can message the other. They
+          are not told.
+        </p>
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 export function PostMenu({ post }: { post: PostShape }) {
-  const [sheet, setSheet] = useState<"cards" | "progress" | "report" | null>(null);
+  const [sheet, setSheet] = useState<"cards" | "progress" | "report" | "block" | null>(
+    null,
+  );
   const { takeDown } = useTakeDown();
 
   const items: MenuItem[] = [];
@@ -195,6 +307,14 @@ export function PostMenu({ post }: { post: PostShape }) {
       onSelect: () => setSheet("report"),
     });
   }
+  if (!post.yours && post.playerId) {
+    items.push({
+      key: "block",
+      label: "Block",
+      icon: <Ban />,
+      onSelect: () => setSheet("block"),
+    });
+  }
 
   if (items.length === 0) return null;
 
@@ -224,6 +344,14 @@ export function PostMenu({ post }: { post: PostShape }) {
           onClose={() => setSheet(null)}
           kind="post"
           targetId={post.postId}
+        />
+      )}
+      {!post.yours && post.playerId && (
+        <BlockPostSheet
+          open={sheet === "block"}
+          onClose={() => setSheet(null)}
+          playerId={post.playerId}
+          name={post.playerName}
         />
       )}
     </>

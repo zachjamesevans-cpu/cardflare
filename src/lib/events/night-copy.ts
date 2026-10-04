@@ -21,7 +21,7 @@ export const PAST_EMPTY = "Nothing yet. Nights you went to land here.";
 export const BOARD_EARLY = "Board open early";
 export const BOARD_EARLY_LINE = "Post now so players know what to bring.";
 export const BOARD_EARLY_LONG =
-  "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the night ends.";
+  "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the event ends.";
 export const MATCHES_FOR_YOU = "Matches for you";
 export const SEE_ALL_MATCHES = "See all matches";
 export const NO_MATCHES =
@@ -49,6 +49,11 @@ export const EVENT_DETAILS = "Event details";
 export const POST_A_FLARE = "Post a Flare";
 export const ACTIVE_FLARES = "Active Flares";
 export const TRADE_BINDERS = "Trade binders";
+
+/** The store's cancel confirm, by who has joined. */
+export const CANCEL_EMPTY =
+  "Nobody has joined yet, so this night will be removed. Cancel it?";
+export const CANCEL_JOINED = "Players who joined will see it closed. Cancel it?";
 
 /** "Nobody yet", "1 player", "18 players". */
 export function playersLine(n: number): string {

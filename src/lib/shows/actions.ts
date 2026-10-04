@@ -72,7 +72,14 @@ export async function createShowAction(
    * store, so the form is the only place a zone can come from. Validated
    * against Intl, exactly like a store's timezone setting.
    */
-  const timezone = text(formData, "timezone") || "UTC";
+  const timezone = text(formData, "timezone");
+  if (!timezone) {
+    return {
+      status: "error",
+      message: "Please pick the show's timezone.",
+      fieldErrors: { timezone: "Pick the venue's timezone." },
+    };
+  }
   if (!isValidTimeZone(timezone)) {
     return {
       status: "error",

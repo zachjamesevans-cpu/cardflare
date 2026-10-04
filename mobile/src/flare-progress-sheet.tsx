@@ -18,10 +18,12 @@ import { Button, ErrorLine, Muted, Tap, Title } from "./ui";
 /**
  * "Update progress" on your own Flare: copies found, per card.
  *
- * The same "+1 found", stepper and Undo the hunts panel offers, reached
- * from the post instead of the profile, because the post is where the
- * owner is when a friend says "got it". It writes by Flare, which is
- * what a post knows; the server finds the request behind it.
+ * The same stepper and Undo the hunts panel offers, reached from the
+ * post instead of the profile, because the post is where the owner is
+ * when a friend says "got it". The stepper is the one control: the
+ * audit of 2026-10-03 found a "+1" tap beside it saying the same thing
+ * twice. It writes by Flare, which is what a post knows; the server
+ * finds the request behind it.
  *
  * Every write asks the Feed to reload, so the post behind the sheet
  * reads the new count when the sheet closes rather than on the next
@@ -172,7 +174,7 @@ export function FlareProgressSheet({
                       numberOfLines={1}
                       style={{ color: colors.textMuted, fontSize: 12 }}
                     >
-                      {printingLabel(card.printingLabel)}
+                      {`${card.cardNumber} · ${printingLabel(card.printingLabel)}`}
                     </Text>
                     <Text
                       style={{
@@ -184,38 +186,14 @@ export function FlareProgressSheet({
                       {`${have} of ${total} found${finished ? "" : ` · ${wantsLine(total, left)}`}`}
                     </Text>
                   </View>
-                  <View style={{ alignItems: "flex-end", gap: spacing(1.5) }}>
-                    {!finished ? (
-                      <Tap
-                        onPress={() => write(card, have + 1)}
-                        accessibilityLabel={`One more ${card.cardName} found`}
-                        style={{
-                          borderRadius: 999,
-                          backgroundColor: colors.accent,
-                          paddingHorizontal: spacing(2.5),
-                          paddingVertical: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: colors.accentContrast,
-                            fontSize: 12,
-                            fontWeight: "700",
-                          }}
-                        >
-                          +1 found
-                        </Text>
-                      </Tap>
-                    ) : null}
-                    <Stepper
-                      value={have}
-                      min={0}
-                      max={total}
-                      onChange={(value) => write(card, value)}
-                      label={`copies of ${card.cardName} found`}
-                      disabled={!card.flareId}
-                    />
-                  </View>
+                  <Stepper
+                    value={have}
+                    min={0}
+                    max={total}
+                    onChange={(value) => write(card, value)}
+                    label={`copies of ${card.cardName} found`}
+                    disabled={!card.flareId}
+                  />
                 </View>
               );
             })}

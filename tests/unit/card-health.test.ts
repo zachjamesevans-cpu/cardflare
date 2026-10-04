@@ -1,32 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { groupFailures, previewRecord, summariseSets } from "@/lib/cards/health";
+import {
+  coverageFromRows,
+  groupFailures,
+  NO_SET_CODE,
+  previewRecord,
+} from "@/lib/cards/health";
 
-describe("summariseSets", () => {
+describe("coverageFromRows", () => {
   /*
-   * The number exists to be compared against an official set list. Counting
-   * printings would overstate every set that has parallels, which is the one
-   * way this figure could quietly mislead.
+   * The counting is the database's (`catalog_sets` counts distinct cards,
+   * not printings, per game and set code). This shapes its rows: names
+   * the codeless bucket, reads the count as a number, and orders by game
+   * then code so a gap is visible at a glance.
    */
-  it("counts distinct cards, not printings", () => {
-    const sets = summariseSets([
-      { card_id: "a", set_code: "OP01" },
-      { card_id: "a", set_code: "OP01" }, // alternate art of the same card
-      { card_id: "b", set_code: "OP01" },
-      { card_id: "c", set_code: "OP02" },
+  it("keeps the game and the set's name beside the code", () => {
+    const sets = coverageFromRows([
+      { game: "one-piece", set_code: "OP01", set_name: "Romance Dawn", cards: 2 },
+      { game: "mtg", set_code: "MKM", set_name: "Murders at Karlov Manor", cards: 1 },
     ]);
 
     expect(sets).toEqual([
-      { setCode: "OP01", cards: 2 },
-      { setCode: "OP02", cards: 1 },
+      { game: "mtg", setCode: "MKM", setName: "Murders at Karlov Manor", cards: 1 },
+      { game: "one-piece", setCode: "OP01", setName: "Romance Dawn", cards: 2 },
     ]);
   });
 
-  it("orders by set code so a gap is visible at a glance", () => {
-    const sets = summariseSets([
-      { card_id: "c", set_code: "OP03" },
-      { card_id: "a", set_code: "OP01" },
-      { card_id: "b", set_code: "ST01" },
+  it("orders by game, then set code, so a gap is visible at a glance", () => {
+    const sets = coverageFromRows([
+      { game: "one-piece", set_code: "OP03", set_name: null, cards: 1 },
+      { game: "one-piece", set_code: "OP01", set_name: null, cards: 1 },
+      { game: "one-piece", set_code: "ST01", set_name: null, cards: 1 },
     ]);
 
     expect(sets.map((set) => set.setCode)).toEqual(["OP01", "OP03", "ST01"]);
@@ -35,16 +39,23 @@ describe("summariseSets", () => {
   /* A printing with no set code is still a card. Dropping it would make the
    * total disagree with the card pool count for no visible reason. */
   it("keeps printings with no set code rather than dropping them", () => {
-    const sets = summariseSets([
-      { card_id: "a", set_code: null },
-      { card_id: "b", set_code: "OP01" },
+    const sets = coverageFromRows([
+      { game: "one-piece", set_code: null, set_name: null, cards: 1 },
+      { game: "one-piece", set_code: "OP01", set_name: null, cards: 3 },
     ]);
 
-    expect(sets.find((set) => set.setCode === "(no set code)")?.cards).toBe(1);
+    expect(sets.find((set) => set.setCode === NO_SET_CODE)?.cards).toBe(1);
+  });
+
+  it("reads a count the driver hands back as a string", () => {
+    const sets = coverageFromRows([
+      { game: "one-piece", set_code: "OP01", set_name: null, cards: "4" as never },
+    ]);
+    expect(sets[0]?.cards).toBe(4);
   });
 
   it("returns nothing for an empty catalog", () => {
-    expect(summariseSets([])).toEqual([]);
+    expect(coverageFromRows([])).toEqual([]);
   });
 });
 

@@ -116,7 +116,7 @@ describe("the viewer builds an offer in the same words on both platforms", () =>
       /* JSX text wraps where the formatter likes; the sentence is one. */
       expect(have).toMatch(/This one already\s+traded\./);
       expect(have).toContain("You offered this.");
-      expect(have).toContain("They can see your name, so keep an eye out.");
+      expect(have).toContain("They will see your name and can message you.");
     }
   });
 });

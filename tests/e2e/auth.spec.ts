@@ -56,10 +56,17 @@ test.describe("protected areas", () => {
     await expect(page.getByLabel(/email/i)).toBeVisible();
   });
 
-  test("neither leaks anything before redirecting", async ({ page }) => {
+  test("neither leaks anything before redirecting", async ({ request }) => {
     for (const path of ["/admin", "/admin/spot-check", "/store"]) {
-      const response = await page.goto(path);
-      const body = (await response?.text()) ?? "";
+      /*
+       * Fetched, not navigated. The store console streams its redirect
+       * (it has a loading state, so the shell flushes first), and a
+       * browser follows that redirect the moment it parses it, which
+       * throws the body away before a test can read it. A fetch keeps
+       * the same final body a browser would have shown, minus the race.
+       */
+      const response = await request.get(path);
+      const body = await response.text();
 
       // The redirect must happen before any privileged content renders.
       expect(body).not.toMatch(/Invite a store|cardflare admin|Spot check/i);

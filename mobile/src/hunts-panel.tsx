@@ -833,9 +833,11 @@ export function HuntProgress({ found, needed }: { found: number; needed: number 
 }
 
 /**
- * One card on a hunt: thumbnail, name, the printing asked for, and the
- * count. Owners get "+1 found" and a stepper; visitors get "Offer this
- * card" and, once selected, how many.
+ * One card on a hunt: thumbnail, name, the card number and printing
+ * asked for, and the count. Owners get one stepper (the audit of
+ * 2026-10-03 found a "+1" tap beside it saying the same thing twice);
+ * visitors get the "I have this card" toggle and, once selected, how
+ * many.
  */
 export function HuntCardRow({
   card,
@@ -894,9 +896,9 @@ export function HuntCardRow({
         >
           {card.cardName}
         </Text>
-        {/* One meta line: the printing, the count, the want line. */}
+        {/* One meta line: the number and printing, the count, the want line. */}
         <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
-          {printingLabel(card.printingLabel)}
+          {`${card.cardNumber} · ${printingLabel(card.printingLabel)}`}
           {" · "}
           <Text style={{ color: colors.textSecondary }}>
             {`${found} of ${needed} found`}
@@ -916,42 +918,13 @@ export function HuntCardRow({
         ) : null}
 
         {owner?.onSet && !done ? (
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: spacing(2),
-            }}
-          >
-            <Tap
-              onPress={() => owner.onSet?.(found + 1)}
-              accessibilityLabel={`One more ${card.cardName} found`}
-              style={{
-                borderRadius: 999,
-                backgroundColor: colors.accent,
-                paddingHorizontal: spacing(2.5),
-                paddingVertical: 6,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.accentContrast,
-                  fontSize: 12,
-                  fontWeight: "700",
-                }}
-              >
-                +1 found
-              </Text>
-            </Tap>
-            <Stepper
-              value={found}
-              min={0}
-              max={needed}
-              onChange={(value) => owner.onSet?.(value)}
-              label={`copies of ${card.cardName} found`}
-            />
-          </View>
+          <Stepper
+            value={found}
+            min={0}
+            max={needed}
+            onChange={(value) => owner.onSet?.(value)}
+            label={`copies of ${card.cardName} found`}
+          />
         ) : null}
 
         {owner?.onReopen ? (

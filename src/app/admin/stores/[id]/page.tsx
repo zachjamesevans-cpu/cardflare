@@ -129,28 +129,20 @@ export default async function AdminStorePage({
       {isVendor ? <VendorSections storeId={store.id} /> : <LgsSections store={store} />}
 
       {/*
-       * Two shops that are one shop. Above the danger zone because it
-       * is the gentler answer to a duplicate: deleting one half throws
-       * its followers and nights away, merging keeps them.
-       */}
-      <section className="flex flex-col gap-5" aria-labelledby="merge-heading">
-        <h2 id="merge-heading" className="text-xl font-bold text-text-primary">
-          Merge into another store
-        </h2>
-        <MergePanel fromId={store.id} fromName={store.name} candidates={candidates} />
-      </section>
-
-      {/*
        * Last on the page, and that is where a destructive control
        * belongs: an admin scrolling past everything they can safely do
-       * has already had every chance to do it. Closed until asked, and
-       * it prints what the delete would take with it before offering a
-       * button.
+       * has already had every chance to do it. Both panels are closed
+       * until asked and print what they would take with them before
+       * offering a button. Merge comes first: for two shops that are
+       * one shop it is the gentler answer, since deleting one half
+       * throws its followers and nights away and merging keeps them,
+       * but it still ends in a deleted store, so it lives here.
        */}
       <section className="flex flex-col gap-5" aria-labelledby="danger-heading">
         <h2 id="danger-heading" className="text-xl font-bold text-text-primary">
           Danger zone
         </h2>
+        <MergePanel fromId={store.id} fromName={store.name} candidates={candidates} />
         <DeletePanel kind="store" id={store.id} name={store.name} />
       </section>
     </div>

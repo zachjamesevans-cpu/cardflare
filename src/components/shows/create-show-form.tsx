@@ -17,7 +17,8 @@ import type { ZoneGroup } from "@/lib/time/zone-choices";
  * The one form where a timezone is typed alongside the times: a show belongs
  * to no store, so there is no store row to carry the zone. Same short,
  * grouped list as the store's picker, passed in as props so the page stays
- * the place that decides what the menu offers.
+ * the place that decides what the menu offers. Unlike the store's picker
+ * there is no UTC choice: a venue is somewhere, so a real zone is picked.
  */
 
 function SubmitButton() {
@@ -33,12 +34,10 @@ function SubmitButton() {
 
 export function CreateShowForm({
   zoneGroups,
-  defaultZone,
   defaultStartsAt,
   defaultEndsAt,
 }: {
   zoneGroups: ZoneGroup[];
-  defaultZone: string;
   defaultStartsAt: string;
   defaultEndsAt: string;
 }) {
@@ -117,9 +116,21 @@ export function CreateShowForm({
             <Select
               {...fieldIds("timezone")}
               name="timezone"
-              defaultValue={defaultZone}
+              required
+              defaultValue=""
+              aria-invalid={state.fieldErrors.timezone ? true : undefined}
+              aria-describedby={describedBy(
+                "timezone",
+                !!state.fieldErrors.timezone,
+                true,
+              )}
             >
-              <option value="UTC">UTC (no timezone set)</option>
+              {/* A show has a venue, and a venue has a zone: there is no
+                  "unset" to offer, so the menu opens on a prompt that
+                  cannot be submitted. */}
+              <option value="" disabled>
+                Choose a timezone
+              </option>
               {zoneGroups.map((group) => (
                 <optgroup key={group.label} label={group.label}>
                   {group.choices.map((choice) => (

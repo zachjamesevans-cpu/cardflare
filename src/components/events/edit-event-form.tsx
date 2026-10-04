@@ -9,6 +9,7 @@ import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { cancelEventAction, updateEventAction } from "@/lib/events/actions";
+import { CANCEL_EMPTY, CANCEL_JOINED } from "@/lib/events/night-copy";
 import {
   CREATE_EVENT_IDLE,
   EVENT_NAME_MAX,
@@ -148,7 +149,14 @@ export function EditEventForm({
  * outright by the action, anything else is closed and marked, and the
  * Events tab says what happened.
  */
-export function CancelEventForm({ eventId }: { eventId: string }) {
+export function CancelEventForm({
+  eventId,
+  joined,
+}: {
+  eventId: string;
+  /** How many players are on the night: the confirm says what cancelling takes. */
+  joined: number;
+}) {
   const [asked, setAsked] = useState(false);
 
   if (!asked) {
@@ -165,7 +173,7 @@ export function CancelEventForm({ eventId }: { eventId: string }) {
     <form action={cancelEventAction} className="flex flex-col gap-3">
       <input type="hidden" name="eventId" value={eventId} />
       <p className="text-sm text-text-secondary">
-        Players who joined will see it closed. Cancel it?
+        {joined === 0 ? CANCEL_EMPTY : CANCEL_JOINED}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <CancelSubmit />

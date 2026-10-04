@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CheckCircle2, Crosshair, PackageOpen } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
-import { PostMenu } from "@/components/feed/post-actions";
+import { PostMenu, UnlessHidden } from "@/components/feed/post-actions";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { agoFrom } from "@/components/feed/flare-feed-card";
@@ -50,95 +50,104 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
       : "Cash"
     : null;
 
+  /* Taken down or blocked, the post leaves on the same paint as the
+     status line, in this view as in the classic one. */
   return (
-    <article className="flex flex-col gap-2 rounded-[16px] border border-border bg-surface px-2.5 py-2">
-      {/* One line: face, name, which way it points, when. */}
-      <div className="flex items-center gap-2">
-        <Link
-          href={`/p/${item.playerId}`}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-control)] transition-colors hover:bg-elevated/60"
-        >
-          <PlayerAvatar
-            displayName={item.displayName}
-            seed={item.playerId}
-            avatarUrl={item.avatarUrl}
-            frame={item.frame}
-            ring={item.ring}
-            size="sm"
-          />
-          <span className="truncate text-sm font-bold text-text-primary">
-            {item.displayName}
-          </span>
-          {/* Which way it points, as a glyph; a finished post wears the
+    <UnlessHidden postId={item.postId} playerId={item.playerId || null}>
+      <article className="flex flex-col gap-2 rounded-[16px] border border-border bg-surface px-2.5 py-2">
+        {/* One line: face, name, which way it points, when. */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/p/${item.playerId}`}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-control)] transition-colors hover:bg-elevated/60"
+          >
+            <PlayerAvatar
+              displayName={item.displayName}
+              seed={item.playerId}
+              avatarUrl={item.avatarUrl}
+              frame={item.frame}
+              ring={item.ring}
+              size="sm"
+            />
+            <span className="truncate text-sm font-bold text-text-primary">
+              {item.displayName}
+            </span>
+            {/* Which way it points, as a glyph; a finished post wears the
               check-circle instead, the same mark the classic card's
               status line wears. No done line anywhere: every tile
               below already carries its tick. */}
-          {item.completed ? (
-            <CheckCircle2
-              className="size-3.5 shrink-0 text-accent"
-              aria-hidden="true"
-            />
-          ) : offering ? (
-            <PackageOpen className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          ) : (
-            <Crosshair className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          )}
-        </Link>
-        <span className="shrink-0 text-[11px] text-text-muted">
-          {agoFrom(item.postedAt)}
-        </span>
-        {/* The same three dots the classic card has: the full list and,
+            {item.completed ? (
+              <CheckCircle2
+                className="size-3.5 shrink-0 text-accent"
+                aria-hidden="true"
+              />
+            ) : offering ? (
+              <PackageOpen
+                className="size-3.5 shrink-0 text-accent"
+                aria-hidden="true"
+              />
+            ) : (
+              <Crosshair className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+            )}
+          </Link>
+          <span className="shrink-0 text-[11px] text-text-muted">
+            {agoFrom(item.postedAt)}
+          </span>
+          {/* The same three dots the classic card has: the full list and,
             on your own post, the progress ticks. The founder: "The 3
             dots contextual menu isn't present in the compact view." */}
-        <PostMenu
-          post={{
-            postId: item.postId,
-            cards: item.cards,
-            total: item.total,
-            direction: offering ? "showcase" : "want",
-            yours: item.yours,
-            completed: item.completed,
-          }}
-        />
-      </div>
+          <PostMenu
+            post={{
+              postId: item.postId,
+              cards: item.cards,
+              total: item.total,
+              direction: offering ? "showcase" : "want",
+              yours: item.yours,
+              completed: item.completed,
+              playerId: item.playerId || null,
+              playerName: item.displayName,
+            }}
+          />
+        </div>
 
-      {/* The strip. Scrolls inside itself, so a long post never makes
+        {/* The strip. Scrolls inside itself, so a long post never makes
           the page scroll sideways. */}
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
-        {item.cards.map((card, index) => (
-          <div key={card.cardId} className="relative shrink-0">
-            <FeedTile
-              imageUrl={card.imageUrl}
-              name={card.cardName}
-              cardNumber={card.cardNumber}
-              match={card.match}
-              size="pager"
-              state={card.state}
-              direction={offering ? "showcase" : "want"}
-              have={haveFor(card, post)}
-              siblings={shelf}
-              position={index}
-            />
-            <NeedBadge card={card} offering={offering} />
-          </div>
-        ))}
-      </div>
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
+          {item.cards.map((card, index) => (
+            <div key={card.cardId} className="relative shrink-0">
+              <FeedTile
+                imageUrl={card.imageUrl}
+                name={card.cardName}
+                cardNumber={card.cardNumber}
+                match={card.match}
+                size="pager"
+                state={card.state}
+                direction={offering ? "showcase" : "want"}
+                have={haveFor(card, post)}
+                siblings={shelf}
+                position={index}
+              />
+              <NeedBadge card={card} offering={offering} />
+            </div>
+          ))}
+        </div>
 
-      {(terms || item.note) && (
-        <p className="line-clamp-2 text-xs text-text-secondary">
-          {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
-        </p>
-      )}
+        {(terms || item.note) && (
+          <p className="line-clamp-2 text-xs text-text-secondary">
+            {[terms, item.note && `“${item.note}”`].filter(Boolean).join(" · ")}
+          </p>
+        )}
 
-      <PostSocial
-        postId={item.postId}
-        likes={item.likes}
-        liked={item.liked}
-        comments={item.comments}
-        offers={item.offers}
-        message={null}
-      />
-    </article>
+        <PostSocial
+          postId={item.postId}
+          likes={item.likes}
+          liked={item.liked}
+          comments={item.comments}
+          offers={item.offers}
+          message={null}
+        />
+      </article>
+    </UnlessHidden>
   );
 }
 

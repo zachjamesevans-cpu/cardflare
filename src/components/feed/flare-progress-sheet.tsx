@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Undo2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { cn } from "@/lib/cn";
@@ -17,8 +16,9 @@ import type { FeedCard } from "@/lib/feed/repository";
  * The same ticks the profile's hunt panel makes, addressed by the Flare
  * instead of the request: the server maps a hunt-linked Flare onto its
  * request, so a copy marked here is the same copy the profile shows.
- * One +1 per card, a stepper for several at once, and Undo for a few
- * seconds after each change.
+ * One stepper per card, the only control, and Undo for a few seconds
+ * after each change. The audit of 2026-10-03 found the plus-one button
+ * beside the stepper's plus to be the same button twice, so it went.
  */
 
 const UNDO_MS = 6000;
@@ -152,7 +152,7 @@ export function FlareProgressSheet({
                       {row.card.cardName}
                     </p>
                     <p className="truncate text-xs text-text-muted">
-                      {row.card.printingLabel ?? "Any printing"}
+                      {row.card.cardNumber} · {row.card.printingLabel ?? "Any printing"}
                     </p>
                     <p className="flex flex-wrap gap-x-2 text-xs tabular-nums">
                       <span className="text-text-secondary">
@@ -165,17 +165,6 @@ export function FlareProgressSheet({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pl-[3.25rem]">
-                  {row.remaining > 0 && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => write(row, row.found + 1)}
-                    >
-                      +1 found
-                    </Button>
-                  )}
                   <Stepper
                     value={row.found}
                     min={0}

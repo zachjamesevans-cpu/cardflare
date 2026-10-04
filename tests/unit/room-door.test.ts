@@ -106,7 +106,7 @@ describe("the door card", () => {
     expect(lobby).toContain('aria-label="Who\'s here"');
     expect(lobby).toContain('aria-haspopup="dialog"');
     expect(lobby).toContain("{present} here now");
-    expect(lobby).toContain("{participants.length} tonight");
+    expect(lobby).toContain("{participants.length} coming");
     expect(lobby).toContain('{flareCount === 1 ? "Flare" : "Flares"}');
     /* Up to three faces, present ones first, 22px. */
     expect(lobby).toContain("const FACES = 3;");

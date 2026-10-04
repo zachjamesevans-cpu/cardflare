@@ -49,6 +49,7 @@ export function CreateEventForm({
   defaultStartsAt,
   defaultEndsAt,
   disabled = false,
+  disabledReason,
 }: {
   /** Fixed store, for a store member. */
   storeId?: string;
@@ -62,6 +63,12 @@ export function CreateEventForm({
    * anyway, so the button says so before the form is filled in vain.
    */
   disabled?: boolean;
+  /**
+   * Why the button waits, printed beside it as a status line. Setting
+   * it disables the submit on its own, so a caller never has to say
+   * the same thing twice.
+   */
+  disabledReason?: string;
 }) {
   const [state, formAction] = useActionState<CreateEventState, FormData>(
     createEventAction,
@@ -178,8 +185,13 @@ export function CreateEventForm({
         </span>
       </label>
 
-      <div>
-        <SubmitButton disabled={disabled} />
+      <div className="flex flex-wrap items-center gap-3">
+        <SubmitButton disabled={disabled || Boolean(disabledReason)} />
+        {disabledReason && (
+          <p role="status" className="text-sm text-text-muted">
+            {disabledReason}
+          </p>
+        )}
       </div>
     </form>
   );

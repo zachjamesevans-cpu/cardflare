@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { isOnePieceSet } from "@/components/admin/set-list";
+import { gameOrder } from "@/components/admin/set-list";
 
 const root = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
@@ -87,16 +87,25 @@ describe("sets off the dashboard", () => {
     expect(health).not.toContain("max-h-72");
   });
 
-  it("groups One Piece codes under their own heading", () => {
-    for (const code of ["OP-07", "OP07", "ST-01", "EB-01", "PRB-01", "P"]) {
-      expect(isOnePieceSet(code)).toBe(true);
-    }
-    for (const code of ["MKM", "OGN", "TFC", "sv1", "(no set code)"]) {
-      expect(isOnePieceSet(code)).toBe(false);
-    }
+  it("groups sets by the game the database names, One Piece first", () => {
+    const set = (game: string, setCode: string) => ({
+      game,
+      setCode,
+      setName: null,
+      cards: 1,
+    });
+    expect(
+      gameOrder([set("mtg", "MKM"), set("one-piece", "OP01"), set("pokemon", "sv1")]),
+    ).toEqual(["one-piece", "mtg", "pokemon"]);
+    expect(gameOrder([set("zzz-new", "X"), set("lorcana", "TFC")])).toEqual([
+      "lorcana",
+      "zzz-new",
+    ]);
     const list = read("src/components/admin/set-list.tsx");
-    expect(list).toContain('title="One Piece"');
-    expect(list).toContain('title="Other games"');
+    expect(list).not.toContain("isOnePieceSet");
+    expect(list).toContain("title={gameLabel(game)}");
+    expect(list).toContain("Set code");
+    expect(list).toContain(">\n                Set\n");
   });
 });
 

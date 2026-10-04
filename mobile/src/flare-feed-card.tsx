@@ -191,9 +191,12 @@ export function FlareActions({
  * everywhere, announces nothing, and can be undone for a minute. The
  * website's `PostMenu` ends in the same item.
  *
- * On somebody ELSE's post the last item is "Report" instead: the
- * report sheet, filed as a post. Never on your own; there is nothing
- * to tell the admins about yourself.
+ * On somebody ELSE's post the last items are "Report" and "Block"
+ * instead: the report sheet, filed as a post, and the same block the
+ * profile offers, so a post you never want to see again is one tap
+ * from the post itself (the audit of 2026-10-03). Never on your own;
+ * there is nothing to tell the admins about yourself. A post with no
+ * player behind it offers no Block, because there is nobody to block.
  */
 export function postActions({
   total,
@@ -203,6 +206,7 @@ export function postActions({
   onProgress,
   onTakeDown,
   onReport,
+  onBlock,
 }: {
   total: number;
   yours: boolean;
@@ -213,6 +217,8 @@ export function postActions({
   onTakeDown?: () => void;
   /** "Report", on somebody else's. */
   onReport?: () => void;
+  /** "Block", on somebody else's, after Report. */
+  onBlock?: () => void;
 }): ActionItem[] {
   const items: ActionItem[] = [];
   if (total > 1 && onViewAll) {
@@ -247,6 +253,14 @@ export function postActions({
       onPress: onReport,
     });
   }
+  if (!yours && onBlock) {
+    items.push({
+      key: "block",
+      label: "Block",
+      icon: "ban-outline",
+      onPress: onBlock,
+    });
+  }
   return items;
 }
 
@@ -263,6 +277,7 @@ export function FlareFeedCard({
   onProgress,
   onTakeDown,
   onReport,
+  onBlock,
   onOpenHunt,
 }: {
   item: Hunt;
@@ -283,6 +298,8 @@ export function FlareFeedCard({
   onTakeDown?: () => void;
   /** "Report", on somebody else's post: the report sheet. */
   onReport?: () => void;
+  /** "Block", on somebody else's post: the profile's confirm, then they are gone. */
+  onBlock?: () => void;
   /** "View hunt", when the post belongs to one. */
   onOpenHunt?: (huntId: string) => void;
 }) {
@@ -305,6 +322,7 @@ export function FlareFeedCard({
     onProgress,
     onTakeDown,
     onReport,
+    onBlock,
   });
   /* A Flare posted to a room names it up here, where the time is, and
      not only on the button at the foot: "at Mox Valley · 2h ago". */

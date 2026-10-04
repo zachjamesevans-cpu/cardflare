@@ -14,6 +14,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   ScrollView,
@@ -28,6 +29,7 @@ import { openRoom } from "../open-room";
 import { followHref } from "../follow-href";
 import {
   belongsToTab,
+  blockPlayer,
   getFeed,
   sectionHeading,
   type FeedEntry,
@@ -43,6 +45,7 @@ import {
   serverMessage,
   storedAccessToken,
   takeDownPost,
+  unblockPlayer,
   type Me,
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
@@ -167,6 +170,9 @@ const STARTERS = {
  * new feed. Far enough to be deliberate, short enough to reach.
  */
 const PULL_TRIGGER = 80;
+
+/** The toast after a block lands, in the website's words. */
+const BLOCKED_LINE = "Blocked. Their posts are hidden and they cannot message you.";
 
 /**
  * The pull-to-refresh spinner, drawn rather than asked for.
@@ -762,6 +768,46 @@ export function HomeScreen() {
     }
   };
 
+  /**
+   * "Block" on somebody else's post: the profile's question in the
+   * profile's words, then `blockPlayer`, and every post of theirs
+   * leaves the list at once, the way a take-down does. The toast says
+   * what happened in the website's words and holds an undo, because a
+   * block from a menu is one tap from a slip and Unblock is otherwise
+   * a trip to Settings.
+   */
+  const block = (playerId: string, name: string) => {
+    Alert.alert(
+      `Block ${name}?`,
+      "You will not see their posts, and neither of you can message the other. They are not told.",
+      [
+        { text: "Keep", style: "cancel" },
+        { text: "Block", style: "destructive", onPress: () => void blockNow(playerId) },
+      ],
+    );
+  };
+  const blockNow = async (playerId: string) => {
+    try {
+      await blockPlayer(playerId);
+      setFeed((current) =>
+        current.filter(
+          (entry) => !(entry.kind === "hunt" && entry.playerId === playerId),
+        ),
+      );
+      markFeedStale();
+      setUndo({
+        key: `block:${playerId}:${Date.now()}`,
+        message: BLOCKED_LINE,
+        onUndo: async () => {
+          await unblockPlayer(playerId).catch(() => undefined);
+          await load(() => true);
+        },
+      });
+    } catch {
+      /* The next load shows the honest state either way. */
+    }
+  };
+
   /*
    * Where a notice's button goes on a phone.
    *
@@ -1260,6 +1306,11 @@ export function HomeScreen() {
                       ? undefined
                       : () => setReport({ kind: "post", targetId: item.postId })
                   }
+                  onBlock={
+                    item.yours || !item.playerId
+                      ? undefined
+                      : () => block(item.playerId, item.displayName)
+                  }
                 />
               ) : (
                 <FlareFeedCard
@@ -1298,6 +1349,12 @@ export function HomeScreen() {
                     item.yours
                       ? undefined
                       : () => setReport({ kind: "post", targetId: item.postId })
+                  }
+                  /* Only a post with a player behind it: a store's has nobody to block. */
+                  onBlock={
+                    item.yours || !item.playerId
+                      ? undefined
+                      : () => block(item.playerId, item.displayName)
                   }
                   onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
                 />

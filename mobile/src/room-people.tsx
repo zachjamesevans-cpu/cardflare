@@ -110,7 +110,7 @@ export function RoomPeopleModal({
           >
             <View style={{ gap: 2, flexShrink: 1 }}>
               <Title>Who&rsquo;s here</Title>
-              <Muted>{`${hereNow} here now · ${people.length} tonight`}</Muted>
+              <Muted>{`${hereNow} here now · ${people.length} coming`}</Muted>
             </View>
             <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={colors.textSecondary} />
