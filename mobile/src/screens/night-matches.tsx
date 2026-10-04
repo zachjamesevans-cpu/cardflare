@@ -22,6 +22,8 @@ import {
   FROM_YOUR_FLARE,
   IN_YOUR_BINDER,
   NO_MATCHES,
+  OTHER_PRINTING_THEY,
+  OTHER_PRINTING_YOU,
   THEY_HAVE_WHAT_YOU_WANT,
   THEY_WANT_WHAT_YOU_HAVE,
   matchesForYouLine,
@@ -211,6 +213,8 @@ export function NightMatchesScreen({ code }: { code: string }) {
                 cards={entry.cards.map(({ card, fromYourFlare }) => ({
                   card,
                   lead: "Has",
+                  printing:
+                    card.match === "other-printing" ? OTHER_PRINTING_THEY : null,
                   note: fromYourFlare ? FROM_YOUR_FLARE : null,
                 }))}
               />
@@ -229,6 +233,7 @@ export function NightMatchesScreen({ code }: { code: string }) {
               cards={entry.cards.map((card) => ({
                 card,
                 lead: "Looking for",
+                printing: card.match === "other-printing" ? OTHER_PRINTING_YOU : null,
                 note: IN_YOUR_BINDER,
               }))}
             />
@@ -241,8 +246,10 @@ export function NightMatchesScreen({ code }: { code: string }) {
 
 /**
  * One player in a match list: the face and the name (a tap opens their
- * event-facing profile), one line per card with its thumbnail, and
- * Message. The match card is one of the two boxes the page allows.
+ * event-facing profile), one line per card with its thumbnail, the
+ * muted "another printing" line when the match is not on the printing
+ * the wanter named, and Message. The match card is one of the two
+ * boxes the page allows.
  */
 function MatchPlayerCard({
   player,
@@ -250,7 +257,13 @@ function MatchPlayerCard({
   onPlayer,
 }: {
   player: MatchPlayer;
-  cards: { card: MatchCard; lead: string; note: string | null }[];
+  cards: {
+    card: MatchCard;
+    lead: string;
+    /** OTHER_PRINTING_THEY or OTHER_PRINTING_YOU, or null on an exact match. */
+    printing: string | null;
+    note: string | null;
+  }[];
   onPlayer: (playerId: string) => void;
 }) {
   const shelf: ZoomCard[] = cards.map(({ card }) => ({
@@ -291,7 +304,7 @@ function MatchPlayerCard({
       </Tap>
 
       <View style={{ gap: spacing(2) }}>
-        {cards.map(({ card, lead, note }, position) => (
+        {cards.map(({ card, lead, printing, note }, position) => (
           <View
             key={card.cardId}
             style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}
@@ -311,6 +324,11 @@ function MatchPlayerCard({
                 <Text style={{ fontWeight: "700" }}>{card.name}</Text>
                 <Text style={{ color: colors.textMuted }}>{`  ${card.number}`}</Text>
               </Text>
+              {printing ? (
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {printing}
+                </Text>
+              ) : null}
               {note ? (
                 <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "600" }}>
                   {note}

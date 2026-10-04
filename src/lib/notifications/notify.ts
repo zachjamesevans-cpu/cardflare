@@ -132,7 +132,8 @@ async function record(entry: {
     | "nearby-match"
     | "post-comment"
     | "store-post"
-    | "night-match";
+    | "night-match"
+    | "night-reminder";
   title: string;
   body: string | null;
   url: string;
@@ -1130,6 +1131,70 @@ export async function notifyNightMatchForGoer(entry: {
     if (id) await deliverByPush(entry.playerId, title, body, path, "night-match");
   } catch (error) {
     console.error("Could not notify the goer's night matches", error);
+  }
+}
+
+/** The reminder's words, pure so a test can read them without a database. */
+export function nightReminderCopy(entry: {
+  eventName: string;
+  storeName: string;
+  when: string;
+  matches: number;
+  bring: number;
+}): { title: string; body: string } {
+  const title = `${entry.eventName} is today at ${entry.storeName}`;
+  if (entry.matches === 0) {
+    return {
+      title,
+      body: `${entry.when}. Nothing matched yet. Post a Flare so people know what to bring.`,
+    };
+  }
+  const matches = `${entry.matches} ${entry.matches === 1 ? "match" : "matches"} on the board`;
+  const bring =
+    entry.bring > 0
+      ? `, ${entry.bring} ${entry.bring === 1 ? "card" : "cards"} to bring`
+      : "";
+  return { title, body: `${entry.when}. ${matches}${bring}.` };
+}
+
+/**
+ * The reminder on the day: once per night per player who said Going,
+ * sent by the daily cron in the hours before doors, with the two
+ * numbers that decide what goes in the bag. Nobody did this, so no
+ * actor; the dedupe key makes a second run of the cron free.
+ */
+export async function notifyNightReminder(entry: {
+  playerId: string;
+  eventId: string;
+  eventName: string;
+  storeName: string;
+  /** `formatEventMoment` in the store's zone. */
+  when: string;
+  code: string;
+  matches: number;
+  bring: number;
+}): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  try {
+    const { title, body } = nightReminderCopy(entry);
+    const path = `/e/${entry.code}`;
+
+    const id = await record({
+      playerId: entry.playerId,
+      kind: "night-reminder",
+      title,
+      body,
+      url: path,
+      dedupeKey: `reminder:${entry.eventId}:${entry.playerId}`,
+      actorId: null,
+    });
+
+    if (id) await deliverByPush(entry.playerId, title, body, path, "night-reminder");
+    return id !== null;
+  } catch (error) {
+    console.error("Could not send the night reminder", error);
+    return false;
   }
 }
 

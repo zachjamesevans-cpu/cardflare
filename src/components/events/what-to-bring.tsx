@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { setPackedAction } from "@/lib/events/night-actions";
 import {
   bringLine,
+  OTHER_PRINTING_YOU,
   PACKED,
   VIEW_LIST,
   wantedByLine,
@@ -110,6 +111,9 @@ export function WhatToBring({
                     {card.number}
                   </span>
                 </span>
+                {card.match === "other-printing" && (
+                  <span className="text-xs text-text-muted">{OTHER_PRINTING_YOU}</span>
+                )}
                 <span className="text-xs text-text-muted">
                   {wantedByLine(wantedBy)}
                 </span>

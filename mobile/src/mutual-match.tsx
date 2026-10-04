@@ -12,7 +12,13 @@ import {
   type MatchCard,
   type MutualMatch,
 } from "./api";
-import { MUTUAL_LINE, MUTUAL_MATCH, THEY_WANT, YOU_WANT } from "./night-copy";
+import {
+  MUTUAL_LINE,
+  MUTUAL_MATCH,
+  OTHER_PRINTING_SHORT,
+  THEY_WANT,
+  YOU_WANT,
+} from "./night-copy";
 import { PlayerAvatar } from "./player-avatar";
 import { colors, radius, spacing } from "./theme";
 import { Button, CardImage, ErrorLine, Tap, type ZoomCard } from "./ui";
@@ -102,7 +108,13 @@ export function MutualMatchBlock({
   );
 }
 
-/** "You want:" and a rail of thumbnails, each opening the viewer. */
+/**
+ * "You want:" and a rail of thumbnails, each opening the viewer. A
+ * card matched on another printing says so in one muted line under
+ * the tile: "They have another printing" on their side, "You have
+ * another printing" on yours. The caption keeps the printing the
+ * wanter named. The website's MatchThumbs.
+ */
 export function ThumbRow({
   label,
   cards,
@@ -130,16 +142,22 @@ export function ThumbRow({
         contentContainerStyle={{ gap: spacing(1.5), paddingVertical: 2 }}
       >
         {cards.map((card, position) => (
-          <CardImage
-            key={card.cardId}
-            imageUrl={card.imageUrl}
-            width={width}
-            name={card.name}
-            cardNumber={card.number}
-            caption={card.printingLabel}
-            siblings={shelf}
-            position={position}
-          />
+          <View key={card.cardId} style={{ width, gap: spacing(0.5) }}>
+            <CardImage
+              imageUrl={card.imageUrl}
+              width={width}
+              name={card.name}
+              cardNumber={card.number}
+              caption={card.printingLabel}
+              siblings={shelf}
+              position={position}
+            />
+            {card.match === "other-printing" ? (
+              <Text style={{ color: colors.textMuted, fontSize: 10, lineHeight: 12 }}>
+                {OTHER_PRINTING_SHORT}
+              </Text>
+            ) : null}
+          </View>
         ))}
       </ScrollView>
     </View>

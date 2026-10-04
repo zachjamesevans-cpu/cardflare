@@ -7,11 +7,17 @@ test.describe("event routes are protected", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test("nothing about an event leaks before redirecting", async ({ page }) => {
-    const response = await page.goto(
+  test("nothing about an event leaks before redirecting", async ({ request }) => {
+    /*
+     * Fetched, not navigated: the store console streams its redirect,
+     * and a browser follows it before the body can be read (the same
+     * race the auth spec hit). A fetch keeps the final body a browser
+     * would have shown, minus the race.
+     */
+    const response = await request.get(
       "/store/events/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     );
-    const body = (await response?.text()) ?? "";
+    const body = await response.text();
 
     expect(body).not.toMatch(/join code|Open the room/i);
   });

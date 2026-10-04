@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import {
   MUTUAL_LINE,
   MUTUAL_MATCH,
+  OTHER_PRINTING_SHORT,
   THEY_WANT,
   YOU_WANT,
 } from "@/lib/events/night-copy";
@@ -18,6 +19,11 @@ import type { MatchCard, MutualMatch } from "@/lib/events/night-matches";
  * A row of small card tiles, the Feed's own, each opening the zoom on
  * the whole row. "You want" and "They have" show cards on offer, so
  * the large view says so; "They want" shows what they are hunting.
+ *
+ * A card matched on another printing says so in one muted line under
+ * the tile: "They have another printing" on their side, "You have
+ * another printing" on yours. The caption on the card keeps the
+ * printing the wanter named.
  */
 export function MatchThumbs({
   cards,
@@ -43,7 +49,7 @@ export function MatchThumbs({
   return (
     <ul aria-label={label} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
       {cards.map((card, index) => (
-        <li key={card.cardId} className="flex shrink-0">
+        <li key={card.cardId} className="flex w-14 shrink-0 flex-col gap-1">
           <FeedTile
             imageUrl={imagesEnabled ? card.imageUrl : null}
             name={card.name}
@@ -54,6 +60,11 @@ export function MatchThumbs({
             position={index}
             direction={direction}
           />
+          {card.match === "other-printing" && (
+            <span className="text-[10px] leading-3 text-text-muted">
+              {OTHER_PRINTING_SHORT}
+            </span>
+          )}
         </li>
       ))}
     </ul>

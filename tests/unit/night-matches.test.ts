@@ -10,6 +10,8 @@ import {
   intersect,
   isMutual,
   matchAttendees,
+  printingMatch,
+  wantedPrinting,
   NIGHT_ATTENDEE_CAP,
   orderMatched,
   perPlayerCounts,
@@ -43,9 +45,11 @@ import {
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-function lists(over: Partial<Record<keyof CardLists, string[]>>): CardLists {
+type ListKey = "wants" | "flareWants" | "binderHaves" | "flareHaves";
+
+function lists(over: Partial<Record<ListKey, string[]>>): CardLists {
   const base = emptyLists();
-  for (const key of Object.keys(over) as (keyof CardLists)[]) {
+  for (const key of Object.keys(over) as ListKey[]) {
     base[key] = new Set(over[key]);
   }
   /* A Flare at the night is one of the wants, by definition. */
@@ -80,16 +84,31 @@ describe("matching", () => {
 
   it("they have what you want, with the source and whether your Flare asked", () => {
     expect(byId.get("chunc")?.theyHave).toEqual([
-      { cardId: "shanks", source: "binder", fromYourFlare: true },
+      {
+        cardId: "shanks",
+        source: "binder",
+        fromYourFlare: true,
+        match: "exact",
+        printingId: null,
+      },
     ]);
     expect(byId.get("jamie")?.theyHave).toEqual([
-      { cardId: "nami", source: "flare", fromYourFlare: false },
+      {
+        cardId: "nami",
+        source: "flare",
+        fromYourFlare: false,
+        match: "exact",
+        printingId: null,
+      },
     ]);
   });
 
   it("they want what you have, from the binder or a showcase Flare", () => {
-    expect(byId.get("alex")?.theyWant).toEqual(["zoro", "luffy"]);
-    expect(byId.get("ace-fan")?.theyWant).toEqual(["ace"]);
+    expect(byId.get("alex")?.theyWant.map((card) => card.cardId)).toEqual([
+      "zoro",
+      "luffy",
+    ]);
+    expect(byId.get("ace-fan")?.theyWant.map((card) => card.cardId)).toEqual(["ace"]);
   });
 
   it("a mutual match is both directions at once", () => {
@@ -115,6 +134,57 @@ describe("matching", () => {
       ]),
     );
     expect(summarize(twice).cardsHuntingHere).toBe(1);
+  });
+});
+
+describe("printings", () => {
+  const any = new Set<string | null>([null]);
+  const alt = new Set<string | null>(["alt"]);
+  const base = new Set<string | null>(["base"]);
+  const unknown = new Set<string | null>([null]);
+
+  it("any printing asked for is exact with any copy, even one of unknown printing", () => {
+    expect(printingMatch(any, base)).toBe("exact");
+    expect(printingMatch(any, unknown)).toBe("exact");
+    expect(printingMatch(undefined, base)).toBe("exact");
+    expect(printingMatch(new Set(), undefined)).toBe("exact");
+  });
+
+  it("a named printing is exact only when the holder is known to have it", () => {
+    expect(printingMatch(alt, new Set(["alt", "base"]))).toBe("exact");
+    expect(printingMatch(alt, base)).toBe("other-printing");
+    expect(printingMatch(alt, unknown)).toBe("other-printing");
+    expect(printingMatch(alt, undefined)).toBe("other-printing");
+  });
+
+  it("wanting it in any printing as well as the alt art is wanting any printing", () => {
+    expect(printingMatch(new Set(["alt", null]), base)).toBe("exact");
+    expect(wantedPrinting(new Set(["alt", null]), base)).toBeNull();
+  });
+
+  it("names the printing the card is drawn as: the held one, else the one asked for", () => {
+    expect(wantedPrinting(any, base)).toBeNull();
+    expect(wantedPrinting(new Set(["alt", "promo"]), new Set(["promo"]))).toBe("promo");
+    expect(wantedPrinting(alt, base)).toBe("alt");
+  });
+
+  it("carries the grade and the printing onto both directions of a match", () => {
+    const want = emptyLists();
+    want.wants.add("shanks");
+    want.wantPrintings.set("shanks", alt);
+    want.binderHaves.add("zoro");
+    want.havePrintings.set("zoro", base);
+    const other = emptyLists();
+    other.binderHaves.add("shanks");
+    other.havePrintings.set("shanks", base);
+    other.wants.add("zoro");
+    other.wantPrintings.set("zoro", base);
+    const [player] = matchAttendees(want, new Map([["p", other]]));
+    expect(player?.theyHave[0]).toMatchObject({
+      match: "other-printing",
+      printingId: "alt",
+    });
+    expect(player?.theyWant[0]).toMatchObject({ match: "exact", printingId: "base" });
   });
 });
 
@@ -247,8 +317,9 @@ describe("the privacy rule", () => {
     expect(matches).not.toContain('from("binder_cards")');
     expect(matches).not.toContain('from("binders")');
     expect(matches).toContain("THE HAVE LIST IS THE ONLY SOURCE OF BINDER CARDS");
-    /* Printing-agnostic this round, said in so many words. */
-    expect(matches).toContain("printing-agnostic");
+    /* Graded by printing the way the board grades an offer, said in so many words. */
+    expect(matches).toContain("graded by printing");
+    expect(matches).toContain("printingMatch(wanted, held)");
     /* Batched, never embedded. */
     expect(matches).not.toMatch(/select\("[^"]*\([^"]*\)[^"]*"\)/);
     expect(matches).toContain("NIGHT_ATTENDEE_CAP = 200");

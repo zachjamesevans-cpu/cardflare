@@ -911,7 +911,14 @@ export interface MatchCard {
   name: string;
   number: string;
   imageUrl: string | null;
+  /** The printing the wanter named, or null when any printing will do. */
   printingLabel: string | null;
+  /**
+   * "exact" when the wanter takes any printing or the holder has the
+   * one they named; "other-printing" when the holder's copy is a
+   * different printing, or one of unknown printing.
+   */
+  match: "exact" | "other-printing";
 }
 
 /** Somebody on the roster, as a match names them. */

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SheetBackdrop } from "./action-menu";
 import { setPacked, type BringCard } from "./api";
 import {
+  OTHER_PRINTING_YOU,
   PACKED,
   VIEW_LIST,
   WHAT_TO_BRING,
@@ -232,6 +233,11 @@ function BringRow({
             {`  ${row.card.number}`}
           </Text>
         </Text>
+        {row.card.match === "other-printing" ? (
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+            {OTHER_PRINTING_YOU}
+          </Text>
+        ) : null}
         <Text style={{ color: colors.textMuted, fontSize: 12 }}>
           {wantedByLine(row.wantedBy)}
         </Text>

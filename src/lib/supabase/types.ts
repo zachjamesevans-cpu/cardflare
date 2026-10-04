@@ -1835,7 +1835,8 @@ export type NotificationRow = {
     | "nearby-match"
     | "post-comment"
     | "store-post"
-    | "night-match";
+    | "night-match"
+    | "night-reminder";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */

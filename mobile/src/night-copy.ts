@@ -32,6 +32,15 @@ export const THEY_HAVE_WHAT_YOU_WANT = "They have what you want";
 export const THEY_WANT_WHAT_YOU_HAVE = "They want what you have";
 export const FROM_YOUR_FLARE = "You posted a Flare for this";
 export const IN_YOUR_BINDER = "In your Trade binder";
+/**
+ * Under a matched card whose printing is not the one the wanter named:
+ * THEY on cards they have that you want, YOU on cards they want that
+ * you have. The second phrase is `youHaveLabel`'s, word for word.
+ */
+export const OTHER_PRINTING_THEY = "They have another printing";
+export const OTHER_PRINTING_YOU = "You have another printing";
+/** The same fact under a thumbnail, where the column heading already says whose. */
+export const OTHER_PRINTING_SHORT = "Other printing";
 export const WHAT_TO_BRING = "What to bring";
 export const PACKED = "Packed";
 export const VIEW_LIST = "View list";

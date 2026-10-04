@@ -8,6 +8,8 @@ import {
   FROM_YOUR_FLARE,
   IN_YOUR_BINDER,
   NO_MATCHES,
+  OTHER_PRINTING_THEY,
+  OTHER_PRINTING_YOU,
   THEY_HAVE_WHAT_YOU_WANT,
   THEY_WANT_WHAT_YOU_HAVE,
 } from "@/lib/events/night-copy";
@@ -121,6 +123,11 @@ export function MatchList({
                           {card.number}
                         </span>
                       </span>
+                      {card.match === "other-printing" && (
+                        <span className="text-xs text-text-muted">
+                          {OTHER_PRINTING_THEY}
+                        </span>
+                      )}
                       {fromYourFlare && (
                         <span className="text-xs text-accent">{FROM_YOUR_FLARE}</span>
                       )}
@@ -155,6 +162,11 @@ export function MatchList({
                           {card.number}
                         </span>
                       </span>
+                      {card.match === "other-printing" && (
+                        <span className="text-xs text-text-muted">
+                          {OTHER_PRINTING_YOU}
+                        </span>
+                      )}
                       <span className="text-xs text-accent">{IN_YOUR_BINDER}</span>
                     </li>
                   ))}
