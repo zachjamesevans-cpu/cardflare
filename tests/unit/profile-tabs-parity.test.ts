@@ -319,7 +319,9 @@ describe("the panes' contents, own and theirs", () => {
 
   it("Hunts: the panel as the hunts page drew it, no Back link", () => {
     expect(web.ownProfile).toContain("limit={huntLimitFor(profile.tier)}");
-    expect(web.playerProfile).toContain("ownerName={profile.displayName}");
+    /* A visitor's panel is the rows alone: the send moved to the
+       hunt's page with the hunts-as-binders round. */
+    expect(web.playerProfile).toMatch(/<HuntsPanel hunts=\{profile\.hunts\} \/>/);
     for (const profile of [web.ownProfile, web.playerProfile]) {
       expect(profile).toContain("<HuntsPanel");
       expect(profile).not.toContain("Back to");

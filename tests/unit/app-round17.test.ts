@@ -39,6 +39,9 @@ const src = {
   ui: read("mobile/src/ui.tsx"),
   sheet: read("mobile/src/flare-progress-sheet.tsx"),
   hunts: read("mobile/src/hunts-panel.tsx"),
+  /* "Hunts drawn like binders": the owner's progress row is the pocket
+     sheet on the hunt's page, one card at a time. */
+  huntPage: read("mobile/src/hunt-binder.tsx"),
   card: read("mobile/src/flare-feed-card.tsx"),
   compact: read("mobile/src/flare-feed-card-compact.tsx"),
   home: read("mobile/src/screens/home.tsx"),
@@ -81,16 +84,13 @@ describe("the Feed and the room say what the audit asked", () => {
 
 describe("the stepper is the one progress control", () => {
   const sheetRow = between(src.sheet, "{open.cards.map((card) => {", "</ScrollView>");
-  const huntRow = between(
-    src.hunts,
-    "export function HuntCardRow(",
-    "export function HuntOfferFooter(",
-  );
+  const huntRow = src.huntPage.slice(src.huntPage.indexOf("function HuntPocketSheet("));
 
   it('has no "+1 found" tap on either row', () => {
     for (const [name, source] of [
       ["sheet", src.sheet],
       ["hunts", src.hunts],
+      ["hunt page", src.huntPage],
     ] as const) {
       expect(source, name).not.toContain("+1 found");
       expect(source, name).not.toContain("One more ${card.cardName} found");
@@ -104,14 +104,11 @@ describe("the stepper is the one progress control", () => {
     expect(sheetRow).not.toContain('alignItems: "flex-end"');
     expect(src.sheet).toContain("<UndoLine label={copies.undoLabel}");
 
-    const owner = between(
-      huntRow,
-      "{owner?.onSet && !done ? (",
-      "{owner?.onReopen ? (",
-    );
+    const owner = between(huntRow, '<View style={{ marginTop: "auto" }}>', "</View>");
     expect(owner.match(/<Stepper/g)?.length).toBe(1);
-    expect(owner).toContain("onChange={(value) => owner.onSet?.(value)}");
+    expect(owner).toContain("onChange={(value) => onSet(value)}");
     expect(owner).not.toContain("<Tap");
+    expect(src.huntPage).toContain("<UndoLine label={copies.undoLabel}");
   });
 
   it("puts the card number before the printing on the meta line", () => {

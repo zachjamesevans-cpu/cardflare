@@ -58,3 +58,30 @@ export function isBinderCover(value: unknown): value is BinderCoverId {
 export function binderCover(id: BinderCoverId): BinderCover {
   return BINDER_COVERS.find((cover) => cover.id === id) ?? BINDER_COVERS[0]!;
 }
+
+/**
+ * The covers a hunt can wear, in the order the sum is taken against.
+ * Every cover but charcoal: a hunt is drawn like a binder, and six
+ * colours tell six hunts apart on the tab where one grey would not.
+ */
+const HUNT_COVERS: readonly BinderCoverId[] = [
+  "lime",
+  "ember",
+  "frost",
+  "rose",
+  "galaxy",
+  "gold",
+];
+
+/**
+ * A hunt's cover, from its id: the sum of the id's character codes,
+ * modulo the six, so the same hunt wears the same colour on every
+ * device and on the website, and nothing has to be stored.
+ */
+export function huntCover(huntId: string): BinderCoverId {
+  let sum = 0;
+  for (let index = 0; index < huntId.length; index += 1) {
+    sum += huntId.charCodeAt(index);
+  }
+  return HUNT_COVERS[sum % HUNT_COVERS.length]!;
+}

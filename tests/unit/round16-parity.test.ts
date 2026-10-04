@@ -62,7 +62,11 @@ const WEB = {
   carousel: read("src/components/feed/flare-carousel.tsx"),
   sheet: read("src/components/feed/flare-cards-sheet.tsx"),
   review: read("src/components/flares/offer-review.tsx"),
-  hunt: read("src/components/players/hunt-detail.tsx"),
+  /* The hunt page, drawn like a binder since the hunts-as-binders
+     round: the view and the machinery under it. */
+  hunt:
+    read("src/components/players/hunt-binder.tsx") +
+    read("src/components/players/hunt-detail.tsx"),
   progress: read("src/components/feed/flare-progress-sheet.tsx"),
   actions: read("src/components/feed/post-actions.tsx"),
   toast: read("src/components/feed/undo-toast.tsx"),
@@ -77,7 +81,7 @@ const APP = {
   pager: read("mobile/src/flare-deck-pager.tsx"),
   sheet: read("mobile/src/flare-cards-sheet.tsx"),
   review: read("mobile/src/offer-review-sheet.tsx"),
-  hunt: read("mobile/src/hunts-panel.tsx"),
+  hunt: read("mobile/src/hunt-binder.tsx") + read("mobile/src/hunts-panel.tsx"),
   progress: read("mobile/src/flare-progress-sheet.tsx"),
   home: read("mobile/src/screens/home.tsx"),
 };
@@ -174,10 +178,8 @@ describe("one set of words wherever a card can be offered", () => {
     for (const [name, source] of [
       ["web zoom", webHave],
       ["web sheet", WEB.sheet],
-      ["web hunt", WEB.hunt],
       ["app zoom", appHave],
       ["app sheet", APP.sheet],
-      ["app hunt", APP.hunt],
     ] as const) {
       expect(source.length, `${name}: read`).toBeGreaterThan(0);
       for (const word of TOGGLE) expect(source, name).toContain(word);
@@ -185,8 +187,21 @@ describe("one set of words wherever a card can be offered", () => {
       /* The way on is the review's label, by count. */
       expect(source, name).toContain("reviewLabel(");
     }
+    /* The hunt page, a binder since the hunts-as-binders round, opens
+       a pocket in the viewer and hands it the offer block, so the
+       toggle there is the viewer's own; the way on under the pages is
+       still the review's label. */
+    for (const [name, source] of [
+      ["web hunt", WEB.hunt],
+      ["app hunt", APP.hunt],
+    ] as const) {
+      expect(source.length, `${name}: read`).toBeGreaterThan(0);
+      for (const word of GONE) expect(spoken(source), name).not.toContain(word);
+      expect(source, name).toContain("reviewLabel(");
+      expect(source, name).toContain('state: "open"');
+    }
     /* The check is an icon before the words, never a typed character. */
-    for (const source of [webHave, WEB.sheet, WEB.hunt]) {
+    for (const source of [webHave, WEB.sheet]) {
       expect(source).toContain("<Check ");
       expect(source.indexOf("<Check ")).toBeLessThan(
         source.indexOf("Added to your offer"),
@@ -320,11 +335,11 @@ describe("every row of the full list reserves its stepper's space", () => {
     expect(WEB.sheet).toContain("disabled={!picked}");
     expect(WEB.sheet).toContain("value={picked ? selection.quantity(flareId) : 1}");
     expect(WEB.sheet).not.toMatch(/\{picked && \(\s*<Stepper/);
-    /* The hunt page has the same rows and the same rule. */
-    expect(WEB.hunt).toContain("disabled={!selection.has(card.requestId)}");
-    expect(WEB.hunt).not.toMatch(
-      /\{selection\.has\(card\.requestId\) && \(\s*<Stepper/,
-    );
+    /* The hunt page has no rows since the hunts-as-binders round: a
+       visitor's pick is the viewer's toggle, one copy, and the number
+       is raised on the review's stepper. */
+    expect(WEB.hunt).toContain("onQuantity={offer.selection.setQuantity}");
+    expect(WEB.hunt).toContain("<OfferReview");
   });
 
   it("and in the app", () => {

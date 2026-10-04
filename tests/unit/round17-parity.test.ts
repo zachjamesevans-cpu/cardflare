@@ -58,6 +58,9 @@ const web = {
   mergePanel: read("src/components/admin/merge-panel.tsx"),
   progressSheet: read("src/components/feed/flare-progress-sheet.tsx"),
   huntDetail: read("src/components/players/hunt-detail.tsx"),
+  /* The hunt page, drawn like a binder since the hunts-as-binders
+     round: a pocket's tap opens the one progress sheet. */
+  huntBinder: read("src/components/players/hunt-binder.tsx"),
   postActions: read("src/components/feed/post-actions.tsx"),
   hiddenPosts: read("src/components/feed/hidden-posts.ts"),
   feedCard: read("src/components/feed/flare-feed-card.tsx"),
@@ -71,6 +74,7 @@ const app = {
   ui: read("mobile/src/ui.tsx"),
   progressSheet: read("mobile/src/flare-progress-sheet.tsx"),
   huntsPanel: read("mobile/src/hunts-panel.tsx"),
+  huntBinder: read("mobile/src/hunt-binder.tsx"),
   feedCard: read("mobile/src/flare-feed-card.tsx"),
   home: read("mobile/src/screens/home.tsx"),
   playerProfile: read("mobile/src/screens/player-profile.tsx"),
@@ -229,9 +233,9 @@ describe("the admin's store page", () => {
 describe("the progress rows", () => {
   const files = {
     "web progress sheet": web.progressSheet,
-    "web hunt detail": web.huntDetail,
+    "web hunt page": web.huntBinder,
     "app progress sheet": app.progressSheet,
-    "app hunts panel": app.huntsPanel,
+    "app hunt page": app.huntBinder,
   };
 
   it("have one control, the stepper, on both platforms", () => {
@@ -248,14 +252,14 @@ describe("the progress rows", () => {
     );
     expect(web.progressSheet).toContain("{row.found} of {row.needed} found");
     expect(web.progressSheet).toContain("wantsLine(row.needed, row.remaining)");
-    expect(web.huntDetail).toContain(
+    expect(web.huntBinder).toContain(
       '{card.cardNumber} · {card.printingLabel ?? "Any printing"}',
     );
-    expect(web.huntDetail).toContain("{card.foundCopies} of {card.needed} found");
+    expect(web.huntBinder).toContain("{card.foundCopies} of {card.needed} found");
     expect(app.progressSheet).toContain(
       "{`${card.cardNumber} · ${printingLabel(card.printingLabel)}`}",
     );
-    expect(app.huntsPanel).toContain(
+    expect(app.huntBinder).toContain(
       "{`${card.cardNumber} · ${printingLabel(card.printingLabel)}`}",
     );
   });

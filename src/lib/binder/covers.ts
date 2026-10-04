@@ -83,6 +83,30 @@ export function binderCover(id: BinderCoverId): BinderCover {
   return BINDER_COVERS.find((cover) => cover.id === id) ?? BINDER_COVERS[0]!;
 }
 
+/**
+ * The covers a hunt can wear: every colour but charcoal, in this
+ * order. A hunt has no cover of its own to store, so its cover is
+ * chosen from its id, and the same id lands on the same colour on the
+ * website and in the app.
+ */
+const HUNT_COVERS: readonly BinderCoverId[] = [
+  "lime",
+  "ember",
+  "frost",
+  "rose",
+  "galaxy",
+  "gold",
+];
+
+/** The cover a hunt wears: the sum of its id's char codes, modulo six. */
+export function huntCover(huntId: string): BinderCoverId {
+  let sum = 0;
+  for (let index = 0; index < huntId.length; index += 1) {
+    sum += huntId.charCodeAt(index);
+  }
+  return HUNT_COVERS[sum % HUNT_COVERS.length]!;
+}
+
 /** "24 cards to trade", "1 card to trade", "Nothing to trade yet". */
 export function binderCountLine(count: number): string {
   if (count === 0) return "Nothing to trade yet";

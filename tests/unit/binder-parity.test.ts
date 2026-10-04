@@ -48,9 +48,13 @@ const web = {
   /* The page is three client pieces; together they are the screen. */
   page:
     read("src/components/binder/binder-page.tsx") +
+    read("src/components/binder/pockets.tsx") +
     read("src/components/binder/binder-settings.tsx") +
     read("src/components/binder/add-binder-card.tsx"),
   view: read("src/components/binder/binder-page.tsx"),
+  /* The pockets, arrows and dots: shared with the hunt page since the
+     hunts-as-binders round, so they are read from their own file. */
+  pockets: read("src/components/binder/pockets.tsx"),
   settings: read("src/components/binder/binder-settings.tsx"),
   ownPage: read("src/app/profile/binders/[binderId]/page.tsx"),
   playerPage: read("src/app/p/[playerId]/binders/[binderId]/page.tsx"),
@@ -63,7 +67,7 @@ const app = {
   cover: read("mobile/src/binder-cover.tsx"),
   list: read("mobile/src/binder-list.tsx"),
   highlights: read("mobile/src/binder-highlights.tsx"),
-  page: read("mobile/src/screens/binder.tsx"),
+  page: read("mobile/src/screens/binder.tsx") + read("mobile/src/pockets.tsx"),
   ownProfile: read("mobile/src/screens/profile.tsx"),
   playerProfile: read("mobile/src/screens/player-profile.tsx"),
   covers: read("mobile/src/binder-covers.ts"),
@@ -134,7 +138,7 @@ describe("the binder page", () => {
       /* The "+" glyph as its own text node, however the formatter wraps it. */
       expect(page, name).toMatch(/>\s*\+\s*</);
     }
-    expect(web.view).toContain('aria-label="Add a card"');
+    expect(web.pockets).toContain('aria-label="Add a card"');
     /* The owner's page count: one more page once the last is full,
        including an empty binder. A visitor never sees the extra page. */
     expect(web.view).toContain("Math.floor(list.length / perPage) + 1");
@@ -158,15 +162,18 @@ describe("the binder page", () => {
   });
 
   it("turns pages with arrows and dots on the web", () => {
-    expect(web.view).toContain('aria-label="Previous page"');
-    expect(web.view).toContain('aria-label="Next page"');
+    expect(web.pockets).toContain('"Previous page"');
+    expect(web.pockets).toContain('"Next page"');
+    expect(web.view).toContain("<PageArrow");
+    expect(web.view).toContain("<PageDots");
+    expect(web.view).toContain('from "@/components/binder/pockets"');
     /* Three by three, the one page a binder has. */
-    expect(web.view).toContain("const COLUMNS = 3;");
-    expect(web.view).toContain("const POCKETS_PER_PAGE = COLUMNS * COLUMNS;");
+    expect(web.pockets).toContain("export const COLUMNS = 3;");
+    expect(web.pockets).toContain("export const POCKETS_PER_PAGE = COLUMNS * COLUMNS;");
     expect(web.view).toContain("grid-cols-3");
     expect(web.view).not.toContain("grid-cols-2");
     expect(web.view).toContain("cfa-bg-binder-page");
-    expect(web.view).toContain("aspect-[63/88]");
+    expect(web.pockets).toContain("aspect-[63/88]");
   });
 
   it("saves every setting at once and refreshes behind it", () => {

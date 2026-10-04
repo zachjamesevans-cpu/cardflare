@@ -26,6 +26,10 @@ const read = (path: string) =>
  */
 
 const page = read("mobile/src/screens/binder.tsx");
+/* The page frame, the pocket, the "+" pocket and the dots: shared with
+   the hunt page since "Hunts drawn like binders", so the grid's
+   arithmetic is pinned where it lives. */
+const pockets = read("mobile/src/pockets.tsx");
 const covers = read("mobile/src/binder-covers.ts");
 const api = read("mobile/src/api.ts");
 const cover = read("mobile/src/binder-cover.tsx");
@@ -47,19 +51,23 @@ describe("the binder grid on the phone", () => {
   });
 
   it("gives every pocket a third of what is inside the frame, floored", () => {
-    expect(page).toContain(
+    expect(pockets).toContain(
       "Math.floor((pageWidth - 2 * PAGE_PAD - 2 * POCKET_GAP) / 3)",
     );
-    expect(page).toContain("const PAGE_PAD = spacing(3);");
-    expect(page).toContain("const POCKET_GAP = spacing(2);");
-    expect(page).toContain("const PAGE_BORDER = 1;");
+    expect(pockets).toContain("export const PAGE_PAD = spacing(3);");
+    expect(pockets).toContain("export const POCKET_GAP = spacing(2);");
+    expect(pockets).toContain("export const PAGE_BORDER = 1;");
     /* The border is part of the pad, so the measured width is what is divided. */
-    expect(page).toContain("padding: PAGE_PAD - PAGE_BORDER,");
-    expect(page).toContain("borderWidth: PAGE_BORDER,");
+    expect(pockets).toContain("padding: PAGE_PAD - PAGE_BORDER,");
+    expect(pockets).toContain("borderWidth: PAGE_BORDER,");
+    /* The binder draws that frame and those pockets, never its own. */
+    expect(page).toContain('} from "../pockets";');
+    expect(page).toContain("<PageFrame geometry={geometry}>");
+    expect(page).not.toContain("PAGE_BORDER");
     /* The pocket is exactly its width and clips whatever is inside it;
        the picture is told the width inside the ring. */
     expect(page).toContain("width={width - 2 * POCKET_RING}");
-    expect(page).toMatch(
+    expect(pockets).toMatch(
       /width,\s+height,\s+borderRadius: 5,[\s\S]{0,400}overflow: "hidden"/,
     );
   });
@@ -112,8 +120,10 @@ describe("hold to move on the phone", () => {
   });
 
   it("leaves a dashed outline behind and rings the pocket under the finger", () => {
-    expect(page).toContain('borderStyle: placeholder ? "dashed" : "solid"');
-    expect(page).toContain("borderColor: targeted\n          ? colors.accent");
+    expect(pockets).toContain('borderStyle: placeholder ? "dashed" : "solid"');
+    expect(pockets).toContain("borderColor: targeted\n          ? colors.accent");
+    expect(page).toContain("placeholder={placeholder}");
+    expect(page).toContain("targeted={targeted}");
     expect(page).toContain("targeted={target === index}");
   });
 
@@ -184,15 +194,25 @@ describe("hold to move on the phone", () => {
     ]) {
       expect(page, gone).not.toContain(gone);
     }
-    /* A pocket is a plain View: no animated transform on a neighbour. */
-    const pocket = page.slice(
-      page.indexOf("function Pocket("),
-      page.indexOf("function HeldPocket("),
+    /* A pocket is a plain View: no animated transform on a neighbour.
+       The shared pocket is the view; the binder's wrapper puts the
+       card in it. Neither animates. */
+    const pocket = pockets.slice(
+      pockets.indexOf("export function Pocket("),
+      pockets.indexOf("export function EmptyPocket("),
     );
     expect(pocket.length).toBeGreaterThan(0);
     expect(pocket).not.toContain("useAnimatedStyle");
     expect(pocket).not.toContain("transform");
     expect(pocket).toContain("<View");
+    const wrapper = page.slice(
+      page.indexOf("function BinderPocket("),
+      page.indexOf("function RemoveZone("),
+    );
+    expect(wrapper.length).toBeGreaterThan(0);
+    expect(wrapper).not.toContain("useAnimatedStyle");
+    expect(wrapper).not.toContain("transform");
+    expect(wrapper).toContain("<Pocket");
     expect(page).toContain("scrollEnabled={!drag.held}");
   });
 });

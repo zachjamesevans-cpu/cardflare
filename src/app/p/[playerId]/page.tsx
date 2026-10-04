@@ -255,9 +255,9 @@ export default async function PublicProfilePage({
                   heading={false}
                 />
               ),
-              /* Their hunts: each shut, saying what is left, opening
-                 onto the list where a visitor picks the cards they
-                 have and offers them. */
+              /* Their hunts: one binder row each, saying what is left,
+                 opening onto the hunt's own page where a visitor picks
+                 the cards they have and offers them. */
               hunts: yours ? (
                 <HuntsPanel
                   hunts={profile.hunts}
@@ -265,7 +265,7 @@ export default async function PublicProfilePage({
                   yours
                 />
               ) : (
-                <HuntsPanel hunts={profile.hunts} ownerName={profile.displayName} />
+                <HuntsPanel hunts={profile.hunts} />
               ),
               /* Only the binders they chose to show; a visitor whose
                  every door is shut reads so rather than nothing. */

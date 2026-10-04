@@ -15,11 +15,11 @@ import { Loading, Muted } from "../ui";
  * stop in the icon row on either profile.
  *
  * The panel is the one the profile used to carry, with exactly the
- * wiring it had there: the owner's "Add cards" lands in the composer
- * with the hunt chosen, and every write inside the panel asks for the
- * truth again behind it. What moved is only where it lives, the
- * founder's call: "users only see deeper information after tapping
- * into them."
+ * wiring it had there: a row opens the hunt's own screen, the owner's
+ * "Add cards" lands in the composer with the hunt chosen, and every
+ * write inside the panel asks for the truth again behind it. What
+ * moved is only where it lives, the founder's call: "users only see
+ * deeper information after tapping into them."
  */
 export function HuntsScreen({ playerId }: { playerId?: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -89,7 +89,12 @@ export function HuntsScreen({ playerId }: { playerId?: string }) {
       }}
     >
       {playerId ? (
-        <HuntsPanel hunts={hunts} ownerName={ownerName} onChanged={() => void load()} />
+        <HuntsPanel
+          hunts={hunts}
+          ownerName={ownerName}
+          onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}
+          onChanged={() => void load()}
+        />
       ) : (
         <HuntsPanel
           hunts={hunts}
@@ -104,6 +109,8 @@ export function HuntsScreen({ playerId }: { playerId?: string }) {
               params: { hunt: huntId },
             })
           }
+          /* A row opens the hunt's own screen, the pockets. */
+          onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}
           /* Every write inside the panel paints first and then asks
              for the truth, so the counts on the row move with the
              stepper rather than going stale until the next open. */

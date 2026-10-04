@@ -32,7 +32,11 @@ const web = {
   copy: read("src/lib/feed/offer-copy.ts"),
   zoom: read("src/components/cards/card-image-zoom.tsx"),
   sheet: read("src/components/feed/flare-cards-sheet.tsx"),
-  hunt: read("src/components/players/hunt-detail.tsx"),
+  /* The hunt page, drawn like a binder since the hunts-as-binders
+     round: the view and the machinery under it. */
+  hunt:
+    read("src/components/players/hunt-binder.tsx") +
+    read("src/components/players/hunt-detail.tsx"),
   thread: read("src/components/feed/post-social.tsx"),
   carousel: read("src/components/feed/flare-carousel.tsx"),
   feedCard: read("src/components/feed/flare-feed-card.tsx"),
@@ -44,7 +48,7 @@ const app = {
   sheet: read("mobile/src/flare-cards-sheet.tsx"),
   /* Round 13 moved the send out of the zoom into the one review sheet. */
   review: read("mobile/src/offer-review-sheet.tsx"),
-  hunt: read("mobile/src/hunts-panel.tsx"),
+  hunt: read("mobile/src/hunt-binder.tsx") + read("mobile/src/hunts-panel.tsx"),
   thread: read("mobile/src/screens/flare-post.tsx"),
   pager: read("mobile/src/flare-deck-pager.tsx"),
   /* The app's zoom sends through a callback; these screens wire it. */
@@ -92,9 +96,16 @@ describe("the verb is Offer wherever a hand goes up on a post", () => {
   it("says I have this card on the full list and the hunt", () => {
     /* Round 16: the viewer's words everywhere a card can be offered.
        "Offer this card" and "Continue to offer" are gone. */
-    for (const source of [web.sheet, web.hunt, app.sheet, app.hunt]) {
+    for (const source of [web.sheet, app.sheet]) {
       expect(source).toContain("I have this card");
       expect(source).toContain("Added to your offer");
+    }
+    /* The hunt page opens a pocket in the viewer and hands it the
+       offer block, so the words there are the viewer's own. */
+    expect(web.hunt).toContain("<OfferPicksContext.Provider");
+    expect(web.hunt).toContain('state: "open"');
+    expect(app.hunt).toContain("haveFor(card)");
+    for (const source of [web.sheet, web.hunt, app.sheet, app.hunt]) {
       expect(source).not.toContain("Continue to offer");
     }
     /* The button that follows the picks is the review's label. */

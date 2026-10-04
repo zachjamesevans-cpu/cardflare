@@ -2,10 +2,19 @@
 
 import { useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
+import {
+  AddPocket,
+  COLUMNS,
+  EmptyPocket,
+  POCKETS_PER_PAGE,
+  PageArrow,
+  PageDots,
+  PocketTile,
+} from "@/components/binder/pockets";
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { Sheet } from "@/components/ui/sheet";
 import { removeBinderCardAction, reorderBinderAction } from "@/lib/binder/actions";
@@ -65,10 +74,6 @@ const settingsOf = (binder: Binder): Settings => ({
   forTrade: binder.forTrade,
   name: binder.name,
 });
-
-/* Three across, three down: the one page a binder has. */
-const COLUMNS = 3;
-const POCKETS_PER_PAGE = COLUMNS * COLUMNS;
 
 /** Where a dragged pocket is hovering: a slot, an arrow, or Remove. */
 type DropSpot = number | "prev" | "next" | "remove";
@@ -400,36 +405,24 @@ export function BinderView({
 
         {pages > 1 && (
           <>
-            <button
-              type="button"
-              aria-label="Previous page"
+            <PageArrow
+              side="prev"
               disabled={page === 0}
               onClick={() => setAt(page - 1)}
+              ring={over === "prev"}
               onDragOver={binder.yours ? dragOver("prev", false) : undefined}
               onDragLeave={binder.yours ? dragLeave("prev") : undefined}
               onDrop={binder.yours ? dropAt("prev") : undefined}
-              className={cn(
-                "absolute top-1/2 left-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
-                over === "prev" && "ring-2 ring-accent",
-              )}
-            >
-              <ChevronLeft className="size-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next page"
+            />
+            <PageArrow
+              side="next"
               disabled={page === pages - 1}
               onClick={() => setAt(page + 1)}
+              ring={over === "next"}
               onDragOver={binder.yours ? dragOver("next", false) : undefined}
               onDragLeave={binder.yours ? dragLeave("next") : undefined}
               onDrop={binder.yours ? dropAt("next") : undefined}
-              className={cn(
-                "absolute top-1/2 right-1 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
-                over === "next" && "ring-2 ring-accent",
-              )}
-            >
-              <ChevronRight className="size-4" aria-hidden="true" />
-            </button>
+            />
           </>
         )}
       </div>
@@ -456,23 +449,7 @@ export function BinderView({
         </div>
       )}
 
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-1.5">
-          {Array.from({ length: pages }, (_, index) => (
-            <button
-              key={index}
-              type="button"
-              aria-label={`Page ${index + 1}`}
-              aria-current={index === page ? "page" : undefined}
-              onClick={() => setAt(index)}
-              className={cn(
-                "h-1.5 cursor-pointer rounded-full transition-all",
-                index === page ? "w-4 bg-accent" : "w-1.5 bg-border-strong",
-              )}
-            />
-          ))}
-        </div>
-      )}
+      {pages > 1 && <PageDots pages={pages} page={page} onPick={setAt} />}
 
       {binder.yours && cards.length > 0 && (
         <p className="text-center text-xs text-text-muted">
@@ -570,84 +547,6 @@ function Chip({
       {count !== undefined && (
         <span className="ml-1 tabular-nums opacity-80">{count}</span>
       )}
-    </button>
-  );
-}
-
-/* A pocket: black, with the sleeve's lip catching the light at the top. */
-const POCKET =
-  "relative aspect-[63/88] w-full overflow-hidden rounded-[5px] bg-black ring-2 ring-black/80 shadow-[inset_0_0_0_2px_rgb(255_255_255/0.06)]";
-
-function PocketTile({
-  card,
-  imagesEnabled,
-}: {
-  card: BinderCard;
-  imagesEnabled: boolean;
-}) {
-  const art = imagesEnabled && isRenderableImageUrl(card.imageUrl);
-
-  return (
-    <div className={POCKET}>
-      {art ? (
-        /* The picture is not its own drag source: the pocket is, so
-           the whole tile travels, not the image out of it. */
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={card.imageUrl ?? ""}
-          alt=""
-          draggable={false}
-          className="size-full object-cover"
-        />
-      ) : (
-        <span className="flex size-full flex-col items-center justify-center gap-0.5 bg-elevated px-1 text-center">
-          <span className="line-clamp-2 text-[10px] font-semibold text-text-primary">
-            {card.name}
-          </span>
-          <span className="text-[9px] text-text-muted">{card.number}</span>
-        </span>
-      )}
-      {/* The sleeve lip. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[6%] bg-[linear-gradient(180deg,rgb(255_255_255/0.22),transparent)]"
-      />
-      {card.quantity > 1 && (
-        <span className="absolute top-1 left-1 rounded-full bg-canvas/85 px-1.5 py-px text-[9px] font-bold text-text-primary tabular-nums ring-1 ring-border-strong">
-          ×{card.quantity}
-        </span>
-      )}
-      {card.onYourHunt && (
-        <span className="absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[8px] font-bold tracking-wider text-accent-contrast uppercase">
-          ON YOUR HUNT
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** A visitor's empty pocket: black, and nothing to press. */
-function EmptyPocket() {
-  return <div aria-hidden="true" className={POCKET} />;
-}
-
-/**
- * The owner's empty pocket: a "+" that opens Add cards. The founder:
- * "there should be a + on the open card areas in the binder to add a
- * card that way."
- */
-function AddPocket({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Add a card"
-      className="flex aspect-[63/88] w-full cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[5px] border-2 border-dashed border-border-strong bg-black/60 text-text-secondary transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
-    >
-      <span aria-hidden="true" className="text-3xl leading-none font-light">
-        +
-      </span>
-      <span className="text-[10px] font-semibold">Add</span>
     </button>
   );
 }

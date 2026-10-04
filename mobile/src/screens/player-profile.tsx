@@ -339,10 +339,14 @@ export function PlayerProfileScreen() {
           /* Every Flare they have up, newest first, three across. */
           return <ProfileFlares flares={profile.flares ?? []} yours={false} />;
         case "hunts":
-          /* The panel the Hunts screen draws for a visitor, with the
-             owner's name for "Sent to <name> in Messages". */
+          /* The panel the Hunts screen draws for a visitor: a row opens
+             the hunt's own screen. */
           return (
-            <HuntsPanel hunts={profile.hunts ?? []} ownerName={profile.displayName} />
+            <HuntsPanel
+              hunts={profile.hunts ?? []}
+              ownerName={profile.displayName}
+              onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}
+            />
           );
         case "binders":
           /* The Binders screen's rows: only the ones you may open. */

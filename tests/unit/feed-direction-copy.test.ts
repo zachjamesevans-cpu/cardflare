@@ -98,10 +98,13 @@ describe("which way a Flare points", () => {
     expect(items).not.toMatch(/\bhunting\b/i);
   });
 
-  it("keeps the crosshair for the Flare status mark alone", () => {
+  it("draws the crosshair on the Flare status mark and on the hunts alike", () => {
+    /* The hunts-as-binders round: the crosshair is the hunts icon
+       everywhere, the tab's included, and the list with ticks is gone
+       from every hunt surface. */
     expect(read("src/components/feed/flare-feed-card.tsx")).toContain("<Crosshair");
-    expect(read("src/components/players/hunts-panel.tsx")).not.toContain("Crosshair");
-    expect(read("src/components/players/hunts-panel.tsx")).toContain("<ListChecks");
+    expect(read("src/components/players/hunts-panel.tsx")).toContain("<Crosshair");
+    expect(read("src/components/players/hunts-panel.tsx")).not.toContain("ListChecks");
   });
 
   it("says offer, never pledge, to a person", () => {
